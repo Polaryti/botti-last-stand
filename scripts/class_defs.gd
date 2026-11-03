@@ -18,7 +18,7 @@ const ALL := {
 	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 90.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 8.0,
 		"no_weapons": true, "auto_tree": true, "hidden": true, "price": 650,
 		"desc": "Dead, and not done. No weapons, only claws of Mist. Gifts come by themselves as you level, and you choose one path."},
-	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,
+	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
 }
 

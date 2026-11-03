@@ -42,7 +42,7 @@ An app signed with a different key will not install over one already on a phone 
 
 ## Tests
 
-    godot --headless --path . res://tests/test_game.tscn              # everything, about 15 minutes
+    godot --headless --path . res://tests/test_game.tscn              # everything, about 8 minutes
     godot --headless --path . res://tests/test_game.tscn -- new       # the newest features and map checks
     godot --headless --path . res://tests/test_game.tscn -- quick     # the later half of the checks, without the first play-through
     godot --headless --path . res://tests/test_game.tscn -- soak      # a long night with everything going on
