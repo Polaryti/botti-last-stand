@@ -1,0 +1,43 @@
+class_name ClassDefs
+## Classes and their ability trees. Each tier offers two abilities, and taking one
+## locks the other for this game. "add" changes a player stat. "flag" switches on a rule.
+
+const MAX_LEVEL := 19
+
+const ALL := {
+	"infantry": {"name": "Infantry", "weapon": "dagger", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true,
+		"desc": "Fast close fighter. Starts with a Dagger. Uses melee and ranged weapons."},
+	"ranger": {"name": "Ranger", "weapon": "bow", "arrows": 30, "hp": 90.0, "speed": 1.05, "ranged": true, "kill_arrows": 2,
+		"desc": "Precise archer. Starts with a Short Bow and 30 arrows, and takes 2 back from each kill. Uses melee and ranged weapons."},
+	"heavy": {"name": "Heavy Infantry", "weapon": "mace", "arrows": 0, "hp": 130.0, "speed": 0.9, "ranged": false, "shield": true,
+		"desc": "Slow wall of iron. Starts with a Mace and a shield that blocks from the front. No ranged weapons."},
+	"chivalry": {"name": "Chivalry", "weapon": "lance", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": false, "horse": true,
+		"desc": "Mounted charger. Starts with a Lance. Kills call a horse to ride. No ranged weapons, unless unlocked."},
+	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 80.0, "speed": 1.0, "ranged": true, "mana": true,
+		"desc": "Fragile caster. Keeps a Staff that uses refilling mana. Elements and summoned allies."},
+	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 90.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 8.0,
+		"no_weapons": true, "auto_tree": true, "hidden": true,
+		"desc": "Dead, and not done. No weapons, only claws of Mist. Gifts come by themselves as you level, and you choose one path."},
+}
+
+static func icon(id: String) -> String:
+	return {"infantry": "sword", "ranger": "bow", "heavy": "shield_rect", "chivalry": "horse", "magician": "staff", "revenant": "claw"}[id]
+
+
+static func color(id: String) -> Color:
+	return {"infantry": Color(0.62, 0.2, 0.14), "ranger": Color(0.22, 0.46, 0.26), "heavy": Color(0.36, 0.4, 0.48),
+		"chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5)}[id]
+
+
+## The classes this phone can play. Some have to be unlocked with a code first.
+static func available() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in ALL:
+		if not ALL[id].get("hidden", false) or Game.unlocked.has(id):
+			out.append(id)
+	return out
+
+
+## Slower climb: a good night reaches the final ability around minute 8 or 9.
+static func xp_for_level(level: int) -> int:
+	return 30 + int(round(level * 9.6))
