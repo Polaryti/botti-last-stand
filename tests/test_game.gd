@@ -1133,6 +1133,15 @@ func test_new_things() -> void:
 	ok(not get_tree().paused and not m2.hud.menu_open, "and Resume closes it")
 	m2.queue_free()
 	await frames(2)
+	# F6 on a map in the editor goes straight into that map.
+	Game.test_map = "res://maps/fort.tscn"
+	var m3: Main = load("res://scripts/main.gd").new()
+	add_child(m3)
+	await seconds(2.0)
+	ok(m3.world != null and m3.world.fort != null, "F6 on a map plays that map")
+	Game.test_map = ""
+	m3.queue_free()
+	await frames(2)
 	await start_clean()
 
 
