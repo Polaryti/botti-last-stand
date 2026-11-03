@@ -1,127 +1,122 @@
 #!/usr/bin/env python3
-"""Draws the launcher icon (plain and adaptive) and the boot splash. All original.
+"""Draws the launcher icon (plain, adaptive and themed) and the boot splash. All original.
+The picture is the village bell in front of the moon, lit from below by a fire you cannot see.
+The splash uses the wordmark, so run tools/make_ui.py first if that changed.
 Run from the project root."""
-import math
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter
 
-rng = np.random.default_rng(7)
 SS = 4  # drawn large, then scaled down
+TOP = np.array([0.043, 0.067, 0.122])
+LOW = np.array([0.125, 0.180, 0.255])
+MOON = np.array([0.945, 0.875, 0.70])
+HALO = np.array([0.20, 0.19, 0.17])
 
 
-def night_sky(w, h, moon=(0.68, 0.3), moon_r=0.2):
-    """Deep blue gradient with stars, a moon behind thin cloud, and a black tree line."""
+def sky(w, h, moon, moon_r, trees=True, stars_seed=7):
+    """Night blue running lighter towards the horizon, the moon, a few stars and two rows of firs.
+    moon is given as a share of the picture's height from the top and of its width from the left."""
+    rng = np.random.default_rng(stars_seed)
     yy, xx = np.mgrid[0:h, 0:w]
-    u = xx / w
-    v = yy / h
-    top = np.array([0.03, 0.05, 0.11])
-    low = np.array([0.13, 0.2, 0.3])
-    rgb = top[None, None] * (1 - v[..., None] ** 1.3) + low[None, None] * v[..., None] ** 1.3
-    aspect = w / h
-    d = np.sqrt(((u - moon[0]) * aspect) ** 2 + (v - moon[1]) ** 2)
-    glow = np.exp(-(d / (moon_r * 1.9)) ** 2)[..., None]
-    rgb = rgb + glow * np.array([0.32, 0.28, 0.2])
-    disc = np.clip((moon_r - d) * h / 3.0, 0, 1)[..., None]
-    moon_col = np.array([0.98, 0.9, 0.68])
-    shade = 1.0 - 0.14 * np.exp(-(((u - moon[0] + moon_r * 0.3) * aspect) ** 2 + (v - moon[1] + moon_r * 0.2) ** 2) / (moon_r * 0.45) ** 2)[..., None]
-    rgb = rgb * (1 - disc) + moon_col * shade * disc
-    im = Image.fromarray(np.uint8(np.clip(rgb, 0, 1) * 255))
-    d2 = ImageDraw.Draw(im)
-    for _ in range(int(w * h / 6000)):
-        x, y = rng.uniform(0, w), rng.uniform(0, h * 0.6)
-        if math.hypot((x / w - moon[0]) * aspect, y / h - moon[1]) < moon_r * 1.05:
+    v = (yy / h)[..., None]
+    rgb = TOP * (1 - v ** 1.25) + LOW * v ** 1.25
+    dist = np.hypot((xx / w - moon[0]) * w / h, yy / h - moon[1])
+    rgb = rgb + np.exp(-(dist / (moon_r * 1.7)) ** 2)[..., None] * HALO
+    disc = np.clip((moon_r - dist) * h / 2.2, 0, 1)[..., None]
+    # The moon's face: broad, soft patches rather than cartoon craters.
+    face = np.ones((h, w, 1))
+    for a, r, size in ((0.5, 0.55, 0.42), (1.9, 0.72, 0.26), (3.6, 0.48, 0.2), (4.7, 0.78, 0.34), (5.8, 0.3, 0.16)):
+        cx, cy = moon[0] + np.cos(a) * r * moon_r * h / w, moon[1] + np.sin(a) * r * moon_r
+        face -= 0.05 * np.exp(-(np.hypot((xx / w - cx) * w / h, yy / h - cy) / (size * moon_r)) ** 2)[..., None]
+    rgb = rgb * (1 - disc) + MOON * face * disc
+    im = Image.fromarray(np.uint8(np.clip(rgb, 0, 1) * 255 + 0.5))
+    draw = ImageDraw.Draw(im)
+    for _ in range(int(w * h / 5200)):
+        x, y = rng.uniform(0, w), rng.uniform(0, h * 0.62)
+        if np.hypot((x / w - moon[0]) * w / h, y / h - moon[1]) < moon_r * 1.25:
             continue
-        r = rng.uniform(0.4, 1.3) * h / 700
-        c = int(rng.uniform(150, 255))
-        d2.ellipse((x - r, y - r, x + r, y + r), fill=(c, c, min(255, c + 20)))
-    # Tree line: rows of little firs getting darker towards the viewer.
-    for row, (base, tone, scale) in enumerate(((0.8, (9, 15, 26), 0.09), (0.88, (5, 9, 16), 0.13))):
-        x = -0.05 * w
-        pts = [(0, h)]
-        while x < w * 1.05:
-            th = rng.uniform(0.6, 1.0) * scale * h
-            tw = th * 0.42
-            y = base * h + rng.uniform(-0.01, 0.01) * h
-            pts += [(x - tw * 0.5, y), (x, y - th), (x + tw * 0.5, y)]
-            x += tw * rng.uniform(0.55, 0.95)
-        pts.append((w, h))
-        d2.polygon(pts, fill=tone)
+        r = rng.uniform(0.35, 1.05) * h / 700
+        c = int(rng.uniform(120, 225))
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(c, c, min(255, c + 18)))
+    if trees:
+        for base, tone, scale in ((0.83, (12, 19, 31), 0.085), (0.91, (6, 10, 17), 0.12)):
+            x = -0.05 * w
+            pts = [(0, h)]
+            while x < w * 1.05:
+                th = rng.uniform(0.55, 1.0) * scale * h
+                tw = th * 0.44
+                y = base * h + rng.uniform(-0.008, 0.008) * h
+                pts += [(x - tw * 0.5, y), (x, y - th), (x + tw * 0.5, y)]
+                x += tw * rng.uniform(0.55, 0.95)
+            pts.append((w, h))
+            draw.polygon(pts, fill=tone)
     return im
 
 
-def skull(size):
-    """A bone-coloured skull with burning eyes and a sword behind it. RGBA, transparent background."""
+def _profile(n=200):
+    """Half the bell's width down its height, both as shares of its height. Smooth through hand-set points."""
+    ys = np.array([0.0, 0.05, 0.13, 0.28, 0.46, 0.63, 0.76, 0.86, 0.94, 1.0])
+    ws = np.array([0.135, 0.205, 0.245, 0.265, 0.285, 0.325, 0.385, 0.455, 0.525, 0.555])
+    t = np.linspace(0, 1, n)
+    w = np.interp(t, ys, ws)
+    kernel = np.hanning(21)
+    kernel /= kernel.sum()
+    pad = np.concatenate([np.full(10, w[0]), w, np.full(10, w[-1])])
+    return t, np.convolve(pad, kernel, mode="valid")
+
+
+def bell_mask(size):
+    """The bell's shape at this size, large: crown, shoulder, flared lip and clapper."""
     n = size * SS
-    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    S = n / 100.0
+    mask = Image.new("L", (n, n), 0)
+    d = ImageDraw.Draw(mask)
+    t, w = _profile()
+    top, height = 0.15 * n, 0.665 * n
+    cx = n / 2
+    pts = [(cx + a * height, top + b * height) for b, a in zip(t, w)]
+    pts += [(cx - a * height, top + b * height) for b, a in zip(t[::-1], w[::-1])]
+    d.polygon(pts, fill=255)
+    # The round head on top of the shoulder.
+    d.rounded_rectangle((cx - 0.10 * height, top - 0.075 * height, cx + 0.10 * height, top + 0.05 * height), 0.04 * height, fill=255)
+    # The loop it hangs from.
+    r_out, r_in = 0.105 * height, 0.058 * height
+    cy = top - 0.115 * height
+    d.ellipse((cx - r_out, cy - r_out, cx + r_out, cy + r_out), fill=255)
+    d.ellipse((cx - r_in, cy - r_in, cx + r_in, cy + r_in), fill=0)
+    # The clapper, under the lip with a small gap.
+    r = 0.078 * height
+    c_y = top + height + 0.075 * height
+    d.ellipse((cx - r, c_y - r, cx + r, c_y + r), fill=255)
+    # Two thin bands and the base of the lip, cut out.
+    for b, thick in ((0.20, 0.012), (0.24, 0.006), (0.895, 0.012)):
+        y = top + b * height
+        half = np.interp(b, t, w) * height + 2
+        d.rectangle((cx - half, y, cx + half, y + thick * height), fill=0)
+    return mask, top, height
 
-    def poly(pts, col):
-        d.polygon([(x * S, y * S) for x, y in pts], fill=col)
 
-    def ell(x0, y0, x1, y1, col):
-        d.ellipse((x0 * S, y0 * S, x1 * S, y1 * S), fill=col)
-
-    def rrect(x0, y0, x1, y1, r, col):
-        d.rounded_rectangle((x0 * S, y0 * S, x1 * S, y1 * S), radius=r * S, fill=col)
-
-    # The sword lies diagonally behind the skull: a blade, a guard and a pommel.
-    sword = Image.new("RGBA", (n, n), (0, 0, 0, 0))
-    sd = ImageDraw.Draw(sword)
-    steel = (178, 188, 204, 255)
-    steel_dark = (118, 128, 146, 255)
-    brass = (222, 174, 78, 255)
-    edge = (20, 14, 12, 255)
-    Y = lambda v: (12 + v * 0.8) * S
-    sd.polygon([(50 * S, Y(104)), (41 * S, Y(88)), (41 * S, Y(14)), (59 * S, Y(14)), (59 * S, Y(88))], fill=edge)
-    sd.polygon([(50 * S, Y(100)), (43.5 * S, Y(87)), (43.5 * S, Y(16)), (56.5 * S, Y(16)), (56.5 * S, Y(87))], fill=steel)
-    sd.polygon([(50 * S, Y(100)), (50 * S, Y(16)), (56.5 * S, Y(16)), (56.5 * S, Y(87))], fill=steel_dark)
-    sd.rectangle((44 * S, Y(-6), 56 * S, Y(8)), fill=edge)
-    sd.rectangle((45.5 * S, Y(-6), 54.5 * S, Y(8)), fill=(112, 68, 38, 255))
-    sd.rounded_rectangle((29 * S, Y(6), 71 * S, Y(16)), radius=3 * S, fill=edge)
-    sd.rounded_rectangle((31 * S, Y(8), 69 * S, Y(14)), radius=2 * S, fill=brass)
-    sd.ellipse((42 * S, Y(-13), 58 * S, Y(1)), fill=edge)
-    sd.ellipse((44 * S, Y(-11), 56 * S, Y(-1)), fill=brass)
-    sword = sword.rotate(-38, resample=Image.BICUBIC, center=(n / 2, n / 2))
-    im.alpha_composite(sword)
-    d = ImageDraw.Draw(im)
-    # Bone, with an outline for small sizes.
-    bone = (238, 228, 200, 255)
-    bone_dark = (196, 182, 150, 255)
-    line = (20, 14, 12, 255)
-    ell(19, 16, 81, 72, line)
-    rrect(31, 58, 69, 88, 7, line)
-    ell(21.5, 18.5, 78.5, 69.5, bone)
-    rrect(33.5, 60, 66.5, 85.5, 5, bone)
-    # Shadow down the right side of the head, kept inside the bone, and under the cheekbones.
-    shade_mask = Image.new("L", (n, n), 0)
-    ImageDraw.Draw(shade_mask).ellipse((21.5 * S, 18.5 * S, 78.5 * S, 69.5 * S), fill=255)
-    cut = Image.new("L", (n, n), 0)
-    ImageDraw.Draw(cut).ellipse((62 * S, 26 * S, 90 * S, 76 * S), fill=120)
-    shade_mask = Image.fromarray(np.minimum(np.asarray(shade_mask), np.asarray(cut)))
-    im.paste(Image.new("RGBA", (n, n), bone_dark), (0, 0), shade_mask)
-    d = ImageDraw.Draw(im)
-    poly([(33.5, 66), (66.5, 66), (66.5, 70), (33.5, 70)], bone_dark)
-    # Teeth.
-    for x in (41, 50, 59):
-        rrect(x - 0.9, 69, x + 0.9, 85, 0.5, (70, 56, 44, 255))
-    # Nose.
-    poly([(50, 53), (45, 63), (55, 63)], line)
-    # Crack.
-    d.line([(36 * S, 21 * S), (40 * S, 28 * S), (36 * S, 33 * S), (41 * S, 39 * S)], fill=(92, 76, 58, 255), width=int(1.2 * S))
-    # Eye sockets.
-    ell(26.5, 34, 45.5, 53, line)
-    ell(54.5, 34, 73.5, 53, line)
-    eyes = Image.new("RGBA", (n, n), (0, 0, 0, 0))
-    e = ImageDraw.Draw(eyes)
-    for cx in (36, 64):
-        e.ellipse(((cx - 7) * S, 37 * S, (cx + 7) * S, 51 * S), fill=(255, 54, 20, 255))
-    glow = eyes.filter(ImageFilter.GaussianBlur(4 * S))
-    im = Image.alpha_composite(im, glow)
-    d = ImageDraw.Draw(im)
-    for cx in (36, 64):
-        d.ellipse(((cx - 5) * S, 39 * S, (cx + 5) * S, 49 * S), fill=(255, 92, 34, 255))
-        d.ellipse(((cx - 2.2) * S, 41.8 * S, (cx + 2.2) * S, 46.2 * S), fill=(255, 226, 150, 255))
+def bell(size):
+    """Dark metal, warmer towards the lip where the fire reaches it, with a thin line of moonlight."""
+    mask, top, height = bell_mask(size)
+    n = size * SS
+    m = np.asarray(mask, dtype=float) / 255.0
+    yy, xx = np.mgrid[0:n, 0:n]
+    v = np.clip((yy - top) / height, -0.3, 1.25)
+    u = (xx - n / 2) / (height * 0.56)
+    dark = np.array([0.070, 0.088, 0.125])
+    warm = np.array([0.74, 0.40, 0.12])
+    hot = np.array([0.98, 0.70, 0.30])
+    heat = np.clip((v - 0.42) / 0.62, 0, 1) ** 1.6
+    # The light comes from below and in front, so it fades towards the edges of the round metal.
+    heat = heat * np.clip(1.08 - np.abs(u) ** 2.2 * 0.75, 0, 1)
+    rgb = dark[None, None] * (1 - heat[..., None]) + warm[None, None] * heat[..., None]
+    rgb = rgb + (hot - warm)[None, None] * (np.clip((v - 0.92) / 0.2, 0, 1) * np.clip(1.0 - np.abs(u) * 0.8, 0, 1))[..., None]
+    # Moonlight just inside the outline, strongest on the upper part.
+    blur = np.asarray(mask.filter(ImageFilter.GaussianBlur(height * 0.012)), dtype=float) / 255.0
+    rim = np.clip((1.0 - blur) * m * 2.2, 0, 1) * np.clip(1.0 - v * 0.6, 0.25, 1)
+    rgb = rgb * (1 - rim[..., None] * 0.75) + np.array([0.86, 0.80, 0.66])[None, None] * rim[..., None] * 0.75
+    arr = np.dstack([np.clip(rgb, 0, 1), m])
+    im = Image.fromarray(np.uint8(arr * 255 + 0.5), "RGBA")
     return im.resize((size, size), Image.LANCZOS)
 
 
@@ -135,42 +130,29 @@ def rounded(im, radius):
 
 
 def icons():
-    bg = night_sky(432, 432, moon=(0.7, 0.26), moon_r=0.2)
-    bg.save("assets/ui/icon_background.png")
-    # Adaptive icons crop to the middle two thirds, so the skull stays inside that.
+    # Adaptive icons crop to the middle two thirds, so the bell and the moon stay inside that.
+    sky(432, 432, (0.5, 0.455), 0.235).save("assets/ui/icon_background.png")
     fg = Image.new("RGBA", (432, 432), (0, 0, 0, 0))
-    s = skull(270)
-    fg.alpha_composite(s, ((432 - 270) // 2, (432 - 270) // 2))
+    b = bell(292)
+    fg.alpha_composite(b, ((432 - 292) // 2, (432 - 292) // 2))
     fg.save("assets/ui/icon_foreground.png")
-    # Themed icons on newer Android: one flat shape. Bone and steel stay, outlines and eyes become holes.
-    a = np.asarray(fg, dtype=float) / 255.0
-    lum = a[..., :3].mean(axis=2)
-    red = a[..., 0] - a[..., 1]
-    shape = a[..., 3] * (lum > 0.4) * (red < 0.3)
-    mono = np.zeros(a.shape, dtype=np.uint8)
+    # Themed icons on newer Android: one flat shape.
+    mono = np.zeros((432, 432, 4), dtype=np.uint8)
     mono[..., :3] = 255
-    mono[..., 3] = np.uint8(np.clip(shape, 0, 1) * 255)
+    mono[..., 3] = np.asarray(fg)[..., 3]
     Image.fromarray(mono, "RGBA").save("assets/ui/icon_monochrome.png")
-    plain = night_sky(512, 512, moon=(0.72, 0.24), moon_r=0.19).convert("RGBA")
-    plain.alpha_composite(skull(404), (54, 62))
+    plain = sky(512, 512, (0.5, 0.44), 0.325).convert("RGBA")
+    plain.alpha_composite(bell(480), (16, 2))
     rounded(plain, 96).save("icon.png")
 
 
 def splash():
     w, h = 1280, 720
-    im = night_sky(w, h, moon=(0.76, 0.21), moon_r=0.15).convert("RGBA")
-    font = ImageFont.truetype("assets/fonts/MedievalSharp.ttf", 132)
-    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    text = "UNDEAD DROP"
-    box = d.textbbox((0, 0), text, font=font)
-    x = (w - (box[2] - box[0])) / 2 - box[0]
-    y = h * 0.44
-    d.text((x, y), text, font=font, fill=(0, 0, 0, 255), stroke_width=9, stroke_fill=(0, 0, 0, 255))
-    layer = layer.filter(ImageFilter.GaussianBlur(5))
-    d = ImageDraw.Draw(layer)
-    d.text((x, y), text, font=font, fill=(255, 212, 118, 255), stroke_width=3, stroke_fill=(44, 24, 10, 255))
-    im.alpha_composite(layer)
+    im = sky(w, h, (0.76, 0.24), 0.15).convert("RGBA")
+    mark = Image.open("assets/ui/wordmark.png").convert("RGBA")
+    scale = 880.0 / mark.width
+    mark = mark.resize((880, int(mark.height * scale)), Image.LANCZOS)
+    im.alpha_composite(mark, ((w - mark.width) // 2, int(h * 0.5 - mark.height * 0.62)))
     im.convert("RGB").save("assets/ui/splash.png")
 
 

@@ -16,26 +16,40 @@ const ALL := {
 	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 80.0, "speed": 1.0, "ranged": true, "mana": true,
 		"desc": "Fragile caster. Keeps a Staff that uses refilling mana. Elements and summoned allies."},
 	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 90.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 8.0,
-		"no_weapons": true, "auto_tree": true, "hidden": true,
+		"no_weapons": true, "auto_tree": true, "hidden": true, "price": 650,
 		"desc": "Dead, and not done. No weapons, only claws of Mist. Gifts come by themselves as you level, and you choose one path."},
+	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,
+		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
 }
 
 static func icon(id: String) -> String:
-	return {"infantry": "sword", "ranger": "bow", "heavy": "shield_rect", "chivalry": "horse", "magician": "staff", "revenant": "claw"}[id]
+	return {"infantry": "sword", "ranger": "bow", "heavy": "shield_rect", "chivalry": "horse", "magician": "staff", "revenant": "claw", "artificer": "gear"}[id]
 
 
 static func color(id: String) -> Color:
 	return {"infantry": Color(0.62, 0.2, 0.14), "ranger": Color(0.22, 0.46, 0.26), "heavy": Color(0.36, 0.4, 0.48),
-		"chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5)}[id]
+		"chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22)}[id]
 
 
-## The classes this phone can play. Some have to be unlocked with a code first.
+## The classes this phone can play. Some have to be bought or opened with a code first.
 static func available() -> Array[String]:
 	var out: Array[String] = []
 	for id: String in ALL:
-		if not ALL[id].get("hidden", false) or Game.unlocked.has(id):
+		if Game.owns_class(id):
 			out.append(id)
 	return out
+
+
+static func for_sale() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in ALL:
+		if price(id) > 0:
+			out.append(id)
+	return out
+
+
+static func price(id: String) -> int:
+	return int(ALL[id].get("price", 0))
 
 
 ## Slower climb: a good night reaches the final ability around minute 8 or 9.

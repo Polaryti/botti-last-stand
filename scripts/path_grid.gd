@@ -41,6 +41,21 @@ func block_box(centre: Vector3, box: Vector3) -> void:
 			astar.set_point_solid(Vector2i(x, y), true)
 
 
+## A box that is not lined up with the grid. A cell closes if its middle is in the box or very near it.
+func block_turned(t: Transform3D, box: Vector3) -> void:
+	var half_x := box.x * 0.5 + 0.35
+	var half_z := box.z * 0.5 + 0.35
+	var reach := Vector2(half_x, half_z).length()
+	var a := to_cell(t.origin - Vector3(reach, 0, reach))
+	var b := to_cell(t.origin + Vector3(reach, 0, reach))
+	var inv := t.basis.inverse()
+	for y in range(a.y, b.y + 1):
+		for x in range(a.x, b.x + 1):
+			var local := inv * (to_world(Vector2i(x, y)) - Vector3(t.origin.x, 0.0, t.origin.z))
+			if absf(local.x) < half_x and absf(local.z) < half_z:
+				astar.set_point_solid(Vector2i(x, y), true)
+
+
 ## A gate opening or closing.
 func set_box(centre: Vector3, box: Vector3, solid: bool) -> void:
 	var a := to_cell(centre - box * 0.5 + Vector3(0.02, 0, 0.02))
@@ -56,6 +71,19 @@ func mark_crops(x0: float, z0: float, x1: float, z1: float) -> void:
 	for y in range(a.y, b.y + 1):
 		for x in range(a.x, b.x + 1):
 			crops[y * size + x] = 1
+
+
+func mark_crops_turned(t: Transform3D, field: Vector2) -> void:
+	var half := field * 0.5 - Vector2(0.5, 0.5)
+	var reach := half.length() + 1.0
+	var a := to_cell(t.origin - Vector3(reach, 0, reach))
+	var b := to_cell(t.origin + Vector3(reach, 0, reach))
+	var inv := t.basis.inverse()
+	for y in range(a.y, b.y + 1):
+		for x in range(a.x, b.x + 1):
+			var local := inv * (to_world(Vector2i(x, y)) - Vector3(t.origin.x, 0.0, t.origin.z))
+			if absf(local.x) < half.x and absf(local.z) < half.y:
+				crops[y * size + x] = 1
 
 
 func in_crops(p: Vector3) -> bool:

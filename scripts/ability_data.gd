@@ -47,6 +47,7 @@ static func tree(class_id: String) -> Dictionary:
 			"chivalry": _cache[class_id] = _chivalry()
 			"magician": _cache[class_id] = _magician()
 			"revenant": _cache[class_id] = _revenant()
+			"artificer": _cache[class_id] = _artificer()
 	return _cache[class_id]
 
 
@@ -86,6 +87,65 @@ static func _revenant() -> Dictionary:
 			[a("swift_call", "Swift Call", "Call comes back 20% sooner", "horn+clock", {"art_cd": -0.2})]],
 			a("summoner_m", "Summoner Mastery", "Revenants stay +0.5 s and hit +2%, claws +3%, Mist Burst +6 damage", "ghost+crown", {"summon_time": 0.5, "ally_damage": 0.02, "melee_damage": 0.03, "burst_damage": 6.0}),
 			a("the_host", "The Host", "Each Revenant lets go a weak Mist Burst when it falls", "burst+ghost", {"summon_time": 2.0}, [], "host_burst")),
+	]}
+
+
+## One weapon at a time, and everything else is built. Each path adds something to make, and the tree
+## improves it. The Inventor's steps mostly add new devices to the bag, or improve ones already in it.
+static func _artificer() -> Dictionary:
+	var copper := Color(0.62, 0.34, 0.16)
+	var iron := Color(0.34, 0.38, 0.44)
+	var brass := Color(0.6, 0.48, 0.14)
+	return {"core": [
+		[a("steady_hands", "Steady Hands", "+15% damage with any weapon", "hand+up", {"melee_damage": 0.15, "ranged_damage": 0.15}),
+		a("greased_boots", "Greased Boots", "+10% move speed", "boot+up", {"speed": 0.1})],
+		[a("leather_apron", "Leather Apron", "+20 max health", "heart+plus", {"max_hp": 20.0}),
+		a("soot_and_ash", "Soot and Ash", "Fire cannot set you alight", "flame+shield_round", {}, [], "fire_proof")],
+		[a("scavenger", "Scavenger", "Heal 2 per kill", "drop+heart", {}, [t("kill", "heal", {"n": 2.0})]),
+		a("tool_belt", "Tool Belt", "Potions last 30% longer", "potion+clock", {"potion_time": 0.3})],
+		[a("whetstone", "Whetstone", "+0.4 m melee reach", "spear+up", {"melee_reach": 0.4}),
+		a("quick_fingers", "Quick Fingers", "+15% attack speed with any weapon", "hand+clock", {"melee_rate": 0.15, "ranged_rate": 0.15})],
+	], "specs": [
+		_spec("pyromaniac", "Pyromaniac", "Throws bombs that leave the ground burning.", copper,
+			a("pyromaniac", "Pyromaniac", "Unlocks Incendiary Bomb: throw a bomb that bursts into flame and sets the ground alight", "bomb+flame"),
+			[[a("bigger_charge", "Bigger Charge", "Bombs reach 1.5 m further", "bomb+up", {"bomb_radius": 1.5}),
+			a("pitch_mix", "Pitch Mix", "The ground burns 3 s longer", "flame+clock", {"bomb_fire": 3.0})],
+			[a("quick_fuse", "Quick Fuse", "The next bomb is ready 20% sooner", "bomb+clock", {"art_cd": -0.2}),
+			a("heavy_powder", "Heavy Powder", "+40 bomb damage", "bomb+plus", {"bomb_damage": 40.0})],
+			[a("two_in_hand", "Two in Hand", "Throw two bombs at once", "bomb+swap", {"bomb_count": 1.0}),
+			a("shrapnel", "Shrapnel", "Bombs stun what they hit for 1 s", "star+flame", {}, [], "bomb_stun")],
+			[a("long_arm", "Long Arm", "Throw 30% further", "hand+wind", {"bomb_throw": 0.3}),
+			a("fire_feeds", "Fire Feeds Fire", "Each kill takes 0.5 s off the wait for the next bomb", "flame+skull", {}, [], "bomb_refund")],
+			[a("white_fire", "White Fire", "Burning enemies take 50% more", "flame+up", {"burn_damage": 0.5}),
+			a("blast_shield", "Blast Shield", "Take 25% less damage for 3 s after a throw", "shield_round+flame", {}, [t("throw", "buff", {"stat": "damage_taken", "val": -0.25, "secs": 3.0, "key": "blast_shield"})])]],
+			a("pyro_m", "Pyromaniac Mastery", "+8 bomb damage, +0.1 m reach", "bomb+crown", {"bomb_damage": 8.0, "bomb_radius": 0.1}),
+			a("chaotic", "Chaotic", "Every bomb throws off 6 bomblets that bounce away at random, each with its own effect: fire, frost, thunder or poison", "spiral+flame", {}, [], "chaotic")),
+		_spec("mechanic", "Mechanic", "Builds a war chariot with room for a friend.", iron,
+			a("mechanic", "Mechanic", "Kills build the War Chariot: slower than a horse, it takes 35% of each hit off you, and a friend can ride along", "chariot+plus", {"riding_armor": -0.35}),
+			[[a("mounted_ballista", "Mounted Ballista", "A turret on the chariot shoots the nearest enemy", "turret+plus", {}, [], "chariot_turret")],
+			[a("better_axles", "Better Axles", "The chariot is 20% faster", "chariot+up", {"horse_speed": 0.2}),
+			a("long_haul", "Long Haul", "The chariot lasts 10 s longer", "chariot+clock", {"horse_time": 10.0})],
+			[a("scythed_wheels", "Scythed Wheels", "Spikes on the wheels cut whatever comes close", "spikes+plus", {}, [], "chariot_spikes")],
+			[a("iron_plates", "Iron Plates", "The chariot takes 15% more of each hit", "shield_rect+chariot", {"riding_armor": -0.15}),
+			a("repair_kit", "Repair Kit", "Heal 4 health a second while riding", "heart+chariot", {"riding_regen": 4.0})],
+			[a("twin_bolts", "Twin Bolts", "The turret shoots twice as fast", "turret+up", {"turret_rate": 1.0}),
+			a("caltrops", "Caltrops", "Drops a trap behind the chariot every 5 s", "trap+chariot", {}, [t("every", "trap", {"secs_every": 5.0, "riding": true})])]],
+			a("mechanic_m", "Mechanic Mastery", "+1 s riding, turret and spikes +6% damage", "chariot+crown", {"horse_time": 1.0, "turret_damage": 0.06}),
+			a("war_machine", "War Machine", "Turret bolts burst into flame, and the chariot lasts 15 s longer", "turret+flame", {"horse_time": 15.0}, [], "war_machine")),
+		_spec("inventor", "Inventor", "A different device every time, and the button shows which is next.", brass,
+			a("inventor", "Inventor", "Unlocks Invention: a random device each use, and the button shows the next one. Starts with Electric Volley and Cryo Flask", "gear+star"),
+			[[a("sentry_plans", "Clockwork Sentry", "New invention: a turret that shoots for 12 s", "turret+gear", {}, [], "inv_sentry"),
+			a("overcharge", "Overcharge", "Electric Volley: 2 more darts, and each spark jumps once more", "dart+up", {"volley_darts": 2.0, "volley_jumps": 1.0})],
+			[a("boots_plans", "Steam Boots", "New invention: a burst of speed, untouchable for 1.5 s", "steam+plus", {}, [], "inv_boots"),
+			a("deep_freeze", "Deep Freeze", "Cryo Flask: freezes 1 s longer and reaches 1.5 m further", "flask+up", {"flask_time": 1.0, "flask_radius": 1.5})],
+			[a("noise_plans", "Noise Box", "New invention: draws everything close to it, then bursts", "noisebox+plus", {}, [], "inv_noise"),
+			a("better_bench", "Better Workbench", "Invention is ready 20% sooner", "gear+clock", {"art_cd": -0.2})],
+			[a("magnet_plans", "Lodestone", "New invention: drags enemies together and holds them for 3 s", "magnet+plus", {}, [], "inv_magnet"),
+			a("fine_gears", "Fine Gears", "Inventions do 25% more damage", "gear+up", {"inv_damage": 0.25})],
+			[a("spare_parts", "Spare Parts", "Each invention also heals you 8", "heart+gear", {"inv_heal": 8.0}),
+			a("prototype", "Prototype", "20% chance that Invention is ready again at once", "gear+swap", {"inv_repeat": 0.2})]],
+			a("inventor_m", "Inventor Mastery", "Inventions do 5% more damage and are ready 2% sooner", "gear+crown", {"inv_damage": 0.05, "art_cd": -0.02}),
+			a("eureka", "Eureka!", "Every invention goes off twice", "bolt+gear", {}, [], "eureka")),
 	]}
 
 

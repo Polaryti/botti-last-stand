@@ -1,3 +1,4 @@
+@tool
 class_name Crops
 ## The plants of the fields and the orchard, drawn as instanced meshes that sway in the wind.
 

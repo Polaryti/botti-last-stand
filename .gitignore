@@ -6,6 +6,3 @@ build/
 keys/
 *.keystore
 *.jks
-
-# Copies of the maps from before they became editable scenes
-map_previews/

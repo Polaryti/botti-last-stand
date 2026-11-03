@@ -4,7 +4,7 @@ extends Target
 ## body that zombies can hunt and that shots can hit, and anything that hurts them is sent over.
 
 const LAYER_AVATAR := 64
-const MODELS := {"infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever"}
+const MODELS := {"infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
 
 var world: World
 var peer := 0
@@ -34,6 +34,9 @@ var rescues := false
 var has_passenger := false
 var _seated := false
 var _horse: MeshInstance3D
+var _chariot: ChariotModel
+var in_chariot := false
+var _has_turret := false
 var _watched := false
 var _view_pitch := 0.0
 
@@ -99,14 +102,20 @@ func _build_body(model: String) -> void:
 ## Riding: the horse under them if it is theirs, and either way they sit higher.
 func _show_seat() -> void:
 	var up := _riding or _seated
-	_visual.position.y = 0.85 if up else 0.0
-	if _riding and _horse == null:
+	_visual.position.y = (0.5 if in_chariot else 0.85) if up else 0.0
+	if _riding and not in_chariot and _horse == null:
 		_horse = MeshInstance3D.new()
 		_horse.mesh = HorseModel.mesh()
 		_horse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_horse)
 	if _horse:
-		_horse.visible = _riding and not _watched
+		_horse.visible = _riding and not in_chariot and not _watched
+	if _riding and in_chariot and _chariot == null:
+		_chariot = ChariotModel.new()
+		add_child(_chariot)
+	if _chariot:
+		_chariot.visible = _riding and in_chariot and not _watched
+		_chariot.show_upgrades(_has_turret, false)
 
 
 func is_mounted() -> bool:
@@ -122,7 +131,7 @@ func set_watched(on: bool) -> void:
 
 func view_transform() -> Transform3D:
 	_view_pitch = lerpf(_view_pitch, _pitch, 0.25)
-	var eye := global_position + Vector3.UP * (2.35 if _riding or _seated else 1.58)
+	var eye := global_position + Vector3.UP * ((2.0 if in_chariot else 2.35) if _riding or _seated else 1.58)
 	return Transform3D(Basis.from_euler(Vector3(_view_pitch, rotation.y, 0.0)), eye)
 
 
@@ -148,6 +157,8 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 	_seated = flags & 8 != 0
 	rescues = flags & 16 != 0
 	has_passenger = flags & 32 != 0
+	in_chariot = flags & 64 != 0 or (_seated and in_chariot)
+	_has_turret = flags & 128 != 0
 	_show_seat()
 	hp_fraction = hp_left
 	var fell := flags & 1 != 0
@@ -179,6 +190,8 @@ func _process(delta: float) -> void:
 	_attack_left -= delta
 	_label.visible = not _watched and (not _unseen or not Net.is_foe(peer))
 	_visual.visible = not _watched and not (_unseen and Net.is_foe(peer))
+	if _chariot and _chariot.visible:
+		_chariot.roll(velocity.length() * delta)
 	if not dead and _attack_left <= 0.0:
 		_play("Running_A" if velocity.length_squared() > 0.5 else "Idle", maxf(0.8, velocity.length() / 5.0))
 

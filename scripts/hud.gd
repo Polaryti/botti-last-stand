@@ -5,6 +5,7 @@ extends Control
 
 signal pause_requested
 signal tree_requested
+signal sandbox_requested
 
 const JOY_R := 88.0
 const COL_BG := Color(0.05, 0.05, 0.07, 0.72)
@@ -16,7 +17,6 @@ var player: Player
 var director: Director
 var font: Font
 var title: Font
-var _frame: Texture2D
 var _glass: Texture2D
 var _ring: Texture2D
 var menu_open := false
@@ -29,8 +29,9 @@ var _joy_finger := -1
 var _pad := 24.0
 var _crosshair: Texture2D
 var _status_bottom := 110.0
-var _box: StyleBoxTexture
-var _pbox: StyleBoxTexture
+var _track := UiTheme.flat(Color(UiTheme.NIGHT, 0.72), Color.TRANSPARENT, 5, 0.0)
+var _fill := UiTheme.flat(Color.WHITE, Color.TRANSPARENT, 5, 0.0)
+var _capsule := UiTheme.flat(Color(UiTheme.NIGHT, 0.6), Color.TRANSPARENT, 10, 0.0)
 var _was_dead := false
 
 
@@ -40,10 +41,9 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	font = ThemeDB.fallback_font if get_theme_default_font() == null else get_theme_default_font()
+	font = UiTheme.bold_font()
 	title = UiTheme.title_font()
 	_crosshair = load("res://assets/sprites/crosshair.png")
-	_frame = load("res://assets/ui/frame.png")
 	_glass = load("res://assets/ui/glass.png")
 	_ring = load("res://assets/ui/ring.png")
 	resized.connect(_layout)
@@ -72,6 +72,7 @@ func _layout() -> void:
 		"take": {"pos": Vector2(s.x * 0.5, s.y * 0.68), "r": 62.0},
 		"pause": {"pos": Vector2(right - 28, 46), "r": 32.0},
 		"tree": {"pos": Vector2(right - 112, 46), "r": 38.0},
+		"sandbox": {"pos": Vector2(right - 204, 46), "r": 38.0},
 		"horse": {"pos": Vector2(right - 372, bottom - 130), "r": 58.0},
 		"burst": {"pos": Vector2(right - 372, bottom - 110), "r": 60.0},
 		"art": {"pos": Vector2(right - 352, bottom - 260), "r": 56.0},
@@ -94,6 +95,8 @@ func _button_visible(id: String) -> bool:
 			return player.has_burst()
 		"art":
 			return player.has_art()
+		"sandbox":
+			return Game.mode == Game.Mode.SANDBOX
 	return true
 
 
@@ -140,6 +143,7 @@ func _touch_down(index: int, at: Vector2) -> void:
 			"take": player.take_nearby_weapon()
 			"pause": pause_requested.emit()
 			"tree": tree_requested.emit()
+			"sandbox": sandbox_requested.emit()
 			"burst": player.use_burst()
 			"art": player.use_art()
 			"horse":
@@ -207,12 +211,12 @@ func _banner_text(t: String, centre: Vector2, a: float) -> void:
 	var fs := 46
 	var w := title.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var at := centre - Vector2(w * 0.5, -fs * 0.32)
-	draw_string_outline(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 8, Color(0, 0, 0, 0.72 * a))
-	draw_string(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(UiTheme.GOLD, a))
+	draw_string_outline(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 7, Color(0, 0, 0, 0.6 * a))
+	draw_string(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(UiTheme.BONE, a))
 
 
 func _text(t: String, at: Vector2, fs: int, col: Color) -> void:
-	draw_string_outline(font, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 5, Color(0, 0, 0, 0.6 * col.a))
+	draw_string_outline(font, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 4, Color(0, 0, 0, 0.55 * col.a))
 	draw_string(font, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, col)
 
 
@@ -259,24 +263,17 @@ func _draw() -> void:
 	_draw_weapon(s)
 	_draw_controls()
 	if player.toast_time > 0.0:
-		_centered(player.toast, Vector2(centre.x, s.y * 0.38), 30, Color(UiTheme.PALE, minf(1.0, player.toast_time * 2.0)))
+		_centered(player.toast, Vector2(centre.x, s.y * 0.38), 30, Color(UiTheme.BONE, minf(1.0, player.toast_time * 2.0)))
 	if director and director.banner_time > 0.0:
 		_banner_text(director.banner, Vector2(centre.x, s.y * 0.32), minf(1.0, director.banner_time))
 
 
 func _bar(r: Rect2, f: float, col: Color) -> void:
-	draw_rect(r, Color(0.03, 0.03, 0.04, 0.8))
-	draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(f, 0.0, 1.0), r.size.y)), col)
-	draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(f, 0.0, 1.0), r.size.y * 0.35)), Color(1, 1, 1, 0.14))
-	draw_style_box(_frame_box(), r.grow(4.0))
-
-
-## The iron frame's corners are taller than a slim bar, so a slim bar gets a plain edge.
-func _thin_bar(r: Rect2, f: float, col: Color) -> void:
-	draw_rect(r.grow(2.0), Color(0.62, 0.62, 0.66, 0.85))
-	draw_rect(r, Color(0.03, 0.03, 0.05))
-	draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(f, 0.0, 1.0), r.size.y)), col)
-	draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(f, 0.0, 1.0), r.size.y * 0.35)), Color(1, 1, 1, 0.16))
+	draw_style_box(_track, r)
+	var part := clampf(f, 0.0, 1.0)
+	if part > 0.0:
+		_fill.bg_color = col
+		draw_style_box(_fill, Rect2(r.position, Vector2(maxf(r.size.x * part, minf(r.size.y, r.size.x)), r.size.y)))
 
 
 ## The heart, the four gates, and how much wood you carry.
@@ -284,14 +281,14 @@ func _draw_fort(s: Vector2, centre: Vector2) -> void:
 	var fort := player.world.fort
 	var w := 260.0
 	var top := 122.0
-	_thin_bar(Rect2(centre.x - w * 0.5, top, w, 12), fort.heart_hp / Fort.HEART_HP, Color(0.9, 0.3, 0.24))
-	_centered("Heart", Vector2(centre.x - w * 0.5 - 36, top + 6), 18, UiTheme.PALE)
+	_bar(Rect2(centre.x - w * 0.5, top, w, 12), fort.heart_hp / Fort.HEART_HP, Color(0.9, 0.3, 0.24))
+	_centered("Heart", Vector2(centre.x - w * 0.5 - 36, top + 6), 18, UiTheme.BONE)
 	var gate_w := (w - 18.0) / 4.0
 	for i in fort.gates.size():
 		var g: Dictionary = fort.gates[i]
 		var r := Rect2(centre.x - w * 0.5 + i * (gate_w + 6.0), top + 20, gate_w, 9)
-		_thin_bar(r, float(g["hp"]) / Fort.GATE_HP, Color(0.72, 0.5, 0.26) if g["closed"] else Color(0.8, 0.2, 0.15))
-		_centered(["N", "E", "S", "W"][i], r.get_center() + Vector2(0, 16), 15, UiTheme.PALE)
+		_bar(r, float(g["hp"]) / Fort.GATE_HP, Color(0.72, 0.5, 0.26) if g["closed"] else Color(0.8, 0.2, 0.15))
+		_centered(["N", "E", "S", "W"][i], r.get_center() + Vector2(0, 16), 15, UiTheme.BONE)
 	if player.wood > 0:
 		_text("Wood %d" % player.wood, Vector2(s.x * 0.33, s.y - 86.0), 22, Color(0.92, 0.72, 0.42))
 	if fort.repairing >= 0:
@@ -305,7 +302,7 @@ func _draw_together(s: Vector2, centre: Vector2) -> void:
 	ids.sort_custom(func(a: int, b: int) -> bool: return int(Net.roster[a]["score"]) > int(Net.roster[b]["score"]))
 	for peer: int in ids:
 		var info: Dictionary = Net.roster[peer]
-		var col := UiTheme.PALE
+		var col := UiTheme.BONE
 		if Net.rules == Net.Rules.TEAMS:
 			col = Net.team_colour(int(info["team"]))
 		var line := str(info["name"])
@@ -319,75 +316,60 @@ func _draw_together(s: Vector2, centre: Vector2) -> void:
 			_banner_text("Back in %d" % ceili(wait), Vector2(centre.x, s.y * 0.3), 1.0)
 		var who := Net.watching_name()
 		if who != "":
-			_centered("Watching %s. Tap to change." % who, Vector2(centre.x, s.y * 0.88), 26, UiTheme.PALE)
-
-
-func _frame_box() -> StyleBoxTexture:
-	if _box == null:
-		_box = UiTheme.box("frame", 10, 0)
-		_box.set_texture_margin_all(10)
-		_box.draw_center = false
-		_box.modulate_color = Color(0.92, 0.92, 0.95)
-	return _box
+			_centered("Watching %s. Tap to change." % who, Vector2(centre.x, s.y * 0.88), 26, UiTheme.BONE)
 
 
 func _draw_status(s: Vector2) -> void:
 	var cls := player.class_id
-	Icons.draw(self, Rect2(_pad, 14, 62, 62), ClassDefs.icon(cls), ClassDefs.color(cls))
-	var x := _pad + 70.0
+	Icons.draw(self, Rect2(_pad, 14, 58, 58), ClassDefs.icon(cls), ClassDefs.color(cls))
+	var x := _pad + 68.0
 	var f := clampf(player.hp / player.max_hp(), 0.0, 1.0)
-	var hp_col := Color(0.32, 0.64, 0.28) if f > 0.35 else Color(0.78, 0.2, 0.14)
+	var hp_col := UiTheme.MOSS.darkened(0.15) if f > 0.35 else UiTheme.BLOOD
 	if player.burn_time > 0.0:
-		hp_col = Color(0.9, 0.48, 0.1)
-	_bar(Rect2(x, 20, 230, 22), f, hp_col)
-	_text("%d" % ceil(player.hp), Vector2(x + 8, 38), 20, Color.WHITE)
+		hp_col = UiTheme.EMBER.darkened(0.1)
+	_bar(Rect2(x, 16, 240, 22), f, hp_col)
+	_text("%d" % ceil(player.hp), Vector2(x + 9, 34), 18, Color.WHITE)
 	var xp_f := 1.0
 	if player.level < ClassDefs.MAX_LEVEL:
 		xp_f = float(player.xp) / float(player.xp_needed())
-	_thin_bar(Rect2(x, 49, 230, 9), xp_f, UiTheme.GOLD)
+	_bar(Rect2(x, 42, 240, 7), xp_f, UiTheme.EMBER)
 	var y := 66.0
 	if player.class_def().get("mana", false):
-		var mana_rect := Rect2(x, 63, 230, 17)
-		_thin_bar(mana_rect, player.mana / maxf(player.max_mana(), 1.0), Color(0.3, 0.78, 0.8) if player.has_burst() else Color(0.3, 0.5, 1.0))
-		_text("%d" % int(player.mana), Vector2(x + 8, 77), 15, Color.WHITE)
+		var mana_rect := Rect2(x, 53, 240, 16)
+		_bar(mana_rect, player.mana / maxf(player.max_mana(), 1.0), UiTheme.MIST)
+		_text("%d" % int(player.mana), Vector2(x + 9, 67), 14, Color.WHITE)
 		y = 84.0
-	y = maxf(y, 86.0)
+	y = maxf(y, 82.0)
 	if Game.is_night() and director:
 		_clock(s, Game.clock(director.night_left()))
-		_text("Kills %d" % player.kills, Vector2(_pad, y + 20), 22, UiTheme.PALE)
+		_text("%d kills" % player.kills, Vector2(_pad, y + 18), 21, UiTheme.BONE)
 		y += 28.0
 		var hunting := player.world.count_hunting()
-		var label := "HUNTED" if hunting > 0 else "UNSEEN"
+		var label := "Hunted" if hunting > 0 else "Unseen"
 		if player.invis_left > 0.0:
-			label = "VANISHED"
-		var col := Color(1.0, 0.38, 0.28) if hunting > 0 and player.invis_left <= 0.0 else Color(0.62, 0.86, 0.68)
-		_centered(label, Vector2(s.x * 0.5, 92), 19, col)
+			label = "Vanished"
+		var col := UiTheme.BLOOD.lightened(0.25) if hunting > 0 and player.invis_left <= 0.0 else UiTheme.MOSS
+		_centered(label, Vector2(s.x * 0.5, 80), 20, col)
 		if player.is_lit():
-			_centered("IN THE LIGHT", Vector2(s.x * 0.5, 114), 17, Color(1.0, 0.72, 0.3))
-	elif Game.mode == Game.Mode.ROAM:
-		_clock(s, "Roam")
+			_centered("In the light", Vector2(s.x * 0.5, 102), 18, UiTheme.EMBER)
+	elif Game.mode == Game.Mode.SANDBOX:
+		_clock(s, "Sandbox")
+	if player.guard_left > 0.0 and player.guard_left < 100.0:
+		_centered("Invincible %d" % ceili(player.guard_left), Vector2(s.x * 0.5, s.y * 0.2), 24, UiTheme.EMBER)
 	if player.is_riding():
-		_text("Riding %d" % ceil(player.riding_left), Vector2(_pad, y + 20), 20, COL_ACCENT)
+		_text("%s %d" % [player.mount_name(), ceil(player.riding_left)], Vector2(_pad, y + 18), 20, UiTheme.EMBER)
 		y += 26.0
-	elif player.class_def().get("horse", false):
-		_text("Horse %d/%d" % [player.horse_progress, player.horses_needed()], Vector2(_pad, y + 20), 20, COL_ACCENT if player.horse_ready() else Color(1, 1, 1, 0.75))
+	elif player.has_mount():
+		_text("%s %d/%d" % [player.mount_name(), player.horse_progress, player.horses_needed()], Vector2(_pad, y + 18), 20, UiTheme.EMBER if player.horse_ready() else UiTheme.BONE)
 		y += 26.0
 	_status_bottom = y + 16.0
 
 
 func _clock(s: Vector2, t: String) -> void:
-	var fs := 36
-	var w := title.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var r := Rect2(s.x * 0.5 - w * 0.5 - 30, 8, w + 60, 66)
-	draw_style_box(_panel_box(), r)
-	draw_string(title, Vector2(s.x * 0.5 - w * 0.5, 54), t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, UiTheme.INK)
-
-
-func _panel_box() -> StyleBoxTexture:
-	if _pbox == null:
-		_pbox = UiTheme.box("panel", 18, 0)
-		_pbox.set_texture_margin_all(14)
-	return _pbox
+	var fs := 32
+	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	draw_style_box(_capsule, Rect2(s.x * 0.5 - w * 0.5 - 18, 12, w + 36, 48))
+	draw_string(font, Vector2(s.x * 0.5 - w * 0.5, 47), t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, UiTheme.BONE)
 
 
 func _draw_powers() -> void:
@@ -400,7 +382,7 @@ func _draw_powers() -> void:
 		var fs := 18
 		var t := "%d" % ceil(left)
 		var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		_text(t, Vector2(x + 23 - w * 0.5, y + 60), fs, UiTheme.PALE)
+		_text(t, Vector2(x + 23 - w * 0.5, y + 60), fs, UiTheme.BONE)
 		x += 52.0
 		if x > _pad + 260.0:
 			x = _pad
@@ -454,8 +436,8 @@ func _draw_level_flash(s: Vector2) -> void:
 	var t := "Level %d" % player.level
 	var w := title.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var at := Vector2(s.x * 0.5 - w * 0.5, 186.0 + (1.0 - a) * -14.0)
-	var col := Color(UiTheme.GOLD, minf(1.0, a * 1.8))
-	draw_string_outline(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 8, Color(0, 0, 0, 0.7 * col.a))
+	var col := Color(UiTheme.EMBER, minf(1.0, a * 1.8))
+	draw_string_outline(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 7, Color(0, 0, 0, 0.6 * col.a))
 	draw_string(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, col)
 
 
@@ -470,7 +452,7 @@ func _draw_item_name() -> void:
 		return
 	var at := cam.unproject_position(above) * size / Vector2(get_viewport().get_visible_rect().size)
 	var text := p.display_name()
-	var col := UiTheme.PALE
+	var col := UiTheme.BONE
 	if p.kind == Pickup.Kind.WEAPON and not player.can_use(p.weapon_id):
 		text += " (not for your class)"
 		col = Color(0.75, 0.72, 0.68, 0.8)
@@ -544,15 +526,15 @@ func _draw_weapon(s: Vector2) -> void:
 		return
 	var y := s.y - 26.0
 	var x := s.x * 0.33
-	_text(str(d["name"]), Vector2(x, y - 30), 26, UiTheme.PALE)
+	_text(str(d["name"]), Vector2(x, y - 30), 24, UiTheme.BONE)
 	if d["kind"] == WeaponDefs.Kind.SPELL:
-		_text("%d mana" % int(player.mana), Vector2(x, y), 22, Color(0.55, 0.75, 1.0))
+		_text("%d mana" % int(player.mana), Vector2(x, y), 22, UiTheme.MIST)
 	elif player.has_burst():
-		_text("%d mist" % int(player.mana), Vector2(x, y), 22, Color(0.62, 0.92, 0.95))
+		_text("%d mist" % int(player.mana), Vector2(x, y), 22, UiTheme.MIST)
 	elif WeaponDefs.uses_arrows(d):
-		_text("%d arrows" % player.arrows, Vector2(x, y), 22, UiTheme.PALE if player.arrows > 0 else Color(1, 0.35, 0.3))
+		_text("%d arrows" % player.arrows, Vector2(x, y), 22, UiTheme.BONE if player.arrows > 0 else UiTheme.BLOOD.lightened(0.25))
 	elif player.arrows > 0:
-		_text("%d arrows" % player.arrows, Vector2(x, y), 18, Color(UiTheme.PALE, 0.65))
+		_text("%d arrows" % player.arrows, Vector2(x, y), 18, Color(UiTheme.BONE, 0.65))
 
 
 func _draw_controls() -> void:
@@ -576,28 +558,30 @@ func _draw_controls() -> void:
 		var rect := Rect2(pos - Vector2.ONE * r, Vector2.ONE * r * 2.0)
 		var tint := Color(1, 1, 1, 1)
 		match id:
-			"fire": tint = Color(0.95, 0.25, 0.16)
-			"take": tint = Color(1.0, 0.72, 0.2)
-			"horse": tint = Color(0.9, 0.56, 0.2)
+			"fire": tint = Color(1.0, 0.72, 0.62)
+			"take": tint = UiTheme.EMBER
+			"horse": tint = UiTheme.EMBER
 			"burst":
-				tint = Color(0.3, 0.85, 0.9) if player.burst_cd_left <= 0.0 and player.mana >= player.burst_cost() else Color(0.35, 0.4, 0.42)
+				tint = UiTheme.MIST if player.burst_cd_left <= 0.0 and player.mana >= player.burst_cost() else Color(0.6, 0.6, 0.6)
 			"art":
-				tint = Color(0.5, 0.75, 0.95) if player.art_cd_left <= 0.0 and player.mana >= player.art_cost() else Color(0.35, 0.4, 0.42)
+				tint = UiTheme.MIST if player.art_cd_left <= 0.0 and player.mana >= player.art_cost() else Color(0.6, 0.6, 0.6)
 			"zoom":
 				if player.zoomed:
-					tint = Color(1.0, 0.72, 0.2)
+					tint = UiTheme.EMBER
 			"tree":
 				if player.points > 0:
-					tint = Color(1.0, 0.72, 0.2, 0.65 + sin(Time.get_ticks_msec() * 0.006) * 0.35)
+					tint = Color(UiTheme.EMBER, 0.65 + sin(Time.get_ticks_msec() * 0.006) * 0.35)
 		if held:
 			rect = rect.grow(-3.0)
 		draw_texture_rect(_glass, rect, false, tint)
 		var glyph := _button_glyph(id)
 		var inset := r * 0.42
-		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color(1, 0.96, 0.84, 0.95))
-		draw_texture_rect(_ring, rect, false, Color.WHITE if not held else Color(1, 0.85, 0.5))
+		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color(UiTheme.BONE, 0.95))
+		draw_texture_rect(_ring, rect, false, Color(1, 1, 1, 0.6) if not held else UiTheme.EMBER)
 		if id == "take" and player.nearby_weapon:
-			_centered(player.nearby_weapon.display_name(), pos + Vector2(0, -r - 18), 26, UiTheme.PALE)
+			_centered(player.nearby_weapon.display_name(), pos + Vector2(0, -r - 18), 26, UiTheme.BONE)
+		if id == "art" and player.art_label() != "":
+			_centered(player.art_label(), pos + Vector2(0, -r - 14), 18, UiTheme.BONE)
 		if id == "burst" or id == "art":
 			var left: float = player.burst_cd_left if id == "burst" else player.art_cd_left
 			var total: float = player.m("burst_cd") if id == "burst" else maxf(float(player.art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
@@ -606,9 +590,9 @@ func _draw_controls() -> void:
 				_centered("%d" % ceili(left), pos, 26, Color.WHITE)
 			var cost: float = player.burst_cost() if id == "burst" else player.art_cost()
 			if cost > 0.0:
-				_centered("%d" % int(cost), pos + Vector2(0, r + 12), 18, Color(0.62, 0.92, 0.95))
+				_centered("%d" % int(cost), pos + Vector2(0, r + 12), 18, UiTheme.MIST)
 		if id == "tree":
-			_centered("%d" % player.level, pos + Vector2(0, r + 14), 20, UiTheme.GOLD if player.points > 0 else UiTheme.PALE)
+			_centered("%d" % player.level, pos + Vector2(0, r + 14), 20, UiTheme.EMBER if player.points > 0 else UiTheme.BONE)
 
 
 func _button_glyph(id: String) -> String:
@@ -621,7 +605,11 @@ func _button_glyph(id: String) -> String:
 		"take": return "grab"
 		"pause": return "pause"
 		"tree": return "tree"
-		"horse": return "horseshoe" if player.is_riding() or player.ride_behind != 0 else "horse"
+		"sandbox": return "gear"
+		"horse":
+			if player.is_riding() or player.ride_behind != 0:
+				return "horseshoe"
+			return "chariot" if player.mount_kind() == "chariot" else "horse"
 		"burst": return "burst"
-		"art": return str(player.art_def().get("icon", "mist"))
+		"art": return player.art_glyph()
 	return "plus"

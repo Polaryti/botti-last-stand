@@ -1,3 +1,4 @@
+@tool
 class_name Terrain
 extends RefCounted
 ## The ground: one height function that the mesh, the player's collision, zombies, items and
@@ -13,23 +14,24 @@ const LAYER := 16 # the ground: blocks the player, sight and shots
 const BARRIER := 32 # the river and the cliffs: block bodies, but not sight or shots
 const ENEMY_ONLY := 128 # blocks enemies and nothing else
 const STEEP := 0.86 # height per metre: steeper than about 40 degrees cannot be walked
-const RIVER: Array[Vector2] = [Vector2(122, -48), Vector2(94, -30), Vector2(76, -12), Vector2(71, 6), Vector2(73, 26), Vector2(66, 46),
-	Vector2(50, 59), Vector2(24, 64), Vector2(0, 64), Vector2(-24, 64), Vector2(-44, 60), Vector2(-60, 68), Vector2(-72, 86), Vector2(-86, 122)]
-const RIVER_WIDTH := 4.2
 const BANK := 5.0
-const CASTLE := Rect2(-96, -94, 48, 48)
-const CASTLE_Y := 8.5
+const WADE := 0.6 # how deep the water can be before it stops you
+const CURRENT := 1.7 # metres a second the river carries you
 
-var use_river := true
+var river: Array[Vector2] = [] # flows from the first point to the last
+var river_width := 4.2
+var roughness := 5.5
+var calm_radius := 30.0
 var walk := PackedFloat32Array()
 var visual := PackedFloat32Array()
 var _noise := FastNoiseLite.new()
 var _detail := FastNoiseLite.new()
 var _hills: Array[Vector4] = []
-var _pads: Array[Dictionary] = []
+var _pads: Array[Dictionary] = [] # levelled at a height given by the map
+var _auto_pads: Array[Dictionary] = [] # levelled at whatever height the land has there
 var _cuts: Array[Dictionary] = []
 var _bridges: Array[Dictionary] = []
-var _fords: Array[Rect2] = []
+var _fords: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -47,9 +49,24 @@ func hill(x: float, z: float, height_m: float, sigma: float) -> void:
 	_hills.append(Vector4(x, z, height_m, sigma))
 
 
-## A level platform for something to stand on, blended into the land around it.
-func pad(r: Rect2, y: float, margin := 5.0) -> void:
-	_pads.append({"r": r, "y": y, "margin": margin})
+## A level platform, blended into the land around it. half is half its size, yaw how far it is turned.
+func level(centre: Vector2, half: Vector2, yaw: float, y: float, margin := 5.0) -> void:
+	_pads.append(_pad(centre, half, yaw, y, margin))
+
+
+## The same, at about the height the land has there, for something that has just been set down.
+func level_auto(centre: Vector2, half: Vector2, yaw: float, margin := 3.0) -> void:
+	_auto_pads.append(_pad(centre, half, yaw, 0.0, margin))
+
+
+func _pad(centre: Vector2, half: Vector2, yaw: float, y: float, margin: float) -> Dictionary:
+	var reach := half.length() + margin
+	return {"c": centre, "h": half, "cos": cos(yaw), "sin": sin(yaw), "y": y, "margin": margin, "reach2": reach * reach}
+
+
+func set_river(line: Array[Vector2], width: float) -> void:
+	river = line
+	river_width = width
 
 
 ## A road cut into the land. Points are (x, y, z), and the height runs along them.
@@ -61,11 +78,13 @@ func bridge(a: Vector2, b: Vector2, hump: float) -> void:
 	_bridges.append({"a": a, "b": b, "hump": hump, "ya": 0.0, "yb": 0.0})
 
 
-func ford(r: Rect2) -> void:
-	_fords.append(r)
+func ford(centre: Vector2, half: Vector2, yaw: float) -> void:
+	_fords.append(_pad(centre, half, yaw, 0.0, 1.0))
 
 
 func bake() -> void:
+	for p: Dictionary in _auto_pads:
+		p["y"] = _natural(p["c"].x, p["c"].y)
 	for j in SIZE:
 		for i in SIZE:
 			var h := _shape(i * CELL - HALF, j * CELL - HALF)
@@ -75,28 +94,48 @@ func bake() -> void:
 		b["ya"] = _sample(visual, b["a"].x, b["a"].y)
 		b["yb"] = _sample(visual, b["b"].x, b["b"].y)
 		_lay_deck(b)
-	for r in _fords:
-		_lay_ford(r)
+	for f: Dictionary in _fords:
+		_lay_ford(f)
 
 
-func _shape(x: float, z: float) -> float:
+## The land before anything is set down on it: hills, roughness, and the map's own platforms.
+func _natural(x: float, z: float) -> float:
 	var d := Vector2(x, z).length()
-	var h := (_noise.get_noise_2d(x, z) * 5.5 + _detail.get_noise_2d(x, z) * 0.5) * smoothstep(30.0, 78.0, d)
+	var h := (_noise.get_noise_2d(x, z) * roughness + _detail.get_noise_2d(x, z) * 0.5) * smoothstep(calm_radius, calm_radius + 48.0, d)
 	for g in _hills:
 		var dx := x - g.x
 		var dz := z - g.y
 		h += g.z * exp(-(dx * dx + dz * dz) / (2.0 * g.w * g.w))
 	for p: Dictionary in _pads:
-		var r: Rect2 = p["r"]
-		var dist := Vector2(maxf(maxf(r.position.x - x, x - r.end.x), 0.0), maxf(maxf(r.position.y - z, z - r.end.y), 0.0)).length()
-		var margin: float = p["margin"]
-		if dist < margin:
-			h = lerpf(float(p["y"]), h, smoothstep(0.0, margin, dist))
+		h = _apply_pad(p, x, z, h)
+	return h
+
+
+func _apply_pad(p: Dictionary, x: float, z: float, h: float) -> float:
+	var c: Vector2 = p["c"]
+	var dx := x - c.x
+	var dz := z - c.y
+	if dx * dx + dz * dz > float(p["reach2"]):
+		return h
+	var half: Vector2 = p["h"]
+	var lx := absf(dx * float(p["cos"]) - dz * float(p["sin"])) - half.x
+	var lz := absf(dx * float(p["sin"]) + dz * float(p["cos"])) - half.y
+	var dist := Vector2(maxf(lx, 0.0), maxf(lz, 0.0)).length()
+	var margin: float = p["margin"]
+	if dist >= margin:
+		return h
+	return lerpf(float(p["y"]), h, smoothstep(0.0, margin, dist))
+
+
+func _shape(x: float, z: float) -> float:
+	var h := _natural(x, z)
+	for p: Dictionary in _auto_pads:
+		h = _apply_pad(p, x, z, h)
 	for c: Dictionary in _cuts:
 		h = _apply_cut(c, x, z, h)
-	var river := river_distance(x, z)
-	if river < RIVER_WIDTH + BANK:
-		h = lerpf(BED_Y, minf(h, 2.2), smoothstep(RIVER_WIDTH - 1.2, RIVER_WIDTH + BANK, river))
+	var dist := river_distance(x, z)
+	if dist < river_width + BANK:
+		h = lerpf(BED_Y, minf(h, 2.2), smoothstep(river_width - 1.2, river_width + BANK, dist))
 	return h
 
 
@@ -122,15 +161,33 @@ func _apply_cut(c: Dictionary, x: float, z: float, h: float) -> float:
 
 
 func river_distance(x: float, z: float) -> float:
-	if not use_river:
-		return INF
 	var best := INF
 	var at := Vector2(x, z)
-	for i in RIVER.size() - 1:
-		var ab := RIVER[i + 1] - RIVER[i]
-		var t := clampf((at - RIVER[i]).dot(ab) / ab.length_squared(), 0.0, 1.0)
-		best = minf(best, at.distance_to(RIVER[i] + ab * t))
+	for i in river.size() - 1:
+		var ab := river[i + 1] - river[i]
+		var t := clampf((at - river[i]).dot(ab) / ab.length_squared(), 0.0, 1.0)
+		best = minf(best, at.distance_to(river[i] + ab * t))
 	return best
+
+
+## Standing in the river, shallows and ford included. A bridge is well above this.
+func in_water(x: float, z: float) -> bool:
+	return height(x, z) < WATER_Y + 0.03 and not river.is_empty()
+
+
+## Which way the river runs at the nearest point to here.
+func river_flow(x: float, z: float) -> Vector2:
+	var best := INF
+	var flow := Vector2.ZERO
+	var at := Vector2(x, z)
+	for i in river.size() - 1:
+		var ab := river[i + 1] - river[i]
+		var t := clampf((at - river[i]).dot(ab) / ab.length_squared(), 0.0, 1.0)
+		var d := at.distance_squared_to(river[i] + ab * t)
+		if d < best:
+			best = d
+			flow = ab.normalized()
+	return flow
 
 
 func deck_y(b: Dictionary, s: float) -> float:
@@ -144,31 +201,38 @@ func bridges() -> Array[Dictionary]:
 func _lay_deck(b: Dictionary) -> void:
 	var a: Vector2 = b["a"]
 	var e: Vector2 = b["b"]
-	var along_x := absf(a.x - e.x) > absf(a.y - e.y)
+	var along := (e - a).normalized()
 	var length := a.distance_to(e)
 	for j in SIZE:
 		for i in SIZE:
-			var x := i * CELL - HALF
-			var z := j * CELL - HALF
-			var s := ((x - a.x) / (e.x - a.x)) if along_x else ((z - a.y) / (e.y - a.y))
-			var side := absf(z - a.y) if along_x else absf(x - a.x)
-			if s < 0.0 or s > 1.0 or side > 5.0:
+			var at := Vector2(i * CELL - HALF, j * CELL - HALF) - a
+			var run := at.dot(along)
+			var side := absf(at.dot(along.orthogonal()))
+			if run < 0.0 or run > length or side > 5.0:
 				continue
-			var y := deck_y(b, s)
+			var y := deck_y(b, run / length)
 			# The very ends meet the road, whatever the land is doing there.
-			if s * length < 2.0 or (1.0 - s) * length < 2.0:
+			if run < 2.0 or length - run < 2.0:
 				y = maxf(y, walk[j * SIZE + i])
 			walk[j * SIZE + i] = y
 
 
-func _lay_ford(r: Rect2) -> void:
+## The stream runs over it, ankle deep, so you can wade across but feel the current as you do.
+func _lay_ford(f: Dictionary) -> void:
+	var c: Vector2 = f["c"]
+	var half: Vector2 = f["h"]
 	for j in SIZE:
 		for i in SIZE:
-			var x := i * CELL - HALF
-			var z := j * CELL - HALF
-			if r.grow(1.0).has_point(Vector2(x, z)) and visual[j * SIZE + i] < WATER_Y + 0.14:
-				visual[j * SIZE + i] = WATER_Y + 0.14
-				walk[j * SIZE + i] = WATER_Y + 0.14
+			var dx := i * CELL - HALF - c.x
+			var dz := j * CELL - HALF - c.y
+			if dx * dx + dz * dz > float(f["reach2"]) * 1.2:
+				continue
+			var lx := absf(dx * float(f["cos"]) - dz * float(f["sin"]))
+			var lz := absf(dx * float(f["sin"]) + dz * float(f["cos"]))
+			var y := WATER_Y - 0.2
+			if lx < half.x + 1.0 and lz < half.y + 1.0 and visual[j * SIZE + i] < y:
+				visual[j * SIZE + i] = y
+				walk[j * SIZE + i] = y
 
 
 func _sample(a: PackedFloat32Array, x: float, z: float) -> float:
@@ -197,28 +261,34 @@ func slope(x: float, z: float) -> float:
 	return Vector2(dx, dz).length()
 
 
+## How far along a bridge, and how far to its side, a point is.
+func _deck_place(b: Dictionary, x: float, z: float) -> Vector2:
+	var a: Vector2 = b["a"]
+	var e: Vector2 = b["b"]
+	var along := (e - a).normalized()
+	var at := Vector2(x, z) - a
+	return Vector2(at.dot(along), absf(at.dot(along.orthogonal())))
+
+
 func on_deck(x: float, z: float) -> bool:
 	for b: Dictionary in _bridges:
-		var a: Vector2 = b["a"]
-		var e: Vector2 = b["b"]
-		var r := Rect2(minf(a.x, e.x), minf(a.y, e.y), absf(a.x - e.x), absf(a.y - e.y))
-		if r.grow(5.0).has_point(Vector2(x, z)):
+		var q := _deck_place(b, x, z)
+		var length := (b["a"] as Vector2).distance_to(b["b"])
+		if q.x > -5.0 and q.x < length + 5.0 and q.y < 5.0:
 			return true
 	return false
 
 
 func over_water_on_deck(x: float, z: float) -> bool:
 	for b: Dictionary in _bridges:
-		var a: Vector2 = b["a"]
-		var e: Vector2 = b["b"]
-		var r := Rect2(minf(a.x, e.x), minf(a.y, e.y), absf(a.x - e.x), absf(a.y - e.y))
-		if r.grow(0.1).has_point(Vector2(x, z)) or (absf(a.x - e.x) > 0.5 and absf(z - a.y) < 3.0 and x > r.position.x and x < r.end.x) or (absf(a.y - e.y) > 0.5 and absf(x - a.x) < 3.0 and z > r.position.y and z < r.end.y):
+		var q := _deck_place(b, x, z)
+		if q.x > 0.0 and q.x < (b["a"] as Vector2).distance_to(b["b"]) and q.y < 3.0:
 			return true
 	return false
 
 
 func is_walkable(x: float, z: float) -> bool:
-	if height(x, z) < WATER_Y + 0.1:
+	if height(x, z) < WATER_Y - WADE:
 		return false
 	return on_deck(x, z) or slope(x, z) < STEEP
 
@@ -272,15 +342,15 @@ func blocked_rects() -> Array[Rect2i]:
 	return out
 
 
-func _tint(x: float, z: float, h: float, steep: float, river: float) -> Color:
+func _tint(x: float, z: float, h: float, steep: float, river_dist: float) -> Color:
 	var n := _detail.get_noise_2d(x * 1.7, z * 1.7) * 0.5 + 0.5
 	var far := _noise.get_noise_2d(z, x) * 0.5 + 0.5
 	var col := Color(0.25, 0.4, 0.19).lerp(Color(0.34, 0.44, 0.2), n).lerp(Color(0.2, 0.33, 0.2), far * 0.7)
 	if h > 3.0:
 		col = col.lerp(Color(0.36, 0.42, 0.26), clampf((h - 3.0) / 6.0, 0.0, 0.6))
 	col = col.lerp(Color(0.36, 0.34, 0.32), smoothstep(0.42, 0.72, steep))
-	if river < RIVER_WIDTH + BANK * 0.65:
-		col = col.lerp(Color(0.32, 0.28, 0.2), 1.0 - smoothstep(RIVER_WIDTH, RIVER_WIDTH + BANK * 0.65, river))
+	if river_dist < river_width + BANK * 0.65:
+		col = col.lerp(Color(0.32, 0.28, 0.2), 1.0 - smoothstep(river_width, river_width + BANK * 0.65, river_dist))
 	return col
 
 
@@ -372,14 +442,14 @@ func _skirt_point(sector: int, u: int, v: int, step: float, along: int) -> Vecto
 func water_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var half := RIVER_WIDTH + BANK * 0.5
+	var half := river_width + BANK * 0.5
 	var flow := 0.0
-	for i in RIVER.size() - 1:
-		var a := RIVER[i]
-		var b := RIVER[i + 1]
+	for i in river.size() - 1:
+		var a := river[i]
+		var b := river[i + 1]
 		var d := (b - a).normalized()
-		var before := (a - RIVER[i - 1]).normalized() if i > 0 else d
-		var after := (RIVER[i + 2] - b).normalized() if i < RIVER.size() - 2 else d
+		var before := (a - river[i - 1]).normalized() if i > 0 else d
+		var after := (river[i + 2] - b).normalized() if i < river.size() - 2 else d
 		var na := (d + before).normalized().orthogonal()
 		var nb := (d + after).normalized().orthogonal()
 		var flow2 := flow + a.distance_to(b)

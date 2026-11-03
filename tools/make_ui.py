@@ -1,131 +1,158 @@
 #!/usr/bin/env python3
-"""Generates the iron and parchment UI textures. All original. Run from the project root."""
+"""Draws the small images the interface uses: discs for icons, the slider knob, the shade behind the
+menu, the Botti Doubloon and the wordmark. The rest of the look is flat colour, set in scripts/ui_theme.gd.
+Run from the project root."""
+import math
 import numpy as np
-from PIL import Image, ImageFilter
-from scipy.ndimage import gaussian_filter, zoom
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-rng = np.random.default_rng(11)
 OUT = "assets/ui/"
 
-def fractal(h, w, base=4, octaves=5):
-    out = np.zeros((h, w))
-    amp = 1.0
-    for o in range(octaves):
-        g = rng.normal(0, 1, (base * 2 ** o + 2, base * 2 ** o + 2))
-        z = zoom(g, (h / (g.shape[0] - 1), w / (g.shape[1] - 1)), order=3)[:h, :w]
-        out += amp * z
-        amp *= 0.55
-    out -= out.min()
-    return out / max(out.max(), 1e-6)
 
-def save(name, arr):
-    Image.fromarray(np.uint8(np.clip(arr, 0, 1) * 255)).save(OUT + name + ".png")
+def disc_alpha(size, radius, feather=1.2):
+    yy, xx = np.mgrid[0:size, 0:size]
+    d = np.hypot(xx + 0.5 - size / 2, yy + 0.5 - size / 2)
+    return np.clip((radius - d) / feather + 0.5, 0, 1), d
 
-def parchment(h, w):
-    n = fractal(h, w)
-    fibre = gaussian_filter(rng.normal(0, 1, (h, w)), (0.6, 3.0))
-    fibre /= np.abs(fibre).max()
-    c0 = np.array([0.56, 0.42, 0.25]); c1 = np.array([0.88, 0.76, 0.54])
-    t = np.clip(0.2 + 0.85 * n + 0.08 * fibre, 0, 1)[..., None]
-    rgb = c0 * (1 - t) + c1 * t
+
+def save_rgba(name, rgb, a):
+    arr = np.dstack([np.clip(rgb, 0, 1), np.clip(a, 0, 1)])
+    Image.fromarray(np.uint8(arr * 255 + 0.5), "RGBA").save(OUT + name + ".png")
+
+
+def medal():
+    """A plain disc for icons. White, so each class can tint it. A little lighter at the top."""
+    n = 128
+    a, _ = disc_alpha(n, 62.5)
+    yy, _x = np.mgrid[0:n, 0:n]
+    v = 1.0 - 0.28 * (yy / n)
+    save_rgba("medal", np.dstack([v, v, v]), a)
+
+
+def ring():
+    """A hairline around each icon."""
+    n = 128
+    outer, _ = disc_alpha(n, 63.0)
+    inner, _ = disc_alpha(n, 59.5)
+    a = (outer - inner) * 0.85
+    save_rgba("ring", np.ones((n, n, 3)) * np.array([0.94, 0.9, 0.82]), a)
+
+
+def glass():
+    """The disc under a touch control: dark and see-through, so the game shows behind it."""
+    n = 128
+    a, d = disc_alpha(n, 62.5)
+    v = 0.3 + 0.12 * (1.0 - d / 64.0)
+    save_rgba("glass", np.dstack([v, v, v]), a * 0.62)
+
+
+def knob():
+    n = 48
+    a, _ = disc_alpha(n, 19.0)
+    save_rgba("knob", np.ones((n, n, 3)) * np.array([0.937, 0.663, 0.247]), a)
+
+
+def shades():
+    # Keeps text readable over the moving village. Dark on the left, gone by two thirds of the way across.
+    w, h = 512, 8
+    xx = np.linspace(0, 1, w)[None, :].repeat(h, 0)
+    a = np.clip(1.0 - xx / 0.72, 0, 1) ** 1.3 * 0.93
+    save_rgba("menu_shade", np.ones((h, w, 3)) * np.array([0.05, 0.07, 0.11]), a)
+    # Everything else: the edges of the screen fall away.
+    w, h = 256, 144
     yy, xx = np.mgrid[0:h, 0:w]
-    edge = np.minimum.reduce([xx, yy, w - 1 - xx, h - 1 - yy]) / (min(h, w) * 0.22)
-    rgb *= (0.62 + 0.38 * np.clip(edge, 0, 1))[..., None]
-    return rgb
+    d = np.hypot((xx - w / 2) / (w / 2), (yy - h / 2) / (h / 2))
+    a = np.clip((d - 0.35) / 1.0, 0, 1) ** 1.2 * 0.75 + 0.42
+    save_rgba("vignette", np.ones((h, w, 3)) * np.array([0.04, 0.055, 0.09]), a)
 
-def iron(h, w):
-    n = fractal(h, w, base=8, octaves=4)
-    brushed = gaussian_filter(rng.normal(0, 1, (h, w)), (0.5, 6.0))
-    brushed /= np.abs(brushed).max()
-    v = 0.17 + 0.09 * n + 0.025 * brushed
-    return np.stack([v * 1.02, v * 1.03, v * 1.1], -1)
 
-def bevel(rgb, m, w=3, strength=0.5):
-    """Lights the top-left and darkens the bottom-right inside the mask."""
-    g = gaussian_filter(m.astype(float), w * 0.6)
-    dy, dx = np.gradient(g)
-    light = (dx + dy) * -1
-    light = np.clip(light * w * 2.4, -1, 1)
-    return rgb * (1 + strength * light[..., None])
+def doubloon():
+    """A hand-struck gold coin: a slightly uneven edge, a beaded border and a raised B."""
+    n = 256 * 3
+    c = n / 2
+    yy, xx = np.mgrid[0:n, 0:n]
+    dx, dy = xx + 0.5 - c, yy + 0.5 - c
+    ang = np.arctan2(dy, dx)
+    d = np.hypot(dx, dy) / (c * 0.96)
+    # Struck by hand, so the outline is never quite round.
+    edge = 1.0 + 0.012 * np.sin(ang * 3 + 0.6) + 0.008 * np.sin(ang * 7 + 2.0) + 0.004 * np.sin(ang * 13)
+    r = d / edge
+    alpha = np.clip((1.0 - r) * c * 0.96 / 2.0 + 0.5, 0, 1)
+    # Height field: a raised rim, a sunk field, beads, and the letter.
+    height = np.zeros((n, n))
+    height += np.clip((r - 0.8) / 0.05, 0, 1) * 1.0
+    height -= np.clip((r - 0.965) / 0.035, 0, 1) * 1.0
+    beads = 36
+    bead_ang = (ang / math.tau * beads) % 1.0 - 0.5
+    bead_r = np.hypot(bead_ang * (math.tau * 0.71 / beads), r - 0.71)
+    height += np.clip((0.021 - bead_r) / 0.012, 0, 1) * 0.55
+    font = ImageFont.truetype("assets/fonts/Cinzel-Black.ttf", int(n * 0.5))
+    letter = Image.new("L", (n, n), 0)
+    ld = ImageDraw.Draw(letter)
+    box = ld.textbbox((0, 0), "B", font=font)
+    ld.text((c - (box[0] + box[2]) / 2, c - (box[1] + box[3]) / 2), "B", font=font, fill=255)
+    letter = letter.filter(ImageFilter.GaussianBlur(n * 0.0035))
+    height += np.asarray(letter, dtype=float) / 255.0 * 1.0
+    height = np.asarray(Image.fromarray(np.uint8(np.clip(height + 0.2, 0, 2) * 120)).filter(ImageFilter.GaussianBlur(n * 0.0022)), dtype=float) / 120.0
+    # Light from the upper left.
+    gy, gx = np.gradient(height)
+    relief = (-gx - gy) * n * 0.02
+    base = np.array([0.93, 0.68, 0.2])
+    shine = np.array([1.0, 0.92, 0.6])
+    deep = np.array([0.52, 0.31, 0.08])
+    sweep = np.clip(0.5 - (dx + dy) / (n * 1.1), 0, 1)[..., None]
+    rgb = base * (0.78 + 0.34 * sweep)
+    # A worn surface, so the gold does not look like plastic.
+    rng = np.random.default_rng(11)
+    wear = np.asarray(Image.fromarray(np.uint8(rng.uniform(0, 255, (n // 8, n // 8)))).resize((n, n), Image.BICUBIC), dtype=float)[..., None] / 255.0 - 0.5
+    rgb = rgb * (1.0 + wear * 0.09)
+    t = np.clip(relief, -1, 1)[..., None]
+    rgb = np.where(t > 0, rgb + (shine - rgb) * t, rgb + (deep - rgb) * -t)
+    # The dark line where the coin's rim meets the air.
+    rgb = rgb * (1.0 - np.clip((r - 0.975) / 0.025, 0, 1)[..., None] * 0.45)
+    img = Image.fromarray(np.uint8(np.dstack([np.clip(rgb, 0, 1), alpha]) * 255 + 0.5), "RGBA")
+    img.resize((256, 256), Image.LANCZOS).save(OUT + "doubloon.png")
 
-def rivets(rgb, alpha, pts, r=5):
-    h, w = alpha.shape
-    yy, xx = np.mgrid[0:h, 0:w]
-    for cx, cy in pts:
-        d = np.hypot(xx - cx, yy - cy) / r
-        m = d < 1
-        v = 0.42 + 0.45 * np.clip(1 - np.hypot(xx - cx + r * 0.3, yy - cy + r * 0.3) / r, 0, 1)
-        rgb[m] = np.stack([v, v, v * 1.05], -1)[m] * 0.9
 
-def framed(name, h, w, b, fill):
-    """A nine-patch: iron band of width b around fill, or transparent if fill is None."""
-    rgb = iron(h, w)
-    alpha = np.ones((h, w))
-    yy, xx = np.mgrid[0:h, 0:w]
-    band = np.minimum.reduce([xx, yy, w - 1 - xx, h - 1 - yy]) < b
-    if fill is not None:
-        rgb[~band] = fill[~band]
-    else:
-        alpha[~band] = 0.0
-    rgb = bevel(rgb, band, 3, 0.55)
-    # A dark line where the iron meets the middle.
-    inner = np.minimum.reduce([xx, yy, w - 1 - xx, h - 1 - yy])
-    line = (inner >= b) & (inner < b + 3)
-    rgb[line] *= 0.45
-    s = b // 2
-    rivets(rgb, alpha, [(s, s), (w - 1 - s, s), (s, h - 1 - s), (w - 1 - s, h - 1 - s)], max(3, b // 3))
-    # Rounded corners.
-    for cx, cy in ((3, 3), (w - 4, 3), (3, h - 4), (w - 4, h - 4)):
-        m = (np.abs(xx - cx) < 4) & (np.abs(yy - cy) < 4) & (np.hypot(xx - cx, yy - cy) > 3.5) & ((xx < 3) | (xx > w - 4)) & ((yy < 3) | (yy > h - 4))
-        alpha[m] = 0
-    Image.fromarray(np.uint8(np.dstack([np.clip(rgb, 0, 1), alpha]) * 255), "RGBA").save(OUT + name + ".png")
+def wordmark(size=132):
+    """The game's name, lit a little from below, as if by a fire nobody can see."""
+    font = ImageFont.truetype("assets/fonts/Cinzel-Black.ttf", size * 3)
+    text = "Botti Last Stand"
+    probe = ImageDraw.Draw(Image.new("L", (8, 8)))
+    box = probe.textbbox((0, 0), text, font=font)
+    pad = 60 * 3 // 3
+    w, h = box[2] - box[0] + pad * 2, box[3] - box[1] + pad * 2
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).text((pad - box[0], pad - box[1]), text, font=font, fill=255)
+    m = np.asarray(mask, dtype=float) / 255.0
+    v = np.linspace(0, 1, h)[:, None]
+    top = np.array([0.965, 0.94, 0.88])
+    low = np.array([0.98, 0.76, 0.42])
+    rgb = top * (1 - np.clip((v - 0.35) / 0.4, 0, 1)[..., None]) + low * np.clip((v - 0.35) / 0.4, 0, 1)[..., None]
+    rgb = np.broadcast_to(rgb, (h, w, 3))
+    glow = np.asarray(mask.filter(ImageFilter.GaussianBlur(size * 0.28)), dtype=float) / 255.0
+    shadow = np.asarray(mask.filter(ImageFilter.GaussianBlur(size * 0.07)), dtype=float) / 255.0
+    # Over the night: first a soft dark edge, then a faint warm halo, then the letters.
+    out_rgb = np.zeros((h, w, 3))
+    out_a = np.zeros((h, w))
+    out_rgb += np.array([0.95, 0.5, 0.14])
+    out_a = glow * 0.4
+    sa = shadow * 0.7
+    out_rgb = (out_rgb * out_a[..., None] * (1 - sa[..., None]) + np.array([0.02, 0.03, 0.05]) * sa[..., None]) / np.maximum(out_a + sa - out_a * sa, 0.001)[..., None]
+    out_a = out_a + sa - out_a * sa
+    out_rgb = (out_rgb * out_a[..., None] * (1 - m[..., None]) + rgb * m[..., None]) / np.maximum(out_a + m - out_a * m, 0.001)[..., None]
+    out_a = out_a + m - out_a * m
+    img = Image.fromarray(np.uint8(np.dstack([np.clip(out_rgb, 0, 1), out_a]) * 255 + 0.5), "RGBA")
+    img = img.resize((w // 3 * 1, h // 3 * 1), Image.LANCZOS)
+    img.save(OUT + "wordmark.png")
 
-framed("panel", 192, 192, 18, parchment(192, 192))
-framed("frame", 96, 96, 10, None)
-save("parchment", parchment(256, 256))
 
-def button(name, c0, c1, b=8):
-    h, w = 96, 192
-    n = fractal(h, w, base=6, octaves=4)[..., None]
-    fill = np.array(c0) * (1 - n) + np.array(c1) * n
-    yy = np.linspace(1.12, 0.78, h)[:, None, None]
-    framed(name, h, w, b, fill * yy)
-
-button("btn_wax", (0.33, 0.06, 0.05), (0.62, 0.13, 0.09))
-button("btn_wax_hover", (0.45, 0.09, 0.06), (0.78, 0.2, 0.12))
-button("btn_wax_down", (0.24, 0.04, 0.03), (0.42, 0.08, 0.06))
-button("btn_iron", (0.13, 0.13, 0.15), (0.28, 0.28, 0.31))
-button("btn_iron_off", (0.09, 0.09, 0.1), (0.15, 0.15, 0.16))
-button("btn_gold", (0.48, 0.32, 0.08), (0.84, 0.62, 0.2))
-
-# Round pieces: medallion base (tinted in game), and the iron ring over it.
-S = 256
-yy, xx = np.mgrid[0:S, 0:S]
-d = np.hypot(xx - S / 2 + 0.5, yy - S / 2 + 0.5) / (S / 2)
-shade = np.clip(1.1 - np.hypot(xx - S * 0.38, yy - S * 0.34) / (S * 0.82), 0.45, 1.0)
-n = fractal(S, S, base=6, octaves=4)
-v = np.clip(shade * (0.82 + 0.18 * n), 0, 1)
-disc = np.dstack([v, v, v, (d < 0.86).astype(float)])
-Image.fromarray(np.uint8(disc * 255), "RGBA").resize((128, 128), Image.LANCZOS).save(OUT + "medal.png")
-ring_rgb = iron(S, S)
-ring = (d < 0.98) & (d > 0.80)
-ang = np.arctan2(yy - S / 2, xx - S / 2)
-light = np.cos(ang + 2.4) * np.where(d > 0.89, 1, -1)
-ring_rgb = ring_rgb * (1 + 0.65 * light[..., None]) + 0.06
-rim = (np.abs(d - 0.89) < 0.008)
-ring_rgb[rim] *= 0.5
-alpha = ring.astype(float)
-for i in range(8):
-    a = i / 8 * 2 * np.pi + np.pi / 8
-    rivets(ring_rgb, alpha, [(S / 2 + S * 0.445 * np.cos(a), S / 2 + S * 0.445 * np.sin(a))], 6)
-Image.fromarray(np.uint8(np.dstack([np.clip(ring_rgb, 0, 1), alpha]) * 255), "RGBA").resize((128, 128), Image.LANCZOS).save(OUT + "ring.png")
-# Glass-dark disc for the HUD buttons.
-dark = np.dstack([np.full((S, S), 0.05), np.full((S, S), 0.05), np.full((S, S), 0.07), (d < 0.86) * 0.62])
-Image.fromarray(np.uint8(dark * 255), "RGBA").resize((128, 128), Image.LANCZOS).save(OUT + "glass.png")
-
-# Dark painted vignette for menus.
-h, w = 360, 640
-yy, xx = np.mgrid[0:h, 0:w]
-dv = np.hypot((xx - w / 2) / (w / 2), (yy - h / 2) / (h / 2))
-a = np.clip((dv - 0.45) / 0.9, 0, 1) ** 1.3
-Image.fromarray(np.uint8(np.dstack([np.zeros((h, w)), np.zeros((h, w)), np.zeros((h, w)), a * 0.9]) * 255), "RGBA").save(OUT + "vignette.png")
+if __name__ == "__main__":
+    medal()
+    ring()
+    glass()
+    knob()
+    shades()
+    doubloon()
+    wordmark()
+    print("interface images done")

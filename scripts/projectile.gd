@@ -18,6 +18,9 @@ var sharp := false
 var from_player := false
 var source := "" # who fired it, for the end screen
 var visual := false # someone else's shot: it flies here too, but only their phone decides what it hits
+var on_burst := Callable() # thrown things: what happens where it lands
+var chaos_left := 0 # bomblets: how many more times it bounces off and goes on
+var sparks := 0 # darts: how many others the spark jumps to
 var _returning := false
 var _spin := 0.0
 var _vel := Vector3.ZERO
@@ -67,6 +70,9 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	sharp = false
 	from_player = false
 	visual = false
+	on_burst = Callable()
+	chaos_left = 0
+	sparks = 0
 	source = ""
 	_returning = false
 	_flame.visible = on_fire or k == Kind.FIREBALL
@@ -134,6 +140,9 @@ func _physics_process(delta: float) -> void:
 		var a := c as Avatar
 		_exclude.append(a.get_rid())
 		if Net.is_foe(a.peer):
+			if on_burst.is_valid():
+				_explode(at)
+				return
 			Net.hit_player(a.peer, damage, position)
 			world.fx_gore(at, Color(0.6, 0.1, 0.08))
 			if world.player:
@@ -170,6 +179,22 @@ func _turn_back() -> void:
 
 
 func _explode(at: Vector3) -> void:
+	if on_burst.is_valid():
+		var burst := on_burst
+		if chaos_left > 0:
+			chaos_left -= 1
+			burst.call(at)
+			# Off again, in any direction.
+			var a := randf() * TAU
+			position = at + Vector3.UP * 0.3
+			_vel = Vector3(cos(a), randf_range(0.9, 1.5), sin(a)).normalized() * randf_range(6.0, 10.0)
+			_left = 40.0
+			_exclude.clear()
+			return
+		on_burst = Callable()
+		stop()
+		burst.call(at)
+		return
 	world.blast(at, blast_radius, WeaponDefs.DAMAGE * 2.0)
 	stop()
 
@@ -181,7 +206,10 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		amount = world.player.modify_damage(z, amount)
 	if fire and z.phases:
 		amount *= 1.5
-	world.damage_zombie(z, amount, _vel.normalized(), knock, at, head)
+	if amount > 0.0:
+		world.damage_zombie(z, amount, _vel.normalized(), knock, at, head)
+	if sparks > 0 and world.player:
+		world.player.spark_from(z, sparks, amount)
 	if from_player and world.player:
 		world.player.on_shot_connect(z)
 	if fire:

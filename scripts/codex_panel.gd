@@ -1,11 +1,10 @@
 class_name CodexPanel
 extends Control
-## The player's field notes: what lives in the village, and what can be found there.
+## The player's field notes: who you can be, what lives out there, and what can be found.
 
 signal closed
 
-const INK_NOTE := Color(0.46, 0.16, 0.08)
-const TABS := ["Enemies", "Familiars", "Items", "Weapons", "Tips"]
+const TABS := ["Classes", "Enemies", "Familiars", "Items", "Weapons"]
 
 var _list: VBoxContainer
 var _scroll: ScrollContainer
@@ -72,65 +71,60 @@ func show_tab(index: int) -> void:
 	for c in _list.get_children():
 		c.queue_free()
 	for i in _tabs.size():
+		UiTheme.plain(_tabs[i])
 		if i == index:
-			UiTheme.wax(_tabs[i])
-		else:
-			for state in ["normal", "hover", "pressed"]:
-				_tabs[i].remove_theme_stylebox_override(state)
-			_tabs[i].remove_theme_color_override("font_color")
-			_tabs[i].remove_theme_color_override("font_pressed_color")
+			UiTheme.selected(_tabs[i])
 	_scroll.scroll_vertical = 0
 	match index:
-		0: _enemies()
-		1: _familiars()
-		2: _items()
-		3: _weapons()
-		4: _tips()
+		0: _classes()
+		1: _enemies()
+		2: _familiars()
+		3: _items()
+		4: _weapons()
 
 
 func _row(icon: String, color: Color, title: String, text: String, note := "") -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	_list.add_child(row)
-	var medal := IconView.new(icon, color, 68.0)
+	var medal := IconView.new(icon, color, 64.0)
 	medal.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(medal)
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_theme_constant_override("separation", 0)
+	words.add_theme_constant_override("separation", 2)
 	row.add_child(words)
 	var head := Label.new()
 	head.text = title
 	head.add_theme_font_override("font", UiTheme.title_font())
-	head.add_theme_font_size_override("font_size", 28)
-	head.add_theme_color_override("font_color", UiTheme.INK)
+	head.add_theme_font_size_override("font_size", 27)
+	head.add_theme_color_override("font_color", UiTheme.BONE)
 	words.add_child(head)
 	var body := Label.new()
 	body.text = text
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 23)
-	body.add_theme_color_override("font_color", UiTheme.INK_SOFT)
+	body.add_theme_font_size_override("font_size", 22)
+	body.add_theme_color_override("font_color", UiTheme.ASH)
 	words.add_child(body)
 	if note != "":
 		var extra := Label.new()
 		extra.text = note
 		extra.add_theme_font_size_override("font_size", 20)
-		extra.add_theme_color_override("font_color", INK_NOTE)
+		extra.add_theme_color_override("font_color", UiTheme.EMBER)
 		words.add_child(extra)
 
 
-func _tip(text: String) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 14)
-	_list.add_child(row)
-	row.add_child(IconView.new("book", Color(0.42, 0.3, 0.18), 52.0))
-	var body := Label.new()
-	body.text = text
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_theme_font_size_override("font_size", 25)
-	body.add_theme_color_override("font_color", UiTheme.INK)
-	row.add_child(body)
+## Every class, whether or not it is yours yet, with its paths.
+func _classes() -> void:
+	for id: String in ClassDefs.ALL:
+		var d: Dictionary = ClassDefs.ALL[id]
+		var paths := PackedStringArray()
+		for spec: Dictionary in AbilityData.tree(id)["specs"]:
+			paths.append(spec["name"])
+		var note := "Health %d, speed %d%%. Paths: %s." % [int(d["hp"]), int(round(float(d["speed"]) * 100.0)), ", ".join(paths)]
+		if not Game.owns_class(id):
+			note += " In the Store for %d doubloons." % ClassDefs.price(id)
+		_row(ClassDefs.icon(id), ClassDefs.color(id), d["name"], d["desc"], note)
 
 
 func _enemies() -> void:
@@ -175,8 +169,3 @@ func _weapons() -> void:
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
 		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
-
-
-func _tips() -> void:
-	for tip: String in Main.TIPS:
-		_tip(tip)
