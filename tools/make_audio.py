@@ -307,3 +307,31 @@ for s in range(0, m, n(1.25)):
         q = n(0.03); p = s + j * n(0.055)
         crick[p:p + q] += np.sin(2 * np.pi * 4300 * t_(q)) * bell_env(q)
 write(SND + "night.ogg", looped(wind * 2.2 + crick * 0.13, n(2)), 0.5, loop=True)
+
+# --- Rain and far-off thunder ------------------------------------------------
+
+def crossfaded(x, tail):
+    """Blends the end into the start with equal power, so a noisy loop has no bump at the seam."""
+    a = np.sin(np.linspace(0, np.pi / 2, tail))
+    out = x[:-tail].copy()
+    out[:tail] = out[:tail] * a + x[-tail:] * a[::-1]
+    return out
+
+m = n(10.5)
+hiss = highp(noise(m), 2200, 2) * 0.9 + band(noise(m), 500, 2200) * 0.75 + lowp(noise(m), 320, 2) * 0.35
+swell = 0.86 + 0.14 * np.interp(np.arange(m), np.arange(0, m + 12000, 12000), rng.random(len(np.arange(0, m + 12000, 12000))))
+drops = np.zeros(m)
+for i in range(420):
+    q = n(rng.uniform(0.004, 0.014))
+    p = rng.integers(0, m - q)
+    drops[p:p + q] += band(noise(q), rng.uniform(900, 2400), rng.uniform(3000, 7000)) * env(q, 0.05, 2) * rng.uniform(0.3, 1.5)
+write(SND + "rain.ogg", crossfaded(hiss * swell + drops * 0.7, n(1.5)), 0.6, loop=True)
+
+m = n(4.2)
+roll = lowp(noise(m), 150, 3) * 5
+for start, size in ((0.0, 1.0), (0.9, 0.7), (1.7, 0.85), (2.8, 0.5)):
+    k = n(1.6)
+    p = n(start)
+    q = min(k, m - p)
+    roll[p:p + q] += lowp(noise(q), 90, 3) * 9 * size * env(q, 0.12, 1.5)[:q]
+save("thunder_far", reverb(roll * env(m, 0.04, 1.1), 1.2, 0.2), 0.7)

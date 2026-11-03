@@ -62,6 +62,7 @@ func finish() -> void:
 
 func _ready() -> void:
 	name = "NetTest"
+	Game.force_weather = Weather.Kind.CLEAR
 	var args := OS.get_cmdline_user_args()
 	host = args[0] == "host"
 	rules = args[1] if args.size() > 1 else "coop"
@@ -375,11 +376,11 @@ func _chariot() -> void:
 	await wait(0.4)
 	if host:
 		ok(pl.class_id == "artificer", "the host plays an Artificer")
-		pl.points = 18
-		for row in 4:
+		pl.points = ClassDefs.MAX_LEVEL - 1
+		for row in Player.CORE_STEPS:
 			pl.choose_ability(row, 0)
-		pl.choose_ability(4, 1)
-		pl.choose_ability(5, 0)
+		pl.choose_ability(Player.CORE_STEPS, 1)
+		pl.choose_ability(Player.CORE_STEPS + 1, 0)
 		ok(pl.spec_id == "mechanic" and pl.has_flag("chariot_turret"), "a Mechanic with a turret")
 		pl.horse_progress = pl.horses_needed()
 		pl.mount()
@@ -659,6 +660,150 @@ func _coop() -> void:
 	await snap("over")
 
 
+## Abilities reach other players in a fight, and rivals' names stay hidden.
+func _rival_effects() -> void:
+	await _clear_zombies_on_host()
+	ok(not _avatar()._label.visible, "no name over a rival's head")
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	pl.global_position = Vector3(-1.2, 0.05, 6) if host else Vector3(1.2, 0.05, 6)
+	await wait(0.6)
+	await sync(30)
+	if not host:
+		ok(w.stun_around(pl.global_position, 5.0, 3.0) >= 1, "a stun counts the other player")
+	await wait(0.4)
+	await sync(31)
+	if host:
+		ok(pl.frozen_left > 0.0 and not pl.is_iced, "a stun from another player stops this one")
+		var at := pl.global_position
+		pl.input_move = Vector2(0, 1)
+		await wait(0.5)
+		ok(pl.global_position.distance_to(at) < 0.2, "and they cannot walk away")
+		pl.input_move = Vector2.ZERO
+	pl.frozen_left = 0.0
+	await sync(32)
+	# The Revenant's Burst: damage and a freeze, seen on every phone.
+	if not host:
+		Net.status_peer(_other(), Net.Status.FREEZE, 3.0)
+		await wait(0.1)
+		ok(_avatar()._ice_left > 0.0, "the frozen player looks frozen to me")
+	await wait(0.4)
+	await sync(33)
+	if host:
+		ok(pl.frozen_left > 0.0 and pl.is_iced, "a freeze from another player")
+		ok(pl.frozen_left <= 3.0 * Player.PVP_STATUS, "though shorter than on the undead")
+		pl.frozen_left = 0.0
+		pl.guard_left = 5.0
+	await wait(0.2)
+	await sync(34)
+	if not host:
+		Net.status_peer(_other(), Net.Status.STUN, 3.0)
+	await wait(0.4)
+	await sync(35)
+	var hp_now := pl.hp
+	if host:
+		ok(pl.frozen_left <= 0.0, "a moment of invincibility shrugs it off")
+		pl.guard_left = 0.0
+	await sync(36)
+	if not host:
+		w.blast(pl.global_position, 5.0, 30.0)
+	await wait(0.5)
+	await sync(37)
+	if host:
+		ok(pl.hp < hp_now, "a blast from another player hurts (%.0f)" % pl.hp)
+	# A trap catches another player too.
+	if not host:
+		w.place_trap(pl, _avatar().global_position)
+	await wait(0.6)
+	await sync(38)
+	if host:
+		ok(pl.frozen_left > 0.0, "a trap from another player catches this one")
+		pl.frozen_left = 0.0
+	await sync(39)
+
+
+## All vs All: the fog, the lives and the last one standing.
+func _fog_match() -> void:
+	ok(w.fog != null, "the fog is out there")
+	ok(w.fog.centre == Net.fog_centre, "closing on the spot the host chose (%s)" % str(w.fog.centre))
+	print("FOGCENTRE %s" % str(w.fog.centre))
+	ok(w.director.dawn_amount() == 0.0, "no dawn is coming")
+	ok(Net.lives_of(Net.my_id()) == (2 if host else 3), "lives count down (%d)" % Net.lives_of(Net.my_id()))
+	if host:
+		w.director.running = true
+		w.director.elapsed = 180.0
+	await wait(1.6)
+	await sync(40)
+	ok(absf(w.fog.radius - ClosingFog.radius_at(w.director.elapsed)) < 4.0 and w.fog.radius < 100.0, "the fog has closed in on this phone (%.0f)" % w.fog.radius)
+	ok(not w.fog.contains(w.fog.centre3() + Vector3(120, 0, 0)), "far away is outside it")
+	# Out there it hurts, and enemies do not stay.
+	var inside := w.fog.centre3() + Vector3(1.5 if host else -1.5, 0.05, 0)
+	var out := w.fog.centre3() + Vector3(0, 0.05, 92.0)
+	out.y = w.ground_at(out) + 0.05
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	pl.global_position = out
+	await wait(1.2)
+	ok(pl.hp < pl.max_hp() - 4.0 and pl.hit_by == "the fog", "the fog hurts outside (%.0f)" % pl.hp)
+	await snap("fog_outside")
+	pl.hp = pl.max_hp()
+	inside.y = w.ground_at(inside) + 0.05
+	pl.global_position = inside
+	await wait(0.5)
+	var hp2 := pl.hp
+	await wait(0.8)
+	ok(pl.hp >= hp2, "and not inside it")
+	# Active effects go under the names, not on them.
+	pl.activate_power("speed", 20.0)
+	pl.activate_power("fire_arrows", 20.0)
+	await snap("fog_inside")
+	# The wall from just inside it, and from far inside.
+	var edge := w.fog.centre3() + Vector3(0, 0, w.fog.radius - 6.0)
+	edge.y = w.ground_at(edge) + 0.05
+	pl.global_position = edge
+	pl.yaw = PI
+	pl.rotation.y = PI
+	await wait(0.3)
+	await snap("fog_edge")
+	pl.global_position = inside
+	pl.yaw = PI
+	pl.rotation.y = PI
+	await wait(0.3)
+	await snap("fog_far")
+	if host:
+		for i in 6:
+			var spot := w._pick_spawn_point()
+			ok(w.fog.contains(spot), "enemies only appear inside it")
+		w.spawn_zombie("normal", out)
+		await wait(1.6)
+		var left_out := w.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and not w.fog.contains(z.position, 4.0))
+		ok(left_out.is_empty(), "an enemy left outside goes (%d)" % left_out.size())
+	await sync(41)
+	# Host falls twice more, and is out: the other phone wins.
+	if host:
+		pl.guard_left = 0.0
+		pl.hurt(99999.0, pl.global_position + Vector3.FORWARD)
+		await wait(0.4)
+		ok(pl.dead and Net.respawn_seconds() > 0.0, "second life gone, back soon")
+		ok(Net.lives_of(Net.my_id()) == 1, "one life left")
+		Net._respawn_left = 0.2
+		await wait(0.6)
+		ok(not pl.dead, "back for the last life")
+		ok(not m._run_over, "the match goes on")
+		pl.guard_left = 0.0
+		pl.hurt(99999.0, pl.global_position + Vector3.FORWARD)
+	await wait(1.2)
+	await sync(42)
+	if host:
+		ok(Net.is_out(), "out of lives")
+		ok(Net.respawn_seconds() < 0.0, "and not coming back")
+		ok(Net.last_winner == _other(), "the other player wins")
+	else:
+		ok(Net.last_winner == Net.my_id(), "this player wins")
+	ok(m._run_over, "last one standing ends the match on this phone")
+	await snap("over")
+
+
 func _fight() -> void:
 	await _clear_zombies_on_host()
 	if host:
@@ -708,13 +853,20 @@ func _fight() -> void:
 	else:
 		ok(pl.level > 1 or pl.xp > 0, "the winner learns from it")
 	if host:
-		ok(Net.respawn_seconds() > 15.0, "the wait is about 20 seconds")
+		if Net.fog_rules():
+			ok(Net.respawn_seconds() > 3.0 and Net.respawn_seconds() <= Net.FOG_RESPAWN, "in All vs All you are back in a few seconds")
+		else:
+			ok(Net.respawn_seconds() > 15.0, "the wait is about 20 seconds")
 		Net._respawn_left = 1.0
 	await wait(1.8)
 	await sync(7)
 	if host:
 		ok(not pl.dead and pl.hp > 0.0, "the loser comes back after a while")
 		ok(pl.global_position.distance_to(_avatar().global_position) > 6.0, "somewhere else")
+	await _rival_effects()
+	if Net.fog_rules():
+		await _fog_match()
+		return
 	# Dawn ends it with a winner.
 	if host:
 		w.director.running = true

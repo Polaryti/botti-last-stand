@@ -4,7 +4,7 @@ extends Node
 
 const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "crossbow", "crow", "eat", "empty",
 	"familiar", "fireball", "gallop", "gargoyle", "hammer", "howl", "banshee", "jump_a", "land", "leaper", "level",
-	"mimic", "pickup", "potion", "rooster", "spell", "thunder", "thunk", "trap", "ui_choose", "ui_click",
+	"mimic", "pickup", "potion", "rooster", "spell", "thunder", "thunder_far", "thunk", "trap", "ui_choose", "ui_click",
 	"weapon_change", "wolf", "wraith"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
@@ -22,6 +22,8 @@ var _ambient: AudioStreamPlayer
 var _music: Array[AudioStreamPlayer] = []
 var _targets := [-2.0, -60.0, -60.0] # calm, hunted, dawn
 var _music_on := false
+var _rain: AudioStreamPlayer
+var _rain_target := -60.0
 
 
 func _ready() -> void:
@@ -97,6 +99,23 @@ func ambient(on: bool) -> void:
 			p.play()
 
 
+## A steady loop while it rains. The volume changes smoothly, so walking indoors sounds right.
+func rain(on: bool, volume_db: float) -> void:
+	if on and _rain == null:
+		var loop: AudioStreamOggVorbis = load("res://assets/sounds/rain.ogg")
+		loop.loop = true
+		_rain = AudioStreamPlayer.new()
+		_rain.stream = loop
+		_rain.volume_db = -40.0
+		_rain.bus = SOUND_BUS
+		add_child(_rain)
+	if _rain == null:
+		return
+	_rain_target = volume_db if on else -60.0
+	if on and not _rain.playing:
+		_rain.play()
+
+
 ## Hunted fades in the drums, dawn fades in the warm stem. The world calls this a few times a second.
 func set_mood(hunted: float, dawn: float) -> void:
 	var calm := 1.0 - dawn
@@ -109,6 +128,10 @@ func set_mood(hunted: float, dawn: float) -> void:
 func _process(delta: float) -> void:
 	for i in _music.size():
 		_music[i].volume_db = move_toward(_music[i].volume_db, _targets[i], delta * 14.0)
+	if _rain and _rain.playing:
+		_rain.volume_db = move_toward(_rain.volume_db, _rain_target, delta * 24.0)
+		if _rain.volume_db <= -59.0 and _rain_target <= -59.0:
+			_rain.stop()
 
 
 ## min_gap keeps a horde from machine-gunning the same sample.

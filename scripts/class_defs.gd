@@ -1,8 +1,9 @@
 class_name ClassDefs
-## Classes and their ability trees. Each tier offers two abilities, and taking one
-## locks the other for this game. "add" changes a player stat. "flag" switches on a rule.
+## Classes, their prices and how fast they level. Their abilities are in AbilityData.
 
-const MAX_LEVEL := 19
+const MAX_LEVEL := 10
+## Experience from each level to the next. A good night reaches the final ability around minute 7.
+const XP_TO_NEXT := [45, 65, 80, 110, 160, 220, 270, 330, 420]
 
 const ALL := {
 	"infantry": {"name": "Infantry", "weapon": "dagger", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true,
@@ -13,9 +14,9 @@ const ALL := {
 		"desc": "Slow wall of iron. Starts with a Mace and a shield that blocks from the front. No ranged weapons."},
 	"chivalry": {"name": "Chivalry", "weapon": "lance", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": false, "horse": true,
 		"desc": "Mounted charger. Starts with a Lance. Kills call a horse to ride. No ranged weapons, unless unlocked."},
-	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 80.0, "speed": 1.0, "ranged": true, "mana": true,
+	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 70.0, "speed": 1.0, "ranged": true, "mana": true,
 		"desc": "Fragile caster. Keeps a Staff that uses refilling mana. Elements and summoned allies."},
-	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 90.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 8.0,
+	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 8.0,
 		"no_weapons": true, "auto_tree": true, "hidden": true, "price": 650,
 		"desc": "Dead, and not done. No weapons, only claws of Mist. Gifts come by themselves as you level, and you choose one path."},
 	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,
@@ -52,6 +53,5 @@ static func price(id: String) -> int:
 	return int(ALL[id].get("price", 0))
 
 
-## Slower climb: a good night reaches the final ability around minute 8 or 9.
 static func xp_for_level(level: int) -> int:
-	return 30 + int(round(level * 9.6))
+	return XP_TO_NEXT[clampi(level - 1, 0, XP_TO_NEXT.size() - 1)]

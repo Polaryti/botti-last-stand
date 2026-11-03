@@ -18,12 +18,19 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 8
+const PROTOCOL := 9
 enum Fx { FIRE_PATCH, SPARK, SENTRY }
+enum Status { FREEZE, STUN, SLOW, BURN }
+const LIVES := 3 # All vs All: how many times you can fall
+const FOG_RESPAWN := 6.0
 const SNAPSHOT_EVERY := 0.08
 const POSE_EVERY := 0.066
 const BEACON_EVERY := 1.0
 const RESPAWN_TIME := 20.0
+# A phone's Wi-Fi can go quiet for seconds at a time, so give it longer than ENet's usual 5 seconds.
+const TIMEOUT_FACTOR := 64
+const TIMEOUT_MIN := 12000
+const TIMEOUT_MAX := 45000
 const PVP_DAMAGE := 0.55 # players hit each other less hard than they hit the undead
 const KILL_POINTS := 5
 const RULE_NAMES := ["Co-op Night", "All vs All", "Teams", "Defend the Fort"]
@@ -40,6 +47,10 @@ var _watching := 0
 var roster := {} # peer id -> {name, class, team, score, deaths}
 var rooms := {} # address -> {name, players, rules, seen}
 var forced_quality := -1
+var weather := 0 # tonight's Weather.Kind, as the host rolled it
+var fog_centre := Vector2.ZERO # where the fog closes in on, in All vs All
+var last_winner := 0
+var _started_with := 0
 var in_game := false
 var world: World
 var started_loading := false
@@ -101,6 +112,20 @@ func pvp() -> bool:
 	return active() and (rules == Rules.FFA or rules == Rules.TEAMS)
 
 
+## All vs All: three lives, and the fog.
+func fog_rules() -> bool:
+	return active() and rules == Rules.FFA
+
+
+func lives_of(peer: int) -> int:
+	return int(roster.get(peer, {}).get("lives", 0))
+
+
+## This player has used up all their lives, and only watches now.
+func is_out() -> bool:
+	return fog_rules() and lives_of(my_id()) <= 0
+
+
 func game_mode() -> int:
 	return Game.Mode.FORT if rules == Rules.FORT else Game.Mode.NIGHT
 
@@ -113,6 +138,9 @@ func is_foe(peer: int) -> bool:
 	if not pvp():
 		return false
 	if rules == Rules.TEAMS:
+		# Someone who has just left can still have a message on its way.
+		if not roster.has(peer) or not roster.has(my_id()):
+			return false
 		return roster[peer]["team"] != roster[my_id()]["team"]
 	return peer != my_id()
 
@@ -121,6 +149,8 @@ func is_foe(peer: int) -> bool:
 
 func host_game() -> Error:
 	leave()
+	PhoneNet.use_default()
+	PhoneNet.hold_wifi()
 	var e := ENetMultiplayerPeer.new()
 	var err := e.create_server(PORT, MAX_PLAYERS - 1)
 	if err != OK:
@@ -139,10 +169,13 @@ func host_game() -> Error:
 
 func join_game(address: String) -> Error:
 	leave()
+	PhoneNet.use_wifi()
+	PhoneNet.hold_wifi()
 	var e := ENetMultiplayerPeer.new()
 	var err := e.create_client(address, PORT)
 	if err != OK:
 		return err
+	e.get_peer(1).set_timeout(TIMEOUT_FACTOR, TIMEOUT_MIN, TIMEOUT_MAX)
 	multiplayer.multiplayer_peer = e
 	role = Role.CLIENT
 	_over = false
@@ -152,6 +185,8 @@ func join_game(address: String) -> Error:
 
 func leave(reason := "") -> void:
 	var was_active := active()
+	PhoneNet.use_default()
+	PhoneNet.release_wifi()
 	stop_search_keep_rooms()
 	if _beacon:
 		_beacon.close()
@@ -181,7 +216,7 @@ func leave(reason := "") -> void:
 
 
 func _my_entry(team: int) -> Dictionary:
-	return {"name": Game.player_name, "class": Game.player_class, "team": team, "score": 0, "deaths": 0}
+	return {"name": Game.player_name, "class": Game.player_class, "team": team, "score": 0, "deaths": 0, "lives": LIVES}
 
 
 func _on_connected() -> void:
@@ -189,15 +224,16 @@ func _on_connected() -> void:
 
 
 func _on_failed() -> void:
-	leave("Could not reach that game. Are you both on the same Wi-Fi?")
+	leave("Could not reach that game. Are you both on the same Wi-Fi?\nIf this phone has mobile data on, try turning it off.")
 
 
 func _on_server_gone() -> void:
-	leave("The host left the game.")
+	leave("Lost touch with the host.\nThey may have left. If this keeps happening, turn off this phone's mobile data.")
 
 
-func _on_peer_connected(_id: int) -> void:
-	pass
+func _on_peer_connected(id: int) -> void:
+	if is_host():
+		(multiplayer.multiplayer_peer as ENetMultiplayerPeer).get_peer(id).set_timeout(TIMEOUT_FACTOR, TIMEOUT_MIN, TIMEOUT_MAX)
 
 
 func _on_peer_disconnected(id: int) -> void:
@@ -212,6 +248,7 @@ func _on_peer_disconnected(id: int) -> void:
 	if in_game:
 		_check_loaded()
 		_check_everyone_down()
+		_check_last_standing.call_deferred()
 
 
 func _remove_peer(id: int) -> void:
@@ -237,7 +274,7 @@ func _hello(protocol: int, player_name: String, cls: String) -> void:
 		_refused.rpc_id(id, "That game has already started." if in_game else "That game is full.")
 		return
 	var team := _smaller_team()
-	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0}
+	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0, "lives": LIVES}
 	_lobby.rpc(roster, rules, difficulty)
 	lobby_changed.emit()
 
@@ -371,6 +408,7 @@ func _send_beacon() -> void:
 func start_search() -> void:
 	if _listener:
 		return
+	PhoneNet.use_wifi()
 	_listener = PacketPeerUDP.new()
 	_listener.set_broadcast_enabled(true) # on Android this also lets broadcasts in
 	if _listener.bind(DISCOVERY_PORT) != OK:
@@ -444,15 +482,23 @@ func start_match() -> void:
 	if _answer:
 		_answer.close()
 		_answer = null
-	_begin.rpc(rules, Game.quality, Game.difficulty, roster)
-	_begin(rules, Game.quality, Game.difficulty, roster)
+	var tonight := Weather.roll()
+	var fog_at := Vector2(randf_range(-22.0, 22.0), randf_range(-22.0, 22.0))
+	for p: int in roster:
+		roster[p]["lives"] = LIVES
+	_begin.rpc(rules, Game.quality, Game.difficulty, roster, tonight, fog_at)
+	_begin(rules, Game.quality, Game.difficulty, roster, tonight, fog_at)
 
 
 ## Everyone uses the host's numbers of zombies, because each zombie has the same id on every phone.
 @rpc("authority", "reliable")
-func _begin(new_rules: int, quality: int, difficulty: int, new_roster: Dictionary) -> void:
+func _begin(new_rules: int, quality: int, difficulty: int, new_roster: Dictionary, tonight: int, fog_at: Vector2) -> void:
 	rules = new_rules
 	roster = new_roster
+	weather = tonight
+	fog_centre = fog_at
+	last_winner = 0
+	_started_with = roster.size()
 	forced_quality = quality
 	Game.difficulty = difficulty
 	Game.player_class = str(roster[my_id()]["class"])
@@ -590,7 +636,7 @@ func _world_fx(kind: int, a: Vector3, b: Vector3) -> void:
 	if world == null or not is_instance_valid(world):
 		return
 	match kind:
-		Fx.FIRE_PATCH: world.drop_poison(a, true, b.x, b.y, true)
+		Fx.FIRE_PATCH: world.drop_poison(a, true, b.x, b.y, true, is_foe(multiplayer.get_remote_sender_id()))
 		Fx.SPARK: world.fx_spark(a, b)
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
 
@@ -619,7 +665,7 @@ func _send_pose() -> void:
 	b.encode_float(28, p.sight_factor())
 	var flags := (1 if p.dead else 0) | (2 if p.is_unseen() else 0) | (4 if p.is_riding() else 0) | (8 if p.ride_behind != 0 else 0) \
 		| (16 if p.has_flag("rescuer") else 0) | (32 if p.passenger != 0 else 0) \
-		| (64 if p.is_riding() and p.mount_kind() == "chariot" else 0) | (128 if p.has_flag("chariot_turret") else 0)
+		| (64 if p.is_riding() and p.mount_kind() == "chariot" else 0) | (128 if p.has_turret() else 0)
 	b[32] = flags
 	b[33] = p.attack_count & 255
 	b[34] = _weapon_ids.find(p.weapon_id()) + 1
@@ -707,7 +753,7 @@ func zombie_died(z: Zombie, killer: int) -> void:
 	_z_died.rpc(z.net_id, killer)
 	if killer > 0 and roster.has(killer):
 		roster[killer]["score"] = int(roster[killer]["score"]) + 1
-		_score.rpc(killer, roster[killer]["score"], roster[killer]["deaths"])
+		_score.rpc(killer, roster[killer]["score"], roster[killer]["deaths"], lives_of(killer))
 	_credit(z, killer)
 
 
@@ -844,6 +890,24 @@ func _hurt(amount: float, from: Vector3, zombie_id: int, by_peer: int) -> void:
 		p.last_foe = 0
 	var z: Zombie = world.zombie_by_id(zombie_id) if zombie_id >= 0 else null
 	p.hurt(amount, from, z)
+
+
+## Frozen, stunned, slowed or set alight by another player. Everyone hears, so they can all see it.
+func status_peer(peer: int, kind: int, seconds: float) -> void:
+	_status.rpc(peer, kind, seconds)
+	_status(peer, kind, seconds)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _status(peer: int, kind: int, seconds: float) -> void:
+	if world == null or not is_instance_valid(world) or world.player == null:
+		return
+	if peer == my_id():
+		var from := multiplayer.get_remote_sender_id()
+		if from != 0 and is_foe(from):
+			world.player.apply_status(kind, seconds)
+	elif _avatars.has(peer):
+		(_avatars[peer] as Avatar).show_status(kind, seconds)
 
 
 func ignite_peer(peer: int, seconds: float) -> void:
@@ -994,6 +1058,16 @@ func _bell(minutes: int) -> void:
 		world.ring_bell(minutes)
 
 
+func lightning(at: Vector3) -> void:
+	_lightning.rpc(at)
+
+
+@rpc("authority", "reliable")
+func _lightning(at: Vector3) -> void:
+	if world and is_instance_valid(world) and world.weather:
+		world.weather.announce(at)
+
+
 func dawn() -> void:
 	_dawn.rpc()
 
@@ -1007,12 +1081,17 @@ func _dawn() -> void:
 # --- Falling, coming back, and the end of the game ---------------------------
 
 func local_died(by_peer: int) -> void:
+	var last_life := fog_rules() and lives_of(my_id()) <= 1
 	if is_host():
 		_note_death(1, by_peer)
 	else:
 		_died.rpc_id(1, by_peer)
-	_respawn_left = RESPAWN_TIME
-	world.player.say("You fell")
+	if last_life:
+		_respawn_left = -1.0
+		world.player.say("You are out")
+	else:
+		_respawn_left = FOG_RESPAWN if fog_rules() else RESPAWN_TIME
+		world.player.say("You fell")
 	_watching = 0
 	watch_next()
 
@@ -1027,15 +1106,20 @@ func _note_death(peer: int, by_peer: int) -> void:
 	if not roster.has(peer):
 		return
 	roster[peer]["deaths"] = int(roster[peer]["deaths"]) + 1
+	if fog_rules():
+		roster[peer]["lives"] = maxi(0, lives_of(peer) - 1)
+		if lives_of(peer) == 0 and world:
+			world.director.show_banner("%s is out" % roster[peer]["name"], 3.0)
 	if _avatars.has(peer):
 		(_avatars[peer] as Avatar).dead = true
-	_score.rpc(peer, roster[peer]["score"], roster[peer]["deaths"])
+	_score.rpc(peer, roster[peer]["score"], roster[peer]["deaths"], lives_of(peer))
 	if by_peer > 0 and roster.has(by_peer):
 		roster[by_peer]["score"] = int(roster[by_peer]["score"]) + KILL_POINTS
-		_score.rpc(by_peer, roster[by_peer]["score"], roster[by_peer]["deaths"])
+		_score.rpc(by_peer, roster[by_peer]["score"], roster[by_peer]["deaths"], lives_of(by_peer))
 		_note_pvp.rpc(by_peer, peer)
 		_note_pvp(by_peer, peer)
 	_check_everyone_down.call_deferred()
+	_check_last_standing.call_deferred()
 
 
 @rpc("authority", "reliable")
@@ -1043,17 +1127,19 @@ func _note_pvp(killer: int, victim: int) -> void:
 	if world == null or not is_instance_valid(world) or world.player == null:
 		return
 	if killer == my_id():
-		world.player.add_xp(30)
+		world.player.add_xp(50)
+		world.player.heal(25.0)
 		world.player.say("You defeated %s" % roster[victim]["name"])
 	elif victim != my_id():
 		world.player.say("%s defeated %s" % [roster[killer]["name"], roster[victim]["name"]])
 
 
 @rpc("authority", "reliable")
-func _score(peer: int, score: int, deaths: int) -> void:
+func _score(peer: int, score: int, deaths: int, lives: int) -> void:
 	if roster.has(peer):
 		roster[peer]["score"] = score
 		roster[peer]["deaths"] = deaths
+		roster[peer]["lives"] = lives
 
 
 ## In co-op, the game ends when nobody is left standing.
@@ -1064,6 +1150,35 @@ func _check_everyone_down() -> void:
 		if not p.dead:
 			return
 	finish("The night took you all", "Nobody was left standing after %s." % Game.clock(world.director.elapsed))
+
+
+## All vs All ends the moment only one player has a life left.
+func _check_last_standing() -> void:
+	if not is_host() or not fog_rules() or not in_game or _over:
+		return
+	var alive: Array = roster.keys().filter(func(p: int) -> bool: return lives_of(p) > 0)
+	# Alone from the start, the fog decides. If the others have left, whoever is still here has won.
+	if alive.size() > 1 or (alive.size() == 1 and _started_with < 2):
+		return
+	var winner: int = alive[0] if alive.size() == 1 else _best_score()
+	last_winner = winner
+	_winner.rpc(winner)
+	finish("Last one standing", "%s wins.\n%s" % [roster[winner]["name"], score_lines()])
+
+
+func _best_score() -> int:
+	var best := -1
+	var who := 1
+	for p: int in roster:
+		if int(roster[p]["score"]) > best:
+			best = int(roster[p]["score"])
+			who = p
+	return who
+
+
+@rpc("authority", "reliable")
+func _winner(peer: int) -> void:
+	last_winner = peer
 
 
 func _tick_respawn(delta: float) -> void:
@@ -1081,7 +1196,8 @@ func _tick_respawn(delta: float) -> void:
 		_respawn_left = -1.0
 		_stop_watching()
 		world.player.respawn(world.far_from_rivals() if pvp() else world.near_friend())
-		world.player.say("Back on your feet")
+		var lives := lives_of(my_id())
+		world.player.say(("Your last life!" if lives == 1 else "Back on your feet. %d lives left" % lives) if fog_rules() else "Back on your feet")
 
 
 # --- Watching someone else while you wait -------------------------------------
@@ -1256,14 +1372,6 @@ func on_dawn_reached() -> void:
 	match rules:
 		Rules.COOP, Rules.FORT:
 			finish("Dawn!", "You survived the night together.\n" + score_lines())
-		Rules.FFA:
-			var best := -1
-			var name := ""
-			for p: int in roster:
-				if int(roster[p]["score"]) > best:
-					best = roster[p]["score"]
-					name = roster[p]["name"]
-			finish("Dawn!", "%s wins with %d points.\n%s" % [name, best, score_lines()])
 		Rules.TEAMS:
 			var totals := [0, 0]
 			for p: int in roster:

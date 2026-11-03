@@ -108,10 +108,12 @@ func _input(event: InputEvent) -> void:
 	if player == null or get_tree().paused or menu_open or not visible:
 		return
 	if player.dead:
-		if event is InputEventScreenTouch:
+		if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 			var at: Vector2 = (event as InputEventScreenTouch).position
 			if at.distance_to(_buttons["pause"]["pos"]) < float(_buttons["pause"]["r"]) * 1.12:
 				pause_requested.emit()
+			elif at.distance_to(_buttons["tree"]["pos"]) < float(_buttons["tree"]["r"]) * 1.12:
+				tree_requested.emit()
 			elif Net.in_game:
 				Net.watch_next()
 		return
@@ -255,11 +257,18 @@ func _draw() -> void:
 		_draw_hurt_direction(centre)
 	_draw_dive_warning(centre)
 	_draw_status(s)
+	_draw_fog(s, centre)
+	if player.frozen_left > 0.0:
+		if player.is_iced:
+			draw_rect(Rect2(Vector2.ZERO, s), Color(0.6, 0.85, 1.0, 0.24))
+		_centered("Frozen" if player.is_iced else "Stunned", Vector2(centre.x, s.y * 0.62), 34, UiTheme.MIST)
+	# Down the left side, each below the last, so nothing lands on anything else.
+	var left_y := _status_bottom
 	if Net.in_game:
-		_draw_together(s, centre)
+		left_y = _draw_together(s, centre)
 	if player.world.fort:
 		_draw_fort(s, centre)
-	_draw_powers()
+	_draw_powers(left_y)
 	_draw_weapon(s)
 	_draw_controls()
 	if player.toast_time > 0.0:
@@ -295,8 +304,22 @@ func _draw_fort(s: Vector2, centre: Vector2) -> void:
 		_centered("Mending the %s gate" % Fort.NAMES[fort.repairing], Vector2(centre.x, s.y * 0.62), 26, Color(0.92, 0.72, 0.42))
 
 
+## All vs All: what the fog is doing, and the way back if you are out in it.
+func _draw_fog(s: Vector2, centre: Vector2) -> void:
+	var fog := player.world.fog
+	if fog == null:
+		return
+	var t := director.elapsed if director else 0.0
+	_centered("The fog is closing" if ClosingFog.is_closing(t) else "The fog holds", Vector2(centre.x, 124.0), 18, UiTheme.MIST)
+	if player.dead or fog.contains(player.global_position):
+		return
+	draw_rect(Rect2(Vector2.ZERO, s), Color(0.45, 0.62, 0.56, 0.22))
+	_banner_text("Get out of the fog!", Vector2(centre.x, s.y * 0.24), 1.0)
+	_sensor_arrow(centre, (Vector3(fog.centre.x, 0.0, fog.centre.y) - player.global_position).normalized() * 5.0, UiTheme.MOSS)
+
+
 ## Who else is out there. In a fight, the score. If you are down, how long until you are back.
-func _draw_together(s: Vector2, centre: Vector2) -> void:
+func _draw_together(s: Vector2, centre: Vector2) -> float:
 	var y := _status_bottom + 18.0
 	var ids: Array = Net.roster.keys()
 	ids.sort_custom(func(a: int, b: int) -> bool: return int(Net.roster[a]["score"]) > int(Net.roster[b]["score"]))
@@ -308,15 +331,23 @@ func _draw_together(s: Vector2, centre: Vector2) -> void:
 		var line := str(info["name"])
 		if Net.rules != Net.Rules.COOP:
 			line += "  %d" % int(info["score"])
-		_text(line, Vector2(_pad, y), 19, Color(col, 1.0 if peer == Net.my_id() else 0.8))
+		var out := Net.fog_rules() and Net.lives_of(peer) <= 0
+		_text(line, Vector2(_pad, y), 19, Color(col, 0.4 if out else (1.0 if peer == Net.my_id() else 0.8)))
+		if Net.fog_rules():
+			var x := _pad + font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 10.0
+			for i in Net.lives_of(peer):
+				draw_texture_rect(Icons.glyph("heart"), Rect2(x + i * 19.0, y - 16.0, 18.0, 18.0), false, UiTheme.BLOOD.lightened(0.2))
 		y += 22.0
 	if player.dead:
 		var wait := Net.respawn_seconds()
-		if wait >= 0.0:
+		if Net.is_out():
+			_banner_text("You are out", Vector2(centre.x, s.y * 0.3), 1.0)
+		elif wait >= 0.0:
 			_banner_text("Back in %d" % ceili(wait), Vector2(centre.x, s.y * 0.3), 1.0)
 		var who := Net.watching_name()
 		if who != "":
 			_centered("Watching %s. Tap to change." % who, Vector2(centre.x, s.y * 0.88), 26, UiTheme.BONE)
+	return y + 4.0
 
 
 func _draw_status(s: Vector2) -> void:
@@ -372,8 +403,8 @@ func _clock(s: Vector2, t: String) -> void:
 	draw_string(font, Vector2(s.x * 0.5 - w * 0.5, 47), t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, UiTheme.BONE)
 
 
-func _draw_powers() -> void:
-	var y := _status_bottom
+func _draw_powers(top: float) -> void:
+	var y := top
 	var x := _pad
 	for id: String in player.powers:
 		var d: Dictionary = PowerDefs.ALL[id]
@@ -549,7 +580,7 @@ func _draw_controls() -> void:
 		draw_arc(hint, JOY_R, 0.0, TAU, 40, Color(1, 1, 1, 0.2), 3.0)
 		draw_circle(hint, 36.0, Color(1, 1, 1, 0.12))
 	for id: String in _buttons:
-		if not _button_visible(id) or (player.dead and id != "pause"):
+		if not _button_visible(id) or (player.dead and id != "pause" and id != "tree"):
 			continue
 		var b: Dictionary = _buttons[id]
 		var pos: Vector2 = b["pos"]

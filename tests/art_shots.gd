@@ -29,10 +29,10 @@ func _start(cls: String, mode: int) -> void:
 
 
 func _take_path(spec: int) -> void:
-	pl.points = 18
-	for s in 4:
+	pl.points = ClassDefs.MAX_LEVEL - 1
+	for s in Player.CORE_STEPS:
 		pl.choose_ability(s, 0)
-	pl.choose_ability(4, spec)
+	pl.choose_ability(Player.CORE_STEPS, spec)
 
 
 func _ready() -> void:

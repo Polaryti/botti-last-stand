@@ -35,6 +35,7 @@ var _props := {}
 var _trees := {}
 var _indoors: Array[Rect2] = []
 var _cells := {} # small things, merged by map area into one mesh each
+static var _cow_mesh: Mesh
 
 
 func _init(world: Variant, p_terrain: Terrain) -> void:
@@ -46,6 +47,7 @@ func _init(world: Variant, p_terrain: Terrain) -> void:
 ## The whole map, for the game.
 func build(root: MapRoot) -> void:
 	ground()
+	w.play_half = root.play_half
 	boundary(root.play_half)
 	_walk(root, Transform3D.IDENTITY)
 	if root.forest_wall:
@@ -689,16 +691,30 @@ func mill_wheel() -> void:
 
 # --- Small things --------------------------------------------------------------
 
+## A cow grazes, wanders a few steps and flicks its tail, all in its shader. It has its own mesh for that.
 func cow() -> void:
-	var l := cell()
-	var white := Color(0.78, 0.76, 0.7)
-	var dark := Color(0.16, 0.14, 0.13)
-	l.box(Vector3(0, 0.95, 0), Vector3(0.75, 0.7, 1.7), white)
-	l.box(Vector3(0.2, 1.05, 0.3), Vector3(0.4, 0.52, 0.7), dark)
-	l.box(Vector3(0, 1.25, 1.05), Vector3(0.48, 0.48, 0.6), white)
-	l.box(Vector3(0, 1.12, 1.38), Vector3(0.36, 0.22, 0.14), Color(0.75, 0.55, 0.5))
-	for s: Vector2 in [Vector2(-0.25, 0.65), Vector2(0.25, 0.65), Vector2(-0.25, -0.65), Vector2(0.25, -0.65)]:
-		l.box(Vector3(s.x, 0.32, s.y), Vector3(0.16, 0.64, 0.16), dark)
+	if _cow_mesh == null:
+		var l := LowPoly.new()
+		var white := Color(0.78, 0.76, 0.7)
+		var dark := Color(0.16, 0.14, 0.13)
+		l.box(Vector3(0, 0.95, 0), Vector3(0.75, 0.7, 1.7), white)
+		l.box(Vector3(0.2, 1.05, 0.3), Vector3(0.4, 0.52, 0.7), dark)
+		l.box(Vector3(0, 1.25, 1.05), Vector3(0.48, 0.48, 0.6), white)
+		l.box(Vector3(0, 1.12, 1.38), Vector3(0.36, 0.22, 0.14), Color(0.75, 0.55, 0.5))
+		l.box(Vector3(0.3, 1.46, 0.92), Vector3(0.2, 0.08, 0.1), dark)
+		l.box(Vector3(-0.3, 1.46, 0.92), Vector3(0.2, 0.08, 0.1), dark)
+		l.box(Vector3(0, 1.05, -0.93), Vector3(0.07, 0.62, 0.07), dark)
+		for s: Vector2 in [Vector2(-0.25, 0.65), Vector2(0.25, 0.65), Vector2(-0.25, -0.65), Vector2(0.25, -0.65)]:
+			l.box(Vector3(s.x, 0.32, s.y), Vector3(0.16, 0.64, 0.16), dark)
+		_cow_mesh = l.commit()
+		var m := ShaderMaterial.new()
+		m.shader = load("res://assets/shaders/cow.gdshader")
+		_cow_mesh.surface_set_material(0, m)
+	var cow_node := MeshInstance3D.new()
+	cow_node.mesh = _cow_mesh
+	cow_node.transform = xf
+	cow_node.extra_cull_margin = 1.5
+	w.add_child(cow_node)
 	solid(Vector3(0, 0.8, 0), Vector3(0.9, 1.6, 2.9))
 
 

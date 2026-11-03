@@ -6,8 +6,9 @@ extends MapPiece
 ## wood and yard_wood: where wood appears in the fort. start: where players begin, in order.
 ## rival: where players begin when they fight each other.
 ## place: a name on the map screen. weapon, item and familiar: the Sandbox's stands.
+## dummy: a training dummy in the Sandbox.
 
-@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar") var kind := "loot":
+@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy") var kind := "loot":
 	set(v):
 		kind = v
 		refresh()
@@ -28,6 +29,7 @@ func build(b: MapBuilder) -> void:
 		"yard_wood": b.w.yard_wood_spots.append(at)
 		"start": b.w.start_spots.append(at)
 		"rival": b.w.rival_spots.append(at)
+		"dummy": b.w.dummy_spots.append(at)
 		"place": b.w.map_marks.append({"name": text, "at": Vector2(at.x, at.z)})
 		"weapon", "item", "familiar": b.w.stands.append({"kind": kind, "at": at, "yaw": b.xf.basis.get_euler().y})
 	if b.is_preview:

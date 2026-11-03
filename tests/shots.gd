@@ -74,11 +74,9 @@ func _ready() -> void:
 	m.toggle_tree()
 	await wait(0.3)
 	await snap("tree_start")
-	for i in 7:
-		pl.choose_ability(i, 0 if i != 4 else 2)
-	m.tree_panel.refresh()
-	m.tree_panel._select_next()
-	m.tree_panel._scroll_to_next()
+	for i in 6:
+		pl.choose_ability(i, 0 if i != Player.CORE_STEPS else 2)
+	m.tree_panel.refresh(true)
 	await wait(0.3)
 	await snap("tree_branch")
 	m.toggle_tree()

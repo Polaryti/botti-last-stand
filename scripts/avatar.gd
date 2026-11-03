@@ -39,6 +39,8 @@ var in_chariot := false
 var _has_turret := false
 var _watched := false
 var _view_pitch := 0.0
+var _ice_left := 0.0
+static var _ice_material: StandardMaterial3D
 
 
 func _init(owner_world: World, peer_id: int, info: Dictionary) -> void:
@@ -102,11 +104,10 @@ func _build_body(model: String) -> void:
 ## Riding: the horse under them if it is theirs, and either way they sit higher.
 func _show_seat() -> void:
 	var up := _riding or _seated
-	_visual.position.y = (0.5 if in_chariot else 0.85) if up else 0.0
+	_visual.position.y = (0.5 if in_chariot else HorseModel.SADDLE) if up else 0.0
 	if _riding and not in_chariot and _horse == null:
-		_horse = MeshInstance3D.new()
-		_horse.mesh = HorseModel.mesh()
-		_horse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_horse = HorseModel.make()
+		_horse.scale = Vector3.ONE * HorseModel.RIDDEN_SIZE
 		add_child(_horse)
 	if _horse:
 		_horse.visible = _riding and not in_chariot and not _watched
@@ -188,16 +189,51 @@ func _process(delta: float) -> void:
 	global_position = global_position.lerp(_target, minf(1.0, delta * 12.0))
 	rotation.y = lerp_angle(rotation.y, _yaw, minf(1.0, delta * 14.0))
 	_attack_left -= delta
-	_label.visible = not _watched and (not _unseen or not Net.is_foe(peer))
+	# A name over someone's head gives them away, so only friends have one.
+	_label.visible = not _watched and not Net.is_foe(peer)
+	if _ice_left > 0.0:
+		_ice_left -= delta
+		if _ice_left <= 0.0:
+			_show_ice(false)
 	_visual.visible = not _watched and not (_unseen and Net.is_foe(peer))
 	if _chariot and _chariot.visible:
 		_chariot.roll(velocity.length() * delta)
+	if _horse and _horse.visible:
+		HorseModel.set_gait(_horse, clampf(velocity.length() / 8.0, 0.0, 1.0))
 	if not dead and _attack_left <= 0.0:
 		_play("Running_A" if velocity.length_squared() > 0.5 else "Idle", maxf(0.8, velocity.length() / 5.0))
 
 
 func is_unseen() -> bool:
 	return _unseen
+
+
+## Someone froze this player. Their own phone does the rest, but everyone can see it here.
+func show_status(kind: int, seconds: float) -> void:
+	if kind != Net.Status.FREEZE or dead:
+		return
+	_ice_left = seconds * Player.PVP_STATUS
+	_show_ice(true)
+
+
+func _show_ice(on: bool) -> void:
+	for mi in _visual.find_children("*", "MeshInstance3D", true, false):
+		var part := mi as MeshInstance3D
+		if on:
+			if not part.has_meta("before_ice"):
+				part.set_meta("before_ice", part.material_override)
+			part.material_override = _ice_look()
+		elif part.has_meta("before_ice"):
+			part.material_override = part.get_meta("before_ice")
+			part.remove_meta("before_ice")
+
+
+static func _ice_look() -> StandardMaterial3D:
+	if _ice_material == null:
+		_ice_material = StandardMaterial3D.new()
+		_ice_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ice_material.albedo_color = Color(0.62, 0.86, 0.96)
+	return _ice_material
 
 
 func sight_factor() -> float:

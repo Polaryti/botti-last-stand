@@ -10,6 +10,7 @@ var mode := 1
 var grid := PreviewGrid.new()
 var fort: Variant = null
 var bell: Node3D
+var play_half := 110.0
 var church_door := Vector3.ZERO
 var perches: Array[Vector3] = []
 var pois: Array[Vector3] = []

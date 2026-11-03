@@ -37,6 +37,9 @@ const TIPS := [
 	"Only you fit through the fort's small doors. Enemies have to break a gate.",
 	"Drop off the fort's walls when you need to get out fast. It does not hurt.",
 	"A Dread Rider is open to a blow while it turns.",
+	"In a storm, run from a glow on the ground. Lightning follows it.",
+	"Lure them under the lightning: it hurts them far more than it hurts you.",
+	"In All vs All the fog comes for everyone. Watch the map, and be inside before it closes.",
 ]
 
 
@@ -707,10 +710,18 @@ func toggle_tree() -> void:
 	_fill(tree_panel)
 	tree_panel.build()
 	tree_panel.closed.connect(close_tree)
+	world.player.damaged.connect(_hurt_with_tree_open)
+
+
+## Something got to you while you were reading: back to the fight.
+func _hurt_with_tree_open(_amount: float, _source: String) -> void:
+	close_tree()
 
 
 func close_tree() -> void:
 	if tree_panel:
+		if world and is_instance_valid(world) and world.player and world.player.damaged.is_connected(_hurt_with_tree_open):
+			world.player.damaged.disconnect(_hurt_with_tree_open)
 		tree_panel.queue_free()
 		tree_panel = null
 	if hud:
@@ -760,6 +771,8 @@ func start_game(mode: int) -> void:
 	loading.queue_free()
 	hud.visible = true
 	_back = show_pause
+	if mode == Game.Mode.SANDBOX:
+		world.player.grant_all_points()
 	if not DisplayServer.is_touchscreen_available():
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -899,6 +912,8 @@ func _on_player_died() -> void:
 	var cause := "Slain by %s." % pl.hit_by if pl.hit_by != "" else "You fell."
 	if pl.hit_by == "flames":
 		cause = "Burned alive."
+	elif pl.hit_by == "lightning":
+		cause = "Struck by lightning."
 	_end_screen("You fell", "%s\nSurvived %s as %s: %d kills, level %d.%s" % [cause, Game.clock(seconds), _character_name(pl), kills, pl.level, (" New best!" if is_best else "") + _earned_line(earned)])
 
 
@@ -952,7 +967,8 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 	if _run_over or world == null:
 		return
 	_run_over = true
-	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, reached_dawn, not Net.pvp()))
+	var won := reached_dawn or Net.last_winner == Net.my_id()
+	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp()))
 	close_tree()
 	if hud:
 		hud.release_all()
@@ -1002,9 +1018,11 @@ func show_sandbox_menu() -> void:
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
 	box.add_child(grid)
-	for id: String in ZombieDefs.ALL:
+	var enemies: Array = ["dummy"]
+	enemies.append_array(ZombieDefs.ALL.keys())
+	for id: String in enemies:
 		var chosen := id
-		var b := _button(str(ZombieDefs.ALL[id]["name"]), func() -> void:
+		var b := _button(str(ZombieDefs.def_of(id)["name"]), func() -> void:
 			world.sandbox_spawn(chosen), Vector2(194, 54))
 		b.add_theme_font_size_override("font_size", 22)
 		grid.add_child(b)
@@ -1013,10 +1031,7 @@ func show_sandbox_menu() -> void:
 	row.add_theme_constant_override("separation", 8)
 	box.add_child(row)
 	var pl := world.player
-	row.add_child(_button("Level up", func() -> void: pl.add_xp(pl.xp_needed() - pl.xp), Vector2(170, 60)))
-	row.add_child(_button("Top level", func() -> void:
-		for i in ClassDefs.MAX_LEVEL:
-			pl.add_xp(pl.xp_needed() - pl.xp), Vector2(170, 60)))
+	row.add_child(_button("New skill tree", func() -> void: start_game(Game.Mode.SANDBOX), Vector2(220, 60)))
 	var safe := _toggle("Cannot be hurt", func() -> bool: return pl.guard_left > 100.0, func(on: bool) -> void: pl.guard_left = 9999.0 if on else 0.0)
 	safe.custom_minimum_size.x = 300
 	row.add_child(safe)
@@ -1024,6 +1039,11 @@ func show_sandbox_menu() -> void:
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 8)
 	box.add_child(foot)
+	var weather_row := HBoxContainer.new()
+	weather_row.add_theme_constant_override("separation", 8)
+	box.add_child(weather_row)
+	weather_row.add_child(_soft("Weather", 23))
+	weather_row.add_child(_choices(["Clear", "Rain", "Storm"], world.weather.kind, 150.0, func(i: int) -> void: world.weather.set_kind(i)))
 	foot.add_child(_button("Change class", func() -> void: show_class_picker(Game.Mode.SANDBOX), Vector2(240, 66)))
 	foot.add_child(_button("Quit to menu", show_menu, Vector2(240, 66)))
 	foot.add_child(_expand())
@@ -1085,13 +1105,23 @@ func show_together() -> void:
 	address_edit.placeholder_text = "192.168.1.20"
 	address_edit.custom_minimum_size = Vector2(290, 58)
 	address_edit.add_theme_font_size_override("font_size", 26)
-	address_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL
+	# Number keyboards on Android allow a single dot, and an address has three.
+	address_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_URL
+	address_edit.text = _address_start()
 	manual.add_child(address_edit)
 	manual.add_child(_button("Join", func() -> void:
 		if address_edit.text.strip_edges() != "":
 			_join(address_edit.text.strip_edges()), Vector2(160, 60)))
 	manual.add_child(_button("Hotspot?", show_hotspot_help, Vector2(170, 60)))
 	manual.add_child(_button("Back", show_menu, Vector2(130, 60)))
+
+
+## The start of this phone's own address, since a game on the same Wi-Fi will share it. Saves typing dots.
+func _address_start() -> String:
+	var mine := Net.local_addresses()
+	if mine.is_empty():
+		return ""
+	return mine[0].substr(0, mine[0].rfind(".") + 1)
 
 
 func show_hotspot_help() -> void:
@@ -1105,7 +1135,7 @@ func show_hotspot_help() -> void:
 	for line: String in ["1. On one phone, turn on the Wi-Fi hotspot in its settings.",
 			"2. On the other phones, connect to that hotspot's Wi-Fi. If a phone warns there is no internet, choose to stay connected.",
 			"3. On the hotspot phone, press Start a game. The others will find it in the list.",
-			"The game itself uses no mobile data, but other apps on the phones might, so you can turn data off."]:
+			"If a phone keeps getting dropped, turn off its mobile data. The game itself uses none."]:
 		var l := _body(line, 25)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(l)
@@ -1164,6 +1194,8 @@ func _fill_lobby(body: VBoxContainer) -> void:
 			levels.add_child(_button(["Easy", "Normal", "Hard"][d], func() -> void: Net.set_difficulty(level), Vector2(150, 52), Net.difficulty == d))
 	else:
 		body.add_child(_body("Game: %s, %s. The host starts when everyone is ready." % [Net.RULE_NAMES[Net.rules], ["Easy", "Normal", "Hard"][Net.difficulty]], 24))
+	if Net.rules == Net.Rules.FFA:
+		body.add_child(_soft("Three lives each, and a deadly fog closes in. The last one standing wins.", 23))
 	var ids: Array = Net.roster.keys()
 	ids.sort()
 	for peer: int in ids:

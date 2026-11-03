@@ -84,6 +84,21 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 0, 0, 13)
 script = ExtResource("9_spot")
 kind = "start"
 
+[node name="Dummy1" type="Node3D" parent="Yard"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -7, 0, -3)
+script = ExtResource("9_spot")
+kind = "dummy"
+
+[node name="Dummy2" type="Node3D" parent="Yard"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 0, 0, -3)
+script = ExtResource("9_spot")
+kind = "dummy"
+
+[node name="Dummy3" type="Node3D" parent="Yard"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 7, 0, -3)
+script = ExtResource("9_spot")
+kind = "dummy"
+
 [node name="NameWeapons" type="Node3D" parent="Yard"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -24, 0, -24)
 script = ExtResource("9_spot")

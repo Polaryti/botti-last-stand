@@ -4,6 +4,11 @@ extends MeshInstance3D
 
 enum Kind { ARROW, ENEMY_ARROW, FIREBALL, BOLT, AXE }
 
+const HIT_PAD := 0.24 # how close to a body a shot has to pass to count as a hit
+
+static var _graze_shape: SphereShape3D
+static var _graze_query: PhysicsShapeQueryParameters3D
+
 var world: World
 var active := false
 var kind: int = Kind.ARROW
@@ -124,6 +129,10 @@ func _physics_process(delta: float) -> void:
 		mask |= Avatar.LAYER_AVATAR
 	var q := PhysicsRayQueryParameters3D.create(position, next, mask, _exclude)
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
+	if _is_friendly() and not visual:
+		var grazed := _grazed_body(position, step, hit)
+		if not grazed.is_empty():
+			hit = grazed
 	if hit.is_empty():
 		position = next
 		_orient()
@@ -147,6 +156,9 @@ func _physics_process(delta: float) -> void:
 			world.fx_gore(at, Color(0.6, 0.1, 0.08))
 			if world.player:
 				world.player.on_hit(false)
+				world.player.on_shot_rival(a.peer, fire, frost)
+				if sparks > 0:
+					Net.status_peer(a.peer, Net.Status.STUN, 0.5)
 			if kind != Kind.AXE:
 				stop()
 		return
@@ -169,6 +181,33 @@ func _physics_process(delta: float) -> void:
 		_explode(at)
 	else:
 		stop()
+
+
+## Bodies look wider than the capsules they collide with, so a shot that passes close enough to
+## touch what you see still lands. Whatever the shot reaches first still stops it: a wall protects.
+func _grazed_body(from: Vector3, step: Vector3, ray_hit: Dictionary) -> Dictionary:
+	if _graze_shape == null:
+		_graze_shape = SphereShape3D.new()
+		_graze_shape.radius = HIT_PAD
+		_graze_query = PhysicsShapeQueryParameters3D.new()
+		_graze_query.shape = _graze_shape
+	_graze_query.collision_mask = Zombie.LAYER | (Avatar.LAYER_AVATAR if Net.pvp() else 0)
+	_graze_query.exclude = _exclude
+	_graze_query.transform = Transform3D(Basis.IDENTITY, from)
+	_graze_query.motion = step
+	var space := get_world_3d().direct_space_state
+	var fractions := space.cast_motion(_graze_query)
+	if fractions[1] >= 1.0:
+		return {}
+	var at := from + step * fractions[1]
+	if not ray_hit.is_empty() and from.distance_squared_to(ray_hit["position"]) <= from.distance_squared_to(at):
+		return {}
+	_graze_query.transform = Transform3D(Basis.IDENTITY, at)
+	_graze_query.motion = Vector3.ZERO
+	var touching := space.intersect_shape(_graze_query, 1)
+	if touching.is_empty():
+		return {}
+	return {"collider": touching[0]["collider"], "position": at}
 
 
 func _turn_back() -> void:

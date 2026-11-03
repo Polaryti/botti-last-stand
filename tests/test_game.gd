@@ -41,6 +41,7 @@ func _ready() -> void:
 	Engine.max_fps = 0
 	Game.quality = 2
 	Game.player_class = "infantry"
+	Game.force_weather = Weather.Kind.CLEAR # a bolt of lightning would upset the tests
 	Game.save_settings()
 	var args := OS.get_cmdline_user_args()
 	if args.has("soakonly"):
@@ -50,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_9()
 		await test_version_8()
 		await test_new_things()
 		await test_fort()
@@ -69,6 +71,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_9()
 	await test_version_8()
 	await test_new_things()
 	await test_fort()
@@ -225,14 +228,14 @@ func test_revenant() -> void:
 	ok(pl.points > 0 and pl.spec_id == "", "the path waits for you")
 	ok(pl.choose_ability(Player.CORE_STEPS, 0), "you can choose it")
 	ok(pl.spec_id == "leaper", "Mist Leaper")
-	ok(pl.next_step() == 18 or pl.points == 0, "and everything else then comes by itself (%d)" % pl.next_step())
+	ok(pl.next_step() == ClassDefs.MAX_LEVEL - 1 or pl.points == 0, "and everything else then comes by itself (%d)" % pl.next_step())
 	# Mist Leaper: forward, up and down the land, not through walls.
 	Game.player_class = "revenant"
 	await start_clean()
 	pl.level = 6
 	pl.points = 1
 	pl._auto_unlock()
-	for i in 4:
+	for i in Player.CORE_STEPS:
 		pl.points += 1
 		pl._auto_unlock()
 	pl.points = 1
@@ -258,7 +261,7 @@ func test_revenant() -> void:
 	Game.player_class = "revenant"
 	await start_clean()
 	place(OPEN)
-	pl.points = 5
+	pl.points = Player.CORE_STEPS + 1
 	pl._auto_unlock()
 	pl.choose_ability(Player.CORE_STEPS, 1)
 	ok(pl.spec_id == "rift", "Rift Traveller")
@@ -665,6 +668,197 @@ func test_fort() -> void:
 	await start_clean()
 
 
+func test_version_9() -> void:
+	# Ten levels, and few but big choices.
+	ok(ClassDefs.MAX_LEVEL == 10, "ten levels")
+	var total_xp := 0
+	var old_xp := 0
+	for level in range(1, ClassDefs.MAX_LEVEL):
+		total_xp += ClassDefs.xp_for_level(level)
+	for level in range(1, 19):
+		old_xp += 30 + int(round(level * 9.6))
+	ok(total_xp < old_xp, "the top level takes less than it did (%d, was %d)" % [total_xp, old_xp])
+	for cid: String in ClassDefs.ALL:
+		var tree := AbilityData.tree(cid)
+		ok((tree["core"] as Array).size() == Player.CORE_STEPS, "%s has three shared choices" % cid)
+		for spec: Dictionary in tree["specs"]:
+			ok((spec["path"] as Array).size() == 4, "%s has four rows" % spec["name"])
+			ok(Player.CORE_STEPS + 1 + (spec["path"] as Array).size() + 1 == ClassDefs.MAX_LEVEL - 1, "one choice for each level of %s" % spec["name"])
+			if not ClassDefs.ALL[cid].get("auto_tree", false):
+				for row: Array in spec["path"]:
+					ok(row.size() == 2, "%s chooses one of two" % spec["name"])
+	ok(ClassDefs.ALL["magician"]["hp"] < 90.0, "the Mage has less health")
+	ok(Player.CHARIOT_SPEED < 1.0, "a chariot is slower than walking")
+
+	# The tree closes when something hurts you.
+	Game.player_class = "infantry"
+	await start_clean()
+	place(OPEN)
+	m.toggle_tree()
+	await frames(2)
+	ok(m.tree_panel != null, "the tree opens")
+	pl.guard_left = 0.0
+	pl.hurt(2.0, pl.global_position + Vector3.FORWARD)
+	await frames(2)
+	ok(m.tree_panel == null, "being hurt closes it")
+	ok(not hud.menu_open, "and the controls are back")
+	# And it can be opened while you are down.
+	pl.dead = true
+	await frames(2)
+	touch(2, hud._buttons["tree"]["pos"], true)
+	await frames(2)
+	touch(2, hud._buttons["tree"]["pos"], false)
+	await frames(2)
+	ok(m.tree_panel != null, "the tree opens while you are down")
+	pl.points = 1
+	(m.tree_panel as TreePanel).choose(0, 0)
+	await frames(2)
+	ok(pl.points == 0 and pl.chosen.size() == 1, "and a choice can be made")
+	m.close_tree()
+	pl.dead = false
+	pl.hp = pl.max_hp()
+	await frames(2)
+
+	# The Illusionist swaps with its own image, and the image goes off.
+	Game.player_class = "magician"
+	await start_clean()
+	place(OPEN, 0.0)
+	pl.grant_all_points()
+	for step in Player.CORE_STEPS:
+		pl.choose_ability(step, 0)
+	var illusionist := -1
+	var specs: Array = pl.tree_data()["specs"]
+	for i in specs.size():
+		if specs[i]["id"] == "illusionist":
+			illusionist = i
+	ok(pl.choose_ability(Player.CORE_STEPS, illusionist), "the Illusionist can be chosen")
+	var was := pl.global_position
+	pl.mana = pl.max_mana()
+	pl.use_art()
+	await seconds(0.4)
+	ok(absf(pl.global_position.distance_to(was) - pl.m("swap_range")) < 2.5, "Mirror Swap moves about %d m (%.1f)" % [int(pl.m("swap_range")), pl.global_position.distance_to(was)])
+	var decoys := w.allies.filter(func(a: Ally) -> bool: return a.kind == "decoy")
+	ok(decoys.size() == 1, "and leaves an image behind")
+	w.spawn_zombie("normal", was + Vector3(1.2, 0, 0))
+	await frames(2)
+	var fooled: Zombie = w.zombies.back()
+	fooled.set_physics_process(false)
+	var fooled_hp := fooled.hp
+	pl.decoy_burst(was + Vector3.UP)
+	await frames(2)
+	ok(fooled.hp < fooled_hp or not fooled.is_alive(), "the burst hurts what came to look")
+	fooled.set_physics_process(true)
+	for z: Zombie in w.zombies.duplicate():
+		z.release()
+
+	# Hits land where the body looks to be.
+	Game.player_class = "infantry"
+	await start_clean()
+	place(OPEN, 0.0)
+	await equip("dagger")
+	w.spawn_zombie("normal", pl.global_position + Vector3(0, 0, -6))
+	await frames(2)
+	var z: Zombie = w.zombies.back()
+	z.set_physics_process(false)
+	var side := z.body_radius() / 1.4 + Projectile.HIT_PAD * 0.7
+	var hp0 := z.hp
+	var from := Vector3(z.position.x + side, z.position.y + 1.0, z.position.z + 5.0)
+	w.spawn_player_arrow(pl, from, Vector3(0, 0, -30), 0.0, 12.0, 0.0, 10.0, false)
+	await seconds(0.4)
+	ok(z.hp < hp0, "an arrow that only just touches it counts")
+	hp0 = z.hp
+	from.x = z.position.x + z.body_radius() + Projectile.HIT_PAD + 0.5
+	w.spawn_player_arrow(pl, from, Vector3(0, 0, -30), 0.0, 12.0, 0.0, 10.0, false)
+	await seconds(0.4)
+	ok(z.hp == hp0, "and one that passes by does not")
+	var d: Dictionary = WeaponDefs.ALL["dagger"]
+	var stats := pl.melee_stats(d)
+	pl.global_position = z.position + Vector3(0, 0, float(stats["range"]) + z.body_radius() * 0.8)
+	pl.yaw = 0.0
+	pl.rotation.y = 0.0
+	await frames(2)
+	hp0 = z.hp
+	ok(w.melee_hit(pl, d, stats) == 1 and z.hp < hp0, "a blow reaches the edge of the body")
+	z.set_physics_process(true)
+	z.release()
+
+	# Weather: mostly clear, and lightning hits everyone under it.
+	var counts := [0, 0, 0]
+	for i in 10000:
+		counts[Weather.roll()] += 1
+	ok(counts[0] > 6800 and counts[0] < 7700, "most nights are clear (%d)" % counts[0])
+	ok(counts[1] > 1700 and counts[1] < 2300, "some are wet (%d)" % counts[1])
+	ok(counts[2] > 500 and counts[2] < 900, "and a few have a storm (%d)" % counts[2])
+	ok(w.weather.kind == Weather.Kind.CLEAR or w.weather.kind == Weather.Kind.RAIN or w.weather.kind == Weather.Kind.STORM, "tonight has weather")
+	w.weather.set_kind(Weather.Kind.STORM)
+	w.weather._next_strike = 9999.0
+	await frames(2)
+	place(OPEN)
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	w.spawn_zombie("normal", pl.global_position + Vector3(2, 0, 0))
+	await frames(2)
+	var struck: Zombie = w.zombies.back()
+	struck.set_physics_process(false)
+	var struck_hp := struck.hp
+	var my_hp := pl.hp
+	w.weather.announce(pl.global_position)
+	await seconds(0.3)
+	ok(pl.hp == my_hp, "the ground glows first")
+	await seconds(Weather.STRIKE_WARNING)
+	ok(pl.hp < my_hp, "then lightning hurts a player (%.0f)" % pl.hp)
+	ok(struck.hp < struck_hp or not struck.is_alive(), "and an enemy")
+	struck.set_physics_process(true)
+	w.weather.set_kind(Weather.Kind.CLEAR)
+	for gone: Zombie in w.zombies.duplicate():
+		gone.release()
+	pl.hp = pl.max_hp()
+
+	# The address box takes dots, and the fog closes in the right order.
+	m.show_together()
+	await frames(2)
+	var boxes: Array = m.panel.find_children("*", "LineEdit", true, false)
+	ok(not boxes.is_empty(), "there is an address box")
+	for b: Node in boxes:
+		ok((b as LineEdit).virtual_keyboard_type != LineEdit.KEYBOARD_TYPE_NUMBER and (b as LineEdit).virtual_keyboard_type != LineEdit.KEYBOARD_TYPE_NUMBER_DECIMAL, "and it offers a keyboard with dots")
+	m.show_menu()
+	await frames(2)
+	var last_r := ClosingFog.radius_at(0.0)
+	ok(last_r >= Vector2(Terrain.HALF + 22.0, Terrain.HALF + 22.0).length(), "the fog starts outside the whole map")
+	var never_opens := true
+	for t in range(1, 430):
+		var r := ClosingFog.radius_at(float(t))
+		if r > last_r + 0.001:
+			never_opens = false
+		last_r = r
+	ok(never_opens and last_r == 0.0, "it only closes in, until nothing is left")
+
+	# The Sandbox has a dummy that takes anything, and every point from the start.
+	Game.player_class = "ranger"
+	await m.start_game(Game.Mode.SANDBOX)
+	await frames(3)
+	w = m.world
+	pl = w.player
+	hud = m.hud
+	ok(pl.points == ClassDefs.MAX_LEVEL - 1, "every point from the start (%d)" % pl.points)
+	var dummies := w.zombies.filter(func(q: Zombie) -> bool: return q.type_id == "dummy")
+	ok(dummies.size() >= 3, "dummies stand ready (%d)" % dummies.size())
+	if not dummies.is_empty():
+		var dummy: Zombie = dummies[0]
+		dummy.take_damage(99999999.0, Vector3.ZERO, 0.0, dummy.centre())
+		await seconds(0.3)
+		ok(dummy.is_alive() and dummy.hp == dummy.max_hp, "a dummy cannot die")
+		ok(int(dummy._dummy_last) > 0, "and shows what it took")
+		var stands := dummy.position
+		pl.global_position = stands + Vector3(1.5, 0.1, 0)
+		pl.hp = pl.max_hp()
+		await seconds(2.0)
+		ok(pl.hp == pl.max_hp(), "it does not hit back")
+		ok(dummy.position.distance_to(stands) < 0.05, "or move")
+	Game.player_class = "infantry"
+	await start_clean()
+
+
 func test_version_8() -> void:
 	# Codes work once, and the Store sells what is locked.
 	var saved_unlocked := Game.unlocked.duplicate()
@@ -843,7 +1037,9 @@ func test_version_8() -> void:
 	await seconds(0.4)
 	w = m.world
 	pl = w.player
-	ok(w.terrain != null and w.zombies.is_empty(), "the Sandbox starts empty")
+	ok(w.terrain != null and w.zombies.size() == w.dummy_spots.size() and w.dummy_spots.size() >= 3, "the Sandbox starts with only its dummies")
+	for dummy_one: Zombie in w.zombies:
+		ok(dummy_one.type_id == "dummy", "and a dummy is all that is there")
 	ok(not w.director.running and not Game.is_night(), "with no night running")
 	var weapon_count := 0
 	for id: String in WeaponDefs.ALL:
@@ -886,10 +1082,7 @@ func test_version_8() -> void:
 	m.show_sandbox_menu()
 	await frames(2)
 	ok(get_tree().paused and m.panel != null, "the Sandbox menu opens and stops the world")
-	await _press("Level up")
-	ok(pl.level == 2, "it can give you a level")
-	await _press("Top level")
-	ok(pl.level == ClassDefs.MAX_LEVEL, "or all of them")
+	ok(pl.level == ClassDefs.MAX_LEVEL and pl.points == ClassDefs.MAX_LEVEL - 1, "the whole tree is there to spend")
 	await _press("Back to it")
 	ok(not get_tree().paused, "and closes")
 
@@ -951,7 +1144,8 @@ func test_version_8() -> void:
 	await seconds(1.0)
 	var chariot_speed := Vector2(pl.velocity.x, pl.velocity.z).length()
 	pl.input_move = Vector2.ZERO
-	ok(chariot_speed < Player.WALK_SPEED * Player.HORSE_SPEED * 0.7, "and it is much slower (%.1f m/s)" % chariot_speed)
+	ok(chariot_speed < Player.WALK_SPEED, "and it is slower than walking (%.1f m/s)" % chariot_speed)
+	ok(pl.horses_needed() < Player.HORSE_KILLS, "but it comes sooner than a horse")
 	pl.guard_left = 0.0
 	var before_hit := pl.hp
 	pl.hurt(40.0, front(2.0))
@@ -1056,10 +1250,10 @@ func _artificer_path(spec: int) -> void:
 	await start_clean()
 	place(OPEN)
 	await seconds(0.2)
-	pl.points = 18
-	for s in 4:
+	pl.points = ClassDefs.MAX_LEVEL - 1
+	for s in Player.CORE_STEPS:
 		pl.choose_ability(s, 0)
-	pl.choose_ability(4, spec)
+	pl.choose_ability(Player.CORE_STEPS, spec)
 
 
 func test_new_things() -> void:
@@ -1159,8 +1353,8 @@ func test_flow() -> void:
 	ok(m.world != null and m.world.mode == Game.Mode.MENU, "menu shows the village")
 	await m.start_game(Game.Mode.SANDBOX)
 	await seconds(3.0)
-	ok(m.world.zombies.is_empty(), "roam has no zombies")
-	ok(m.world.pickups.size() > 0, "roam still has random pickups")
+	ok(m.world.zombies.size() == m.world.dummy_spots.size(), "the Sandbox has no zombies, only dummies")
+	ok(m.world.pickups.size() > 0, "the Sandbox has things to pick up")
 	m.queue_free()
 	await frames(2)
 
@@ -1805,7 +1999,7 @@ func test_zombies() -> void:
 func test_trees() -> void:
 	for id: String in ClassDefs.ALL:
 		var tree := AbilityData.tree(id)
-		ok((tree["core"] as Array).size() == 4, "%s has 4 shared tiers" % id)
+		ok((tree["core"] as Array).size() == Player.CORE_STEPS, "%s has its shared tiers" % id)
 		ok((tree["specs"] as Array).size() == 3, "%s has 3 specializations" % id)
 		var ids := {}
 		var icons := {}
@@ -1825,14 +2019,14 @@ func test_trees() -> void:
 		for spec: Dictionary in tree["specs"]:
 			check.call(spec["entry"])
 			check.call(spec["final"])
-			ok((spec["path"] as Array).size() == 12, "%s has 12 steps" % spec["name"])
+			ok((spec["path"] as Array).size() == 4, "%s has 4 steps" % spec["name"])
 			var choices := 0
 			for step: Array in spec["path"]:
 				if step.size() == 2:
 					choices += 1
 				for a: Dictionary in step:
 					check.call(a)
-			ok(choices == (0 if ClassDefs.ALL[id].get("auto_tree", false) else (3 if spec["id"] == "mechanic" else 5)), "%s has its real choices" % spec["name"])
+			ok(choices == (0 if ClassDefs.ALL[id].get("auto_tree", false) else 4), "%s has its real choices" % spec["name"])
 			ok(spec["final"].get("final", false), "%s ends in a final ability" % spec["name"])
 		var dupes := 0
 		for k: String in ids:
@@ -1853,8 +2047,9 @@ func test_trees() -> void:
 	for l in range(1, ClassDefs.MAX_LEVEL):
 		total_xp += ClassDefs.xp_for_level(l)
 	print("  xp to top level ", total_xp)
-	ok(total_xp > 1500 and total_xp < 3000, "levelling is much slower (%d points)" % total_xp)
-	ok(ClassDefs.MAX_LEVEL - 1 == 18, "18 points fill a branch")
+	ok(total_xp > 1200 and total_xp < 2500, "levelling takes most of a night (%d points)" % total_xp)
+	ok(ClassDefs.MAX_LEVEL - 1 == Player.CORE_STEPS + 1 + 4 + 1, "the points exactly fill a branch")
+	ok(ClassDefs.XP_TO_NEXT.size() == ClassDefs.MAX_LEVEL - 1, "and each level has its price")
 
 	# Exclusivity and order.
 	Game.player_class = "magician"
@@ -1869,34 +2064,30 @@ func test_trees() -> void:
 	ok(not pl.choose_ability(0, 0), "no point, no ability")
 	pl.points = 20
 	ok(not pl.choose_ability(1, 0), "steps go in order")
-	for i in 4:
+	for i in Player.CORE_STEPS:
 		ok(pl.choose_ability(i, 0), "takes shared ability %d" % i)
 	ok(not pl.choose_ability(0, 1), "the other choice of a tier stays locked")
-	ok(pl.steps().size() == 5, "branches stay closed until a specialization is taken")
+	ok(pl.steps().size() == Player.CORE_STEPS + 1, "branches stay closed until a specialization is taken")
 	m.toggle_tree()
 	await frames(3)
 	var panel_ref: TreePanel = m.tree_panel
 	ok(panel_ref != null and hud.menu_open and not get_tree().paused, "tree opens with the game running")
-	var picked := false
-	for n in panel_ref._nodes:
-		if n.step == Player.CORE_STEPS and n.spec == 2:
-			panel_ref.select(n)
-			panel_ref.choose_selected()
-			picked = true
-			break
+	var cards := panel_ref._zone.find_children("*", "Button", true, false)
+	ok(cards.size() == 3, "three specializations to choose from, as cards")
+	(cards[2] as Button).pressed.emit()
 	await frames(2)
-	ok(picked and pl.spec_id == "illusionist", "tapping a branch and Choose picks the specialization")
-	ok(pl.steps().size() == 18, "the chosen branch opens")
-	var locked := 0
+	ok(pl.spec_id == "illusionist", "one tap on a card picks the specialization")
+	ok(pl.steps().size() == ClassDefs.MAX_LEVEL - 1, "the chosen branch opens")
+	var others := 0
 	var open_nodes := 0
-	for n in panel_ref._nodes:
+	for n in panel_ref._map.nodes:
 		if n.spec >= 0 and n.spec != 2:
-			if panel_ref.state_of(n) == "locked":
-				locked += 1
+			others += 1
 		if panel_ref.state_of(n) == "ready":
 			open_nodes += 1
-	ok(locked == 2 * 19 + 2 * 5 - 0 or locked > 30, "the other two branches lock (%d nodes)" % locked)
+	ok(others == 0, "the other two branches leave the map")
 	ok(open_nodes == 2, "the next tier offers its two choices")
+	ok(panel_ref._zone.find_children("*", "Button", true, false).size() == 2, "as two cards")
 	m.toggle_tree()
 	await frames(2)
 	ok(m.tree_panel == null and not hud.menu_open, "tree closes")
@@ -1912,9 +2103,9 @@ func test_trees() -> void:
 				Game.player_class = id
 				await start_clean()
 				place(OPEN)
-				pl.points = 18
+				pl.points = ClassDefs.MAX_LEVEL - 1
 				var ok_all := true
-				for step in 18:
+				for step in ClassDefs.MAX_LEVEL - 1:
 					if pl.next_step() > step:
 						continue # a Revenant's gifts come by themselves
 					var options: Array = pl.steps()[step]
@@ -1945,8 +2136,8 @@ func build(cls: String, spec: int) -> void:
 	Game.player_class = cls
 	await start_clean()
 	place(OPEN)
-	pl.points = 18
-	for step in 18:
+	pl.points = ClassDefs.MAX_LEVEL - 1
+	for step in ClassDefs.MAX_LEVEL - 1:
 		var opt := spec if step == Player.CORE_STEPS else 0
 		pl.choose_ability(step, opt)
 	pl.hp = pl.max_hp()
@@ -2110,7 +2301,7 @@ func test_finals() -> void:
 	pl.mount()
 	pl.hp = 20.0
 	await seconds(1.0)
-	ok(pl.hp > 22.0, "and heals while riding")
+	ok(pl.hp > 21.0, "and heals while riding")
 	pl.dismount()
 	ok(not pl.horse_ready(), "but only every 60 s")
 
@@ -2131,12 +2322,12 @@ func test_finals() -> void:
 	await kill_all()
 
 	await build("magician", 0)
-	ok(int(pl.m("ally_cap")) == 8, "Army of the Dead allows 8 allies")
+	ok(int(pl.m("ally_cap")) == 6, "Army of the Dead allows 6 allies")
 	for e: Dictionary in pl._triggers["every"]:
-		if int(e.get("n", 0)) == 4:
+		if int(e.get("n", 0)) == 3:
 			pl._act(e, {})
 	await frames(3)
-	ok(w.count_allies("skeleton") >= 4, "4 skeletons rise (%d)" % w.count_allies("skeleton"))
+	ok(w.count_allies("skeleton") >= 3, "3 skeletons rise (%d)" % w.count_allies("skeleton"))
 	for al: Ally in w.allies.duplicate():
 		w.remove_ally(al)
 
@@ -2162,11 +2353,10 @@ func test_finals() -> void:
 	ok(element_shots.size() == 3, "bolts cycle through elements")
 
 	await build("magician", 2)
-	for e: Dictionary in pl._triggers["every"]:
-		if e["do"] == "summon":
-			pl._act(e, {})
-	await frames(3)
-	ok(w.count_allies("mirror") >= 1 and w.count_allies("decoy") >= 1, "decoys and mirror images appear")
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await seconds(0.3)
+	ok(w.count_allies("mirror") >= 1 and w.count_allies("decoy") >= 1, "a swap leaves decoys and mirror images")
 	var mz := spawn("normal", w.allies[0].position + Vector3(0, 0, 4.0))
 	mz.hp = 1000.0
 	await seconds(3.0)
@@ -2203,7 +2393,7 @@ func test_classes() -> void:
 	pl.choose_ability(0, 0)
 	pl.choose_ability(1, 0)
 	pl.choose_ability(2, 0)
-	ok(pl.shield_tier == 2 and pl._shield_node.mesh != mesh0, "shield upgrades to iron round")
+	ok(pl.shield_tier == 1 and pl._shield_node.mesh != mesh0, "shield upgrades to banded iron")
 	pl.hp = pl.max_hp()
 	pl.hurt(20.0, front(3.0))
 	var blocked := pl.max_hp() - pl.hp
@@ -2212,9 +2402,6 @@ func test_classes() -> void:
 	var from_back := pl.max_hp() - pl.hp
 	print("  shield: front ", blocked, " back ", from_back)
 	ok(blocked < from_back * 0.6, "shield blocks from the front only")
-	pl.hp = pl.max_hp()
-	pl.ignite(3.0)
-	ok(pl.burn_time == 0.0, "iron shield stops burning")
 
 	# Magician.
 	Game.player_class = "magician"
@@ -3102,24 +3289,22 @@ func test_review() -> void:
 	await frames(2)
 	ok(not get_tree().paused, "and it resumes afterwards")
 
-	# Touch scrolling in the tree, on empty parchment and starting on a medallion.
-	Input.emulate_touch_from_mouse = true
+	# The whole tree fits on the screen, and tapping something on the map reads it out.
 	pl.points = 1
 	m.toggle_tree()
 	await frames(3)
-	var scroll: ScrollContainer = m.tree_panel._scroll
-	scroll.scroll_horizontal = 0
-	var empty_at := scroll.global_position + Vector2(380, 18)
-	await _mouse_drag(empty_at, Vector2(-300, 0))
-	ok(scroll.scroll_horizontal > 100, "dragging empty parchment scrolls the tree (%d)" % scroll.scroll_horizontal)
-	scroll.scroll_horizontal = 0
+	var tree_nodes: Array = m.tree_panel._map.nodes
+	var fits := true
+	for tree_node: Control in tree_nodes:
+		if tree_node.position.x < -1.0 or tree_node.position.x + tree_node.size.x > m.tree_panel._map.size.x + 1.0 or tree_node.position.y + tree_node.size.y > m.tree_panel._map.size.y + 1.0:
+			fits = false
+	ok(fits and not tree_nodes.is_empty(), "the whole tree fits on the screen")
+	m.tree_panel.read(tree_nodes[tree_nodes.size() - 1])
 	await frames(2)
-	var node: Control = m.tree_panel._nodes[0]
-	var selected_before: Variant = m.tree_panel._selected
-	await _mouse_drag(node.global_position + node.size * 0.5, Vector2(-300, 0))
-	ok(scroll.scroll_horizontal > 100, "dragging from a medallion scrolls too (%d)" % scroll.scroll_horizontal)
-	ok(m.tree_panel._selected == selected_before, "and does not count as a tap")
-	Input.emulate_touch_from_mouse = false
+	ok(m.tree_panel._zone.get_child_count() == 1, "tapping an ability on the map shows it large")
+	m.tree_panel.read(null)
+	await frames(2)
+	ok(not m.tree_panel._zone.find_children("*", "Button", true, false).is_empty(), "and you can go back to your choice")
 	m.close_tree()
 
 	# Summoned bodies are reused.

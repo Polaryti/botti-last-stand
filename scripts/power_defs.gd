@@ -49,6 +49,7 @@ const POISON_DPS := 10.0
 const BOUNCES := 2
 
 static var _meshes := {}
+static var _moving := {}
 
 
 static func pick_weighted(table: Dictionary) -> String:
@@ -77,6 +78,17 @@ static func pick_familiar() -> String:
 		if ALL[id]["familiar"]:
 			t[id] = ALL[id]
 	return pick_weighted(t)
+
+
+## How a familiar moves at your shoulder: wings beat, and a rat scurries.
+static func familiar_material(id: String) -> ShaderMaterial:
+	if not _moving.has(id):
+		var m := ShaderMaterial.new()
+		m.shader = load("res://assets/shaders/familiar.gdshader")
+		m.set_shader_parameter("flap", {"angel": 0.6, "daemon": 0.8, "raven": 1.0, "imp": 0.5}.get(id, 0.0))
+		m.set_shader_parameter("scurry", 1.0 if id == "rat" else 0.0)
+		_moving[id] = m
+	return _moving[id]
 
 
 static func mesh(id: String) -> Mesh:

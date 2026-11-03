@@ -18,7 +18,8 @@ const ARTS := {
 	"summoner": {"name": "Call Revenant", "cost": 50.0, "cast": 0.7, "cd": 18.0, "icon": "ghost"},
 	"guardian": {"name": "Shield Dome", "cost": 0.0, "cast": 0.15, "cd": 24.0, "icon": "shield_rect"},
 	"pyromaniac": {"name": "Incendiary Bomb", "cost": 0.0, "cast": 0.25, "cd": 7.0, "icon": "bomb"},
-	"inventor": {"name": "Invention", "cost": 0.0, "cast": 0.35, "cd": 8.0, "icon": "gear"},
+	"inventor": {"name": "Invention", "cost": 0.0, "cast": 0.3, "cd": 6.0, "icon": "gear"},
+	"illusionist": {"name": "Mirror Swap", "cost": 0.0, "cast": 0.1, "cd": 8.0, "icon": "mirror"},
 }
 
 ## The Inventor's bag of tricks. Which ones are in it depends on the tree.
@@ -30,10 +31,10 @@ const INVENTIONS := {
 	"noise": {"name": "Noise Box", "icon": "noisebox"},
 	"magnet": {"name": "Lodestone", "icon": "magnet"},
 }
-const SENTRY_TIME := 12.0
+const SENTRY_TIME := 14.0
 const SENTRY_REACH := 20.0
 const TURRET_REACH := 20.0
-const TURRET_EVERY := 0.9
+const TURRET_EVERY := 0.7
 const SPARK_REACH := 8.0
 const BOMBLET_COLOURS := {"fire": Color(1.0, 0.5, 0.12), "frost": Color(0.65, 0.95, 1.0), "thunder": Color(0.95, 0.9, 0.4), "poison": Color(0.5, 0.85, 0.25)}
 

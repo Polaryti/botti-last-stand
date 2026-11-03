@@ -44,13 +44,21 @@ const ALL := {
 		"tint": Color(0.42, 0.42, 0.52), "models": ["beast"], "hero": true, "weapon": "mace", "shielded": true},
 	"hero_chivalry": {"name": "Fallen Knight", "icon": "lance", "desc": "Charges in a straight line with its lance. Charges more often at minute 6.", "hp": 150.0, "roam_speed": 1.8, "speed": 3.4, "damage": 16.0, "scale": 1.18, "xp": 34, "sight": 34.0,
 		"tint": Color(0.56, 0.42, 0.24), "models": ["beast"], "hero": true, "weapon": "lance", "charges": true},
-	"rider": {"name": "Dread Rider", "icon": "horse", "desc": "Gallops through you with a lance and turns wide to come again. Hit it while it turns. Bring down its horse and it fights on foot.", "hp": 260.0, "roam_speed": 3.5, "speed": 8.2, "damage": 20.0, "scale": 1.0, "xp": 45,
+	"rider": {"name": "Dread Rider", "icon": "horse", "desc": "Gallops through you with a lance and turns wide to come again. Hit it while it turns. Bring down its horse and it fights on foot.", "hp": 260.0, "roam_speed": 3.5, "speed": 8.2, "damage": 20.0, "scale": 1.3, "xp": 45,
 		"sight": 42.0, "tint": Color(0.5, 0.3, 0.26), "models": ["beast"], "from": 300.0, "weight": 0.0, "weapon": "lance", "rider": true},
 	"hero_magician": {"name": "Fallen Mage", "icon": "staff", "desc": "Two fireballs at minute 4. Raises zombies around itself at minute 7.", "hp": 90.0, "roam_speed": 1.4, "speed": 2.5, "damage": 11.0, "scale": 1.12, "xp": 32, "sight": 38.0,
 		"tint": Color(0.5, 0.26, 0.54), "models": ["magic"], "hero": true, "caster": true},
 }
 
+## Only in the Sandbox: something to hit that never dies and never hits back.
+const DUMMY := {"name": "Training Dummy", "icon": "target", "desc": "Never dies and never hits back. Shows how hard you hit it.", "hp": 10000000.0, "roam_speed": 0.0, "speed": 0.0, "damage": 0.0, "scale": 1.0, "xp": 0,
+	"sight": 0.0, "tint": Color(0.72, 0.6, 0.3), "models": ["dummy"], "from": 9999.0, "weight": 0.0, "custom": true, "dummy": true}
+
 const HEROES := ["hero_infantry", "hero_ranger", "hero_heavy", "hero_chivalry", "hero_magician"]
+
+
+static func def_of(id: String) -> Dictionary:
+	return DUMMY if id == "dummy" else ALL[id]
 
 
 static func pick_roamer(elapsed: float) -> String:

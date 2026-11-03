@@ -82,6 +82,7 @@ These show in the editor as small markers. Set Kind in the Inspector.
 | `place` | A name on the map screen. Type it in Text. |
 | `wood`, `yard_wood` | Where wood appears in the fort: outside it, and in its yard. |
 | `weapon`, `item`, `familiar` | The stands in the Sandbox. Each row fills itself with everything of that type. |
+| `dummy` | A training dummy in the Sandbox. It takes any hit and shows the damage. |
 
 ## Doors and windows
 

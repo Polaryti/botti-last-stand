@@ -11,6 +11,7 @@ const CODES := {"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b3
 
 var mode: int = Mode.MENU
 var test_map := "" # a map scene to play instead of the usual one: see MapRoot
+var force_weather := -1 # a test can ask for a certain weather
 var player_class := "infantry"
 var player_name := ""
 var unlocked := {} # classes bought, or opened with a code
@@ -115,6 +116,13 @@ func max_live_zombies() -> int:
 
 ## How many of each model to keep ready. Together they match max_live_zombies().
 func zombie_pool_plan() -> Dictionary:
+	var plan := _zombie_pools()
+	if mode == Mode.SANDBOX:
+		plan["dummy"] = 6
+	return plan
+
+
+func _zombie_pools() -> Dictionary:
 	match zombie_quality():
 		0: return {"normal_a": 5, "normal_b": 5, "clever": 3, "magic": 3, "beast": 3, "crow": 3, "gargoyle": 1, "mimic": 1, "scarecrow": 2}
 		2: return {"normal_a": 9, "normal_b": 9, "clever": 6, "magic": 5, "beast": 4, "crow": 6, "gargoyle": 2, "mimic": 2, "scarecrow": 3}

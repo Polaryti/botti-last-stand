@@ -15,11 +15,13 @@ const SHIELD_BASE := 0.3
 const HORSE_KILLS := 10
 const HORSE_TIME := 15.0
 const HORSE_SPEED := 1.9
-const CHARIOT_SPEED := 1.15
-const CHARIOT_TIME := 25.0
+const CHARIOT_SPEED := 0.8 # slower than walking: you ride it to fight, not to get away
+const CHARIOT_TIME := 30.0
 const TRAMPLE_DAMAGE := 40.0
-const CORE_STEPS := 4
+const CORE_STEPS := 3
 const LEVEL_UP_GUARD := 3.0 # seconds nothing can hurt you after gaining a level
+const PVP_STATUS := 0.6 # a freeze or a stun lasts this much as long on a player
+const PVP_STATUS_GAP := 1.5
 const WADE_SPEED := 0.8
 const SWING_HIT := 0.3 # how far through a swing the blow lands
 const BASH := {"kind": WeaponDefs.Kind.MELEE, "rate": 0.8, "range": 2.3, "cone": 110.0, "max_hits": 1, "knock": 3.5, "power": 0.6}
@@ -56,7 +58,8 @@ var mods := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_
 	"cover": 0.0, "cover_radius": 0.0, "dome_time": 3.0, "dome_radius": 6.0,
 	"bomb_damage": 70.0, "bomb_radius": 4.5, "bomb_fire": 4.0, "bomb_count": 1.0, "bomb_throw": 1.0,
 	"turret_rate": 1.0, "turret_damage": 1.0,
-	"volley_darts": 5.0, "volley_jumps": 2.0, "flask_time": 2.5, "flask_radius": 5.0, "inv_damage": 1.0, "inv_heal": 0.0, "inv_repeat": 0.0}
+	"volley_darts": 7.0, "volley_jumps": 3.0, "flask_time": 3.0, "flask_radius": 6.0, "inv_damage": 1.0, "inv_heal": 0.0,
+	"swap_range": 9.0, "swap_burst": 50.0, "swap_radius": 4.0, "swap_decoys": 1.0, "swap_decoy_time": 5.0}
 var flags := {}
 var spec_id := ""
 var _buffs := {} # key -> {stat, val, left, stacks}
@@ -97,7 +100,7 @@ var _cast_left := 0.0
 var _leap_t := -1.0
 var _leap_from := Vector3.ZERO
 var _leap_to := Vector3.ZERO
-var _rift_targets: Array[Zombie] = []
+var _rift_targets: Array = [] # enemies and, in a fight, other players
 var _rift_timer := 0.0
 var _lit := false
 var _lit_timer := 0.0
@@ -117,6 +120,10 @@ var _dawn_bright := 0.0
 var hit_marker := 0.0
 var hit_head := false
 var burn_time := 0.0
+var frozen_left := 0.0 # frozen or stunned by another player: you can look around, and that is all
+var is_iced := false
+var _status_immune := 0.0 # just after a freeze or stun nobody can start another, or it never ends
+var slowed_left := 0.0
 var toast := ""
 var toast_time := 0.0
 
@@ -527,6 +534,41 @@ func ignite(seconds: float) -> void:
 	burn_time = maxf(burn_time, seconds)
 
 
+## Another player's ability. It does not last as long on a person as on the undead.
+func apply_status(kind: int, seconds: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	var secs := seconds * PVP_STATUS
+	if (kind == Net.Status.FREEZE or kind == Net.Status.STUN) and (frozen_left > 0.0 or _status_immune > 0.0):
+		return
+	match kind:
+		Net.Status.FREEZE:
+			frozen_left = secs
+			is_iced = true
+			say("Frozen!")
+		Net.Status.STUN:
+			frozen_left = secs
+			is_iced = false
+			say("Stunned!")
+		Net.Status.SLOW:
+			slowed_left = maxf(slowed_left, secs)
+		Net.Status.BURN:
+			ignite(secs)
+
+
+## The deadly fog: no armour or dodge helps against it, though a moment of invincibility does.
+func fog_hurt(amount: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	hp -= amount
+	hurt_flash = maxf(hurt_flash, 0.35)
+	hit_by = "the fog"
+	last_foe = 0
+	damaged.emit(amount, hit_by)
+	if hp <= 0.0:
+		_on_fatal()
+
+
 func _on_fatal() -> void:
 	_kill()
 
@@ -546,6 +588,9 @@ func respawn(at: Vector3) -> void:
 	hp = max_hp()
 	mana = max_mana()
 	burn_time = 0.0
+	frozen_left = 0.0
+	slowed_left = 0.0
+	_status_immune = 0.0
 	guard_left = 2.5
 	last_foe = 0
 	velocity = Vector3.ZERO
@@ -612,6 +657,14 @@ func add_xp(n: int) -> void:
 	_auto_unlock()
 
 
+## In the Sandbox the whole tree is yours from the start.
+func grant_all_points() -> void:
+	level = ClassDefs.MAX_LEVEL
+	xp = 0
+	points = ClassDefs.MAX_LEVEL - 1 - chosen.size()
+	_auto_unlock()
+
+
 func tree_data() -> Dictionary:
 	return AbilityData.tree(class_id)
 
@@ -620,8 +673,8 @@ func next_step() -> int:
 	return chosen.size()
 
 
-## The options of each step of this character's path, in order. Step 4 is the choice of
-## specialization, and its branch only appears here once one has been taken.
+## The options of each step of this character's path, in order. After the shared steps comes the
+## choice of specialization, and its branch only appears here once one has been taken.
 func steps() -> Array:
 	var t := tree_data()
 	var out: Array = (t["core"] as Array).duplicate()
@@ -689,8 +742,13 @@ func _apply_ability(a: Dictionary) -> void:
 		flags[a["flag"]] = true
 		if a["flag"] == "art_summoner":
 			world.prepare_allies("revenant", 3)
+		elif a["flag"] == "art_swap":
+			world.prepare_allies("decoy", 3)
+		elif a["flag"] == "swap_legion":
+			world.prepare_allies("mirror", 3)
 	if max_hp() > was_hp:
 		hp += max_hp() - was_hp
+	hp = minf(hp, max_hp())
 	if add.has("mana"):
 		mana += float(add["mana"])
 	if add.has("wolves"):
@@ -767,6 +825,8 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 		"stun":
 			if z:
 				z.stun(float(e["secs"]))
+			elif ctx.has("rival"):
+				Net.status_peer(ctx["rival"], Net.Status.STUN, float(e["secs"]))
 		"stun_attacker":
 			var at: Zombie = ctx.get("attacker")
 			if at:
@@ -780,9 +840,13 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 		"dot":
 			if z:
 				z.add_dot(float(e["dps"]), float(e["secs"]))
+			elif ctx.has("rival"):
+				Net.status_peer(ctx["rival"], Net.Status.BURN, float(e["secs"]))
 		"ignite":
 			if z:
 				z.ignite(ZombieDefs.BURN_SECONDS)
+			elif ctx.has("rival"):
+				Net.status_peer(ctx["rival"], Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 		"extra":
 			if z and z.is_alive():
 				z.take_damage(WeaponDefs.DAMAGE * float(e["mult"]) * m("melee_damage"), Vector3.ZERO, 0.0, z.centre())
@@ -809,15 +873,19 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 			world.stun_around(here, float(e["r"]), 1.2)
 		"thunder":
 			var t := world.nearest_zombie(eye_position(), PowerDefs.THUNDER_RANGE, false)
-			if t == null:
+			var foe := world.nearest_rival(eye_position(), PowerDefs.THUNDER_RANGE)
+			if t == null and foe == null:
 				return false
-			world.thunder_strike(self, t.position)
+			world.thunder_strike(self, foe.global_position if foe else t.position)
 		"thunder_all":
 			var any := false
 			for t: Zombie in world.zombies.duplicate():
 				if t.is_alive() and t.position.distance_to(here) <= float(e["r"]):
 					t.take_damage(PowerDefs.THUNDER_DAMAGE, t.position - here, 3.0, t.centre())
 					any = true
+			for r: Avatar in world.rivals_near(here, float(e["r"])):
+				Net.hit_player(r.peer, PowerDefs.THUNDER_DAMAGE, here)
+				any = true
 			if not any:
 				return false
 			Sfx.play("thunder", -3.0, 1.0, 0.2)
@@ -829,6 +897,10 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 					t.take_damage(float(e["dmg"]), t.position - here, 3.0, t.centre())
 					t.ignite(ZombieDefs.BURN_SECONDS)
 					any = true
+			for r: Avatar in world.rivals_near(here, float(e["r"])):
+				Net.hit_player(r.peer, float(e["dmg"]), here)
+				Net.status_peer(r.peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
+				any = true
 			if not any:
 				return false
 			world.fx_blast(here + Vector3.UP, float(e["r"]) * 0.45, Color(1.0, 0.45, 0.1, 0.4))
@@ -854,17 +926,20 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 		"poison":
 			world.drop_poison(here, true)
 		"hawk":
-			var t := world.nearest_zombie(eye_position(), 18.0, true)
+			var t: Node3D = world.nearest_rival(eye_position(), 18.0)
+			if t == null:
+				t = world.nearest_zombie(eye_position(), 18.0, true)
 			if t == null:
 				return false
 			world.familiar_arrow(self, t)
 		"fetch":
 			world.imp_steal(self)
 		"volley":
-			var targets := world.zombies_near(here, 18.0, int(e["n"]))
+			var targets: Array = world.zombies_near(here, 18.0, int(e["n"]))
+			targets.append_array(world.rivals_near(here, 18.0))
 			if targets.is_empty():
 				return false
-			for t: Zombie in targets:
+			for t: Node3D in targets:
 				world.familiar_arrow(self, t)
 		"power":
 			activate_power(e["id"], float(e["time"]))
@@ -921,7 +996,7 @@ func on_kill(z: Zombie) -> void:
 
 func on_ally_kill() -> void:
 	if has_flag("bond"):
-		heal(3.0)
+		heal(5.0)
 
 
 ## Crits, backstabs and other per-target rules for anything the player deals.
@@ -939,7 +1014,7 @@ func modify_damage(z: Zombie, base: float) -> float:
 		dmg *= 1.0 + m("backstab")
 		fire("backstab", {"z": z})
 	if has_flag("pack_tactics") and world.ally_near(z.position, 5.0):
-		dmg *= 1.25
+		dmg *= 1.3
 	return dmg
 
 
@@ -964,7 +1039,7 @@ func mount() -> void:
 		if _chariot == null:
 			_chariot = ChariotModel.new(2)
 			add_child(_chariot)
-		_chariot.show_upgrades(has_flag("chariot_turret"), has_flag("chariot_spikes"))
+		_chariot.show_upgrades(has_turret(), has_spikes())
 		_chariot.visible = true
 		Sfx.play("creak", 0.0)
 	else:
@@ -1052,32 +1127,47 @@ func _tick_riding(delta: float) -> void:
 
 
 ## What a Mechanic's upgrades do while the chariot is out.
+func has_turret() -> bool:
+	return has_flag("chariot_turret") or has_flag("war_machine")
+
+
+func has_spikes() -> bool:
+	return has_flag("chariot_spikes") or has_flag("war_machine")
+
+
 func _tick_chariot(delta: float) -> void:
-	if has_flag("chariot_turret"):
+	if has_turret():
 		_turret_timer -= delta
 		if _turret_timer <= 0.0:
 			var from := global_position + global_basis * Vector3(0.6, 1.6, -1.0)
-			var z := world.nearest_zombie(from, WorldLight.TURRET_REACH, true)
-			if z == null:
+			var aim_at := world.aim_point(from, WorldLight.TURRET_REACH)
+			if aim_at == Vector3.INF:
 				_turret_timer = 0.25
 			else:
 				_turret_timer = WorldLight.TURRET_EVERY / m("turret_rate")
-				_chariot.aim_turret(z.centre())
-				var dir := (z.centre() - from).normalized()
-				world.spawn_player_arrow(self, from, dir * 45.0, 0.0, WorldLight.TURRET_REACH + 6.0, 1.5, WeaponDefs.DAMAGE * 0.8 * m("turret_damage") * damage_multiplier(), false)
+				_chariot.aim_turret(aim_at)
+				var dir := (aim_at - from).normalized()
+				world.spawn_player_arrow(self, from, dir * 45.0, 0.0, WorldLight.TURRET_REACH + 6.0, 1.5, WeaponDefs.DAMAGE * 1.2 * m("turret_damage") * damage_multiplier(), false)
 				Sfx.play("crossbow", -8.0, 1.1, 0.1)
-	if has_flag("chariot_spikes"):
+	if has_spikes():
 		_spike_timer -= delta
 		if _spike_timer <= 0.0:
-			_spike_timer = 0.45
+			_spike_timer = 0.45 / m("turret_rate")
 			for z: Zombie in world.zombies_near(global_position, 2.5, 8):
 				z.take_damage(26.0 * m("turret_damage") * damage_multiplier(), z.position - global_position, 2.0, z.centre())
 				on_hit(false)
+			for r: Avatar in world.rivals_near(global_position, 2.5):
+				Net.hit_player(r.peer, 26.0 * m("turret_damage") * damage_multiplier(), global_position)
 
 
 func _trample(horiz: float) -> void:
 	var now := world.now
 	var ahead := Vector3(velocity.x, 0, velocity.z) / maxf(horiz, 0.01)
+	for r: Avatar in world.rivals_near(global_position, 2.3):
+		if now - float(_trampled.get(r.get_instance_id(), -10.0)) >= 0.8:
+			_trampled[r.get_instance_id()] = now
+			Net.hit_player(r.peer, TRAMPLE_DAMAGE * m("trample") * damage_multiplier(), global_position)
+			Net.status_peer(r.peer, Net.Status.STUN, 0.8)
 	for z: Zombie in world.zombies:
 		if not z.is_alive():
 			continue
@@ -1088,7 +1178,7 @@ func _trample(horiz: float) -> void:
 		if now - float(_trampled.get(z.get_instance_id(), -10.0)) < 0.8:
 			continue
 		_trampled[z.get_instance_id()] = now
-		var dmg := TRAMPLE_DAMAGE * m("trample") * damage_multiplier() * (0.6 if mount_kind() == "chariot" else 1.0)
+		var dmg := TRAMPLE_DAMAGE * m("trample") * damage_multiplier()
 		if has_flag("war_horse") and z.type_id == "normal":
 			dmg = 9999.0
 		if has_flag("unstoppable") and z.type_id != "beast":
@@ -1123,6 +1213,7 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 		if not _familiars.has(id):
 			var mi := MeshInstance3D.new()
 			mi.mesh = PowerDefs.mesh(id)
+			mi.material_override = PowerDefs.familiar_material(id)
 			mi.scale = Vector3.ONE * 0.22
 			mi.layers = 2
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1260,7 +1351,7 @@ func art_cost() -> float:
 
 ## Mist Burst: gather the mist for a moment, then let it go.
 func use_burst() -> void:
-	if not has_burst() or _cast_kind != "" or _is_moved_by_mist():
+	if not has_burst() or _cast_kind != "" or _is_moved_by_mist() or frozen_left > 0.0:
 		return
 	if burst_cd_left > 0.0:
 		return
@@ -1277,7 +1368,7 @@ func use_burst() -> void:
 ## The second ability, from the chosen path.
 func use_art() -> void:
 	var d := art_def()
-	if d.is_empty() or _cast_kind != "" or _is_moved_by_mist() or art_cd_left > 0.0:
+	if d.is_empty() or _cast_kind != "" or _is_moved_by_mist() or art_cd_left > 0.0 or frozen_left > 0.0:
 		return
 	if mana < art_cost():
 		say("Not enough mist")
@@ -1318,6 +1409,7 @@ func _tick_mist(delta: float) -> void:
 		"guardian": raise_dome()
 		"pyromaniac": _throw_bombs()
 		"inventor": _invent()
+		"illusionist": _mirror_swap()
 
 
 func mist_burst_at(at: Vector3, power: float) -> void:
@@ -1336,6 +1428,7 @@ func mist_burst_at(at: Vector3, power: float) -> void:
 			on_hit(false)
 	for r: Avatar in world.rivals_near(at, radius):
 		Net.hit_player(r.peer, dmg, at)
+		Net.status_peer(r.peer, Net.Status.FREEZE, WorldLight.BURST_FREEZE)
 
 
 ## Nobody inside can be hurt for a moment, including the summons.
@@ -1404,10 +1497,13 @@ func bomb_burst(at: Vector3) -> void:
 			z.take_damage(dmg, z.position - at, 5.0, z.centre())
 			z.ignite(ZombieDefs.BURN_SECONDS)
 			if has_flag("bomb_stun"):
-				z.stun(1.0)
+				z.stun(1.5)
 			on_hit(false)
 	for r: Avatar in world.rivals_near(at, radius):
 		Net.hit_player(r.peer, dmg, at)
+		Net.status_peer(r.peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
+		if has_flag("bomb_stun"):
+			Net.status_peer(r.peer, Net.Status.STUN, 1.5)
 	var patch := minf(radius * 0.6, 3.6)
 	world.drop_poison(at, true, m("bomb_fire"), patch)
 	if Net.active():
@@ -1445,6 +1541,12 @@ func _bomblet_burst(at: Vector3, kind: String) -> void:
 			"frost": z.freeze(1.5)
 			"thunder": z.stun(0.8)
 			"poison": z.add_dot(10.0, 4.0)
+	for r: Avatar in world.rivals_near(at, REACH):
+		Net.hit_player(r.peer, dmg, at)
+		match kind:
+			"fire", "poison": Net.status_peer(r.peer, Net.Status.BURN, 2.0)
+			"frost": Net.status_peer(r.peer, Net.Status.FREEZE, 1.5)
+			"thunder": Net.status_peer(r.peer, Net.Status.STUN, 0.8)
 	match kind:
 		"fire": world.drop_poison(at, true, 2.5, 1.6)
 		"poison": world.drop_poison(at)
@@ -1487,9 +1589,6 @@ func _invent() -> void:
 		_later.append({"left": 0.5, "do": func() -> void: _run_invention(what)})
 	if m("inv_heal") > 0.0:
 		heal(m("inv_heal"))
-	if randf() < m("inv_repeat"):
-		art_cd_left = 0.0
-		say("Ready again!")
 	_last_invention = what
 	_roll_invention()
 
@@ -1512,7 +1611,7 @@ func _run_invention(what: String) -> void:
 			Sfx.play("creak", -2.0, 1.2)
 		"boots":
 			_act({"do": "buff", "key": "steam_boots", "stat": "speed", "val": 0.8, "secs": 4.0}, {})
-			guard_left = maxf(guard_left, 1.5)
+			guard_left = maxf(guard_left, 2.0)
 			_fog_at(global_position + Vector3.UP * 0.5, 1.2)
 			Sfx.play("wraith", -9.0, 1.6, 0.2)
 		"noise":
@@ -1531,7 +1630,7 @@ func _tick_artificer(delta: float) -> void:
 			_volley_left -= 1
 			var dir := world.assist_aim(camera.global_position, -camera.global_basis.z, 40.0)
 			dir = dir.rotated(Vector3.UP, randf_range(-0.03, 0.03))
-			world.spawn_dart(_throw_start(), dir * 55.0, WeaponDefs.DAMAGE * 0.7 * m("inv_damage") * damage_multiplier(), int(m("volley_jumps")))
+			world.spawn_dart(_throw_start(), dir * 55.0, WeaponDefs.DAMAGE * m("inv_damage") * damage_multiplier(), int(m("volley_jumps")))
 			Sfx.play("crossbow", -7.0, 1.5, 0.04)
 	for i in range(_later.size() - 1, -1, -1):
 		_later[i]["left"] = float(_later[i]["left"]) - delta
@@ -1570,9 +1669,12 @@ func _flask_burst(at: Vector3) -> void:
 		Net.blast_fx(at, radius * 0.8, col)
 	Sfx.play("blast", -4.0, 1.6, 0.1)
 	for z: Zombie in world.zombies_near(at, radius, 14):
-		z.take_damage(20.0 * m("inv_damage") * damage_multiplier(), z.position - at, 0.5, z.centre())
+		z.take_damage(40.0 * m("inv_damage") * damage_multiplier(), z.position - at, 0.5, z.centre())
 		z.freeze(m("flask_time"))
 		on_hit(false)
+	for r: Avatar in world.rivals_near(at, radius):
+		Net.hit_player(r.peer, 40.0 * m("inv_damage") * damage_multiplier(), at)
+		Net.status_peer(r.peer, Net.Status.FREEZE, m("flask_time"))
 
 
 ## Everything close comes to see, and then it goes off.
@@ -1588,8 +1690,10 @@ func _noise_burst(at: Vector3) -> void:
 			Net.blast_fx(at, 4.5, col)
 		Sfx.play("blast", -2.0, 0.9, 0.1)
 		for z: Zombie in world.zombies_near(at, 6.0, 16):
-			z.take_damage(90.0 * m("inv_damage") * damage_multiplier(), z.position - at, 6.0, z.centre())
-			on_hit(false)})
+			z.take_damage(130.0 * m("inv_damage") * damage_multiplier(), z.position - at, 6.0, z.centre())
+			on_hit(false)
+		for r: Avatar in world.rivals_near(at, 6.0):
+			Net.hit_player(r.peer, 130.0 * m("inv_damage") * damage_multiplier(), at)})
 
 
 func _magnet_burst(at: Vector3) -> void:
@@ -1601,8 +1705,63 @@ func _magnet_burst(at: Vector3) -> void:
 	for z: Zombie in world.zombies_near(at, 10.0, 16):
 		z.pull_to(at)
 		z.stun(3.0)
-		z.take_damage(15.0 * m("inv_damage") * damage_multiplier(), Vector3.ZERO, 0.0, z.centre())
+		z.take_damage(30.0 * m("inv_damage") * damage_multiplier(), Vector3.ZERO, 0.0, z.centre())
 		on_hit(false)
+	for r: Avatar in world.rivals_near(at, 10.0):
+		Net.hit_player(r.peer, 30.0 * m("inv_damage") * damage_multiplier(), at)
+		Net.status_peer(r.peer, Net.Status.STUN, 3.0)
+
+
+## The Illusionist's trick: gone from here and there already, with something left behind to look at.
+func _mirror_swap() -> void:
+	var dir := global_basis * Vector3(input_move.x, 0, input_move.y)
+	if dir.length_squared() < 0.04:
+		dir = -global_basis.z
+	dir = Vector3(dir.x, 0, dir.z).normalized()
+	var from := global_position
+	var to := leap_landing(from, dir, m("swap_range"))
+	var side := Vector3(-dir.z, 0, dir.x)
+	for i in int(m("swap_decoys")):
+		world.spawn_ally("decoy", from + side * (i * 1.6), m("swap_decoy_time") * m("ally_time"))
+	# Everything close turns to look at what is still standing there.
+	for z: Zombie in world.zombies_near(from, 14.0, 16):
+		z.taunted_by(from)
+	_fog_at(from + Vector3.UP, 1.2)
+	global_position = to + Vector3.UP * 0.04
+	velocity = Vector3.ZERO
+	_fog_at(to + Vector3.UP, 0.9)
+	fog_flash = 0.6
+	guard_left = maxf(guard_left, 0.3)
+	Sfx.play("wraith", -8.0, 1.7, 0.2)
+	if has_flag("swap_fade"):
+		invis_left = maxf(invis_left, 2.5)
+	if has_flag("swap_forget"):
+		world.forget_around(to, 10.0)
+	if has_flag("swap_legion"):
+		for i in 3:
+			var a := TAU * i / 3.0 + rotation.y
+			world.spawn_ally("mirror", to + Vector3(sin(a), 0, cos(a)) * 1.8, 8.0 * m("ally_time"))
+	_noise(4.0)
+
+
+## What a decoy does when it ends, whether it was broken or simply ran out.
+func decoy_burst(at: Vector3) -> void:
+	var radius := m("swap_radius")
+	var dmg := m("swap_burst") * damage_multiplier()
+	var col := Color(0.72, 0.4, 0.95, 0.5)
+	world.fx_blast(at, radius * 0.8, col)
+	if Net.active():
+		Net.blast_fx(at, radius * 0.8, col)
+	world.sfx_at("blast", at, -5.0)
+	for z: Zombie in world.zombies_near(at, radius, 16):
+		z.take_damage(dmg, z.position - at, 3.0, z.centre())
+		if has_flag("swap_stun"):
+			z.stun(1.5)
+		on_hit(false)
+	for r: Avatar in world.rivals_near(at, radius):
+		Net.hit_player(r.peer, dmg, at)
+		if has_flag("swap_stun"):
+			Net.status_peer(r.peer, Net.Status.STUN, 1.5)
 
 
 ## A hit a friend's Guardian took for them.
@@ -1695,16 +1854,26 @@ func _tick_leap(delta: float) -> void:
 					z.freeze(WorldLight.BURST_FREEZE)
 				elif stuns:
 					z.stun(1.0)
+			for r: Avatar in world.rivals_near(global_position, 4.0):
+				if hit > 0.0:
+					Net.hit_player(r.peer, hit * damage_multiplier(), global_position)
+				if freezes:
+					Net.status_peer(r.peer, Net.Status.FREEZE, WorldLight.BURST_FREEZE)
+				elif stuns:
+					Net.status_peer(r.peer, Net.Status.STUN, 1.0)
 
 
-func _rift_candidates() -> Array[Zombie]:
-	var out: Array[Zombie] = []
+func _rift_candidates() -> Array:
+	var out: Array = []
 	var eye := eye_position()
 	for z in world.zombies:
 		if z.is_alive() and not z.dormant and z.position.distance_to(global_position) <= WorldLight.RIFT_REACH and world.has_line_of_sight(eye, z.centre()):
 			out.append(z)
+	for r: Avatar in world.rivals_near(global_position, WorldLight.RIFT_REACH):
+		if world.has_line_of_sight(eye, r.eye_position()):
+			out.append(r)
 	var here := global_position
-	out.sort_custom(func(a: Zombie, b: Zombie) -> bool: return a.position.distance_squared_to(here) < b.position.distance_squared_to(here))
+	out.sort_custom(func(a: Node3D, b: Node3D) -> bool: return a.global_position.distance_squared_to(here) < b.global_position.distance_squared_to(here))
 	return out
 
 
@@ -1727,26 +1896,34 @@ func _tick_rift(delta: float) -> void:
 	if _rift_timer > 0.0:
 		return
 	_rift_timer = 0.17
-	var z: Zombie = _rift_targets.pop_front()
-	while z != null and not z.is_alive():
-		z = _rift_targets.pop_front() if not _rift_targets.is_empty() else null
+	var z: Variant = null
+	while z == null and not _rift_targets.is_empty():
+		var next: Variant = _rift_targets.pop_front()
+		if is_instance_valid(next) and ((next is Zombie and next.is_alive()) or (next is Avatar and not next.dead)):
+			z = next
 	if z == null:
 		return
-	var away := global_position - z.position
+	var there: Vector3 = (z as Node3D).global_position
+	var away := global_position - there
 	away.y = 0.0
-	var spot := z.position + (away.normalized() if away.length_squared() > 0.01 else Vector3.FORWARD) * 1.1
+	var spot := there + (away.normalized() if away.length_squared() > 0.01 else Vector3.FORWARD) * 1.1
 	var cell := world.grid.to_cell(spot)
 	if not world.grid.is_free(cell):
 		spot = world.grid.to_world(world.grid.nearest_free(cell))
 	spot.y = world.ground_at(spot) + 0.05
 	world.fx_blast(global_position + Vector3.UP, 0.8, Color(0.62, 0.92, 0.95, 0.35))
 	global_position = spot
-	z.take_damage(m("rift_damage") * damage_multiplier(), z.position - spot, 1.5, z.centre())
+	if z is Avatar:
+		Net.hit_player(z.peer, m("rift_damage") * damage_multiplier(), spot)
+		if has_flag("rift_freeze"):
+			Net.status_peer(z.peer, Net.Status.FREEZE, 0.8)
+	else:
+		z.take_damage(m("rift_damage") * damage_multiplier(), there - spot, 1.5, z.centre())
+		if has_flag("rift_freeze") and z.is_alive():
+			z.freeze(0.8)
 	on_hit(false)
-	if has_flag("rift_freeze") and z.is_alive():
-		z.freeze(0.8)
 	if has_flag("rift_mist"):
-		mana = minf(max_mana(), mana + 4.0)
+		mana = minf(max_mana(), mana + 6.0)
 	_swing_side = not _swing_side
 	_swing_keys = WeaponAnim.keys_for("claw", _swing_side)
 	_swing_time = 0.2
@@ -1774,6 +1951,20 @@ func _physics_process(delta: float) -> void:
 	if dead:
 		head.position.y = lerp(head.position.y, 0.3, delta * 4.0)
 		return
+	slowed_left = maxf(0.0, slowed_left - delta)
+	_status_immune = maxf(0.0, _status_immune - delta)
+	if frozen_left > 0.0:
+		frozen_left -= delta
+		if frozen_left <= 0.0:
+			_status_immune = PVP_STATUS_GAP
+		velocity.x = 0.0
+		velocity.z = 0.0
+		if not is_on_floor():
+			velocity.y -= GRAVITY * delta
+		input_jump = false
+		move_and_slide()
+		_tick_riding(delta)
+		return
 	if ride_behind != 0:
 		_tick_seat(delta)
 		return
@@ -1787,6 +1978,8 @@ func _physics_process(delta: float) -> void:
 	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (0.5 if zoomed else 1.0)
 	if is_riding():
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
+	if slowed_left > 0.0:
+		speed *= 0.6
 	var wading := world.terrain.in_water(global_position.x, global_position.z)
 	if wading:
 		speed *= WADE_SPEED
@@ -1954,7 +2147,7 @@ func attack_interval(d: Dictionary) -> float:
 
 func _handle_fire() -> void:
 	var d := weapon_def()
-	if d.is_empty() or not input_fire or _cooldown > 0.0 or _is_moved_by_mist():
+	if d.is_empty() or not input_fire or _cooldown > 0.0 or _is_moved_by_mist() or frozen_left > 0.0:
 		return
 	if WeaponDefs.uses_arrows(d) and arrows <= 0:
 		_bash("No arrows")
@@ -2016,7 +2209,7 @@ func _ranged_mult() -> float:
 	if is_riding():
 		mult *= m("riding_ranged")
 	if has_flag("still_aim") and Vector2(velocity.x, velocity.z).length() < 0.5:
-		mult *= 1.3
+		mult *= 1.5
 	return mult
 
 
@@ -2039,7 +2232,7 @@ func _fire_arrow(d: Dictionary) -> void:
 	var max_range: float = float(d["range"]) * power
 	var dmg := WeaponDefs.DAMAGE * _ranged_mult()
 	_shot_count += 1
-	if has_flag("overdraw") and _shot_count % 4 == 0:
+	if has_flag("overdraw") and _shot_count % 3 == 0:
 		dmg *= 2.0
 	if has_flag("killing_shot") and _kill_shot_cd <= 0.0:
 		_kill_shot_cd = 6.0
@@ -2078,7 +2271,7 @@ func _cast_bolt(d: Dictionary) -> void:
 	var dir := world.assist_aim(camera.global_position, -camera.global_basis.z, float(d["range"]))
 	var start := camera.global_position + dir * 0.6 + camera.global_basis.x * 0.12 + Vector3.DOWN * 0.02
 	_shot_count += 1
-	var meteor := has_flag("meteor") and _shot_count % 5 == 0
+	var meteor := has_flag("meteor") and _shot_count % 4 == 0
 	var dmg := WeaponDefs.DAMAGE * m("spell_damage") * damage_multiplier()
 	var element := ""
 	if has_flag("elements"):
@@ -2123,7 +2316,7 @@ func _do_melee_hit() -> void:
 
 ## Rules applied to every zombie a melee swing connects with.
 func on_melee_connect(z: Zombie, d: Dictionary) -> void:
-	if has_flag("execution") and z.is_alive() and z.hp < z.max_hp * 0.25:
+	if has_flag("execution") and z.is_alive() and z.hp < z.max_hp * 0.3:
 		z.take_damage(9999.0, Vector3.FORWARD, 0.0, z.centre())
 		return
 	if has_flag("blood_frenzy") and hp < max_hp() * 0.5:
@@ -2135,9 +2328,31 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 	fire("hit", {"z": z})
 
 
+## A melee blow that lands on another player brings its rules along.
+func on_melee_rival(peer: int, d: Dictionary) -> void:
+	if d.get("burns", false):
+		Net.status_peer(peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
+	if d.has("stun"):
+		Net.status_peer(peer, Net.Status.STUN, float(d["stun"]))
+	fire("hit", {"rival": peer})
+
+
+## Arrows and bolts likewise.
+func on_shot_rival(peer: int, fire_shot: bool, frost_shot: bool) -> void:
+	if fire_shot:
+		Net.status_peer(peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
+	if frost_shot:
+		Net.status_peer(peer, Net.Status.SLOW, ZombieDefs.BURN_SECONDS)
+	fire("shot", {"rival": peer})
+
+
 ## Rules for arrows and bolts that reach a zombie.
 func on_shot_connect(z: Zombie) -> void:
 	fire("shot", {"z": z})
+
+
+func shake(amount: float) -> void:
+	_shake = maxf(_shake, amount)
 
 
 func on_hit(head_shot: bool) -> void:

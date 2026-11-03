@@ -10,6 +10,7 @@ var world: World
 
 func _ready() -> void:
 	set_process(true)
+	clip_contents = true
 
 
 func _process(_delta: float) -> void:
@@ -80,8 +81,12 @@ func _draw() -> void:
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		draw_string_outline(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
 		draw_string(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
+	if world.fog:
+		var c := _to_map(world.fog.centre.x, world.fog.centre.y)
+		var r := world.fog.radius / (Terrain.HALF * 2.0) * size.x
+		draw_arc(c, r, 0.0, TAU, 72, Color(UiTheme.MIST, 0.9), 3.0, true)
 	for t in world.players:
-		if t is Avatar and not t.dead:
+		if t is Avatar and not t.dead and not Net.is_foe((t as Avatar).peer):
 			var p := _to_map(t.global_position.x, t.global_position.z)
 			draw_circle(p, 6.0, Net.team_colour((t as Avatar).team))
 			draw_arc(p, 6.0, 0.0, TAU, 12, UiTheme.BONE, 1.5)

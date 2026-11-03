@@ -162,9 +162,10 @@ func _spec_name() -> String:
 
 
 func _revenant_arts() -> void:
-	if cls == "artificer":
-		# Bombs and inventions: used as soon as anything is close enough to be worth it.
-		if pl.has_art() and pl.art_cd_left <= 0.0 and _near8 >= 1:
+	if not pl.call("has_burst"):
+		# Bombs, inventions and swaps: used as soon as anything is close enough to be worth it.
+		var wanted := 3 if pl.get("spec_id") == "guardian" else 1
+		if pl.has_art() and pl.art_cd_left <= 0.0 and _near8 >= wanted:
 			pl.use_art()
 		return
 	if not pl.call("has_burst"):
@@ -322,7 +323,7 @@ func _choose() -> void:
 		var step: int = pl.call("next_step")
 		var options: Array = pl.call("steps")[step]
 		var pick := _rng.randi() % options.size()
-		if step == 4:
+		if step == pl.CORE_STEPS:
 			pick = spec
 		pl.call("choose_ability", step, pick)
 	elif pl.has_method("next_tier"):

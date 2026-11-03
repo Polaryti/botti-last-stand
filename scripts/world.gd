@@ -36,7 +36,11 @@ var fort: Fort
 var wood_spots: Array[Vector3] = []
 var yard_wood_spots: Array[Vector3] = []
 var map_roads: Array = []
+var weather: Weather
+var fog: ClosingFog
+var play_half := 110.0
 var start_spots: Array[Vector3] = []
+var dummy_spots: Array[Vector3] = []
 var rival_spots: Array[Vector3] = []
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
 var _enemy_blocks: StaticBody3D
@@ -104,6 +108,7 @@ var _puddle_life: Array[float] = []
 var _puddle_fire: Array[bool] = []
 var _puddle_size: Array[float] = []
 var _puddle_shown_only: Array[bool] = []
+var _puddle_hurts_me: Array[bool] = []
 var _sparks: Array[MeshInstance3D] = []
 var _spark_life: Array[float] = []
 var _next_spark := 0
@@ -120,6 +125,12 @@ var _sky_material: ShaderMaterial
 var _dawn_done := false
 var _sky_timer := 0.0
 var _sky_value := -1.0
+var _last_dawn := 0.0
+var _ambient_now := 0.5
+var _moon_now := 0.5
+var _moon_colour := Color(0.6, 0.7, 1.0)
+var _fog_now := 0.03
+var _fog_thick := 1.0
 var now := 0.0 # game seconds: unlike the system clock, these stop during a pause
 
 
@@ -221,6 +232,11 @@ func setup(game_mode: int) -> void:
 		director.set_process(false)
 		_apply_sky(0.0)
 		return
+	weather = Weather.new(self)
+	add_child(weather)
+	if Net.fog_rules():
+		fog = ClosingFog.new(self, Net.fog_centre)
+		add_child(fog)
 	_build_zombie_pools()
 	prepare_allies("ghost", 1)
 	player = Player.new(self)
@@ -239,6 +255,43 @@ func setup(game_mode: int) -> void:
 		director.begin(true)
 	_scan_pickups()
 	_apply_sky(0.0)
+	_start_weather()
+
+
+## The host picked tonight's weather for everyone. The Sandbox stays dry until you ask for rain.
+func _start_weather() -> void:
+	var kind: int = Weather.Kind.CLEAR
+	if mode != Game.Mode.SANDBOX:
+		kind = Game.force_weather if Game.force_weather >= 0 else (Net.weather if Net.active() else Weather.roll())
+	weather.set_kind(kind)
+	if not Net.is_client() and kind != Weather.Kind.CLEAR:
+		get_tree().create_timer(5.0).timeout.connect(func() -> void:
+			if is_instance_valid(self) and director:
+				director.show_banner(weather.opening_words(), 3.5))
+
+
+## Clouds hide the stars and thicken the air. Called when the weather changes, and by the sky itself.
+func weather_changed() -> void:
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
+
+
+## Standing out in the deadly fog, you cannot see far.
+func set_fog_thickness(amount: float) -> void:
+	if not is_equal_approx(amount, _fog_thick):
+		_fog_thick = amount
+		_env.fog_density = _fog_now * _fog_thick
+
+
+## Lightning lights up the whole world for a moment.
+func show_lightning(amount: float) -> void:
+	_sky_material.set_shader_parameter("flash", amount)
+	_env.ambient_light_energy = _ambient_now + amount * 1.5
+	_moon.light_energy = _moon_now + amount * 1.6
+	if amount > 0.0:
+		_moon.light_color = Color(0.8, 0.88, 1.0)
+	else:
+		_moon.light_color = _moon_colour
 
 
 ## Which map scene this game is on. Pressing F6 on a map in the editor overrides it.
@@ -527,6 +580,9 @@ func _apply_sky(dawn: float) -> void:
 	if is_equal_approx(dawn, _sky_value):
 		return
 	_sky_value = dawn
+	_last_dawn = dawn
+	var wet := weather != null and weather.is_wet()
+	_sky_material.set_shader_parameter("cloud", 1.0 if wet else 0.0)
 	var warm := smoothstep(0.0, 0.7, dawn)
 	var bright := smoothstep(0.25, 1.0, dawn)
 	_sky_material.set_shader_parameter("dawn", dawn)
@@ -534,15 +590,19 @@ func _apply_sky(dawn: float) -> void:
 		_water_material.set_shader_parameter("dawn", bright)
 	_sky_material.set_shader_parameter("sun_dir", _sun_direction(dawn))
 	_star_material.albedo_color = Color(1, 1, 1, clampf(1.0 - dawn * 1.8, 0.0, 1.0))
-	_night_dome.visible = dawn < 0.56
+	_night_dome.visible = dawn < 0.56 and not wet
 	_env.background_color = NIGHT_BG.lerp(DAWN_BG, bright)
 	_env.ambient_light_color = NIGHT_AMBIENT.lerp(DAWN_AMBIENT, warm)
-	_env.ambient_light_energy = lerpf(0.5, 0.8, bright)
+	_ambient_now = lerpf(0.5, 0.8, bright) * (0.9 if wet else 1.0)
+	_env.ambient_light_energy = _ambient_now
 	_env.fog_light_color = NIGHT_FOG.lerp(DAWN_FOG, warm)
-	_env.fog_density = lerpf(0.03, 0.006, bright)
+	_fog_now = lerpf(0.03, 0.006, bright) * (1.35 if wet else 1.0)
+	_env.fog_density = _fog_now * _fog_thick
 	_moon.rotation_degrees = Vector3(lerpf(-48.0, -13.0, bright), lerpf(-32.0, -150.0, bright), 0.0)
-	_moon.light_color = Color(0.6, 0.7, 1.0).lerp(Color(1.0, 0.68, 0.42), warm)
-	_moon.light_energy = lerpf(0.5, 1.35, bright)
+	_moon_colour = Color(0.6, 0.7, 1.0).lerp(Color(1.0, 0.68, 0.42), warm)
+	_moon.light_color = _moon_colour
+	_moon_now = lerpf(0.5, 1.35, bright) * (0.55 if wet else 1.0)
+	_moon.light_energy = _moon_now
 	for l in _lanterns:
 		l.light_energy = lerpf(2.0, 0.25, bright)
 	if player:
@@ -759,8 +819,27 @@ func call_all(at: Vector3) -> void:
 			z._start_chase(at)
 
 
+## What area abilities do to other players in a fight. Returns how many there were.
+func status_rivals(at: Vector3, radius: float, kind: int, seconds: float) -> int:
+	var near := rivals_near(at, radius)
+	for r: Avatar in near:
+		Net.status_peer(r.peer, kind, seconds)
+	return near.size()
+
+
+func nearest_rival(from: Vector3, radius: float) -> Avatar:
+	var best: Avatar = null
+	var best_d := radius * radius
+	for r: Avatar in rivals_near(from, radius):
+		var d := r.global_position.distance_squared_to(from)
+		if d < best_d and has_line_of_sight(from, r.eye_position()):
+			best_d = d
+			best = r
+	return best
+
+
 func slow_around(at: Vector3, radius: float, seconds: float) -> int:
-	var n := 0
+	var n := status_rivals(at, radius, Net.Status.SLOW, seconds)
 	for z in zombies:
 		if z.is_alive() and z.position.distance_to(at) <= radius:
 			z.slow(seconds)
@@ -769,7 +848,7 @@ func slow_around(at: Vector3, radius: float, seconds: float) -> int:
 
 
 func burn_around(at: Vector3, radius: float) -> int:
-	var n := 0
+	var n := status_rivals(at, radius, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 	for z in zombies:
 		if z.is_alive() and z.position.distance_to(at) <= radius:
 			z.ignite(ZombieDefs.BURN_SECONDS)
@@ -812,7 +891,7 @@ func count_allies(kind: String) -> int:
 
 
 func stun_around(at: Vector3, radius: float, seconds: float) -> int:
-	var n := 0
+	var n := status_rivals(at, radius, Net.Status.STUN, seconds)
 	for z in zombies:
 		if z.is_alive() and z.position.distance_to(at) <= radius:
 			z.stun(seconds)
@@ -832,7 +911,7 @@ func make_noise(at: Vector3, radius: float) -> void:
 
 ## Gentle touch-screen aim help: bends a shot that barely misses onto the target.
 func assist_aim(origin: Vector3, dir: Vector3, max_range: float) -> Vector3:
-	const CONE := 0.9992 # about 2.3 degrees
+	const CONE := 0.9984 # about 3.2 degrees
 	var best: Zombie = null
 	var best_dot := CONE
 	var aim := dir
@@ -860,7 +939,8 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 	var forward := -attacker.camera.global_basis.z
 	var range_m: float = stats["range"]
 	var flat_forward := Vector3(forward.x, 0, forward.z).normalized()
-	var cos_limit := cos(deg_to_rad(minf(float(stats["cone"]), 359.0) * 0.5))
+	var half_cone := deg_to_rad(minf(float(stats["cone"]), 359.0) * 0.5)
+	var cos_limit := cos(half_cone)
 	var left: int = stats["hits"]
 	var hits := 0
 	for z: Zombie in zombies.duplicate():
@@ -872,9 +952,11 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 		var to := centre - origin
 		var flat := Vector3(to.x, 0, to.z)
 		var dist := flat.length()
-		if dist > range_m + 0.35 or absf(to.y) > 3.0:
+		# What counts is the edge of the body, not its middle.
+		var body := z.body_radius()
+		if dist > range_m + body or absf(to.y) > 3.0:
 			continue
-		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos_limit:
+		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos(minf(half_cone + atan2(body, dist), PI)):
 			continue
 		if not has_line_of_sight(origin, centre):
 			continue
@@ -904,6 +986,7 @@ func _melee_rivals(attacker: Player, origin: Vector3, flat_forward: Vector3, ran
 			Net.hit_player((t as Avatar).peer, damage, attacker.global_position)
 			fx_gore(centre, Color(0.6, 0.1, 0.08))
 			attacker.on_hit(false)
+			attacker.on_melee_rival((t as Avatar).peer, attacker.weapon_def())
 			hits += 1
 	return hits
 
@@ -927,9 +1010,10 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 			Net.shot(0, at, vel, grav, max_range, burning, Color.WHITE)
 
 
-func familiar_arrow(p: Player, target: Zombie) -> void:
+func familiar_arrow(p: Player, target: Node3D) -> void:
 	var from := p.eye_position() + p.camera.global_basis.x * -0.4 + Vector3.UP * 0.25
-	var dir := (target.centre() - from).normalized()
+	var aim: Vector3 = (target as Zombie).centre() if target is Zombie else target.global_position + Vector3.UP
+	var dir := (aim - from).normalized()
 	spawn_player_arrow(p, from, dir * 40.0, 0.0, PowerDefs.ARCHER_RANGE + 5.0, 1.0, WeaponDefs.DAMAGE * p.damage_multiplier(), false)
 	Sfx.play("bow", -9.0, 1.2)
 
@@ -995,6 +1079,8 @@ func blast(at: Vector3, radius: float, damage: float) -> void:
 			z.take_damage(damage, z.position - at, 5.0, z.centre())
 			if player:
 				player.on_hit(false)
+	for r: Avatar in rivals_near(at, radius):
+		Net.hit_player(r.peer, damage, at)
 
 
 func flash_bolt(at: Vector3) -> void:
@@ -1011,6 +1097,8 @@ func thunder_strike(p: Player, at: Vector3) -> void:
 		if z.is_alive() and z.position.distance_to(at) <= PowerDefs.THUNDER_RADIUS:
 			z.take_damage(PowerDefs.THUNDER_DAMAGE * p.damage_multiplier(), z.position - at, 4.0, z.centre())
 			p.on_hit(false)
+	for r: Avatar in rivals_near(at, PowerDefs.THUNDER_RADIUS):
+		Net.hit_player(r.peer, PowerDefs.THUNDER_DAMAGE * p.damage_multiplier(), at)
 	fx_gore(at + Vector3.UP * 0.5, Color(0.7, 0.85, 1.0))
 
 
@@ -1096,7 +1184,8 @@ func sandbox_spawn(id: String) -> bool:
 
 func sandbox_clear() -> void:
 	for z: Zombie in zombies.duplicate():
-		z.release()
+		if z.type_id != "dummy":
+			z.release()
 
 
 ## Something thrown by hand, that does its work where it lands.
@@ -1181,15 +1270,24 @@ func _tick_sentries(delta: float) -> void:
 		if float(s["timer"]) > 0.0:
 			continue
 		var from := node.global_position + Vector3.UP * 1.12
-		var z := nearest_zombie(from, WorldLight.SENTRY_REACH, true)
-		if z == null:
+		var aim_at := aim_point(from, WorldLight.SENTRY_REACH)
+		if aim_at == Vector3.INF:
 			s["timer"] = 0.3
 			continue
 		s["timer"] = 0.55
-		node.rotation.y = atan2(-(z.position.x - from.x), -(z.position.z - from.z))
-		var dir := (z.centre() - from).normalized()
-		spawn_player_arrow(owner_player, from + dir * 0.9, dir * 45.0, 0.0, WorldLight.SENTRY_REACH + 6.0, 1.0, WeaponDefs.DAMAGE * 0.7 * owner_player.m("inv_damage") * owner_player.damage_multiplier(), false)
+		node.rotation.y = atan2(-(aim_at.x - from.x), -(aim_at.z - from.z))
+		var dir := (aim_at - from).normalized()
+		spawn_player_arrow(owner_player, from + dir * 0.9, dir * 45.0, 0.0, WorldLight.SENTRY_REACH + 6.0, 1.0, WeaponDefs.DAMAGE * owner_player.m("inv_damage") * owner_player.damage_multiplier(), false)
 		sfx_at("crossbow", from, -6.0)
+
+
+## What a turret should shoot at: the closest enemy, or the closest rival player.
+func aim_point(from: Vector3, reach: float) -> Vector3:
+	var z := nearest_zombie(from, reach, true)
+	var r := nearest_rival(from, reach)
+	if r and (z == null or r.global_position.distance_squared_to(from) < z.centre().distance_squared_to(from)):
+		return r.global_position + Vector3.UP
+	return z.centre() if z else Vector3.INF
 
 
 func _launch(kind: int, m: Mesh, at: Vector3, vel: Vector3, grav: float, max_range: float, dmg: float, knock := 0.0, fire := false, bounces := 0) -> Projectile:
@@ -1246,7 +1344,7 @@ func _build_zombie_pools() -> void:
 
 
 func spawn_zombie(id: String, at := Vector3.INF) -> bool:
-	var models: Array = ZombieDefs.ALL[id]["models"].duplicate()
+	var models: Array = ZombieDefs.def_of(id)["models"].duplicate()
 	models.shuffle()
 	var pool: Array = []
 	for m: String in models:
@@ -1344,10 +1442,12 @@ func stock_wood() -> void:
 
 
 func far_from_rivals() -> Vector3:
-	var best := Vector3(0, 0, 4.5)
+	var best := Vector3(fog.centre.x, 0, fog.centre.y) if fog else Vector3(0, 0, 4.5)
 	var best_d := -1.0
 	for i in 12:
 		var spot := loot_spots[randi() % loot_spots.size()]
+		if fog and not fog.contains(spot, -5.0):
+			continue
 		var near := INF
 		for t in players:
 			if t != player and not t.dead:
@@ -1435,6 +1535,8 @@ func _pick_spawn_point() -> Vector3:
 			if absf(p.x) > HALF_SIZE - 2.0 or absf(p.z) > HALF_SIZE - 2.0:
 				continue
 		p.y = 0.0
+		if fog and not fog.contains(p, -4.0):
+			continue
 		var c := grid.to_cell(p)
 		if not grid.is_free(c):
 			continue
@@ -1543,6 +1645,8 @@ func spawn_pickup_random(kind: int, id: String) -> Pickup:
 		if not grid.is_free(c):
 			continue
 		if player and at.distance_to(player.global_position) < 4.0:
+			continue
+		if fog and not fog.contains(at, -3.0):
 			continue
 		var clash := false
 		for other in pickups:
@@ -1771,12 +1875,13 @@ func imp_steal(p: Player) -> void:
 
 
 ## shown_only: another player's patch. It looks the same here, and their phone does the burning.
-func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false) -> void:
+func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false, hurts_me := false) -> void:
 	var m := _puddles[_next_puddle]
 	_puddle_life[_next_puddle] = seconds if seconds > 0.0 else PowerDefs.POISON_TIME
 	_puddle_fire[_next_puddle] = burning
 	_puddle_size[_next_puddle] = size
 	_puddle_shown_only[_next_puddle] = shown_only
+	_puddle_hurts_me[_next_puddle] = hurts_me
 	m.scale = Vector3(size / 1.6, 1.0, size / 1.6)
 	m.material_override = _fire_puddle if burning else null
 	_next_puddle = (_next_puddle + 1) % _puddles.size()
@@ -1795,6 +1900,9 @@ func _tick_poison(delta: float) -> void:
 		_puddle_life[i] -= delta
 		if _puddle_life[i] <= 0.0:
 			_puddles[i].visible = false
+		elif tick and _puddle_hurts_me[i]:
+			if player and Vector2(player.global_position.x - _puddles[i].global_position.x, player.global_position.z - _puddles[i].global_position.z).length() < _puddle_size[i]:
+				player.ignite(2.0)
 		elif tick and not _puddle_shown_only[i]:
 			var at := _puddles[i].global_position
 			for z: Zombie in zombies.duplicate():
@@ -1866,6 +1974,14 @@ func _tick_traps(_delta: float) -> void:
 		return
 	for i in range(_traps.size() - 1, -1, -1):
 		var at: Vector3 = _traps[i]["at"]
+		var caught := rivals_near(at, 1.1)
+		if not caught.is_empty():
+			(_traps[i]["node"] as Node).queue_free()
+			_traps.remove_at(i)
+			Sfx.play_at("trap", at, player.global_position, 0.0)
+			Net.hit_player(caught[0].peer, player.m("trap_damage"), at)
+			Net.status_peer(caught[0].peer, Net.Status.STUN, 2.0 + player.m("trap_stun"))
+			continue
 		for z: Zombie in zombies:
 			if not z.is_alive() or z.flies or z.dormant:
 				continue
@@ -1882,11 +1998,11 @@ func _spring_trap(i: int, z: Zombie, at: Vector3) -> void:
 	z.stun(2.0 + p.m("trap_stun"))
 	z.take_damage(p.m("trap_damage"), Vector3.UP, 0.0, z.centre())
 	if p.has_flag("trap_bleed"):
-		z.add_dot(10.0, 4.0)
+		z.add_dot(16.0, 4.0)
 	if p.has_flag("trap_fire"):
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if p.has_flag("trap_blast"):
-		blast(at + Vector3.UP * 0.4, 3.5, 40.0)
+		blast(at + Vector3.UP * 0.4, 3.8, 60.0)
 	if p.has_flag("field_snares") and not z.is_alive():
 		place_trap(p, at)
 
@@ -2130,6 +2246,7 @@ func _build_fx() -> void:
 		_puddle_fire.append(false)
 		_puddle_size.append(1.6)
 		_puddle_shown_only.append(false)
+		_puddle_hurts_me.append(false)
 	for i in 3:
 		var l := OmniLight3D.new()
 		l.light_color = Color(1.0, 0.55, 0.2)

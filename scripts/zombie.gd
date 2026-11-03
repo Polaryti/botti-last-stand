@@ -14,6 +14,7 @@ const LOOPS := ["Idle", "Walking_A", "Walking_C", "Running_A"]
 const ATTACK_TIME := 0.62
 const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its height
 const FAR := 34.0
+const DUMMY_WINDOW := 5.0
 
 static var _scenes := {}
 static var _fit := {}
@@ -128,6 +129,11 @@ var _dive_aim := Vector3.ZERO
 var net_warning := false
 var _frozen := 0.0
 var _mounted := false
+var _is_dummy := false
+var _dummy_log: Array = []
+var _dummy_last := 0.0
+var _dummy_show := 0.0
+var _dummy_label: Label3D
 var _horse_node: MeshInstance3D
 var _ride_pass := 0.0
 var _ride_turn := 0.0
@@ -204,14 +210,14 @@ func _material_for(id: String, source: Material) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = _shader
 	m.set_shader_parameter("tex", (source as StandardMaterial3D).albedo_texture)
-	m.set_shader_parameter("tint", ZombieDefs.ALL[id]["tint"])
+	m.set_shader_parameter("tint", ZombieDefs.def_of(id)["tint"])
 	_materials[key] = m
 	return m
 
 
 func _build_visual() -> void:
 	_setup_static()
-	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow"]
+	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy"]
 	if _custom:
 		_visual = EnemyModels.build(model_id)
 		add_child(_visual)
@@ -243,10 +249,8 @@ func _build_visual() -> void:
 		# Bone attachments cost time on every pose update, so only add those that get used.
 		if model_id == "beast":
 			_claws = [_attach("handslot.r", _claw_mesh, Vector3.ZERO), _attach("handslot.l", _claw_mesh, Vector3.ZERO)]
-			_horse_node = MeshInstance3D.new()
-			_horse_node.mesh = HorseModel.mesh()
+			_horse_node = HorseModel.make()
 			_horse_node.rotation.y = PI
-			_horse_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_horse_node.visible = false
 			add_child(_horse_node)
 	_shadow = World.make_blob_shadow(1.0)
@@ -310,7 +314,11 @@ func _set_enabled(on: bool) -> void:
 
 func spawn(id: String, at: Vector3, minute := 0) -> void:
 	type_id = id
-	def = ZombieDefs.ALL[id]
+	def = ZombieDefs.def_of(id)
+	_is_dummy = def.get("dummy", false)
+	_dummy_log.clear()
+	if _dummy_label:
+		_dummy_label.visible = false
 	var s: float = def["scale"]
 	_scale = s
 	_sight = def["sight"]
@@ -453,7 +461,49 @@ func _show_mount(on: bool) -> void:
 	_mounted = on
 	if _horse_node:
 		_horse_node.visible = on
-	_visual.position.y = 0.85 if on else 0.0
+		_horse_node.scale = Vector3.ONE * _scale * HorseModel.RIDDEN_SIZE
+	_visual.position.y = HorseModel.SADDLE * _scale if on else 0.0
+	if def.get("rider", false):
+		# On horseback there is a lot more of it to hit.
+		_capsule.radius = (0.85 if on else 0.36) * _scale
+		_capsule.height = height + (1.1 * _scale if on else 0.0)
+		_shape.position = Vector3(0, _capsule.height * 0.5, 0)
+
+
+## A training dummy cannot die or do anything back. It only says how hard it has been hit.
+func _tick_dummy(delta: float) -> void:
+	_tick_burn(delta)
+	_tick_dot(delta)
+	_tick_flash(delta)
+	bar_time = 0.0
+	if _stun > 0.0:
+		_stun -= delta
+	_knock = Vector3.ZERO
+	_hurt_stun = 0.0
+	var dealt := max_hp - hp
+	hp = max_hp
+	if dealt > 0.0:
+		_dummy_last = dealt
+		_dummy_log.append([world.now, dealt])
+	while not _dummy_log.is_empty() and world.now - float(_dummy_log[0][0]) > DUMMY_WINDOW:
+		_dummy_log.pop_front()
+	_dummy_show -= delta
+	if _dummy_show <= 0.0:
+		_dummy_show = 0.2
+		var total := 0.0
+		for entry: Array in _dummy_log:
+			total += float(entry[1])
+		if _dummy_label == null:
+			_dummy_label = Label3D.new()
+			_dummy_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			_dummy_label.font = UiTheme.bold_font()
+			_dummy_label.font_size = 48
+			_dummy_label.pixel_size = 0.009
+			_dummy_label.outline_size = 10
+			_dummy_label.position.y = 2.75
+			add_child(_dummy_label)
+		_dummy_label.visible = not _dummy_log.is_empty()
+		_dummy_label.text = "Last hit %d\n%d a second" % [int(_dummy_last), int(total / DUMMY_WINDOW)]
 
 
 ## The rider comes through at a gallop, turns wide, and comes through again.
@@ -584,6 +634,12 @@ func centre() -> Vector3:
 	return position + Vector3.UP * height * 0.55
 
 
+## How wide the body really is. Models are wider than the capsule they collide with, and a hit
+## that lands on what you can see should count.
+func body_radius() -> float:
+	return _capsule.radius * 1.4
+
+
 func is_unaware() -> bool:
 	return is_alive() and state != State.CHASE
 
@@ -642,6 +698,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 			amount *= 0.5
 			world.sfx_at("block", position, -6.0)
 	hp -= amount
+	if _is_dummy:
+		hp = maxf(hp, 1.0)
 	bar_time = 2.5
 	_flash_on()
 	if flies and (_dive > 0.0 or _windup > 0.0):
@@ -655,6 +713,9 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		Net.gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
 	if hp <= 0.0:
 		_die()
+		return
+	if _is_dummy:
+		world.sfx_at("thunk", position, -8.0)
 		return
 	_check_dismount()
 	world.sfx_at("zombie_hurt", position, -8.0)
@@ -867,6 +928,8 @@ func _puppet_tick(delta: float) -> void:
 	reveal_left -= delta
 	bar_time -= delta
 	_tick_flash(delta)
+	if _mounted:
+		HorseModel.set_gait(_horse_node, clampf(was.distance_to(position) / maxf(delta, 0.001) / 7.0, 0.0, 1.0))
 	if _custom and not dormant:
 		_animate_custom(delta, was.distance_squared_to(position))
 	elif _lure and dormant:
@@ -1252,6 +1315,9 @@ func _physics_process(delta: float) -> void:
 			if not flies:
 				position.y = world.ground_at(position)
 		return
+	if _is_dummy:
+		_tick_dummy(delta)
+		return
 	_tick_time += delta
 	_tick_count += 1
 	if _tick_every > 1 and _tick_count % _tick_every != 0:
@@ -1318,6 +1384,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if _mounted:
 		_tick_rider(target, to, dist, delta)
+		HorseModel.set_gait(_horse_node, clampf(velocity.length() / 7.0, 0.0, 1.0))
 		return
 	_tick_hero(target, dist, delta)
 	_try_leap(target, dist)

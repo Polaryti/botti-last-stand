@@ -61,6 +61,9 @@ Screenshots and performance need a display:
     godot --path . --rendering-driver opengl3 res://tests/shots.tscn -- /some/folder 2
     godot --path . --rendering-driver opengl3 res://tests/art_shots.tscn -- /some/folder
     godot --path . --rendering-driver opengl3 res://tests/top_shots.tscn -- /some/folder village fort sandbox
+    godot --path . --rendering-driver opengl3 res://tests/tree_shots.tscn -- /some/folder
+    godot --path . --rendering-driver opengl3 res://tests/weather_shots.tscn -- /some/folder
+    godot --path . --rendering-driver opengl3 res://tests/animal_shots.tscn -- /some/folder
     godot --path . --rendering-driver opengl3 res://tests/perf.tscn -- 2
 
 ## Art and sound tools
@@ -70,7 +73,7 @@ Everything generated is made by the scripts in `tools/`. They need Python 3 with
 | Script | Makes |
 |---|---|
 | `tools/make_audio.py` | All sound effects |
-| `tools/make_music.py` | All the music |
+| `tools/make_music.py` | All the music. The score is written in this file, and it plays it with the VSCO 2 Community Edition samples. They are 3 GB and not kept here, so clone https://github.com/sgossner/VSCO-2-CE and pass its folder: `python3 tools/make_music.py path/to/VSCO-2-CE` |
 | `tools/make_icons.py` | Every icon |
 | `tools/make_ui.py` | Discs, slider knob, menu shade, the Botti Doubloon and the wordmark |
 | `tools/make_launcher.py` | Launcher icon and splash |

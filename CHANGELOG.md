@@ -2,6 +2,31 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.9.0 (4 November 2026)
+### New
+- All vs All is a new kind of match: three lives each, and a deadly fog closes in on the village. The last one standing wins, in about six minutes. Zombies are still out there, and if you are out you can watch.
+- In All vs All and Teams, abilities now work on other players: freezes, stuns, fire, traps, summons, turrets and the rest. Freezes and stuns last a little less on a person. Defeating someone heals you.
+- Weather: most nights are clear, some bring rain, and a few a storm. Lightning strikes the map and hurts everyone under it, players and enemies alike. The ground glows first, so run.
+- Illusionist rebuilt around Mirror Swap: you jump ahead and leave a copy that draws enemies, then bursts. The tree adds more copies, bigger bursts or copies that fight.
+- Training dummies in the Sandbox: they cannot die or hit back, and show how much damage you are doing. The Sandbox also gives you all your skill points from the start, and lets you pick the weather.
+- New music, played by a recorded orchestra: horns, strings, harp, choir and drums. It builds on one theme, turns harder when you are hunted and bright at dawn.
+### Changed
+- New skill trees for every class: one big choice per level, up to level 10. Three shared choices, a specialization, four either/or choices with real trade-offs, and a final ability.
+- The tree screen is easier to use in a fight: large cards to tap, a marker for where you are, and the specialization's name on its branch.
+- The tree closes when something hurts you, and you can open it and spend points while you are down.
+- Levels come faster in the middle and late game.
+- Enemies are easier to hit: arrows that graze the body and blows at the edge of it now count.
+- Names no longer show over rivals' heads, and rivals no longer show on the map.
+- The Paladin heals much less, and the Necromancer's skeletons and their explosions are weaker. The Warpriest heals less too, and the Beastmaster's pack hits a little softer.
+- The Artificer is stronger: a better Inventor, and a chariot that arrives sooner and takes half of each hit. The chariot is now slower than walking.
+- The Magician has less health. The Revenant has a little more, and its kills heal it.
+### Fixed
+- The Dread Rider looked tiny on a huge horse. Rider and horse now match.
+- Animals move properly: horses gallop, cows graze and walk, wolves run, and familiars flap their wings or scurry.
+- The address box now accepts dots, so you can type an address.
+- Phones that lost the game a few seconds after joining a hotspot, like a Pixel 8 with mobile data on, now stay on the hotspot's Wi-Fi. If one still drops, turn off its mobile data.
+- Active effects no longer cover the players' names.
+
 ## 0.8.0 (3 November 2026)
 ### New
 - The game is now called Botti Last Stand, with a new look: clearer lettering, dark panels and firelit colours in place of parchment and iron.

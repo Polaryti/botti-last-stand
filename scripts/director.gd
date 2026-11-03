@@ -69,6 +69,8 @@ func begin_sandbox() -> void:
 	running = false
 	sandbox = true
 	world.set_up_stands()
+	for at: Vector3 in world.dummy_spots:
+		world.spawn_zombie("dummy", at)
 
 
 func begin(with_zombies: bool) -> void:
@@ -90,7 +92,12 @@ func begin(with_zombies: bool) -> void:
 		_spawn_timer = 0.0
 		for i in target_population():
 			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed))
-		show_banner("Hold the fort until dawn" if world.fort else "Survive until dawn", 4.0)
+		var opening := "Survive until dawn"
+		if world.fort:
+			opening = "Hold the fort until dawn"
+		elif Net.fog_rules():
+			opening = "Three lives. Last one standing"
+		show_banner(opening, 4.0)
 
 
 func show_banner(text: String, seconds: float) -> void:
@@ -100,13 +107,18 @@ func show_banner(text: String, seconds: float) -> void:
 		Net.banner(text, seconds)
 
 
+## How long this match runs. In All vs All the clock counts down to the fog closing, not to dawn.
+func match_length() -> float:
+	return ClosingFog.TOTAL if Net.fog_rules() else Game.NIGHT_LENGTH
+
+
 func night_left() -> float:
-	return maxf(0.0, Game.NIGHT_LENGTH - elapsed)
+	return maxf(0.0, match_length() - elapsed)
 
 
 ## 0 at night, 1 at dawn.
 func dawn_amount() -> float:
-	if not running:
+	if not running or Net.fog_rules():
 		return 0.0
 	return clampf(1.0 - night_left() / DAWN_GLOW, 0.0, 1.0)
 
@@ -120,6 +132,8 @@ func target_population() -> int:
 	var crowd := lerpf(start, cap, t) * (1.0 + 0.35 * (world.players.size() - 1))
 	if elapsed >= LAST_STAND:
 		crowd *= 1.3
+	if Net.fog_rules():
+		crowd *= 0.6 # enough to keep you busy, but the others are the danger here
 	return int(round(crowd))
 
 
@@ -180,7 +194,7 @@ func _process(delta: float) -> void:
 		_far_timer = 4.0
 		if world.fort == null:
 			_clear_far_zombies()
-	if elapsed >= Game.NIGHT_LENGTH:
+	if elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules():
 		_won = true
 		_sound("rooster", 0.0)
 		if Net.is_host():
@@ -227,6 +241,8 @@ func _spawn_familiar() -> void:
 
 ## The last two minutes: the sky starts to change, and everything still standing wants you dead.
 func _tick_last_stand(delta: float) -> void:
+	if Net.fog_rules():
+		return
 	if not _last_stand:
 		if elapsed >= LAST_STAND:
 			_last_stand = true

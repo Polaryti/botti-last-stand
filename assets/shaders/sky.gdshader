@@ -4,6 +4,8 @@ render_mode unshaded, fog_disabled, cull_front, depth_draw_never, shadows_disabl
 
 uniform float dawn = 0.0;
 uniform vec3 sun_dir = vec3(0.0, -0.2, -1.0);
+uniform float cloud = 0.0; // how overcast it is
+uniform float flash = 0.0; // lightning
 
 varying vec3 dir;
 
@@ -28,5 +30,8 @@ void fragment() {
 	c += vec3(1.0, 0.56, 0.24) * pow(s, 9.0) * 0.5 * presence;
 	c += vec3(1.0, 0.8, 0.52) * pow(s, 90.0) * 0.8 * presence;
 	c = mix(c, vec3(1.0, 0.95, 0.78), smoothstep(0.9988, 0.9994, s) * presence);
+	vec3 overcast = mix(vec3(0.05, 0.06, 0.08), vec3(0.3, 0.32, 0.36), smoothstep(0.1, 0.9, dawn));
+	c = mix(c, overcast, cloud * 0.85);
+	c += vec3(0.55, 0.62, 0.8) * flash * (0.35 + 0.65 * (1.0 - h));
 	ALBEDO = c;
 }
