@@ -24,6 +24,7 @@ Newest first. The game shows this file on its Changelog screen, so keep the same
 - Codes can only be redeemed once. New code for the Artificer.
 - The Codex now lists every class. Its tips page is gone, and the tips stay on the loading screen.
 - New Botti Doubloon coin, and a new app icon: the village bell against the moon.
+- The Torch has a real flame now, and it flickers.
 ### Fixed
 - The Fort's stairs were hollow, so you could walk inside them and sink into the steps. They are solid now, and you walk on top.
 - Two of the Fort's small doors opened straight into a staircase. They have moved to the other side of the gate.
