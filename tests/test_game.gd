@@ -335,10 +335,17 @@ func test_fire() -> void:
 	await seconds(0.4)
 	ok(pl.is_lit(), "standing near a fire puts you in the light")
 	ok(pl.sight_factor() > 1.2, "and zombies see you from further away")
+	# Well clear of every fire, at ground height: a spot can be inside a wall and push you out of it.
 	var dark := Vector3(-100, 0, -100)
-	for i in 30:
+	for i in 60:
 		var p := Vector3(randf_range(-100, 100), 0, randf_range(-100, 100))
-		if not w.in_firelight(p):
+		var on_land := Vector3(p.x, w.ground_at(p), p.z)
+		var clear := true
+		for f: Dictionary in w.fires:
+			if on_land.distance_to(f["at"]) < float(f["radius"]) + 4.0:
+				clear = false
+				break
+		if clear:
 			dark = p
 			break
 	place(dark)
