@@ -1,23 +1,28 @@
 extends Node
 ## Global settings and saved progress.
 
-enum Mode { MENU, NIGHT, ROAM, FORT }
+enum Mode { MENU, NIGHT, SANDBOX, FORT }
 
 const SAVE_PATH := "user://settings.cfg"
 const NIGHT_LENGTH := 600.0
-## Codes are kept as hashes, so they cannot simply be read out of the game files.
-const CODES := {"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b36": "revenant"}
+## Codes are kept as hashes, so they cannot simply be read out of the game files or the repository.
+const CODES := {"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b36": "revenant",
+	"7a3ce9794828ed7871e069bbe3d115b24e9f62b0e0c3972339a454141e79ecdb": "artificer"}
 
 var mode: int = Mode.MENU
+var test_map := "" # a map scene to play instead of the usual one: see MapRoot
 var player_class := "infantry"
 var player_name := ""
-var unlocked := {} # classes opened with a code
+var unlocked := {} # classes bought, or opened with a code
+var redeemed := {} # the hashes of codes already used on this phone
 var doubloons := 0
 var sensitivity := 1.0
 var quality := 1 # 0 low, 1 medium, 2 high
 var difficulty := 1 # 0 easy, 1 normal, 2 hard
 var auto_jump := true
 var vibration := true
+var steady_brightness := true # hold the screen's brightness still while playing
+var brightness := -1.0 # the level to hold, from 0 to 1. Below 0: whatever the phone was at when the game opened
 var music_volume := 0.8
 var sound_volume := 1.0
 var best_time := 0.0
@@ -28,17 +33,46 @@ var nights_survived := 0
 func _ready() -> void:
 	load_settings()
 	apply_quality()
+	PhoneScreen.apply_orientation()
+	PhoneScreen.apply_brightness()
 	if player_name == "":
 		player_name = ["Aldric", "Bertrand", "Cedric", "Edith", "Godfrey", "Isolde", "Matilda", "Roland", "Rowena", "Wilfred"][randi() % 10]
 
 
-## Returns what the code opened, or "" if it is not a code.
-func redeem(code: String) -> String:
-	var opened: String = CODES.get(code.strip_edges().to_upper().sha256_text(), "")
-	if opened != "":
-		unlocked[opened] = true
-		save_settings()
-	return opened
+## Each code works once on a phone. Returns {"result": "opened", "class": id}, or "used", or "bad".
+func redeem(code: String) -> Dictionary:
+	return redeem_key(code_key(code))
+
+
+## What a code is kept as: the same whatever its case, and with or without stray spaces.
+static func code_key(code: String) -> String:
+	return code.strip_edges().to_upper().sha256_text()
+
+
+func redeem_key(key: String) -> Dictionary:
+	if not CODES.has(key):
+		return {"result": "bad"}
+	if redeemed.has(key):
+		return {"result": "used"}
+	var opened: String = CODES[key]
+	redeemed[key] = true
+	unlocked[opened] = true
+	save_settings()
+	return {"result": "opened", "class": opened}
+
+
+func owns_class(id: String) -> bool:
+	return not ClassDefs.ALL[id].get("hidden", false) or unlocked.has(id)
+
+
+func buy_class(id: String) -> bool:
+	var price := ClassDefs.price(id)
+	if owns_class(id) or price <= 0 or doubloons < price:
+		return false
+	doubloons -= price
+	unlocked[id] = true
+	save_settings()
+	return true
 
 
 func is_night() -> bool:
@@ -108,12 +142,15 @@ func load_settings() -> void:
 		player_class = "infantry"
 	auto_jump = c.get_value("input", "auto_jump", true)
 	vibration = c.get_value("input", "vibration", true)
+	steady_brightness = c.get_value("video", "steady_brightness", true)
+	brightness = c.get_value("video", "brightness", -1.0)
 	music_volume = c.get_value("audio", "music", 0.8)
 	sound_volume = c.get_value("audio", "sound", 1.0)
 	quality = clampi(c.get_value("video", "quality", 1), 0, 2)
 	difficulty = clampi(c.get_value("progress", "difficulty", 1), 0, 2)
 	player_name = str(c.get_value("progress", "player_name", ""))
 	unlocked = c.get_value("progress", "unlocked", {})
+	redeemed = c.get_value("progress", "redeemed", {})
 	doubloons = c.get_value("progress", "doubloons", 0)
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class):
 		player_class = "infantry"
@@ -128,12 +165,15 @@ func save_settings() -> void:
 	c.set_value("progress", "player_class", player_class)
 	c.set_value("input", "auto_jump", auto_jump)
 	c.set_value("input", "vibration", vibration)
+	c.set_value("video", "steady_brightness", steady_brightness)
+	c.set_value("video", "brightness", brightness)
 	c.set_value("audio", "music", music_volume)
 	c.set_value("audio", "sound", sound_volume)
 	c.set_value("video", "quality", quality)
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
 	c.set_value("progress", "unlocked", unlocked)
+	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)

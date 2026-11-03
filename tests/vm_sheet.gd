@@ -11,11 +11,11 @@ func _ready() -> void:
 	var ids: Array = args.slice(1) if args.size() > 1 else WeaponDefs.ALL.keys()
 	Game.quality = 2
 	Game.apply_quality()
-	Game.mode = Game.Mode.ROAM
+	Game.mode = Game.Mode.SANDBOX
 	Game.player_class = "ranger"
 	var w := World.new()
 	add_child(w)
-	w.setup(Game.Mode.ROAM)
+	w.setup(Game.Mode.SANDBOX)
 	w.director.set_process(false)
 	var p := w.player
 	p.set_process(false)

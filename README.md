@@ -1,83 +1,51 @@
-# Undead Drop
+# Botti Last Stand
 
-Low-poly first-person medieval zombie survival for phones, made with Godot 4.7.2.
+A low-poly, first-person medieval zombie survival game for phones, made with Godot 4.7.2. Free, with no servers and no internet needed: friends play together over the same Wi-Fi or one phone's hotspot.
 
-## What works now (version 0.7)
+The game's own Changelog screen, in `CHANGELOG.md`, lists what changed in each version.
 
-- **Survive the Night:** zombies roam the village and more arrive as the night goes on. In the last two minutes they sense the dawn and all come for you. Stay alive for 10 minutes to reach it, when a real sunrise burns the undead away.
-- **Defend the Fort:** a second map with a walled fort in a clearing. Zombies break down one of four wooden gates, pour in and go for the Heart in the keep. Lose it, or lose everyone, and the night is over. Stairs climb the walls, you can jump off them, and small doors let you out but keep the zombies out. Wood lies mostly outside, and standing near a damaged gate with wood mends it.
-- **Roam:** walk the map freely with no zombies.
-- **Store and Botti Doubloons:** every match pays 1 doubloon a minute, 1 per 5 kills and 20 for reaching dawn, with 1.5 times as much in multiplayer. The Store button is on the main menu but is not open yet.
-- **Classes:** Infantry, Ranger, Heavy Infantry, Chivalry, Magician. Each has its own start, rules and ability tree. A sixth, the Revenant, is hidden until a code is redeemed in Settings.
-- **Revenant:** no weapons. Spectral claws use Mist, which refills over time and from kills. Mist Burst damages and freezes everything around for 2 seconds. Gifts unlock by themselves with each level, apart from one chosen path: Mist Leaper (bound forward in a burst of fog), Rift Traveller (hop between enemies, untouchable) or Summoner (call one more Revenant for a while).
-- **Firelight:** bonfires and torches light the map. Zombies see you 50% further when you stand in firelight or carry a torch, and a bonfire slowly heals you if you stand close.
-- **Map screen:** in the pause menu, with your position and place names.
-- **Ability tree:** kills give XP, each level gives one choice. Four shared steps, then one of three specializations per class, then 12 more steps and a final ability. 18 levels in all, and the final ability comes around minute 8 of a good night. The game keeps running while the tree is open.
-- **Specializations:** Duelist, Berserker, Shadow Blade. Sharpshooter, Trapper, Beastmaster. Guardian (raises a dome and takes hits for teammates), Warpriest, Warlord. Lancer, Paladin, Horse Archer. A Chivalry horse can carry one teammate behind the rider, who can fight but not steer. Necromancer, Elementalist, Illusionist.
-- **Enemies:** Zombie, Clever, Magic, Beast, Leaper, Carrion Crow, Gargoyle, Mimic, Scarecrow, Wraith, Banshee, Dread Rider (mounted, from minute 5), and five Fallen Heroes who get stronger each minute. The Codex in the game menu describes them all.
-- **Play Together:** on the same Wi-Fi or through one phone's hotspot, up to 4 phones, with no server and no internet. One phone starts the game and the others find it in a list, or join by its address. Summons are shared too. The host picks the difficulty on the same screen. Four ways to play: Co-op Night, Defend the Fort, All vs All and Teams. Fallen players come back after 20 seconds and watch through another player's eyes while they wait. If all of a co-op team are down at once, the match ends.
-- **Map:** a large map at night with real hills, light fog and a river that can only be crossed on two bridges and at a ford. The village at the centre has 7 houses, a shed, a barn, a cowshed and a church with a bell. Around it: a walled castle ruin on a hill, with one road up and holes in its walls; a graveyard with a crypt; a windmill on a hilltop; a water mill; a farm; an orchard with vines; two hamlets; a lumber camp; a watch post. Buildings can be entered, and roofs stop flying enemies.
-- **Crops:** wheat and barley sway in the wind and hide you. Corn stands taller than you do. Vegetable gardens have cabbages, turnips, beans and pumpkins.
-- **Bell:** rings each minute and pulls roaming zombies toward the church.
-- **Stealth:** zombies notice by sight and sound, call others, try to surround you, and search where you were heading. Tall crops hide you. Pushing the stick halfway walks quietly.
-- **Weapons:** Dagger, Sword, Spear, Mace, Lance, Scythe, Flail, Bell Hammer, Pitchfork, Torch, Short Bow, Crossbow, Long Bow, Throwing Axes, and the Magician's Staff.
-- **Items:** food heals, and arrows are one shared stock. Weapons vanish after 60 s and other drops after 45 s.
-- **Potions (20 s):** Speed, Sensor, Fire Arrows, Bouncing Arrows.
-- **Familiars (40 s, one about every 30 s, announced by a chime):** Angel, Daemon, Archer, Thunder, Raven, Ghost Knight, Thief Imp, Bell Spirit, Plague Rat.
-- **Sound:** synthesized creature voices, and dark music in three layers that follow the night: calm, hunted, dawn. Music and sound have separate volume sliders.
-- **Difficulty:** Easy, Normal or Hard in Settings. On any of them, whatever rises late in the night is tougher than what came before.
-- **Help in the game:** the Codex describes every enemy, familiar, item and weapon, and the loading screen gives tips. An item within reach shows its name, enemies you hit show a health bar, and a red arc shows where a hit came from.
-- **Controls:** touch, with auto-jump and vibration that can be turned off in Settings. Keyboard and mouse work for desktop testing.
+## The game
 
-## Ideas for later
+**Ways to play**
 
-More maps, internet multiplayer with free room codes, an open Store, iOS build.
+- **Survive the Night:** zombies roam the village, and more arrive as the night goes on. In the last two minutes they sense the dawn and all come for you. Last 10 minutes and a real sunrise burns them away.
+- **Defend the Fort:** zombies break down the fort's gates and go for the Heart in the keep. Lose it, or lose everyone, and the night is over. Wood mends the gates, stairs climb the walls and small doors let you out.
+- **Play Together:** up to 4 phones. Co-op Night, Defend the Fort, All vs All or Teams. Fallen players come back after 20 seconds.
+- **Sandbox:** a small map with every weapon, item and familiar on stands, and any class you own. Call up any enemy, level up at will, and turn off damage.
 
-## Looking at the maps in the Godot editor
+**Classes**
 
-The game builds its maps from code when it starts, so `scenes/main.tscn` looks empty in the editor. To see them, open `map_previews/village.scn` or `map_previews/fort.scn`. These are copies to look at: the game does not read them, and changes made there do not reach the game. Maps are changed in `scripts/village.gd`, `scripts/fort_map.gd` and `scripts/landmarks.gd`. After a change, make new copies with:
+Each class has its own start and rules, and an ability tree: four shared steps, one of three specializations, then more steps up to a final ability near dawn.
 
-    godot --path . res://tools/make_previews.tscn
+| Class | Specializations |
+|---|---|
+| Infantry | Duelist, Berserker, Shadow Blade |
+| Ranger | Sharpshooter, Trapper, Beastmaster |
+| Heavy Infantry | Guardian, Warpriest, Warlord |
+| Chivalry | Lancer, Paladin, Horse Archer |
+| Magician | Necromancer, Elementalist, Illusionist |
+| Revenant (Store or code) | Mist Leaper, Rift Traveller, Summoner |
+| Artificer (Store or code) | Pyromaniac, Mechanic, Inventor |
 
-## Run and test
+The Artificer carries one weapon at a time and starts with a Torch. The Pyromaniac throws incendiary bombs, ending with Chaotic bomblets. The Mechanic builds a slow war chariot that absorbs damage, takes a friend along, and gains a turret and spikes. The Inventor gets a different device with every use, and the button shows which comes next.
 
-Open the folder in Godot 4.7.2, or run it from a terminal:
+**The world**
 
-    godot --path .
-    godot --headless --path . res://tests/test_game.tscn
-    godot --headless --path . res://tests/test_game.tscn -- soak
+- A large map at night with hills, fog, firelight, crops to hide in, and a river that carries you along and can only be crossed on bridges and fords.
+- The church bell strikes once for each minute gone, half a second apart, across the whole map, and draws zombies towards it.
+- Many kinds of enemy, from the plain Zombie to the Dread Rider and Fallen Heroes who grow stronger each minute. Zombies notice by sight and sound, call each other, surround you and search where you were heading.
+- Melee and ranged weapons, food, potions and familiars appear around the map and vanish if nobody takes them.
+- Botti Doubloons come from every match and buy the two extra classes in the Store.
 
-Multiplayer has its own test, which runs two copies of the game talking to each other. The rules can be coop, ffa or teams:
+The Codex in the game describes every class, enemy, familiar, item and weapon.
 
-    godot --headless --path . res://tests/net_test.tscn -- host coop
-    godot --headless --path . res://tests/net_test.tscn -- client coop
+## Changing the game
 
-`tests/sim.tscn` is a balance simulator: a bot with human-like limits plays whole nights at 12 times normal speed and prints one line of results per night:
+- [Editing the maps](docs/EDITING_MAPS.md): every map is a Godot scene you can open and change. Move, turn, copy or delete any building, tree or fire, and drag hills, roads and the river. Press F6 to walk around it.
+- [Building and testing](docs/BUILDING.md): building the Android app, the signing key, the tests and the art tools.
 
-    godot --headless --path . res://tests/sim.tscn -- class=ranger spec=2 nights=3 skill=good quality=2
+iOS is not built yet.
 
-`tests/shots.tscn` renders reference screenshots, and `tests/perf.tscn` prints what each part of the scene costs to draw. Both need a display:
+## Licence
 
-    godot --path . --rendering-driver opengl3 res://tests/shots.tscn -- /some/folder 2
-    godot --path . --rendering-driver opengl3 res://tests/perf.tscn -- 2
-
-## Build the Android APK on Ubuntu
-
-1. Install Godot 4.7.2, its export templates and the Android SDK command-line tools.
-2. In Godot, set the SDK path under Editor Settings > Export > Android.
-3. Run:
-
-       mkdir -p build
-       godot --headless --path . --export-release Android build/undead-drop.apk
-
-`keys/undead-drop.keystore` is a test key, and its password is stored in `export_presets.cfg`.
-Keep it so phone updates install over the old version. Make a new private key before publishing on a store.
-
-## Tools
-
-- `tools/make_audio.py`: every sound effect and all the music.
-- `tools/make_icons.py`, `tools/make_ui.py`, `tools/make_launcher.py`: icons, iron and parchment textures, launcher icon and splash.
-- `tools/make_assets.py`: the ground texture.
-- `tools/slim_characters.mjs`: strips the KayKit characters down and joins them into one mesh per material.
-
-See `CREDITS.md` for asset licences.
+All rights reserved: see `LICENSE`. Free assets and fonts stay under their own licences, listed in `CREDITS.md`.

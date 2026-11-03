@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE }
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL }
 
 const DIVE_WARNING := 0.6
 
@@ -33,6 +33,8 @@ var hp := 0.0
 var max_hp := 0.0
 var height := HEIGHT
 var state: int = State.ROAM
+var _pull_at := Vector3.ZERO
+var _pull_left := 0.0
 var weapon_id := ""
 var burn_time := 0.0
 var xp_value := 10
@@ -895,8 +897,21 @@ func forget() -> void:
 
 ## A Guardian's challenge: everything comes for them, even what had lost interest.
 func taunted_by(at: Vector3) -> void:
-	if not puppet and not dormant:
+	if puppet:
+		Net.effect_zombie(self, Effect.TAUNT, at.x, at.z)
+	elif not dormant:
 		_start_chase(at)
+
+
+## Dragged to a point, as if on a rope.
+func pull_to(at: Vector3) -> void:
+	if not is_alive():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.PULL, at.x, at.z)
+		return
+	_pull_at = at
+	_pull_left = 0.7
 
 
 func hear(at: Vector3) -> void:
@@ -1229,6 +1244,14 @@ func _physics_process(delta: float) -> void:
 		_frozen -= delta
 		if _frozen <= 0.0:
 			_show_frozen(0.0)
+	if _pull_left > 0.0:
+		_pull_left -= delta
+		var to_pull := Vector3(_pull_at.x - position.x, 0.0, _pull_at.z - position.z)
+		if to_pull.length() > 1.0:
+			position += to_pull.normalized() * minf(16.0 * delta, to_pull.length())
+			if not flies:
+				position.y = world.ground_at(position)
+		return
 	_tick_time += delta
 	_tick_count += 1
 	if _tick_every > 1 and _tick_count % _tick_every != 0:

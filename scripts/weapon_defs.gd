@@ -4,6 +4,7 @@ class_name WeaponDefs
 enum Kind { MELEE, RANGED, SPELL }
 
 const DAMAGE := 25.0
+const TORCH_FIRE := 0.575 # how high up a torch the fire starts
 
 const ALL := {
 	"dagger": {"name": "Dagger", "desc": "Very fast, and short reach.", "kind": Kind.MELEE, "rate": 0.26, "range": 1.9, "cone": 70.0, "max_hits": 1,
@@ -207,11 +208,49 @@ static func _pitchfork() -> Mesh:
 
 static func _torch() -> Mesh:
 	var l := LowPoly.new()
-	l.prism(Vector3(0, -0.2, 0), Vector3(0, 0.46, 0), 0.024, 0.03, 6, WOOD)
-	l.prism(Vector3(0, 0.44, 0), Vector3(0, 0.56, 0), 0.05, 0.055, 6, Color(0.2, 0.15, 0.1))
-	l.prism(Vector3(0, 0.56, 0), Vector3(0, 0.82, 0), 0.075, 0.0, 6, Color(1.0, 0.55, 0.12))
-	l.prism(Vector3(0.015, 0.56, 0.01), Vector3(0.01, 0.72, 0), 0.04, 0.0, 5, Color(1.0, 0.9, 0.4))
-	return l.commit()
+	l.prism(Vector3(0, -0.2, 0), Vector3(0, 0.44, 0), 0.022, 0.03, 6, WOOD)
+	# Rags bound round the head, charred where they burn.
+	l.prism(Vector3(0, 0.42, 0), Vector3(0, 0.5, 0), 0.034, 0.058, 7, Color(0.36, 0.28, 0.18))
+	l.prism(Vector3(0, 0.5, 0), Vector3(0, TORCH_FIRE, 0), 0.058, 0.05, 7, Color(0.1, 0.08, 0.07))
+	# Fire: several tongues, so it cannot be taken for a spear point. White is how the shader tells it apart.
+	var fire := Color.WHITE
+	l.prism(Vector3(0, TORCH_FIRE, 0), Vector3(0.01, 0.84, 0.0), 0.05, 0.0, 6, fire)
+	l.prism(Vector3(0.03, TORCH_FIRE, 0.016), Vector3(0.08, 0.74, 0.03), 0.032, 0.0, 5, fire)
+	l.prism(Vector3(-0.03, TORCH_FIRE, 0.012), Vector3(-0.075, 0.71, 0.026), 0.032, 0.0, 5, fire)
+	l.prism(Vector3(0.0, TORCH_FIRE, -0.028), Vector3(-0.02, 0.77, -0.07), 0.03, 0.0, 5, fire)
+	l.prism(Vector3(0.012, TORCH_FIRE, 0.03), Vector3(0.02, 0.68, 0.075), 0.026, 0.0, 5, fire)
+	var mesh := l.commit()
+	mesh.surface_set_material(0, _torch_material())
+	return mesh
+
+
+## The handle is lit like anything else. The fire above it glows, and flickers by itself.
+static func _torch_material() -> ShaderMaterial:
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+varying float fire;
+varying float rise;
+void vertex() {
+	fire = step(0.99, COLOR.b);
+	rise = max(VERTEX.y - %.3f, 0.0);
+	float t = TIME * 10.0 + MODEL_MATRIX[3].x * 3.0;
+	VERTEX.x += sin(t + VERTEX.y * 26.0 + VERTEX.z * 40.0) * rise * 0.2;
+	VERTEX.z += cos(t * 1.27 + VERTEX.y * 21.0 + VERTEX.x * 40.0) * rise * 0.16;
+	VERTEX.y += (sin(t * 1.73 + VERTEX.x * 50.0) * 0.5 + 0.2) * rise * 0.2;
+}
+void fragment() {
+	float up = clamp(rise / 0.26, 0.0, 1.0);
+	vec3 flame = mix(vec3(1.0, 0.82, 0.34), vec3(1.0, 0.36, 0.05), smoothstep(0.1, 0.8, up));
+	ALBEDO = COLOR.rgb * (1.0 - fire);
+	EMISSION = flame * fire * 1.05;
+	ROUGHNESS = 1.0;
+	SPECULAR = 0.0;
+}
+""" % TORCH_FIRE
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	return material
 
 
 static func axe_mesh() -> Mesh:

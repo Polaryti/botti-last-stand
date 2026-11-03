@@ -15,8 +15,12 @@ const SHIELD_BASE := 0.3
 const HORSE_KILLS := 10
 const HORSE_TIME := 15.0
 const HORSE_SPEED := 1.9
+const CHARIOT_SPEED := 1.15
+const CHARIOT_TIME := 25.0
 const TRAMPLE_DAMAGE := 40.0
 const CORE_STEPS := 4
+const LEVEL_UP_GUARD := 3.0 # seconds nothing can hurt you after gaining a level
+const WADE_SPEED := 0.8
 const SWING_HIT := 0.3 # how far through a swing the blow lands
 const BASH := {"kind": WeaponDefs.Kind.MELEE, "rate": 0.8, "range": 2.3, "cone": 110.0, "max_hits": 1, "knock": 3.5, "power": 0.6}
 
@@ -49,7 +53,10 @@ var mods := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_
 	"trap_damage": 50.0, "trap_cd": 0.0, "trap_cap": 3.0, "trap_stun": 0.0,
 	"burst_damage": 45.0, "burst_radius": 6.0, "burst_cost": 35.0, "burst_cd": 7.0, "art_cost": 1.0, "art_cd": 1.0,
 	"leap_range": 9.0, "leap_damage": 0.0, "rift_hops": 3.0, "rift_damage": 40.0, "summon_n": 1.0, "summon_time": 10.0,
-	"cover": 0.0, "cover_radius": 0.0, "dome_time": 3.0, "dome_radius": 6.0}
+	"cover": 0.0, "cover_radius": 0.0, "dome_time": 3.0, "dome_radius": 6.0,
+	"bomb_damage": 70.0, "bomb_radius": 4.5, "bomb_fire": 4.0, "bomb_count": 1.0, "bomb_throw": 1.0,
+	"turret_rate": 1.0, "turret_damage": 1.0,
+	"volley_darts": 5.0, "volley_jumps": 2.0, "flask_time": 2.5, "flask_radius": 5.0, "inv_damage": 1.0, "inv_heal": 0.0, "inv_repeat": 0.0}
 var flags := {}
 var spec_id := ""
 var _buffs := {} # key -> {stat, val, left, stacks}
@@ -120,6 +127,14 @@ var _vm_mesh: MeshInstance3D
 var _shield_node: MeshInstance3D
 var _horse: Node3D
 var _horse_legs: Array[Node3D] = []
+var _chariot: ChariotModel
+var _turret_timer := 0.0
+var _spike_timer := 0.0
+var _next_invention := ""
+var _last_invention := ""
+var _volley_left := 0
+var _volley_timer := 0.0
+var _later: Array[Dictionary] = []
 var _light: OmniLight3D
 var _familiars := {} # id -> MeshInstance3D
 var _cooldown := 0.0
@@ -296,11 +311,26 @@ func is_riding() -> bool:
 	return riding_left > 0.0
 
 
+## Chivalry rides a horse. A Mechanic builds a war chariot, which works much the same.
+func has_mount() -> bool:
+	return class_def().get("horse", false) or spec_id == "mechanic"
+
+
+func mount_kind() -> String:
+	return "chariot" if spec_id == "mechanic" else "horse"
+
+
+func mount_name() -> String:
+	return "Chariot" if spec_id == "mechanic" else "Horse"
+
+
 func carries(id: String) -> bool:
 	return slots.has(id)
 
 
 func has_empty_slot() -> bool:
+	if class_def().get("one_weapon", false):
+		return slots[0] == null
 	return slots[0] == null or slots[1] == null
 
 
@@ -314,6 +344,11 @@ func can_use(id: String) -> bool:
 
 
 func give_weapon(id: String) -> void:
+	if class_def().get("one_weapon", false):
+		current = 0
+		slots[0] = id
+		_equip()
+		return
 	if slots[current] == null:
 		slots[current] = id
 	elif slots[1 - current] == null:
@@ -569,6 +604,7 @@ func add_xp(n: int) -> void:
 		level += 1
 		points += 1
 		level_flash = 1.0
+		guard_left = maxf(guard_left, LEVEL_UP_GUARD)
 		Sfx.play("level", -2.0)
 		say("Level %d! Choose an ability" % level)
 	if level >= ClassDefs.MAX_LEVEL:
@@ -622,6 +658,8 @@ func choose_ability(step: int, index: int) -> bool:
 	if step == CORE_STEPS:
 		spec_id = (tree_data()["specs"] as Array)[index]["id"]
 	_apply_ability(a)
+	if step == CORE_STEPS:
+		spec_chosen()
 	Sfx.play("ui_choose", -3.0)
 	_auto_unlock()
 	return true
@@ -871,10 +909,12 @@ func on_kill(z: Zombie) -> void:
 	if _assassin_kill:
 		_assassin_kill = false
 		invis_left = maxf(invis_left, 3.0)
-	if class_def().get("horse", false) and not is_riding():
+	if has_mount() and not is_riding():
 		horse_progress = mini(horses_needed(), horse_progress + 1)
 		if horse_progress == horses_needed():
-			say("Your horse is ready!")
+			say("Your %s is ready!" % mount_name().to_lower())
+	if has_flag("bomb_refund"):
+		art_cd_left = maxf(0.0, art_cd_left - 0.5)
 	if is_riding() and (has_flag("ride_on_kill") or has_flag("war_horse")):
 		riding_left += 1.0
 
@@ -908,7 +948,7 @@ func horses_needed() -> int:
 
 
 func horse_ready() -> bool:
-	if not class_def().get("horse", false) or is_riding():
+	if not has_mount() or is_riding():
 		return false
 	return horse_progress >= horses_needed() or (has_flag("sacred_steed") and _sacred_cd <= 0.0)
 
@@ -918,12 +958,21 @@ func mount() -> void:
 		return
 	horse_progress = 0
 	_sacred_cd = 60.0
-	riding_left = HORSE_TIME + m("horse_time")
 	_trampled.clear()
-	if _horse == null:
-		_build_horse()
-	_horse.visible = true
-	Sfx.play("gallop", 0.0)
+	if mount_kind() == "chariot":
+		riding_left = CHARIOT_TIME + m("horse_time")
+		if _chariot == null:
+			_chariot = ChariotModel.new(2)
+			add_child(_chariot)
+		_chariot.show_upgrades(has_flag("chariot_turret"), has_flag("chariot_spikes"))
+		_chariot.visible = true
+		Sfx.play("creak", 0.0)
+	else:
+		riding_left = HORSE_TIME + m("horse_time")
+		if _horse == null:
+			_build_horse()
+		_horse.visible = true
+		Sfx.play("gallop", 0.0)
 	fire("mount", {})
 
 
@@ -934,6 +983,8 @@ func dismount() -> void:
 		passenger = 0
 	if _horse:
 		_horse.visible = false
+	if _chariot:
+		_chariot.visible = false
 	if not dead:
 		fire("dismount", {})
 
@@ -970,22 +1021,58 @@ func _build_horse() -> void:
 
 
 func _tick_riding(delta: float) -> void:
-	var target_y := 2.35 if is_riding() or ride_behind != 0 else 1.58
+	var target_y := 1.58
+	if is_riding():
+		target_y = 2.0 if mount_kind() == "chariot" else 2.35
+	elif ride_behind != 0:
+		var carrier: Avatar = Net.avatar(ride_behind)
+		target_y = 2.0 if carrier and carrier.in_chariot else 2.35
 	head.position.y = lerpf(head.position.y, target_y, min(1.0, delta * 7.0))
 	if not is_riding():
 		return
 	riding_left -= delta
 	var horiz := Vector2(velocity.x, velocity.z).length()
-	var t := Time.get_ticks_msec() * 0.016
-	for i in _horse_legs.size():
-		var swing := sin(t + (0.0 if i % 3 == 0 else PI)) * 0.7 * clampf(horiz / 6.0, 0.05, 1.0)
-		_horse_legs[i].rotation.x = swing
-	if horiz > 3.0:
-		_trample(horiz)
-		Sfx.play("gallop", -9.0, 1.0, 0.32)
+	if mount_kind() == "chariot":
+		_chariot.roll(horiz * delta)
+		_tick_chariot(delta)
+		if horiz > 3.0:
+			_trample(horiz)
+			Sfx.play("creak", -14.0, 1.0, 0.9)
+	else:
+		var t := Time.get_ticks_msec() * 0.016
+		for i in _horse_legs.size():
+			var swing := sin(t + (0.0 if i % 3 == 0 else PI)) * 0.7 * clampf(horiz / 6.0, 0.05, 1.0)
+			_horse_legs[i].rotation.x = swing
+		if horiz > 3.0:
+			_trample(horiz)
+			Sfx.play("gallop", -9.0, 1.0, 0.32)
 	if riding_left <= 0.0:
 		dismount()
-		say("Your horse is gone")
+		say("Your %s is gone" % mount_name().to_lower())
+
+
+## What a Mechanic's upgrades do while the chariot is out.
+func _tick_chariot(delta: float) -> void:
+	if has_flag("chariot_turret"):
+		_turret_timer -= delta
+		if _turret_timer <= 0.0:
+			var from := global_position + global_basis * Vector3(0.6, 1.6, -1.0)
+			var z := world.nearest_zombie(from, WorldLight.TURRET_REACH, true)
+			if z == null:
+				_turret_timer = 0.25
+			else:
+				_turret_timer = WorldLight.TURRET_EVERY / m("turret_rate")
+				_chariot.aim_turret(z.centre())
+				var dir := (z.centre() - from).normalized()
+				world.spawn_player_arrow(self, from, dir * 45.0, 0.0, WorldLight.TURRET_REACH + 6.0, 1.5, WeaponDefs.DAMAGE * 0.8 * m("turret_damage") * damage_multiplier(), false)
+				Sfx.play("crossbow", -8.0, 1.1, 0.1)
+	if has_flag("chariot_spikes"):
+		_spike_timer -= delta
+		if _spike_timer <= 0.0:
+			_spike_timer = 0.45
+			for z: Zombie in world.zombies_near(global_position, 2.5, 8):
+				z.take_damage(26.0 * m("turret_damage") * damage_multiplier(), z.position - global_position, 2.0, z.centre())
+				on_hit(false)
 
 
 func _trample(horiz: float) -> void:
@@ -1001,7 +1088,7 @@ func _trample(horiz: float) -> void:
 		if now - float(_trampled.get(z.get_instance_id(), -10.0)) < 0.8:
 			continue
 		_trampled[z.get_instance_id()] = now
-		var dmg := TRAMPLE_DAMAGE * m("trample") * damage_multiplier()
+		var dmg := TRAMPLE_DAMAGE * m("trample") * damage_multiplier() * (0.6 if mount_kind() == "chariot" else 1.0)
 		if has_flag("war_horse") and z.type_id == "normal":
 			dmg = 9999.0
 		if has_flag("unstoppable") and z.type_id != "beast":
@@ -1150,6 +1237,19 @@ func art_def() -> Dictionary:
 	return WorldLight.ARTS.get(spec_id, {})
 
 
+## The picture on the ability's button. For an Inventor, that is what will come out next.
+func art_glyph() -> String:
+	if spec_id == "inventor" and _next_invention != "":
+		return WorldLight.INVENTIONS[_next_invention]["icon"]
+	return str(art_def().get("icon", "mist"))
+
+
+func art_label() -> String:
+	if spec_id == "inventor" and _next_invention != "":
+		return WorldLight.INVENTIONS[_next_invention]["name"]
+	return ""
+
+
 func burst_cost() -> float:
 	return m("burst_cost")
 
@@ -1216,6 +1316,8 @@ func _tick_mist(delta: float) -> void:
 		"rift": _start_rift()
 		"summoner": _summon_revenants()
 		"guardian": raise_dome()
+		"pyromaniac": _throw_bombs()
+		"inventor": _invent()
 
 
 func mist_burst_at(at: Vector3, power: float) -> void:
@@ -1258,6 +1360,249 @@ func raise_dome() -> void:
 		for z: Zombie in world.zombies:
 			if z.is_alive() and z.position.distance_to(global_position) < 22.0:
 				z.taunted_by(global_position)
+
+
+# --- The Artificer -----------------------------------------------------------
+
+## Where something leaves the hand, and which way it goes: up a little, to carry it.
+func _throw_start() -> Vector3:
+	return camera.global_position + camera.global_basis.x * 0.2 + Vector3.DOWN * 0.1 - camera.global_basis.z * 0.5
+
+
+func _throw_velocity(speed: float, spread := 0.0) -> Vector3:
+	var dir := (-camera.global_basis.z + Vector3.UP * 0.2).normalized()
+	if spread != 0.0:
+		dir = dir.rotated(Vector3.UP, spread)
+	return dir * speed
+
+
+func _throw_anim() -> void:
+	_swing_time = 0.3
+	_swing = 0.0
+	_swing_keys = "throw"
+	Sfx.play("swing", -3.0, 0.8)
+
+
+func _throw_bombs() -> void:
+	var n := int(m("bomb_count"))
+	for i in n:
+		var spread := 0.0 if n == 1 else (float(i) / (n - 1) - 0.5) * 0.3
+		world.spawn_thrown(_throw_start(), _throw_velocity(17.0 * m("bomb_throw"), spread), Color(0.1, 0.1, 0.12), bomb_burst, true, 1.3)
+	_throw_anim()
+	fire("throw", {})
+
+
+func bomb_burst(at: Vector3) -> void:
+	var radius := m("bomb_radius")
+	var dmg := m("bomb_damage") * damage_multiplier()
+	var col := Color(1.0, 0.55, 0.15, 0.55)
+	world.fx_blast(at, radius * 0.8, col)
+	Sfx.play("blast", -2.0, 1.0, 0.1)
+	world.make_noise(at, 16.0)
+	for z: Zombie in world.zombies.duplicate():
+		if z.is_alive() and z.centre().distance_to(at) <= radius:
+			z.take_damage(dmg, z.position - at, 5.0, z.centre())
+			z.ignite(ZombieDefs.BURN_SECONDS)
+			if has_flag("bomb_stun"):
+				z.stun(1.0)
+			on_hit(false)
+	for r: Avatar in world.rivals_near(at, radius):
+		Net.hit_player(r.peer, dmg, at)
+	var patch := minf(radius * 0.6, 3.6)
+	world.drop_poison(at, true, m("bomb_fire"), patch)
+	if Net.active():
+		Net.blast_fx(at, radius * 0.8, col)
+		Net.world_fx(Net.Fx.FIRE_PATCH, at, Vector3(m("bomb_fire"), patch, 0))
+	if has_flag("chaotic"):
+		_scatter_bomblets(at)
+
+
+## The Pyromaniac's last step: every bomb throws off bomblets, and nobody knows what each will do.
+func _scatter_bomblets(at: Vector3) -> void:
+	var kinds: Array = WorldLight.BOMBLET_COLOURS.keys()
+	for i in 6:
+		var kind: String = kinds[randi() % kinds.size()]
+		var a := randf() * TAU
+		var vel := Vector3(cos(a), randf_range(0.9, 1.4), sin(a)).normalized() * randf_range(8.0, 12.0)
+		var shot := world.spawn_thrown(at + Vector3.UP * 0.5, vel, WorldLight.BOMBLET_COLOURS[kind], func(p: Vector3) -> void: _bomblet_burst(p, kind), kind == "fire", 0.7)
+		if shot:
+			shot.chaos_left = 2
+
+
+func _bomblet_burst(at: Vector3, kind: String) -> void:
+	const REACH := 3.2
+	var col: Color = WorldLight.BOMBLET_COLOURS[kind]
+	world.fx_blast(at, REACH * 0.6, Color(col, 0.45))
+	if Net.active():
+		Net.blast_fx(at, REACH * 0.6, Color(col, 0.45))
+	Sfx.play("blast", -9.0, 1.4, 0.08)
+	var dmg := m("bomb_damage") * 0.3 * damage_multiplier()
+	for z: Zombie in world.zombies_near(at, REACH, 8):
+		z.take_damage(dmg, z.position - at, 2.0, z.centre())
+		on_hit(false)
+		match kind:
+			"fire": z.ignite(ZombieDefs.BURN_SECONDS)
+			"frost": z.freeze(1.5)
+			"thunder": z.stun(0.8)
+			"poison": z.add_dot(10.0, 4.0)
+	match kind:
+		"fire": world.drop_poison(at, true, 2.5, 1.6)
+		"poison": world.drop_poison(at)
+		"thunder": world.flash_bolt(at)
+
+
+func spec_chosen() -> void:
+	if spec_id == "inventor":
+		_roll_invention()
+
+
+## What is in the Inventor's bag right now.
+func _inventions() -> Array[String]:
+	var bag: Array[String] = ["volley", "flask"]
+	if has_flag("inv_sentry"):
+		bag.append("sentry")
+	if has_flag("inv_boots"):
+		bag.append("boots")
+	if has_flag("inv_noise"):
+		bag.append("noise")
+	if has_flag("inv_magnet"):
+		bag.append("magnet")
+	return bag
+
+
+func _roll_invention() -> void:
+	var bag := _inventions()
+	if bag.size() > 1:
+		bag.erase(_last_invention)
+	_next_invention = bag[randi() % bag.size()]
+
+
+func _invent() -> void:
+	var what := _next_invention
+	if what == "":
+		_roll_invention()
+		what = _next_invention
+	_run_invention(what)
+	if has_flag("eureka"):
+		_later.append({"left": 0.5, "do": func() -> void: _run_invention(what)})
+	if m("inv_heal") > 0.0:
+		heal(m("inv_heal"))
+	if randf() < m("inv_repeat"):
+		art_cd_left = 0.0
+		say("Ready again!")
+	_last_invention = what
+	_roll_invention()
+
+
+func _run_invention(what: String) -> void:
+	match what:
+		"volley":
+			_volley_left += int(m("volley_darts"))
+			_volley_timer = 0.0
+			Sfx.play("spell", -3.0, 1.6)
+		"flask":
+			world.spawn_thrown(_throw_start(), _throw_velocity(17.0), Color(0.65, 0.95, 1.0), _flask_burst, false, 1.2)
+			_throw_anim()
+		"sentry":
+			var at := global_position - global_basis.z * 2.0
+			var cell := world.grid.to_cell(at)
+			if not world.grid.is_free(cell):
+				at = world.grid.to_world(world.grid.nearest_free(cell))
+			world.place_sentry(self, at, WorldLight.SENTRY_TIME)
+			Sfx.play("creak", -2.0, 1.2)
+		"boots":
+			_act({"do": "buff", "key": "steam_boots", "stat": "speed", "val": 0.8, "secs": 4.0}, {})
+			guard_left = maxf(guard_left, 1.5)
+			_fog_at(global_position + Vector3.UP * 0.5, 1.2)
+			Sfx.play("wraith", -9.0, 1.6, 0.2)
+		"noise":
+			world.spawn_thrown(_throw_start(), _throw_velocity(17.0), Color(0.78, 0.6, 0.24), _noise_burst, false, 1.3)
+			_throw_anim()
+		"magnet":
+			world.spawn_thrown(_throw_start(), _throw_velocity(17.0), Color(0.75, 0.2, 0.2), _magnet_burst, false, 1.3)
+			_throw_anim()
+
+
+func _tick_artificer(delta: float) -> void:
+	if _volley_left > 0:
+		_volley_timer -= delta
+		if _volley_timer <= 0.0:
+			_volley_timer = 0.09
+			_volley_left -= 1
+			var dir := world.assist_aim(camera.global_position, -camera.global_basis.z, 40.0)
+			dir = dir.rotated(Vector3.UP, randf_range(-0.03, 0.03))
+			world.spawn_dart(_throw_start(), dir * 55.0, WeaponDefs.DAMAGE * 0.7 * m("inv_damage") * damage_multiplier(), int(m("volley_jumps")))
+			Sfx.play("crossbow", -7.0, 1.5, 0.04)
+	for i in range(_later.size() - 1, -1, -1):
+		_later[i]["left"] = float(_later[i]["left"]) - delta
+		if float(_later[i]["left"]) <= 0.0:
+			var job: Callable = _later[i]["do"]
+			_later.remove_at(i)
+			job.call()
+
+
+## The spark from a dart: on to whatever is close, and from there to the next.
+func spark_from(first: Zombie, jumps: int, damage: float) -> void:
+	var hit: Array[RID] = [first.get_rid()]
+	var from := first.centre()
+	first.stun(0.25)
+	for i in jumps:
+		var next := world.nearest_zombie_excluding(from, WorldLight.SPARK_REACH, hit)
+		if next == null:
+			return
+		hit.append(next.get_rid())
+		var to := next.centre()
+		world.fx_spark(from, to)
+		if Net.active():
+			Net.world_fx(Net.Fx.SPARK, from, to)
+		next.take_damage(damage * 0.7, to - from, 1.0, to)
+		next.stun(0.25)
+		on_hit(false)
+		Sfx.play("thunder", -16.0, 1.8, 0.08)
+		from = to
+
+
+func _flask_burst(at: Vector3) -> void:
+	var radius := m("flask_radius")
+	var col := Color(0.65, 0.95, 1.0, 0.5)
+	world.fx_blast(at, radius * 0.8, col)
+	if Net.active():
+		Net.blast_fx(at, radius * 0.8, col)
+	Sfx.play("blast", -4.0, 1.6, 0.1)
+	for z: Zombie in world.zombies_near(at, radius, 14):
+		z.take_damage(20.0 * m("inv_damage") * damage_multiplier(), z.position - at, 0.5, z.centre())
+		z.freeze(m("flask_time"))
+		on_hit(false)
+
+
+## Everything close comes to see, and then it goes off.
+func _noise_burst(at: Vector3) -> void:
+	world.sfx_at("bell", at, -4.0)
+	world.fx_blast(at + Vector3.UP * 0.5, 1.2, Color(0.9, 0.75, 0.3, 0.4))
+	for z: Zombie in world.zombies_near(at, 24.0, 16):
+		z.taunted_by(at)
+	_later.append({"left": 3.0, "do": func() -> void:
+		var col := Color(1.0, 0.75, 0.3, 0.55)
+		world.fx_blast(at, 4.5, col)
+		if Net.active():
+			Net.blast_fx(at, 4.5, col)
+		Sfx.play("blast", -2.0, 0.9, 0.1)
+		for z: Zombie in world.zombies_near(at, 6.0, 16):
+			z.take_damage(90.0 * m("inv_damage") * damage_multiplier(), z.position - at, 6.0, z.centre())
+			on_hit(false)})
+
+
+func _magnet_burst(at: Vector3) -> void:
+	var col := Color(0.85, 0.3, 0.3, 0.4)
+	world.fx_blast(at, 3.0, col)
+	if Net.active():
+		Net.blast_fx(at, 3.0, col)
+	Sfx.play("blast", -6.0, 0.6, 0.1)
+	for z: Zombie in world.zombies_near(at, 10.0, 16):
+		z.pull_to(at)
+		z.stun(3.0)
+		z.take_damage(15.0 * m("inv_damage") * damage_multiplier(), Vector3.ZERO, 0.0, z.centre())
+		on_hit(false)
 
 
 ## A hit a friend's Guardian took for them.
@@ -1441,7 +1786,10 @@ func _physics_process(delta: float) -> void:
 	var dir := global_basis * Vector3(input_move.x, 0, input_move.y)
 	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (0.5 if zoomed else 1.0)
 	if is_riding():
-		speed = WALK_SPEED * HORSE_SPEED * m("horse_speed")
+		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
+	var wading := world.terrain.in_water(global_position.x, global_position.z)
+	if wading:
+		speed *= WADE_SPEED
 	var accel := 14.0 if is_on_floor() else 5.0
 	velocity.x = move_toward(velocity.x, dir.x * speed, accel * speed * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, accel * speed * delta)
@@ -1457,6 +1805,9 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= GRAVITY * delta
 	input_jump = false
 	move_and_slide()
+	if wading and global_position.y < Terrain.WATER_Y + 0.6:
+		var flow := world.terrain.river_flow(global_position.x, global_position.z)
+		move_and_collide(Vector3(flow.x, 0, flow.y) * Terrain.CURRENT * delta)
 	# However it happened, nobody stays under the ground.
 	var floor_y := world.ground_at(global_position)
 	if global_position.y < floor_y - 1.0:
@@ -1566,6 +1917,7 @@ func _process(delta: float) -> void:
 					return
 	_tick_powers(delta)
 	_tick_mist(delta)
+	_tick_artificer(delta)
 	_lit_timer -= delta
 	if _lit_timer <= 0.0:
 		_lit_timer = 0.25

@@ -4,6 +4,11 @@ extends Node
 
 const VIEWS := [
 	["square", Vector3(0, 0, 8), 0.0, 0.0],
+	["square_back", Vector3(0, 0, -7), 3.14, 0.0],
+	["north_road", Vector3(1, 0, -18), 0.0, 0.0],
+	["east_road", Vector3(14, 0, 1), -1.57, 0.0],
+	["west_road", Vector3(-14, 0, -1), 1.57, 0.0],
+	["south_road", Vector3(-1, 0, 16), 3.14, 0.0],
 	["castle_road", Vector3(-27, 0, -52), 1.2, 0.1],
 	["castle_gate", Vector3(-44, 0, -70), 1.57, 0.05],
 	["castle_yard", Vector3(-58, 0, -58), 2.2, 0.0],
@@ -33,14 +38,17 @@ func _ready() -> void:
 	var out: String = args[0]
 	Game.quality = int(args[1]) if args.size() > 1 else 2
 	Game.apply_quality()
-	Game.mode = Game.Mode.ROAM
+	Game.mode = Game.Mode.NIGHT
 	Game.player_class = "infantry"
 	var t0 := Time.get_ticks_msec()
 	var w := World.new()
 	add_child(w)
-	w.setup(Game.Mode.ROAM)
+	w.setup(Game.Mode.NIGHT)
 	print("map build ms=", Time.get_ticks_msec() - t0)
+	w.director.running = false
 	w.director.set_process(false)
+	for z: Zombie in w.zombies.duplicate():
+		z.release()
 	var p := w.player
 	p.set_physics_process(false)
 	for pu: Pickup in w.pickups.duplicate():

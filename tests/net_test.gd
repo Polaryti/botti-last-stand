@@ -93,7 +93,7 @@ func _as_host() -> void:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.roster.size() == 2, "the other phone joined")
-	Net.set_rules({"coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -102,6 +102,9 @@ func _as_host() -> void:
 	if rules == "ride":
 		Game.player_class = "chivalry"
 		Net.set_my_class("chivalry")
+	if rules == "chariot":
+		Game.player_class = "artificer"
+		Net.set_my_class("artificer")
 	if rules == "teams":
 		# Put the two on opposite teams.
 		Net.roster[1]["team"] = 0
@@ -117,6 +120,8 @@ func _as_host() -> void:
 	await wait(0.2)
 	if rules == "ride":
 		Net.set_my_class("chivalry")
+	if rules == "chariot":
+		Net.set_my_class("artificer")
 	var chosen := Net.rules
 	_press("Teams")
 	await wait(0.1)
@@ -208,6 +213,8 @@ func _play() -> void:
 		await _fort()
 	elif rules == "ride":
 		await _ride()
+	elif rules == "chariot":
+		await _chariot()
 	elif rules == "coop":
 		await _coop()
 	else:
@@ -358,6 +365,81 @@ func _ride() -> void:
 		ok(not pl.can_board(), "and there is nothing to climb on")
 	else:
 		ok(pl.passenger == 0, "and the seat is free")
+
+
+## The Artificer on two phones: the chariot and its seat, what his devices leave behind, and the bell.
+func _chariot() -> void:
+	await _clear_zombies_on_host()
+	await sync(2)
+	pl.global_position = Vector3(0, 0.05, 15) if host else Vector3(2, 0.05, 15)
+	await wait(0.4)
+	if host:
+		ok(pl.class_id == "artificer", "the host plays an Artificer")
+		pl.points = 18
+		for row in 4:
+			pl.choose_ability(row, 0)
+		pl.choose_ability(4, 1)
+		pl.choose_ability(5, 0)
+		ok(pl.spec_id == "mechanic" and pl.has_flag("chariot_turret"), "a Mechanic with a turret")
+		pl.horse_progress = pl.horses_needed()
+		pl.mount()
+		ok(pl.is_riding() and pl.mount_kind() == "chariot", "he climbs into the chariot")
+	await wait(0.6)
+	await sync(3)
+	if not host:
+		ok(_avatar().is_mounted() and _avatar().in_chariot, "I see a chariot, not a horse")
+		ok(_avatar()._has_turret, "with the turret on it")
+		ok(pl.can_board(), "and I can climb on")
+		pl.board()
+	await wait(0.5)
+	await sync(4)
+	if host:
+		ok(pl.passenger != 0, "one friend is on")
+		pl.global_position = Vector3(0, 0.05, 25)
+	else:
+		ok(pl.ride_behind != 0, "I am riding in the chariot")
+		await snap("chariot")
+	await wait(0.8)
+	await sync(5)
+	if not host:
+		ok(pl.global_position.distance_to(Vector3(0, 0, 25)) < 3.0, "the chariot takes me along (%s)" % pl.global_position)
+	await sync(6)
+	if host:
+		pl.dismount()
+	await wait(0.6)
+	await sync(7)
+	if not host:
+		ok(pl.ride_behind == 0, "when he gets out so do I")
+	else:
+		ok(pl.passenger == 0, "and the seat is free")
+	# A bomb on the host's phone leaves fire on the other's too.
+	if host:
+		pl.bomb_burst(Vector3(10, w.ground_at(Vector3(10, 0, 30)), 30))
+	await wait(0.5)
+	await sync(8)
+	var burning := false
+	for i in w._puddles.size():
+		if w._puddle_life[i] > 0.0 and w._puddle_fire[i] and w._puddles[i].global_position.distance_to(Vector3(10, w.ground_at(Vector3(10, 0, 30)), 30)) < 1.0:
+			burning = true
+	ok(burning, "a bomb's fire shows on both phones")
+	# The same goes for a sentry.
+	if host:
+		w.place_sentry(pl, Vector3(6, 0, 30), 5.0)
+	await wait(0.5)
+	await sync(9)
+	ok(not w._sentries.is_empty(), "a sentry stands on both phones")
+	# Minute 3: three strokes, half a second apart, on both phones.
+	if host:
+		w.ring_bell(3)
+		Net.bell(3)
+	await wait(0.2)
+	ok(w.bell_strokes_left() == 2, "the first stroke rings straight away (%d left)" % w.bell_strokes_left())
+	await wait(0.5)
+	ok(w.bell_strokes_left() == 1, "the second after half a second (%d left)" % w.bell_strokes_left())
+	await wait(0.5)
+	ok(w.bell_strokes_left() == 0, "and the third after another (%d left)" % w.bell_strokes_left())
+	await wait(0.2)
+	await sync(10)
 
 
 func _clear_zombies_on_host() -> void:
@@ -542,8 +624,8 @@ func _coop() -> void:
 	if host:
 		ok(_avatar().dead, "the host sees me fallen")
 		ok(not m._run_over, "and the night goes on for the one still standing")
-		w.ring_bell()
-		Net.bell()
+		w.ring_bell(1)
+		Net.bell(1)
 	else:
 		ok(Net.respawn_seconds() > 15.0, "I wait about 20 seconds (%.0f)" % Net.respawn_seconds())
 		ok(Net.watching_name() == "H", "watching the other player")

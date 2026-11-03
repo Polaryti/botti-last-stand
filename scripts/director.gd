@@ -44,6 +44,8 @@ var _won := false
 var _waiting := false # a multiplayer game has not started yet
 var _follows_host := false
 var _bell_timer := 60.0
+var _bell_minute := 0
+var sandbox := false
 var _last_stand := false
 var _call_timer := 0.0
 var _far_timer := 4.0
@@ -59,6 +61,14 @@ func join_game(follow: bool) -> void:
 	_follows_host = follow
 	_waiting = not follow
 	running = follow
+
+
+## No night and no zombies unless you ask for them: only rows of things to try.
+func begin_sandbox() -> void:
+	_waiting = false
+	running = false
+	sandbox = true
+	world.set_up_stands()
 
 
 func begin(with_zombies: bool) -> void:
@@ -123,6 +133,9 @@ func stock(kind: int) -> void:
 
 func _process(delta: float) -> void:
 	banner_time = maxf(0.0, banner_time - delta)
+	if sandbox:
+		world.tick_stands(delta)
+		return
 	if _follows_host:
 		if running:
 			elapsed += delta
@@ -132,9 +145,10 @@ func _process(delta: float) -> void:
 	_bell_timer -= delta
 	if _bell_timer <= 0.0:
 		_bell_timer = 60.0
-		world.ring_bell()
+		_bell_minute += 1
+		world.ring_bell(_bell_minute)
 		if Net.is_host():
-			Net.bell()
+			Net.bell(_bell_minute)
 	_stock_timer -= delta
 	if _stock_timer <= 0.0:
 		_stock_timer = 8.0

@@ -10,6 +10,7 @@ signal fort_lost
 const HALF_SIZE := 110.0
 const PATHS_PER_FRAME := 1
 const SKY_EVERY := 0.15
+const BELL_GAP := 0.5
 const NIGHT_BG := Color(0.035, 0.055, 0.1)
 const DAWN_BG := Color(0.78, 0.6, 0.46)
 const NIGHT_AMBIENT := Color(0.34, 0.42, 0.62)
@@ -34,7 +35,10 @@ var terrain: Terrain
 var fort: Fort
 var wood_spots: Array[Vector3] = []
 var yard_wood_spots: Array[Vector3] = []
-var map_roads: Array = Village.ROADS
+var map_roads: Array = []
+var start_spots: Array[Vector3] = []
+var rival_spots: Array[Vector3] = []
+var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
 var _enemy_blocks: StaticBody3D
 var director: Director
 var player: Player
@@ -90,12 +94,22 @@ var _star_material: StandardMaterial3D
 var _burn_lights: Array[OmniLight3D] = []
 var _burning: Array[Zombie] = []
 var _bell_swing := 0.0
+var _bell_strokes := 0
+var _bell_wait := 0.0
 var _blast: MeshInstance3D
 var _blast_mat: StandardMaterial3D
 var _blast_life := 0.0
 var _puddles: Array[MeshInstance3D] = []
 var _puddle_life: Array[float] = []
 var _puddle_fire: Array[bool] = []
+var _puddle_size: Array[float] = []
+var _puddle_shown_only: Array[bool] = []
+var _sparks: Array[MeshInstance3D] = []
+var _spark_life: Array[float] = []
+var _next_spark := 0
+var _sentries: Array[Dictionary] = []
+var _sentry_look: Mesh
+var _stand_items: Array[Dictionary] = []
 var _fire_puddle: StandardMaterial3D
 var _next_puddle := 0
 var _poison_tick := 0.0
@@ -161,16 +175,13 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	grid = PathGrid.new(int(HALF_SIZE * 2.0))
-	var fort_map := mode == Game.Mode.FORT
-	var land_id := "fort" if fort_map else "village"
-	if not _lands.has(land_id):
+	var file := _map_file()
+	var map: MapRoot = (load(file) as PackedScene).instantiate()
+	if not _lands.has(file):
 		var t := Terrain.new()
-		if fort_map:
-			FortMap.plan_land(t)
-		else:
-			Village.plan_land(t)
-		_lands[land_id] = t
-	terrain = _lands[land_id]
+		map.plan_land(t)
+		_lands[file] = t
+	terrain = _lands[file]
 	_body = StaticBody3D.new()
 	_body.collision_layer = 1
 	_body.collision_mask = 0
@@ -191,10 +202,12 @@ func setup(game_mode: int) -> void:
 	ground.add_child(ground_shape)
 	add_child(ground)
 	_build_environment()
-	if fort_map:
-		Village.new(self).build_fort()
-	else:
-		Village.new(self).build()
+	var builder := MapBuilder.new(self, terrain)
+	builder.quality = Game.quality
+	builder.grass_tufts = Game.grass_count()
+	builder.skip_beyond = mode == Game.Mode.MENU
+	builder.build(map)
+	map.free()
 	grid.astar.update()
 	grid.build_far_grid()
 	_build_fx()
@@ -212,21 +225,99 @@ func setup(game_mode: int) -> void:
 	prepare_allies("ghost", 1)
 	player = Player.new(self)
 	add_child(player)
-	var start := Vector3(3, 0, 11) if fort_map else Vector3(0, 0, 4.5)
+	var start: Vector3 = start_spots[0] if not start_spots.is_empty() else Vector3.ZERO
 	player.position = Vector3(start.x, ground_at(start) + 0.05, start.z)
-	if fort_map:
+	if fort:
 		fort.fallen.connect(_on_fort_fallen)
 	players.append(player)
 	if Net.active():
 		Net.attach(self)
 		director.join_game(Net.is_client())
+	elif mode == Game.Mode.SANDBOX:
+		director.begin_sandbox()
 	else:
-		director.begin(mode == Game.Mode.NIGHT or mode == Game.Mode.FORT)
+		director.begin(true)
 	_scan_pickups()
 	_apply_sky(0.0)
 
 
-# --- Map helpers used by Village ---------------------------------------------
+## Which map scene this game is on. Pressing F6 on a map in the editor overrides it.
+func _map_file() -> String:
+	if Game.test_map != "":
+		return Game.test_map
+	match mode:
+		Game.Mode.FORT: return "res://maps/fort.tscn"
+		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
+	return "res://maps/village.tscn"
+
+
+# --- Map helpers used by MapBuilder ------------------------------------------
+
+func start_fort() -> void:
+	fort = Fort.new(self)
+	add_child(fort)
+	church_door = Vector3(0, 0, 8)
+
+
+## True when a transform is turned by some number of quarter turns, so a plain box will do.
+func _square_on(t: Transform3D) -> int:
+	var yaw := t.basis.get_euler().y
+	var quarter := yaw / (PI * 0.5)
+	if absf(quarter - round(quarter)) < 0.01:
+		return posmod(int(round(quarter)), 2)
+	return -1
+
+
+func add_solid_xf(t: Transform3D, size: Vector3) -> void:
+	var turns := _square_on(t)
+	if turns >= 0:
+		add_solid(t.origin, size if turns == 0 else Vector3(size.z, size.y, size.x))
+		return
+	add_rotated_collider(t, size)
+	if t.origin.y - size.y * 0.5 - ground_at(t.origin) < 1.8:
+		grid.block_turned(t, size)
+
+
+func add_collider_xf(t: Transform3D, size: Vector3) -> void:
+	var turns := _square_on(t)
+	if turns >= 0:
+		add_collider(t.origin, size if turns == 0 else Vector3(size.z, size.y, size.x))
+	else:
+		add_rotated_collider(t, size)
+
+
+func add_barrier_xf(t: Transform3D, size: Vector3) -> void:
+	var turns := _square_on(t)
+	if turns >= 0:
+		add_barrier(t.origin, size if turns == 0 else Vector3(size.z, size.y, size.x))
+		return
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = t
+	_barriers.add_child(cs)
+	grid.block_turned(t, size)
+
+
+## A solid with any shape, given by the corners of its hull.
+func add_wedge(t: Transform3D, points: PackedVector3Array) -> void:
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = points
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = t
+	_body.add_child(cs)
+
+
+func grid_block_turned(t: Transform3D, size: Vector3) -> void:
+	grid.block_turned(t, size)
+
+
+func grid_mark_crops(t: Transform3D, size: Vector2) -> void:
+	grid.mark_crops_turned(t, size)
+
+
 
 func ground_at(at: Vector3) -> float:
 	return terrain.height(at.x, at.z)
@@ -502,6 +593,7 @@ func _process(delta: float) -> void:
 	_tick_bell(delta)
 	_tick_poison(delta)
 	_tick_traps(delta)
+	_tick_sentries(delta)
 	# The light changes slowly, so a few updates a second look the same and cost less.
 	_sky_timer -= delta
 	if _sky_timer <= 0.0:
@@ -538,6 +630,11 @@ func _tick_fx(delta: float) -> void:
 		_blast.scale *= 1.0 + delta * 2.0
 		if _blast_life <= 0.0:
 			_blast.visible = false
+	for i in _sparks.size():
+		if _spark_life[i] > 0.0:
+			_spark_life[i] -= delta
+			if _spark_life[i] <= 0.0:
+				_sparks[i].visible = false
 
 
 # --- Queries -----------------------------------------------------------------
@@ -820,7 +917,7 @@ func damage_zombie(z: Zombie, amount: float, dir: Vector3, knock: float, at: Vec
 ## from_hand is false for familiars and hawks, whose arrows do not count as the player's own shots.
 func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_range: float, knock: float, dmg: float, from_hand := true) -> void:
 	var bounce := int(p.m("bounces")) + (PowerDefs.BOUNCES if p.has_power("bounce_arrows") else 0)
-	var burning := p.has_power("fire_arrows") or (p.is_riding() and p.has_flag("riding_fire"))
+	var burning := p.has_power("fire_arrows") or (p.is_riding() and (p.has_flag("riding_fire") or p.has_flag("war_machine")))
 	var shot := _launch(Projectile.Kind.ARROW, _arrow_mesh, at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
 		shot.pierce = int(p.m("pierce"))
@@ -933,6 +1030,166 @@ func spawn_enemy_arrow(at: Vector3, target: Vector3, damage: float, max_range: f
 	if shot:
 		shot.source = source
 	sfx_at("bow", at, -6.0)
+
+
+# --- The Sandbox ----------------------------------------------------------------
+
+## Lays out one of everything along the rows the map marks, each taken thing coming back soon after.
+func set_up_stands() -> void:
+	_stand_items.clear()
+	for row: Dictionary in stands:
+		var along := Basis(Vector3.UP, float(row["yaw"])) * Vector3.RIGHT
+		var entries: Array = []
+		match str(row["kind"]):
+			"weapon":
+				for id: String in WeaponDefs.ALL:
+					var d: Dictionary = WeaponDefs.ALL[id]
+					if not d.get("hidden", false) and id != "staff":
+						entries.append([Pickup.Kind.WEAPON, id])
+			"item":
+				for id: String in PowerDefs.ALL:
+					if not PowerDefs.ALL[id]["familiar"]:
+						entries.append([Pickup.Kind.POWER, id])
+				for id: String in PowerDefs.FOODS:
+					entries.append([Pickup.Kind.FOOD, id])
+				entries.append([Pickup.Kind.ARROWS, "arrows"])
+			"familiar":
+				for id: String in PowerDefs.ALL:
+					if PowerDefs.ALL[id]["familiar"]:
+						entries.append([Pickup.Kind.POWER, id])
+		for i in entries.size():
+			var at: Vector3 = row["at"] + along * (i * 3.6)
+			_stand_items.append({"kind": entries[i][0], "id": entries[i][1], "at": at, "item": null, "wait": 0.0})
+		var sign_post := Label3D.new()
+		sign_post.text = {"weapon": "Weapons", "item": "Potions and food", "familiar": "Familiars"}[str(row["kind"])]
+		sign_post.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		sign_post.font = UiTheme.title_font()
+		sign_post.font_size = 64
+		sign_post.pixel_size = 0.012
+		sign_post.modulate = UiTheme.BONE
+		sign_post.outline_size = 12
+		sign_post.position = (row["at"] as Vector3) + along * (entries.size() - 1) * 1.8 + Vector3.UP * 3.2
+		add_child(sign_post)
+
+
+func tick_stands(delta: float) -> void:
+	for s: Dictionary in _stand_items:
+		if is_instance_valid(s["item"]):
+			(s["item"] as Pickup).life = 999.0
+			continue
+		s["wait"] = float(s["wait"]) - delta
+		if float(s["wait"]) <= 0.0:
+			s["wait"] = 2.0
+			s["item"] = spawn_pickup_at(s["at"], s["kind"], s["id"])
+
+
+## An enemy of your choice, a little way in front of you.
+func sandbox_spawn(id: String) -> bool:
+	var ahead := -player.global_basis.z
+	var at := player.global_position + ahead * 9.0
+	var cell := grid.to_cell(at)
+	if not grid.is_free(cell):
+		at = grid.to_world(grid.nearest_free(cell))
+	at.y = 0.0
+	return spawn_zombie(id, at)
+
+
+func sandbox_clear() -> void:
+	for z: Zombie in zombies.duplicate():
+		z.release()
+
+
+## Something thrown by hand, that does its work where it lands.
+func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burning := false, size := 1.0) -> Projectile:
+	var shot := _launch(Projectile.Kind.BOLT, _orb_mesh(col), at, vel, 14.0, 70.0, 0.0, 0.0, burning)
+	if shot == null:
+		burst.call(at + vel * 0.5)
+		return null
+	shot.from_player = true
+	shot.blast_radius = 0.01
+	shot.on_burst = burst
+	shot.scale = Vector3.ONE * size
+	if Net.active():
+		Net.shot(2, at, vel, 14.0, 70.0, burning, col)
+	return shot
+
+
+## A dart that carries a spark. It jumps to whatever is near when it hits.
+func spawn_dart(at: Vector3, vel: Vector3, dmg: float, jumps: int) -> void:
+	var col := Color(0.6, 0.92, 1.0)
+	var shot := _launch(Projectile.Kind.BOLT, _orb_mesh(col), at, vel, 0.0, 40.0, dmg, 1.0)
+	if shot:
+		shot.from_player = true
+		shot.sparks = jumps
+		shot.scale = Vector3.ONE * 0.5
+		if Net.active():
+			Net.shot(2, at, vel, 0.0, 40.0, false, col)
+
+
+## A line of light between two points, for a moment.
+func fx_spark(a: Vector3, b: Vector3) -> void:
+	var m := _sparks[_next_spark]
+	_next_spark = (_next_spark + 1) % _sparks.size()
+	var length := a.distance_to(b)
+	if length < 0.05:
+		return
+	m.look_at_from_position((a + b) * 0.5, b, Vector3.UP if absf((b - a).normalized().y) < 0.98 else Vector3.RIGHT)
+	m.scale = Vector3(1, 1, length)
+	m.visible = true
+	_spark_life[_sparks.find(m)] = 0.14
+
+
+func place_sentry(p: Player, at: Vector3, seconds: float) -> void:
+	var node := MeshInstance3D.new()
+	node.mesh = _sentry_mesh()
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
+	node.global_position = Vector3(at.x, ground_at(at), at.z)
+	_sentries.append({"node": node, "left": seconds, "timer": 0.4, "owner": p})
+	if p and Net.active():
+		Net.world_fx(Net.Fx.SENTRY, at, Vector3(seconds, 0, 0))
+
+
+func _sentry_mesh() -> Mesh:
+	if _sentry_look == null:
+		var iron := Color(0.27, 0.29, 0.32)
+		var brass := Color(0.72, 0.56, 0.22)
+		var l := LowPoly.new()
+		for a: float in [0.0, TAU / 3.0, TAU * 2.0 / 3.0]:
+			l.prism(Vector3(0, 0.95, 0), Vector3(cos(a) * 0.55, 0.0, sin(a) * 0.55), 0.05, 0.04, 5, Color(0.36, 0.24, 0.14))
+		l.box(Vector3(0, 1.08, 0), Vector3(0.36, 0.3, 0.56), iron)
+		l.prism(Vector3(0, 1.12, -0.2), Vector3(0, 1.12, -1.0), 0.06, 0.05, 6, brass)
+		l.box(Vector3(0, 1.12, -0.32), Vector3(1.0, 0.06, 0.06), Color(0.36, 0.24, 0.14))
+		_sentry_look = l.commit()
+	return _sentry_look
+
+
+func _tick_sentries(delta: float) -> void:
+	for i in range(_sentries.size() - 1, -1, -1):
+		var s: Dictionary = _sentries[i]
+		s["left"] = float(s["left"]) - delta
+		var node: MeshInstance3D = s["node"]
+		if float(s["left"]) <= 0.0:
+			fx_blast(node.global_position + Vector3.UP * 0.8, 0.8, Color(1.0, 0.8, 0.4, 0.4))
+			node.queue_free()
+			_sentries.remove_at(i)
+			continue
+		var owner_player: Player = s["owner"]
+		if owner_player == null:
+			continue
+		s["timer"] = float(s["timer"]) - delta
+		if float(s["timer"]) > 0.0:
+			continue
+		var from := node.global_position + Vector3.UP * 1.12
+		var z := nearest_zombie(from, WorldLight.SENTRY_REACH, true)
+		if z == null:
+			s["timer"] = 0.3
+			continue
+		s["timer"] = 0.55
+		node.rotation.y = atan2(-(z.position.x - from.x), -(z.position.z - from.z))
+		var dir := (z.centre() - from).normalized()
+		spawn_player_arrow(owner_player, from + dir * 0.9, dir * 45.0, 0.0, WorldLight.SENTRY_REACH + 6.0, 1.0, WeaponDefs.DAMAGE * 0.7 * owner_player.m("inv_damage") * owner_player.damage_multiplier(), false)
+		sfx_at("crossbow", from, -6.0)
 
 
 func _launch(kind: int, m: Mesh, at: Vector3, vel: Vector3, grav: float, max_range: float, dmg: float, knock := 0.0, fire := false, bounces := 0) -> Projectile:
@@ -1066,12 +1323,10 @@ func player_start(peer: int) -> Vector3:
 	var order: Array = Net.roster.keys()
 	order.sort()
 	var i := maxi(order.find(peer), 0)
-	var spots: Array[Vector3] = [Vector3(0, 0, 4.5), Vector3(-3, 0, 4.5), Vector3(3, 0, 4.5), Vector3(0, 0, 7.5)]
-	if fort:
-		spots = [Vector3(3, 0, 11), Vector3(-3, 0, 11), Vector3(11, 0, 3), Vector3(-11, 0, 3)]
-	if Net.pvp():
-		spots = [Vector3(-26, 0, 6), Vector3(26, 0, 7), Vector3(-4, 0, 34), Vector3(-5, 0, -30)]
-	var s: Vector3 = spots[i % spots.size()]
+	var spots := start_spots
+	if Net.pvp() and not rival_spots.is_empty():
+		spots = rival_spots
+	var s: Vector3 = spots[i % spots.size()] if not spots.is_empty() else Vector3.ZERO
 	return Vector3(s.x, ground_at(s) + 0.05, s.z)
 
 
@@ -1515,10 +1770,14 @@ func imp_steal(p: Player) -> void:
 		Sfx.play("pickup", -9.0, 0.8, 0.5)
 
 
-func drop_poison(at: Vector3, burning := false) -> void:
+## shown_only: another player's patch. It looks the same here, and their phone does the burning.
+func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false) -> void:
 	var m := _puddles[_next_puddle]
-	_puddle_life[_next_puddle] = PowerDefs.POISON_TIME
+	_puddle_life[_next_puddle] = seconds if seconds > 0.0 else PowerDefs.POISON_TIME
 	_puddle_fire[_next_puddle] = burning
+	_puddle_size[_next_puddle] = size
+	_puddle_shown_only[_next_puddle] = shown_only
+	m.scale = Vector3(size / 1.6, 1.0, size / 1.6)
 	m.material_override = _fire_puddle if burning else null
 	_next_puddle = (_next_puddle + 1) % _puddles.size()
 	m.global_position = Vector3(at.x, ground_at(at) + 0.07, at.z)
@@ -1536,10 +1795,10 @@ func _tick_poison(delta: float) -> void:
 		_puddle_life[i] -= delta
 		if _puddle_life[i] <= 0.0:
 			_puddles[i].visible = false
-		elif tick:
+		elif tick and not _puddle_shown_only[i]:
 			var at := _puddles[i].global_position
 			for z: Zombie in zombies.duplicate():
-				if z.is_alive() and Vector2(z.position.x - at.x, z.position.z - at.z).length() < 1.6:
+				if z.is_alive() and Vector2(z.position.x - at.x, z.position.z - at.z).length() < _puddle_size[i]:
 					if _puddle_fire[i]:
 						z.ignite(ZombieDefs.BURN_SECONDS)
 					else:
@@ -1547,16 +1806,27 @@ func _tick_poison(delta: float) -> void:
 
 
 ## The bell can be heard across the village. Roaming zombies walk over to see why.
-func ring_bell() -> void:
-	_bell_swing = 1.0
-	var d := church_door.distance_to(player.global_position) if player else 0.0
-	Sfx.play("bell", maxf(-1.0 - d * 0.09, -11.0), 1.0, 1.0)
+## One stroke for each minute gone, half a second apart, and the whole map can hear them.
+func ring_bell(minutes: int) -> void:
+	_bell_strokes = maxi(_bell_strokes, minutes)
+	_bell_wait = 0.0
 	for z in zombies:
 		if z.position.distance_to(church_door) < 50.0:
 			z.hear_bell(church_door)
 
 
+func bell_strokes_left() -> int:
+	return _bell_strokes
+
+
 func _tick_bell(delta: float) -> void:
+	if _bell_strokes > 0:
+		_bell_wait -= delta
+		if _bell_wait <= 0.0:
+			_bell_wait = BELL_GAP
+			_bell_strokes -= 1
+			_bell_swing = 1.0
+			Sfx.play("bell", -2.0, 1.0, 0.2)
 	if bell == null or _bell_swing <= 0.0:
 		return
 	_bell_swing = maxf(0.0, _bell_swing - delta * 0.28)
@@ -1689,6 +1959,7 @@ func warm_up() -> void:
 	await _warm_frame()
 	for n in running_effects:
 		n.process_mode = Node.PROCESS_MODE_INHERIT
+	_mist_pool[0].visible = false
 	for z in added:
 		z.burn_time = 0.0
 		z._stop_flames()
@@ -1741,7 +2012,26 @@ func _warm_frame() -> void:
 
 # --- Effects -----------------------------------------------------------------
 
+func _build_sparks() -> void:
+	var box := BoxMesh.new()
+	box.size = Vector3(0.05, 0.05, 1.0)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(0.7, 0.95, 1.0)
+	m.disable_fog = true
+	box.material = m
+	for i in 8:
+		var mi := MeshInstance3D.new()
+		mi.mesh = box
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.visible = false
+		add_child(mi)
+		_sparks.append(mi)
+		_spark_life.append(0.0)
+
+
 func _build_fx() -> void:
+	_build_sparks()
 	if _arrow_mesh == null:
 		_arrow_mesh = LowPoly.new() \
 			.prism(Vector3(0, 0, 0.32), Vector3(0, 0, -0.32), 0.012, 0.012, 4, WeaponDefs.LIGHT_WOOD) \
@@ -1838,6 +2128,8 @@ func _build_fx() -> void:
 		_puddles.append(pd)
 		_puddle_life.append(0.0)
 		_puddle_fire.append(false)
+		_puddle_size.append(1.6)
+		_puddle_shown_only.append(false)
 	for i in 3:
 		var l := OmniLight3D.new()
 		l.light_color = Color(1.0, 0.55, 0.2)
@@ -1898,6 +2190,7 @@ func fx_mist(at: Vector3, size: float) -> void:
 	p.scale_amount_max = size * 1.3
 	p.initial_velocity_min = size * 0.5
 	p.initial_velocity_max = size * 1.5
+	p.visible = true
 	p.restart()
 
 

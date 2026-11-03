@@ -46,8 +46,8 @@ func build() -> void:
 	_header = Label.new()
 	_header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_header.add_theme_font_override("font", UiTheme.title_font())
-	_header.add_theme_font_size_override("font_size", 28)
-	_header.add_theme_color_override("font_color", UiTheme.INK)
+	_header.add_theme_font_size_override("font_size", 26)
+	_header.add_theme_color_override("font_color", UiTheme.BONE)
 	top.add_child(_header)
 	var close := Button.new()
 	close.text = "Close"
@@ -63,7 +63,7 @@ func build() -> void:
 	box.add_child(_scroll)
 	_content = TreeCanvas.new()
 	_content.panel = self
-	# Drags have to reach the scroll container, on bare parchment as well as on a medallion.
+	# Drags have to reach the scroll container, between abilities as well as on one.
 	_content.mouse_filter = Control.MOUSE_FILTER_PASS
 	_scroll.add_child(_content)
 	_build_nodes()
@@ -78,18 +78,18 @@ func build() -> void:
 	detail.add_child(text)
 	_detail_name = Label.new()
 	_detail_name.add_theme_font_size_override("font_size", 24)
-	_detail_name.add_theme_color_override("font_color", UiTheme.INK)
+	_detail_name.add_theme_color_override("font_color", UiTheme.BONE)
 	text.add_child(_detail_name)
 	_detail_desc = Label.new()
 	_detail_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_detail_desc.add_theme_font_size_override("font_size", 20)
-	_detail_desc.add_theme_color_override("font_color", UiTheme.INK_SOFT)
+	_detail_desc.add_theme_color_override("font_color", UiTheme.ASH)
 	text.add_child(_detail_desc)
 	_choose = Button.new()
 	_choose.text = "Choose"
 	_choose.custom_minimum_size = Vector2(170, 62)
 	_choose.add_theme_font_size_override("font_size", 26)
-	UiTheme.wax(_choose)
+	UiTheme.primary(_choose)
 	_choose.pressed.connect(choose_selected)
 	detail.add_child(_choose)
 	refresh()
@@ -215,7 +215,7 @@ func refresh() -> void:
 		_choose.text = {"taken": "Taken", "locked": "Locked", "ready": "Choose"}.get(st, "Later")
 	else:
 		_detail_name.text = ""
-		_detail_desc.text = "Tap a medallion to read it."
+		_detail_desc.text = "Tap an ability to read it."
 		_choose.disabled = true
 	for n in _nodes:
 		n.queue_redraw()
@@ -237,7 +237,7 @@ class TreeCanvas:
 			var prev := _previous(n, by_step)
 			for p: TreeNodeButton in prev:
 				var both := panel.state_of(n) == "taken" and panel.state_of(p) == "taken"
-				var col := Color(0.62, 0.42, 0.08) if both else Color(0.3, 0.22, 0.15, 0.42)
+				var col := UiTheme.EMBER if both else Color(UiTheme.STEEL, 0.9)
 				draw_line(p.position + p.size * 0.5, n.position + n.size * 0.5, col, 4.0 if both else 2.0, true)
 
 	func _previous(n: TreeNodeButton, by_step: Dictionary) -> Array:
@@ -279,11 +279,11 @@ class TreeNodeButton:
 		var r := Rect2(Vector2.ZERO, size)
 		if st == "ready":
 			var pulse := 0.5 + sin(Time.get_ticks_msec() * 0.006) * 0.5
-			draw_circle(size * 0.5, size.x * 0.56, Color(1.0, 0.78, 0.2, 0.25 + pulse * 0.5))
+			draw_circle(size * 0.5, size.x * 0.58, Color(UiTheme.EMBER, 0.2 + pulse * 0.5))
 		if st == "taken":
-			draw_circle(size * 0.5, size.x * 0.56, Color(0.85, 0.6, 0.12, 0.85))
+			draw_circle(size * 0.5, size.x * 0.56, Color(UiTheme.EMBER, 0.9))
 		if panel._selected == self:
-			draw_arc(size * 0.5, size.x * 0.58, 0.0, TAU, 32, UiTheme.INK, 3.0)
+			draw_arc(size * 0.5, size.x * 0.62, 0.0, TAU, 32, UiTheme.BONE, 3.0, true)
 		Icons.draw(self, r, ability["icon"], color.darkened(0.3) if st == "future" else color, st == "locked")
 		if ability.get("final", false) and st != "locked":
-			draw_arc(size * 0.5, size.x * 0.52, 0.0, TAU, 32, UiTheme.GOLD, 3.0)
+			draw_arc(size * 0.5, size.x * 0.52, 0.0, TAU, 32, UiTheme.EMBER, 3.0, true)

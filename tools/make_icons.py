@@ -476,19 +476,101 @@ def rift(p, x):
     p.circle(82, 70, 8)
 
 @glyph
-def coin(p, x):
-    p.circle(50, 50, 40)
-    x.circle(50, 50, 30)
-    p.circle(50, 50, 25)
-    x.rect(44, 28, 56, 72)
-    x.rect(30, 44, 70, 56)
-
-@glyph
 def log(p, x):
     p.line(16, (14, 72), (86, 44))
     p.line(16, (14, 42), (70, 20))
     x.circle(80, 46, 4)
     p.line(14, (26, 88), (82, 66))
+
+@glyph
+def lock(p, x):
+    p.arc(50, 40, 19, 180, 360, 9)
+    p.line(9, (31, 40), (31, 50))
+    p.line(9, (69, 40), (69, 50))
+    p.rect(22, 48, 78, 88)
+    x.circle(50, 64, 7)
+    x.rect(47, 64, 53, 78)
+
+@glyph
+def gear(p, x):
+    p.circle(50, 50, 30)
+    for i in range(8):
+        a = math.tau * i / 8
+        c, s_ = math.cos(a), math.sin(a)
+        w = 9
+        p.poly((50 + c * 26 - s_ * w, 50 + s_ * 26 + c * w), (50 + c * 44 - s_ * w * 0.7, 50 + s_ * 44 + c * w * 0.7),
+               (50 + c * 44 + s_ * w * 0.7, 50 + s_ * 44 - c * w * 0.7), (50 + c * 26 + s_ * w, 50 + s_ * 26 - c * w))
+    x.circle(50, 50, 13)
+
+@glyph
+def bomb(p, x):
+    p.circle(44, 60, 30)
+    p.line(10, (62, 38), (70, 30))
+    p.line(6, (70, 30), (78, 18), (88, 16))
+    for a in (0, 60, 120, 180, 240, 300):
+        c, s_ = math.cos(math.radians(a)), math.sin(math.radians(a))
+        p.line(3, (88 + c * 3, 16 + s_ * 3), (88 + c * 9, 16 + s_ * 9))
+    x.arc(44, 60, 21, 195, 255, 5)
+
+@glyph
+def chariot(p, x):
+    p.circle(38, 66, 24)
+    x.circle(38, 66, 16)
+    p.circle(38, 66, 6)
+    for a in (0, 60, 120):
+        c, s_ = math.cos(math.radians(a)), math.sin(math.radians(a))
+        p.line(4, (38 - c * 18, 66 - s_ * 18), (38 + c * 18, 66 + s_ * 18))
+    p.poly((16, 24), (32, 24), (40, 42), (74, 42), (68, 56), (22, 56))
+    p.line(6, (68, 50), (94, 40))
+
+@glyph
+def turret(p, x):
+    p.rect(30, 34, 62, 58)
+    p.line(11, (56, 44), (92, 30))
+    p.line(8, (46, 58), (24, 90))
+    p.line(8, (46, 58), (68, 90))
+    p.line(8, (46, 58), (46, 86))
+    x.circle(40, 46, 5)
+
+@glyph
+def spikes(p, x):
+    p.rect(8, 74, 92, 88)
+    for cx, top in ((22, 22), (50, 10), (78, 22)):
+        p.poly((cx - 13, 78), (cx, top), (cx + 13, 78))
+
+@glyph
+def flask(p, x):
+    p.rect(38, 8, 62, 18)
+    p.poly((43, 16), (57, 16), (57, 38), (84, 84), (78, 92), (22, 92), (16, 84), (43, 38))
+    x.circle(44, 72, 7)
+    x.circle(60, 62, 4)
+    x.circle(58, 80, 3)
+
+@glyph
+def steam(p, x):
+    for dx in (0, 26, 52):
+        p.line(9, (22 + dx, 88), (14 + dx, 72), (28 + dx, 52), (16 + dx, 32), (24 + dx, 14))
+
+@glyph
+def noisebox(p, x):
+    p.rect(10, 38, 36, 62)
+    p.poly((34, 38), (56, 20), (56, 80), (34, 62))
+    p.arc(56, 50, 16, -55, 55, 7)
+    p.arc(56, 50, 31, -50, 50, 7)
+
+@glyph
+def magnet(p, x):
+    p.line(16, (26, 16), (26, 54))
+    p.line(16, (74, 16), (74, 54))
+    p.arc(50, 54, 24, 0, 180, 16)
+    x.rect(16, 30, 84, 35)
+
+@glyph
+def dart(p, x):
+    p.line(6, (16, 84), (70, 30))
+    p.poly((92, 8), (60, 24), (76, 40))
+    p.poly((16, 84), (8, 62), (28, 72))
+    p.poly((16, 84), (38, 92), (28, 72))
 
 W = 800
 

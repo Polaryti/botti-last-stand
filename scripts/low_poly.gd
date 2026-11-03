@@ -1,3 +1,4 @@
+@tool
 class_name LowPoly
 extends RefCounted
 ## Tiny flat-shaded mesh builder used for weapons that have no matching free model.
@@ -5,6 +6,7 @@ extends RefCounted
 
 static var _material: StandardMaterial3D
 
+var base := Transform3D.IDENTITY # everything added goes through this, so a shape can be placed and turned
 var _st := SurfaceTool.new()
 
 
@@ -35,11 +37,11 @@ func _tri(a: Vector3, b: Vector3, c: Vector3, centre: Vector3, col: Color) -> vo
 		b = c
 		c = t
 		n = -n
-	n = n.normalized()
+	n = (base.basis * n).normalized()
 	for v: Vector3 in [a, b, c]:
 		_st.set_color(col)
 		_st.set_normal(n)
-		_st.add_vertex(v)
+		_st.add_vertex(base * v)
 
 
 func box(centre: Vector3, size: Vector3, col: Color, rot_deg := Vector3.ZERO) -> LowPoly:
@@ -50,6 +52,20 @@ func box(centre: Vector3, size: Vector3, col: Color, rot_deg := Vector3.ZERO) ->
 		for y: float in [-h.y, h.y]:
 			for z: float in [-h.z, h.z]:
 				p.append(centre + b * Vector3(x, y, z))
+	for f: Array in [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [2, 3, 7, 6], [0, 2, 6, 4], [1, 3, 7, 5]]:
+		_tri(p[f[0]], p[f[1]], p[f[2]], centre, col)
+		_tri(p[f[0]], p[f[2]], p[f[3]], centre, col)
+	return self
+
+
+## A box turned by any rotation, for shapes that are not lined up with the world.
+func turned_box(centre: Vector3, size: Vector3, col: Color, turn: Basis) -> LowPoly:
+	var h := size * 0.5
+	var p: Array[Vector3] = []
+	for x: float in [-h.x, h.x]:
+		for y: float in [-h.y, h.y]:
+			for z: float in [-h.z, h.z]:
+				p.append(centre + turn * Vector3(x, y, z))
 	for f: Array in [[0, 1, 3, 2], [4, 5, 7, 6], [0, 1, 5, 4], [2, 3, 7, 6], [0, 2, 6, 4], [1, 3, 7, 5]]:
 		_tri(p[f[0]], p[f[1]], p[f[2]], centre, col)
 		_tri(p[f[0]], p[f[2]], p[f[3]], centre, col)

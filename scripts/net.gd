@@ -18,7 +18,8 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 7
+const PROTOCOL := 8
+enum Fx { FIRE_PATCH, SPARK, SENTRY }
 const SNAPSHOT_EVERY := 0.08
 const POSE_EVERY := 0.066
 const BEACON_EVERY := 1.0
@@ -331,20 +332,20 @@ func _start_beacon() -> void:
 
 
 func _beacon_text() -> PackedByteArray:
-	return JSON.stringify({"g": "undead-drop", "v": PROTOCOL, "n": Game.player_name, "p": roster.size(), "r": rules}).to_utf8_buffer()
+	return JSON.stringify({"g": "botti-last-stand", "v": PROTOCOL, "n": Game.player_name, "p": roster.size(), "r": rules}).to_utf8_buffer()
 
 
 func _answer_questions() -> void:
 	while _answer and _answer.get_available_packet_count() > 0:
 		var data := _answer.get_packet()
-		if data.get_string_from_utf8() == "undead-drop?":
+		if data.get_string_from_utf8() == "botti-last-stand?":
 			_answer.set_dest_address(_answer.get_packet_ip(), DISCOVERY_PORT)
 			_answer.put_packet(_beacon_text())
 
 
 ## Every address on this phone's own network gets one small question.
 func _ask_around() -> void:
-	var question := "undead-drop?".to_utf8_buffer()
+	var question := "botti-last-stand?".to_utf8_buffer()
 	var targets := PackedStringArray(["127.0.0.1", "255.255.255.255"])
 	for a in local_addresses():
 		var base := "%s.%s.%s." % [a.get_slice(".", 0), a.get_slice(".", 1), a.get_slice(".", 2)]
@@ -399,7 +400,7 @@ func _read_beacons(delta: float) -> void:
 		var data := _listener.get_packet()
 		var from := _listener.get_packet_ip()
 		var parsed: Variant = JSON.parse_string(data.get_string_from_utf8())
-		if not parsed is Dictionary or (parsed as Dictionary).get("g", "") != "undead-drop":
+		if not parsed is Dictionary or (parsed as Dictionary).get("g", "") != "botti-last-stand":
 			continue
 		var d: Dictionary = parsed
 		if not rooms.has(from):
@@ -579,6 +580,21 @@ func _ally_hurt(index: int, amount: float) -> void:
 				return
 
 
+## Things other players should see, but that only one phone works out.
+func world_fx(kind: int, a: Vector3, b := Vector3.ZERO) -> void:
+	_world_fx.rpc(kind, a, b)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _world_fx(kind: int, a: Vector3, b: Vector3) -> void:
+	if world == null or not is_instance_valid(world):
+		return
+	match kind:
+		Fx.FIRE_PATCH: world.drop_poison(a, true, b.x, b.y, true)
+		Fx.SPARK: world.fx_spark(a, b)
+		Fx.SENTRY: world.place_sentry(null, a, b.x)
+
+
 func blast_fx(at: Vector3, radius: float, col: Color) -> void:
 	_blast_fx.rpc(at, radius, col)
 
@@ -602,7 +618,8 @@ func _send_pose() -> void:
 	b.encode_float(24, p.velocity.z)
 	b.encode_float(28, p.sight_factor())
 	var flags := (1 if p.dead else 0) | (2 if p.is_unseen() else 0) | (4 if p.is_riding() else 0) | (8 if p.ride_behind != 0 else 0) \
-		| (16 if p.has_flag("rescuer") else 0) | (32 if p.passenger != 0 else 0)
+		| (16 if p.has_flag("rescuer") else 0) | (32 if p.passenger != 0 else 0) \
+		| (64 if p.is_riding() and p.mount_kind() == "chariot" else 0) | (128 if p.has_flag("chariot_turret") else 0)
 	b[32] = flags
 	b[33] = p.attack_count & 255
 	b[34] = _weapon_ids.find(p.weapon_id()) + 1
@@ -788,6 +805,8 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.DOT: z.add_dot(a, b)
 		Zombie.Effect.FORGET: z.forget()
 		Zombie.Effect.FREEZE: z.freeze(a)
+		Zombie.Effect.TAUNT: z.taunted_by(Vector3(a, 0.0, b))
+		Zombie.Effect.PULL: z.pull_to(Vector3(a, 0.0, b))
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -965,14 +984,14 @@ func _repair(i: int, amount: float) -> void:
 		world.fort.repair(i, amount)
 
 
-func bell() -> void:
-	_bell.rpc()
+func bell(minutes: int) -> void:
+	_bell.rpc(minutes)
 
 
 @rpc("authority", "reliable")
-func _bell() -> void:
+func _bell(minutes: int) -> void:
 	if world and is_instance_valid(world):
-		world.ring_bell()
+		world.ring_bell(minutes)
 
 
 func dawn() -> void:

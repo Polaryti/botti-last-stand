@@ -1,3 +1,4 @@
+@tool
 class_name Models
 ## Loads model files once and hands out merged meshes for cheap rendering.
 

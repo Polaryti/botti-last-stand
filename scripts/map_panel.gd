@@ -1,6 +1,6 @@
 class_name MapPanel
 extends Control
-## A parchment map of the world, drawn once from the land itself. Only your own position and the
+## A moonlit map of the world, drawn once from the land itself. Only your own position and the
 ## other players' are shown on it, because what is out there is for you to find.
 
 static var _images := {}
@@ -28,11 +28,11 @@ static func _bake(w: World) -> ImageTexture:
 			var wx := (x + 0.5) / SIDE * half * 2.0 - half
 			var wz := (y + 0.5) / SIDE * half * 2.0 - half
 			var h := t.ground_height(wx, wz)
-			var col := Color(0.78, 0.68, 0.48).lerp(Color(0.58, 0.46, 0.3), clampf((h + 1.0) / 11.0, 0.0, 1.0))
+			var col := Color(0.11, 0.17, 0.17).lerp(Color(0.22, 0.28, 0.26), clampf((h + 1.0) / 11.0, 0.0, 1.0))
 			if fmod(h + 40.0, 2.0) < 0.14:
-				col = col.darkened(0.14)
+				col = col.lightened(0.09)
 			if h < Terrain.WATER_Y:
-				col = Color(0.34, 0.46, 0.52)
+				col = Color(0.2, 0.36, 0.5)
 			elif t.slope(wx, wz) > Terrain.STEEP:
 				col = col.darkened(0.3)
 			img.set_pixel(x, y, col)
@@ -46,13 +46,13 @@ static func _bake(w: World) -> ImageTexture:
 				var px := int((p.x + half) / (half * 2.0) * SIDE)
 				var py := int((p.y + half) / (half * 2.0) * SIDE)
 				if px >= 0 and py >= 0 and px < SIDE and py < SIDE:
-					img.set_pixel(px, py, Color(0.42, 0.3, 0.18))
+					img.set_pixel(px, py, Color(0.6, 0.52, 0.38))
 	for r in w.indoors:
 		var p0 := Vector2i(int((r.position.x + half) / (half * 2.0) * SIDE), int((r.position.y + half) / (half * 2.0) * SIDE))
 		var size := Vector2i(maxi(2, int(r.size.x / (half * 2.0) * SIDE)), maxi(2, int(r.size.y / (half * 2.0) * SIDE)))
-		img.fill_rect(Rect2i(p0, size), Color(0.24, 0.17, 0.12))
+		img.fill_rect(Rect2i(p0, size), UiTheme.BONE.darkened(0.15))
 	if w.fort:
-		var wall := Color(0.3, 0.27, 0.27)
+		var wall := UiTheme.ASH
 		var a := int((float(Terrain.HALF) - Fort.HALF) / (float(Terrain.HALF) * 2.0) * SIDE)
 		var b := SIDE - a
 		img.fill_rect(Rect2i(a, a, b - a, 3), wall)
@@ -71,22 +71,23 @@ func _draw() -> void:
 	if world == null or not is_instance_valid(world):
 		return
 	draw_texture_rect(_bake(world), Rect2(Vector2.ZERO, size), false)
-	draw_rect(Rect2(Vector2.ZERO, size), UiTheme.INK, false, 3.0)
-	var font := UiTheme.title_font()
+	draw_rect(Rect2(Vector2.ZERO, size), UiTheme.STEEL, false, 2.0)
+	var font := UiTheme.bold_font()
 	for mark: Dictionary in world.map_marks:
 		var at: Vector2 = mark["at"]
 		var p := _to_map(at.x, at.y)
 		var text: String = mark["name"]
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-		draw_string(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.INK)
+		draw_string_outline(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
+		draw_string(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
 	for t in world.players:
 		if t is Avatar and not t.dead:
 			var p := _to_map(t.global_position.x, t.global_position.z)
 			draw_circle(p, 6.0, Net.team_colour((t as Avatar).team))
-			draw_arc(p, 6.0, 0.0, TAU, 12, UiTheme.INK, 1.5)
+			draw_arc(p, 6.0, 0.0, TAU, 12, UiTheme.BONE, 1.5)
 	var me := world.player
 	if me:
 		var p := _to_map(me.global_position.x, me.global_position.z)
 		var d := Vector2(-sin(me.yaw), -cos(me.yaw))
 		var side := d.orthogonal()
-		draw_colored_polygon(PackedVector2Array([p + d * 11.0, p - d * 6.0 + side * 6.5, p - d * 6.0 - side * 6.5]), Color(0.72, 0.13, 0.09))
+		draw_colored_polygon(PackedVector2Array([p + d * 12.0, p - d * 6.0 + side * 7.0, p - d * 6.0 - side * 7.0]), UiTheme.EMBER)

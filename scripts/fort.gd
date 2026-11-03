@@ -1,3 +1,4 @@
+@tool
 class_name Fort
 extends Node
 ## Defend the Fort: four wooden gates and a heart in the keep. The host decides what happens to
@@ -23,6 +24,7 @@ const REPAIR_PER_WOOD := 110.0
 const REPAIR_EVERY := 0.3
 const REPAIR_REACH := 6.5
 const NAMES := ["north", "east", "south", "west"]
+const DOORS := [-15.0, 15.0, -15.0, 15.0] # where each side's small door is, away from its stairs
 const DIRS: Array[Vector3] = [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0)]
 
 var world: World
