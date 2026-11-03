@@ -119,6 +119,12 @@ Press F6 and walk around first. To look for problems such as a road that has bec
 
 It lists anything that fails and ends with `RESULT`. A line saying `road blocked` tells you where.
 
+To find places nobody can walk to, such as a yard closed in by fences, run:
+
+    godot --headless --path . res://tests/reach_check.tscn
+
+A few small corners behind buildings are normal, and so is the islet in the river at the far corner of the village map.
+
 ## Sharing your changes
 
 Maps are text files, so Git shows exactly what changed. Save in Godot, then commit and push to GitHub. Each new version is built from what is on GitHub, so your edits stay when other changes are made on top. If two people move things in the same map at the same time, Git may ask you to choose between the two versions, so agree who is working on which map.
