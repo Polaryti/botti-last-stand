@@ -2,6 +2,10 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.12.3 (4 November 2026)
+### Fixed
+- Online: corrected how the game identifies itself to the online service, which should bring back short room codes in place of the long one.
+
 ## 0.12.2 (4 November 2026)
 ### Fixed
 - Play Together: moving from Wi-Fi to mobile data no longer stops you starting a game until you restart. If a game still cannot start, the message now shows a number that helps find out why.
