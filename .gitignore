@@ -4,5 +4,10 @@ build/
 
 # The Android signing key never goes in this repository. See docs/BUILDING.md.
 keys/
+# The Epic plugin's files and the Android build template are large, and are added when building.
+addons/
+android/
+scripts/epic_keys.gd
+scripts/epic_keys.gd.uid
 *.keystore
 *.jks

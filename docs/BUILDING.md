@@ -40,6 +40,16 @@ An app signed with a different key will not install over one already on a phone 
 2. Add the notes to the top of `CHANGELOG.md`. The game shows this file on its Changelog screen, so write for players. It reads `## ` as a version, `### ` as a heading and `- ` as a line.
 3. Run the tests below, build the app, commit as `Version X.Y.Z` and push.
 
+## iPhone
+
+Every push to `main` builds an unsigned iPhone app on one of GitHub's Macs. Nothing needs a paid Apple account:
+
+1. On GitHub, open Actions, then the latest "iOS build" run, and download `botti-last-stand-ios`. Unzip it to get the `.ipa`.
+2. On a Mac or Windows PC, open Sideloadly, plug in the iPhone, drop in the `.ipa` and sign in with an Apple ID.
+3. On the iPhone, trust the profile in Settings > General > VPN & Device Management, and turn on Developer Mode if asked.
+
+With a free Apple ID the app stops opening after 7 days. Install it again to renew it.
+
 ## Tests
 
     godot --headless --path . res://tests/test_game.tscn              # everything, about 8 minutes

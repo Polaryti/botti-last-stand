@@ -86,7 +86,7 @@ func _ready() -> void:
 func _as_host() -> void:
 	m.show_together()
 	await wait(0.2)
-	ok(Net.host_game() == OK, "a game can be started")
+	ok(Net.host_game(Net.Way.DIRECT if rules == "direct" else Net.Way.LOCAL) == OK, "a game can be started")
 	Net.use_beacons = rules != "teams" # in one of the runs, the asking has to find it alone
 	m.show_lobby()
 	var t := 0.0
@@ -94,7 +94,7 @@ func _as_host() -> void:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.roster.size() == 2, "the other phone joined")
-	Net.set_rules({"coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "direct": Net.Rules.COOP, "bots": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -147,16 +147,22 @@ func _as_host() -> void:
 
 func _as_client() -> void:
 	# Finding the game: by its beacon, or by asking around when a hotspot drops broadcasts.
-	Net.start_search()
 	var t := 0.0
-	while Net.rooms.is_empty() and t < 15.0:
+	if rules == "direct":
+		m.show_together(2)
 		await wait(0.1)
-		t += 0.1
-	ok(not Net.rooms.is_empty(), "the game shows up in the list of games nearby")
-	Net.stop_search()
-	m.show_together()
-	await wait(0.1)
-	m._join("127.0.0.1")
+		# IPv6 where this machine has it, because many networks only offer a public address that way.
+		m._join("::1" if IP.get_local_addresses().has("0:0:0:0:0:0:0:1") else "127.0.0.1", Net.Way.DIRECT)
+	else:
+		Net.start_search()
+		while Net.rooms.is_empty() and t < 15.0:
+			await wait(0.1)
+			t += 0.1
+		ok(not Net.rooms.is_empty(), "the game shows up in the list of games nearby")
+		Net.stop_search()
+		m.show_together()
+		await wait(0.1)
+		m._join("127.0.0.1")
 	t = 0.0
 	while not Net.roster.has(Net.my_id()) and t < 10.0:
 		await wait(0.1)
@@ -218,7 +224,7 @@ func _play() -> void:
 		await _ride()
 	elif rules == "chariot":
 		await _chariot()
-	elif rules == "coop":
+	elif rules == "coop" or rules == "direct":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
 		await _with_bots()

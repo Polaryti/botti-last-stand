@@ -25,7 +25,7 @@ func _ready() -> void:
 	m.show_together()
 	await wait(0.2)
 	await snap("together")
-	m.show_hotspot_help()
+	m.show_together(1)
 	await wait(0.2)
 	await snap("hotspot")
 	m.show_together()

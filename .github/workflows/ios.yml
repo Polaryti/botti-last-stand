@@ -1,0 +1,57 @@
+name: iOS build
+
+# Builds an unsigned iPhone app on one of GitHub's Macs. Sign and install it with Sideloadly and a
+# free Apple ID: see docs/BUILDING.md.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Godot and its export templates
+        run: |
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+          unzip -q godot.zip -d "$RUNNER_TEMP/godot"
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz -d "$RUNNER_TEMP/tpz"
+          dest="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          mv "$RUNNER_TEMP"/tpz/templates/* "$dest/"
+          rm godot.zip templates.tpz
+          echo "GODOT=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
+
+      - name: Export the Xcode project
+        run: |
+          "$GODOT" --headless --path . --import 2>&1 | tail -5 || true
+          mkdir -p build/ios
+          "$GODOT" --headless --path . --export-release iOS build/ios/botti.ipa 2>&1 | tee build/ios-export.log | tail -20
+          test -d build/ios/botti.xcodeproj
+
+      - name: Build the app, unsigned
+        run: |
+          cd build/ios
+          xcodebuild archive -project botti.xcodeproj -scheme botti -archivePath botti.xcarchive \
+            -destination "generic/platform=iOS" -configuration Release \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" 2>&1 \
+            | tee ../xcode.log | tail -30
+          mkdir Payload
+          cp -R botti.xcarchive/Products/Applications/*.app Payload/
+          zip -qry "$GITHUB_WORKSPACE/botti-last-stand-ios.ipa" Payload
+          ls -la "$GITHUB_WORKSPACE/botti-last-stand-ios.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: botti-last-stand-ios
+          path: botti-last-stand-ios.ipa
+          retention-days: 30

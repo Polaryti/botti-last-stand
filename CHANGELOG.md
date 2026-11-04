@@ -2,6 +2,14 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.11.0 (4 November 2026)
+### New
+- First iPhone version.
+- Direct connection: play over the internet with no one in the middle. The game asks the host's router to let friends in, and shows the address to give them.
+### Changed
+- Play Together now offers each way to play on its own tab: Same Wi-Fi, Hotspot, Direct and Online. Online arrives in the next version.
+- The hotspot steps are on their own tab instead of behind a help button.
+
 ## 0.10.0 (4 November 2026)
 ### New
 - Bots in Play Together: the host can add up to three, in every mode. They fill empty places, follow you in co-op, fight in All vs All and Teams, fall and come back. If a friend joins a full game, they take a bot's place.

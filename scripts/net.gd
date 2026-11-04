@@ -12,13 +12,14 @@ signal game_over(title: String, line: String, reached_dawn: bool)
 
 enum Role { OFFLINE, HOST, CLIENT }
 enum Rules { COOP, FFA, TEAMS, FORT }
+enum Way { LOCAL, DIRECT, EPIC } # how the phones reach each other
 
 const PORT := 27415
 const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 10
+const PROTOCOL := 11
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
 enum Fx { FIRE_PATCH, SPARK, SENTRY }
@@ -42,6 +43,8 @@ const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B"]
 
 var role: int = Role.OFFLINE
+var way: int = Way.LOCAL
+var direct: DirectHost # the host's helper in a Direct game
 var rules: int = Rules.COOP
 var difficulty := 1
 var spectate_cam: Camera3D
@@ -232,8 +235,9 @@ func is_foe(peer: int) -> bool:
 
 # --- Connecting --------------------------------------------------------------
 
-func host_game() -> Error:
+func host_game(new_way := Way.LOCAL) -> Error:
 	leave()
+	way = new_way
 	PhoneNet.use_default()
 	PhoneNet.hold_wifi()
 	var e := ENetMultiplayerPeer.new()
@@ -246,15 +250,24 @@ func host_game() -> Error:
 	difficulty = Game.difficulty
 	_over = false
 	roster = {1: _my_entry(0)}
-	_start_beacon()
+	if way == Way.LOCAL:
+		_start_beacon()
+	else:
+		direct = DirectHost.new()
+		add_child(direct)
+		direct.changed.connect(func() -> void: lobby_changed.emit())
+		direct.start(PORT)
 	set_process(true)
 	lobby_changed.emit()
 	return OK
 
 
-func join_game(address: String) -> Error:
+func join_game(address: String, new_way := Way.LOCAL) -> Error:
 	leave()
-	PhoneNet.use_wifi()
+	way = new_way
+	# A game nearby needs the Wi-Fi even if it has no internet. One far away needs whatever has internet.
+	if way == Way.LOCAL:
+		PhoneNet.use_wifi()
 	PhoneNet.hold_wifi()
 	var e := ENetMultiplayerPeer.new()
 	var err := e.create_client(address, PORT)
@@ -273,6 +286,9 @@ func leave(reason := "") -> void:
 	PhoneNet.use_default()
 	PhoneNet.release_wifi()
 	stop_search_keep_rooms()
+	if direct:
+		direct.queue_free()
+		direct = null
 	if _beacon:
 		_beacon.close()
 		_beacon = null
@@ -310,15 +326,21 @@ func _on_connected() -> void:
 
 
 func _on_failed() -> void:
-	leave("Could not reach that game. Are you both on the same Wi-Fi?\nIf this phone has mobile data on, try turning it off.")
+	if way == Way.LOCAL:
+		leave("Could not reach that game. Are you both on the same Wi-Fi?\nIf this phone has mobile data on, try turning it off.")
+	else:
+		leave("Could not reach that game. Check the address. If it is right, the host's router is keeping you out: try Online instead.")
 
 
 func _on_server_gone() -> void:
-	leave("Lost touch with the host.\nThey may have left. If this keeps happening, turn off this phone's mobile data.")
+	if way == Way.LOCAL:
+		leave("Lost touch with the host.\nThey may have left. If this keeps happening, turn off this phone's mobile data.")
+	else:
+		leave("Lost touch with the host. They may have left.")
 
 
 func _on_peer_connected(id: int) -> void:
-	if is_host():
+	if is_host() and multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 		(multiplayer.multiplayer_peer as ENetMultiplayerPeer).get_peer(id).set_timeout(TIMEOUT_FACTOR, TIMEOUT_MIN, TIMEOUT_MAX)
 
 

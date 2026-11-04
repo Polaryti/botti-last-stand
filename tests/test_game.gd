@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_11()
 		await test_version_10()
 		await test_version_9()
 		await test_version_8()
@@ -72,6 +73,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_11()
 	await test_version_10()
 	await test_version_9()
 	await test_version_8()
@@ -668,6 +670,35 @@ func test_fort() -> void:
 	await frames(2)
 	Game.mode = Game.Mode.NIGHT
 	await start_clean()
+
+
+func test_version_11() -> void:
+	# Four ways to play, and no help button.
+	for tab in Main.TOGETHER_TABS.size():
+		m.show_together(tab)
+		await frames(2)
+		var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+		for title: String in Main.TOGETHER_TABS:
+			ok(names.has(title), "the %s way is on offer" % title)
+		ok(not names.has("Hotspot?"), "with no Hotspot? button")
+		ok(names.has("Back"), "and a way back")
+	m.show_together(0)
+	await frames(2)
+	m.show_menu()
+	await frames(2)
+	# A Direct game knows what to tell the host, even with no router to ask.
+	ok(DirectHost._is_public("81.40.12.7"), "a public address is recognised")
+	for hidden: String in ["192.168.1.2", "10.0.0.1", "172.20.1.1", "100.64.3.4", "127.0.0.1", "nonsense"]:
+		ok(not DirectHost._is_public(hidden), "%s is not public" % hidden)
+	ok(Net.host_game(Net.Way.DIRECT) == OK and Net.direct != null, "a Direct game starts")
+	m.show_lobby()
+	await frames(2)
+	ok(Net.direct.status_line() != "", "and says how it is going")
+	Net.leave()
+	await frames(2)
+	ok(Net.direct == null, "and cleans up after itself")
+	m.show_menu()
+	await frames(2)
 
 
 func test_version_10() -> void:

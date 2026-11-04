@@ -8,11 +8,13 @@ var ui_layer: CanvasLayer
 var panel: Control
 var _theme: Theme
 var tree_panel: TreePanel
+var _together_tab := 0
 var _run_over := false
 var _back := Callable() # what the phone's back button does on the current screen
 var _pause_root: Control
 var _net_go := false
 
+const TOGETHER_TABS := ["Same Wi-Fi", "Hotspot", "Direct", "Online"]
 const TIPS := [
 	"Push the stick halfway to walk quietly.",
 	"Zombies see you much less in tall wheat.",
@@ -1050,14 +1052,21 @@ func show_sandbox_menu() -> void:
 	foot.add_child(_button("Back to it", _resume, Vector2(260, 66), true))
 
 
-## Finding a game on the same Wi-Fi, or starting one.
-func show_together() -> void:
+## The four ways to play together, and what each one needs.
+func show_together(tab := -1) -> void:
+	if tab >= 0:
+		_together_tab = tab
 	_clear_ui()
 	_back = show_menu
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 860
-	box.add_child(_body("On the same Wi-Fi, or with no Wi-Fi at all through one phone's hotspot.", 24))
+	box.custom_minimum_size.x = 900
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 8)
+	box.add_child(tabs)
+	for t in TOGETHER_TABS.size():
+		var pick := t
+		tabs.add_child(_button(TOGETHER_TABS[t], func() -> void: show_together(pick), Vector2(216, 60), _together_tab == t))
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 10)
 	box.add_child(top)
@@ -1071,14 +1080,36 @@ func show_together() -> void:
 		Game.player_name = t.strip_edges() if t.strip_edges() != "" else Game.player_name
 		Game.save_settings())
 	top.add_child(name_edit)
-	top.add_child(_button("Start a game", func() -> void:
-		if Net.host_game() == OK:
-			show_lobby()
-		else:
-			_on_net_left("Could not start a game here."), Vector2(300, 66), true))
+	var direct_way := _together_tab == 2
+	if _together_tab != 3:
+		top.add_child(_button("Start a game", func() -> void:
+			if Net.host_game(Net.Way.DIRECT if direct_way else Net.Way.LOCAL) == OK:
+				show_lobby()
+			else:
+				_on_net_left("Could not start a game here."), Vector2(300, 66), true))
+	top.add_child(_button("Back", show_menu, Vector2(130, 66)))
+	match _together_tab:
+		0:
+			box.add_child(_soft("Everyone on the same Wi-Fi network.", 24))
+			_nearby_games(box, root)
+		1:
+			var steps := _soft("1. On one phone, turn on the hotspot in its settings.\n2. Connect the others to that hotspot's Wi-Fi. If a phone warns there is no internet, stay connected.\n3. Start a game on the hotspot phone, and it appears on the others.\nIf a phone keeps getting dropped, turn off its mobile data.", 23)
+			steps.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(steps)
+			_nearby_games(box, root)
+		2:
+			var how := _soft("Over the internet, straight from phone to phone. The host's network has to let the others in, so it does not work from every network.", 24)
+			how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(how)
+			_join_by_address(box, "81.40.12.7", "", Net.Way.DIRECT)
+		3:
+			_online_tab(box)
+
+
+func _nearby_games(box: VBoxContainer, root: Control) -> void:
 	box.add_child(_body("Games nearby", 26))
 	var rooms := VBoxContainer.new()
-	rooms.custom_minimum_size.y = 150
+	rooms.custom_minimum_size.y = 80
 	rooms.add_theme_constant_override("separation", 6)
 	box.add_child(rooms)
 	var fill := func() -> void:
@@ -1097,23 +1128,34 @@ func show_together() -> void:
 		Net.stop_search())
 	Net.start_search()
 	fill.call()
+	_join_by_address(box, "192.168.1.20", _address_start(), Net.Way.LOCAL)
+
+
+func _join_by_address(box: VBoxContainer, hint: String, start: String, way: int) -> void:
 	var manual := HBoxContainer.new()
 	manual.add_theme_constant_override("separation", 10)
 	box.add_child(manual)
-	manual.add_child(_body("Or its address", 24))
+	manual.add_child(_body("Join by address", 24))
 	var address_edit := LineEdit.new()
-	address_edit.placeholder_text = "192.168.1.20"
-	address_edit.custom_minimum_size = Vector2(290, 58)
+	address_edit.placeholder_text = hint
+	address_edit.custom_minimum_size = Vector2(400, 58)
 	address_edit.add_theme_font_size_override("font_size", 26)
 	# Number keyboards on Android allow a single dot, and an address has three.
 	address_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_URL
-	address_edit.text = _address_start()
+	address_edit.text = start
 	manual.add_child(address_edit)
 	manual.add_child(_button("Join", func() -> void:
 		if address_edit.text.strip_edges() != "":
-			_join(address_edit.text.strip_edges()), Vector2(160, 60)))
-	manual.add_child(_button("Hotspot?", show_hotspot_help, Vector2(170, 60)))
-	manual.add_child(_button("Back", show_menu, Vector2(130, 60)))
+			_join(address_edit.text.strip_edges(), way), Vector2(160, 60)))
+
+
+func _online_tab(box: VBoxContainer) -> void:
+	var how := _soft("Over the internet, through Epic's relay. It works from almost any network, mobile data included.", 24)
+	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(how)
+	var soon := _body("Coming in the next version.", 24)
+	soon.add_theme_color_override("font_color", UiTheme.EMBER)
+	box.add_child(soon)
 
 
 ## The start of this phone's own address, since a game on the same Wi-Fi will share it. Saves typing dots.
@@ -1124,26 +1166,8 @@ func _address_start() -> String:
 	return mine[0].substr(0, mine[0].rfind(".") + 1)
 
 
-func show_hotspot_help() -> void:
-	var root := _modal("No Wi-Fi? Use a hotspot")
-	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 860
-	var close := func() -> void:
-		root.queue_free()
-		_back = show_menu
-	_back = close
-	for line: String in ["1. On one phone, turn on the Wi-Fi hotspot in its settings.",
-			"2. On the other phones, connect to that hotspot's Wi-Fi. If a phone warns there is no internet, choose to stay connected.",
-			"3. On the hotspot phone, press Start a game. The others will find it in the list.",
-			"If a phone keeps getting dropped, turn off its mobile data. The game itself uses none."]:
-		var l := _body(line, 25)
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		box.add_child(l)
-	box.add_child(_button("Got it", close, Vector2(860, 64), true))
-
-
-func _join(address: String) -> void:
-	if Net.join_game(address) == OK:
+func _join(address: String, way := Net.Way.LOCAL) -> void:
+	if Net.join_game(address, way) == OK:
 		show_lobby()
 	else:
 		_on_net_left("That address does not look right.")
@@ -1165,6 +1189,24 @@ func show_lobby() -> void:
 	refresh.call()
 
 
+func _direct_lines(body: VBoxContainer) -> void:
+	var d := Net.direct
+	var line := _soft(d.status_line(), 23)
+	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_child(line)
+	for a: String in [d.address, d.ipv6]:
+		if a == "":
+			continue
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		body.add_child(row)
+		var shown := _body(a, 24 if a.length() < 20 else 20)
+		shown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(shown)
+		var text := a
+		row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(text), Vector2(120, 48)))
+
+
 func _fill_lobby(body: VBoxContainer) -> void:
 	if not is_instance_valid(body):
 		return
@@ -1177,8 +1219,11 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		body.add_child(_button("Back", show_menu, Vector2(240, 60)))
 		return
 	if Net.is_host():
-		var where := Net.local_addresses()
-		body.add_child(_body("Your address, if someone needs it: %s" % (where[0] if not where.is_empty() else "no Wi-Fi?"), 24))
+		if Net.way == Net.Way.DIRECT:
+			_direct_lines(body)
+		else:
+			var where := Net.local_addresses()
+			body.add_child(_body("Your address, if someone needs it: %s" % (where[0] if not where.is_empty() else "no Wi-Fi?"), 24))
 		var kinds := HBoxContainer.new()
 		kinds.add_theme_constant_override("separation", 8)
 		body.add_child(kinds)
