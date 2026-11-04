@@ -175,15 +175,15 @@ func sign_in() -> bool:
 	_ieos.call("connect_interface_create_device_id", device)
 	var made: Dictionary = await _ieos.get("connect_interface_create_device_id_callback")
 	if int(made["result_code"]) != SUCCESS and int(made["result_code"]) != DUPLICATE:
-		return _fail("Epic did not accept this phone (%d)." % int(made["result_code"]))
+		return _fail("Could not go online (%d). Are you connected?" % int(made["result_code"]))
 	var login := LoginOptions.new()
 	login.user_login_info.display_name = Game.player_name
 	_ieos.call("connect_interface_login", login)
 	var done: Dictionary = await _ieos.get("connect_interface_login_callback")
 	if int(done["result_code"]) != SUCCESS:
-		return _fail("Could not sign in to Epic (%d). Are you online?" % int(done["result_code"]))
+		return _fail("Could not go online (%d). Are you connected?" % int(done["result_code"]))
 	_user = str(done["local_user_id"])
-	return _user != "" or _fail("Could not sign in to Epic.")
+	return _user != "" or _fail("Could not go online.")
 
 
 ## A short code for friends to type: Epic gives the room its own ID, and the code is written on it.

@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_12_2()
 		await test_version_11()
 		await test_version_10()
 		await test_version_9()
@@ -73,6 +74,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_12_2()
 	await test_version_11()
 	await test_version_10()
 	await test_version_9()
@@ -414,15 +416,8 @@ func test_land() -> void:
 	ok(walker.position.distance_to(Vector3(-20, 0, -18)) < 6.0, "a zombie finds its way from the far bank to the village (%s)" % walker.position)
 	await kill_all()
 	await frames(2)
-	# The castle stands high, and its hill has one road.
+	# The castle stands high.
 	ok(t.height(-72, -60) > 7.5, "the castle stands on high ground")
-	ok(not w.grid.is_free(w.grid.to_cell(Vector3(-46, 0, -48))) or t.height(-46, -48) < 7.0, "the hill is steep")
-	var cliff := 0
-	for i in 40:
-		var a := float(i) / 40.0
-		if not t.is_walkable(lerpf(-96.0, -48.0, a), -41.5):
-			cliff += 1
-	ok(cliff > 12, "with cliffs along its sides")
 	# The player walks up the castle road, and across a bridge, on the real collision.
 	var goal := Vector3(-44, 0, -70)
 	pl.global_position = Vector3(-25, t.height(-25, -48) + 0.2, -48)
@@ -672,6 +667,137 @@ func test_fort() -> void:
 	await start_clean()
 
 
+func test_version_12_2() -> void:
+	await start_clean()
+	# Roads are painted on the land: nothing floats, and the ground knows where they are.
+	var ground: ShaderMaterial = null
+	for c: Node in w.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).material_override is ShaderMaterial:
+			var mat := (c as MeshInstance3D).material_override as ShaderMaterial
+			if mat.get_shader_parameter("roads") != null:
+				ground = mat
+				break
+	ok(ground != null, "the ground has the roads painted on it")
+	if ground:
+		var mask: Image = (ground.get_shader_parameter("roads") as Texture2D).get_image()
+		var px := func(at: Vector2) -> float:
+			var scale := MapBuilder.ROAD_PIXELS_PER_METRE
+			return mask.get_pixel(int((at.x + Terrain.HALF) * scale), int((at.y + Terrain.HALF) * scale)).r
+		var line: Array = w.map_roads[0]
+		var on_road: Vector2 = (line[0] as Vector2).lerp(line[1], 0.5)
+		ok(px.call(on_road) < 0.5, "a road is marked on the mask")
+		var side: Vector2 = ((line[1] as Vector2) - (line[0] as Vector2)).normalized().orthogonal()
+		ok(px.call(on_road + side * 9.0) > 0.9, "and the land beside it is not")
+	# The way down from the castle: no walls you cannot see on either side of the road.
+	for rd: Array in w.map_roads:
+		if (rd[rd.size() - 1] as Vector2).distance_to(Vector2(-53, -70)) > 1.0:
+			continue
+		var steep := 0
+		for i in rd.size() - 1:
+			var a: Vector2 = rd[i]
+			var b: Vector2 = rd[i + 1]
+			var across := (b - a).normalized().orthogonal()
+			for k in int(a.distance_to(b)) + 1:
+				var c: Vector2 = a.lerp(b, float(k) / maxf(a.distance_to(b), 1.0))
+				for o: float in [-7.0, -5.0, -3.0, -1.0, 1.0, 3.0, 5.0, 7.0]:
+					var q: Vector2 = c + across * o
+					if not w.terrain.is_walkable(q.x, q.y):
+						steep += 1
+		ok(steep == 0, "the castle road can be left on either side (%d steep spots)" % steep)
+	# A fence in the way: it goes round, and does not stand there staring.
+	for z: Zombie in w.zombies.duplicate():
+		z.release()
+	var spot := Vector3.INF
+	for x in range(-60, 60, 6):
+		for z in range(10, 70, 6):
+			var clear := true
+			for dx in range(-12, 13):
+				for dz in range(-5, 6):
+					var c := w.grid.to_cell(Vector3(x + dx, 0, z + dz))
+					if not w.grid.is_free(c) or w.terrain.slope(x + dx, z + dz) > 0.3:
+						clear = false
+			if clear:
+				spot = Vector3(x, 0, z)
+				break
+		if spot != Vector3.INF:
+			break
+	ok(spot != Vector3.INF, "there is open land to test on")
+	if spot != Vector3.INF:
+		spot.y = w.ground_at(spot)
+		w.add_solid(spot + Vector3.UP * 0.5, Vector3(16, 1.0, 0.14))
+		await w.get_tree().physics_frame
+		await w.get_tree().physics_frame
+		ok(not w.grid.line_is_open(spot + Vector3(0, 0, -3), spot + Vector3(0, 0, 3)), "the fence closes the straight line")
+		ok(w.grid.line_is_open(spot + Vector3(9, 0, -3), spot + Vector3(9, 0, 3)), "and only where it stands")
+		pl.global_position = spot + Vector3(0, 0, 3)
+		pl.velocity = Vector3.ZERO
+		pl.set_physics_process(false)
+		var fz := spawn("normal", spot + Vector3(0, 0, -3), false)
+		fz._start_chase(pl.global_position)
+		var t := 0.0
+		var reached := false
+		while t < 25.0 and is_instance_valid(fz):
+			await seconds(0.25)
+			t += 0.25
+			pl.hp = pl.max_hp()
+			if fz.position.z > spot.z + 0.2 and Vector2(fz.position.x - pl.global_position.x, fz.position.z - pl.global_position.z).length() < 2.5:
+				reached = true
+				break
+		ok(reached, "a mob behind a fence walks round it to reach you (%.1f s)" % t)
+		if is_instance_valid(fz):
+			fz.release()
+		# Standing close to the fence, with a mob that likes to come from that side.
+		pl.global_position = spot + Vector3(0, 0, 1.7)
+		var near := spawn("normal", spot + Vector3(0, 0, -1.7), false)
+		near._flank = Vector3(0, 0, -1)
+		near._start_chase(pl.global_position)
+		t = 0.0
+		reached = false
+		while t < 25.0 and is_instance_valid(near):
+			await seconds(0.25)
+			t += 0.25
+			pl.hp = pl.max_hp()
+			if near.position.z > spot.z + 0.2:
+				reached = true
+				break
+		ok(reached, "and a mob's favourite side does not stop it short (%.1f s)" % t)
+		if is_instance_valid(near):
+			near.release()
+		pl.set_physics_process(true)
+	# Fallen in a team game: only your own side's eyes.
+	ok(Net.host_game() == OK, "a team game starts")
+	Net.rules = Net.Rules.TEAMS
+	Net.roster[1]["team"] = 0
+	Net.roster[501] = {"name": "Friend", "class": "infantry", "team": 0, "score": 0, "deaths": 0, "lives": 3}
+	Net.roster[502] = {"name": "Foe", "class": "infantry", "team": 1, "score": 0, "deaths": 0, "lives": 3}
+	Net.world = w
+	for id: int in [501, 502]:
+		var body := Avatar.new(w, id, Net.roster[id])
+		w.add_child(body)
+		body.global_position = pl.global_position + Vector3(id - 500, 0, 0)
+		Net._avatars[id] = body
+	pl.dead = true
+	Net._watching = 0
+	Net.watch_next()
+	ok(Net._watching == 501, "a fallen player watches a team-mate")
+	Net.watch_next()
+	ok(Net._watching == 501, "and tapping never moves to the other team")
+	(Net._avatars[501] as Avatar).set_fallen(true)
+	Net.watch_next()
+	ok(Net._watching == 0, "with no team-mate left standing, nothing to watch")
+	Net.rules = Net.Rules.FFA
+	Net.watch_next()
+	ok(Net._watching == 502, "in All vs All anyone will do")
+	Net._stop_watching()
+	pl.dead = false
+	for id: int in [501, 502]:
+		(Net._avatars[id] as Avatar).queue_free()
+		Net._avatars.erase(id)
+	Net.leave()
+	await frames(2)
+	await start_clean()
+
+
 func test_version_11() -> void:
 	# Four ways to play, and no help button.
 	for tab in Main.TOGETHER_TABS.size():
@@ -687,34 +813,28 @@ func test_version_11() -> void:
 	m.show_menu()
 	await frames(2)
 	# Online is offered only if this build has what it needs. A wrong code says so.
-	m.show_together(3)
+	m.show_together(Main.ONLINE_TAB)
 	await frames(2)
 	if EpicNet.available():
 		ok(m.panel.find_children("*", "LineEdit", true, false).size() == 2, "Online asks for a room code")
-	# A Direct game knows what to tell the host, even with no router to ask.
-	ok(DirectHost._is_public("81.40.12.7"), "a public address is recognised")
-	for hidden: String in ["192.168.1.2", "10.0.0.1", "172.20.1.1", "100.64.3.4", "127.0.0.1", "nonsense"]:
-		ok(not DirectHost._is_public(hidden), "%s is not public" % hidden)
-	ok(Net.host_game(Net.Way.DIRECT) == OK and Net.direct != null, "a Direct game starts")
+	# What is behind Online is nobody's business.
+	var words: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	ok(not " ".join(words).contains("Epic"), "and does not say what it runs on")
+	ok(not Main.TOGETHER_TABS.has("Direct"), "there is no Direct tab")
+	# Leaving a game goes back to Play Together, and a failed join stays there.
+	ok(Net.host_game() == OK, "a game starts")
 	m.show_lobby()
 	await frames(2)
-	ok(Net.direct.status_line() != "", "and says how it is going")
-	# The address shows without waiting for the router, and leaving waits for nobody.
-	ok(not Net.direct.router_answered, "the router has not answered yet")
-	Net.direct._on_public_address(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), "81.40.12.7".to_utf8_buffer())
-	await frames(2)
-	var shown_labels: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
-	ok(shown_labels.has("81.40.12.7"), "the address is on the lobby screen")
 	var left_at := Time.get_ticks_msec()
 	m._leave_lobby()
 	ok(Time.get_ticks_msec() - left_at < 300, "Leave is immediate (%d ms)" % (Time.get_ticks_msec() - left_at))
 	await frames(2)
 	var after: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
-	ok(after.has("Direct") and after.has("Start a game"), "and goes back to Play Together")
+	ok(after.has("Online") and after.has("Start a game"), "and goes back to Play Together")
 	m._on_net_left("No such game.")
 	await frames(2)
 	var underneath: Array = m.ui_layer.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
-	ok(underneath.has("Direct"), "a failed join also stays on Play Together")
+	ok(underneath.has("Online"), "a failed join also stays on Play Together")
 	m.show_together(0)
 	await frames(2)
 	var boxes_now: Array = m.ui_layer.find_children("*", "LineEdit", true, false)
@@ -722,8 +842,7 @@ func test_version_11() -> void:
 		ok(not box_now.text.ends_with("."), "with no half address in a box")
 	m.show_menu()
 	await frames(2)
-	ok(Net.direct == null, "and cleans up after itself")
-	# A room code or, if Epic gave no room, a host's own long ID.
+	# A room code or, if no room could be opened, a host's own long ID.
 	if EpicNet.available():
 		var epic_node := EpicNet.new()
 		add_child(epic_node)

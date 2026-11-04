@@ -14,7 +14,8 @@ var _back := Callable() # what the phone's back button does on the current scree
 var _pause_root: Control
 var _net_go := false
 
-const TOGETHER_TABS := ["Same Wi-Fi", "Hotspot", "Direct", "Online"]
+const TOGETHER_TABS := ["Same Wi-Fi", "Hotspot", "Online"]
+const ONLINE_TAB := 2
 const TIPS := [
 	"Push the stick halfway to walk quietly.",
 	"Zombies see you much less in tall wheat.",
@@ -136,7 +137,7 @@ func show_menu(rebuild := false) -> void:
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_class_picker(Game.Mode.NIGHT), true))
 	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
-	box.add_child(_menu_row("Play Together", "Up to four phones, over Wi-Fi or a hotspot.", show_together))
+	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
 	box.add_child(_menu_row("Sandbox", "Try any weapon, item or class you own.", func() -> void: show_class_picker(Game.Mode.SANDBOX)))
 	box.add_child(_expand(true))
 	var foot := HBoxContainer.new()
@@ -1083,16 +1084,16 @@ func show_together(tab := -1) -> void:
 		Game.player_name = t.strip_edges() if t.strip_edges() != "" else Game.player_name
 		Game.save_settings())
 	top.add_child(name_edit)
-	var direct_way := _together_tab == 2
-	if _together_tab == 3:
+	if _together_tab == ONLINE_TAB:
 		if EpicNet.available():
 			top.add_child(_button("Start a game", _start_online, Vector2(300, 66), true))
 	else:
 		top.add_child(_button("Start a game", func() -> void:
-			if Net.host_game(Net.Way.DIRECT if direct_way else Net.Way.LOCAL) == OK:
+			var problem := Net.host_game()
+			if problem == OK:
 				show_lobby()
 			else:
-				_on_net_left("Could not start a game here."), Vector2(300, 66), true))
+				_on_net_left("Could not start a game here (%d)." % problem), Vector2(300, 66), true))
 	top.add_child(_button("Back", show_menu, Vector2(130, 66)))
 	match _together_tab:
 		0:
@@ -1104,11 +1105,6 @@ func show_together(tab := -1) -> void:
 			box.add_child(steps)
 			_nearby_games(box, root)
 		2:
-			var how := _soft("Over the internet, straight from phone to phone. The host's network has to let the others in, so it does not work from every network.", 24)
-			how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			box.add_child(how)
-			_join_by_address(box, "81.40.12.7", Net.Way.DIRECT)
-		3:
 			_online_tab(box)
 
 
@@ -1134,16 +1130,12 @@ func _nearby_games(box: VBoxContainer, root: Control) -> void:
 		Net.stop_search())
 	Net.start_search()
 	fill.call()
-	_join_by_address(box, _example_address(), Net.Way.LOCAL)
-
-
-func _join_by_address(box: VBoxContainer, hint: String, way: int) -> void:
 	var manual := HBoxContainer.new()
 	manual.add_theme_constant_override("separation", 10)
 	box.add_child(manual)
 	manual.add_child(_body("Join by address", 24))
 	var address_edit := LineEdit.new()
-	address_edit.placeholder_text = hint
+	address_edit.placeholder_text = _example_address()
 	address_edit.custom_minimum_size = Vector2(400, 58)
 	address_edit.add_theme_font_size_override("font_size", 26)
 	# Number keyboards on Android allow a single dot, and an address has three.
@@ -1151,11 +1143,11 @@ func _join_by_address(box: VBoxContainer, hint: String, way: int) -> void:
 	manual.add_child(address_edit)
 	manual.add_child(_button("Join", func() -> void:
 		if address_edit.text.strip_edges() != "":
-			_join(address_edit.text.strip_edges(), way), Vector2(160, 60)))
+			_join(address_edit.text.strip_edges()), Vector2(160, 60)))
 
 
 func _online_tab(box: VBoxContainer) -> void:
-	var how := _soft("Over the internet, through Epic's relay. It works from almost any network, mobile data included.", 24)
+	var how := _soft("Over the internet, from almost any network, mobile data included.", 24)
 	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(how)
 	if not EpicNet.available():
@@ -1178,16 +1170,16 @@ func _online_tab(box: VBoxContainer) -> void:
 			_join_online(code_edit.text), Vector2(160, 60)))
 
 
-func _epic_wait() -> void:
+func _online_wait() -> void:
 	_clear_ui()
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
 	box.custom_minimum_size.x = 600
-	box.add_child(_body("Connecting to Epic...", 28))
+	box.add_child(_body("Connecting...", 28))
 
 
 func _start_online() -> void:
-	_epic_wait()
+	_online_wait()
 	var problem := await Net.host_online()
 	if problem != "":
 		_on_online_failed(problem)
@@ -1196,7 +1188,7 @@ func _start_online() -> void:
 
 
 func _join_online(code: String) -> void:
-	_epic_wait()
+	_online_wait()
 	var problem := await Net.join_online(code)
 	if problem != "":
 		_on_online_failed(problem)
@@ -1205,7 +1197,7 @@ func _join_online(code: String) -> void:
 
 
 func _on_online_failed(problem: String) -> void:
-	show_together(3)
+	show_together(ONLINE_TAB)
 	_on_net_left(problem)
 
 
@@ -1217,8 +1209,8 @@ func _example_address() -> String:
 	return mine[0].substr(0, mine[0].rfind(".") + 1) + "20"
 
 
-func _join(address: String, way := Net.Way.LOCAL) -> void:
-	if Net.join_game(address, way) == OK:
+func _join(address: String) -> void:
+	if Net.join_game(address) == OK:
 		show_lobby()
 	else:
 		_on_net_left("That address does not look right.")
@@ -1240,24 +1232,6 @@ func show_lobby() -> void:
 	refresh.call()
 
 
-func _direct_lines(body: VBoxContainer) -> void:
-	var d := Net.direct
-	var line := _soft(d.status_line(), 23)
-	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_child(line)
-	for a: String in [d.address, d.ipv6]:
-		if a == "":
-			continue
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		body.add_child(row)
-		var shown := _body(a, 24 if a.length() < 20 else 20)
-		shown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(shown)
-		var text := a
-		row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(text), Vector2(120, 48)))
-
-
 func _leave_lobby() -> void:
 	Net.leave()
 	show_together()
@@ -1275,9 +1249,7 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		body.add_child(_button("Back", _leave_lobby, Vector2(240, 60)))
 		return
 	if Net.is_host():
-		if Net.way == Net.Way.DIRECT:
-			_direct_lines(body)
-		elif Net.way == Net.Way.EPIC:
+		if Net.way == Net.Way.ONLINE:
 			var row := HBoxContainer.new()
 			row.add_theme_constant_override("separation", 10)
 			body.add_child(row)

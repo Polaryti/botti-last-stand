@@ -35,18 +35,32 @@ static func use_wifi() -> void:
 		if caps and caps.hasTransport(TRANSPORT_WIFI):
 			_bound = manager.bindProcessToNetwork(network) == true
 			return
+	# No Wi-Fi now, so nothing may stay tied to the one that went away.
+	_bound = false
+	manager.bindProcessToNetwork(null)
 
 
 ## Back to whatever the phone prefers, for a phone that hosts: its own hotspot needs that.
+## Always asked for, because a network that has gone away must never keep hold of this phone.
 static func use_default() -> void:
-	if not _bound:
-		return
 	_bound = false
 	var activity: Variant = _activity()
 	if activity:
 		var manager: Variant = activity.getSystemService("connectivity")
 		if manager:
 			manager.bindProcessToNetwork(null)
+
+
+## The last resort when nothing can be opened: tied by hand to the network the phone is using now.
+static func use_active() -> void:
+	var activity: Variant = _activity()
+	if activity == null:
+		return
+	var manager: Variant = activity.getSystemService("connectivity")
+	if manager == null:
+		return
+	var active: Variant = manager.getActiveNetwork()
+	_bound = active != null and manager.bindProcessToNetwork(active) == true
 
 
 ## Keeps the Wi-Fi radio awake during a game, so packets are not held back to save power.

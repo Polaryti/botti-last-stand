@@ -17,6 +17,8 @@ const CASTLE_DARK := Color(0.32, 0.32, 0.35)
 const FLOOR := Color(0.3, 0.22, 0.15)
 const HAY := Color(0.72, 0.6, 0.26)
 const DIRT := Color(0.27, 0.2, 0.13)
+const ROAD_PIXELS_PER_METRE := 2
+const ROAD_REACH := 3.0 # metres either side of a road's edge that the ground's road mask can tell apart
 const GRASS := Color(0.27, 0.44, 0.19)
 const GRASS_TIP := Color(0.42, 0.56, 0.24)
 const BRASS := Color(0.78, 0.6, 0.24)
@@ -27,6 +29,8 @@ var terrain: Terrain
 var quality := 1 # 0 low, 1 medium, 2 high
 var grass_tufts := 350 # how much grass the whole map gets
 var is_preview := false
+var _ground_material: ShaderMaterial
+var _road_lines: Array[Dictionary] = []
 var skip_beyond := false # the menu only needs the village
 var xf := Transform3D.IDENTITY # where the piece being built stands
 var piece_scale := 1.0
@@ -53,6 +57,7 @@ func build(root: MapRoot) -> void:
 	if root.forest_wall:
 		forest_wall(root.play_half)
 	grass(root.play_half)
+	_paint_roads()
 	flush()
 	w.indoors = _indoors
 
@@ -153,10 +158,13 @@ func no_fog() -> StandardMaterial3D:
 ## a lantern costs the few patches around it rather than all the ground on screen.
 func ground() -> void:
 	const CELLS := 12
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.albedo_texture = load("res://assets/sprites/ground_tile.png")
-	mat.roughness = 1.0
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://assets/shaders/ground.gdshader")
+	mat.set_shader_parameter("tile", load("res://assets/sprites/ground_tile.png"))
+	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
+	mat.set_shader_parameter("map_half", float(Terrain.HALF))
+	mat.set_shader_parameter("mask_reach", ROAD_REACH)
+	_ground_material = mat
 	var j := 0
 	while j < Terrain.SIZE - 1:
 		var i := 0
@@ -196,8 +204,54 @@ func boundary(h: float) -> void:
 			w.grid.block_box(box[0], box[1])
 
 
-## A strip that follows the land. It is cut every 24 m or so, for the same reason as the ground patches.
+## In a game a road is painted on the ground itself, so it cannot float over the land or swallow feet.
 func road(points: Array[Vector2], width: float) -> void:
+	if is_preview:
+		_road_strip(points, width)
+	else:
+		_road_lines.append({"points": points, "half": width * 0.5})
+
+
+## The ground's shader reads how far each spot is from the nearest road's edge. With that, even a
+## coarse picture gives a clean edge, and a 220 m map needs only half a metre per pixel.
+func _paint_roads() -> void:
+	if _road_lines.is_empty():
+		return
+	var side := Terrain.HALF * ROAD_PIXELS_PER_METRE * 2
+	var far := 255
+	var mask := PackedByteArray()
+	mask.resize(side * side)
+	mask.fill(far)
+	for line: Dictionary in _road_lines:
+		var points: Array[Vector2] = line["points"]
+		var half: float = line["half"]
+		var reach: float = half + ROAD_REACH
+		for i in points.size() - 1:
+			var a: Vector2 = points[i]
+			var b: Vector2 = points[i + 1]
+			var ab := b - a
+			var ab_len2 := maxf(ab.length_squared(), 0.001)
+			var x0 := clampi(int((minf(a.x, b.x) - reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+			var x1 := clampi(int((maxf(a.x, b.x) + reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+			var z0 := clampi(int((minf(a.y, b.y) - reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+			var z1 := clampi(int((maxf(a.y, b.y) + reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+			for z in range(z0, z1 + 1):
+				var wz := (z + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+				for x in range(x0, x1 + 1):
+					var wx := (x + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+					var t := clampf(((wx - a.x) * ab.x + (wz - a.y) * ab.y) / ab_len2, 0.0, 1.0)
+					var edge := Vector2(wx - a.x - ab.x * t, wz - a.y - ab.y * t).length() - half
+					if edge >= ROAD_REACH:
+						continue
+					var value := int((edge / ROAD_REACH * 0.5 + 0.5) * 255.0)
+					if value < mask[z * side + x] and not terrain.over_water_on_deck(wx, wz):
+						mask[z * side + x] = value
+	var image := Image.create_from_data(side, side, false, Image.FORMAT_L8, mask)
+	_ground_material.set_shader_parameter("roads", ImageTexture.create_from_image(image))
+
+
+## A strip that follows the land, for the map editor. It is cut every 24 m or so, for the same reason as the ground patches.
+func _road_strip(points: Array[Vector2], width: float) -> void:
 	const STEP := 1.6
 	const ACROSS := 3
 	var st := SurfaceTool.new()

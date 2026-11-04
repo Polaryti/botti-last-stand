@@ -28,7 +28,7 @@ func _ready() -> void:
 	m.show_together(1)
 	await wait(0.2)
 	await snap("hotspot")
-	m.show_together(3)
+	m.show_together(Main.ONLINE_TAB)
 	await wait(0.2)
 	await snap("online")
 	m.show_together()

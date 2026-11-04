@@ -73,6 +73,9 @@ var _next_plan := 0.0
 var _goal := Vector3.ZERO
 var _has_goal := false
 var _direct := false
+var _walk_around_until := 0.0
+var _blocked_timer := 0.0
+var _blocked_from := Vector3.ZERO
 var _last_seen := Vector3.ZERO
 var _lost := 0.0
 var _search_left := 0.0
@@ -1001,6 +1004,9 @@ func _start_chase(at: Vector3) -> void:
 	# Re-plan only when the target has really moved: paths are the costly part.
 	# The further away it is, the less a small move changes the way there.
 	var spot := at + _flank * 2.5
+	# Coming at someone from the side must not mean stopping on the wrong side of their fence.
+	if not world.grid.line_is_open(at, spot):
+		spot = at
 	var slack := maxf(2.0, position.distance_to(at) * 0.2)
 	if not _has_goal or _goal.distance_squared_to(spot) > slack * slack:
 		_set_goal(spot)
@@ -1121,7 +1127,9 @@ func _decide(target: Target, to: Vector3, dist: float, dt: float) -> void:
 		_hold = dist > 4.0 and dist < _ranged_reach()
 	elif _sees and _screams and dist < 12.0:
 		_hold = true # a Banshee never comes close: she stares, and calls the others
-	_direct = _sees and dist < 8.0 and state == State.CHASE and not _hold
+	# Straight at you, unless a fence or a cart is in the way: seeing you is not the same as reaching you.
+	_direct = _sees and dist < 8.0 and state == State.CHASE and not _hold and world.now >= _walk_around_until \
+			and (phases or world.grid.line_is_open(position, target.global_position))
 	if flies:
 		_clear = (state == State.CHASE or _sees) and world.has_line_of_sight(position, target.eye_position())
 		return
@@ -1622,6 +1630,7 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 			if dist > _melee_reach() * 0.7:
 				var approach := to + _flank * clampf(dist - 2.5, 0.0, 4.0)
 				dir = approach.normalized()
+				_check_blocked(delta)
 			_clear_path_only()
 		elif _has_goal:
 			if _needs_path and world.take_path_budget():
@@ -1721,6 +1730,18 @@ func _combat(target: Target, dist: float, delta: float) -> void:
 		else:
 			_play("Unarmed_Melee_Attack_Punch_A", 1.2, 0.1)
 		world.sfx_at("attack", position, -8.0)
+
+
+## Walking straight at someone and getting nowhere: something the grid does not know about is in the way.
+func _check_blocked(delta: float) -> void:
+	_blocked_timer += delta
+	if _blocked_timer < 0.9:
+		return
+	if position.distance_to(_blocked_from) < 0.3 and not phases:
+		_walk_around_until = world.now + 3.0
+		_direct = false
+	_blocked_timer = 0.0
+	_blocked_from = position
 
 
 func _stuck_check(delta: float) -> void:

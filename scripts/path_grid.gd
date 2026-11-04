@@ -95,6 +95,19 @@ func is_free(c: Vector2i) -> bool:
 	return astar.is_in_boundsv(c) and not astar.is_point_solid(c)
 
 
+## Can something walk this straight line? The two ends' own cells do not count: someone standing
+## against a wall is in a cell the wall touches, and they can still be walked up to.
+func line_is_open(from: Vector3, to: Vector3) -> bool:
+	var a := to_cell(from)
+	var b := to_cell(to)
+	var steps := int(Vector2(to.x - from.x, to.z - from.z).length() / 0.4)
+	for i in range(1, steps):
+		var c := to_cell(from.lerp(to, float(i) / steps))
+		if c != a and c != b and astar.is_point_solid(c):
+			return false
+	return true
+
+
 func nearest_free(c: Vector2i) -> Vector2i:
 	if is_free(c):
 		return c

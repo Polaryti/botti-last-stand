@@ -2,16 +2,28 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.12.2 (4 November 2026)
+### Fixed
+- Play Together: moving from Wi-Fi to mobile data no longer stops you starting a game until you restart. If a game still cannot start, the message now shows a number that helps find out why.
+- Teams: once you fall, you only watch your own team-mates, never the other team.
+- Mobs behind a fence or a cart now walk round it to reach you, instead of standing there looking at you.
+- Survive the Night: no more invisible walls on the castle hill. The slopes are gentler, and you can leave the road and walk down on either side.
+- Roads are now part of the ground. They no longer float over the land, and feet no longer sink into them.
+
+### Changed
+- Direct connection is gone: Play Together now offers Same Wi-Fi, Hotspot and Online.
+- Online no longer talks about what runs behind it.
+
 ## 0.12.1 (4 November 2026)
 ### Fixed
 - Same Wi-Fi and Hotspot: the address box no longer starts with half an address. It shows a full example instead.
 - Direct: your address now appears straight away, without waiting for the router. Leaving no longer takes seconds.
 - Leave and failed joins now return to Play Together on the same tab, not to the main menu.
-- Online: rooms are made in a different way, to get past the "Could not open a room" error. If Epic still refuses a room, you get a longer code that works without one.
+- Online: rooms are made in a different way, to get past the "Could not open a room" error. If a room still cannot be made, you get a longer code that works without one.
 
 ## 0.12.0 (4 November 2026)
 ### New
-- Online play through Epic's relay: start a game, and share the room code. It works from almost any network, mobile data included, and needs no account.
+- Online play: start a game, and share the room code. It works from almost any network, mobile data included, and needs no account.
 
 ## 0.11.0 (4 November 2026)
 ### New

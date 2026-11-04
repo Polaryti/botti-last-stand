@@ -270,7 +270,7 @@ blend = 5
 transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -72, 8.5, -70)
 script = ExtResource("6_level")
 size = Vector2(48, 48)
-blend = 7
+blend = 14
 
 [node name="GraveGround" type="Node3D" parent="Land"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 49, 3, -81)
@@ -421,7 +421,7 @@ script = ExtResource("9_road")
 width = 5.2
 draw = false
 cut = true
-cut_blend = 3.5
+cut_blend = 10.0
 curve = SubResource("Curve_14")
 
 [node name="GraveCut" type="Path3D" parent="Roads"]
