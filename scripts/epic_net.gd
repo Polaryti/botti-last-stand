@@ -9,6 +9,10 @@ extends Node
 const SOCKET := "botti"
 const CODE_LETTERS := "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 6
+const USER_ID_LENGTH := 32 # a host's own Epic ID also works as a code, if a room could not be opened
+const CODE_ATTRIBUTE := "CODE"
+const PUBLIC := 0 # EOS_LAT_Public
+const EQUAL := 0 # EOS_CO_EQUAL
 const SUCCESS := 0
 const ALREADY_STARTED := 15 # EOS_AlreadyConfigured
 const DUPLICATE := 24 # EOS_DuplicateNotAllowed: this phone already has its anonymous ID
@@ -96,9 +100,20 @@ class RoomOptions:
 	var crossplay_opt_out := false
 	var rtc_room_join_action_type := 0
 	var local_rtc_options: Variant = null
-	var enable_join_by_id := true
+	var enable_join_by_id := false
 	var rejoin_after_kick_requires_invite := false
 	var allowed_platform_ids: Array = []
+
+
+class ChangeOptions:
+	extends RefCounted
+	var local_user_id := ""
+	var lobby_id := ""
+
+
+class UpdateOptions:
+	extends Options
+	var lobby_modification: Object
 
 
 class SearchOptions:
@@ -171,34 +186,58 @@ func sign_in() -> bool:
 	return _user != "" or _fail("Could not sign in to Epic.")
 
 
-## A short code for friends to type. Returns "" if no room could be made.
+## A short code for friends to type: Epic gives the room its own ID, and the code is written on it.
+## Returns "" if no room could be made.
 func open_room() -> String:
-	for attempt in 3:
-		var code := ""
-		for i in CODE_LENGTH:
-			code += CODE_LETTERS[randi() % CODE_LETTERS.length()]
-		var room := RoomOptions.new()
-		room.local_user_id = _user
-		room.bucket_id = "botti-%d" % Net.PROTOCOL
-		room.lobby_id = code
-		_ieos.call("lobby_interface_create_lobby", room)
-		var made: Dictionary = await _ieos.get("lobby_interface_create_lobby_callback")
-		var result := int(made["result_code"])
-		if result == SUCCESS:
-			_lobby_id = str(made["lobby_id"])
-			return code
-		last_error = "Could not open a room (%d)." % result
-	return ""
+	var room := RoomOptions.new()
+	room.local_user_id = _user
+	room.bucket_id = "botti-%d" % Net.PROTOCOL
+	_ieos.call("lobby_interface_create_lobby", room)
+	var made: Dictionary = await _ieos.get("lobby_interface_create_lobby_callback")
+	if int(made["result_code"]) != SUCCESS:
+		_fail("Could not open a room (%d)." % int(made["result_code"]))
+		return ""
+	_lobby_id = str(made["lobby_id"])
+	var change := ChangeOptions.new()
+	change.local_user_id = _user
+	change.lobby_id = _lobby_id
+	var opened: Dictionary = _ieos.call("lobby_interface_update_lobby_modification", change)
+	if int(opened["result_code"]) != SUCCESS:
+		_fail("Could not set up the room (%d)." % int(opened["result_code"]))
+		close_room()
+		return ""
+	var code := ""
+	for i in CODE_LENGTH:
+		code += CODE_LETTERS[randi() % CODE_LETTERS.length()]
+	var modification: Object = opened["lobby_modification"]
+	modification.call("add_attribute", CODE_ATTRIBUTE, code, PUBLIC)
+	var update := UpdateOptions.new()
+	update.lobby_modification = modification
+	_ieos.call("lobby_interface_update_lobby", update)
+	var updated: Dictionary = await _ieos.get("lobby_interface_update_lobby_callback")
+	if int(updated["result_code"]) != SUCCESS:
+		_fail("Could not set up the room (%d)." % int(updated["result_code"]))
+		close_room()
+		return ""
+	return code
+
+
+## If Epic will not give this phone a room, friends can still reach it directly with its ID.
+func own_id() -> String:
+	return _user
 
 
 ## Who is hosting this code, or "" if nobody is.
 func find_room(code: String) -> String:
+	code = code.strip_edges()
+	if code.length() == USER_ID_LENGTH:
+		return code.to_lower()
 	var made: Dictionary = _ieos.call("lobby_interface_create_lobby_search", SearchOptions.new())
 	if int(made["result_code"]) != SUCCESS:
 		_fail("Could not look for that room (%d)." % int(made["result_code"]))
 		return ""
 	var search: Object = made["lobby_search"]
-	search.call("set_lobby_id", code.strip_edges().to_upper())
+	search.call("set_parameter", CODE_ATTRIBUTE, code.to_upper(), EQUAL)
 	search.call("find", _user)
 	var found: Dictionary = await _ieos.get("lobby_search_find_callback")
 	if int(found["result_code"]) != SUCCESS or int(search.call("get_search_result_count")) < 1:

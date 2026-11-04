@@ -989,8 +989,11 @@ func _on_net_left(reason: String) -> void:
 	# Whoever is already reading the results can finish reading them.
 	if _run_over and hud:
 		return
-	if hud or panel:
+	# From a game, back to the menu. From the Play Together screens, back to where this began.
+	if hud:
 		show_menu()
+	elif panel:
+		show_together()
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
 	var l := _body(reason, 26)
@@ -1104,7 +1107,7 @@ func show_together(tab := -1) -> void:
 			var how := _soft("Over the internet, straight from phone to phone. The host's network has to let the others in, so it does not work from every network.", 24)
 			how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			box.add_child(how)
-			_join_by_address(box, "81.40.12.7", "", Net.Way.DIRECT)
+			_join_by_address(box, "81.40.12.7", Net.Way.DIRECT)
 		3:
 			_online_tab(box)
 
@@ -1131,10 +1134,10 @@ func _nearby_games(box: VBoxContainer, root: Control) -> void:
 		Net.stop_search())
 	Net.start_search()
 	fill.call()
-	_join_by_address(box, "192.168.1.20", _address_start(), Net.Way.LOCAL)
+	_join_by_address(box, _example_address(), Net.Way.LOCAL)
 
 
-func _join_by_address(box: VBoxContainer, hint: String, start: String, way: int) -> void:
+func _join_by_address(box: VBoxContainer, hint: String, way: int) -> void:
 	var manual := HBoxContainer.new()
 	manual.add_theme_constant_override("separation", 10)
 	box.add_child(manual)
@@ -1145,7 +1148,6 @@ func _join_by_address(box: VBoxContainer, hint: String, start: String, way: int)
 	address_edit.add_theme_font_size_override("font_size", 26)
 	# Number keyboards on Android allow a single dot, and an address has three.
 	address_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_URL
-	address_edit.text = start
 	manual.add_child(address_edit)
 	manual.add_child(_button("Join", func() -> void:
 		if address_edit.text.strip_edges() != "":
@@ -1167,7 +1169,7 @@ func _online_tab(box: VBoxContainer) -> void:
 	join.add_child(_body("Room code", 24))
 	var code_edit := LineEdit.new()
 	code_edit.placeholder_text = "ABC234"
-	code_edit.max_length = EpicNet.CODE_LENGTH
+	code_edit.max_length = EpicNet.USER_ID_LENGTH
 	code_edit.custom_minimum_size = Vector2(260, 58)
 	code_edit.add_theme_font_size_override("font_size", 26)
 	join.add_child(code_edit)
@@ -1207,12 +1209,12 @@ func _on_online_failed(problem: String) -> void:
 	_on_net_left(problem)
 
 
-## The start of this phone's own address, since a game on the same Wi-Fi will share it. Saves typing dots.
-func _address_start() -> String:
+## An example from this phone's own network, since a game on the same Wi-Fi will share the start of it.
+func _example_address() -> String:
 	var mine := Net.local_addresses()
 	if mine.is_empty():
-		return ""
-	return mine[0].substr(0, mine[0].rfind(".") + 1)
+		return "192.168.1.20"
+	return mine[0].substr(0, mine[0].rfind(".") + 1) + "20"
 
 
 func _join(address: String, way := Net.Way.LOCAL) -> void:
@@ -1225,7 +1227,7 @@ func _join(address: String, way := Net.Way.LOCAL) -> void:
 ## Who is here, and what the game will be.
 func show_lobby() -> void:
 	_clear_ui()
-	_back = show_menu
+	_back = _leave_lobby
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
 	box.custom_minimum_size.x = 900
@@ -1256,6 +1258,11 @@ func _direct_lines(body: VBoxContainer) -> void:
 		row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(text), Vector2(120, 48)))
 
 
+func _leave_lobby() -> void:
+	Net.leave()
+	show_together()
+
+
 func _fill_lobby(body: VBoxContainer) -> void:
 	if not is_instance_valid(body):
 		return
@@ -1265,7 +1272,7 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		c.queue_free()
 	if Net.is_client() and not Net.roster.has(Net.my_id()):
 		body.add_child(_body("Connecting...", 28))
-		body.add_child(_button("Back", show_menu, Vector2(240, 60)))
+		body.add_child(_button("Back", _leave_lobby, Vector2(240, 60)))
 		return
 	if Net.is_host():
 		if Net.way == Net.Way.DIRECT:
@@ -1274,10 +1281,14 @@ func _fill_lobby(body: VBoxContainer) -> void:
 			var row := HBoxContainer.new()
 			row.add_theme_constant_override("separation", 10)
 			body.add_child(row)
-			var shown := _body("Room code: %s" % Net.room_code, 30)
+			var shown := _body("Room code: %s" % Net.room_code, 30 if Net.room_problem == "" else 22)
 			shown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(shown)
 			row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(Net.room_code), Vector2(120, 48)))
+			if Net.room_problem != "":
+				var why := _soft("%s This longer code still works: copy it and send it to your friends." % Net.room_problem, 22)
+				why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				body.add_child(why)
 		else:
 			var where := Net.local_addresses()
 			body.add_child(_body("Your address, if someone needs it: %s" % (where[0] if not where.is_empty() else "no Wi-Fi?"), 24))
@@ -1348,7 +1359,7 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		var go := _button("Start the night", Net.start_match, Vector2(360, 66), true)
 		go.disabled = not Net.can_start()
 		foot.add_child(go)
-	foot.add_child(_button("Leave", show_menu, Vector2(180, 66)))
+	foot.add_child(_button("Leave", _leave_lobby, Vector2(180, 66)))
 
 
 func _character_name(pl: Player) -> String:

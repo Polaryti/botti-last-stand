@@ -19,7 +19,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 12
+const PROTOCOL := 13
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -48,6 +48,7 @@ var way: int = Way.LOCAL
 var direct: DirectHost # the host's helper in a Direct game
 var epic: EpicNet # stays once made, because Epic's system can only start once
 var room_code := ""
+var room_problem := "" # why there is no short code
 var _connect_wait := 0.0
 var rules: int = Rules.COOP
 var difficulty := 1
@@ -293,7 +294,9 @@ func host_online() -> String:
 		return e.last_error
 	var code := await e.open_room()
 	if code == "":
-		return e.last_error
+		# Not fatal: the host's own ID works as a (long) code, because only the room lookup needs a room.
+		room_problem = e.last_error
+		code = e.own_id()
 	var peer := e.make_peer()
 	if peer == null:
 		e.close_room()
@@ -343,6 +346,7 @@ func leave(reason := "") -> void:
 	if epic:
 		epic.close_room()
 	room_code = ""
+	room_problem = ""
 	_connect_wait = 0.0
 	PhoneNet.use_default()
 	PhoneNet.release_wifi()

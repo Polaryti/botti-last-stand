@@ -2,6 +2,13 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.12.1 (4 November 2026)
+### Fixed
+- Same Wi-Fi and Hotspot: the address box no longer starts with half an address. It shows a full example instead.
+- Direct: your address now appears straight away, without waiting for the router. Leaving no longer takes seconds.
+- Leave and failed joins now return to Play Together on the same tab, not to the main menu.
+- Online: rooms are made in a different way, to get past the "Could not open a room" error. If Epic still refuses a room, you get a longer code that works without one.
+
 ## 0.12.0 (4 November 2026)
 ### New
 - Online play through Epic's relay: start a game, and share the room code. It works from almost any network, mobile data included, and needs no account.

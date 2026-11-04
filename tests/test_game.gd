@@ -699,11 +699,36 @@ func test_version_11() -> void:
 	m.show_lobby()
 	await frames(2)
 	ok(Net.direct.status_line() != "", "and says how it is going")
-	Net.leave()
+	# The address shows without waiting for the router, and leaving waits for nobody.
+	ok(not Net.direct.router_answered, "the router has not answered yet")
+	Net.direct._on_public_address(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), "81.40.12.7".to_utf8_buffer())
 	await frames(2)
-	ok(Net.direct == null, "and cleans up after itself")
+	var shown_labels: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	ok(shown_labels.has("81.40.12.7"), "the address is on the lobby screen")
+	var left_at := Time.get_ticks_msec()
+	m._leave_lobby()
+	ok(Time.get_ticks_msec() - left_at < 300, "Leave is immediate (%d ms)" % (Time.get_ticks_msec() - left_at))
+	await frames(2)
+	var after: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	ok(after.has("Direct") and after.has("Start a game"), "and goes back to Play Together")
+	m._on_net_left("No such game.")
+	await frames(2)
+	var underneath: Array = m.ui_layer.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	ok(underneath.has("Direct"), "a failed join also stays on Play Together")
+	m.show_together(0)
+	await frames(2)
+	var boxes_now: Array = m.ui_layer.find_children("*", "LineEdit", true, false)
+	for box_now: LineEdit in boxes_now:
+		ok(not box_now.text.ends_with("."), "with no half address in a box")
 	m.show_menu()
 	await frames(2)
+	ok(Net.direct == null, "and cleans up after itself")
+	# A room code or, if Epic gave no room, a host's own long ID.
+	if EpicNet.available():
+		var epic_node := EpicNet.new()
+		add_child(epic_node)
+		ok(await epic_node.find_room("0002156C852B463AB32A97B4CAD67223") == "0002156c852b463ab32a97b4cad67223", "a long code is taken as the host's ID")
+		epic_node.free()
 
 
 func test_version_10() -> void:
