@@ -686,6 +686,11 @@ func test_version_11() -> void:
 	await frames(2)
 	m.show_menu()
 	await frames(2)
+	# Online is offered only if this build has what it needs. A wrong code says so.
+	m.show_together(3)
+	await frames(2)
+	if EpicNet.available():
+		ok(m.panel.find_children("*", "LineEdit", true, false).size() == 2, "Online asks for a room code")
 	# A Direct game knows what to tell the host, even with no router to ask.
 	ok(DirectHost._is_public("81.40.12.7"), "a public address is recognised")
 	for hidden: String in ["192.168.1.2", "10.0.0.1", "172.20.1.1", "100.64.3.4", "127.0.0.1", "nonsense"]:

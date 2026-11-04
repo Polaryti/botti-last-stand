@@ -2,6 +2,10 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.12.0 (4 November 2026)
+### New
+- Online play through Epic's relay: start a game, and share the room code. It works from almost any network, mobile data included, and needs no account.
+
 ## 0.11.0 (4 November 2026)
 ### New
 - First iPhone version.

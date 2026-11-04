@@ -19,7 +19,8 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 11
+const PROTOCOL := 12
+const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
 enum Fx { FIRE_PATCH, SPARK, SENTRY }
@@ -45,6 +46,9 @@ const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
 var direct: DirectHost # the host's helper in a Direct game
+var epic: EpicNet # stays once made, because Epic's system can only start once
+var room_code := ""
+var _connect_wait := 0.0
 var rules: int = Rules.COOP
 var difficulty := 1
 var spectate_cam: Camera3D
@@ -281,8 +285,65 @@ func join_game(address: String, new_way := Way.LOCAL) -> Error:
 	return OK
 
 
+## Online, through Epic. These return why it failed, or "" if all is well.
+func host_online() -> String:
+	leave()
+	var e := _epic_node()
+	if not await e.sign_in():
+		return e.last_error
+	var code := await e.open_room()
+	if code == "":
+		return e.last_error
+	var peer := e.make_peer()
+	if peer == null:
+		e.close_room()
+		return e.last_error
+	way = Way.EPIC
+	multiplayer.multiplayer_peer = peer
+	role = Role.HOST
+	rules = Rules.COOP
+	difficulty = Game.difficulty
+	_over = false
+	roster = {1: _my_entry(0)}
+	room_code = code
+	set_process(true)
+	lobby_changed.emit()
+	return ""
+
+
+func join_online(code: String) -> String:
+	leave()
+	var e := _epic_node()
+	if not await e.sign_in():
+		return e.last_error
+	var host_user := await e.find_room(code)
+	if host_user == "":
+		return e.last_error
+	var peer := e.make_peer(host_user)
+	if peer == null:
+		return e.last_error
+	way = Way.EPIC
+	multiplayer.multiplayer_peer = peer
+	role = Role.CLIENT
+	_over = false
+	_connect_wait = CONNECT_WAIT
+	set_process(true)
+	return ""
+
+
+func _epic_node() -> EpicNet:
+	if epic == null:
+		epic = EpicNet.new()
+		add_child(epic)
+	return epic
+
+
 func leave(reason := "") -> void:
 	var was_active := active()
+	if epic:
+		epic.close_room()
+	room_code = ""
+	_connect_wait = 0.0
 	PhoneNet.use_default()
 	PhoneNet.release_wifi()
 	stop_search_keep_rooms()
@@ -322,12 +383,15 @@ func _my_entry(team: int) -> Dictionary:
 
 
 func _on_connected() -> void:
+	_connect_wait = 0.0
 	_hello.rpc_id(1, PROTOCOL, Game.player_name, Game.player_class)
 
 
 func _on_failed() -> void:
 	if way == Way.LOCAL:
 		leave("Could not reach that game. Are you both on the same Wi-Fi?\nIf this phone has mobile data on, try turning it off.")
+	elif way == Way.EPIC:
+		leave("Could not reach that game. Check that the host is still in the lobby, and try again.")
 	else:
 		leave("Could not reach that game. Check the address. If it is right, the host's router is keeping you out: try Online instead.")
 
@@ -566,6 +630,11 @@ func _read_beacons(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if _connect_wait > 0.0:
+		_connect_wait -= delta
+		if _connect_wait <= 0.0:
+			_on_failed()
+			return
 	_read_beacons(delta)
 	if _listener:
 		_ask_timer -= delta

@@ -1081,7 +1081,10 @@ func show_together(tab := -1) -> void:
 		Game.save_settings())
 	top.add_child(name_edit)
 	var direct_way := _together_tab == 2
-	if _together_tab != 3:
+	if _together_tab == 3:
+		if EpicNet.available():
+			top.add_child(_button("Start a game", _start_online, Vector2(300, 66), true))
+	else:
 		top.add_child(_button("Start a game", func() -> void:
 			if Net.host_game(Net.Way.DIRECT if direct_way else Net.Way.LOCAL) == OK:
 				show_lobby()
@@ -1153,9 +1156,55 @@ func _online_tab(box: VBoxContainer) -> void:
 	var how := _soft("Over the internet, through Epic's relay. It works from almost any network, mobile data included.", 24)
 	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(how)
-	var soon := _body("Coming in the next version.", 24)
-	soon.add_theme_color_override("font_color", UiTheme.EMBER)
-	box.add_child(soon)
+	if not EpicNet.available():
+		var missing := _body("This build has no online play.", 24)
+		missing.add_theme_color_override("font_color", UiTheme.EMBER)
+		box.add_child(missing)
+		return
+	var join := HBoxContainer.new()
+	join.add_theme_constant_override("separation", 10)
+	box.add_child(join)
+	join.add_child(_body("Room code", 24))
+	var code_edit := LineEdit.new()
+	code_edit.placeholder_text = "ABC234"
+	code_edit.max_length = EpicNet.CODE_LENGTH
+	code_edit.custom_minimum_size = Vector2(260, 58)
+	code_edit.add_theme_font_size_override("font_size", 26)
+	join.add_child(code_edit)
+	join.add_child(_button("Join", func() -> void:
+		if code_edit.text.strip_edges() != "":
+			_join_online(code_edit.text), Vector2(160, 60)))
+
+
+func _epic_wait() -> void:
+	_clear_ui()
+	var root := _modal("Play Together")
+	var box: VBoxContainer = root.get_meta("box")
+	box.custom_minimum_size.x = 600
+	box.add_child(_body("Connecting to Epic...", 28))
+
+
+func _start_online() -> void:
+	_epic_wait()
+	var problem := await Net.host_online()
+	if problem != "":
+		_on_online_failed(problem)
+	else:
+		show_lobby()
+
+
+func _join_online(code: String) -> void:
+	_epic_wait()
+	var problem := await Net.join_online(code)
+	if problem != "":
+		_on_online_failed(problem)
+	else:
+		show_lobby()
+
+
+func _on_online_failed(problem: String) -> void:
+	show_together(3)
+	_on_net_left(problem)
 
 
 ## The start of this phone's own address, since a game on the same Wi-Fi will share it. Saves typing dots.
@@ -1221,6 +1270,14 @@ func _fill_lobby(body: VBoxContainer) -> void:
 	if Net.is_host():
 		if Net.way == Net.Way.DIRECT:
 			_direct_lines(body)
+		elif Net.way == Net.Way.EPIC:
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 10)
+			body.add_child(row)
+			var shown := _body("Room code: %s" % Net.room_code, 30)
+			shown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(shown)
+			row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(Net.room_code), Vector2(120, 48)))
 		else:
 			var where := Net.local_addresses()
 			body.add_child(_body("Your address, if someone needs it: %s" % (where[0] if not where.is_empty() else "no Wi-Fi?"), 24))

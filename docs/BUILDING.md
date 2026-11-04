@@ -40,6 +40,15 @@ An app signed with a different key will not install over one already on a phone 
 2. Add the notes to the top of `CHANGELOG.md`. The game shows this file on its Changelog screen, so write for players. It reads `## ` as a version, `### ` as a heading and `- ` as a line.
 3. Run the tests below, build the app, commit as `Version X.Y.Z` and push.
 
+## Online play
+
+The Epic plugin's compiled files (hundreds of MB) and the keys are not in the repository, so a fresh copy builds without online play until you add them. Android also needs a Gradle build with the Android SDK's android-36 platform and build-tools 36.1.0:
+
+    godot --headless --path . --install-android-build-template --export-release Android build/first.apk
+    python3 tools/setup_epic.py path/to/addons/epic-online-services-godot
+
+Download the plugin from its [Releases](https://github.com/3ddelano/epic-online-services-godot/releases), the file with `-all-` in its name. The keys go in `keys/epic.env`. For iPhone builds they go in the repository's GitHub secrets: `EPIC_PRODUCT_ID`, `EPIC_SANDBOX_ID`, `EPIC_DEPLOYMENT_ID`, `EPIC_CLIENT_ID` and `EPIC_CLIENT_SECRET`. `tests/epic_check.tscn` signs in and tries a room with them.
+
 ## iPhone
 
 Every push to `main` builds an unsigned iPhone app on one of GitHub's Macs. Nothing needs a paid Apple account:
