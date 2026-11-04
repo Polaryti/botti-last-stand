@@ -94,7 +94,7 @@ func _as_host() -> void:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.roster.size() == 2, "the other phone joined")
-	Net.set_rules({"coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -106,6 +106,8 @@ func _as_host() -> void:
 	if rules == "chariot":
 		Game.player_class = "artificer"
 		Net.set_my_class("artificer")
+	if rules == "bots" or rules == "botsffa":
+		Net.set_bots(2)
 	if rules == "teams":
 		# Put the two on opposite teams.
 		Net.roster[1]["team"] = 0
@@ -183,7 +185,7 @@ func _press(text: String) -> void:
 
 func _other() -> int:
 	for p: int in Net.roster:
-		if p != Net.my_id():
+		if p != Net.my_id() and not Net.is_bot(p):
 			return p
 	return 0
 
@@ -218,10 +220,72 @@ func _play() -> void:
 		await _chariot()
 	elif rules == "coop":
 		await _coop()
+	elif rules == "bots" or rules == "botsffa":
+		await _with_bots()
 	else:
 		await _fight()
 	await wait(0.5)
 	finish()
+
+
+## Two phones and two bots: the bots are real to both.
+func _with_bots() -> void:
+	pl.guard_left = 99999.0
+	var ids: Array = Net.roster.keys().filter(Net.is_bot)
+	ok(ids.size() == 2, "two bots in the match")
+	for b: int in ids:
+		ok(Net._avatars.has(b) and w.players.has(Net._avatars[b]), "with bodies on this phone")
+	var bot_id: int = ids[0]
+	var body: Avatar = Net._avatars[bot_id]
+	await sync(50)
+	var was := body.global_position
+	await wait(4.0)
+	await sync(51)
+	ok(body.global_position.distance_to(was) > 1.0 or rules == "bots", "the bots move on this phone")
+	# A blow from the phone that does not run the bot.
+	if not host:
+		Net.hit_player(bot_id, 99999.0, pl.global_position)
+	await wait(0.8)
+	await sync(52)
+	ok(body.dead, "a defeated bot falls on this phone")
+	ok(body._current == "Death_A", "and lies down")
+	ok(Net.lives_of(bot_id) == (Net.LIVES - 1 if rules == "botsffa" else Net.LIVES), "lives are counted")
+	if rules == "botsffa":
+		var scorer := _human_other() if host else Net.my_id()
+		ok(int(Net.roster[scorer]["score"]) >= Net.KILL_POINTS, "whoever did it scores")
+	# The body also falls for people.
+	if not host:
+		pl.guard_left = 0.0
+		pl.hurt(99999.0, pl.global_position + Vector3.FORWARD)
+	await wait(0.8)
+	await sync(53)
+	if host:
+		var them: Avatar = Net._avatars[_human_other()]
+		ok(them.dead and them._current == "Death_A", "a fallen player lies down on the host")
+	else:
+		ok(pl.dead, "the player fell")
+	await sync(54)
+	if rules == "bots":
+		# Bots fight the night, in co-op, and credit goes round.
+		if host:
+			var bot: BotPlayer = Net._bots[ids[1]]
+			w.spawn_zombie("normal", bot.at + Vector3(1.0, 0, 0))
+			var scored := int(Net.roster[ids[1]]["score"])
+			var t := 0.0
+			while int(Net.roster[ids[1]]["score"]) == scored and t < 12.0:
+				await wait(0.2)
+				t += 0.2
+			ok(int(Net.roster[ids[1]]["score"]) > scored, "a bot kills zombies (%.1f s)" % t)
+	await sync(55)
+	await wait(0.3)
+	await snap("bots")
+
+
+func _human_other() -> int:
+	for p: int in Net.roster:
+		if p != Net.my_id() and not Net.is_bot(p):
+			return p
+	return 0
 
 
 ## A real stretch of night, with both players wandering and swinging at whatever comes.

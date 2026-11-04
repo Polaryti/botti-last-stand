@@ -22,6 +22,7 @@ const CORE_STEPS := 3
 const LEVEL_UP_GUARD := 3.0 # seconds nothing can hurt you after gaining a level
 const PVP_STATUS := 0.6 # a freeze or a stun lasts this much as long on a player
 const PVP_STATUS_GAP := 1.5
+const FOG_XP := 0.5
 const WADE_SPEED := 0.8
 const SWING_HIT := 0.3 # how far through a swing the blow lands
 const BASH := {"kind": WeaponDefs.Kind.MELEE, "rate": 0.8, "range": 2.3, "cone": 110.0, "max_hits": 1, "knock": 3.5, "power": 0.6}
@@ -637,7 +638,9 @@ func _kill() -> void:
 # --- Levels and abilities ----------------------------------------------------
 
 func xp_needed() -> int:
-	return ClassDefs.xp_for_level(level)
+	var needed := ClassDefs.xp_for_level(level)
+	# All vs All is short, and has fewer enemies in it.
+	return ceili(needed * FOG_XP) if Net.fog_rules() else needed
 
 
 func add_xp(n: int) -> void:

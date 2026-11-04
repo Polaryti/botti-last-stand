@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_10()
 		await test_version_9()
 		await test_version_8()
 		await test_new_things()
@@ -71,6 +72,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_10()
 	await test_version_9()
 	await test_version_8()
 	await test_new_things()
@@ -665,6 +667,124 @@ func test_fort() -> void:
 	wf.queue_free()
 	await frames(2)
 	Game.mode = Game.Mode.NIGHT
+	await start_clean()
+
+
+func test_version_10() -> void:
+	# Reading a skill you can take: unlock it from there.
+	Game.player_class = "infantry"
+	await start_clean()
+	pl.points = 1
+	m.toggle_tree()
+	await frames(2)
+	var panel := m.tree_panel as TreePanel
+	var first: TreePanel.TreeNodeButton = null
+	for n in panel._map.nodes:
+		if panel.state_of(n) == "ready" and n.option == 1:
+			first = n
+	ok(first != null, "a second option is ready to read")
+	panel.read(first)
+	await frames(2)
+	var unlock: Button = null
+	for b: Node in panel._zone.find_children("*", "Button", true, false):
+		if (b as Button).text == "Unlock":
+			unlock = b
+	ok(unlock != null, "reading it offers Unlock")
+	var wanted: String = first.ability["id"]
+	unlock.pressed.emit()
+	await frames(2)
+	ok(pl.chosen.get(0) == wanted, "and Unlock takes that one, not the other")
+	m.close_tree()
+	# And choosing a specialization from its card works the same way.
+	pl.points = Player.CORE_STEPS
+	for step in range(1, Player.CORE_STEPS):
+		pl.choose_ability(step, 0)
+	m.toggle_tree()
+	await frames(2)
+	panel = m.tree_panel as TreePanel
+	var last_spec: TreePanel.TreeNodeButton = null
+	for n in panel._map.nodes:
+		if n.step == Player.CORE_STEPS and n.spec == 2:
+			last_spec = n
+	ok(last_spec != null and panel.state_of(last_spec) == "ready", "the third specialization is ready")
+	panel.read(last_spec)
+	await frames(2)
+	for b: Node in panel._zone.find_children("*", "Button", true, false):
+		if (b as Button).text == "Unlock":
+			(b as Button).pressed.emit()
+			break
+	await frames(2)
+	ok(pl.spec_id == pl.tree_data()["specs"][2]["id"], "and Unlock gives that path")
+	m.close_tree()
+
+	# All vs All and Teams need someone to fight, and bots count.
+	m.show_menu()
+	await frames(2)
+	ok(Net.host_game() == OK, "a game can be hosted")
+	Net.set_rules(Net.Rules.FFA)
+	ok(not Net.can_start(), "All vs All alone cannot start")
+	Net.start_match()
+	ok(not Net.in_game, "not even by asking")
+	Net.set_rules(Net.Rules.TEAMS)
+	ok(not Net.can_start(), "nor Teams")
+	Net.set_rules(Net.Rules.COOP)
+	ok(Net.can_start(), "Co-op can")
+	Net.set_bots(9)
+	ok(Net.bot_count() == Net.MAX_PLAYERS - 1, "bots fill the empty places, no more")
+	Net.set_bots(2)
+	ok(Net.bot_count() == 2 and Net.roster.size() == 3, "and can be sent away")
+	Net.set_rules(Net.Rules.TEAMS)
+	Net.set_bots(1)
+	ok(Net.can_start(), "a bot makes Teams possible, on the other side")
+	Net.set_bots(3)
+	Net.set_rules(Net.Rules.FFA)
+	ok(Net.can_start(), "and All vs All")
+	Net.start_match()
+	var t := 0.0
+	while not m._net_go and t < 40.0:
+		await seconds(0.2)
+		t += 0.2
+	ok(m._net_go, "a match with bots starts")
+	w = m.world
+	pl = w.player
+	hud = m.hud
+	var bots: Array = Net.bot_players()
+	ok(bots.size() == 3, "with three bots")
+	var starts: Array = bots.map(func(b: BotPlayer) -> Vector3: return b.at)
+	ok(pl.xp_needed() < ClassDefs.xp_for_level(pl.level), "levels come faster in All vs All")
+	pl.guard_left = 99999.0
+	w.director.elapsed = 5.0
+	await seconds(4.0)
+	var moved := 0
+	for i in bots.size():
+		if (bots[i] as BotPlayer).at.distance_to(starts[i]) > 3.0:
+			moved += 1
+	ok(moved >= 2, "bots go looking for a fight (%d)" % moved)
+	var victim: BotPlayer = bots[0]
+	var lives: int = Net.lives_of(victim.peer)
+	Net.hit_player(victim.peer, 99999.0, pl.global_position)
+	await seconds(0.3)
+	ok(victim.down and victim.body.dead, "a bot can be defeated")
+	ok(victim.body._current == "Death_A", "and its body lies down (%s)" % victim.body._current)
+	ok(Net.lives_of(victim.peer) == lives - 1, "and it loses a life")
+	ok(int(Net.roster[1]["score"]) >= Net.KILL_POINTS, "and whoever did it scores")
+	await seconds(Net.FOG_RESPAWN + 1.0)
+	ok(not victim.down and not victim.body.dead, "it comes back")
+	# Everyone else out: the match ends.
+	for b: BotPlayer in bots:
+		while Net.lives_of(b.peer) > 0 and not m._run_over:
+			b._guard = 0.0
+			b.down = false
+			b.hurt(99999.0, 1)
+			await seconds(0.05)
+	await seconds(0.5)
+	ok(m._run_over and Net.last_winner == Net.my_id(), "last one standing beats the bots")
+	Net.leave()
+	m.show_menu()
+	await frames(2)
+	# A left-over fight must not leak into the next game.
+	ok(Net.bot_players().is_empty(), "bots are gone with the match")
+
 	await start_clean()
 
 
@@ -1873,6 +1993,7 @@ func test_zombies() -> void:
 	wall.add_child(wall_shape)
 	w.add_child(wall)
 	wall.global_position = pl.global_position + Vector3(0, 2, -5)
+	await seconds(0.1) # the wall only counts for sight from the next physics step
 	var blind := spawn("normal", front(10.0))
 	blind.rotation.y = 0.0
 	pl.input_move = Vector2.ZERO

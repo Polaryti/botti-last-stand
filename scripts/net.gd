@@ -18,7 +18,9 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 9
+const PROTOCOL := 10
+const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
+const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
 enum Fx { FIRE_PATCH, SPARK, SENTRY }
 enum Status { FREEZE, STUN, SLOW, BURN }
 const LIVES := 3 # All vs All: how many times you can fall
@@ -74,6 +76,7 @@ var _over := false
 var _dawn_ending := false
 var _ally_goodbyes := 0
 var _ally_timer := 0.0
+var _bots := {} # on the host: peer id -> BotPlayer
 
 
 func _ready() -> void:
@@ -124,6 +127,88 @@ func lives_of(peer: int) -> int:
 ## This player has used up all their lives, and only watches now.
 func is_out() -> bool:
 	return fog_rules() and lives_of(my_id()) <= 0
+
+
+func is_bot(peer: int) -> bool:
+	return peer >= BOT_BASE
+
+
+func humans() -> int:
+	var n := 0
+	for p: int in roster:
+		if not is_bot(p):
+			n += 1
+	return n
+
+
+func bot_count() -> int:
+	return roster.size() - humans()
+
+
+## All vs All and Teams need someone to fight. Bots count.
+func can_start() -> bool:
+	if rules == Rules.FFA:
+		return roster.size() >= 2
+	if rules == Rules.TEAMS:
+		var teams := {}
+		for p: int in roster:
+			teams[int(roster[p]["team"])] = true
+		return teams.size() >= 2
+	return true
+
+
+## Whether two players are on opposite sides, whoever's phone is asking.
+func bots_foes(a: int, b: int) -> bool:
+	if a == b or not pvp():
+		return false
+	if rules == Rules.TEAMS:
+		return roster.has(a) and roster.has(b) and roster[a]["team"] != roster[b]["team"]
+	return true
+
+
+func set_bots(count: int) -> void:
+	if not is_host():
+		return
+	count = clampi(count, 0, MAX_PLAYERS - humans())
+	var mine: Array = roster.keys().filter(is_bot)
+	mine.sort()
+	while mine.size() > count:
+		roster.erase(mine.pop_back())
+	var i := 0
+	while mine.size() < count:
+		var id := BOT_BASE + i
+		i += 1
+		if roster.has(id):
+			continue
+		mine.append(id)
+		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("hidden", false))
+		# Each bot something different, as long as there are enough to go round.
+		for other: int in mine:
+			if roster.has(other):
+				offered.erase(roster[other]["class"])
+		var name_for_bot: String = BOT_NAMES[i % BOT_NAMES.size()]
+		roster[id] = {"name": "%s (bot)" % name_for_bot, "class": offered[randi() % offered.size()], "team": 0, "score": 0, "deaths": 0, "lives": LIVES}
+	_share_lobby()
+
+
+## Bots take whichever side leaves the teams even. People choose for themselves.
+func _balance_bots() -> void:
+	var count := [0, 0]
+	for p: int in roster:
+		if not is_bot(p):
+			count[int(roster[p]["team"])] += 1
+	var mine: Array = roster.keys().filter(is_bot)
+	mine.sort()
+	for p: int in mine:
+		var team := 0 if count[0] <= count[1] else 1
+		roster[p]["team"] = team
+		count[team] += 1
+
+
+func _share_lobby() -> void:
+	_balance_bots()
+	_lobby.rpc(roster, rules, difficulty)
+	lobby_changed.emit()
 
 
 func game_mode() -> int:
@@ -205,6 +290,7 @@ func leave(reason := "") -> void:
 	roster.clear()
 	_loaded.clear()
 	_avatars.clear()
+	_bots.clear()
 	_stop_watching()
 	spectate_cam = null
 	_respawn_left = -1.0
@@ -243,8 +329,11 @@ func _on_peer_disconnected(id: int) -> void:
 	roster.erase(id)
 	_loaded.erase(id)
 	_remove_peer(id)
-	_lobby.rpc(roster, rules, difficulty)
-	lobby_changed.emit()
+	if in_game:
+		_lobby.rpc(roster, rules, difficulty)
+		lobby_changed.emit()
+	else:
+		_share_lobby()
 	if in_game:
 		_check_loaded()
 		_check_everyone_down()
@@ -270,19 +359,22 @@ func _hello(protocol: int, player_name: String, cls: String) -> void:
 	if protocol != PROTOCOL:
 		_refused.rpc_id(id, "That phone has a different version of the game.")
 		return
+	# A real person takes a bot's place.
+	if not in_game and roster.size() >= MAX_PLAYERS and bot_count() > 0:
+		set_bots(bot_count() - 1)
 	if in_game or roster.size() >= MAX_PLAYERS:
 		_refused.rpc_id(id, "That game has already started." if in_game else "That game is full.")
 		return
 	var team := _smaller_team()
 	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0, "lives": LIVES}
-	_lobby.rpc(roster, rules, difficulty)
-	lobby_changed.emit()
+	_share_lobby()
 
 
 func _smaller_team() -> int:
 	var count := [0, 0]
 	for p: int in roster:
-		count[int(roster[p]["team"])] += 1
+		if not is_bot(p):
+			count[int(roster[p]["team"])] += 1
 	return 0 if count[0] <= count[1] else 1
 
 
@@ -314,8 +406,7 @@ func switch_team() -> void:
 	var team := 1 - int(roster[my_id()]["team"])
 	if is_host():
 		roster[1]["team"] = team
-		_lobby.rpc(roster, rules, difficulty)
-		lobby_changed.emit()
+		_share_lobby()
 	elif active():
 		_choice.rpc_id(1, "", team)
 
@@ -344,8 +435,7 @@ func _choice(cls: String, team: int) -> void:
 		roster[id]["class"] = cls
 	if team >= 0:
 		roster[id]["team"] = team
-	_lobby.rpc(roster, rules, difficulty)
-	lobby_changed.emit()
+	_share_lobby()
 
 
 func local_addresses() -> PackedStringArray:
@@ -473,7 +563,7 @@ func _process(delta: float) -> void:
 # --- Starting a game ---------------------------------------------------------
 
 func start_match() -> void:
-	if not is_host():
+	if not is_host() or not can_start():
 		return
 	multiplayer.multiplayer_peer.refuse_new_connections = true
 	if _beacon:
@@ -515,9 +605,13 @@ func attach(w: World) -> void:
 		if peer != my_id():
 			var a := Avatar.new(w, peer, roster[peer])
 			w.add_child(a)
-			a.global_position = w.player_start(int(peer))
+			a.teleport(w.player_start(int(peer)))
 			_avatars[peer] = a
 			w.players.append(a)
+			if is_host() and is_bot(peer):
+				var bot := BotPlayer.new(w, a, roster[peer])
+				w.add_child(bot)
+				_bots[peer] = bot
 	w.player.global_position = w.player_start(my_id())
 
 
@@ -540,7 +634,7 @@ func _check_loaded() -> void:
 	if not is_host() or not in_game or not started_loading:
 		return
 	for p: int in roster:
-		if not _loaded.has(p):
+		if not _loaded.has(p) and not is_bot(p):
 			return
 	started_loading = false
 	_go.rpc()
@@ -868,12 +962,65 @@ func _noise(at: Vector3, radius: float) -> void:
 # --- Hurting a player --------------------------------------------------------
 
 func hurt_peer(peer: int, amount: float, from: Vector3, attacker: Zombie) -> void:
+	if is_bot(peer):
+		_hurt_bot(peer, amount, 0)
+		return
 	_hurt.rpc_id(peer, amount, from, attacker.net_id if attacker else -1, 0)
 
 
 ## One player hitting another. The victim's own phone applies it, like any other damage.
 func hit_player(peer: int, amount: float, from: Vector3) -> void:
+	if is_bot(peer):
+		_hurt_bot(peer, amount * PVP_DAMAGE, my_id())
+		return
 	_hurt.rpc_id(peer, amount * PVP_DAMAGE, from, -1, my_id())
+
+
+# --- Bots: they live on the host, and the other phones only see their bodies ---
+
+func _hurt_bot(peer: int, amount: float, by_peer: int) -> void:
+	if is_host():
+		if _bots.has(peer):
+			(_bots[peer] as BotPlayer).hurt(amount, by_peer)
+	else:
+		_bot_hurt.rpc_id(1, peer, amount, by_peer)
+
+
+@rpc("any_peer", "reliable")
+func _bot_hurt(peer: int, amount: float, by_peer: int) -> void:
+	_hurt_bot(peer, amount, by_peer)
+
+
+## A bot's blow, on another bot or on a person's phone.
+func bot_hit(bot: int, victim: int, amount: float, from: Vector3) -> void:
+	if is_bot(victim):
+		_hurt_bot(victim, amount * PVP_DAMAGE, bot)
+	elif victim == my_id():
+		_hurt(amount * PVP_DAMAGE, from, -1, bot)
+	else:
+		_hurt.rpc_id(victim, amount * PVP_DAMAGE, from, -1, bot)
+
+
+func note_bot_fell(peer: int, by_peer: int) -> void:
+	_note_death(peer, by_peer)
+
+
+func bot_pose(bot: BotPlayer, at: Vector3, yaw: float, vel: Vector3, attacks: int, weapon: String, hp_left: float) -> void:
+	var id := _weapon_ids.find(weapon) + 1
+	var flags := 1 if bot.down else 0
+	bot.body.apply_pose(at, yaw, 0.0, vel, 1.0, flags, attacks, weapon, hp_left)
+	_bot_pose.rpc(bot.peer, at, yaw, vel, flags, attacks, id, hp_left)
+
+
+@rpc("authority", "unreliable_ordered", "call_remote", 1)
+func _bot_pose(peer: int, at: Vector3, yaw: float, vel: Vector3, flags: int, attacks: int, weapon: int, hp_left: float) -> void:
+	var a: Avatar = _avatars.get(peer)
+	if a:
+		a.apply_pose(at, yaw, 0.0, vel, 1.0, flags, attacks, _weapon_ids[weapon - 1] if weapon > 0 else "", hp_left)
+
+
+func bot_players() -> Array:
+	return _bots.values()
 
 
 @rpc("any_peer", "reliable")
@@ -908,9 +1055,15 @@ func _status(peer: int, kind: int, seconds: float) -> void:
 			world.player.apply_status(kind, seconds)
 	elif _avatars.has(peer):
 		(_avatars[peer] as Avatar).show_status(kind, seconds)
+		if is_host() and _bots.has(peer):
+			(_bots[peer] as BotPlayer).apply_status(kind, seconds)
 
 
 func ignite_peer(peer: int, seconds: float) -> void:
+	if is_bot(peer):
+		if _bots.has(peer):
+			(_bots[peer] as BotPlayer).ignite(seconds)
+		return
 	_ignite.rpc_id(peer, seconds)
 
 
@@ -1111,7 +1264,7 @@ func _note_death(peer: int, by_peer: int) -> void:
 		if lives_of(peer) == 0 and world:
 			world.director.show_banner("%s is out" % roster[peer]["name"], 3.0)
 	if _avatars.has(peer):
-		(_avatars[peer] as Avatar).dead = true
+		(_avatars[peer] as Avatar).set_fallen(true)
 	_score.rpc(peer, roster[peer]["score"], roster[peer]["deaths"], lives_of(peer))
 	if by_peer > 0 and roster.has(by_peer):
 		roster[by_peer]["score"] = int(roster[by_peer]["score"]) + KILL_POINTS
@@ -1127,7 +1280,7 @@ func _note_pvp(killer: int, victim: int) -> void:
 	if world == null or not is_instance_valid(world) or world.player == null:
 		return
 	if killer == my_id():
-		world.player.add_xp(50)
+		world.player.add_xp(80 if fog_rules() else 50)
 		world.player.heal(25.0)
 		world.player.say("You defeated %s" % roster[victim]["name"])
 	elif victim != my_id():
@@ -1158,18 +1311,20 @@ func _check_last_standing() -> void:
 		return
 	var alive: Array = roster.keys().filter(func(p: int) -> bool: return lives_of(p) > 0)
 	# Alone from the start, the fog decides. If the others have left, whoever is still here has won.
-	if alive.size() > 1 or (alive.size() == 1 and _started_with < 2):
+	# With every person out, nobody needs to sit and watch bots finish it off.
+	var people_left := alive.any(func(p: int) -> bool: return not is_bot(p))
+	if (alive.size() > 1 and people_left) or (alive.size() == 1 and _started_with < 2):
 		return
-	var winner: int = alive[0] if alive.size() == 1 else _best_score()
+	var winner: int = _best_score(alive if not alive.is_empty() else roster.keys())
 	last_winner = winner
 	_winner.rpc(winner)
 	finish("Last one standing", "%s wins.\n%s" % [roster[winner]["name"], score_lines()])
 
 
-func _best_score() -> int:
+func _best_score(among: Array) -> int:
 	var best := -1
 	var who := 1
-	for p: int in roster:
+	for p: int in among:
 		if int(roster[p]["score"]) > best:
 			best = int(roster[p]["score"])
 			who = p

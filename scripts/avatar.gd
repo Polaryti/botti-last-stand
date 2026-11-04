@@ -162,15 +162,7 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 	_has_turret = flags & 128 != 0
 	_show_seat()
 	hp_fraction = hp_left
-	var fell := flags & 1 != 0
-	if fell != dead:
-		dead = fell
-		collision_layer = 0 if dead else LAYER_AVATAR
-		_current = ""
-		if dead:
-			_play("Death_A")
-		else:
-			_play("Idle")
+	set_fallen(flags & 1 != 0)
 	if attacks != _attack_seen:
 		_attack_seen = attacks
 		if not dead:
@@ -183,6 +175,23 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 		_hand.mesh = WeaponDefs.mesh(weapon) if weapon != "" else null
 		if weapon != "":
 			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * 1.6 / _fit
+
+
+## They go down where they stood, and lie there until they come back.
+func set_fallen(on: bool) -> void:
+	if on == dead:
+		return
+	dead = on
+	collision_layer = 0 if dead else LAYER_AVATAR
+	_attack_left = 0.0
+	_current = ""
+	_play("Death_A" if dead else "Idle")
+
+
+## Straight there, without gliding across the map on the way.
+func teleport(at: Vector3) -> void:
+	_target = at
+	global_position = at
 
 
 func _process(delta: float) -> void:

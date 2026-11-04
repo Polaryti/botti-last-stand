@@ -2,6 +2,20 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.10.0 (4 November 2026)
+### New
+- Bots in Play Together: the host can add up to three, in every mode. They fill empty places, follow you in co-op, fight in All vs All and Teams, fall and come back. If a friend joins a full game, they take a bot's place.
+- With bots you can play All vs All or Teams alone. Bots do not raise the co-op bonus on Botti Doubloons.
+### Changed
+- The game is now called Botti's Last Stand.
+- Reading a skill you can take now has an Unlock button, so you do not have to go back to choose it.
+- All vs All: levels come twice as fast, and defeating someone gives more experience.
+- The Artificer's code had a spelling mistake. It is now spelled correctly, and the old spelling no longer works. If you already opened the class, you keep it.
+### Fixed
+- All vs All and Teams could be started with nobody to fight. They now need a player or a bot on the other side.
+- A fallen player stayed standing, frozen, on the host's phone. They now fall and lie on the ground until they come back.
+- Once the fog had closed, standing on its exact centre was safe.
+
 ## 0.9.0 (4 November 2026)
 ### New
 - All vs All is a new kind of match: three lives each, and a deadly fog closes in on the village. The last one standing wins, in about six minutes. Zombies are still out there, and if you are out you can watch.

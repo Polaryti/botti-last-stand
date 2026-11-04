@@ -34,6 +34,12 @@ func _ready() -> void:
 	m.show_lobby()
 	await wait(0.3)
 	await snap("lobby")
+	Net.set_rules(Net.Rules.FFA)
+	await wait(0.2)
+	await snap("lobby_alone")
+	Net.set_bots(2)
+	await wait(0.2)
+	await snap("lobby_bots")
 	Net.leave()
 	await wait(0.2)
 	Game.doubloons = 800

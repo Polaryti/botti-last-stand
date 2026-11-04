@@ -117,7 +117,7 @@ def doubloon():
 def wordmark(size=132):
     """The game's name, lit a little from below, as if by a fire nobody can see."""
     font = ImageFont.truetype("assets/fonts/Cinzel-Black.ttf", size * 3)
-    text = "Botti Last Stand"
+    text = "Botti's Last Stand"
     probe = ImageDraw.Draw(Image.new("L", (8, 8)))
     box = probe.textbbox((0, 0), text, font=font)
     pad = 60 * 3 // 3

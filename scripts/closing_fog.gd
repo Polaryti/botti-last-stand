@@ -65,7 +65,8 @@ static func is_closing(t: float) -> bool:
 
 
 func contains(at: Vector3, margin := 0.0) -> bool:
-	return Vector2(at.x - centre.x, at.z - centre.y).length() <= radius + margin
+	# Once it has closed there is nowhere left, not even the very middle.
+	return radius > 0.0 and Vector2(at.x - centre.x, at.z - centre.y).length() <= radius + margin
 
 
 func _process(delta: float) -> void:

@@ -1428,7 +1428,6 @@ func player_start(peer: int) -> Vector3:
 	return Vector3(s.x, ground_at(s) + 0.05, s.z)
 
 
-## Somewhere to come back: as far as can be managed from everyone else.
 func stock_wood() -> void:
 	if wood_spots.is_empty():
 		return
@@ -1439,6 +1438,25 @@ func stock_wood() -> void:
 		if other.global_position.distance_to(at) < 1.0:
 			return
 	spawn_pickup_at(at, Pickup.Kind.WOOD, "wood")
+
+
+## Somewhere to come back: as far as can be managed from everyone else. A bot asks from its own side.
+func far_from_rivals_of(peer: int) -> Vector3:
+	var best := Vector3(fog.centre.x, 0, fog.centre.y) if fog else Vector3(0, 0, 4.5)
+	var best_d := -1.0
+	for i in 12:
+		var spot := loot_spots[randi() % loot_spots.size()]
+		if fog and not fog.contains(spot, -5.0):
+			continue
+		var near := INF
+		for t: Target in players:
+			var other: int = (t as Avatar).peer if t is Avatar else Net.my_id()
+			if not t.dead and Net.bots_foes(peer, other):
+				near = minf(near, t.global_position.distance_to(spot))
+		if near > best_d:
+			best_d = near
+			best = spot
+	return best
 
 
 func far_from_rivals() -> Vector3:

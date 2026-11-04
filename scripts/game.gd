@@ -7,7 +7,7 @@ const SAVE_PATH := "user://settings.cfg"
 const NIGHT_LENGTH := 600.0
 ## Codes are kept as hashes, so they cannot simply be read out of the game files or the repository.
 const CODES := {"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b36": "revenant",
-	"7a3ce9794828ed7871e069bbe3d115b24e9f62b0e0c3972339a454141e79ecdb": "artificer"}
+	"28e314800565692691a7af4606286f26fc0f53b2201fe1fb4c8feaa018e3a6ad": "artificer"}
 
 var mode: int = Mode.MENU
 var test_map := "" # a map scene to play instead of the usual one: see MapRoot

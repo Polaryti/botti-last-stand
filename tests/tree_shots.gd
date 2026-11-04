@@ -28,6 +28,10 @@ func _ready() -> void:
 	m.toggle_tree()
 	await wait(0.2)
 	await snap("a_first")
+	m.tree_panel.read(m.tree_panel._map.nodes[1])
+	await wait(0.2)
+	await snap("a_read_unlock")
+	m.tree_panel.read(null)
 	pl.choose_ability(0, 0)
 	pl.points = 0
 	m.tree_panel.refresh(true)

@@ -968,7 +968,7 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 		return
 	_run_over = true
 	var won := reached_dawn or Net.last_winner == Net.my_id()
-	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp()))
+	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp() and Net.humans() > 1))
 	close_tree()
 	if hud:
 		hud.release_all()
@@ -1188,14 +1188,26 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		var levels := HBoxContainer.new()
 		levels.add_theme_constant_override("separation", 8)
 		body.add_child(levels)
+		var bots_row := levels
 		levels.add_child(_body("Difficulty", 24))
 		for d in 3:
 			var level := d
-			levels.add_child(_button(["Easy", "Normal", "Hard"][d], func() -> void: Net.set_difficulty(level), Vector2(150, 52), Net.difficulty == d))
+			levels.add_child(_button(["Easy", "Normal", "Hard"][d], func() -> void: Net.set_difficulty(level), Vector2(125, 52), Net.difficulty == d))
+		bots_row.add_child(_body("  Bots", 24))
+		for n in Net.MAX_PLAYERS - Net.humans() + 1:
+			var wanted := n
+			bots_row.add_child(_button(str(n), func() -> void: Net.set_bots(wanted), Vector2(62, 52), Net.bot_count() == n))
 	else:
 		body.add_child(_body("Game: %s, %s. The host starts when everyone is ready." % [Net.RULE_NAMES[Net.rules], ["Easy", "Normal", "Hard"][Net.difficulty]], 24))
 	if Net.rules == Net.Rules.FFA:
 		body.add_child(_soft("Three lives each, and a deadly fog closes in. The last one standing wins.", 23))
+	if not Net.can_start():
+		var need := "All vs All needs someone to fight." if Net.rules == Net.Rules.FFA else "Teams needs a player or bot on each side."
+		if Net.is_host():
+			need += " Wait for a friend or add a bot."
+		var why := _soft(need, 23)
+		why.add_theme_color_override("font_color", UiTheme.EMBER)
+		body.add_child(why)
 	var ids: Array = Net.roster.keys()
 	ids.sort()
 	for peer: int in ids:
@@ -1231,7 +1243,9 @@ func _fill_lobby(body: VBoxContainer) -> void:
 	if Net.rules == Net.Rules.TEAMS:
 		foot.add_child(_button("Change team", Net.switch_team, Vector2(240, 66)))
 	if Net.is_host():
-		foot.add_child(_button("Start the night", Net.start_match, Vector2(360, 66), true))
+		var go := _button("Start the night", Net.start_match, Vector2(360, 66), true)
+		go.disabled = not Net.can_start()
+		foot.add_child(go)
 	foot.add_child(_button("Leave", show_menu, Vector2(180, 66)))
 
 

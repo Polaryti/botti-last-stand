@@ -47,10 +47,12 @@ An app signed with a different key will not install over one already on a phone 
     godot --headless --path . res://tests/test_game.tscn -- quick     # the later half of the checks, without the first play-through
     godot --headless --path . res://tests/test_game.tscn -- soak      # a long night with everything going on
 
-Multiplayer has its own test, which runs two copies of the game talking to each other. Start the host and the client in two terminals. The third word can be `coop`, `ffa`, `teams`, `fort`, `ride`, `chariot` or `soak`:
+Multiplayer has its own test, which runs two copies of the game talking to each other. Start the host and the client in two terminals. The third word can be `bots`, `botsffa`, `coop`, `ffa`, `teams`, `fort`, `ride`, `chariot` or `soak`:
 
     godot --headless --path . res://tests/net_test.tscn -- host coop
     godot --headless --path . res://tests/net_test.tscn -- client coop
+
+`tests/bot_watch.tscn` watches the multiplayer bots play a match at high speed, with the player safely aside: `-- coop 3 300` is the rules, how many bots and how many seconds. After those can come a class for all of them and a clock to start from.
 
 `tests/sim.tscn` is a balance simulator. A bot with human limits plays whole nights at high speed and prints one line of results per night:
 

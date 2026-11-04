@@ -269,12 +269,23 @@ func _show_reading() -> void:
 	state.add_theme_font_size_override("font_size", 23)
 	state.add_theme_color_override("font_color", UiTheme.EMBER)
 	text.add_child(state)
+	var buttons := VBoxContainer.new()
+	buttons.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	buttons.add_theme_constant_override("separation", 10)
+	row.add_child(buttons)
+	if state_of(_reading) == "ready":
+		var taking := _reading
+		var unlock := Button.new()
+		unlock.text = "Unlock"
+		unlock.custom_minimum_size = Vector2(190, 72)
+		UiTheme.primary(unlock)
+		unlock.pressed.connect(func() -> void: choose(taking.step, taking.spec if taking.spec >= 0 and taking.step == Player.CORE_STEPS else taking.option))
+		buttons.add_child(unlock)
 	var back := Button.new()
 	back.text = "Your choice" if player.points > 0 else "OK"
 	back.custom_minimum_size = Vector2(190, 64)
-	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	back.pressed.connect(func() -> void: read(null))
-	row.add_child(back)
+	buttons.add_child(back)
 
 
 func _state_words(n: TreeNodeButton) -> String:
