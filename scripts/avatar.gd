@@ -168,13 +168,34 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 		if not dead:
 			_attack_left = 0.5
 			_current = ""
-			_play("1H_Melee_Attack_Chop" if weapon == "" or not WeaponDefs.is_ranged(weapon) else "2H_Ranged_Shoot", 1.6)
+			_play(_attack_anim(weapon), 1.6)
 			Sfx.play_at("swing", global_position, world.player.global_position if world.player else global_position, -4.0)
 	if weapon != _weapon:
 		_weapon = weapon
 		_hand.mesh = WeaponDefs.mesh(weapon) if weapon != "" else null
 		if weapon != "":
-			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * 1.6 / _fit
+			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * (0.8 if WeaponDefs.hand_rotation(weapon) != Vector3.ZERO else 1.6) / _fit
+			_hand.rotation = WeaponDefs.hand_rotation(weapon)
+
+
+static func _attack_anim(weapon: String) -> String:
+	if weapon == "":
+		return "1H_Melee_Attack_Chop"
+	var d: Dictionary = WeaponDefs.ALL[weapon]
+	if d["kind"] == WeaponDefs.Kind.SPELL:
+		return "Spellcast_Shoot"
+	if d["kind"] == WeaponDefs.Kind.RANGED:
+		return "Unarmed_Melee_Attack_Punch_A" if d.has("shot") or d.get("returning", false) else "2H_Ranged_Shoot"
+	return "Unarmed_Melee_Attack_Punch_A" if d.get("swing", "") in ["thrust", "claw"] else "1H_Melee_Attack_Chop"
+
+
+## They used an ability: everyone can see them raise a hand.
+func play_cast() -> void:
+	if dead:
+		return
+	_attack_left = 0.6
+	_current = ""
+	_play("Spellcast_Shoot", 1.4)
 
 
 ## They go down where they stood, and lie there until they come back.

@@ -26,6 +26,8 @@ var visual := false # someone else's shot: it flies here too, but only their pho
 var on_burst := Callable() # thrown things: what happens where it lands
 var chaos_left := 0 # bomblets: how many more times it bounces off and goes on
 var sparks := 0 # darts: how many others the spark jumps to
+var poison := Vector2.ZERO # damage per second, and seconds
+var stagger := 0.0
 var _returning := false
 var _spin := 0.0
 var _vel := Vector3.ZERO
@@ -56,6 +58,8 @@ func _ready() -> void:
 
 func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range: float, dmg: float, knock_force := 0.0, on_fire := false, bounce_count := 0) -> void:
 	kind = k
+	poison = Vector2.ZERO
+	stagger = 0.0
 	mesh = m
 	position = pos
 	_vel = vel
@@ -157,6 +161,8 @@ func _physics_process(delta: float) -> void:
 			if world.player:
 				world.player.on_hit(false)
 				world.player.on_shot_rival(a.peer, fire, frost)
+				if poison.y > 0.0:
+					Net.status_peer(a.peer, Net.Status.POISON, poison.y)
 				if sparks > 0:
 					Net.status_peer(a.peer, Net.Status.STUN, 0.5)
 			if kind != Kind.AXE:
@@ -255,6 +261,10 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if frost:
 		z.slow(ZombieDefs.BURN_SECONDS)
+	if poison.y > 0.0:
+		z.add_dot(poison.x, poison.y)
+	if stagger > 0.0:
+		z.stun(stagger)
 	world.sfx_at("thunk", at, -3.0)
 	_exclude.append(z.get_rid())
 	if blast_radius > 0.0:

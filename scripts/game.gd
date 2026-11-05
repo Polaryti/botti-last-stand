@@ -17,6 +17,9 @@ var player_name := ""
 var unlocked := {} # classes bought, or opened with a code
 var redeemed := {} # the hashes of codes already used on this phone
 var doubloons := 0
+var finished_games := 0
+var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
+const GAMES_FOR_MAGICIAN := 5
 var sensitivity := 1.0
 var quality := 1 # 0 low, 1 medium, 2 high
 var difficulty := 1 # 0 easy, 1 normal, 2 hard
@@ -64,6 +67,37 @@ func redeem_key(key: String) -> Dictionary:
 
 func owns_class(id: String) -> bool:
 	return not ClassDefs.ALL[id].get("hidden", false) or unlocked.has(id)
+
+
+## How to earn a class that cannot be bought.
+func earn_text(id: String) -> String:
+	match ClassDefs.ALL[id].get("earned", ""):
+		"rider":
+			return "Kill a Dread Rider to unlock this class."
+		"games":
+			return "Finish %d games to unlock this class, win or lose. So far: %d." % [GAMES_FOR_MAGICIAN, mini(finished_games, GAMES_FOR_MAGICIAN)]
+	return ""
+
+
+func note_rider_killed() -> void:
+	if mode != Mode.SANDBOX and not unlocked.has("chivalry"):
+		_earn("chivalry")
+
+
+## A game played to its end, won or lost. Leaving early does not get here, and the Sandbox has no end.
+func note_game_finished() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	finished_games += 1
+	if finished_games >= GAMES_FOR_MAGICIAN and not unlocked.has("magician"):
+		_earn("magician")
+	save_settings()
+
+
+func _earn(id: String) -> void:
+	unlocked[id] = true
+	fresh_unlocks.append(id)
+	save_settings()
 
 
 func buy_class(id: String) -> bool:
@@ -160,6 +194,7 @@ func load_settings() -> void:
 	unlocked = c.get_value("progress", "unlocked", {})
 	redeemed = c.get_value("progress", "redeemed", {})
 	doubloons = c.get_value("progress", "doubloons", 0)
+	finished_games = c.get_value("progress", "finished_games", 0)
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class):
 		player_class = "infantry"
 	best_time = c.get_value("progress", "best_time", 0.0)
@@ -183,6 +218,7 @@ func save_settings() -> void:
 	c.set_value("progress", "unlocked", unlocked)
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
+	c.set_value("progress", "finished_games", finished_games)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)

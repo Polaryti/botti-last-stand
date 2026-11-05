@@ -19,12 +19,12 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 15
+const PROTOCOL := 16
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
 enum Fx { FIRE_PATCH, SPARK, SENTRY }
-enum Status { FREEZE, STUN, SLOW, BURN }
+enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED }
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
 const SNAPSHOT_EVERY := 0.08
@@ -188,7 +188,7 @@ func set_bots(count: int) -> void:
 		if roster.has(id):
 			continue
 		mine.append(id)
-		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("hidden", false))
+		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("hidden", false) or ClassDefs.ALL[c].has("earned"))
 		# Each bot something different, as long as there are enough to go round.
 		for other: int in mine:
 			if roster.has(other):
@@ -824,6 +824,29 @@ func _world_fx(kind: int, a: Vector3, b: Vector3) -> void:
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
 
 
+func ring_fx(at: Vector3, radius: float, col: Color) -> void:
+	if active():
+		_ring_fx.rpc(at, radius, col)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _ring_fx(at: Vector3, radius: float, col: Color) -> void:
+	if world and is_instance_valid(world):
+		world.show_ring(at, radius, col)
+
+
+func cast_anim() -> void:
+	if active():
+		_cast_anim.rpc()
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _cast_anim() -> void:
+	var a: Avatar = _avatars.get(multiplayer.get_remote_sender_id())
+	if a:
+		a.play_cast()
+
+
 func blast_fx(at: Vector3, radius: float, col: Color) -> void:
 	_blast_fx.rpc(at, radius, col)
 
@@ -892,7 +915,7 @@ func _send_snapshot() -> void:
 			| (32 if z._frozen > 0.0 else 0) | (64 if z.is_warning() else 0) | (128 if z._mounted else 0)
 		b.encode_u8(at + 8, flags)
 		b.encode_u8(at + 9, clampi(int(z.hp / maxf(z.max_hp, 1.0) * 255.0), 0, 255))
-		b.encode_u8(at + 10, int(_anim_ids.get(z._current_anim, 0)))
+		b.encode_u8(at + 10, int(_anim_ids.get(z._current_anim, 0)) | (64 if z.poison_left > 0.0 else 0) | (128 if z.bleed_left > 0.0 else 0))
 		b.encode_u8(at + 11, clampi(int(z.anim_speed() * 40.0), 0, 255))
 		at += 12
 	b.resize(at)
@@ -908,9 +931,13 @@ func _snapshot(b: PackedByteArray) -> void:
 	while at + 12 <= b.size():
 		var z: Zombie = world.zombie_by_id(b.decode_u8(at))
 		if z and z.active:
+			var anim_byte := b.decode_u8(at + 10)
 			z.net_apply(Vector3(b.decode_s16(at + 1), b.decode_s16(at + 3), b.decode_s16(at + 5)) * 0.01,
 				b.decode_u8(at + 7) / 255.0 * TAU, b.decode_u8(at + 8), b.decode_u8(at + 9) / 255.0,
-				ANIMS[mini(b.decode_u8(at + 10), ANIMS.size() - 1)], b.decode_u8(at + 11) / 40.0)
+				ANIMS[mini(anim_byte & 63, ANIMS.size() - 1)], b.decode_u8(at + 11) / 40.0)
+			if anim_byte & 192 != z.shown_debuffs:
+				z.shown_debuffs = anim_byte & 192
+				z.show_debuffs(anim_byte & 64 != 0, anim_byte & 128 != 0)
 		at += 12
 
 
@@ -1032,6 +1059,7 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.IGNITE: z.ignite(a)
 		Zombie.Effect.MARK: z.mark(a, b)
 		Zombie.Effect.DOT: z.add_dot(a, b)
+		Zombie.Effect.BLEED: z.add_dot(a, b, true)
 		Zombie.Effect.FORGET: z.forget()
 		Zombie.Effect.FREEZE: z.freeze(a)
 		Zombie.Effect.TAUNT: z.taunted_by(Vector3(a, 0.0, b))

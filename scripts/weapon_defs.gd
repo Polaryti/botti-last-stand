@@ -1,40 +1,47 @@
 class_name WeaponDefs
-## All weapons do the same damage for now. Range, cadence, shape and a special rule set them apart.
+## Each hit does DAMAGE times the weapon's power. Range, cadence, shape and a special rule set them apart.
 
 enum Kind { MELEE, RANGED, SPELL }
 
 const DAMAGE := 25.0
+const HAND_TURN := PI * 0.5
 const TORCH_FIRE := 0.575 # how high up a torch the fire starts
 
 const ALL := {
-	"dagger": {"name": "Dagger", "desc": "Very fast, and short reach.", "kind": Kind.MELEE, "rate": 0.26, "range": 1.9, "cone": 70.0, "max_hits": 1,
+	"dagger": {"power": 0.65, "name": "Dagger", "backstab": true, "desc": "Very fast, with short reach. Does double damage from behind.", "kind": Kind.MELEE, "rate": 0.26, "range": 1.9, "cone": 70.0, "max_hits": 1,
 		"knock": 1.0, "swing": "stab", "weight": 1.2, "pos": Vector3(0.24, -0.26, -0.42), "scale": 0.3},
 	"sword": {"name": "Sword", "desc": "A good all-round blade that cuts up to three at once.", "kind": Kind.MELEE, "rate": 0.55, "range": 2.8, "cone": 95.0, "max_hits": 3,
 		"knock": 2.5, "swing": "slash", "weight": 1.6, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.3},
-	"spear": {"name": "Spear", "desc": "Long reach in a narrow line.", "kind": Kind.MELEE, "rate": 0.6, "range": 4.4, "cone": 24.0, "max_hits": 1,
+	"spear": {"power": 1.25, "name": "Spear", "desc": "Long reach in a narrow line, and hits hard.", "kind": Kind.MELEE, "rate": 0.6, "range": 4.4, "cone": 24.0, "max_hits": 1,
 		"knock": 2.0, "swing": "thrust", "weight": 1.6, "pos": Vector3(0.22, -0.24, 0.05), "scale": 1.0},
-	"mace": {"name": "Mace", "desc": "Short but very broad. Sends enemies flying.", "kind": Kind.MELEE, "rate": 0.6, "range": 2.2, "cone": 170.0, "max_hits": 6,
+	"mace": {"power": 1.05, "name": "Mace", "desc": "Short but very broad. Sends enemies flying.", "kind": Kind.MELEE, "rate": 0.6, "range": 2.2, "cone": 170.0, "max_hits": 6,
 		"knock": 4.0, "swing": "smash", "weight": 1.6, "pos": Vector3(0.28, -0.3, -0.46), "scale": 0.72},
-	"lance": {"name": "Lance", "desc": "The longest reach of all, through up to two enemies.", "kind": Kind.MELEE, "rate": 0.75, "range": 5.2, "cone": 16.0, "max_hits": 2,
+	"lance": {"power": 1.5, "name": "Lance", "charge": true, "desc": "The longest reach of all, through up to two enemies. Half as strong again while you run or ride.", "kind": Kind.MELEE, "rate": 0.75, "range": 5.2, "cone": 16.0, "max_hits": 2,
 		"knock": 3.0, "swing": "thrust", "weight": 0.7, "pos": Vector3(0.24, -0.22, 0.35), "scale": 1.0},
-	"scythe": {"name": "Scythe", "desc": "Slow, and sweeps a huge arc through a whole crowd.", "kind": Kind.MELEE, "rate": 0.95, "range": 3.3, "cone": 210.0, "max_hits": 8,
+	"scythe": {"power": 0.8, "name": "Scythe", "bleed": true, "desc": "Slow, and sweeps a huge arc through a whole crowd. Leaves them bleeding.", "kind": Kind.MELEE, "rate": 0.95, "range": 3.3, "cone": 210.0, "max_hits": 8,
 		"knock": 2.0, "swing": "reap", "arc": 1.2, "weight": 1.2, "pos": Vector3(0.28, -0.32, -0.42), "scale": 0.72},
-	"flail": {"name": "Flail", "desc": "Gets faster the longer you keep swinging.", "kind": Kind.MELEE, "rate": 0.85, "range": 2.5, "cone": 100.0, "max_hits": 3,
+	"flail": {"power": 0.95, "name": "Flail", "desc": "Gets faster the longer you keep swinging.", "kind": Kind.MELEE, "rate": 0.85, "range": 2.5, "cone": 100.0, "max_hits": 3,
 		"knock": 2.0, "swing": "smash", "momentum": true, "weight": 1.2, "pos": Vector3(0.28, -0.28, -0.46), "scale": 0.72},
-	"bell_hammer": {"name": "Bell Hammer", "desc": "Stuns all it hits, and everyone can hear it.", "kind": Kind.MELEE, "rate": 1.05, "range": 2.5, "cone": 130.0, "max_hits": 6,
+	"bell_hammer": {"power": 1.3, "name": "Bell Hammer", "desc": "Stuns all it hits, and everyone can hear it.", "kind": Kind.MELEE, "rate": 1.05, "range": 2.5, "cone": 130.0, "max_hits": 6,
 		"knock": 4.0, "swing": "overhead", "stun": 1.3, "loud": 22.0, "weight": 1.0, "pos": Vector3(0.22, -0.4, -0.5), "scale": 0.5},
-	"pitchfork": {"name": "Pitchfork", "desc": "Stabs straight through up to three in a row.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.8, "cone": 16.0, "max_hits": 3,
+	"pitchfork": {"power": 0.8, "name": "Pitchfork", "desc": "Stabs straight through up to three in a row.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.8, "cone": 16.0, "max_hits": 3,
 		"knock": 1.5, "swing": "thrust", "weight": 1.3, "pos": Vector3(0.22, -0.24, 0.0), "scale": 1.0},
-	"torch": {"name": "Torch", "desc": "Sets enemies on fire and lights your way.", "kind": Kind.MELEE, "rate": 0.5, "range": 2.0, "cone": 80.0, "max_hits": 2,
+	"torch": {"power": 0.55, "name": "Torch", "desc": "Sets enemies on fire and lights your way.", "kind": Kind.MELEE, "rate": 0.5, "range": 2.0, "cone": 80.0, "max_hits": 2,
 		"knock": 1.0, "swing": "slash", "burns": true, "weight": 1.2, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.72},
 	"bow": {"nock": Vector3(-0.01, 0.0, -0.02), "name": "Short Bow", "desc": "Medium range and steady.", "kind": Kind.RANGED, "rate": 0.65, "range": 36.0, "speed": 38.0, "gravity": 3.5,
 		"knock": 1.5, "weight": 1.6, "pos": Vector3(0.17, -0.1, -0.45), "scale": 0.5, "tilt": -0.42},
-	"crossbow": {"nock": Vector3(0.0, 0.03, -0.16), "name": "Crossbow", "desc": "Short range and very fast.", "kind": Kind.RANGED, "rate": 0.3, "range": 16.0, "speed": 30.0, "gravity": 3.5,
+	"crossbow": {"power": 0.6, "nock": Vector3(0.0, 0.03, -0.16), "name": "Crossbow", "desc": "Short range and very fast, but each bolt is light.", "kind": Kind.RANGED, "rate": 0.3, "range": 16.0, "speed": 30.0, "gravity": 3.5,
 		"knock": 1.0, "weight": 1.3, "pos": Vector3(0.17, -0.2, -0.3), "scale": 0.2, "mesh_yaw": 3.1416},
-	"longbow": {"nock": Vector3(-0.01, 0.0, -0.02), "name": "Long Bow", "desc": "Slow, and reaches across the map. Zoom in to aim.", "kind": Kind.RANGED, "rate": 1.25, "range": 75.0, "speed": 64.0, "gravity": 1.5,
+	"longbow": {"power": 3.2, "nock": Vector3(-0.01, 0.0, -0.02), "name": "Long Bow", "pierce": 2, "desc": "Slow, but one arrow kills a zombie and goes on through two more. Reaches across the map. Zoom in to aim.", "kind": Kind.RANGED, "rate": 1.25, "range": 75.0, "speed": 64.0, "gravity": 1.5,
 		"knock": 2.5, "zoom_fov": 38.0, "weight": 1.0, "pos": Vector3(0.17, -0.1, -0.5), "scale": 0.7, "tilt": -0.42},
-	"axes": {"name": "Throwing Axes", "desc": "They come back to you, cutting on the way out and back. No arrows needed.", "kind": Kind.RANGED, "rate": 0.5, "range": 15.0, "speed": 24.0, "gravity": 0.0,
+	"axes": {"power": 0.9, "name": "Throwing Axes", "desc": "They come back to you, cutting on the way out and back. No arrows needed.", "kind": Kind.RANGED, "rate": 0.5, "range": 15.0, "speed": 24.0, "gravity": 0.0,
 		"knock": 2.0, "returning": true, "weight": 1.1, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
+	"javelins": {"power": 2.2, "pierce": 1, "shot": "javelin", "name": "Javelins", "desc": "Heavy, with a falling arc. Passes through the first enemy. Uses arrows.", "kind": Kind.RANGED, "rate": 1.0, "range": 30.0, "speed": 27.0, "gravity": 8.0,
+		"knock": 3.5, "weight": 1.0, "pos": Vector3(0.22, -0.22, -0.1), "scale": 1.0},
+	"sling": {"power": 0.5, "free_ammo": true, "stagger": 0.35, "shot": "stone", "name": "Sling", "desc": "Stones are everywhere, so it never needs arrows. Weak, but it staggers what it hits.", "kind": Kind.RANGED, "rate": 0.55, "range": 24.0, "speed": 28.0, "gravity": 7.0,
+		"knock": 2.0, "weight": 1.2, "pos": Vector3(0.24, -0.14, -0.44), "scale": 1.5},
+	"blowgun": {"power": 0.25, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.8, "range": 22.0, "speed": 40.0, "gravity": 2.0,
+		"knock": 0.0, "weight": 0.9, "pos": Vector3(0.14, -0.16, -0.25), "scale": 1.0},
 	"claws": {"name": "Spectral Claws", "desc": "A Revenant's own hands, shrouded in mist. Each blow uses a little Mist.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.5, "cone": 100.0, "max_hits": 2,
 		"knock": 1.2, "swing": "claw", "cost": 6.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
 	"staff": {"name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
@@ -66,12 +73,20 @@ static func pick_random() -> String:
 	return "sword"
 
 
+## How a weapon sits in a character's hand. Poles and bows are drawn along their length, so they need
+## a quarter turn to point where the character is looking.
+static func hand_rotation(id: String) -> Vector3:
+	if id in ["spear", "lance", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow"]:
+		return Vector3(HAND_TURN, 0.0, 0.0)
+	return Vector3.ZERO
+
+
 static func is_ranged(id: String) -> bool:
 	return ALL[id]["kind"] == Kind.RANGED
 
 
 static func uses_arrows(d: Dictionary) -> bool:
-	return d["kind"] == Kind.RANGED and not d.get("returning", false)
+	return d["kind"] == Kind.RANGED and not d.get("returning", false) and not d.get("free_ammo", false)
 
 
 static func mesh(id: String) -> Mesh:
@@ -93,6 +108,9 @@ static func mesh(id: String) -> Mesh:
 		"pitchfork": m = _pitchfork()
 		"torch": m = _torch()
 		"axes": m = axe_mesh()
+		"javelins": m = _javelins()
+		"sling": m = _sling()
+		"blowgun": m = _blowgun()
 		"staff": m = _staff()
 		"claws": m = _claws()
 	_meshes[id] = m
@@ -126,6 +144,31 @@ static func _spear() -> Mesh:
 	l.prism(Vector3(0, 0, 0.5), Vector3(0, 0, -1.6), 0.018, 0.018, 5, WOOD)
 	l.box(Vector3(0, 0, -1.6), Vector3(0.05, 0.05, 0.06), DARK)
 	l.prism(Vector3(0, 0, -1.62), Vector3(0, 0, -1.95), 0.05, 0.0, 4, STEEL)
+	return l.commit()
+
+
+static func _javelins() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, 0, 0.45), Vector3(0, 0, -0.75), 0.016, 0.016, 5, LIGHT_WOOD)
+	l.prism(Vector3(0, 0, -0.75), Vector3(0, 0, -1.0), 0.04, 0.0, 4, STEEL)
+	l.box(Vector3(0, 0, 0.05), Vector3(0.035, 0.035, 0.12), DARK)
+	return l.commit()
+
+
+static func _sling() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, 0.02, 0), Vector3(0.05, -0.1, -0.08), 0.006, 0.006, 3, WOOD)
+	l.prism(Vector3(0, 0.02, 0), Vector3(-0.05, -0.1, -0.08), 0.006, 0.006, 3, WOOD)
+	l.box(Vector3(0, -0.13, -0.09), Vector3(0.09, 0.05, 0.07), Color(0.3, 0.2, 0.12))
+	l.box(Vector3(0, -0.1, -0.09), Vector3(0.05, 0.04, 0.05), Color(0.5, 0.5, 0.5))
+	return l.commit()
+
+
+static func _blowgun() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, 0, 0.2), Vector3(0, 0, -0.62), 0.016, 0.012, 6, Color(0.46, 0.5, 0.26))
+	l.box(Vector3(0, 0, -0.2), Vector3(0.028, 0.028, 0.03), DARK)
+	l.box(Vector3(0, 0, 0.12), Vector3(0.028, 0.028, 0.03), DARK)
 	return l.commit()
 
 

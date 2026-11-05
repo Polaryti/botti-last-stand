@@ -24,6 +24,9 @@ const PVP_STATUS := 0.6 # a freeze or a stun lasts this much as long on a player
 const PVP_STATUS_GAP := 1.5
 const FOG_XP := 0.5
 const WADE_SPEED := 0.7
+const POISON_HURT := 1.05 # poisoned: everything hurts this much more
+const BLEED_SPEED := 0.9 # bleeding: this much of your speed is left
+const DEBUFF_DPS := 3.0
 const SWING_HIT := 0.3 # how far through a swing the blow lands
 const BASH := {"kind": WeaponDefs.Kind.MELEE, "rate": 0.8, "range": 2.3, "cone": 110.0, "max_hits": 1, "knock": 3.5, "power": 0.6}
 
@@ -121,6 +124,9 @@ var _dawn_bright := 0.0
 var hit_marker := 0.0
 var hit_head := false
 var burn_time := 0.0
+var poison_left := 0.0
+var bleed_left := 0.0
+var _debuff_tick := 0.0
 var frozen_left := 0.0 # frozen or stunned by another player: you can look around, and that is all
 var is_iced := false
 var _status_immune := 0.0 # just after a freeze or stun nobody can start another, or it never ends
@@ -476,7 +482,7 @@ func hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		Sfx.play("block", 0.0)
 		say("Perfect Riposte!")
 		return
-	var dmg := amount * m("damage_taken")
+	var dmg := amount * m("damage_taken") * (POISON_HURT if poison_left > 0.0 else 1.0)
 	if Net.active():
 		# A Guardian nearby takes part of it.
 		var cover: Avatar = world.best_cover(global_position)
@@ -554,6 +560,12 @@ func apply_status(kind: int, seconds: float) -> void:
 			say("Stunned!")
 		Net.Status.SLOW:
 			slowed_left = maxf(slowed_left, secs)
+		Net.Status.POISON:
+			poison_left = maxf(poison_left, seconds)
+			say("Poisoned")
+		Net.Status.BLEED:
+			bleed_left = maxf(bleed_left, seconds)
+			say("Bleeding")
 		Net.Status.BURN:
 			ignite(secs)
 
@@ -590,6 +602,8 @@ func respawn(at: Vector3) -> void:
 	hp = max_hp()
 	mana = max_mana()
 	burn_time = 0.0
+	poison_left = 0.0
+	bleed_left = 0.0
 	frozen_left = 0.0
 	slowed_left = 0.0
 	_status_immune = 0.0
@@ -616,11 +630,12 @@ func is_unseen() -> bool:
 
 ## Firelight shows you to everything out in the dark, and so does a torch in your hand.
 func sight_factor() -> float:
-	return maxf(0.15, m("sight")) * (WorldLight.SEEN_IN_LIGHT if _lit else 1.0)
+	return maxf(0.15, m("sight")) * (WorldLight.SEEN_IN_LIGHT if is_lit() else 1.0)
 
 
+## Burning counts: you are your own torch.
 func is_lit() -> bool:
-	return _lit
+	return _lit or burn_time > 0.0
 
 
 func look_direction() -> Vector3:
@@ -843,9 +858,9 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 				z.reveal_left = float(e["secs"])
 		"dot":
 			if z:
-				z.add_dot(float(e["dps"]), float(e["secs"]))
+				z.add_dot(float(e["dps"]), float(e["secs"]), e.get("bleed", false))
 			elif ctx.has("rival"):
-				Net.status_peer(ctx["rival"], Net.Status.BURN, float(e["secs"]))
+				Net.status_peer(ctx["rival"], Net.Status.BLEED if e.get("bleed", false) else Net.Status.POISON, float(e["secs"]))
 		"ignite":
 			if z:
 				z.ignite(ZombieDefs.BURN_SECONDS)
@@ -918,7 +933,7 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 				world.spawn_ally("skeleton", z.position, float(e["secs"]) * m("ally_time"))
 		"invis":
 			invis_left = maxf(invis_left, float(e["secs"]))
-			say("Unseen")
+			say("Invisible")
 		"guard":
 			guard_left = maxf(guard_left, float(e["secs"]))
 			Sfx.play("block", -6.0, 1.3, 0.2)
@@ -981,6 +996,10 @@ func _refresh_shield() -> void:
 
 func on_kill(z: Zombie) -> void:
 	kills += 1
+	if z.type_id == "rider" and not Game.unlocked.has("chivalry"):
+		Game.note_rider_killed()
+		if Game.unlocked.has("chivalry"):
+			say("Chivalry unlocked!")
 	add_xp(z.xp_value)
 	mana = minf(max_mana(), mana + float(class_def().get("kill_mist", 0.0)))
 	add_arrows(int(class_def().get("kill_arrows", 0)))
@@ -1366,6 +1385,7 @@ func use_burst() -> void:
 	burst_cd_left = m("burst_cd")
 	_cast_kind = "burst"
 	_cast_left = 0.45
+	Net.cast_anim()
 	Sfx.play("spell", -3.0, 0.55)
 
 
@@ -1384,6 +1404,7 @@ func use_art() -> void:
 	art_cd_left = float(d["cd"]) * m("art_cd")
 	_cast_kind = spec_id
 	_cast_left = float(d["cast"])
+	Net.cast_anim()
 	Sfx.play("spell", -5.0, 1.3)
 
 
@@ -1548,7 +1569,8 @@ func _bomblet_burst(at: Vector3, kind: String) -> void:
 	for r: Avatar in world.rivals_near(at, REACH):
 		Net.hit_player(r.peer, dmg, at)
 		match kind:
-			"fire", "poison": Net.status_peer(r.peer, Net.Status.BURN, 2.0)
+			"fire": Net.status_peer(r.peer, Net.Status.BURN, 2.0)
+			"poison": Net.status_peer(r.peer, Net.Status.POISON, 4.0)
 			"frost": Net.status_peer(r.peer, Net.Status.FREEZE, 1.5)
 			"thunder": Net.status_peer(r.peer, Net.Status.STUN, 0.8)
 	match kind:
@@ -1984,6 +2006,8 @@ func _physics_process(delta: float) -> void:
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
 	if slowed_left > 0.0:
 		speed *= 0.6
+	if bleed_left > 0.0:
+		speed *= BLEED_SPEED
 	var wading := world.terrain.in_water(global_position.x, global_position.z)
 	if wading:
 		speed *= WADE_SPEED
@@ -2104,6 +2128,16 @@ func _process(delta: float) -> void:
 	_cooldown -= delta
 	if dead:
 		return
+	if poison_left > 0.0 or bleed_left > 0.0:
+		poison_left -= delta
+		bleed_left -= delta
+		_debuff_tick -= delta
+		if _debuff_tick <= 0.0:
+			_debuff_tick = 1.0
+			hit_by = "poison" if poison_left > 0.0 else "bleeding"
+			hurt(DEBUFF_DPS, global_position)
+			if dead:
+				return
 	if burn_time > 0.0:
 		burn_time -= delta
 		if guard_left <= 0.0:
@@ -2183,7 +2217,7 @@ func _handle_fire() -> void:
 			if d.get("returning", false):
 				_throw_axe(d)
 			else:
-				if randf() >= m("arrow_save"):
+				if WeaponDefs.uses_arrows(d) and randf() >= m("arrow_save"):
 					arrows -= 1
 				_fire_arrow(d)
 		WeaponDefs.Kind.SPELL:
@@ -2238,7 +2272,7 @@ func _fire_arrow(d: Dictionary) -> void:
 	var power := m("ranged_power")
 	var speed: float = float(d["speed"]) * power
 	var max_range: float = float(d["range"]) * power
-	var dmg := WeaponDefs.DAMAGE * _ranged_mult()
+	var dmg := WeaponDefs.DAMAGE * float(d.get("power", 1.0)) * _ranged_mult()
 	_shot_count += 1
 	if has_flag("overdraw") and _shot_count % 3 == 0:
 		dmg *= 2.0
@@ -2251,7 +2285,16 @@ func _fire_arrow(d: Dictionary) -> void:
 		var side := dir.rotated(Vector3.UP, deg_to_rad(4.0))
 		world.spawn_player_arrow(self, start, side * speed + Vector3.UP * 0.5, float(d["gravity"]), max_range, float(d["knock"]), dmg)
 	_kick = 1.0
-	Sfx.play("crossbow" if weapon_id() == "crossbow" else "bow", -2.0, 0.85 if weapon_id() == "longbow" else 1.0)
+	if d.get("silent", false):
+		Sfx.play("bow", -16.0, 1.6)
+		return
+	if d.has("shot"):
+		_swing_time = 0.3
+		_swing = 0.0
+		_swing_keys = "throw"
+		Sfx.play("swing", -3.0, 0.75)
+	else:
+		Sfx.play("crossbow" if weapon_id() == "crossbow" else "bow", -2.0, 0.85 if weapon_id() == "longbow" else 1.0)
 	_noise(4.0)
 
 
@@ -2262,7 +2305,7 @@ func _throw_axe(d: Dictionary) -> void:
 	_swing_time = 0.3
 	_swing = 0.0
 	_swing_keys = "throw"
-	var dmg := WeaponDefs.DAMAGE * _ranged_mult()
+	var dmg := WeaponDefs.DAMAGE * float(d.get("power", 1.0)) * _ranged_mult()
 	world.spawn_axe(self, start, dir * float(d["speed"]) * m("ranged_power"), float(d["range"]) * m("ranged_power"), float(d["knock"]), dmg)
 	Sfx.play("swing", -3.0, 0.8)
 	_noise(3.0)
@@ -2296,6 +2339,8 @@ func melee_stats(d: Dictionary) -> Dictionary:
 	var mult := m("melee_damage") * damage_multiplier()
 	if is_riding():
 		mult *= m("riding_damage") * (2.0 if has_flag("couched") else 1.0)
+	if d.get("charge", false) and (is_riding() or Vector2(velocity.x, velocity.z).length() > WALK_SPEED * 0.8):
+		mult *= 1.5
 	return {
 		"damage": WeaponDefs.DAMAGE * mult * float(d.get("power", 1.0)),
 		"range": float(d["range"]) + m("melee_reach"),
@@ -2333,6 +2378,13 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if d.has("stun"):
 		z.stun(float(d["stun"]))
+	if d.get("bleed", false):
+		z.add_dot(8.0, 3.0, true)
+	if d.get("backstab", false) and z.is_alive():
+		var facing := Vector3(sin(z.rotation.y), 0, cos(z.rotation.y))
+		if facing.dot(global_position - z.position) < 0.0:
+			z.take_damage(melee_stats(d)["damage"], Vector3.ZERO, 0.0, z.centre())
+			say("Backstab!")
 	fire("hit", {"z": z})
 
 
@@ -2342,6 +2394,8 @@ func on_melee_rival(peer: int, d: Dictionary) -> void:
 		Net.status_peer(peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 	if d.has("stun"):
 		Net.status_peer(peer, Net.Status.STUN, float(d["stun"]))
+	if d.get("bleed", false):
+		Net.status_peer(peer, Net.Status.BLEED, 3.0)
 	fire("hit", {"rival": peer})
 
 

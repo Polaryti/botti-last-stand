@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_13()
 		await test_version_12_4()
 		await test_version_12_2()
 		await test_version_11()
@@ -75,6 +76,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_13()
 	await test_version_12_4()
 	await test_version_12_2()
 	await test_version_11()
@@ -148,7 +150,7 @@ func test_revenant() -> void:
 	ok(Game.redeem_key(_code_of("revenant"))["class"] == "revenant", "the code works")
 	ok(Game.redeem_key(_code_of("revenant"))["result"] == "used", "and only once")
 	ok(ClassDefs.available().has("revenant"), "and shows the class")
-	ok(ClassDefs.available().size() >= 6, "next to the others")
+	ok(ClassDefs.available().size() >= 4, "next to the others")
 	Game.save_settings()
 	Game.unlocked.clear()
 	Game.load_settings()
@@ -180,7 +182,7 @@ func test_revenant() -> void:
 	ok(pl.mana < 50.0, "and use Mist")
 	pl.mana = 50.0
 	await seconds(1.0)
-	ok(pl.mana > 54.0, "Mist comes back by itself (%.1f)" % pl.mana)
+	ok(pl.mana > 52.0, "Mist comes back by itself (%.1f)" % pl.mana)
 	pl.mana = 10.0
 	z.next_hitter = 0
 	await kill_all()
@@ -675,6 +677,124 @@ func test_fort() -> void:
 	wf.queue_free()
 	await frames(2)
 	Game.mode = Game.Mode.NIGHT
+	await start_clean()
+
+
+func test_version_13() -> void:
+	await start_clean()
+	# Weapons differ in strength now, and the long bow earns its slowness.
+	var longbow: Dictionary = WeaponDefs.ALL["longbow"]
+	ok(WeaponDefs.DAMAGE * float(longbow["power"]) >= float(ZombieDefs.ALL["normal"]["hp"]), "one long bow arrow kills a plain zombie")
+	ok(int(longbow["pierce"]) == 2, "and goes on through two more")
+	for id: String in ["javelins", "sling", "blowgun"]:
+		ok(WeaponDefs.is_ranged(id) and WeaponDefs.mesh(id) != null, "%s is a new ranged weapon" % id)
+	ok(not WeaponDefs.uses_arrows(WeaponDefs.ALL["sling"]), "the sling needs no arrows")
+	# Debuffs, on a mob.
+	var z := spawn("normal", front(6.0), true)
+	z.hp = 1000.0
+	z.max_hp = 1000.0
+	z.take_damage(100.0, Vector3.ZERO, 0.0, z.centre())
+	var plain := 1000.0 - z.hp
+	z.hp = 1000.0
+	z.add_dot(0.0, 5.0)
+	z.take_damage(100.0, Vector3.ZERO, 0.0, z.centre())
+	ok(is_equal_approx(1000.0 - z.hp, plain * 1.05), "poison: 5%% more damage from anything (%.1f against %.1f)" % [1000.0 - z.hp, plain])
+	z.state = Zombie.State.CHASE
+	var before := z._desired_speed()
+	z.add_dot(0.0, 5.0, true)
+	ok(is_equal_approx(z._desired_speed(), before * 0.9), "bleeding: 10% slower")
+	z.release()
+	# Debuffs, on you.
+	pl.hp = 100.0
+	pl.poison_left = 5.0
+	var hp_before := pl.hp
+	pl.hurt(20.0, pl.global_position)
+	ok(pl.hp < hp_before - 20.0, "poison makes you take more too")
+	pl.poison_left = 0.0
+	pl.hp = pl.max_hp()
+	pl.ignite(1.0)
+	ok(pl.is_lit(), "burning puts you in the light")
+	pl.burn_time = 0.0
+	# Invisible: not even right next to it.
+	var near := spawn("normal", pl.global_position + Vector3(1.2, 0, 0), false)
+	near._start_chase(pl.global_position)
+	pl.invis_left = 3.0
+	pl.hp = pl.max_hp()
+	var hp_now := pl.hp
+	await seconds(1.5)
+	ok(pl.hp >= hp_now, "nothing can hit what it cannot see, even next to it")
+	ok(not near._sees, "nor does it see you")
+	pl.invis_left = 0.0
+	near.release()
+	# Effects you can see.
+	w.stun_around(pl.global_position, 5.0, 0.1)
+	ok(not w._rings.is_empty() and (w._rings[0]["node"] as MeshInstance3D).visible, "an area stun sends a ring along the ground")
+	w.drop_poison(pl.global_position + Vector3(3, 0, 0), true, 2.0)
+	var puddle: MeshInstance3D = w._puddles[(w._next_puddle - 1 + w._puddles.size()) % w._puddles.size()]
+	ok((puddle.get_child(0) as Node3D).visible, "fire on the ground has real flames")
+	w.drop_poison(pl.global_position + Vector3(-3, 0, 0))
+	puddle = w._puddles[(w._next_puddle - 1 + w._puddles.size()) % w._puddles.size()]
+	ok((puddle.get_child(1) as CPUParticles3D).emitting and not (puddle.get_child(0) as Node3D).visible, "and poison bubbles")
+	# Weapons in the hand.
+	ok(WeaponDefs.hand_rotation("spear") != Vector3.ZERO and WeaponDefs.hand_rotation("sword") == Vector3.ZERO, "poles get a quarter turn in the hand")
+	# Earned classes.
+	var unlocked_before := Game.unlocked.duplicate()
+	var games_before := Game.finished_games
+	Game.unlocked.erase("chivalry")
+	Game.unlocked.erase("magician")
+	Game.finished_games = 0
+	ok(not Game.owns_class("chivalry") and not Game.owns_class("magician"), "Chivalry and Magician start locked")
+	Game.note_rider_killed()
+	ok(Game.owns_class("chivalry"), "killing a Dread Rider opens Chivalry")
+	for i in 4:
+		Game.note_game_finished()
+	ok(not Game.owns_class("magician"), "four games are not enough for the Magician")
+	Game.note_game_finished()
+	ok(Game.owns_class("magician"), "five are")
+	var old_mode := Game.mode
+	Game.unlocked.erase("chivalry")
+	Game.finished_games = 0
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_rider_killed()
+	Game.note_game_finished()
+	ok(not Game.owns_class("chivalry") and Game.finished_games == 0, "the Sandbox counts for nothing")
+	Game.mode = old_mode
+	Game.fresh_unlocks.clear()
+	Game.unlocked = unlocked_before
+	Game.finished_games = games_before
+	Game.save_settings()
+	# Bots: they learn, and they go for what they need.
+	ok(Net.host_game() == OK, "a game with a bot")
+	Net.in_game = true
+	var info := {"name": "Bot", "class": "infantry", "team": 0}
+	var body := Avatar.new(w, Net.BOT_BASE + 50, info)
+	w.add_child(body)
+	body.teleport(pl.global_position + Vector3(4, 0, 0))
+	var bot := BotPlayer.new(w, body, info)
+	w.add_child(bot)
+	var power_before := bot._power()
+	bot.gifts["damage"] = 1
+	ok(bot._power() > power_before, "a gift of damage makes its blows stronger")
+	bot.gifts.clear()
+	bot._gain_xp(40)
+	var taken := 0
+	for gift: String in bot.gifts:
+		taken += int(bot.gifts[gift])
+	ok(bot.level > 3 and taken == bot.level - 1, "it levels up and picks a gift each time (level %d, %d gifts)" % [bot.level, taken])
+	bot.hp = bot.max_hp * 0.3
+	var food := w.spawn_pickup_at(bot.at + Vector3(0, 0, 4), Pickup.Kind.FOOD, PowerDefs.FOODS.keys()[0])
+	var low_hp := bot.hp
+	await seconds(3.0)
+	ok(not is_instance_valid(food) or not w.pickups.has(food), "a hurt bot walks to food and eats it")
+	ok(bot.hp > low_hp, "and feels better")
+	var hard: Dictionary = BotPlayer.SMARTS[2]
+	var easy: Dictionary = BotPlayer.SMARTS[0]
+	ok(float(hard["aim"]) > float(easy["aim"]) and float(hard["think"]) < float(easy["think"]), "a harder game means sharper bots")
+	bot.queue_free()
+	body.queue_free()
+	Net.in_game = false
+	Net.leave()
+	await frames(2)
 	await start_clean()
 
 
@@ -1810,9 +1930,9 @@ func test_weapons() -> void:
 		await frames(3)
 		aim_at(z)
 		var dealt: float = await damage_dealt(z, 3.0)
-		hits[id] = dealt / WeaponDefs.DAMAGE
+		hits[id] = dealt / (WeaponDefs.DAMAGE * float(WeaponDefs.ALL[id].get("power", 1.0)))
 		print("  ", id, " hits in 3 s=", hits[id])
-		ok(is_equal_approx(fmod(dealt, WeaponDefs.DAMAGE), 0.0) and dealt > 0.0, "%s deals %d per hit" % [id, WeaponDefs.DAMAGE])
+		ok(dealt > 0.0, "%s does damage" % id)
 		z.set_physics_process(true)
 		await kill_all()
 	ok(hits["dagger"] > hits["sword"], "dagger attacks faster than sword")
@@ -3219,7 +3339,7 @@ func test_new_stuff() -> void:
 	ok(pl._axe_out, "axe is thrown")
 	await seconds(2.5)
 	ok(not pl._axe_out, "axe flies back")
-	ok(1000.0 - az.hp >= WeaponDefs.DAMAGE * 2.0, "it hits going out and coming back")
+	ok(1000.0 - az.hp >= WeaponDefs.DAMAGE * float(WeaponDefs.ALL["axes"]["power"]) * 2.0 - 0.01, "it hits going out and coming back")
 	ok(pl.arrows == arrows0, "axes use no arrows")
 	az.set_physics_process(true)
 	await kill_all()

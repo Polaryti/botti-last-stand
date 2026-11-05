@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL }
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED }
 
 const DIVE_WARNING := 0.6
 
@@ -106,6 +106,11 @@ var _predicted := false
 var _custom := false
 var _dot_time := 0.0
 var _dot_dps := 0.0
+var poison_left := 0.0
+var bleed_left := 0.0
+var _debuff_fx: CPUParticles3D
+var _stun_fx: CPUParticles3D
+var shown_debuffs := 0 # on another phone: which of them the host last told us about
 var _dot_tick := 0.0
 var _mark_time := 0.0
 var _mark_mult := 1.0
@@ -374,6 +379,9 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_tick_every = 1
 	_tick_time = 0.0
 	_dot_time = 0.0
+	poison_left = 0.0
+	bleed_left = 0.0
+	show_debuffs(false, false)
 	_mark_time = 0.0
 	_airborne = false
 	_special_cd = randf_range(1.5, 4.0)
@@ -384,6 +392,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_home = at
 	dormant = _statue or _is_dormant_type
 	_stun = 0.0
+	_show_stun(false)
 	_slow = 0.0
 	_predicted = false
 	# Each zombie approaches from its own side, so a group ends up surrounding you.
@@ -481,6 +490,8 @@ func _tick_dummy(delta: float) -> void:
 	bar_time = 0.0
 	if _stun > 0.0:
 		_stun -= delta
+		if _stun <= 0.0:
+			_show_stun(false)
 	_knock = Vector3.ZERO
 	_hurt_stun = 0.0
 	var dealt := max_hp - hp
@@ -568,8 +579,9 @@ func _show_weapon(id: String) -> void:
 		_hand_mesh = _attach("handslot.r", null, Vector3.ZERO)
 	var d: Dictionary = WeaponDefs.ALL[id]
 	_hand_mesh.mesh = WeaponDefs.mesh(id)
-	var hold := 0.55 if WeaponDefs.is_ranged(id) or id in ["lance", "spear", "pitchfork"] else 1.0
+	var hold := 0.55 if WeaponDefs.is_ranged(id) or id in ["lance", "spear", "pitchfork", "javelins"] else 1.0
 	_hand_mesh.scale = Vector3.ONE * float(d["scale"]) * hold * 2.2 / float(_fit[model_id])
+	_hand_mesh.rotation = WeaponDefs.hand_rotation(id)
 
 
 func _restore_materials() -> void:
@@ -662,12 +674,73 @@ func mark(mult: float, seconds: float) -> void:
 	_mark_time = seconds
 
 
-func add_dot(dps: float, seconds: float) -> void:
+## Poison also makes it take 5% more from everything. Bleeding also slows it by 10%.
+func add_dot(dps: float, seconds: float, bleeding := false) -> void:
 	if puppet:
-		Net.effect_zombie(self, Effect.DOT, dps, seconds)
+		Net.effect_zombie(self, Effect.BLEED if bleeding else Effect.DOT, dps, seconds)
 		return
 	_dot_dps = dps
 	_dot_time = maxf(_dot_time, seconds)
+	if bleeding:
+		bleed_left = maxf(bleed_left, seconds)
+	else:
+		poison_left = maxf(poison_left, seconds)
+	show_debuffs(poison_left > 0.0, bleed_left > 0.0)
+
+
+## Stars circling the head.
+func _show_stun(on: bool) -> void:
+	if _stun_fx == null:
+		if not on:
+			return
+		_stun_fx = CPUParticles3D.new()
+		_stun_fx.amount = 5
+		_stun_fx.lifetime = 0.7
+		_stun_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_stun_fx.emission_sphere_radius = 0.3
+		_stun_fx.gravity = Vector3.ZERO
+		_stun_fx.local_coords = true
+		_stun_fx.orbit_velocity_min = 1.0
+		_stun_fx.orbit_velocity_max = 1.4
+		_stun_fx.position = Vector3.UP * 2.0
+		var star := BoxMesh.new()
+		star.size = Vector3(0.09, 0.09, 0.09)
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.albedo_color = Color(1.0, 0.85, 0.3)
+		star.material = look
+		_stun_fx.mesh = star
+		add_child(_stun_fx)
+	if _stun_fx.emitting != on:
+		_stun_fx.emitting = on
+
+
+## Green bubbles for poison, red drops for bleeding. Made the first time they are needed.
+func show_debuffs(poisoned: bool, bleeding: bool) -> void:
+	if not poisoned and not bleeding:
+		if _debuff_fx:
+			_debuff_fx.emitting = false
+		return
+	if _debuff_fx == null:
+		_debuff_fx = CPUParticles3D.new()
+		_debuff_fx.amount = 10
+		_debuff_fx.lifetime = 0.8
+		_debuff_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_debuff_fx.emission_sphere_radius = 0.35
+		_debuff_fx.position = Vector3.UP * 1.0
+		_debuff_fx.gravity = Vector3.ZERO
+		var dot := QuadMesh.new()
+		dot.size = Vector2(0.11, 0.11)
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		look.vertex_color_use_as_albedo = true
+		dot.material = look
+		_debuff_fx.mesh = dot
+		add_child(_debuff_fx)
+	_debuff_fx.color = Color(0.35, 0.95, 0.25) if poisoned else Color(0.85, 0.08, 0.06)
+	_debuff_fx.gravity = Vector3.UP * (1.0 if poisoned else -3.0)
+	_debuff_fx.emitting = true
 
 
 # --- Damage ------------------------------------------------------------------
@@ -675,6 +748,8 @@ func add_dot(dps: float, seconds: float) -> void:
 func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector3) -> void:
 	if not is_alive():
 		return
+	if poison_left > 0.0:
+		amount *= 1.05
 	if puppet:
 		# Show the hit straight away. The host has the last word on whether it killed.
 		hp = maxf(hp - amount, 1.0)
@@ -776,6 +851,7 @@ func stun(seconds: float) -> void:
 	if dormant:
 		_wake()
 	_stun = maxf(_stun, seconds)
+	_show_stun(true)
 	_attack_left = 0.0
 	_attack_hit_pending = false
 	_special_left = 0.0 # a stun cuts a Banshee's scream or a Fallen Knight's charge short
@@ -903,6 +979,7 @@ func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_nam
 	_net_rot = rot
 	state = flags & 3
 	hp = maxf(1.0, hp_fraction * max_hp)
+	_show_stun(flags & 16 != 0)
 	net_warning = flags & 64 != 0
 	if def.get("rider", false) and (flags & 128 != 0) != _mounted:
 		_show_mount(flags & 128 != 0)
@@ -1364,6 +1441,8 @@ func _physics_process(delta: float) -> void:
 		return
 	if _stun > 0.0:
 		_stun -= delta
+		if _stun <= 0.0:
+			_show_stun(false)
 		velocity = _knock
 		_knock = _knock.lerp(Vector3.ZERO, min(1.0, delta * 8.0))
 		if not flies and not phases:
@@ -1412,6 +1491,11 @@ func _idle_sound() -> String:
 
 
 func _tick_dot(delta: float) -> void:
+	if poison_left > 0.0 or bleed_left > 0.0:
+		poison_left -= delta
+		bleed_left -= delta
+		if poison_left <= 0.0 or bleed_left <= 0.0:
+			show_debuffs(poison_left > 0.0, bleed_left > 0.0)
 	if _dot_time <= 0.0:
 		return
 	_dot_time -= delta
@@ -1608,6 +1692,8 @@ func _desired_speed() -> float:
 	var mult := 0.5 if _slow > 0.0 else 1.0
 	if not flies and world.terrain.in_water(position.x, position.z):
 		mult *= Player.WADE_SPEED
+	if bleed_left > 0.0:
+		mult *= Player.BLEED_SPEED
 	if _charges and _special_left > 0.0:
 		mult *= 2.6
 	match state:

@@ -45,7 +45,7 @@ static func draw(c: CanvasItem, r: Rect2, icon: String, col: Color, dim := false
 static func weapon(id: String) -> String:
 	return {"dagger": "dagger", "sword": "sword", "spear": "spear", "mace": "mace", "lance": "lance", "scythe": "scythe",
 		"flail": "flail", "bell_hammer": "bell", "pitchfork": "pitchfork", "torch": "torch", "bow": "bow",
-		"crossbow": "crossbow", "longbow": "bow+up", "axes": "axe", "staff": "staff", "claws": "claw"}.get(id, "sword")
+		"crossbow": "crossbow", "longbow": "bow+up", "axes": "axe", "javelins": "spear", "sling": "target", "blowgun": "poison", "staff": "staff", "claws": "claw"}.get(id, "sword")
 
 
 static func power(id: String) -> String:

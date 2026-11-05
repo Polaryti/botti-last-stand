@@ -20,6 +20,7 @@ const DAWN_FOG := Color(0.92, 0.66, 0.46)
 
 static var _shadow_mesh: QuadMesh
 static var _arrow_mesh: Mesh
+static var _stone_mesh: Mesh
 static var _fireball_mesh: Mesh
 static var _bolt_mesh: ArrayMesh
 static var _axe_proj: Mesh
@@ -116,6 +117,9 @@ var _sentries: Array[Dictionary] = []
 var _sentry_look: Mesh
 var _stand_items: Array[Dictionary] = []
 var _fire_puddle: StandardMaterial3D
+var _rings: Array[Dictionary] = []
+var _next_ring := 0
+const RING_TIME := 0.55
 var _next_puddle := 0
 var _poison_tick := 0.0
 var _traps: Array[Dictionary] = []
@@ -652,6 +656,7 @@ func _process(delta: float) -> void:
 		player.poll_keyboard()
 	_tick_bell(delta)
 	_tick_poison(delta)
+	_tick_rings(delta)
 	_tick_traps(delta)
 	_tick_sentries(delta)
 	# The light changes slowly, so a few updates a second look the same and cost less.
@@ -839,6 +844,7 @@ func nearest_rival(from: Vector3, radius: float) -> Avatar:
 
 
 func slow_around(at: Vector3, radius: float, seconds: float) -> int:
+	fx_ring(at, radius, Color(0.55, 0.85, 1.0))
 	var n := status_rivals(at, radius, Net.Status.SLOW, seconds)
 	for z in zombies:
 		if z.is_alive() and z.position.distance_to(at) <= radius:
@@ -848,6 +854,7 @@ func slow_around(at: Vector3, radius: float, seconds: float) -> int:
 
 
 func burn_around(at: Vector3, radius: float) -> int:
+	fx_ring(at, radius, Color(1.0, 0.55, 0.15))
 	var n := status_rivals(at, radius, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 	for z in zombies:
 		if z.is_alive() and z.position.distance_to(at) <= radius:
@@ -891,6 +898,7 @@ func count_allies(kind: String) -> int:
 
 
 func stun_around(at: Vector3, radius: float, seconds: float) -> int:
+	fx_ring(at, radius, Color(1.0, 0.85, 0.35))
 	var n := status_rivals(at, radius, Net.Status.STUN, seconds)
 	for z in zombies:
 		if z.is_alive() and z.position.distance_to(at) <= radius:
@@ -998,12 +1006,28 @@ func damage_zombie(z: Zombie, amount: float, dir: Vector3, knock: float, at: Vec
 
 
 ## from_hand is false for familiars and hawks, whose arrows do not count as the player's own shots.
+func _shot_mesh(id: String) -> Mesh:
+	match id:
+		"javelin":
+			return WeaponDefs.mesh("javelins")
+		"stone":
+			if _stone_mesh == null:
+				var l := LowPoly.new()
+				l.box(Vector3.ZERO, Vector3(0.09, 0.09, 0.09), Color(0.5, 0.5, 0.48))
+				_stone_mesh = l.commit()
+			return _stone_mesh
+	return _arrow_mesh
+
+
 func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_range: float, knock: float, dmg: float, from_hand := true) -> void:
 	var bounce := int(p.m("bounces")) + (PowerDefs.BOUNCES if p.has_power("bounce_arrows") else 0)
 	var burning := p.has_power("fire_arrows") or (p.is_riding() and (p.has_flag("riding_fire") or p.has_flag("war_machine")))
-	var shot := _launch(Projectile.Kind.ARROW, _arrow_mesh, at, vel, grav, max_range, dmg, knock, burning, bounce)
+	var d := p.weapon_def() if from_hand else {}
+	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
-		shot.pierce = int(p.m("pierce"))
+		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
+		shot.poison = d.get("poison", Vector2.ZERO)
+		shot.stagger = float(d.get("stagger", 0.0))
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
@@ -1892,6 +1916,47 @@ func imp_steal(p: Player) -> void:
 		Sfx.play("pickup", -9.0, 0.8, 0.5)
 
 
+## Real flames for fire, and rising bubbles for poison, on top of the glow on the ground.
+func _dress_puddle(pd: MeshInstance3D, seed_from: int) -> void:
+	var flames := Node3D.new()
+	flames.visible = false
+	pd.add_child(flames)
+	for i in 5:
+		var a := TAU * (float(i) / 5.0 + seed_from * 0.13)
+		var flame := MeshInstance3D.new()
+		flame.mesh = WorldLight.flame_mesh()
+		flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		flame.position = Vector3(cos(a), 0.0, sin(a)) * (0.0 if i == 0 else 0.75)
+		flame.scale = Vector3.ONE * (0.8 if i == 0 else 0.5 + 0.1 * i)
+		flames.add_child(flame)
+	var bubbles := CPUParticles3D.new()
+	bubbles.visible = false
+	bubbles.emitting = false
+	bubbles.amount = 16
+	bubbles.lifetime = 1.1
+	bubbles.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	bubbles.emission_box_extents = Vector3(1.0, 0.05, 1.0)
+	bubbles.direction = Vector3.UP
+	bubbles.spread = 12.0
+	bubbles.gravity = Vector3.UP * 0.6
+	bubbles.initial_velocity_min = 0.3
+	bubbles.initial_velocity_max = 0.8
+	bubbles.scale_amount_min = 0.5
+	bubbles.scale_amount_max = 1.3
+	var ball := SphereMesh.new()
+	ball.radius = 0.07
+	ball.height = 0.14
+	ball.radial_segments = 6
+	ball.rings = 3
+	var look := StandardMaterial3D.new()
+	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	look.albedo_color = Color(0.5, 1.0, 0.25, 0.8)
+	ball.material = look
+	bubbles.mesh = ball
+	pd.add_child(bubbles)
+
+
 ## shown_only: another player's patch. It looks the same here, and their phone does the burning.
 func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false, hurts_me := false) -> void:
 	var m := _puddles[_next_puddle]
@@ -1902,6 +1967,10 @@ func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, sho
 	_puddle_hurts_me[_next_puddle] = hurts_me
 	m.scale = Vector3(size / 1.6, 1.0, size / 1.6)
 	m.material_override = _fire_puddle if burning else null
+	(m.get_child(0) as Node3D).visible = burning
+	var bubbles := m.get_child(1) as CPUParticles3D
+	bubbles.visible = not burning
+	bubbles.emitting = not burning
 	_next_puddle = (_next_puddle + 1) % _puddles.size()
 	m.global_position = Vector3(at.x, ground_at(at) + 0.07, at.z)
 	m.visible = true
@@ -2016,7 +2085,7 @@ func _spring_trap(i: int, z: Zombie, at: Vector3) -> void:
 	z.stun(2.0 + p.m("trap_stun"))
 	z.take_damage(p.m("trap_damage"), Vector3.UP, 0.0, z.centre())
 	if p.has_flag("trap_bleed"):
-		z.add_dot(16.0, 4.0)
+		z.add_dot(16.0, 4.0, true)
 	if p.has_flag("trap_fire"):
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if p.has_flag("trap_blast"):
@@ -2259,6 +2328,7 @@ func _build_fx() -> void:
 		pd.visible = false
 		pd.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(pd)
+		_dress_puddle(pd, i)
 		_puddles.append(pd)
 		_puddle_life.append(0.0)
 		_puddle_fire.append(false)
@@ -2411,6 +2481,48 @@ func near_friend() -> Vector3:
 			var c := grid.nearest_free(grid.to_cell(t.global_position + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2))))
 			return grid.to_world(c)
 	return far_from_rivals()
+
+
+## A wave along the ground, shown on every phone.
+func fx_ring(at: Vector3, radius: float, col: Color) -> void:
+	show_ring(at, radius, col)
+	Net.ring_fx(at, radius, col)
+
+
+func show_ring(at: Vector3, radius: float, col: Color) -> void:
+	if _rings.is_empty():
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(2.0, 2.0)
+		for i in 4:
+			var mi := MeshInstance3D.new()
+			mi.mesh = plane
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var look := ShaderMaterial.new()
+			look.shader = load("res://assets/shaders/shock_ring.gdshader")
+			mi.material_override = look
+			mi.visible = false
+			add_child(mi)
+			_rings.append({"node": mi, "left": 0.0})
+	var ring: Dictionary = _rings[_next_ring]
+	_next_ring = (_next_ring + 1) % _rings.size()
+	var node := ring["node"] as MeshInstance3D
+	node.global_position = Vector3(at.x, ground_at(at) + 0.12, at.z)
+	node.scale = Vector3(radius, 1.0, radius)
+	(node.material_override as ShaderMaterial).set_shader_parameter("tint", Vector3(col.r, col.g, col.b))
+	node.visible = true
+	ring["left"] = RING_TIME
+
+
+func _tick_rings(delta: float) -> void:
+	for ring: Dictionary in _rings:
+		if float(ring["left"]) <= 0.0:
+			continue
+		ring["left"] = float(ring["left"]) - delta
+		var node := ring["node"] as MeshInstance3D
+		if float(ring["left"]) <= 0.0:
+			node.visible = false
+		else:
+			(node.material_override as ShaderMaterial).set_shader_parameter("progress", 1.0 - float(ring["left"]) / RING_TIME)
 
 
 func fx_blast(at: Vector3, radius: float, col: Color) -> void:

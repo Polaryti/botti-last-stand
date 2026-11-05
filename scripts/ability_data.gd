@@ -130,7 +130,7 @@ static func _infantry() -> Dictionary:
 			a("duelist", "Duelist", "20% crit chance, and crits do double", "sword+star", {"crit_chance": 0.2}),
 			[[a("footwork", "Footwork", "Each hit: +25% speed for 2 s", "boot+wind", {}, [t("hit", "buff", {"stat": "speed", "val": 0.25, "secs": 2.0, "key": "footwork"})]),
 			a("measure", "Measure", "+1 m melee reach", "target+up", {"melee_reach": 1.0})],
-			[a("bleeding_cut", "Bleeding Cut", "Hits bleed for 12 per second, 3 s", "drop+dagger", {}, [t("hit", "dot", {"dps": 12.0, "secs": 3.0})]),
+			[a("bleeding_cut", "Bleeding Cut", "Hits bleed for 12 per second, 3 s", "drop+dagger", {}, [t("hit", "dot", {"dps": 12.0, "secs": 3.0, "bleed": true})]),
 			a("feint", "Feint", "Crits stun for 1.2 s", "mask+star", {}, [t("crit", "stun", {"secs": 1.2})])],
 			[a("parry", "Parry Stance", "30% chance to avoid any hit", "shield_round+sword", {"dodge": 0.3}),
 			a("counterstroke", "Counterstroke", "When hit: +70% damage for 3 s", "swap+sword", {}, [t("hurt", "buff", {"stat": "melee_damage", "val": 0.7, "secs": 3.0, "key": "counter"})])],

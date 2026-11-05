@@ -61,6 +61,20 @@ func add_gate(i: int, node: Node3D, rows: Array[Node3D]) -> void:
 	world.add_child(body)
 	gates.append({"i": i, "at": at, "dir": dir, "size": size, "hp": GATE_HP, "closed": true, "node": node, "rows": rows, "shape": cs})
 	world.grid.set_box(at, size, true)
+	var sign_board := Label3D.new()
+	sign_board.text = NAMES[i].to_upper()
+	sign_board.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+	sign_board.font_size = 96
+	sign_board.outline_size = 24
+	sign_board.pixel_size = 0.012
+	sign_board.modulate = Color(0.95, 0.8, 0.5)
+	sign_board.position = at + Vector3.UP * (WALL_H + 1.2)
+	world.add_child(sign_board)
+
+
+## How much wood it would take to mend this gate completely.
+func wood_needed(g: Dictionary) -> int:
+	return ceili(maxf(0.0, GATE_HP - float(g["hp"])) / REPAIR_PER_WOOD)
 
 
 func set_heart(at: Vector3, mesh: Node3D) -> void:

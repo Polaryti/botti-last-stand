@@ -2,6 +2,21 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.13.0 (5 November 2026)
+### New
+- Three new ranged weapons. Javelins hit hard with a falling arc and pass through the first enemy. The Sling never needs arrows and staggers what it hits. The Blowgun is silent and poisons.
+- Chivalry is now earned by killing a Dread Rider, and the Magician by finishing 5 games, win or lose.
+- Defend the Fort: a compass shows which way each gate lies, and each gate has its name above it. You can now see how much wood you carry and how much each gate needs.
+- Bots level up and pick a gift each time. They go after weapons, arrows, food and familiars, and they back off when badly hurt. On a harder difficulty they think faster, aim better and keep their distance.
+
+### Changed
+- Weapons now differ in strength. The Long Bow kills a plain zombie with one arrow and goes through two more. The Dagger does double damage from behind, the Scythe makes things bleed, and the Lance hits harder at a run.
+- Poisoned: you take 5% more damage from everything. Bleeding: you move 10% slower. Burning: you are also in the light.
+- Invisible replaces Vanished. Nothing can see you, even right next to you.
+- Fire on the ground now has real flames, and poison bubbles.
+- Area stuns, slows and burns send a wave along the ground, and stunned enemies have stars around their heads.
+- Other players and armed mobs now hold spears, bows and the like pointing forward. Attacks and abilities have their own animations.
+
 ## 0.12.4 (5 November 2026)
 ### Fixed
 - Stairs are now walked up smoothly, with no jumping.

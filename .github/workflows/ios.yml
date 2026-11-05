@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Fetch Godot and its export templates
         run: |
@@ -32,7 +32,6 @@ jobs:
           echo "GODOT=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
 
       - name: Add online play
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           EPIC_PRODUCT_ID: ${{ secrets.EPIC_PRODUCT_ID }}
@@ -49,7 +48,6 @@ jobs:
           python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" ios
 
       - name: Are the Epic keys there
-        continue-on-error: true
         run: test -f scripts/epic_keys.gd
 
       - name: Export the Xcode project
@@ -71,7 +69,7 @@ jobs:
           zip -qry "$GITHUB_WORKSPACE/botti-last-stand-ios.ipa" Payload
           ls -la "$GITHUB_WORKSPACE/botti-last-stand-ios.ipa"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: botti-last-stand-ios
           path: botti-last-stand-ios.ipa

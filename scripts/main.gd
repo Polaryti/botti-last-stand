@@ -614,7 +614,12 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 		spec_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		line.add_child(spec_desc)
 	detail.add_child(_expand(true))
-	if not owned:
+	if not owned and c.has("earned"):
+		var how := _body(Game.earn_text(id), 26)
+		how.add_theme_color_override("font_color", UiTheme.EMBER)
+		how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.add_child(how)
+	elif not owned:
 		_buy_row(detail, id, mode, in_store)
 	elif in_store:
 		var have := _body("You own this class.", 26)
@@ -963,7 +968,12 @@ func _on_fort_lost() -> void:
 
 
 func _earned_line(earned: int) -> String:
-	return "\n+%d Botti Doubloons" % earned if earned > 0 else ""
+	var line := "\n+%d Botti Doubloons" % earned if earned > 0 else ""
+	Game.note_game_finished()
+	for id: String in Game.fresh_unlocks:
+		line += "\n%s unlocked!" % ClassDefs.ALL[id]["name"]
+	Game.fresh_unlocks.clear()
+	return line
 
 
 func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:

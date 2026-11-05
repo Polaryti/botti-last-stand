@@ -298,10 +298,41 @@ func _draw_fort(s: Vector2, centre: Vector2) -> void:
 		var r := Rect2(centre.x - w * 0.5 + i * (gate_w + 6.0), top + 20, gate_w, 9)
 		_bar(r, float(g["hp"]) / Fort.GATE_HP, Color(0.72, 0.5, 0.26) if g["closed"] else Color(0.8, 0.2, 0.15))
 		_centered(["N", "E", "S", "W"][i], r.get_center() + Vector2(0, 16), 15, UiTheme.BONE)
-	if player.wood > 0:
-		_text("Wood %d" % player.wood, Vector2(s.x * 0.33, s.y - 86.0), 22, Color(0.92, 0.72, 0.42))
-	if fort.repairing >= 0:
-		_centered("Mending the %s gate" % Fort.NAMES[fort.repairing], Vector2(centre.x, s.y * 0.62), 26, Color(0.92, 0.72, 0.42))
+	const WOOD_COL := Color(0.92, 0.72, 0.42)
+	var needs: Array[String] = []
+	for g: Dictionary in fort.gates:
+		if fort.wood_needed(g) > 0:
+			needs.append("%s %d" % [["N", "E", "S", "W"][g["i"]], fort.wood_needed(g)])
+	var wood_line := "Wood %d of %d" % [player.wood, Fort.WOOD_MAX]
+	if not needs.is_empty():
+		wood_line += "   Gates need: %s" % ", ".join(needs)
+	_centered(wood_line, Vector2(centre.x, top + 60), 20, WOOD_COL)
+	var near := fort.damaged_gate_near(player.global_position)
+	if near >= 0:
+		var missing := fort.wood_needed(fort.gates[near])
+		var note := "Mending the %s gate: %d more wood" % [Fort.NAMES[near], missing]
+		if player.wood <= 0:
+			note = "The %s gate needs %d wood, and you have none" % [Fort.NAMES[near], missing]
+		_centered(note, Vector2(centre.x, s.y * 0.62), 26, WOOD_COL)
+	_draw_gate_compass(fort, Vector2(centre.x + w * 0.5 + 66.0, top + 26.0))
+
+
+## Which way each gate lies from where you stand. The top of the dial is the way you are looking.
+func _draw_gate_compass(fort: Fort, at: Vector2) -> void:
+	const RADIUS := 36.0
+	draw_circle(at, RADIUS + 16.0, Color(0.05, 0.06, 0.09, 0.62))
+	draw_arc(at, RADIUS + 16.0, 0.0, TAU, 32, Color(0.92, 0.72, 0.42, 0.7), 2.0, true)
+	draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7), at + Vector2(-5, 5), at + Vector2(5, 5)]), UiTheme.BONE)
+	for g: Dictionary in fort.gates:
+		var to: Vector3 = (g["at"] as Vector3) - player.global_position
+		var local := Vector3(to.x, 0.0, to.z).rotated(Vector3.UP, -player.rotation.y)
+		var dir := Vector2(local.x, local.z).normalized()
+		var col := UiTheme.BONE
+		if not g["closed"]:
+			col = Color(1.0, 0.3, 0.22)
+		elif fort.wood_needed(g) > 0:
+			col = Color(0.95, 0.65, 0.25)
+		_centered(["N", "E", "S", "W"][g["i"]], at + dir * RADIUS + Vector2(0, 7), 20, col)
 
 
 ## All vs All: what the fog is doing, and the way back if you are out in it.
@@ -378,13 +409,20 @@ func _draw_status(s: Vector2) -> void:
 		var hunting := player.world.count_hunting()
 		var label := "Hunted" if hunting > 0 else "Unseen"
 		if player.invis_left > 0.0:
-			label = "Vanished"
+			label = "Invisible"
 		var col := UiTheme.BLOOD.lightened(0.25) if hunting > 0 and player.invis_left <= 0.0 else UiTheme.MOSS
 		_centered(label, Vector2(s.x * 0.5, 80), 20, col)
 		if player.is_lit():
 			_centered("In the light", Vector2(s.x * 0.5, 102), 18, UiTheme.EMBER)
 	elif Game.mode == Game.Mode.SANDBOX:
 		_clock(s, "Sandbox")
+	var ailments: Array[String] = []
+	if player.poison_left > 0.0:
+		ailments.append("Poisoned")
+	if player.bleed_left > 0.0:
+		ailments.append("Bleeding")
+	if not ailments.is_empty():
+		_centered(", ".join(ailments), Vector2(s.x * 0.5, 124), 18, UiTheme.EMBER)
 	if player.guard_left > 0.0 and player.guard_left < 100.0:
 		_centered("Invincible %d" % ceili(player.guard_left), Vector2(s.x * 0.5, s.y * 0.2), 24, UiTheme.EMBER)
 	if player.is_riding():
