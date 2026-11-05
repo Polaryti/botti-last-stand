@@ -2,6 +2,12 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.16.0 (5 November 2026)
+### New
+- Monk: spirit and martial arts. Fights with bare hands and can use any weapon. Way of the Staff replaces every weapon with a bo. Way of the Spirit brings Inner Peace, a moment nothing can touch. Way of the Fist needs nothing but its hands. It opens only with a code.
+- Plague Doctor: the beaked mask. Starts with a Blowgun. Apothecary cures you and your friends, Pestilence spreads sickness through the crowd, and the Rat King calls rats to fight. It opens only with a code.
+- Two new weapons: the Bo Staff, which sweeps wide, can be found on the map, and a Monk's Bare Hands.
+
 ## 0.15.0 (5 November 2026)
 ### New
 - A new map for Survive the Night: The Mists. Floating islands in a violet sky, with nothing beneath them.

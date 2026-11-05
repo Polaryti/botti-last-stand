@@ -19,6 +19,8 @@ const ARTS := {
 	"guardian": {"name": "Shield Dome", "cost": 0.0, "cast": 0.15, "cd": 24.0, "icon": "shield_rect"},
 	"pyromaniac": {"name": "Incendiary Bomb", "cost": 0.0, "cast": 0.25, "cd": 7.0, "icon": "bomb"},
 	"inventor": {"name": "Invention", "cost": 0.0, "cast": 0.3, "cd": 6.0, "icon": "gear"},
+	"spirit": {"name": "Inner Peace", "cost": 0.0, "cast": 0.2, "cd": 24.0, "icon": "sun"},
+	"apothecary": {"name": "Healing Tonic", "cost": 0.0, "cast": 0.3, "cd": 14.0, "icon": "potion"},
 	"illusionist": {"name": "Mirror Swap", "cost": 0.0, "cast": 0.1, "cd": 8.0, "icon": "mirror"},
 }
 

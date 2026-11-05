@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_16()
 		await test_version_15()
 		await test_version_14()
 		await test_version_13()
@@ -78,6 +79,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_16()
 	await test_version_15()
 	await test_version_14()
 	await test_version_13()
@@ -684,6 +686,87 @@ func test_fort() -> void:
 	await start_clean()
 
 
+func test_version_16() -> void:
+	for id: String in ["monk", "plague_doctor"]:
+		ok(not Game.owns_class(id) or Game.unlocked.has(id), "%s is locked until a code opens it" % id)
+		ok(ClassDefs.price(id) == 0 and not ClassDefs.for_sale().has(id), "and %s cannot be bought" % id)
+		ok(AbilityData.tree(id)["specs"].size() == 3, "%s has three specializations" % id)
+	var unlocked_before := Game.unlocked.duplicate()
+	var redeemed_before := Game.redeemed.duplicate()
+	Game.unlocked.erase("monk")
+	Game.redeemed.erase(_code_of("monk"))
+	ok(Game.redeem_key(_code_of("monk"))["class"] == "monk" and Game.owns_class("monk"), "the Monk's code opens the Monk")
+	Game.unlocked.erase("plague_doctor")
+	Game.redeemed.erase(_code_of("plague_doctor"))
+	ok(Game.redeem_key(_code_of("plague_doctor"))["class"] == "plague_doctor", "and the other code the Plague Doctor")
+	# The Monk.
+	Game.player_class = "monk"
+	await start_clean()
+	ok(pl.weapon_id() == "fists", "the Monk starts with bare hands")
+	ok(pl.can_use("sword") and pl.can_use("bow"), "and can use any weapon")
+	pl.points = 10
+	for i in Player.CORE_STEPS:
+		pl.choose_ability(i, 0)
+	pl.choose_ability(Player.CORE_STEPS, 0)
+	ok(pl.weapon_id() == "bo", "Way of the Staff puts a bo in your hands")
+	ok(not pl.can_use("sword") and pl.can_use("bo"), "and nothing else")
+	Game.player_class = "monk"
+	await start_clean()
+	pl.points = 10
+	for i in Player.CORE_STEPS:
+		pl.choose_ability(i, 0)
+	pl.choose_ability(Player.CORE_STEPS, 1)
+	ok(pl.has_art(), "Way of the Spirit has its ability")
+	pl.hp = 40.0
+	pl.use_art()
+	await seconds(0.5)
+	ok(pl.guard_left > 0.0 and pl.hp >= 60.0, "Inner Peace heals, and nothing can touch you")
+	# The Plague Doctor.
+	Game.player_class = "plague_doctor"
+	await start_clean()
+	ok(pl.weapon_id() == "blowgun" and pl.arrows == 24, "the Plague Doctor starts with a Blowgun and 24 darts")
+	pl.points = 10
+	for i in Player.CORE_STEPS:
+		pl.choose_ability(i, 0)
+	pl.choose_ability(Player.CORE_STEPS, 0)
+	pl.hp = 30.0
+	pl.use_art()
+	await seconds(0.5)
+	ok(pl.hp >= 55.0, "the Healing Tonic heals")
+	Game.player_class = "plague_doctor"
+	await start_clean()
+	pl.points = 10
+	for i in Player.CORE_STEPS:
+		pl.choose_ability(i, 0)
+	pl.choose_ability(Player.CORE_STEPS, 2)
+	pl.fire("take", {})
+	var rat_time := 0.0
+	while rat_time < 22.0 and w.count_allies("rat") == 0:
+		await seconds(0.5)
+		rat_time += 0.5
+	ok(w.count_allies("rat") > 0, "the Rat King's rats come (%.1f s)" % rat_time)
+	Game.player_class = "plague_doctor"
+	await start_clean()
+	pl.flags["plague_burst"] = true
+	pl.flags["black_death"] = true
+	var sick := spawn("normal", front(6.0), true)
+	var next_to := spawn("normal", front(7.0), true)
+	sick.add_dot(1.0, 5.0)
+	pl.on_kill(sick)
+	ok(next_to.poison_left > 0.0, "Black Death spreads the sickness")
+	sick.release()
+	next_to.release()
+	# Every class can be shown in the Store's stage and the picker.
+	for id: String in ClassDefs.ALL:
+		m.show_class_picker(Game.Mode.SANDBOX)
+		await frames(1)
+	Game.unlocked = unlocked_before
+	Game.redeemed = redeemed_before
+	Game.player_class = "infantry"
+	Game.save_settings()
+	await start_clean()
+
+
 func test_version_15() -> void:
 	var saved_map := Game.night_map
 	Game.night_map = "mists"
@@ -787,6 +870,11 @@ func test_version_15() -> void:
 	bot._goal = pl.global_position
 	var target_island := gates.island_of(far_centre)
 	bot._goal = far_centre
+	gates._timer = 9999.0
+	for link: Dictionary in gates.links:
+		link["open"] = true
+		link["closing"] = 0.0
+		gates._show(link)
 	t = 0.0
 	var moved_on := false
 	while t < 30.0:

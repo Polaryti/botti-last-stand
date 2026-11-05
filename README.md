@@ -8,7 +8,7 @@ The game's own Changelog screen, in `CHANGELOG.md`, lists what changed in each v
 
 **Ways to play**
 
-- **Survive the Night:** zombies roam the village, and more arrive as the night goes on. In the last two minutes they sense the dawn and all come for you. Last 10 minutes and a real sunrise burns them away.
+- **Survive the Night:** zombies roam the village, and more arrive as the night goes on. In the last two minutes they sense the dawn and all come for you. Last 10 minutes and a real sunrise burns them away. Played in the village, or in The Mists: floating islands joined by gates that open and close, where falling is death.
 - **Defend the Fort:** zombies break down the fort's gates and go for the Heart in the keep. Lose it, or lose everyone, and the night is over. Wood mends the gates, stairs climb the walls and small doors let you out.
 - **Play Together:** up to 4 players, on phones or as bots: on the same Wi-Fi, through one phone's hotspot, or online with a room code. Co-op Night, Defend the Fort, All vs All or Teams. Fallen players come back after 20 seconds.
 - **All vs All:** three lives each, and a deadly fog closes in on the village. The last one standing wins, in about six minutes. Zombies are still out there, and abilities work on other players.

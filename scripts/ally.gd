@@ -6,11 +6,11 @@ extends Target
 
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
-const HEALTH := {"raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
-const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox"]
-const BEASTS := ["wolf", "raven", "snake", "fox"]
-const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75}
-const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 5.5, "fox": 7.5}
+const HEALTH := {"rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
+const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat"]
+const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
+const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
+const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 5.5, "fox": 7.5, "rat": 7.5}
 const RAVEN_HEIGHT := 2.1
 const SNAKE_POISON := 0.35
 const FOX_FOOD := 0.1
@@ -138,7 +138,7 @@ static func build_beast_model(beast: String, root: Node3D) -> Dictionary:
 
 
 static func _four_legs_model(beast: String, root: Node3D) -> Dictionary:
-	var fur := Color(0.34, 0.32, 0.34) if beast == "wolf" else Color(0.72, 0.36, 0.12)
+	var fur: Color = {"wolf": Color(0.34, 0.32, 0.34), "fox": Color(0.72, 0.36, 0.12), "rat": Color(0.3, 0.27, 0.24)}[beast]
 	if not _beast_parts.has(beast):
 		var h := LowPoly.new()
 		h.box(Vector3(0, 0.0, 0.1), Vector3(0.36, 0.36, 0.42), fur.darkened(0.08))
@@ -155,7 +155,7 @@ static func _four_legs_model(beast: String, root: Node3D) -> Dictionary:
 			"head": h.commit(), "tail": tail.commit(),
 			"leg": LowPoly.new().box(Vector3(0, -0.22, 0), Vector3(0.12, 0.46, 0.12), fur.darkened(0.2)).commit()}
 	var parts: Dictionary = _beast_parts[beast]
-	root.scale = Vector3.ONE * (0.8 if beast == "fox" else 1.0)
+	root.scale = Vector3.ONE * {"wolf": 1.0, "fox": 0.8, "rat": 0.42}[beast]
 	_part(root, parts["body"], Vector3.ZERO)
 	var legs: Array[Node3D] = []
 	for s: Vector3 in [Vector3(-0.16, 0.46, 0.38), Vector3(0.16, 0.46, 0.38), Vector3(-0.16, 0.46, -0.38), Vector3(0.16, 0.46, -0.38)]:
@@ -334,6 +334,8 @@ func _physics_process(delta: float) -> void:
 			elif BEASTS.has(kind) and player and player.has_flag("wolf_stun"):
 				_foe.stun(0.7)
 			if _foe.is_alive() and kind == "snake" and randf() < SNAKE_POISON:
+				_foe.add_dot(10.0, 4.0)
+			if _foe.is_alive() and kind == "rat" and player and player.has_flag("rat_poison") and randf() < 0.5:
 				_foe.add_dot(10.0, 4.0)
 			if kind == "fox" and randf() < FOX_FOOD:
 				world.spawn_pickup_at(position + Vector3(0.6, 0, 0.6), Pickup.Kind.FOOD, PowerDefs.FOODS.keys().pick_random())

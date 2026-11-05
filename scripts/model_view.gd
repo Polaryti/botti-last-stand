@@ -76,6 +76,7 @@ func show_class(id: String) -> void:
 		if id == "revenant":
 			part.material_override = Ally._ghost()
 	body.scale = Vector3.ONE * 1.8 / float(Zombie.BODY_TOP.get(model, maxf(top, 0.5)))
+	ClassDefs.dress(body, id)
 	var players := body.find_children("*", "AnimationPlayer", true, false)
 	if not players.is_empty():
 		_anim = players[0]

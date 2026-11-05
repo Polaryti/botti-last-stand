@@ -376,6 +376,8 @@ func has_empty_slot() -> bool:
 func can_use(id: String) -> bool:
 	if class_def().get("no_weapons", false):
 		return false
+	if has_flag("bo_master"):
+		return id == "bo"
 	if WeaponDefs.is_ranged(id):
 		return bool(class_def()["ranged"]) or has_flag("ranged_ok")
 	return true
@@ -584,11 +586,13 @@ func apply_status(kind: int, seconds: float) -> void:
 		Net.Status.SLOW:
 			slowed_left = maxf(slowed_left, secs)
 		Net.Status.POISON:
-			poison_left = maxf(poison_left, seconds)
-			say("Poisoned")
+			if not has_flag("antidote"):
+				poison_left = maxf(poison_left, seconds)
+				say("Poisoned")
 		Net.Status.BLEED:
-			bleed_left = maxf(bleed_left, seconds)
-			say("Bleeding")
+			if not has_flag("antidote"):
+				bleed_left = maxf(bleed_left, seconds)
+				say("Bleeding")
 		Net.Status.BURN:
 			ignite(secs)
 
@@ -955,6 +959,13 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 		"forget":
 			if world.forget_around(here, float(e["r"])) == 0:
 				return false
+		"give_weapon":
+			slots[0] = e["id"]
+			slots[1] = null
+			current = 0
+			_equip()
+		"miasma":
+			world.drop_poison(here)
 		"trap":
 			if has_item("trap_satchel"):
 				trap_charges = mini(TRAPS_CARRIED, trap_charges + 1)
@@ -1014,6 +1025,12 @@ func _refresh_shield() -> void:
 
 func on_kill(z: Zombie) -> void:
 	kills += 1
+	if z.poison_left > 0.0 and has_flag("plague_burst"):
+		world.drop_poison(z.position)
+	if z.poison_left > 0.0 and has_flag("black_death"):
+		world.fx_ring(z.position, 6.0, Color(0.5, 0.95, 0.25))
+		for near: Zombie in world.zombies_near(z.position, 6.0, 8):
+			near.add_dot(14.0, 5.0)
 	if has_item("shadow_shroud"):
 		shadow_kills = mini(SHROUD_KILLS, shadow_kills + 1)
 	if z.type_id == "rider" and not Game.unlocked.has("chivalry"):
@@ -1518,6 +1535,31 @@ func use_art() -> void:
 	Sfx.play("spell", -5.0, 1.3)
 
 
+func _inner_peace() -> void:
+	guard_left = maxf(guard_left, 2.5)
+	heal(50.0 if has_flag("enlightened") else 25.0)
+	world.fx_ring(global_position, 6.0, Color(1.0, 0.85, 0.45))
+	if has_flag("enlightened"):
+		world.burn_around(global_position, 6.0)
+	Sfx.play("bell", -6.0, 1.3)
+
+
+func _healing_tonic() -> void:
+	const FRIEND_REACH := 8.0
+	var strong := 15.0 if has_flag("strong_tonic") else 0.0
+	var untouchable := 2.0 if has_flag("miracle_cure") else 0.0
+	heal(30.0 + strong)
+	guard_left = maxf(guard_left, untouchable)
+	poison_left = 0.0
+	bleed_left = 0.0
+	world.fx_ring(global_position, FRIEND_REACH, Color(0.4, 0.95, 0.5))
+	Sfx.play("eat", -2.0, 0.8)
+	if Net.active():
+		for t in world.players:
+			if t is Avatar and not t.dead and t.global_position.distance_to(global_position) <= FRIEND_REACH and not Net.is_foe((t as Avatar).peer):
+				Net.guard_peer((t as Avatar).peer, untouchable, 25.0 + strong)
+
+
 func cast_progress() -> float:
 	return _cast_left if _cast_kind != "" else 0.0
 
@@ -1547,6 +1589,8 @@ func _tick_mist(delta: float) -> void:
 		"pyromaniac": _throw_bombs()
 		"inventor": _invent()
 		"illusionist": _mirror_swap()
+		"spirit": _inner_peace()
+		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
 			world.place_trap(self, global_position, TRAP_ARMING)

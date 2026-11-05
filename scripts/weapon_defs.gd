@@ -42,6 +42,10 @@ const ALL := {
 		"knock": 2.0, "weight": 1.2, "pos": Vector3(0.24, -0.14, -0.44), "scale": 1.5},
 	"blowgun": {"power": 0.25, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.8, "range": 22.0, "speed": 40.0, "gravity": 2.0,
 		"knock": 0.0, "weight": 0.9, "pos": Vector3(0.14, -0.16, -0.25), "scale": 1.0},
+	"fists": {"power": 0.7, "name": "Bare Hands", "desc": "A Monk's own hands: quick, and never dropped.", "kind": Kind.MELEE, "rate": 0.34, "range": 2.4, "cone": 100.0, "max_hits": 2,
+		"knock": 1.4, "swing": "claw", "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
+	"bo": {"power": 0.95, "name": "Bo Staff", "desc": "A long staff that sweeps wide and keeps them away.", "kind": Kind.MELEE, "rate": 0.48, "range": 3.2, "cone": 130.0, "max_hits": 3,
+		"knock": 2.8, "swing": "slash", "weight": 0.9, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.8},
 	"claws": {"name": "Spectral Claws", "desc": "A Revenant's own hands, shrouded in mist. Each blow uses a little Mist.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.5, "cone": 100.0, "max_hits": 2,
 		"knock": 1.2, "swing": "claw", "cost": 6.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
 	"staff": {"name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
@@ -109,6 +113,8 @@ static func mesh(id: String) -> Mesh:
 		"torch": m = _torch()
 		"axes": m = axe_mesh()
 		"javelins": m = _javelins()
+		"fists": m = _fists()
+		"bo": m = _bo()
 		"sling": m = _sling()
 		"blowgun": m = _blowgun()
 		"staff": m = _staff()
@@ -144,6 +150,22 @@ static func _spear() -> Mesh:
 	l.prism(Vector3(0, 0, 0.5), Vector3(0, 0, -1.6), 0.018, 0.018, 5, WOOD)
 	l.box(Vector3(0, 0, -1.6), Vector3(0.05, 0.05, 0.06), DARK)
 	l.prism(Vector3(0, 0, -1.62), Vector3(0, 0, -1.95), 0.05, 0.0, 4, STEEL)
+	return l.commit()
+
+
+static func _fists() -> Mesh:
+	var l := LowPoly.new()
+	l.box(Vector3(0, 0.06, 0), Vector3(0.13, 0.14, 0.15), Color(0.82, 0.62, 0.46))
+	l.box(Vector3(0, -0.06, 0), Vector3(0.11, 0.1, 0.13), Color(0.9, 0.86, 0.76))
+	l.prism(Vector3(0, -0.1, 0), Vector3(0, -0.5, 0), 0.05, 0.05, 6, Color(0.82, 0.62, 0.46))
+	return l.commit()
+
+
+static func _bo() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -1.0, 0), Vector3(0, 1.0, 0), 0.028, 0.028, 6, LIGHT_WOOD.darkened(0.15))
+	l.box(Vector3(0, 0.82, 0), Vector3(0.07, 0.1, 0.07), DARK)
+	l.box(Vector3(0, -0.82, 0), Vector3(0.07, 0.1, 0.07), DARK)
 	return l.commit()
 
 

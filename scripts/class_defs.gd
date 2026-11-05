@@ -19,17 +19,53 @@ const ALL := {
 	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.5, "kill_mist": 5.0,
 		"no_weapons": true, "hidden": true, "price": 650,
 		"desc": "Dead, and not done. No weapons, only claws of Mist, which it spends with every blow."},
+	"monk": {"name": "Monk", "weapon": "fists", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "hidden": true,
+		"desc": "Spirit and martial arts. Fights with bare hands, quick on its feet, and can use any weapon it finds."},
+	"plague_doctor": {"name": "Plague Doctor", "weapon": "blowgun", "arrows": 24, "hp": 90.0, "speed": 1.0, "ranged": true, "kill_arrows": 1, "hidden": true,
+		"desc": "The beaked mask has seen it all. Starts with a Blowgun and 24 darts. Cures friends, spreads sickness, or commands the rats."},
 	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
 }
 
 static func icon(id: String) -> String:
-	return {"infantry": "sword", "ranger": "bow", "heavy": "shield_rect", "chivalry": "horse", "magician": "staff", "revenant": "claw", "artificer": "gear"}[id]
+	return {"infantry": "sword", "ranger": "bow", "heavy": "shield_rect", "chivalry": "horse", "magician": "staff", "revenant": "claw", "artificer": "gear", "monk": "sun", "plague_doctor": "mask"}[id]
 
 
 static func color(id: String) -> Color:
 	return {"infantry": Color(0.62, 0.2, 0.14), "ranger": Color(0.22, 0.46, 0.26), "heavy": Color(0.36, 0.4, 0.48),
-		"chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22)}[id]
+		"chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22), "monk": Color(0.76, 0.46, 0.14), "plague_doctor": Color(0.26, 0.32, 0.24)}[id]
+
+
+## Some classes share a body with another, but not its clothes.
+static func dress(body: Node3D, id: String) -> void:
+	if id != "monk" and id != "plague_doctor":
+		return
+	for mi in body.find_children("*", "MeshInstance3D", true, false):
+		var part := mi as MeshInstance3D
+		if part.mesh == null or part.mesh.get_surface_count() == 0:
+			continue
+		var look: Material = part.mesh.surface_get_material(0)
+		if not look is BaseMaterial3D:
+			continue
+		if id == "monk":
+			var robe := ShaderMaterial.new()
+			robe.shader = load("res://assets/shaders/recolour.gdshader")
+			robe.set_shader_parameter("tex", (look as BaseMaterial3D).albedo_texture)
+			part.material_override = robe
+		else:
+			var worn: BaseMaterial3D = look.duplicate()
+			worn.albedo_color = Color(0.5, 0.5, 0.55)
+			part.material_override = worn
+	if id == "plague_doctor":
+		var skeleton: Skeleton3D = body.find_children("*", "Skeleton3D", true, false)[0] if not body.find_children("*", "Skeleton3D", true, false).is_empty() else null
+		if skeleton and skeleton.find_bone("head") >= 0:
+			var at := BoneAttachment3D.new()
+			at.bone_name = "head"
+			skeleton.add_child(at)
+			var beak := MeshInstance3D.new()
+			beak.mesh = LowPoly.new().prism(Vector3(0, 0.45, 0.45), Vector3(0, 0.3, 1.05), 0.2, 0.02, 6, Color(0.82, 0.76, 0.6)).commit()
+			beak.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			at.add_child(beak)
 
 
 ## The classes this phone can play. Some have to be bought or opened with a code first.

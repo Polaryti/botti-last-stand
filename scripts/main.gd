@@ -655,6 +655,10 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 		how.add_theme_color_override("font_color", UiTheme.EMBER)
 		how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.add_child(how)
+	elif not owned and ClassDefs.price(id) <= 0:
+		var how := _body("This class opens with a code, in Settings.", 26)
+		how.add_theme_color_override("font_color", UiTheme.EMBER)
+		detail.add_child(how)
 	elif not owned:
 		_buy_row(detail, id, mode, in_store)
 	elif in_store:

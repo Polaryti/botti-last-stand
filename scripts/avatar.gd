@@ -4,7 +4,7 @@ extends Target
 ## body that zombies can hunt and that shots can hit, and anything that hurts them is sent over.
 
 const LAYER_AVATAR := 64
-const MODELS := {"infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
+const MODELS := {"monk": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
 
 var world: World
 var peer := 0
@@ -58,6 +58,7 @@ func _init(owner_world: World, peer_id: int, info: Dictionary) -> void:
 	shape.position.y = 0.9
 	add_child(shape)
 	_build_body(str(MODELS.get(str(info.get("class", "infantry")), "clever")))
+	ClassDefs.dress(_visual, str(info.get("class", "")))
 	if str(info.get("class", "")) == "revenant":
 		for mi in _visual.find_children("*", "MeshInstance3D", true, false):
 			(mi as MeshInstance3D).material_override = Ally._ghost()

@@ -6,7 +6,9 @@ enum Mode { MENU, NIGHT, SANDBOX, FORT }
 const SAVE_PATH := "user://settings.cfg"
 const NIGHT_LENGTH := 600.0
 ## Codes are kept as hashes, so they cannot simply be read out of the game files or the repository.
-const CODES := {"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b36": "revenant",
+const CODES := {"7d81dd39a273704c54618b070924a179bb3f9bd7b7b0854aead3dfaaa0f3f385": "monk",
+	"87d952a34c98ffc8a98c3f809286c052d94848c42ee7c09828ffd205c468c90a": "plague_doctor",
+	"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b36": "revenant",
 	"28e314800565692691a7af4606286f26fc0f53b2201fe1fb4c8feaa018e3a6ad": "artificer"}
 
 var mode: int = Mode.MENU

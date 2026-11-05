@@ -32,7 +32,99 @@ static func tree(class_id: String) -> Dictionary:
 			"magician": _cache[class_id] = _magician()
 			"revenant": _cache[class_id] = _revenant()
 			"artificer": _cache[class_id] = _artificer()
+			"monk": _cache[class_id] = _monk()
+			"plague_doctor": _cache[class_id] = _plague_doctor()
 	return _cache[class_id]
+
+
+static func _monk() -> Dictionary:
+	return {"core": [
+		[a("focus", "Focus", "+20% melee damage", "sun+up", {"melee_damage": 0.2}),
+		a("agility", "Agility", "+12% move speed", "boot+wind", {"speed": 0.12})],
+		[a("meditation", "Meditation", "Heal 3 per kill", "sun+heart", {}, [t("kill", "heal", {"n": 3.0})]),
+		a("hardened", "Hardened Body", "+30 max health", "heart+up", {"max_hp": 30.0})],
+		[a("patience", "Patience", "15% chance to avoid any hit", "wind+shield", {"dodge": 0.15}),
+		a("ki_strike", "Ki Strike", "15% crit chance", "star+sun", {"crit_chance": 0.15})],
+	], "specs": [
+		_spec("way_staff", "Way of the Staff", "The bo replaces every other weapon", Color(0.62, 0.42, 0.18),
+			a("way_staff", "Way of the Staff", "Your weapon becomes a Bo Staff, for good. +20% melee damage with it", "staff+star", {"melee_damage": 0.2}, [t("take", "give_weapon", {"id": "bo"})], "bo_master"),
+			[[a("long_sweep", "Long Sweep", "+1 m reach", "staff+plus", {"melee_reach": 1.0}),
+			a("whirlwind", "Whirlwind", "Hits 2 more enemies", "spiral+staff", {"melee_hits": 2})],
+			[a("iron_stance", "Iron Stance", "Take 20% less damage", "shield+staff", {"damage_taken": -0.2}),
+			a("flowing", "Flowing Strikes", "+25% attack speed", "wind+staff", {"melee_rate": 0.25})],
+			[a("staggering", "Staggering Blow", "25% chance to stun for 0.8 s", "star+staff", {}, [t("hit", "stun", {"chance": 0.25, "secs": 0.8})]),
+			a("bone_breaker", "Bone Breaker", "+35% melee damage", "bones+staff", {"melee_damage": 0.35})],
+			[a("deflect", "Deflect", "20% chance to avoid any hit", "shield_round+staff", {"dodge": 0.2}),
+			a("rising_dragon", "Rising Dragon", "Double knockback", "quake+staff", {"knock": 1.0})]],
+			a("hundred_hands", "Hundred Hands", "+30% attack speed, and every 12 s stun everything near you", "staff+crown", {"melee_rate": 0.3}, [t("every", "stun_around", {"secs_every": 12.0, "r": 5.0, "secs": 1.0, "sound": "hammer"})])),
+		_spec("spirit", "Way of the Spirit", "Stillness that nothing can touch", Color(0.8, 0.68, 0.3),
+			a("spirit", "Way of the Spirit", "Unlocks Inner Peace: 2.5 s untouchable, and heal 25. Heal 1 per second", "sun+cross", {"regen": 1.0}),
+			[[a("deep_calm", "Deep Calm", "Heal 1 more per second", "sun+clock", {"regen": 1.0}),
+			a("mantra", "Mantra", "Heal 4 per kill", "cross+heart", {}, [t("kill", "heal", {"n": 4.0})])],
+			[a("still_water", "Still Water", "Inner Peace comes back 30% sooner", "drop+clock", {"art_cd": -0.3}),
+			a("long_life", "Long Life", "+40 max health", "heart+clock", {"max_hp": 40.0})],
+			[a("open_palm", "Open Palm", "Hits mark enemies: +25% damage for 4 s", "target+sun", {}, [t("hit", "mark", {"mult": 1.25, "secs": 4.0})]),
+			a("quiet_mind", "Quiet Mind", "Zombies see you 35% less far", "eye_closed+sun", {"sight": -0.35})],
+			[a("ki_burst", "Ki Burst", "Every 12 s, stun enemies within 5 m", "burst+sun", {}, [t("every", "stun_around", {"secs_every": 12.0, "r": 5.0, "secs": 1.0})]),
+			a("calm_aura", "Aura of Calm", "Every 8 s, slow enemies within 6 m", "wind+sun", {}, [t("every", "slow_around", {"secs_every": 8.0, "r": 6.0, "secs": 3.0})])]],
+			a("enlightenment", "Enlightenment", "Inner Peace also heals 25 more and burns everything within 6 m", "sun+crown", {}, [], "enlightened")),
+		_spec("iron_fist", "Way of the Fist", "Bare hands are enough", Color(0.7, 0.3, 0.16),
+			a("iron_fist", "Way of the Fist", "+25% melee damage and +15% attack speed", "claw+star", {"melee_damage": 0.25, "melee_rate": 0.15}),
+			[[a("drunken_step", "Drunken Step", "25% chance to avoid any hit", "boot+star", {"dodge": 0.25}),
+			a("swift_feet", "Swift Feet", "+20% move speed", "boot+up", {"speed": 0.2})],
+			[a("combo", "Combination", "Each hit: +8% attack speed for 3 s, up to 5 times", "claw+clock", {}, [t("hit", "buff", {"stat": "melee_rate", "val": 0.08, "secs": 3.0, "key": "combo", "max": 5})]),
+			a("heavy_palm", "Heavy Palm", "20% crit chance", "claw+up", {"crit_chance": 0.2})],
+			[a("pressure_point", "Pressure Point", "Crits stun for 1.2 s", "target+star", {}, [t("crit", "stun", {"secs": 1.2})]),
+			a("bleeding_palm", "Bleeding Palm", "Hits bleed for 10 per second, 3 s", "drop+claw", {}, [t("hit", "dot", {"dps": 10.0, "secs": 3.0, "bleed": true})])],
+			[a("second_breath", "Second Breath", "Heal 4 per kill", "wind+heart", {}, [t("kill", "heal", {"n": 4.0})]),
+			a("momentum", "Momentum", "Each kill: +30% speed for 3 s", "skull+boot", {}, [t("kill", "buff", {"stat": "speed", "val": 0.3, "secs": 3.0, "key": "momentum"})])]],
+			a("seven_strikes", "Seven-Sided Strike", "Every 8 s, a blur of blows: 70 damage to everything within 5 m", "claw+crown", {}, [t("every", "quake", {"secs_every": 8.0, "r": 5.0, "dmg": 70.0})])),
+	]}
+
+
+static func _plague_doctor() -> Dictionary:
+	return {"core": [
+		[a("steady_hand", "Steady Hand", "+25% ranged damage", "poison+up", {"ranged_damage": 0.25}),
+		a("long_breath_pd", "Long Breath", "+25% range and dart speed", "wind+arrow", {"ranged_power": 0.25})],
+		[a("thick_cloak", "Waxed Cloak", "Take 15% less damage", "mask+shield", {"damage_taken": -0.15}),
+		a("bird_mask", "Bird Mask", "Zombies see you 25% less far", "mask+eye_closed", {"sight": -0.25})],
+		[a("bandolier", "Bandolier", "Carry 30 more darts, and get 20 now", "arrows+plus", {"max_arrows": 30}, [t("take", "arrows", {"n": 20})]),
+		a("cheap_darts", "Cheap Darts", "35% of shots use no dart", "arrows+clock", {"arrow_save": 0.35})],
+	], "specs": [
+		_spec("apothecary", "Apothecary", "Keeps everyone on their feet", Color(0.3, 0.56, 0.36),
+			a("apothecary", "Apothecary", "Unlocks Healing Tonic: heal 30, and friends near you 25", "potion+heart", {}),
+			[[a("strong_tonic", "Strong Tonic", "The Tonic heals 15 more", "potion+up", {}, [], "strong_tonic"),
+			a("quick_brew", "Quick Brew", "The Tonic comes back 30% sooner", "potion+clock", {"art_cd": -0.3})],
+			[a("bedside", "Bedside Manner", "Heal 1 health per second", "heart+clock", {"regen": 1.0}),
+			a("field_medic", "Field Medic", "+40 max health", "cross+up", {"max_hp": 40.0})],
+			[a("antidote", "Antidote", "Poison and bleeding do nothing to you", "drop+shield", {}, [], "antidote"),
+			a("salts", "Smelling Salts", "Every 15 s, stun enemies within 5 m", "star+potion", {}, [t("every", "stun_around", {"secs_every": 15.0, "r": 5.0, "secs": 1.0})])],
+			[a("last_rites", "Last Rites", "Heal 4 per kill", "cross+skull", {}, [t("kill", "heal", {"n": 4.0})]),
+			a("sanitize", "Sanitize", "Every 8 s, burn enemies within 4.5 m", "flame+cross", {}, [t("every", "burn_around", {"secs_every": 8.0, "r": 4.5})])]],
+			a("miracle_cure", "Miracle Cure", "The Tonic also makes you and those friends untouchable for 2 s", "potion+crown", {}, [], "miracle_cure")),
+		_spec("pestilence", "Pestilence", "Everything you touch gets sick", Color(0.44, 0.56, 0.14),
+			a("pestilence", "Pestilence", "Every hit, near or far, poisons for 10 per second, 4 s", "poison+skull", {}, [t("hit", "dot", {"dps": 10.0, "secs": 4.0}), t("shot", "dot", {"dps": 10.0, "secs": 4.0})]),
+			[[a("virulence", "Virulence", "Poison does 18 per second, for 5 s", "poison+star", {}, [t("hit", "dot", {"dps": 18.0, "secs": 5.0}), t("shot", "dot", {"dps": 18.0, "secs": 5.0})]),
+			a("rotting", "Rotting Touch", "Darts mark enemies: +25% damage for 4 s", "target+poison", {}, [t("shot", "mark", {"mult": 1.25, "secs": 4.0})])],
+			[a("miasma", "Miasma", "Every 4 s, you leave a pool of poison behind you", "wind+poison", {}, [t("every", "miasma", {"secs_every": 4.0})]),
+			a("contagion", "Contagious Darts", "Darts pass through 1 enemy", "arrow+poison", {"pierce": 1})],
+			[a("sickly_air", "Sickly Air", "Every 8 s, slow enemies within 5 m", "wind+skull", {}, [t("every", "slow_around", {"secs_every": 8.0, "r": 5.0, "secs": 3.0})]),
+			a("feed", "Feed on Sickness", "Heal 3 per kill", "heart+poison", {}, [t("kill", "heal", {"n": 3.0})])],
+			[a("plague_bearer", "Plague Bearer", "Poisoned enemies leave a pool of poison when they die", "skull+drop", {}, [], "plague_burst"),
+			a("dose", "The Right Dose", "+30% ranged damage", "drop+up", {"ranged_damage": 0.3})]],
+			a("black_death", "Black Death", "When a poisoned enemy dies, everything within 6 m is poisoned", "skull+crown", {}, [], "black_death")),
+		_spec("rat_king", "Rat King", "They come when you whistle", Color(0.38, 0.32, 0.28),
+			a("rat_king", "Rat King", "Every 18 s, 2 rats come to fight for you for 14 s", "tooth+plus", {"ally_cap": 3}, [t("every", "summon", {"secs_every": 18.0, "kind": "rat", "n": 2, "secs": 14.0})]),
+			[[a("litter", "Big Litter", "One more rat each time", "tooth+up", {"summon_extra": 1}),
+			a("fat_rats", "Fat Rats", "Rats have 60% more health", "tooth+heart", {"ally_hp": 0.6})],
+			[a("sharp_teeth", "Sharp Teeth", "Rats do 40% more damage", "tooth+star", {"ally_damage": 0.4}),
+			a("long_lived", "Long Lived", "Rats stay 50% longer", "tooth+clock", {"ally_time": 0.5})],
+			[a("fleas", "Fleas", "Heal 5 whenever a rat kills", "heart+tooth", {}, [], "bond"),
+			a("filth", "Filth", "Half of all rat bites poison", "drop+tooth", {}, [], "rat_poison")],
+			[a("scurry", "Scurry", "+15% move speed", "boot+tooth", {"speed": 0.15}),
+			a("vermin_cloak", "Vermin Cloak", "Take 15% less damage", "shield+tooth", {"damage_taken": -0.15})]],
+			a("the_swarm", "The Swarm", "Every 30 s, 5 more rats pour out for 10 s", "tooth+crown", {"ally_cap": 5}, [t("every", "summon", {"secs_every": 30.0, "kind": "rat", "n": 5, "secs": 10.0})])),
+	]}
 
 
 static func _revenant() -> Dictionary:
