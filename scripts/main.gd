@@ -135,7 +135,7 @@ func show_menu(rebuild := false) -> void:
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 14
 	box.add_child(gap)
-	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_class_picker(Game.Mode.NIGHT), true))
+	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
 	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
@@ -468,9 +468,28 @@ func _button(text: String, action: Callable, min_size: Vector2, primary := false
 # --- Choosing a class, and the Store ------------------------------------------
 
 ## The list of classes on the left, what the chosen one is on the right.
-func show_class_picker(mode: int) -> void:
+## Where to spend the night.
+func show_map_picker() -> void:
 	_clear_ui()
 	_back = show_menu
+	var root := _modal("Survive the Night")
+	var box: VBoxContainer = root.get_meta("box")
+	box.custom_minimum_size.x = 860
+	for id: String in Game.MAPS:
+		var chosen := id
+		var row := _menu_row(Game.MAPS[id]["name"], Game.MAPS[id]["desc"], func() -> void:
+			Game.night_map = chosen
+			Game.save_settings()
+			show_class_picker(Game.Mode.NIGHT))
+		row.custom_minimum_size.x = 800
+		box.add_child(row)
+	box.add_child(_button("Back", show_menu, Vector2(160, 60)))
+	panel = root
+
+
+func show_class_picker(mode: int) -> void:
+	_clear_ui()
+	_back = show_map_picker if mode == Game.Mode.NIGHT else show_menu
 	var root := _two_panes("Choose your class")
 	var list: VBoxContainer = root.get_meta("list")
 	var detail: VBoxContainer = root.get_meta("detail")
@@ -1506,6 +1525,13 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		for r in Net.RULE_NAMES.size():
 			var pick := r
 			kinds.add_child(_button(Net.RULE_NAMES[r], func() -> void: Net.set_rules(pick), Vector2(215, 58), Net.rules == r))
+		if Net.rules == Net.Rules.COOP:
+			var maps := HBoxContainer.new()
+			maps.add_theme_constant_override("separation", 8)
+			body.add_child(maps)
+			for id: String in Game.MAPS:
+				var chosen_map := id
+				maps.add_child(_button(Game.MAPS[id]["name"], func() -> void: Net.set_night_map(chosen_map), Vector2(215, 52), Net.night_map == id))
 		var levels := HBoxContainer.new()
 		levels.add_theme_constant_override("separation", 8)
 		body.add_child(levels)

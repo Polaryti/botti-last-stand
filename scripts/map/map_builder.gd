@@ -173,8 +173,9 @@ func ground() -> void:
 			_ground_mesh(terrain.patch_mesh(i, j, CELLS), mat)
 			i += CELLS
 		j += CELLS
-	for sector in 4:
-		_ground_mesh(terrain.skirt_mesh(sector), mat)
+	if not terrain.has_islands():
+		for sector in 4:
+			_ground_mesh(terrain.skirt_mesh(sector), mat)
 
 
 func _ground_mesh(m: Mesh, mat: Material) -> void:
@@ -195,7 +196,11 @@ func boundary(h: float) -> void:
 	for r in terrain.blocked_rects():
 		var c := Vector2(r.position) + Vector2(r.size) * 0.5 - Vector2.ONE * Terrain.HALF
 		var y := terrain.height(c.x, c.y)
-		w.add_barrier(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
+		if terrain.has_islands():
+			# You can walk off the edge. Mobs know better.
+			w.add_enemy_block(Vector3(c.x, 0.0, c.y), Vector3(r.size.x, 120.0, r.size.y))
+		else:
+			w.add_barrier(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
 	# Everything outside a smaller map is closed to pathing too.
 	if h < Terrain.HALF - 0.5:
 		var far := float(Terrain.HALF)

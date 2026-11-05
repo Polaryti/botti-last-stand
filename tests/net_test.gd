@@ -94,7 +94,10 @@ func _as_host() -> void:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.roster.size() == 2, "the other phone joined")
-	Net.set_rules({"coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	if rules == "mists":
+		Net.set_night_map("mists")
+		ok(true, "the host picks the Mists")
+	Net.set_rules({"mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -218,6 +221,8 @@ func _play() -> void:
 		await _ride()
 	elif rules == "chariot":
 		await _chariot()
+	elif rules == "mists":
+		await _mists()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -229,6 +234,32 @@ func _play() -> void:
 
 
 ## Two phones and two bots: the bots are real to both.
+## The islands on two phones: the same land, the same gates, and walking through them shows on the other.
+func _mists() -> void:
+	ok(w.portals != null, "both phones are on the islands")
+	await sync(10)
+	ok(w.terrain.has_islands(), "with no land between them")
+	await sync(11)
+	await wait(1.5)
+	await sync(12)
+	var link: Dictionary = w.portals.links[0]
+	if not link["open"] and Net.is_host():
+		link["open"] = true
+		w.portals._show(link)
+		w.portals._tell_others()
+	await wait(0.5)
+	await sync(13)
+	ok(w.portals.links[0]["open"], "a gate opened on the host opens here too")
+	pl.global_position = (link["a"] as Vector3) + Vector3.UP * 0.1 if Net.is_host() else pl.global_position
+	await wait(1.0)
+	await sync(14)
+	if Net.is_host():
+		ok(w.portals.island_of(pl.global_position) == int(link["ib"]), "the host stepped through")
+	else:
+		var other: Avatar = Net.avatar(1)
+		ok(other and w.portals.island_of(other.global_position) == int(link["ib"]), "and the other phone sees it arrive")
+
+
 func _with_bots() -> void:
 	pl.guard_left = 99999.0
 	var ids: Array = Net.roster.keys().filter(Net.is_bot)

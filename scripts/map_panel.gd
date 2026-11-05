@@ -32,7 +32,9 @@ static func _bake(w: World) -> ImageTexture:
 			var col := Color(0.11, 0.17, 0.17).lerp(Color(0.22, 0.28, 0.26), clampf((h + 1.0) / 11.0, 0.0, 1.0))
 			if fmod(h + 40.0, 2.0) < 0.14:
 				col = col.lightened(0.09)
-			if h < Terrain.WATER_Y:
+			if t.has_islands() and h < 0.0:
+				col = Color(0.06, 0.04, 0.12)
+			elif h < Terrain.WATER_Y:
 				col = Color(0.2, 0.36, 0.5)
 			elif t.slope(wx, wz) > Terrain.STEEP:
 				col = col.darkened(0.3)
@@ -81,6 +83,14 @@ func _draw() -> void:
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
 		draw_string_outline(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
 		draw_string(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
+	if world.portals:
+		for link: Dictionary in world.portals.links:
+			if link["open"]:
+				var pa := _to_map((link["a"] as Vector3).x, (link["a"] as Vector3).z)
+				var pb := _to_map((link["b"] as Vector3).x, (link["b"] as Vector3).z)
+				draw_line(pa, pb, Color(0.66, 0.42, 1.0, 0.35), 2.0)
+				draw_circle(pa, 4.0, Color(0.66, 0.42, 1.0))
+				draw_circle(pb, 4.0, Color(0.66, 0.42, 1.0))
 	if world.fog:
 		var c := _to_map(world.fog.centre.x, world.fog.centre.y)
 		var r := world.fog.radius / (Terrain.HALF * 2.0) * size.x

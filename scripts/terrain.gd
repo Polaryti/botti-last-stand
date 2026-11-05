@@ -9,6 +9,8 @@ const HALF := 110
 const CELL := 2.0
 const SIZE := 111 # vertices per side
 const WATER_Y := -0.7
+const VOID_Y := -40.0
+const ISLAND_RIM := 2.0
 const BED_Y := -1.25 # shallow enough for anyone to wade across
 const LAYER := 16 # the ground: blocks the player, sight and shots
 const BARRIER := 32 # the river and the cliffs: block bodies, but not sight or shots
@@ -18,6 +20,8 @@ const BANK := 5.0
 const WADE := 0.6 # how deep the water can be before it stops you
 const CURRENT := 1.7 # metres a second the river carries you
 
+var islands: Array[Vector4] = [] # x, z, radius and height. With any at all, the rest of the map is empty sky.
+var _island_wobble: Array[float] = []
 var river: Array[Vector2] = [] # flows from the first point to the last
 var river_width := 4.2
 var roughness := 5.5
@@ -43,6 +47,42 @@ func _init() -> void:
 	_detail.fractal_octaves = 1
 	walk.resize(SIZE * SIZE)
 	visual.resize(SIZE * SIZE)
+
+
+func add_island(island: Vector4, wobble: float) -> void:
+	islands.append(island)
+	_island_wobble.append(wobble)
+
+
+## The land of a floating island: nearly flat, then the edge, then nothing.
+func _island_shape(x: float, z: float) -> float:
+	var best := VOID_Y
+	for i in islands.size():
+		var g := islands[i]
+		var a := atan2(z - g.y, x - g.x)
+		var edge := g.z * (1.0 + _noise.get_noise_2d(cos(a) * 60.0 + g.x, sin(a) * 60.0 + g.y) * _island_wobble[i] * 2.0)
+		var past := Vector2(x - g.x, z - g.y).length() - edge
+		if past >= ISLAND_RIM:
+			continue
+		var top := g.w + _detail.get_noise_2d(x, z) * 0.5 * clampf(-past / 6.0, 0.0, 1.0)
+		best = maxf(best, lerpf(top, VOID_Y, smoothstep(-0.5, ISLAND_RIM, past)))
+	return best
+
+
+func has_islands() -> bool:
+	return not islands.is_empty()
+
+
+## The height of the nearest island: what something hovering over the void should stay level with.
+func island_floor(x: float, z: float) -> float:
+	var best := INF
+	var y := 0.0
+	for g: Vector4 in islands:
+		var d := Vector2(x - g.x, z - g.y).length() - g.z
+		if d < best:
+			best = d
+			y = g.w
+	return y
 
 
 func hill(x: float, z: float, height_m: float, sigma: float) -> void:
@@ -128,6 +168,8 @@ func _apply_pad(p: Dictionary, x: float, z: float, h: float) -> float:
 
 
 func _shape(x: float, z: float) -> float:
+	if not islands.is_empty():
+		return _island_shape(x, z)
 	var h := _natural(x, z)
 	for p: Dictionary in _auto_pads:
 		h = _apply_pad(p, x, z, h)
@@ -353,6 +395,9 @@ func _tint(x: float, z: float, h: float, steep: float, river_dist: float) -> Col
 	if h > 3.0:
 		col = col.lerp(Color(0.36, 0.42, 0.26), clampf((h - 3.0) / 6.0, 0.0, 0.6))
 	col = col.lerp(Color(0.36, 0.34, 0.32), smoothstep(0.42, 0.72, steep))
+	if not islands.is_empty():
+		var mossy := Color(0.2, 0.3, 0.3).lerp(Color(0.34, 0.28, 0.44), clampf(_noise.get_noise_2d(x * 2.0, z * 2.0) * 1.2 + 0.5, 0.0, 1.0))
+		return mossy.lerp(Color(0.2, 0.17, 0.27), smoothstep(0.42, 0.72, steep))
 	if river_dist < river_width + BANK * 0.65:
 		col = col.lerp(Color(0.32, 0.28, 0.2), 1.0 - smoothstep(river_width, river_width + BANK * 0.65, river_dist))
 	return col
@@ -388,6 +433,8 @@ func patch_mesh(i0: int, j0: int, cells: int) -> ArrayMesh:
 	for j in d - 1:
 		for i in w - 1:
 			var a := j * w + i
+			if not islands.is_empty() and _all_void(i0 + i, j0 + j):
+				continue
 			st.add_index(a)
 			st.add_index(a + 1)
 			st.add_index(a + w)
@@ -395,6 +442,11 @@ func patch_mesh(i0: int, j0: int, cells: int) -> ArrayMesh:
 			st.add_index(a + w + 1)
 			st.add_index(a + w)
 	return st.commit()
+
+
+func _all_void(i: int, j: int) -> bool:
+	var low := VOID_Y + 1.0
+	return visual[j * SIZE + i] < low and visual[j * SIZE + i + 1] < low and visual[(j + 1) * SIZE + i] < low and visual[(j + 1) * SIZE + i + 1] < low
 
 
 ## Land beyond the edge of the map, rising away so the world seems to go on.

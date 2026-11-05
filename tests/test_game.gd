@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_15()
 		await test_version_14()
 		await test_version_13()
 		await test_version_12_4()
@@ -77,6 +78,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_15()
 	await test_version_14()
 	await test_version_13()
 	await test_version_12_4()
@@ -679,6 +681,145 @@ func test_fort() -> void:
 	wf.queue_free()
 	await frames(2)
 	Game.mode = Game.Mode.NIGHT
+	await start_clean()
+
+
+func test_version_15() -> void:
+	var saved_map := Game.night_map
+	Game.night_map = "mists"
+	await start_clean()
+	ok(w.portals != null and w.terrain.has_islands(), "the Mists are floating islands with gates")
+	var gates := w.portals
+	ok(gates._all_joined(), "at the start every island can be reached")
+	for i in 60:
+		gates._change_one()
+		for link: Dictionary in gates.links:
+			if float(link["closing"]) > 0.0:
+				link["closing"] = 0.0
+				link["open"] = false
+		if not gates._all_joined():
+			break
+	ok(gates._all_joined(), "and however the gates change, one way round stays open")
+	var far_centre := Vector3(MapIslands.ISLANDS[1].x, 0, MapIslands.ISLANDS[1].y)
+	far_centre.y = w.ground_at(far_centre)
+	var way := gates.waypoint(Vector3(0, 4, 0), far_centre)
+	ok(way != far_centre and gates.island_of(way) == 0, "to reach another island you walk to a gate on your own")
+	ok(gates.waypoint(Vector3(0, 4, 0), Vector3(4, 4, 4)) == Vector3(4, 4, 4), "and on your own island you just walk")
+	# Through a gate.
+	var open_link: Dictionary = {}
+	for link: Dictionary in gates.links:
+		if link["open"] and int(link["ia"]) == 0:
+			open_link = link
+	if open_link.is_empty():
+		open_link = gates.links[0]
+		open_link["open"] = true
+		gates._show(open_link)
+	var enter: Vector3 = open_link["a"]
+	pl.global_position = enter + Vector3.UP * 0.1
+	pl.velocity = Vector3.ZERO
+	pl._gate_wait = 0.0
+	await seconds(0.3)
+	ok(gates.island_of(pl.global_position) == int(open_link["ib"]), "stepping into a gate takes you to its other end")
+	ok(pl.global_position.y > 0.0, "standing on the ground")
+	# A mob follows through the gates.
+	var hunter := spawn("normal", enter + Vector3(1.0, 0, 1.0), false)
+	var hunted_on := int(open_link["ib"])
+	var t := 0.0
+	while t < 20.0 and is_instance_valid(hunter) and gates.island_of(hunter.position) != hunted_on:
+		hunter._start_chase(pl.global_position)
+		await seconds(0.5)
+		t += 0.5
+	ok(gates.island_of(hunter.position) == hunted_on, "mobs use the gates too (%.1f s)" % t)
+	hunter.release()
+	# Mobs do not walk off the edge. You can.
+	var edge_x := MapIslands.ISLANDS[0].z + 8.0
+	var stuck := spawn("normal", Vector3(MapIslands.ISLANDS[0].z - 6.0, 0, 8.0), false)
+	stuck._direct = true
+	stuck._set_goal(Vector3(edge_x, 0, 8.0))
+	stuck.state = Zombie.State.INVESTIGATE
+	await seconds(3.0)
+	ok(w.terrain.height(stuck.position.x, stuck.position.z) > 0.0, "a mob stays on its island (%s)" % stuck.position)
+	stuck.release()
+	# A brave jump over to a stepping stone.
+	var stone: Vector4 = MapIslands.STONES[0]
+	var from_x := MapIslands.ISLANDS[0].z - 3.0
+	var run_at := Vector3(from_x, w.ground_at(Vector3(from_x, 0, stone.y)) + 0.1, stone.y)
+	pl.global_position = run_at
+	pl.rotation.y = -PI * 0.5
+	pl.yaw = -PI * 0.5
+	pl.velocity = Vector3.ZERO
+	pl.input_move = Vector2(0, -1)
+	var jumped := false
+	for i in 150:
+		await frames(1)
+		var ahead := Vector3(pl.global_position.x + 1.4, 0, pl.global_position.z)
+		if pl.is_on_floor() and w.terrain.height(ahead.x, ahead.z) < 0.0 and not jumped:
+			pl.input_jump = true
+			jumped = true
+		if pl.global_position.x > stone.x - 2.0 and pl.is_on_floor():
+			break
+	pl.input_move = Vector2.ZERO
+	ok(pl.global_position.x > stone.x - 3.0 and pl.global_position.y > 2.0, "the stepping stones can be reached with a jump (%s)" % pl.global_position)
+	# A night here runs like any other.
+	pl.guard_left = 9999.0
+	w.director.running = true
+	w.director.elapsed = 420.0
+	await seconds(4.0)
+	ok(w.zombies.size() > 0, "the night comes here too")
+	var fell := 0
+	for z: Zombie in w.zombies:
+		if not z.flies and z.position.y < -2.0:
+			fell += 1
+	ok(fell == 0, "and nothing has dropped into the void (%d)" % fell)
+	w.director.running = false
+	await kill_all()
+	# Bots use the gates.
+	ok(Net.host_game() == OK, "a game with a bot here")
+	Net.in_game = true
+	var info := {"name": "Bot", "class": "infantry", "team": 0}
+	var body := Avatar.new(w, Net.BOT_BASE + 60, info)
+	w.add_child(body)
+	var bot_at := Vector3(4, w.ground_at(Vector3(4, 0, 4)) + 0.1, 4)
+	body.teleport(bot_at)
+	var bot := BotPlayer.new(w, body, info)
+	w.add_child(bot)
+	bot._has_goal = true
+	bot._goal = pl.global_position
+	var target_island := gates.island_of(far_centre)
+	bot._goal = far_centre
+	t = 0.0
+	var moved_on := false
+	while t < 30.0:
+		bot._has_goal = true
+		bot._goal = far_centre
+		bot._think = 5.0
+		await seconds(0.5)
+		t += 0.5
+		if gates.island_of(bot.at) == target_island:
+			moved_on = true
+			break
+	ok(moved_on, "a bot walks through the gates to reach another island (%.1f s)" % t)
+	bot.queue_free()
+	body.queue_free()
+	Net.in_game = false
+	Net.leave()
+	await frames(2)
+	# Falling is a normal death.
+	pl.set_physics_process(true)
+	pl.guard_left = 0.0
+	pl.global_position = Vector3(38.0, 8.0, 38.0)
+	pl.velocity = Vector3.ZERO
+	await seconds(2.0)
+	ok(pl.dead, "falling off the world kills you")
+	# Choosing a map.
+	Game.night_map = saved_map
+	await start_clean()
+	m.show_map_picker()
+	await frames(2)
+	var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	ok(m.panel.find_children("*", "Button", true, false).size() >= 3, "you can choose where to spend the night")
+	m.show_menu()
+	await frames(2)
 	await start_clean()
 
 

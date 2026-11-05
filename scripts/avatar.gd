@@ -145,10 +145,11 @@ func _play(anim_name: String, speed := 1.0) -> void:
 
 
 func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: float, flags: int, attacks: int, weapon: String, hp_left: float) -> void:
-	_target = at
-	if not _got_pose:
-		_got_pose = true
+	# Far in one step: a gate. No gliding across the sky.
+	if not _got_pose or at.distance_to(_target) > 12.0:
 		global_position = at
+	_got_pose = true
+	_target = at
 	_yaw = yaw
 	_pitch = pitch
 	velocity = vel

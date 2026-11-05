@@ -45,6 +45,10 @@ var dummy_spots: Array[Vector3] = []
 var rival_spots: Array[Vector3] = []
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
 var _enemy_blocks: StaticBody3D
+var portals: MistPortals
+var night_bg := NIGHT_BG
+var night_ambient := NIGHT_AMBIENT
+const FALL_DEATH := -6.0 # below this on the islands, you have fallen off the world
 var director: Director
 var player: Player
 var players: Array[Target] = []
@@ -226,6 +230,8 @@ func setup(game_mode: int) -> void:
 	map.free()
 	grid.astar.update()
 	grid.build_far_grid()
+	if terrain.has_islands():
+		_mists_look()
 	_build_fx()
 	director = Director.new(self)
 	add_child(director)
@@ -306,6 +312,9 @@ func _map_file() -> String:
 	match mode:
 		Game.Mode.FORT: return "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
+		Game.Mode.NIGHT:
+			if Game.current_map() == "mists":
+				return "res://maps/mists.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -378,7 +387,10 @@ func grid_mark_crops(t: Transform3D, size: Vector2) -> void:
 
 
 func ground_at(at: Vector3) -> float:
-	return terrain.height(at.x, at.z)
+	var h := terrain.height(at.x, at.z)
+	if h < FALL_DEATH and terrain.has_islands():
+		return terrain.island_floor(at.x, at.z) # over the void, what flies stays level with the islands
+	return h
 
 
 func add_barrier(at: Vector3, size: Vector3) -> void:
@@ -536,6 +548,15 @@ func _build_environment() -> void:
 	_build_sky()
 
 
+## A violet night with nothing under it.
+func _mists_look() -> void:
+	night_bg = Color(0.11, 0.06, 0.2)
+	_env.fog_light_color = Color(0.2, 0.12, 0.32)
+	_env.fog_density = 0.012
+	night_ambient = Color(0.42, 0.36, 0.68)
+	_sky_material.set_shader_parameter("tint", Vector3(1.8, 0.85, 2.2))
+
+
 func _build_sky() -> void:
 	_sky_root = Node3D.new()
 	add_child(_sky_root)
@@ -596,8 +617,8 @@ func _apply_sky(dawn: float) -> void:
 	_sky_material.set_shader_parameter("sun_dir", _sun_direction(dawn))
 	_star_material.albedo_color = Color(1, 1, 1, clampf(1.0 - dawn * 1.8, 0.0, 1.0))
 	_night_dome.visible = dawn < 0.56 and not wet
-	_env.background_color = NIGHT_BG.lerp(DAWN_BG, bright)
-	_env.ambient_light_color = NIGHT_AMBIENT.lerp(DAWN_AMBIENT, warm)
+	_env.background_color = night_bg.lerp(DAWN_BG, bright)
+	_env.ambient_light_color = night_ambient.lerp(DAWN_AMBIENT, warm)
 	_ambient_now = lerpf(0.5, 0.8, bright) * (0.9 if wet else 1.0)
 	_env.ambient_light_energy = _ambient_now
 	_env.fog_light_color = NIGHT_FOG.lerp(DAWN_FOG, warm)

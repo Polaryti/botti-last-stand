@@ -21,6 +21,9 @@ var finished_games := 0
 var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
+var night_map := "village"
+const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
+	"mists": {"name": "The Mists", "desc": "Floating islands, joined by gates that open and close. Mind the edge: falling is death."}}
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 var sensitivity := 1.0
@@ -70,6 +73,13 @@ func redeem_key(key: String) -> Dictionary:
 
 func owns_class(id: String) -> bool:
 	return not ClassDefs.ALL[id].get("hidden", false) or unlocked.has(id)
+
+
+## Which map a night is played on: the host decides in a game together.
+func current_map() -> String:
+	if Net.active():
+		return "village" if Net.pvp() else Net.night_map
+	return night_map
 
 
 func owns_item(id: String) -> bool:
@@ -236,6 +246,9 @@ func load_settings() -> void:
 	owned_items = c.get_value("progress", "owned_items", {})
 	switched_off = c.get_value("progress", "switched_off", {})
 	pet = c.get_value("progress", "pet", "wolf")
+	night_map = c.get_value("progress", "night_map", "village")
+	if not MAPS.has(night_map):
+		night_map = "village"
 	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
 		pet = "wolf"
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class):
@@ -265,6 +278,7 @@ func save_settings() -> void:
 	c.set_value("progress", "owned_items", owned_items)
 	c.set_value("progress", "switched_off", switched_off)
 	c.set_value("progress", "pet", pet)
+	c.set_value("progress", "night_map", night_map)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)

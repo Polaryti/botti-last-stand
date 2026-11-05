@@ -2,6 +2,14 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.15.0 (5 November 2026)
+### New
+- A new map for Survive the Night: The Mists. Floating islands in a violet sky, with nothing beneath them.
+- Gates join the islands. They open and close by themselves, flickering first, but one way round always stays open. Mobs and bots use them too.
+- Two stepping stones can be crossed with a jump, and nothing can follow you that way.
+- Falling off the edge is a normal death. Mobs know better than to try.
+- Survive the Night now asks which map you want. In a game together, the host chooses for co-op. All vs All and Teams stay in the village.
+
 ## 0.14.0 (5 November 2026)
 ### New
 - The Store has sections: Classes, Class upgrades and Pets. What you select turns slowly next to its description.

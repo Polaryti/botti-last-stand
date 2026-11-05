@@ -49,7 +49,7 @@ var _idle_time := 0.0
 func _init(owner_world: World, ally_kind: String) -> void:
 	world = owner_world
 	kind = ally_kind
-	collision_mask = 1 | Terrain.BARRIER
+	collision_mask = 1 | Terrain.BARRIER | (Terrain.ENEMY_ONLY if world.terrain.has_islands() else 0)
 	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.34
@@ -343,6 +343,9 @@ func _physics_process(delta: float) -> void:
 	elif world.player:
 		var to := world.player.global_position - position
 		to.y = 0.0
+		if world.portals and to.length() > 26.0:
+			# You went through a gate. It finds its own way.
+			position = world.player.global_position + Vector3(1.5, 0.0, 1.5)
 		if to.length() > 4.0:
 			dir = to.normalized()
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 7.0))

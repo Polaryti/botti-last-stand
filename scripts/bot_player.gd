@@ -80,6 +80,7 @@ var _item: Pickup
 var _familiar := 0.0
 var _poisoned := 0.0
 var _bleeding := 0.0
+var _gate_wait := 0.0
 
 
 func _init(owner_world: World, avatar: Avatar, info: Dictionary) -> void:
@@ -353,12 +354,23 @@ func _act(delta: float) -> void:
 func _walk(delta: float) -> void:
 	_repath -= delta
 	_no_shortcut -= delta
-	var direct := _clear_way and _no_shortcut <= 0.0
+	var aim := _goal
+	if world.portals:
+		_gate_wait -= delta
+		aim = world.portals.waypoint(at, _goal)
+		var out := world.portals.exit_from(at) if _gate_wait <= 0.0 else Vector3.INF
+		if out != Vector3.INF:
+			at = out
+			body.teleport(at)
+			_gate_wait = 2.0
+			_repath = 0.0
+			return
+	var direct := _clear_way and _no_shortcut <= 0.0 and aim == _goal
 	if not direct and _repath <= 0.0:
 		_repath = REPATH_EVERY
-		_path = world.grid.route(at, _goal)
+		_path = world.grid.route(at, aim)
 		_path_at = 0
-	var next := _goal
+	var next := aim
 	if not direct and _path_at < _path.size():
 		next = _path[_path_at]
 		if Vector2(next.x - at.x, next.z - at.z).length() < 0.7:

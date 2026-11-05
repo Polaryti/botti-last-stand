@@ -19,7 +19,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 17
+const PROTOCOL := 18
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -45,6 +45,7 @@ const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_
 
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
+var night_map := "village" # which map a co-op night is played on: the host's choice
 var online: EpicNet # stays once made, because its system can only start once
 var room_code := ""
 var room_problem := "" # why there is no short code
@@ -214,7 +215,7 @@ func _balance_bots() -> void:
 
 func _share_lobby() -> void:
 	_balance_bots()
-	_lobby.rpc(roster, rules, difficulty)
+	_lobby.rpc(roster, rules, difficulty, night_map)
 	lobby_changed.emit()
 
 
@@ -467,7 +468,8 @@ func _refused(reason: String) -> void:
 
 
 @rpc("authority", "reliable")
-func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int) -> void:
+func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map: String) -> void:
+	night_map = new_map
 	roster = new_roster
 	rules = new_rules
 	difficulty = new_difficulty
@@ -822,6 +824,22 @@ func _world_fx(kind: int, a: Vector3, b: Vector3) -> void:
 		Fx.FIRE_PATCH: world.drop_poison(a, true, b.x, b.y, true, is_foe(multiplayer.get_remote_sender_id()))
 		Fx.SPARK: world.fx_spark(a, b)
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
+
+
+func set_night_map(id: String) -> void:
+	if is_host():
+		night_map = id
+		_share_lobby()
+
+
+func send_portals(bits: PackedByteArray) -> void:
+	_portals.rpc(bits)
+
+
+@rpc("authority", "reliable", "call_remote")
+func _portals(bits: PackedByteArray) -> void:
+	if world and is_instance_valid(world) and world.portals:
+		world.portals.apply_state(bits)
 
 
 func ring_fx(at: Vector3, radius: float, col: Color) -> void:

@@ -109,6 +109,7 @@ var _dot_dps := 0.0
 var poison_left := 0.0
 var bleed_left := 0.0
 var _debuff_fx: CPUParticles3D
+var _gate_wait := 0.0
 var _stun_fx: CPUParticles3D
 var shown_debuffs := 0 # on another phone: which of them the host last told us about
 var _dot_tick := 0.0
@@ -975,6 +976,8 @@ func anim_speed() -> float:
 func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_name: String, speed: float) -> void:
 	if _dying > 0.0:
 		return
+	if position.distance_to(at) > 12.0:
+		position = at
 	_net_pos = at
 	_net_rot = rot
 	state = flags & 3
@@ -1703,6 +1706,15 @@ func _desired_speed() -> float:
 
 
 func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
+	if world.portals and not flies:
+		_gate_wait -= delta
+		if _gate_wait <= 0.0:
+			var out := world.portals.exit_from(position)
+			if out != Vector3.INF:
+				position = out
+				_gate_wait = 2.0
+				_needs_path = true
+				_path = PackedVector3Array()
 	var dir := Vector3.ZERO
 	var speed := _desired_speed()
 	if speed > 0.0:
@@ -1722,7 +1734,8 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 			_clear_path_only()
 		elif _has_goal:
 			if _needs_path and world.take_path_budget():
-				_path = world.grid.path(position, _goal) if _full_path else world.grid.route(position, _goal)
+				var aim := world.portals.waypoint(position, _goal) if world.portals else _goal
+				_path = world.grid.path(position, aim) if _full_path else world.grid.route(position, aim)
 				_full_path = false
 				_path_i = 0
 				_needs_path = false

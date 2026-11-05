@@ -6,6 +6,7 @@ uniform float dawn = 0.0;
 uniform vec3 sun_dir = vec3(0.0, -0.2, -1.0);
 uniform float cloud = 0.0; // how overcast it is
 uniform float flash = 0.0; // lightning
+uniform vec3 tint = vec3(1.0); // the Mists are violet
 
 varying vec3 dir;
 
@@ -18,7 +19,7 @@ void fragment() {
 	float h = clamp(d.y, -0.05, 1.0);
 	vec3 night_top = vec3(0.012, 0.022, 0.06);
 	vec3 night_low = vec3(0.05, 0.08, 0.135);
-	vec3 night = mix(night_low, night_top, pow(h, 0.5));
+	vec3 night = mix(night_low, night_top, pow(h, 0.5)) * tint;
 	vec3 day_top = vec3(0.28, 0.44, 0.68);
 	vec3 day_mid = vec3(0.74, 0.62, 0.62);
 	vec3 day_low = vec3(1.0, 0.62, 0.34);

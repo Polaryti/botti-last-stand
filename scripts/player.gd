@@ -87,6 +87,8 @@ var _riposte_cd := 0.0
 var _kill_shot_cd := 0.0
 var _sacred_cd := 0.0
 var aiming_art := false
+var _gate_wait := 0.0
+var _safe_spot := Vector3.ZERO
 var trap_charges := 0
 var shadow_kills := 0
 var flurry_left := 0.0
@@ -2150,11 +2152,13 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= GRAVITY * delta
 	input_jump = false
 	move_and_slide()
+	if world.portals:
+		_tick_islands(delta)
 	if wading and global_position.y < Terrain.WATER_Y + 0.6:
 		var flow := world.terrain.river_flow(global_position.x, global_position.z)
 		move_and_collide(Vector3(flow.x, 0, flow.y) * Terrain.CURRENT * delta)
 	# However it happened, nobody stays under the ground.
-	var floor_y := world.ground_at(global_position)
+	var floor_y := world.terrain.height(global_position.x, global_position.z)
 	if global_position.y < floor_y - 1.0:
 		global_position.y = floor_y + 0.1
 		velocity.y = 0.0
@@ -2165,6 +2169,33 @@ func _physics_process(delta: float) -> void:
 	_was_on_floor = is_on_floor()
 	_footsteps(delta)
 	_tick_riding(delta)
+
+
+## On the floating islands: gates to step through, and a long way down.
+func _tick_islands(delta: float) -> void:
+	_gate_wait -= delta
+	if is_on_floor() and world.terrain.height(global_position.x, global_position.z) > 0.0:
+		_safe_spot = global_position
+	if global_position.y < World.FALL_DEATH:
+		hit_by = "the fall"
+		guard_left = 0.0
+		_kill()
+		if not dead:
+			# Undying Rage brings you back up.
+			global_position = _safe_spot
+			velocity = Vector3.ZERO
+		return
+	if _gate_wait > 0.0:
+		return
+	var out := world.portals.exit_from(global_position)
+	if out != Vector3.INF:
+		global_position = out
+		velocity = Vector3.ZERO
+		_gate_wait = 1.5
+		Sfx.play("spell", -4.0, 1.5)
+		hurt_flash = 0.0
+		level_flash = 0.5
+		world.fx_ring(out, 3.0, Color(0.66, 0.42, 1.0))
 
 
 ## Riding behind a friend: their horse goes where they go. You can look around and fight.
