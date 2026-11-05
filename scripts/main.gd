@@ -629,9 +629,12 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 12)
 		detail.add_child(line)
+		var emblem := IconView.new("spec_%s" % spec["id"], ClassDefs.color(id), 44.0)
+		emblem.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		line.add_child(emblem)
 		var spec_name := _body(spec["name"], 23)
 		spec_name.add_theme_font_override("font", UiTheme.bold_font())
-		spec_name.custom_minimum_size.x = 210
+		spec_name.custom_minimum_size.x = 190
 		spec_name.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		line.add_child(spec_name)
 		var spec_desc := _soft(spec["desc"], 23)
@@ -763,14 +766,13 @@ func _item_row(id: String) -> Button:
 	var d: Dictionary = ShopDefs.ITEMS[id]
 	var owned := Game.owns_item(id)
 	var row := Button.new()
-	row.custom_minimum_size = Vector2(320, 72)
+	row.custom_minimum_size = Vector2(320, 80)
 	var inner := HBoxContainer.new()
 	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inner.add_theme_constant_override("separation", 12)
 	row.add_child(inner)
 	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 	var medal := IconView.new(str(d["icon"]), ClassDefs.color(str(d["class"])), 54.0)
-	medal.dim = not owned
 	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	inner.add_child(medal)
 	var name_label := _body(d["name"], 24)
@@ -780,7 +782,16 @@ func _item_row(id: String) -> Button:
 	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if not owned:
 		name_label.add_theme_color_override("font_color", UiTheme.ASH)
-	inner.add_child(name_label)
+	var words := VBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_theme_constant_override("separation", 0)
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	words.add_child(name_label)
+	var whose := _soft(ShopDefs.whose(id), 18)
+	whose.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.add_child(whose)
+	inner.add_child(words)
 	return row
 
 
@@ -803,7 +814,14 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	var title := _body(d["name"], 36)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
-	words.add_child(_soft("For %s" % ClassDefs.ALL[d["class"]]["name"], 23))
+	var owner_row := HBoxContainer.new()
+	owner_row.add_theme_constant_override("separation", 10)
+	owner_row.add_child(IconView.new(ClassDefs.icon(d["class"]), ClassDefs.color(d["class"]), 46.0))
+	owner_row.add_child(IconView.new("spec_%s" % d["spec"], ClassDefs.color(d["class"]), 46.0))
+	var owner_words := _soft(ShopDefs.whose(id), 23)
+	owner_words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	owner_row.add_child(owner_words)
+	words.add_child(owner_row)
 	var desc := _body(d["desc"], 24)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	words.add_child(desc)
@@ -881,36 +899,53 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	head.add_child(view)
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_theme_constant_override("separation", 8)
+	words.add_theme_constant_override("separation", 10)
 	head.add_child(words)
 	var title := _body(ClassDefs.ALL[id]["name"], 36)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
 	var items := ShopDefs.for_class(id)
-	var upgrades := items.filter(func(item: String) -> bool: return not ShopDefs.ITEMS[item].get("pet", false))
 	if items.is_empty():
 		words.add_child(_soft("Nothing for this class yet.", 24))
-	for item: String in upgrades:
-		words.add_child(_armory_upgrade_row(item, id))
-	if not upgrades.is_empty() and upgrades.size() < items.size():
-		words.add_child(_pet_row())
+	var shown_specs := {}
+	for item: String in items:
+		var spec := str(ShopDefs.ITEMS[item]["spec"])
+		if shown_specs.has(spec):
+			continue
+		shown_specs[spec] = true
+		words.add_child(_armory_spec_row(id, spec, items.filter(func(other: String) -> bool: return ShopDefs.ITEMS[other]["spec"] == spec)))
 
 
-func _armory_upgrade_row(item: String, class_id: String) -> Control:
-	var d: Dictionary = ShopDefs.ITEMS[item]
+## One specialization: its emblem and name, and what you have for it.
+func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
-	var name_label := _body("%s (%s)" % [d["name"], _spec_name(class_id, str(d["spec"]))], 23)
-	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(name_label)
-	if not Game.owns_item(item):
-		row.add_child(_button("In the Store", func() -> void: show_store(item), Vector2(190, 52)))
+	var emblem := IconView.new("spec_%s" % spec, ClassDefs.color(class_id), 58.0)
+	emblem.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	row.add_child(emblem)
+	var column := VBoxContainer.new()
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 4)
+	row.add_child(column)
+	column.add_child(_body(_spec_name(class_id, spec), 23))
+	if ShopDefs.ITEMS[items[0]].get("pet", false):
+		column.add_child(_pet_row())
 		return row
-	var on := Game.item_active(item)
-	row.add_child(_button("Equipped" if on else "Not equipped", func() -> void:
-		Game.set_item_on(item, not on)
-		show_armory(class_id), Vector2(190, 52), on))
+	for item: String in items:
+		var d: Dictionary = ShopDefs.ITEMS[item]
+		var line := HBoxContainer.new()
+		line.add_theme_constant_override("separation", 12)
+		column.add_child(line)
+		var name_label := _soft(d["name"], 22)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(name_label)
+		if not Game.owns_item(item):
+			line.add_child(_button("In the Store", func() -> void: show_store(item), Vector2(190, 50)))
+			continue
+		var on := Game.item_active(item)
+		line.add_child(_button("Equipped" if on else "Not equipped", func() -> void:
+			Game.set_item_on(item, not on)
+			show_armory(class_id), Vector2(190, 50), on))
 	return row
 
 
@@ -925,7 +960,6 @@ static func _spec_name(class_id: String, spec: String) -> String:
 func _pet_row() -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
-	box.add_child(_body("Beastmaster's pet", 23))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
 	box.add_child(row)
@@ -945,7 +979,7 @@ func _pet_row() -> Control:
 		if not owned:
 			b.modulate = Color(1, 1, 1, 0.55)
 		row.add_child(b)
-	var shown := ModelView.new(Vector2(200, 170))
+	var shown := ModelView.new(Vector2(200, 130))
 	shown.show_pet(Game.pet)
 	box.add_child(shown)
 	return box

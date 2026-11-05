@@ -19,6 +19,8 @@ static func t(when: String, action: String, params := {}) -> Dictionary:
 
 static func _spec(id: String, name: String, desc: String, color: Color, entry: Dictionary, path: Array, final: Dictionary) -> Dictionary:
 	final["final"] = true
+	entry["icon"] = "spec_%s" % id
+	final["icon"] = "spec_%s+crown" % id
 	return {"id": id, "name": name, "desc": desc, "color": color, "entry": entry, "path": path, "final": final}
 
 

@@ -945,6 +945,19 @@ func test_version_14() -> void:
 	await frames(2)
 	var words: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 	ok(words.has("Equipped") and words.has("Raven"), "the Armory lists upgrades and pets")
+	ok(not ShopDefs.SECTIONS.has("pets") and ShopDefs.in_section("upgrades").has("raven"), "pets are among the class upgrades")
+	ok(ShopDefs.whose("raven") == "Ranger, Beastmaster pet" and ShopDefs.whose("rain_of_arrows") == "Ranger, Sharpshooter", "each purchase says whose it is")
+	# Every class and path has a picture of its own.
+	var seen_icons := {}
+	for class_id: String in ClassDefs.ALL:
+		ok(Icons.exists("crest_%s" % class_id), "%s has its own crest" % class_id)
+		for sp: Dictionary in AbilityData.tree(class_id)["specs"]:
+			ok(Icons.exists("spec_%s" % sp["id"]) and not seen_icons.has(sp["id"]), "%s has its own emblem" % sp["id"])
+			seen_icons[sp["id"]] = true
+	for item: String in ShopDefs.ITEMS:
+		ok(Icons.exists(str(ShopDefs.ITEMS[item]["icon"])), "%s has an icon" % item)
+	for weapon_id: String in WeaponDefs.ALL:
+		ok(Icons.exists(Icons.weapon(weapon_id).split("+")[0]), "%s has an icon" % weapon_id)
 	for class_id: String in ClassDefs.available():
 		m.show_armory(class_id)
 		await frames(1)

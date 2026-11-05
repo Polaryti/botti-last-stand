@@ -2,6 +2,12 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.17.0 (5 November 2026)
+### Changed
+- All new icons, painted in colour. Each class has its own crest with its own outline, and each specialization its own emblem. Purchases, pets and weapons have their own pictures, and the symbols used by abilities were redrawn.
+- Store: pets are now among the Class upgrades, under the Beastmaster. Every upgrade says which class and specialization it is for.
+- Armory: upgrades and pets are listed under their specialization.
+
 ## 0.16.0 (5 November 2026)
 ### New
 - Monk: spirit and martial arts. Fights with bare hands and can use any weapon. Way of the Staff replaces every weapon with a bo. Way of the Spirit brings Inner Peace, a moment nothing can touch. Way of the Fist needs nothing but its hands. It opens only with a code.

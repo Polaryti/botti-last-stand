@@ -28,7 +28,7 @@ const ALL := {
 }
 
 static func icon(id: String) -> String:
-	return {"infantry": "sword", "ranger": "bow", "heavy": "shield_rect", "chivalry": "horse", "magician": "staff", "revenant": "claw", "artificer": "gear", "monk": "sun", "plague_doctor": "mask"}[id]
+	return "crest_%s" % id
 
 
 static func color(id: String) -> Color:

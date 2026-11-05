@@ -651,7 +651,7 @@ func _draw_controls() -> void:
 		draw_texture_rect(_glass, rect, false, tint)
 		var glyph := _button_glyph(id)
 		var inset := r * 0.42
-		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color(UiTheme.BONE, 0.95))
+		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color.WHITE)
 		draw_texture_rect(_ring, rect, false, Color(1, 1, 1, 0.6) if not held else UiTheme.EMBER)
 		if id == "take" and player.nearby_weapon:
 			_centered(player.nearby_weapon.display_name(), pos + Vector2(0, -r - 18), 26, UiTheme.BONE)
