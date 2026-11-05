@@ -17,8 +17,8 @@ const ALL := {
 	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 70.0, "speed": 1.0, "ranged": true, "mana": true, "hidden": true, "earned": "games",
 		"desc": "Fragile caster. Keeps a Staff that uses refilling mana. Elements and summoned allies."},
 	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.5, "kill_mist": 5.0,
-		"no_weapons": true, "auto_tree": true, "hidden": true, "price": 650,
-		"desc": "Dead, and not done. No weapons, only claws of Mist. Gifts come by themselves as you level, and you choose one path."},
+		"no_weapons": true, "hidden": true, "price": 650,
+		"desc": "Dead, and not done. No weapons, only claws of Mist, which it spends with every blow."},
 	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
 }

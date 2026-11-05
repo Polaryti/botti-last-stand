@@ -118,12 +118,13 @@ var _sentry_look: Mesh
 var _stand_items: Array[Dictionary] = []
 var _fire_puddle: StandardMaterial3D
 var _rings: Array[Dictionary] = []
+var _aim_ring: MeshInstance3D
 var _next_ring := 0
 const RING_TIME := 0.55
 var _next_puddle := 0
 var _poison_tick := 0.0
 var _traps: Array[Dictionary] = []
-var _trap_mesh: Mesh
+static var _trap_mesh: Mesh
 var _lanterns: Array[OmniLight3D] = []
 var _sky_material: ShaderMaterial
 var _dawn_done := false
@@ -1815,7 +1816,7 @@ func _scan_pickups() -> void:
 
 func spawn_ally(kind: String, at: Vector3, seconds: float) -> void:
 	var cap := int(player.m("ally_cap")) if player else 4
-	if kind == "wolf":
+	if Ally.BEASTS.has(kind):
 		cap += 4
 	var mine := 0
 	for other in allies:
@@ -2030,11 +2031,7 @@ func _tick_bell(delta: float) -> void:
 
 # --- Traps --------------------------------------------------------------------
 
-func place_trap(p: Player, at: Vector3) -> void:
-	var limit := int(p.m("trap_cap"))
-	while _traps.size() >= limit:
-		var old: Dictionary = _traps.pop_front()
-		(old["node"] as Node).queue_free()
+static func trap_mesh() -> Mesh:
 	if _trap_mesh == null:
 		var l := LowPoly.new()
 		l.prism(Vector3(0, 0.0, 0), Vector3(0, 0.06, 0), 0.5, 0.5, 8, Color(0.3, 0.3, 0.33))
@@ -2043,12 +2040,22 @@ func place_trap(p: Player, at: Vector3) -> void:
 			var a := TAU * i / 8.0
 			l.prism(Vector3(cos(a) * 0.4, 0.05, sin(a) * 0.4), Vector3(cos(a) * 0.32, 0.26, sin(a) * 0.32), 0.05, 0.0, 3, Color(0.78, 0.8, 0.84))
 		_trap_mesh = l.commit()
+	return _trap_mesh
+
+
+func place_trap(p: Player, at: Vector3, arming := 0.0) -> void:
+	var limit := int(p.m("trap_cap"))
+	while _traps.size() >= limit:
+		var old: Dictionary = _traps.pop_front()
+		(old["node"] as Node).queue_free()
 	var mi := MeshInstance3D.new()
-	mi.mesh = _trap_mesh
+	mi.mesh = trap_mesh()
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	mi.global_position = Vector3(at.x, ground_at(at) + 0.03, at.z)
-	_traps.append({"node": mi, "at": mi.global_position})
+	if arming > 0.0:
+		mi.scale = Vector3.ONE * 0.6
+	_traps.append({"node": mi, "at": mi.global_position, "armed_at": now + arming})
 	Sfx.play("trap", -8.0, 1.3, 0.2)
 	if p.has_flag("trap_lure"):
 		for z in zombies:
@@ -2061,6 +2068,12 @@ func _tick_traps(_delta: float) -> void:
 		return
 	for i in range(_traps.size() - 1, -1, -1):
 		var at: Vector3 = _traps[i]["at"]
+		if now < float(_traps[i]["armed_at"]):
+			continue
+		var trap_node := _traps[i]["node"] as Node3D
+		if trap_node.scale.x < 1.0:
+			trap_node.scale = Vector3.ONE
+			Sfx.play_at("trap", at, player.global_position, -6.0)
 		var caught := rivals_near(at, 1.1)
 		if not caught.is_empty():
 			(_traps[i]["node"] as Node).queue_free()
@@ -2133,7 +2146,7 @@ func warm_up() -> void:
 			elif i % 3 == 1:
 				z._flash_on()
 	var allies_from := allies.size()
-	for kind: String in ["skeleton", "wolf", "ghost"]:
+	for kind: String in ["skeleton", "wolf", "raven", "snake", "fox", "ghost"]:
 		spawn_ally(kind, spot + Vector3(allies.size() * 1.5 - 2.0, 0, -2.0), 1.0)
 	fx_gore(spot + Vector3(-1, 1, 1), Color(0.5, 0.2, 0.2))
 	fx_blast(spot + Vector3(1, 1, 1), 1.5, Color(1.0, 0.55, 0.15, 0.55))
@@ -2481,6 +2494,24 @@ func near_friend() -> Vector3:
 			var c := grid.nearest_free(grid.to_cell(t.global_position + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2))))
 			return grid.to_world(c)
 	return far_from_rivals()
+
+
+## Where an aimed ability will land. A radius of zero takes it away.
+func show_aim(at: Vector3, radius: float) -> void:
+	if _aim_ring == null:
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(2.0, 2.0)
+		_aim_ring = MeshInstance3D.new()
+		_aim_ring.mesh = plane
+		_aim_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var look := ShaderMaterial.new()
+		look.shader = load("res://assets/shaders/strike_ring.gdshader")
+		_aim_ring.material_override = look
+		add_child(_aim_ring)
+	_aim_ring.visible = radius > 0.0
+	if radius > 0.0:
+		_aim_ring.global_position = at + Vector3.UP * 0.15
+		_aim_ring.scale = Vector3(radius, 1.0, radius)
 
 
 ## A wave along the ground, shown on every phone.

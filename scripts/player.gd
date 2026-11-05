@@ -24,6 +24,19 @@ const PVP_STATUS := 0.6 # a freeze or a stun lasts this much as long on a player
 const PVP_STATUS_GAP := 1.5
 const FOG_XP := 0.5
 const WADE_SPEED := 0.7
+const RAIN_REACH := 30.0
+const RAIN_RADIUS := 5.0
+const RAIN_ARROWS := 8
+const RAIN_POWER := 0.8 # each of the eight strikes in the volley
+const TRAPS_CARRIED := 5
+const TRAP_ARMING := 3.0
+const FLURRY_TIME := 4.0
+const FLURRY_RATE := 1.6
+const RAGE_TIME := 5.0
+const RAGE_COOLDOWN := 60.0
+const RAGE_SPEED := 1.3
+const SHROUD_KILLS := 8
+const SHROUD_TIME := 3.0
 const POISON_HURT := 1.05 # poisoned: everything hurts this much more
 const BLEED_SPEED := 0.9 # bleeding: this much of your speed is left
 const DEBUFF_DPS := 3.0
@@ -73,6 +86,14 @@ var guard_left := 0.0
 var _riposte_cd := 0.0
 var _kill_shot_cd := 0.0
 var _sacred_cd := 0.0
+var aiming_art := false
+var trap_charges := 0
+var shadow_kills := 0
+var flurry_left := 0.0
+var rage_left := 0.0
+var _rage_cd := 0.0
+var _rain_spot := Vector3.ZERO
+var _rain_wait := 0.0
 var _wolf_timer := 0.0
 var _low_armed := true
 var _assassin_kill := false
@@ -643,6 +664,16 @@ func look_direction() -> Vector3:
 
 
 func _kill() -> void:
+	if has_item("undying_rage") and _rage_cd <= 0.0:
+		_rage_cd = RAGE_COOLDOWN
+		rage_left = RAGE_TIME
+		hp = max_hp() * 0.3
+		burn_time = 0.0
+		say("Undying Rage!")
+		hurt_flash = 1.0
+		world.fx_ring(global_position, 6.0, Color(1.0, 0.25, 0.1))
+		Sfx.play("blast", -2.0, 0.8)
+		return
 	hp = 0.0
 	dead = true
 	input_fire = false
@@ -673,7 +704,6 @@ func add_xp(n: int) -> void:
 		say("Level %d! Choose an ability" % level)
 	if level >= ClassDefs.MAX_LEVEL:
 		xp = 0
-	_auto_unlock()
 
 
 ## In the Sandbox the whole tree is yours from the start.
@@ -681,7 +711,6 @@ func grant_all_points() -> void:
 	level = ClassDefs.MAX_LEVEL
 	xp = 0
 	points = ClassDefs.MAX_LEVEL - 1 - chosen.size()
-	_auto_unlock()
 
 
 func tree_data() -> Dictionary:
@@ -733,23 +762,7 @@ func choose_ability(step: int, index: int) -> bool:
 	if step == CORE_STEPS:
 		spec_chosen()
 	Sfx.play("ui_choose", -3.0)
-	_auto_unlock()
 	return true
-
-
-## A Revenant does not choose its gifts: they come with each level. The one exception is its path.
-func _auto_unlock() -> void:
-	if not class_def().get("auto_tree", false) or points <= 0:
-		return
-	var all := steps()
-	var step := next_step()
-	if step >= all.size():
-		return
-	if (all[step] as Array).size() != 1:
-		say("Level %d! Choose your path" % level)
-		return
-	say(str((all[step] as Array)[0]["name"]))
-	choose_ability(step, 0)
 
 
 func _apply_ability(a: Dictionary) -> void:
@@ -771,7 +784,7 @@ func _apply_ability(a: Dictionary) -> void:
 	if add.has("mana"):
 		mana += float(add["mana"])
 	if add.has("wolves"):
-		world.prepare_allies("wolf", int(m("wolves")))
+		world.prepare_allies(pet_kind(), int(m("wolves")))
 	for e: Dictionary in a.get("on", []):
 		if e["do"] == "summon":
 			world.prepare_allies(e["kind"], int(e["n"]) + int(m("summon_extra")))
@@ -941,7 +954,10 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 			if world.forget_around(here, float(e["r"])) == 0:
 				return false
 		"trap":
-			world.place_trap(self, here)
+			if has_item("trap_satchel"):
+				trap_charges = mini(TRAPS_CARRIED, trap_charges + 1)
+			else:
+				world.place_trap(self, here)
 		"poison":
 			world.drop_poison(here, true)
 		"hawk":
@@ -996,6 +1012,8 @@ func _refresh_shield() -> void:
 
 func on_kill(z: Zombie) -> void:
 	kills += 1
+	if has_item("shadow_shroud"):
+		shadow_kills = mini(SHROUD_KILLS, shadow_kills + 1)
 	if z.type_id == "rider" and not Game.unlocked.has("chivalry"):
 		Game.note_rider_killed()
 		if Game.unlocked.has("chivalry"):
@@ -1030,6 +1048,8 @@ func modify_damage(z: Zombie, base: float) -> float:
 		_assassin_kill = true
 		return 99999.0
 	var crit := m("crit_chance") + (m("riding_crit") if is_riding() else 0.0)
+	if flurry_left > 0.0:
+		crit = 1.0
 	if crit > 0.0 and randf() < crit:
 		dmg *= m("crit_mult")
 		fire("crit", {"z": z})
@@ -1318,6 +1338,10 @@ func _tick_ability_timers(delta: float) -> void:
 	guard_left = maxf(0.0, guard_left - delta)
 	_riposte_cd -= delta
 	_kill_shot_cd -= delta
+	flurry_left -= delta
+	rage_left -= delta
+	_rage_cd -= delta
+	_tick_art_aim()
 	if not is_riding():
 		_sacred_cd -= delta
 	var regen := m("regen") + (m("riding_regen") if is_riding() else 0.0)
@@ -1330,9 +1354,9 @@ func _tick_ability_timers(delta: float) -> void:
 		if _wolf_timer <= 0.0:
 			# The pack comes back at the same pace however large it is.
 			_wolf_timer = 15.0 / maxf(1.0, m("wolves"))
-			if world.count_allies("wolf") < int(m("wolves")):
-				world.spawn_ally("wolf", global_position + Vector3(1.5, 0, 1.5), INF)
-				Sfx.play("wolf", -5.0)
+			if world.count_allies(pet_kind()) < int(m("wolves")):
+				world.spawn_ally(pet_kind(), global_position + Vector3(1.5, 0, 1.5), INF)
+				Sfx.play("wolf" if pet_kind() in ["wolf", "fox"] else "thunk", -5.0)
 	_check_low()
 
 
@@ -1348,7 +1372,75 @@ func has_burst() -> bool:
 
 
 func art_def() -> Dictionary:
+	var item := ShopDefs.art_item(spec_id)
+	if item != "" and Game.item_active(item):
+		return ShopDefs.ITEMS[item]["art"]
 	return WorldLight.ARTS.get(spec_id, {})
+
+
+func has_item(id: String) -> bool:
+	return Game.item_active(id) and spec_id == str(ShopDefs.ITEMS[id]["spec"])
+
+
+func pet_kind() -> String:
+	return Game.pet
+
+
+## Some abilities are aimed first: the button goes down, a circle shows where, and letting go does it.
+func art_is_held() -> bool:
+	return art_def().get("hold", false)
+
+
+func art_aim() -> void:
+	if art_cd_left > 0.0 or _cast_kind != "":
+		return
+	aiming_art = true
+
+
+func art_release() -> void:
+	if not aiming_art:
+		return
+	aiming_art = false
+	world.show_aim(Vector3.ZERO, 0.0)
+	use_art()
+
+
+func _tick_art_aim() -> void:
+	if not aiming_art:
+		return
+	if dead or _cast_kind != "":
+		aiming_art = false
+		world.show_aim(Vector3.ZERO, 0.0)
+		return
+	var from := camera.global_position
+	var dir := -camera.global_basis.z
+	var reach := RAIN_REACH
+	if dir.y < -0.02:
+		reach = minf(RAIN_REACH, (from.y - world.ground_at(from)) / -dir.y)
+	var spot := from + dir * reach
+	spot.y = world.ground_at(spot)
+	_rain_spot = spot
+	world.show_aim(spot, RAIN_RADIUS)
+
+
+func _rain_tick(delta: float) -> void:
+	_rain_wait -= delta
+	if _rain_wait > 0.0:
+		return
+	_rain_wait = 0.25
+	for i in 3:
+		var a := randf() * TAU
+		var fall := _rain_spot + Vector3(cos(a), 0.0, sin(a)) * randf() * RAIN_RADIUS
+		var from := fall + Vector3(0.0, 16.0, 0.0)
+		world.net_visual_shot(0, from, Vector3.DOWN * 45.0, 0.0, 16.0, false, Color.WHITE)
+		Net.shot(0, from, Vector3.DOWN * 45.0, 0.0, 16.0, false, Color.WHITE)
+	var dmg := WeaponDefs.DAMAGE * RAIN_POWER * _ranged_mult()
+	for z: Zombie in world.zombies_near(_rain_spot, RAIN_RADIUS, 14):
+		z.take_damage(dmg, Vector3.ZERO, 0.5, z.centre())
+		on_hit(false)
+	for r: Avatar in world.rivals_near(_rain_spot, RAIN_RADIUS):
+		Net.hit_player(r.peer, dmg, _rain_spot)
+	Sfx.play("bow", -8.0, 1.2, 0.2)
 
 
 ## The picture on the ability's button. For an Inventor, that is what will come out next.
@@ -1361,6 +1453,10 @@ func art_glyph() -> String:
 func art_label() -> String:
 	if spec_id == "inventor" and _next_invention != "":
 		return WorldLight.INVENTIONS[_next_invention]["name"]
+	if has_item("trap_satchel"):
+		return "%d of %d" % [trap_charges, TRAPS_CARRIED]
+	if has_item("shadow_shroud"):
+		return "%d of %d" % [shadow_kills, SHROUD_KILLS]
 	return ""
 
 
@@ -1400,6 +1496,18 @@ func use_art() -> void:
 	if spec_id == "rift" and _rift_candidates().is_empty():
 		say("Nothing to jump to")
 		return
+	if has_item("trap_satchel") and trap_charges <= 0:
+		say("No traps ready")
+		return
+	if has_item("shadow_shroud") and shadow_kills < SHROUD_KILLS:
+		say("%d more kills" % (SHROUD_KILLS - shadow_kills))
+		return
+	if has_item("rain_of_arrows"):
+		if arrows < RAIN_ARROWS:
+			say("Needs %d arrows" % RAIN_ARROWS)
+			return
+		arrows -= RAIN_ARROWS
+		_rain_wait = 0.0
 	mana -= art_cost()
 	art_cd_left = float(d["cd"]) * m("art_cd")
 	_cast_kind = spec_id
@@ -1421,6 +1529,8 @@ func _tick_mist(delta: float) -> void:
 	art_cd_left = maxf(0.0, art_cd_left - delta)
 	if _cast_kind == "":
 		return
+	if _cast_kind == "sharpshooter":
+		_rain_tick(delta)
 	_cast_left -= delta
 	if _cast_left > 0.0:
 		return
@@ -1435,6 +1545,18 @@ func _tick_mist(delta: float) -> void:
 		"pyromaniac": _throw_bombs()
 		"inventor": _invent()
 		"illusionist": _mirror_swap()
+		"trapper":
+			trap_charges -= 1
+			world.place_trap(self, global_position, TRAP_ARMING)
+		"duelist":
+			flurry_left = FLURRY_TIME
+			say("Blade Flurry!")
+			world.fx_blast(global_position + Vector3.UP, 1.6, Color(0.5, 0.75, 1.0, 0.4))
+		"shadow":
+			shadow_kills = 0
+			invis_left = maxf(invis_left, SHROUD_TIME)
+			say("Invisible")
+			world.fx_mist(global_position + Vector3.UP, 1.0)
 
 
 func mist_burst_at(at: Vector3, power: float) -> void:
@@ -2001,7 +2123,9 @@ func _physics_process(delta: float) -> void:
 		_tick_rift(delta)
 		return
 	var dir := global_basis * Vector3(input_move.x, 0, input_move.y)
-	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (0.5 if zoomed else 1.0)
+	if _cast_kind == "sharpshooter":
+		dir = Vector3.ZERO
+	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
 	if is_riding():
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
 	if slowed_left > 0.0:
@@ -2174,6 +2298,10 @@ func _process(delta: float) -> void:
 
 func attack_interval(d: Dictionary) -> float:
 	var rate: float = d["rate"]
+	if rage_left > 0.0:
+		rate /= RAGE_SPEED
+	if flurry_left > 0.0:
+		rate /= FLURRY_RATE
 	if d["kind"] == WeaponDefs.Kind.MELEE:
 		rate /= m("melee_rate")
 		if d.get("momentum", false):
@@ -2380,6 +2508,8 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		z.stun(float(d["stun"]))
 	if d.get("bleed", false):
 		z.add_dot(8.0, 3.0, true)
+	if rage_left > 0.0:
+		z.ignite(ZombieDefs.BURN_SECONDS)
 	if d.get("backstab", false) and z.is_alive():
 		var facing := Vector3(sin(z.rotation.y), 0, cos(z.rotation.y))
 		if facing.dot(global_position - z.position) < 0.0:

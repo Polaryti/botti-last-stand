@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_14()
 		await test_version_13()
 		await test_version_12_4()
 		await test_version_12_2()
@@ -76,6 +77,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_14()
 	await test_version_13()
 	await test_version_12_4()
 	await test_version_12_2()
@@ -231,23 +233,21 @@ func test_revenant() -> void:
 	ok(pl.mana == 10.0, "and needs enough Mist")
 	await kill_all()
 	await frames(2)
-	# The tree unlocks by itself, up to the choice of a path.
+	# The Revenant chooses at each step, like every other class.
 	pl.mana = 100.0
 	pl.add_xp(100000)
-	ok(pl.next_step() == Player.CORE_STEPS, "levels bring the shared gifts by themselves, up to the path")
-	ok(pl.points > 0 and pl.spec_id == "", "the path waits for you")
-	ok(pl.choose_ability(Player.CORE_STEPS, 0), "you can choose it")
+	ok(pl.next_step() == 0 and pl.points > 0, "levels give points, and nothing is chosen for you")
+	for i in Player.CORE_STEPS:
+		ok(pl.choose_ability(i, 1), "you can take the other gift at step %d" % i)
+	ok(pl.spec_id == "" and pl.choose_ability(Player.CORE_STEPS, 0), "then you choose a path")
 	ok(pl.spec_id == "leaper", "Mist Leaper")
-	ok(pl.next_step() == ClassDefs.MAX_LEVEL - 1 or pl.points == 0, "and everything else then comes by itself (%d)" % pl.next_step())
 	# Mist Leaper: forward, up and down the land, not through walls.
 	Game.player_class = "revenant"
 	await start_clean()
 	pl.level = 6
-	pl.points = 1
-	pl._auto_unlock()
 	for i in Player.CORE_STEPS:
 		pl.points += 1
-		pl._auto_unlock()
+		pl.choose_ability(i, 0)
 	pl.points = 1
 	pl.choose_ability(Player.CORE_STEPS, 0)
 	var from := Vector3(0, 0, 40)
@@ -272,7 +272,8 @@ func test_revenant() -> void:
 	await start_clean()
 	place(OPEN)
 	pl.points = Player.CORE_STEPS + 1
-	pl._auto_unlock()
+	for i in Player.CORE_STEPS:
+		pl.choose_ability(i, 0)
 	pl.choose_ability(Player.CORE_STEPS, 1)
 	ok(pl.spec_id == "rift", "Rift Traveller")
 	pl.mana = 100.0
@@ -307,7 +308,8 @@ func test_revenant() -> void:
 	await start_clean()
 	place(OPEN)
 	pl.points = 5
-	pl._auto_unlock()
+	for i in Player.CORE_STEPS:
+		pl.choose_ability(i, 0)
 	pl.choose_ability(Player.CORE_STEPS, 2)
 	ok(pl.spec_id == "summoner", "Summoner")
 	pl.mana = 100.0
@@ -677,6 +679,145 @@ func test_fort() -> void:
 	wf.queue_free()
 	await frames(2)
 	Game.mode = Game.Mode.NIGHT
+	await start_clean()
+
+
+func test_version_14() -> void:
+	var saved_doubloons := Game.doubloons
+	var saved_items := Game.owned_items.duplicate()
+	var saved_off := Game.switched_off.duplicate()
+	var saved_pet := Game.pet
+	Game.owned_items.clear()
+	Game.switched_off.clear()
+	Game.pet = "wolf"
+	# Buying.
+	Game.doubloons = 100
+	ok(not Game.buy_item("raven"), "too few doubloons buy nothing")
+	Game.doubloons = 400
+	ok(Game.buy_item("raven") and Game.doubloons == 250 and Game.owns_item("raven"), "a pet can be bought")
+	ok(Game.pet == "raven", "and is chosen at once")
+	ok(not Game.buy_item("raven"), "and only once")
+	Game.choose_pet("snake")
+	ok(Game.pet == "raven", "a pet you do not own cannot be chosen")
+	Game.choose_pet("wolf")
+	ok(Game.pet == "wolf", "the wolf is always there")
+	Game.doubloons = 2000
+	for item: String in ["rain_of_arrows", "trap_satchel", "blade_flurry", "undying_rage", "shadow_shroud", "snake", "fox"]:
+		ok(Game.buy_item(item), "%s can be bought" % item)
+	# Every section of the Store and every class in the Armory opens.
+	for section: String in ShopDefs.SECTIONS:
+		m.show_store("", -1, section)
+		await frames(2)
+		ok(m.panel != null and m.panel.find_children("*", "ModelView", true, false).size() == 1, "the %s section shows a turning model" % section)
+	for item: String in ShopDefs.ITEMS:
+		m.show_store(item)
+		await frames(1)
+	m.show_armory("ranger")
+	await frames(2)
+	var words: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	ok(words.has("Equipped") and words.has("Raven"), "the Armory lists upgrades and pets")
+	for class_id: String in ClassDefs.available():
+		m.show_armory(class_id)
+		await frames(1)
+	Game.set_item_on("trap_satchel", false)
+	ok(not Game.item_active("trap_satchel") and Game.owns_item("trap_satchel"), "an upgrade can be taken off")
+	Game.set_item_on("trap_satchel", true)
+	m.show_menu()
+	await frames(2)
+	# Rain of Arrows: hold, aim, let go, stand still, and it falls.
+	Game.player_class = "ranger"
+	await start_clean()
+	pl.spec_id = "sharpshooter"
+	ok(pl.art_is_held() and pl.has_art(), "the Sharpshooter's upgrade is an ability you hold")
+	pl.add_arrows(30)
+	var arrows_before := pl.arrows
+	pl.art_aim()
+	await frames(2)
+	ok(pl.aiming_art, "holding the button aims")
+	ok(w._aim_ring != null and w._aim_ring.visible, "with a circle on the ground")
+	var target := spawn("normal", pl._rain_spot, true)
+	target.hp = 1000.0
+	target.max_hp = 1000.0
+	pl.art_release()
+	ok(not w._aim_ring.visible and pl.arrows == arrows_before - Player.RAIN_ARROWS, "letting go fires, for 8 arrows")
+	pl.input_move = Vector2(0, -1)
+	var stood := pl.global_position
+	await seconds(1.2)
+	ok(pl.global_position.distance_to(stood) < 0.3, "and you stand still while it falls")
+	await seconds(1.2)
+	pl.input_move = Vector2.ZERO
+	ok(target.hp < 900.0, "the volley hits what is in the circle (%.0f)" % target.hp)
+	target.set_physics_process(true)
+	target.release()
+	# Trap Satchel: carried, set by hand, armed late.
+	pl.spec_id = "trapper"
+	pl.trap_charges = 0
+	pl._act({"do": "trap"}, {})
+	ok(pl.trap_charges == 1 and w._traps.is_empty(), "traps go in the satchel instead of dropping")
+	for i in 8:
+		pl._act({"do": "trap"}, {})
+	ok(pl.trap_charges == Player.TRAPS_CARRIED, "up to 5")
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await frames(3)
+	ok(pl.trap_charges == Player.TRAPS_CARRIED - 1 and w._traps.size() == 1, "the ability sets one")
+	var armed_at := float(w._traps[0]["armed_at"])
+	ok(armed_at > w.now + 2.5, "and it arms about 3 s later")
+	# Blade Flurry.
+	Game.player_class = "infantry"
+	await start_clean()
+	pl.spec_id = "duelist"
+	var rate_before := pl.attack_interval(WeaponDefs.ALL["sword"])
+	pl.use_art()
+	await frames(3)
+	ok(pl.flurry_left > 0.0 and pl.attack_interval(WeaponDefs.ALL["sword"]) < rate_before, "Blade Flurry speeds up your attacks")
+	pl.flurry_left = 0.0
+	# Undying Rage.
+	pl.spec_id = "berserker"
+	pl.hp = 1.0
+	pl._rage_cd = 0.0
+	pl._kill()
+	ok(not pl.dead and pl.rage_left > 0.0 and pl.hp > 1.0, "a Berserker rises again in a rage")
+	pl.hp = 1.0
+	pl._kill()
+	ok(pl.dead, "but not twice within a minute")
+	await start_clean()
+	# Shadow Shroud.
+	pl.spec_id = "shadow"
+	pl.shadow_kills = 7
+	pl.use_art()
+	await frames(2)
+	ok(pl.invis_left <= 0.0, "not yet with 7 kills")
+	pl.shadow_kills = 8
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await frames(3)
+	ok(pl.invis_left > 0.0 and pl.shadow_kills == 0, "the eighth kill lets you vanish")
+	pl.invis_left = 0.0
+	# Pets.
+	for kind: String in ["raven", "snake", "fox"]:
+		var body := Ally.new(w, kind)
+		w.add_child(body)
+		ok(body._visual != null and body._visual.get_child_count() > 1, "the %s has a body" % kind)
+		body.queue_free()
+	Game.choose_pet("raven")
+	pl.spec_id = "beastmaster"
+	pl.mods["wolves"] = 1.0
+	pl._wolf_timer = 0.0
+	await frames(3)
+	ok(w.count_allies("raven") == 1 and w.count_allies("wolf") == 0, "a Beastmaster gets the pet chosen")
+	# The Revenant chooses like the others.
+	var rev: Dictionary = AbilityData.tree("revenant")
+	for row: Array in rev["core"]:
+		ok(row.size() == 2, "the Revenant has a choice at each shared step")
+	for spec: Dictionary in rev["specs"]:
+		for row: Array in spec["path"]:
+			ok(row.size() == 2, "and on each step of %s" % spec["name"])
+	Game.owned_items = saved_items
+	Game.switched_off = saved_off
+	Game.pet = saved_pet
+	Game.doubloons = saved_doubloons
+	Game.save_settings()
 	await start_clean()
 
 
@@ -1372,7 +1513,7 @@ func test_version_8() -> void:
 	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
-	ok(m.panel.get_meta("list").get_child_count() == 2, "the Store opens")
+	ok(m.panel.get_meta("list").get_child_count() == 3, "the Store opens, with its tabs and two classes")
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await frames(2)
 	ok(m.panel.get_meta("list").get_child_count() == ClassDefs.available().size(), "the Sandbox only offers what you own")

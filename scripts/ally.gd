@@ -6,15 +6,18 @@ extends Target
 
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
-const HEALTH := {"ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
-const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant"]
+const HEALTH := {"raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
+const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox"]
+const BEASTS := ["wolf", "raven", "snake", "fox"]
+const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75}
+const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 5.5, "fox": 7.5}
+const RAVEN_HEIGHT := 2.1
+const SNAKE_POISON := 0.35
+const FOX_FOOD := 0.1
 
 static var _scenes := {}
 static var _ghost_material: StandardMaterial3D
-static var _wolf_body: Mesh
-static var _wolf_leg: Mesh
-static var _wolf_head: Mesh
-static var _wolf_tail: Mesh
+static var _beast_parts := {}
 
 var world: World
 var kind := ""
@@ -55,8 +58,8 @@ func _init(owner_world: World, ally_kind: String) -> void:
 	shape.shape = capsule
 	shape.position.y = height * 0.5
 	add_child(shape)
-	if ally_kind == "wolf":
-		_build_wolf()
+	if BEASTS.has(ally_kind):
+		_build_beast(_visual_root())
 		return
 	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
@@ -104,12 +107,39 @@ func deactivate() -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
 
 
-func _build_wolf() -> void:
+func _visual_root() -> Node3D:
 	_visual = Node3D.new()
 	add_child(_visual)
-	var fur := Color(0.34, 0.32, 0.34)
-	if _wolf_body == null:
-		_wolf_body = LowPoly.new().box(Vector3(0, 0.62, 0), Vector3(0.42, 0.42, 1.05), fur).commit()
+	return _visual
+
+
+## The body of a pet, also used to show it in the Store and the Armory. Returns the parts that move.
+func _build_beast(root: Node3D) -> void:
+	var made := build_beast_model(kind, root)
+	_head = made["head"]
+	_tail = made["tail"]
+	_legs.assign(made["legs"])
+
+
+static func _part(root: Node3D, mesh: Mesh, at: Vector3) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.position = at
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(mi)
+	return mi
+
+
+static func build_beast_model(beast: String, root: Node3D) -> Dictionary:
+	match beast:
+		"raven": return _raven_model(root)
+		"snake": return _snake_model(root)
+	return _four_legs_model(beast, root)
+
+
+static func _four_legs_model(beast: String, root: Node3D) -> Dictionary:
+	var fur := Color(0.34, 0.32, 0.34) if beast == "wolf" else Color(0.72, 0.36, 0.12)
+	if not _beast_parts.has(beast):
 		var h := LowPoly.new()
 		h.box(Vector3(0, 0.0, 0.1), Vector3(0.36, 0.36, 0.42), fur.darkened(0.08))
 		h.box(Vector3(0, -0.08, 0.41), Vector3(0.18, 0.15, 0.3), fur.lightened(0.12))
@@ -117,32 +147,54 @@ func _build_wolf() -> void:
 		h.prism(Vector3(0.1, 0.18, 0.05), Vector3(0.12, 0.38, 0.05), 0.06, 0.0, 4, fur)
 		h.box(Vector3(0.09, 0.06, 0.31), Vector3(0.06, 0.05, 0.02), Color(1, 0.8, 0.2))
 		h.box(Vector3(-0.09, 0.06, 0.31), Vector3(0.06, 0.05, 0.02), Color(1, 0.8, 0.2))
-		_wolf_head = h.commit()
-		_wolf_tail = LowPoly.new().prism(Vector3.ZERO, Vector3(0, -0.12, -0.52), 0.09, 0.02, 5, fur.lightened(0.05)).commit()
-		_wolf_leg = LowPoly.new().box(Vector3(0, -0.22, 0), Vector3(0.12, 0.46, 0.12), fur.darkened(0.2)).commit()
-	var body := MeshInstance3D.new()
-	body.mesh = _wolf_body
-	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_visual.add_child(body)
-	var head := MeshInstance3D.new()
-	head.mesh = _wolf_head
-	head.position = Vector3(0, 0.82, 0.45)
-	head.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_visual.add_child(head)
-	_head = head
-	var tail := MeshInstance3D.new()
-	tail.mesh = _wolf_tail
-	tail.position = Vector3(0, 0.72, -0.5)
-	tail.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_visual.add_child(tail)
-	_tail = tail
+		var tail := LowPoly.new().prism(Vector3.ZERO, Vector3(0, -0.12, -0.52), 0.09, 0.02, 5, fur.lightened(0.1))
+		if beast == "fox":
+			tail.prism(Vector3(0, -0.1, -0.42), Vector3(0, -0.12, -0.56), 0.05, 0.01, 5, Color(0.92, 0.9, 0.84))
+		_beast_parts[beast] = {
+			"body": LowPoly.new().box(Vector3(0, 0.62, 0), Vector3(0.42, 0.42, 1.05), fur).commit(),
+			"head": h.commit(), "tail": tail.commit(),
+			"leg": LowPoly.new().box(Vector3(0, -0.22, 0), Vector3(0.12, 0.46, 0.12), fur.darkened(0.2)).commit()}
+	var parts: Dictionary = _beast_parts[beast]
+	root.scale = Vector3.ONE * (0.8 if beast == "fox" else 1.0)
+	_part(root, parts["body"], Vector3.ZERO)
+	var legs: Array[Node3D] = []
 	for s: Vector3 in [Vector3(-0.16, 0.46, 0.38), Vector3(0.16, 0.46, 0.38), Vector3(-0.16, 0.46, -0.38), Vector3(0.16, 0.46, -0.38)]:
-		var mi := MeshInstance3D.new()
-		mi.mesh = _wolf_leg
-		mi.position = s
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		_visual.add_child(mi)
-		_legs.append(mi)
+		legs.append(_part(root, parts["leg"], s))
+	return {"head": _part(root, parts["head"], Vector3(0, 0.82, 0.45)), "tail": _part(root, parts["tail"], Vector3(0, 0.72, -0.5)), "legs": legs}
+
+
+static func _raven_model(root: Node3D) -> Dictionary:
+	var ink := Color(0.1, 0.1, 0.14)
+	if not _beast_parts.has("raven"):
+		_beast_parts["raven"] = {
+			"body": LowPoly.new().box(Vector3(0, 0, 0), Vector3(0.2, 0.2, 0.5), ink).commit(),
+			"head": LowPoly.new().box(Vector3(0, 0, 0), Vector3(0.16, 0.16, 0.16), ink.lightened(0.08)).prism(Vector3(0, 0, 0.08), Vector3(0, -0.03, 0.26), 0.04, 0.0, 4, Color(0.75, 0.62, 0.2)).commit(),
+			"tail": LowPoly.new().box(Vector3(0, 0, -0.15), Vector3(0.18, 0.03, 0.3), ink).commit(),
+			"wing": LowPoly.new().box(Vector3(0.28, 0, 0), Vector3(0.56, 0.03, 0.3), ink.lightened(0.05)).commit()}
+	var parts: Dictionary = _beast_parts["raven"]
+	_part(root, parts["body"], Vector3.ZERO)
+	_part(root, parts["wing"], Vector3(0.08, 0.05, 0))
+	var left := _part(root, parts["wing"], Vector3(-0.08, 0.05, 0))
+	left.rotation.y = PI
+	return {"head": _part(root, parts["head"], Vector3(0, 0.08, 0.3)), "tail": _part(root, parts["tail"], Vector3(0, 0, -0.25)), "legs": [] as Array[Node3D]}
+
+
+static func _snake_model(root: Node3D) -> Dictionary:
+	var scale_col := Color(0.24, 0.42, 0.18)
+	if not _beast_parts.has("snake"):
+		var b := LowPoly.new()
+		var last := Vector3(0, 0.08, 0.3)
+		for i in range(1, 8):
+			var next := Vector3(sin(i * 1.1) * 0.16, 0.08, 0.3 - i * 0.24)
+			b.prism(last, next, 0.09 - i * 0.008, 0.09 - (i + 1) * 0.008, 6, scale_col.lightened(0.1 if i % 2 == 0 else 0.0))
+			last = next
+		var head := LowPoly.new().box(Vector3(0, 0, 0.05), Vector3(0.2, 0.11, 0.26), scale_col.darkened(0.15))
+		head.box(Vector3(0.07, 0.05, 0.1), Vector3(0.04, 0.03, 0.04), Color(1, 0.85, 0.1))
+		head.box(Vector3(-0.07, 0.05, 0.1), Vector3(0.04, 0.03, 0.04), Color(1, 0.85, 0.1))
+		_beast_parts["snake"] = {"body": b.commit(), "head": head.commit(), "tail": LowPoly.new().prism(Vector3.ZERO, Vector3(0, 0, -0.2), 0.03, 0.0, 5, scale_col).commit()}
+	var parts: Dictionary = _beast_parts["snake"]
+	_part(root, parts["body"], Vector3.ZERO)
+	return {"head": _part(root, parts["head"], Vector3(0, 0.1, 0.4)), "tail": _part(root, parts["tail"], Vector3(0.15, 0.08, -1.4)), "legs": [] as Array[Node3D]}
 
 
 static func _ghost() -> StandardMaterial3D:
@@ -229,7 +281,7 @@ func _physics_process(delta: float) -> void:
 		elif _rival and _foe and _foe.position.distance_squared_to(position) < _rival.global_position.distance_squared_to(position):
 			_rival = null
 	var dir := Vector3.ZERO
-	var speed := 7.0 if kind == "wolf" else 5.0
+	var speed: float = BEAST_SPEED.get(kind, 5.0)
 	if kind == "decoy":
 		velocity = Vector3.ZERO
 		return
@@ -263,7 +315,7 @@ func _physics_process(delta: float) -> void:
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
 			Net.hit_player(_rival.peer, WeaponDefs.DAMAGE * dmg_mult * 0.7, position)
-			world.sfx_at("wolf" if kind == "wolf" else "clang", position, -10.0)
+			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
 	elif _foe and _foe.is_alive():
@@ -276,12 +328,16 @@ func _physics_process(delta: float) -> void:
 			_attack_left = 0.5 if _anim else 0.25
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
-			_foe.take_damage(WeaponDefs.DAMAGE * dmg_mult * (0.7 if kind == "revenant" else 0.8 if kind == "skeleton" else 1.0), to, 2.0, _foe.centre())
+			_foe.take_damage(WeaponDefs.DAMAGE * dmg_mult * float(BEAST_BITE.get(kind, 0.7 if kind == "revenant" else 0.8 if kind == "skeleton" else 1.0)), to, 2.0, _foe.centre())
 			if not _foe.is_alive() and player:
 				player.on_ally_kill()
-			elif kind == "wolf" and player and player.has_flag("wolf_stun"):
+			elif BEASTS.has(kind) and player and player.has_flag("wolf_stun"):
 				_foe.stun(0.7)
-			world.sfx_at("wolf" if kind == "wolf" else "clang", position, -10.0)
+			if _foe.is_alive() and kind == "snake" and randf() < SNAKE_POISON:
+				_foe.add_dot(10.0, 4.0)
+			if kind == "fox" and randf() < FOX_FOOD:
+				world.spawn_pickup_at(position + Vector3(0.6, 0, 0.6), Pickup.Kind.FOOD, PowerDefs.FOODS.keys().pick_random())
+			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
 	elif world.player:
@@ -295,7 +351,7 @@ func _physics_process(delta: float) -> void:
 		dir = Vector3.ZERO
 	velocity = dir * speed
 	move_and_slide()
-	position.y = world.ground_at(position)
+	position.y = world.ground_at(position) + (RAVEN_HEIGHT if kind == "raven" else 0.0)
 	if _attack_left <= 0.0:
 		_play("Running_A" if dir != Vector3.ZERO else "Idle")
 	_move_wolf(delta, dir != Vector3.ZERO)

@@ -18,6 +18,9 @@ var unlocked := {} # classes bought, or opened with a code
 var redeemed := {} # the hashes of codes already used on this phone
 var doubloons := 0
 var finished_games := 0
+var owned_items := {} # things bought in the Store, other than classes
+var switched_off := {} # bought, and turned off in the Armory
+var pet := "wolf"
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 var sensitivity := 1.0
@@ -67,6 +70,41 @@ func redeem_key(key: String) -> Dictionary:
 
 func owns_class(id: String) -> bool:
 	return not ClassDefs.ALL[id].get("hidden", false) or unlocked.has(id)
+
+
+func owns_item(id: String) -> bool:
+	return owned_items.has(id)
+
+
+## Bought, and not turned off in the Armory.
+func item_active(id: String) -> bool:
+	return owned_items.has(id) and not switched_off.has(id)
+
+
+func buy_item(id: String) -> bool:
+	var price := int(ShopDefs.ITEMS[id]["price"])
+	if owned_items.has(id) or doubloons < price:
+		return false
+	doubloons -= price
+	owned_items[id] = true
+	if ShopDefs.ITEMS[id].get("pet", false):
+		pet = id
+	save_settings()
+	return true
+
+
+func set_item_on(id: String, on: bool) -> void:
+	if on:
+		switched_off.erase(id)
+	else:
+		switched_off[id] = true
+	save_settings()
+
+
+func choose_pet(id: String) -> void:
+	if id == "wolf" or owned_items.has(id):
+		pet = id
+		save_settings()
 
 
 ## How to earn a class that cannot be bought.
@@ -195,6 +233,11 @@ func load_settings() -> void:
 	redeemed = c.get_value("progress", "redeemed", {})
 	doubloons = c.get_value("progress", "doubloons", 0)
 	finished_games = c.get_value("progress", "finished_games", 0)
+	owned_items = c.get_value("progress", "owned_items", {})
+	switched_off = c.get_value("progress", "switched_off", {})
+	pet = c.get_value("progress", "pet", "wolf")
+	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
+		pet = "wolf"
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class):
 		player_class = "infantry"
 	best_time = c.get_value("progress", "best_time", 0.0)
@@ -219,6 +262,9 @@ func save_settings() -> void:
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
 	c.set_value("progress", "finished_games", finished_games)
+	c.set_value("progress", "owned_items", owned_items)
+	c.set_value("progress", "switched_off", switched_off)
+	c.set_value("progress", "pet", pet)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)

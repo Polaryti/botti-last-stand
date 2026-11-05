@@ -2,6 +2,21 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.14.0 (5 November 2026)
+### New
+- The Store has sections: Classes, Class upgrades and Pets. What you select turns slowly next to its description.
+- Armory, on the main menu: for each class, switch the upgrades you own on or off, and choose your pet.
+- Rain of Arrows (Sharpshooter, 260): hold the ability to place a circle, let go, stand still for 2 s, and arrows fall on it.
+- Trap Satchel (Trapper, 220): carry up to 5 traps, and set them by hand. They arm 3 s later.
+- Blade Flurry (Duelist, 240): for 4 s, attack 60% faster, and every hit is a critical.
+- Undying Rage (Berserker, 280): rise again in a rage when you would die. Once every 60 s.
+- Shadow Shroud (Shadow Blade, 240): every 8 kills, turn Invisible for 3 s.
+- Pets for the Beastmaster: Raven (150) attacks from the air, Snake (180) can poison, Fox (150) sometimes finds food.
+- The Revenant now chooses its abilities at each level, like every other class.
+
+### Changed
+- Beastmaster abilities now apply to whichever pet you choose.
+
 ## 0.13.0 (5 November 2026)
 ### New
 - Three new ranged weapons. Javelins hit hard with a falling arc and pass through the first enemy. The Sling never needs arrows and staggers what it hits. The Blowgun is silent and poisons.

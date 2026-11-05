@@ -147,7 +147,11 @@ func _touch_down(index: int, at: Vector2) -> void:
 			"tree": tree_requested.emit()
 			"sandbox": sandbox_requested.emit()
 			"burst": player.use_burst()
-			"art": player.use_art()
+			"art":
+				if player.art_is_held():
+					player.art_aim()
+				else:
+					player.use_art()
 			"horse":
 				if player.ride_behind != 0:
 					player.leave_horse()
@@ -176,6 +180,8 @@ func _touch_up(index: int) -> void:
 		player.input_move = Vector2.ZERO
 	elif role == "fire":
 		player.input_fire = false
+	elif role == "art":
+		player.art_release()
 
 
 func _touch_drag(e: InputEventScreenDrag) -> void:
@@ -189,7 +195,7 @@ func _touch_drag(e: InputEventScreenDrag) -> void:
 				off = e.position - _joy_origin
 			_joy_pos = e.position
 			player.input_move = (off / JOY_R).limit_length(1.0)
-		"look", "fire":
+		"look", "fire", "art":
 			# Aiming also works while a thumb holds ATTACK.
 			player.apply_look(e.relative.x, e.relative.y)
 

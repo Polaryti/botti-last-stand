@@ -138,6 +138,7 @@ func show_menu(rebuild := false) -> void:
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_class_picker(Game.Mode.NIGHT), true))
 	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
+	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Sandbox", "Try any weapon, item or class you own.", func() -> void: show_class_picker(Game.Mode.SANDBOX)))
 	box.add_child(_expand(true))
 	var foot := HBoxContainer.new()
@@ -588,7 +589,12 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 18)
 	detail.add_child(head)
-	head.add_child(IconView.new(ClassDefs.icon(id), ClassDefs.color(id), 92.0))
+	if in_store:
+		var view := ModelView.new(Vector2(170, 210))
+		view.show_class(id)
+		head.add_child(view)
+	else:
+		head.add_child(IconView.new(ClassDefs.icon(id), ClassDefs.color(id), 92.0))
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override("separation", 0)
@@ -613,6 +619,17 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 		spec_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		spec_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		line.add_child(spec_desc)
+	if id == "ranger" and not in_store and ShopDefs.PETS.any(func(p: String) -> bool: return Game.owns_item(p)):
+		var pets := HBoxContainer.new()
+		pets.add_theme_constant_override("separation", 6)
+		detail.add_child(pets)
+		pets.add_child(_body("Pet", 23))
+		for pet: String in ShopDefs.PETS:
+			if pet == "wolf" or Game.owns_item(pet):
+				var chosen_pet := pet
+				pets.add_child(_button(pet.capitalize(), func() -> void:
+					Game.choose_pet(chosen_pet)
+					_fill_class_detail(detail, id, mode, in_store), Vector2(120, 48), Game.pet == pet))
 	detail.add_child(_expand(true))
 	if not owned and c.has("earned"):
 		var how := _body(Game.earn_text(id), 26)
@@ -670,10 +687,14 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 	row.add_child(buy)
 
 
-## Classes for sale. Later this is also where skins will go.
-func show_store(focus := "", from_mode := -1) -> void:
+## Everything for sale, by section. What you pick turns slowly beside its description.
+func show_store(focus := "", from_mode := -1, section := "") -> void:
 	_clear_ui()
 	_back = show_menu if from_mode < 0 else func() -> void: show_class_picker(from_mode)
+	if section == "":
+		section = "classes"
+		if ShopDefs.ITEMS.has(focus):
+			section = str(ShopDefs.ITEMS[focus]["section"])
 	var root := _two_panes("Store")
 	var top: HBoxContainer = root.get_meta("top")
 	top.add_child(_coin(44.0))
@@ -683,14 +704,136 @@ func show_store(focus := "", from_mode := -1) -> void:
 	top.add_child(purse)
 	var list: VBoxContainer = root.get_meta("list")
 	var detail: VBoxContainer = root.get_meta("detail")
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 6)
+	list.add_child(tabs)
+	for key: String in ShopDefs.SECTIONS:
+		var chosen_section := key
+		var tab := _button(ShopDefs.SECTIONS[key], func() -> void: show_store("", from_mode, chosen_section), Vector2(0, 52), key == section)
+		tab.add_theme_font_size_override("font_size", 19)
+		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tabs.add_child(tab)
+	var ids: Array[String] = ClassDefs.for_sale() if section == "classes" else ShopDefs.in_section(section)
 	var rows := {}
 	var pick := func(id: String) -> void:
 		for other: String in rows:
 			(rows[other] as Button).remove_theme_stylebox_override("normal")
 			(rows[other] as Button).remove_theme_stylebox_override("hover")
 		UiTheme.selected(rows[id])
-		_fill_class_detail(detail, id, from_mode, true)
-	for id: String in ClassDefs.for_sale():
+		if section == "classes":
+			_fill_class_detail(detail, id, from_mode, true)
+		else:
+			_fill_item_detail(detail, id, from_mode)
+	for id: String in ids:
+		var row := _class_row(id) if section == "classes" else _item_row(id)
+		rows[id] = row
+		var chosen := id
+		row.pressed.connect(func() -> void:
+			Sfx.play("ui_click", -5.0)
+			pick.call(chosen))
+		list.add_child(row)
+	pick.call(focus if rows.has(focus) else ids[0])
+	panel = root
+
+
+func _item_row(id: String) -> Button:
+	var d: Dictionary = ShopDefs.ITEMS[id]
+	var owned := Game.owns_item(id)
+	var row := Button.new()
+	row.custom_minimum_size = Vector2(320, 72)
+	var inner := HBoxContainer.new()
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_theme_constant_override("separation", 12)
+	row.add_child(inner)
+	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
+	var medal := IconView.new(str(d["icon"]), ClassDefs.color(str(d["class"])), 54.0)
+	medal.dim = not owned
+	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inner.add_child(medal)
+	var name_label := _body(d["name"], 24)
+	name_label.add_theme_font_override("font", UiTheme.bold_font())
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if not owned:
+		name_label.add_theme_color_override("font_color", UiTheme.ASH)
+	inner.add_child(name_label)
+	return row
+
+
+func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> void:
+	for child in detail.get_children():
+		detail.remove_child(child)
+		child.queue_free()
+	var d: Dictionary = ShopDefs.ITEMS[id]
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 18)
+	head.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(head)
+	var view := ModelView.new(Vector2(250, 270))
+	view.show_item(id)
+	head.add_child(view)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 8)
+	head.add_child(words)
+	var title := _body(d["name"], 36)
+	title.add_theme_font_override("font", UiTheme.title_font())
+	words.add_child(title)
+	words.add_child(_soft("For %s" % ClassDefs.ALL[d["class"]]["name"], 23))
+	var desc := _body(d["desc"], 24)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	words.add_child(desc)
+	if Game.owns_item(id):
+		var have := _body("You own this. Find it in the Armory.", 26)
+		have.add_theme_color_override("font_color", UiTheme.MOSS)
+		detail.add_child(have)
+		return
+	var price := int(d["price"])
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	detail.add_child(row)
+	row.add_child(_coin(52.0))
+	var cost := _body("%d" % price, 34)
+	cost.add_theme_font_override("font", UiTheme.bold_font())
+	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(cost)
+	var left := _soft("You have %d." % Game.doubloons, 24)
+	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(left)
+	var buy := _button("Buy", func() -> void: pass, Vector2(260, 68), true)
+	buy.disabled = Game.doubloons < price
+	if buy.disabled:
+		buy.text = "Need %d more" % (price - Game.doubloons)
+	var asked := [false]
+	buy.pressed.connect(func() -> void:
+		if not asked[0]:
+			asked[0] = true
+			buy.text = "Tap again to buy"
+			return
+		if Game.buy_item(id):
+			Sfx.play("level", -3.0)
+			show_store(id, from_mode))
+	row.add_child(buy)
+
+
+## What you own for each class, to switch on and off.
+func show_armory(focus := "") -> void:
+	_clear_ui()
+	_back = show_menu
+	var root := _two_panes("Armory")
+	var list: VBoxContainer = root.get_meta("list")
+	var detail: VBoxContainer = root.get_meta("detail")
+	var rows := {}
+	var pick := func(id: String) -> void:
+		for other: String in rows:
+			(rows[other] as Button).remove_theme_stylebox_override("normal")
+			(rows[other] as Button).remove_theme_stylebox_override("hover")
+		UiTheme.selected(rows[id])
+		_fill_armory(detail, id)
+	var classes := ClassDefs.available()
+	for id: String in classes:
 		var row := _class_row(id)
 		rows[id] = row
 		var chosen := id
@@ -698,8 +841,91 @@ func show_store(focus := "", from_mode := -1) -> void:
 			Sfx.play("ui_click", -5.0)
 			pick.call(chosen))
 		list.add_child(row)
-	pick.call(focus if rows.has(focus) else ClassDefs.for_sale()[0])
+	pick.call(focus if rows.has(focus) else classes[0])
 	panel = root
+
+
+func _fill_armory(detail: VBoxContainer, id: String) -> void:
+	for child in detail.get_children():
+		detail.remove_child(child)
+		child.queue_free()
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 18)
+	head.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(head)
+	var view := ModelView.new(Vector2(230, 300))
+	view.show_class(id)
+	head.add_child(view)
+	var words := VBoxContainer.new()
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_theme_constant_override("separation", 8)
+	head.add_child(words)
+	var title := _body(ClassDefs.ALL[id]["name"], 36)
+	title.add_theme_font_override("font", UiTheme.title_font())
+	words.add_child(title)
+	var items := ShopDefs.for_class(id)
+	var upgrades := items.filter(func(item: String) -> bool: return not ShopDefs.ITEMS[item].get("pet", false))
+	if items.is_empty():
+		words.add_child(_soft("Nothing for this class yet.", 24))
+	for item: String in upgrades:
+		words.add_child(_armory_upgrade_row(item, id))
+	if not upgrades.is_empty() and upgrades.size() < items.size():
+		words.add_child(_pet_row())
+
+
+func _armory_upgrade_row(item: String, class_id: String) -> Control:
+	var d: Dictionary = ShopDefs.ITEMS[item]
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var name_label := _body("%s (%s)" % [d["name"], _spec_name(class_id, str(d["spec"]))], 23)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(name_label)
+	if not Game.owns_item(item):
+		row.add_child(_button("In the Store", func() -> void: show_store(item), Vector2(190, 52)))
+		return row
+	var on := Game.item_active(item)
+	row.add_child(_button("Equipped" if on else "Not equipped", func() -> void:
+		Game.set_item_on(item, not on)
+		show_armory(class_id), Vector2(190, 52), on))
+	return row
+
+
+static func _spec_name(class_id: String, spec: String) -> String:
+	for s: Dictionary in AbilityData.tree(class_id)["specs"]:
+		if s["id"] == spec:
+			return s["name"]
+	return spec
+
+
+## The Beastmaster's companion. Whichever is chosen shows on the stage.
+func _pet_row() -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	box.add_child(_body("Beastmaster's pet", 23))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	box.add_child(row)
+	for pet: String in ShopDefs.PETS:
+		var owned := pet == "wolf" or Game.owns_item(pet)
+		var chosen := pet
+		var label: String = pet.capitalize()
+		var b := _button(label, func() -> void:
+			if not owned:
+				show_store(chosen)
+				return
+			Game.choose_pet(chosen)
+			if panel:
+				show_armory("ranger"), Vector2(0, 52), Game.pet == pet)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 20)
+		if not owned:
+			b.modulate = Color(1, 1, 1, 0.55)
+		row.add_child(b)
+	var shown := ModelView.new(Vector2(200, 170))
+	shown.show_pet(Game.pet)
+	box.add_child(shown)
+	return box
 
 
 func toggle_tree() -> void:

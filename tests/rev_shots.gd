@@ -38,7 +38,7 @@ func _ready() -> void:
 	await wait(0.4)
 	await snap("hud_start")
 	pl.points = 5
-	pl._auto_unlock()
+	pl.choose_ability(pl.next_step(), 0)
 	m.toggle_tree()
 	await wait(0.3)
 	await snap("tree")
