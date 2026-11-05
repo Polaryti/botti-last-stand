@@ -23,7 +23,7 @@ const LEVEL_UP_GUARD := 3.0 # seconds nothing can hurt you after gaining a level
 const PVP_STATUS := 0.6 # a freeze or a stun lasts this much as long on a player
 const PVP_STATUS_GAP := 1.5
 const FOG_XP := 0.5
-const WADE_SPEED := 0.8
+const WADE_SPEED := 0.7
 const SWING_HIT := 0.3 # how far through a swing the blow lands
 const BASH := {"kind": WeaponDefs.Kind.MELEE, "rate": 0.8, "range": 2.3, "cone": 110.0, "max_hits": 1, "knock": 3.5, "power": 0.6}
 
@@ -182,6 +182,7 @@ func _init(owner_world: World) -> void:
 	collision_layer = LAYER
 	collision_mask = 1 | Terrain.LAYER | Terrain.BARRIER
 	floor_snap_length = 0.55
+	floor_constant_speed = true
 	floor_constant_speed = true
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.36
@@ -1056,6 +1057,7 @@ func mount() -> void:
 
 func dismount() -> void:
 	riding_left = 0.0
+	_sacred_cd = 60.0
 	if passenger != 0:
 		Net.drop_passenger(passenger)
 		passenger = 0
@@ -1186,8 +1188,6 @@ func _trample(horiz: float) -> void:
 			dmg = 9999.0
 		if has_flag("unstoppable") and z.type_id != "beast":
 			dmg = 9999.0
-		if has_flag("sacred_steed"):
-			z.ignite(ZombieDefs.BURN_SECONDS)
 		z.take_damage(dmg, ahead, 9.0, z.centre())
 		fire("trample", {"z": z})
 		on_hit(false)
@@ -1299,7 +1299,8 @@ func _tick_ability_timers(delta: float) -> void:
 	guard_left = maxf(0.0, guard_left - delta)
 	_riposte_cd -= delta
 	_kill_shot_cd -= delta
-	_sacred_cd -= delta
+	if not is_riding():
+		_sacred_cd -= delta
 	var regen := m("regen") + (m("riding_regen") if is_riding() else 0.0)
 	if regen > 0.0 and hp < max_hp():
 		hp = minf(max_hp(), hp + regen * delta)
@@ -2063,7 +2064,11 @@ func _should_auto_jump(dir: Vector3) -> bool:
 	var from := global_position
 	var reach := 1.5 if is_riding() else 0.95
 	var low := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 0.35, from + Vector3.UP * 0.35 + flat * reach, 1)
-	if space.intersect_ray(low).is_empty():
+	var ahead := space.intersect_ray(low)
+	if ahead.is_empty():
+		return false
+	# Stairs and slopes are walked up, not jumped at.
+	if (ahead["normal"] as Vector3).y > 0.5:
 		return false
 	var high := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.25, from + Vector3.UP * 1.25 + flat * (reach + 0.35), 1)
 	if not space.intersect_ray(high).is_empty():

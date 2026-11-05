@@ -1629,7 +1629,7 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < HALF_SIZE - 2.0 and absf(at.z) < HALF_SIZE - 2.0 and grid.is_free(grid.to_cell(at)):
+		if absf(at.x) < HALF_SIZE - 2.0 and absf(at.z) < HALF_SIZE - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z):
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -1660,7 +1660,7 @@ func spawn_pickup_random(kind: int, id: String) -> Pickup:
 		else:
 			at = _open_ground_near_players()
 		var c := grid.to_cell(at)
-		if not grid.is_free(c):
+		if not grid.is_free(c) or terrain.in_water(at.x, at.z):
 			continue
 		if player and at.distance_to(player.global_position) < 4.0:
 			continue

@@ -9,7 +9,7 @@ const HALF := 110
 const CELL := 2.0
 const SIZE := 111 # vertices per side
 const WATER_Y := -0.7
-const BED_Y := -2.3
+const BED_Y := -1.25 # shallow enough for anyone to wade across
 const LAYER := 16 # the ground: blocks the player, sight and shots
 const BARRIER := 32 # the river and the cliffs: block bodies, but not sight or shots
 const ENEMY_ONLY := 128 # blocks enemies and nothing else
@@ -133,6 +133,10 @@ func _shape(x: float, z: float) -> float:
 		h = _apply_pad(p, x, z, h)
 	for c: Dictionary in _cuts:
 		h = _apply_cut(c, x, z, h)
+	if river.is_empty():
+		return h
+	# Hollows in the land stay above the water, or they would be pits with no water in them.
+	h = maxf(h, WATER_Y + 0.3)
 	var dist := river_distance(x, z)
 	if dist < river_width + BANK:
 		h = lerpf(BED_Y, minf(h, 2.2), smoothstep(river_width - 1.2, river_width + BANK, dist))

@@ -31,6 +31,7 @@ var grass_tufts := 350 # how much grass the whole map gets
 var is_preview := false
 var _ground_material: ShaderMaterial
 var _road_lines: Array[Dictionary] = []
+var _dirt_patches: Array[Dictionary] = []
 var skip_beyond := false # the menu only needs the village
 var xf := Transform3D.IDENTITY # where the piece being built stands
 var piece_scale := 1.0
@@ -215,7 +216,7 @@ func road(points: Array[Vector2], width: float) -> void:
 ## The ground's shader reads how far each spot is from the nearest road's edge. With that, even a
 ## coarse picture gives a clean edge, and a 220 m map needs only half a metre per pixel.
 func _paint_roads() -> void:
-	if _road_lines.is_empty():
+	if _road_lines.is_empty() and _dirt_patches.is_empty():
 		return
 	var side := Terrain.HALF * ROAD_PIXELS_PER_METRE * 2
 	var far := 255
@@ -246,6 +247,30 @@ func _paint_roads() -> void:
 					var value := int((edge / ROAD_REACH * 0.5 + 0.5) * 255.0)
 					if value < mask[z * side + x] and not terrain.over_water_on_deck(wx, wz):
 						mask[z * side + x] = value
+	# Bare patches, like the village square: boxes with rounded corners, so they melt into the paths.
+	for patch_of_dirt: Dictionary in _dirt_patches:
+		var at: Transform3D = patch_of_dirt["at"]
+		var half_size: Vector2 = patch_of_dirt["half"]
+		var inverse := at.affine_inverse()
+		var round_off := minf(3.0, minf(half_size.x, half_size.y))
+		var far_corner := half_size.length() + ROAD_REACH
+		var mid := Vector2(at.origin.x, at.origin.z)
+		var x0 := clampi(int((mid.x - far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+		var x1 := clampi(int((mid.x + far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+		var z0 := clampi(int((mid.y - far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+		var z1 := clampi(int((mid.y + far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+		for z in range(z0, z1 + 1):
+			var wz := (z + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+			for x in range(x0, x1 + 1):
+				var wx := (x + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+				var local := inverse * Vector3(wx, at.origin.y, wz)
+				var q := Vector2(absf(local.x), absf(local.z)) - half_size + Vector2.ONE * round_off
+				var edge := Vector2(maxf(q.x, 0.0), maxf(q.y, 0.0)).length() + minf(maxf(q.x, q.y), 0.0) - round_off
+				if edge >= ROAD_REACH:
+					continue
+				var value := clampi(int((edge / ROAD_REACH * 0.5 + 0.5) * 255.0), 0, 255)
+				if value < mask[z * side + x]:
+					mask[z * side + x] = value
 	var image := Image.create_from_data(side, side, false, Image.FORMAT_L8, mask)
 	_ground_material.set_shader_parameter("roads", ImageTexture.create_from_image(image))
 
@@ -421,7 +446,7 @@ func _reeds() -> void:
 		if absf(p.x) > Terrain.HALF or absf(p.y) > Terrain.HALF or t.on_deck(p.x, p.y):
 			continue
 		var y := t.ground_height(p.x, p.y)
-		if y < Terrain.WATER_Y - 0.5 or y > 0.5:
+		if y < Terrain.WATER_Y - 0.3 or y > 0.5:
 			continue
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.y / 24.0)))
 		if not chunks.has(key):
@@ -990,6 +1015,9 @@ func fallen_log() -> void:
 
 ## Bare earth or paving.
 func dirt(size: Vector2) -> void:
+	if not is_preview:
+		_dirt_patches.append({"at": xf, "half": size * 0.5})
+		return
 	var l := mesh()
 	l.box(Vector3(0, 0.02, 0), Vector3(size.x, 0.04, size.y), DIRT.lightened(0.05))
 	add(l).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

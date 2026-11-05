@@ -1606,6 +1606,8 @@ func _desired_speed() -> float:
 	if _hold or _attack_left > 0.0 or _hurt_stun > 0.0:
 		return 0.0
 	var mult := 0.5 if _slow > 0.0 else 1.0
+	if not flies and world.terrain.in_water(position.x, position.z):
+		mult *= Player.WADE_SPEED
 	if _charges and _special_left > 0.0:
 		mult *= 2.6
 	match state:

@@ -19,10 +19,13 @@ void fragment() {
 	vec3 grain = texture(tile, UV).rgb;
 	vec3 land = grain * COLOR.rgb;
 	float edge = (texture(roads, at / (2.0 * map_half) + 0.5).r * 2.0 - 1.0) * mask_reach;
-	// The grain makes the edge a little uneven, the way a worn track is.
-	float worn = edge + (grain.g - 0.5) * 0.7;
-	float road = 1.0 - smoothstep(-0.2, 0.25, worn);
-	vec3 surface = dirt * mix(1.07, 0.9, smoothstep(-2.0, 0.0, edge)) * (0.7 + grain.g * 0.6);
+	// Grain at two sizes makes the edge wander and fray, the way a worn track does, so bare earth
+	// fades into the grass instead of stopping at a line.
+	float wander = texture(tile, at * 0.021).g - 0.5;
+	float worn = edge + (grain.g - 0.5) * 1.1 + wander * 2.2;
+	float road = 1.0 - smoothstep(-0.55, 0.45, worn);
+	vec3 surface = dirt * mix(1.08, 0.92, smoothstep(-2.0, 0.0, edge)) * (0.68 + grain.g * 0.64);
+	surface = mix(surface, land, 0.18);
 	ALBEDO = mix(land, surface, road);
 	ROUGHNESS = 1.0;
 }

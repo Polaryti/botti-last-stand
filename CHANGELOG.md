@@ -2,6 +2,17 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.12.4 (5 November 2026)
+### Fixed
+- Stairs are now walked up smoothly, with no jumping.
+- Survive the Night: the village square and the paths are now one piece of worn earth that fades into the grass.
+- The river can be crossed anywhere, by you, bots and mobs alike. It slows everyone down, and has no more invisible walls. The hollows beside its far end, which used to trap you, are gone.
+- Sacred Steed: the horse now comes 60 s after your last ride. It was often ready again within seconds.
+
+### Balance
+- Sacred Steed no longer burns what it passes, since Flaming Trail does that. It now heals 2 per second, up from 1.5.
+- Revenant: each claw swing costs 6 Mist, up from 4. Mist refills more slowly, and kills give back 5, down from 8. Hungry Dead gives 4 more, down from 6.
+
 ## 0.12.3 (4 November 2026)
 ### Fixed
 - Online: corrected how the game identifies itself to the online service, which should bring back short room codes in place of the long one.

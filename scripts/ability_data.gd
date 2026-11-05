@@ -41,7 +41,7 @@ static func _revenant() -> Dictionary:
 	return {"core": [
 		[a("cold_hands", "Cold Hands", "+25% claw damage", "claw+up", {"melee_damage": 0.25})],
 		[a("thick_mist", "Thick Mist", "+40 max Mist, and quieter steps", "mist+plus", {"mana": 40.0, "noise": -0.25})],
-		[a("hungry_dead", "Hungry Dead", "Kills give 6 more Mist, and heal 2", "skull+mist", {}, [t("kill", "mana", {"n": 6.0}), t("kill", "heal", {"n": 2.0})])],
+		[a("hungry_dead", "Hungry Dead", "Kills give 4 more Mist, and heal 2", "skull+mist", {}, [t("kill", "mana", {"n": 4.0}), t("kill", "heal", {"n": 2.0})])],
 	], "specs": [
 		_spec("leaper", "Mist Leaper", "Crosses the map in bounds.", teal,
 			a("mist_leaper", "Mist Leaper", "Unlocks Mist Leap: bound 9 m forward, untouchable in the air", "leap+mist", {}, [], "art_leaper"),
@@ -282,7 +282,7 @@ static func _chivalry() -> Dictionary:
 			a("flaming_trail", "Flaming Trail", "While riding, you leave burning ground", "flame+horseshoe", {}, [t("every", "poison", {"secs_every": 0.7, "riding": true})])],
 			[a("spirit_knight", "Spirit Knight", "Under 30% health: a spirit knight fights for you, every 45 s", "ghost+cross", {}, [t("low", "summon", {"kind": "ghost", "n": 1, "secs": 15.0, "cd": 45.0})]),
 			a("endurance", "Endurance", "+12 s of riding", "horse+clock", {"horse_time": 12.0})]],
-			a("sacred_steed", "Sacred Steed", "The horse comes every 60 s without kills, heals 1.5 per second, and burns what it passes", "sun+crown", {"riding_regen": 1.5}, [], "sacred_steed")),
+			a("sacred_steed", "Sacred Steed", "The horse comes 60 s after your last ride, without kills, and heals 2 per second", "sun+crown", {"riding_regen": 2.0}, [], "sacred_steed")),
 		_spec("horse_archer", "Horse Archer", "Strike from the saddle and be gone", Color(0.22, 0.46, 0.3),
 			a("horse_archer", "Horse Archer", "Unlocks ranged weapons: a Short Bow, 30 arrows, an arrow back per kill, and +20% ranged damage while riding", "bow+horse", {"riding_ranged": 0.2}, [t("take", "arrows", {"n": 30}), t("take", "weapon", {"id": "bow"}), t("kill", "arrows", {"n": 1})], "ranged_ok"),
 			[[a("swift_quiver", "Swift Quiver", "+25% firing speed", "arrows+clock", {"ranged_rate": 0.25}),

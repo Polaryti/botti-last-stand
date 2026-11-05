@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_12_4()
 		await test_version_12_2()
 		await test_version_11()
 		await test_version_10()
@@ -74,6 +75,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_12_4()
 	await test_version_12_2()
 	await test_version_11()
 	await test_version_10()
@@ -186,7 +188,7 @@ func test_revenant() -> void:
 	var kz := spawn("normal", front(1.8), true)
 	pl.mana = 10.0
 	kz.take_damage(99999.0, Vector3.FORWARD, 0.0, kz.centre())
-	ok(pl.mana >= 18.0, "and from kills")
+	ok(pl.mana >= 15.0, "and from kills")
 	await seconds(0.1)
 	# No Mist: still a weak blow.
 	var weak := spawn("normal", front(1.8), true)
@@ -386,18 +388,27 @@ func test_land() -> void:
 		ok(start.has(w.grid.nearest_free(w.grid.to_cell(poi))), "the place at %s can be reached" % poi)
 	ok(start.has(w.grid.to_cell(Vector3(-72, 0, -55))), "the castle yard can be reached")
 	ok(start.has(w.grid.to_cell(Vector3(-10, 0, 100))), "and the far bank too")
-	# The water can only be crossed at three places.
+	# The water can be crossed anywhere, and it slows everyone down.
 	ok(t.is_walkable(0, 64), "the stone bridge stands over the river")
 	ok(t.is_walkable(72, 0), "the timber bridge too")
 	ok(t.is_walkable(-54, 64), "and the ford is shallow")
-	ok(not t.is_walkable(24, 64), "the river is too deep to wade")
-	ok(not w.grid.is_free(w.grid.to_cell(Vector3(24, 0, 64))), "so nothing plans a path through it")
+	ok(t.is_walkable(24, 64), "and the rest of the river can be waded")
+	ok(w.grid.is_free(w.grid.to_cell(Vector3(24, 0, 64))), "so paths can go through it")
+	var walls_in_water := 0
+	for rx in range(-110, 111, 2):
+		for rz in range(-110, 111, 2):
+			# Right beside a bridge, its own side stops you.
+			var by_bridge := t.on_deck(rx - 2, rz) or t.on_deck(rx + 2, rz) or t.on_deck(rx, rz - 2) or t.on_deck(rx, rz + 2)
+			if t.in_water(rx, rz) and not t.is_walkable(rx, rz) and not by_bridge:
+				walls_in_water += 1
+	ok(walls_in_water == 0, "with no invisible wall anywhere in the water (%d)" % walls_in_water)
+	var wet := spawn("normal", Vector3(24, 0, 64), true)
+	ok(t.in_water(24, 64) and wet._desired_speed() < wet._speed + 0.01, "mobs are slowed in the water too")
+	wet.state = Zombie.State.CHASE
+	ok(is_equal_approx(wet._desired_speed(), wet._speed * Player.WADE_SPEED), "by the same amount as you")
+	wet.release()
 	var north := w.grid.path(Vector3(24, 0, 55), Vector3(24, 0, 76))
-	var crossed := false
-	for p: Vector3 in north:
-		if absf(p.x) < 6.0:
-			crossed = true
-	ok(not north.is_empty() and crossed, "to reach the other bank a zombie walks to the bridge")
+	ok(north.size() > 0 and north.size() < 40, "a zombie walks straight across")
 	# A long journey is planned in stretches, and those stretches do get there.
 	var walker := spawn("normal", Vector3(24, 0, 80))
 	walker._set_goal(Vector3(-20, 0, -18))
@@ -454,9 +465,9 @@ func test_land() -> void:
 	pl.rotation.y = PI
 	await seconds(0.2)
 	pl.input_move = Vector2(0, -1)
-	await seconds(1.5)
+	await seconds(5.0)
 	pl.input_move = Vector2.ZERO
-	ok(pl.global_position.z < 62.0 and pl.global_position.y > Terrain.WATER_Y, "the river stops you")
+	ok(pl.global_position.z > 72.0, "you can wade across the river (%s)" % pl.global_position)
 	# Zombies and items stand on the ground, wherever that is.
 	place(Vector3(-60, 0, -60))
 	var z := spawn("normal", Vector3(-70, 0, -60))
@@ -665,6 +676,39 @@ func test_fort() -> void:
 	await frames(2)
 	Game.mode = Game.Mode.NIGHT
 	await start_clean()
+
+
+func test_version_12_4() -> void:
+	# Claws: a full bar of Mist runs out if you keep swinging with nothing dying.
+	var claws: Dictionary = WeaponDefs.ALL["claws"]
+	var rev: Dictionary = ClassDefs.ALL["revenant"]
+	var net := float(claws["cost"]) / float(claws["rate"]) - Player.MANA_REGEN * float(rev["mana_regen"])
+	ok(net > 8.0 and net < 14.0, "swinging drains Mist faster than it comes back (%.1f per second)" % net)
+	# The Square is painted on the land like the paths.
+	var boxes := 0
+	ok(w.map_roads.size() > 0, "the map has roads")
+	for c: Node in w.get_children():
+		if c is MeshInstance3D and (c as MeshInstance3D).global_position == Vector3.ZERO and (c as MeshInstance3D).mesh is ArrayMesh:
+			var box := ((c as MeshInstance3D).mesh as ArrayMesh).get_aabb()
+			if is_equal_approx(box.size.x, 19.0) and is_equal_approx(box.size.z, 19.0):
+				boxes += 1
+	ok(boxes == 0, "the village square is not a box sitting on the ground")
+	# The very end of the river, where it runs into the edge of the map, can be crossed too.
+	pl.global_position = Vector3(-92, w.ground_at(Vector3(-92, 0, 104)) + 0.2, 104)
+	pl.yaw = -PI * 0.5
+	pl.rotation.y = -PI * 0.5
+	pl.velocity = Vector3.ZERO
+	await seconds(0.2)
+	pl.input_move = Vector2(0, -1)
+	await seconds(7.0)
+	pl.input_move = Vector2.ZERO
+	ok(pl.global_position.x > -72.0, "the end of the river does not trap you (%s)" % pl.global_position)
+	# Sacred Steed: the wait starts when the ride ends.
+	pl._sacred_cd = 30.0
+	pl.dismount()
+	ok(is_equal_approx(pl._sacred_cd, 60.0), "the sacred horse waits 60 s after a ride")
+	await seconds(0.3)
+	ok(pl._sacred_cd < 60.0 and pl._sacred_cd > 59.0, "and the wait runs down on foot")
 
 
 func test_version_12_2() -> void:
@@ -1322,7 +1366,16 @@ func test_version_8() -> void:
 	pl.rotation.y = -PI * 0.5
 	await seconds(0.2)
 	pl.input_move = Vector2(0, -1)
-	await seconds(2.2)
+	var stair_jumps := 0
+	var was_jump := false
+	Game.auto_jump = true
+	for frame in 132:
+		await frames(1)
+		var jumping := pl.velocity.y > Player.JUMP_SPEED * 0.8
+		if jumping and not was_jump:
+			stair_jumps += 1
+		was_jump = jumping
+	ok(stair_jumps == 0, "stairs are walked up, with no jumping (%d jumps)" % stair_jumps)
 	var height_on := pl.global_position.y
 	var run := pl.global_position.x + 21.0
 	var slope_y := run / 15.0 * 6.5

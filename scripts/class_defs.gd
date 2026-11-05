@@ -16,7 +16,7 @@ const ALL := {
 		"desc": "Mounted charger. Starts with a Lance. Kills call a horse to ride. No ranged weapons, unless unlocked."},
 	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 70.0, "speed": 1.0, "ranged": true, "mana": true,
 		"desc": "Fragile caster. Keeps a Staff that uses refilling mana. Elements and summoned allies."},
-	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 8.0,
+	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.5, "kill_mist": 5.0,
 		"no_weapons": true, "auto_tree": true, "hidden": true, "price": 650,
 		"desc": "Dead, and not done. No weapons, only claws of Mist. Gifts come by themselves as you level, and you choose one path."},
 	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,

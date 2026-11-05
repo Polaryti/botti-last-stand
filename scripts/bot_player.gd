@@ -216,6 +216,8 @@ func _walk(delta: float) -> void:
 		return
 	way = way.normalized()
 	var speed := SPEED * (0.6 if _slowed > 0.0 else 1.0)
+	if world.terrain.in_water(body.global_position.x, body.global_position.z):
+		speed *= Player.WADE_SPEED
 	var moved := at + way * speed * delta
 	if not world.grid.is_free(world.grid.to_cell(moved)):
 		if direct or _path_at >= _path.size():

@@ -36,7 +36,7 @@ const ALL := {
 	"axes": {"name": "Throwing Axes", "desc": "They come back to you, cutting on the way out and back. No arrows needed.", "kind": Kind.RANGED, "rate": 0.5, "range": 15.0, "speed": 24.0, "gravity": 0.0,
 		"knock": 2.0, "returning": true, "weight": 1.1, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
 	"claws": {"name": "Spectral Claws", "desc": "A Revenant's own hands, shrouded in mist. Each blow uses a little Mist.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.5, "cone": 100.0, "max_hits": 2,
-		"knock": 1.2, "swing": "claw", "cost": 4.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
+		"knock": 1.2, "swing": "claw", "cost": 6.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
 	"staff": {"name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
 		"knock": 1.5, "weight": 0.0, "pos": Vector3(0.26, -0.38, -0.5), "scale": 0.6},
 }
