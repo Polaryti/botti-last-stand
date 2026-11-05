@@ -14,6 +14,8 @@ const REST_DIRS := {
 	"smash": Vector3(-0.28, 0.8, -0.3),
 	"claw": Vector3(-0.06, 0.82, -0.56),
 	"overhead": Vector3(-0.1, 0.94, -0.3),
+	"punch": Vector3(-0.08, 0.5, -0.86),
+	"bo": Vector3(-0.56, 0.76, -0.32),
 }
 
 ## name -> list of [time, hand offset, blade direction, roll around the blade]
@@ -42,6 +44,41 @@ const KEYS := {
 		[0.3, Vector3(-0.06, 0.05, -0.2), Vector3(-0.3, 0.46, -0.84), 0.8],
 		[0.44, Vector3(-0.36, -0.14, -0.12), Vector3(-0.8, -0.12, -0.5), 1.0],
 		[1.0, Vector3.ZERO, Vector3(-0.06, 0.82, -0.56), 0.0]],
+	# Straight from the shoulder, one fist after the other.
+	"punch_a": [
+		[0.0, Vector3.ZERO, Vector3(-0.08, 0.5, -0.86), 0.0],
+		[0.16, Vector3(0.03, -0.03, 0.1), Vector3(-0.02, 0.62, -0.78), 0.0],
+		[0.3, Vector3(-0.18, 0.18, -0.3), Vector3(-0.2, 0.12, -0.97), 0.0],
+		[0.42, Vector3(-0.16, 0.16, -0.26), Vector3(-0.18, 0.16, -0.97), 0.0],
+		[1.0, Vector3.ZERO, Vector3(-0.08, 0.5, -0.86), 0.0]],
+	"punch_b": [
+		[0.0, Vector3.ZERO, Vector3(-0.08, 0.5, -0.86), 0.0],
+		[0.16, Vector3(0.03, -0.03, 0.1), Vector3(-0.02, 0.62, -0.78), 0.0],
+		[0.3, Vector3(-0.18, 0.18, -0.3), Vector3(-0.2, 0.12, -0.97), 0.0],
+		[0.42, Vector3(-0.16, 0.16, -0.26), Vector3(-0.18, 0.16, -0.97), 0.0],
+		[1.0, Vector3.ZERO, Vector3(-0.08, 0.5, -0.86), 0.0]],
+	# The staff is held at its middle, so both ends show. It crosses the view from one side, then the other.
+	"bo_a": [
+		[0.0, Vector3.ZERO, Vector3(-0.56, 0.76, -0.32), 0.0],
+		[0.18, Vector3(0.14, 0.03, 0.06), Vector3(0.74, 0.26, 0.62), 0.0],
+		[0.3, Vector3(0.0, -0.02, -0.14), Vector3(0.3, 0.12, -0.95), 0.0],
+		[0.46, Vector3(-0.2, -0.06, -0.06), Vector3(-0.86, 0.1, -0.5), 0.0],
+		[1.0, Vector3.ZERO, Vector3(-0.56, 0.76, -0.32), 0.0]],
+	"bo_b": [
+		[0.0, Vector3.ZERO, Vector3(-0.56, 0.76, -0.32), 0.0],
+		[0.18, Vector3(-0.18, 0.03, 0.06), Vector3(-0.8, 0.26, 0.54), 0.0],
+		[0.3, Vector3(-0.04, -0.02, -0.14), Vector3(-0.3, 0.12, -0.95), 0.0],
+		[0.46, Vector3(0.16, -0.06, -0.06), Vector3(0.86, 0.1, -0.5), 0.0],
+		[1.0, Vector3.ZERO, Vector3(-0.56, 0.76, -0.32), 0.0]],
+	# The third blow: a whole turn in front of you, like a wheel.
+	"bo_spin": [
+		[0.0, Vector3.ZERO, Vector3(-0.56, 0.76, -0.32), 0.0],
+		[0.14, Vector3(-0.06, 0.06, -0.12), Vector3(0.95, 0.3, -0.05), 0.0],
+		[0.28, Vector3(-0.06, 0.08, -0.16), Vector3(0.2, 0.97, -0.1), 0.0],
+		[0.42, Vector3(-0.06, 0.08, -0.16), Vector3(-0.95, 0.3, -0.05), 0.0],
+		[0.56, Vector3(-0.06, 0.08, -0.16), Vector3(-0.2, -0.97, -0.1), 0.0],
+		[0.7, Vector3(-0.06, 0.06, -0.12), Vector3(0.95, -0.3, -0.05), 0.0],
+		[1.0, Vector3.ZERO, Vector3(-0.56, 0.76, -0.32), 0.0]],
 	"slash_a": [
 		[0.0, Vector3.ZERO, Vector3(-0.22, 0.75, -0.62), 0.0],
 		[0.17, Vector3(0.1, 0.1, 0.03), Vector3(0.55, 0.78, 0.12), 0.3],
@@ -123,6 +160,11 @@ static var _orb: Mesh
 static var _mist: Material
 
 
+## Weapons with a right and a left: one strikes while the other waits.
+static func both_hands(d: Dictionary) -> bool:
+	return d.get("swing", "") == "claw" or d.get("swing", "") == "punch"
+
+
 static func keys_for(swing: String, side: bool) -> String:
 	if swing == "":
 		return ""
@@ -188,8 +230,8 @@ static func smear_roll(keys: String) -> float:
 		"overhead_a", "overhead_b": return 1.57
 		"claw_a": return 0.5
 		"claw_b": return -0.5
-		"slash_a": return 0.28
-		"slash_b": return -0.28
+		"slash_a", "bo_a": return 0.28
+		"slash_b", "bo_b": return -0.28
 		"reap_a": return 0.1
 		"reap_b": return -0.1
 		"smash_a": return 1.35
@@ -200,8 +242,8 @@ static func smear_roll(keys: String) -> float:
 ## Which way the trail travels while it fades.
 static func smear_turn(keys: String) -> float:
 	match keys:
-		"slash_a", "reap_a", "claw_a": return 0.9
-		"slash_b", "reap_b", "claw_b": return -0.9
+		"slash_a", "reap_a", "claw_a", "bo_a": return 0.9
+		"slash_b", "reap_b", "claw_b", "bo_b": return -0.9
 		"smash_a", "smash_b": return 0.6
 	return 0.0
 

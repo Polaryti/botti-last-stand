@@ -11,6 +11,31 @@ const BASE_ARROWS := 60
 const BURN_DPS := 5.0
 const BASE_MANA := 100.0
 const MANA_REGEN := 8.0
+# The Monk.
+const KI_PER_HIT := 10.0
+const KI_PER_SHOT := 5.0
+const SWEEP_REACH := 3.4
+const VAULT_REACH := 9.0
+const VAULT_POWER := 1.4
+const SPIRIT_TIME := 4.0
+const SPIRIT_HEAL := 10.0
+const SPIRIT_SPEED := 1.3
+const SKIN_MAX := 0.6
+const SKIN_UNMOVED := 0.8
+const SKIN_GROWS := 0.1 # a second
+const SKIN_WEARS := 0.3 # a second
+const SKIN_STRONG := 0.3 # from here Recoil and Rooted Blows work
+const SKIN_WAITS := 0.4 # standing still this long before it starts
+# The Adept.
+const STANCES: Array[String] = ["wind", "stone", "flame"]
+const STANCE_ADDS := {"wind": {"speed": 0.25, "melee_damage": -0.3}, "stone": {"damage_taken": -0.3, "knock": 1.5}, "flame": {"damage_taken": 0.15}, "void": {}}
+const STANCE_NAMES := {"wind": "Wind", "stone": "Stone", "flame": "Flame", "void": "Void"}
+const STANCE_ICONS := {"wind": "wind", "stone": "mountain", "flame": "flame", "void": "moon"}
+const STANCE_COLOURS := {"wind": Color(0.75, 0.95, 1.0), "stone": Color(0.72, 0.68, 0.6), "flame": Color(1.0, 0.55, 0.15), "void": Color(0.62, 0.36, 0.95)}
+const ECHO_POWER := 0.5
+const ECHO_AFTER := 0.13
+const VOID_TIME := 5.0
+const MIRROR_WINDOW := 1.0
 const SHIELD_BASE := 0.3
 const HORSE_KILLS := 10
 const HORSE_TIME := 15.0
@@ -63,7 +88,7 @@ var points := 0
 var chosen := {} # step index -> ability id
 var mods := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_cone": 0.0, "melee_hits": 0.0,
 	"knock": 1.0, "ranged_damage": 1.0, "ranged_rate": 1.0, "ranged_power": 1.0, "speed": 1.0, "max_hp": 0.0,
-	"damage_taken": 1.0, "noise": 1.0, "sight": 1.0, "arrow_save": 0.0, "max_arrows": 0.0, "pierce": 0.0, "bounces": 0.0,
+	"damage_taken": 1.0, "ki_gain": 1.0, "noise": 1.0, "sight": 1.0, "arrow_save": 0.0, "max_arrows": 0.0, "pierce": 0.0, "bounces": 0.0,
 	"shield": 0.0, "thorns": 0.0, "mana": 0.0, "mana_regen": 1.0, "spell_damage": 1.0, "spell_rate": 1.0, "spell_cost": 1.0,
 	"horse_speed": 1.0, "horse_time": 0.0, "horse_kills": 0.0, "trample": 1.0, "riding_armor": 1.0, "riding_damage": 1.0,
 	"riding_crit": 0.0, "riding_ranged": 1.0, "riding_regen": 0.0, "familiar_time": 1.0, "potion_time": 1.0,
@@ -100,6 +125,23 @@ var _wolf_timer := 0.0
 var _low_armed := true
 var _assassin_kill := false
 var mana := 0.0
+var spirit_left := 0.0
+var _spirit_home := Vector3.ZERO
+var _spirit_taken := 0.0
+var _bo_hits := 0
+var _sweep_now := false
+var _vaulting := false
+var _next_hit_mult := 1.0
+var stone_skin := 0.0
+var _still_for := 0.0
+var _skin_step := 0
+var stance := ""
+var void_left := 0.0
+var _void_hits := {}
+var _echo_left := -1.0
+var _second_sweep := -1.0
+var _last_hit := 0.0
+var _last_hit_left := 0.0
 var shield_tier := 0
 var horse_progress := 0
 var riding_left := 0.0
@@ -287,7 +329,9 @@ func setup_class(id: String) -> void:
 	mods["speed"] = float(c["speed"])
 	mods["mana_regen"] = float(c.get("mana_regen", 1.0))
 	hp = max_hp()
-	mana = max_mana()
+	mana = 0.0 if c.get("ki", false) else max_mana()
+	if id == "adept":
+		_enter_stance("wind")
 	if c.get("shield", false):
 		_refresh_shield()
 	if c.get("horse", false):
@@ -366,10 +410,15 @@ func carries(id: String) -> bool:
 	return slots.has(id)
 
 
+## An empty hand is an empty slot, even when it is the Monk's and can punch.
+func _slot_free(i: int) -> bool:
+	return slots[i] == null or slots[i] == "fists"
+
+
 func has_empty_slot() -> bool:
 	if class_def().get("one_weapon", false):
-		return slots[0] == null
-	return slots[0] == null or slots[1] == null
+		return _slot_free(0)
+	return _slot_free(0) or _slot_free(1)
 
 
 ## Class rule: Heavy Infantry and Chivalry cannot use ranged weapons, unless unlocked.
@@ -378,6 +427,8 @@ func can_use(id: String) -> bool:
 		return false
 	if has_flag("bo_master"):
 		return id == "bo"
+	if id == "bo":
+		return class_id == "monk"
 	if WeaponDefs.is_ranged(id):
 		return bool(class_def()["ranged"]) or has_flag("ranged_ok")
 	return true
@@ -389,9 +440,9 @@ func give_weapon(id: String) -> void:
 		slots[0] = id
 		_equip()
 		return
-	if slots[current] == null:
+	if _slot_free(current):
 		slots[current] = id
-	elif slots[1 - current] == null:
+	elif _slot_free(1 - current):
 		current = 1 - current
 		slots[current] = id
 	else:
@@ -427,7 +478,7 @@ func take_nearby_weapon() -> void:
 	if not has_empty_slot():
 		_swap_slot_index()
 		var old: Variant = slots[current]
-		if old:
+		if old and old != "fists":
 			world.drop_weapon(global_position - camera.global_basis.z * 1.2, old)
 	world.collect_weapon(p)
 	nearby_weapon = null
@@ -464,7 +515,7 @@ func _equip() -> void:
 	_vm_mesh.rotation.y = float(d.get("mesh_yaw", 0.0))
 	_vm_mesh.visible = not (d.get("returning", false) and _axe_out)
 	_vm_root.scale = Vector3.ONE * float(d["scale"])
-	_vm_left.visible = d.get("swing", "") == "claw"
+	_vm_left.visible = WeaponAnim.both_hands(d)
 	if _vm_left.visible:
 		_vm_left.mesh = _vm_mesh.mesh
 	if WeaponDefs.uses_arrows(d):
@@ -524,6 +575,13 @@ func hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		var drained := minf(mana, dmg * 0.5)
 		mana -= drained
 		dmg -= drained
+	if stone_skin > 0.0:
+		dmg *= 1.0 - stone_skin
+		if attacker and has_flag("recoil") and stone_skin >= SKIN_STRONG:
+			attacker.take_damage(15.0, attacker.position - global_position, 1.0, attacker.centre())
+	if has_flag("mirror_step"):
+		_last_hit = dmg
+		_last_hit_left = 1.5 if has_flag("long_mirror") else MIRROR_WINDOW
 	if attacker and m("thorns") > 0.0:
 		attacker.take_damage(m("thorns"), attacker.position - global_position, 1.0, attacker.centre())
 	hp -= dmg
@@ -627,7 +685,10 @@ func _check_low() -> void:
 func respawn(at: Vector3) -> void:
 	dead = false
 	hp = max_hp()
-	mana = max_mana()
+	mana = 0.0 if class_def().get("ki", false) else max_mana()
+	stone_skin = 0.0
+	spirit_left = 0.0
+	_vm_root.visible = true
 	burn_time = 0.0
 	poison_left = 0.0
 	bleed_left = 0.0
@@ -652,7 +713,7 @@ func respawn(at: Vector3) -> void:
 
 
 func is_unseen() -> bool:
-	return invis_left > 0.0
+	return invis_left > 0.0 or spirit_left > 0.0
 
 
 ## Firelight shows you to everything out in the dark, and so does a torch in your hand.
@@ -784,6 +845,8 @@ func _apply_ability(a: Dictionary) -> void:
 			world.prepare_allies("decoy", 3)
 		elif a["flag"] == "swap_legion":
 			world.prepare_allies("mirror", 3)
+		elif a["flag"] == "spirit_walker":
+			world.prepare_allies("body", 1)
 	if max_hp() > was_hp:
 		hp += max_hp() - was_hp
 	hp = minf(hp, max_hp())
@@ -1039,6 +1102,12 @@ func on_kill(z: Zombie) -> void:
 			say("Chivalry unlocked!")
 	add_xp(z.xp_value)
 	mana = minf(max_mana(), mana + float(class_def().get("kill_mist", 0.0)))
+	if void_left > 0.0:
+		if has_flag("hungry_void"):
+			heal(12.0)
+		if has_flag("walker_between"):
+			void_left += 1.0
+			invis_left = maxf(invis_left, void_left)
 	add_arrows(int(class_def().get("kill_arrows", 0)))
 	fire("kill", {"z": z})
 	if _assassin_kill:
@@ -1360,6 +1429,8 @@ func _tick_ability_timers(delta: float) -> void:
 	flurry_left -= delta
 	rage_left -= delta
 	_rage_cd -= delta
+	_tick_monk(delta)
+	_tick_adept(delta)
 	_tick_art_aim()
 	if not is_riding():
 		_sacred_cd -= delta
@@ -1391,6 +1462,10 @@ func has_burst() -> bool:
 
 
 func art_def() -> Dictionary:
+	if class_id == "adept":
+		return WorldLight.ARTS["stance"]
+	if class_id == "monk" and spec_id == "":
+		return WorldLight.ARTS["ki_blast"]
 	var item := ShopDefs.art_item(spec_id)
 	if item != "" and Game.item_active(item):
 		return ShopDefs.ITEMS[item]["art"]
@@ -1464,12 +1539,18 @@ func _rain_tick(delta: float) -> void:
 
 ## The picture on the ability's button. For an Inventor, that is what will come out next.
 func art_glyph() -> String:
+	if class_id == "adept":
+		return "moon" if _void_is_ready() else str(STANCE_ICONS.get(stance, "wind"))
 	if spec_id == "inventor" and _next_invention != "":
 		return WorldLight.INVENTIONS[_next_invention]["icon"]
 	return str(art_def().get("icon", "mist"))
 
 
 func art_label() -> String:
+	if class_id == "adept":
+		return "Void is open" if _void_is_ready() else "%s stance" % STANCE_NAMES.get(stance, "")
+	if spirit_left > 0.0:
+		return "Come back"
 	if spec_id == "inventor" and _next_invention != "":
 		return WorldLight.INVENTIONS[_next_invention]["name"]
 	if has_item("trap_satchel"):
@@ -1484,7 +1565,14 @@ func burst_cost() -> float:
 
 
 func art_cost() -> float:
+	if spirit_left > 0.0 or (has_flag("unmoved") and stone_skin >= SKIN_UNMOVED - 0.001):
+		return 0.0
 	return float(art_def().get("cost", 0.0)) * m("art_cost")
+
+
+## What the bar is full of, for "Not enough...".
+func _art_fuel() -> String:
+	return "Ki" if class_def().get("ki", false) else "mist"
 
 
 ## Mist Burst: gather the mist for a moment, then let it go.
@@ -1506,11 +1594,14 @@ func use_burst() -> void:
 
 ## The second ability, from the chosen path.
 func use_art() -> void:
+	if spirit_left > 0.0:
+		_come_back()
+		return
 	var d := art_def()
 	if d.is_empty() or _cast_kind != "" or _is_moved_by_mist() or art_cd_left > 0.0 or frozen_left > 0.0:
 		return
 	if mana < art_cost():
-		say("Not enough mist")
+		say("Not enough %s" % _art_fuel())
 		return
 	if spec_id == "rift" and _rift_candidates().is_empty():
 		say("Nothing to jump to")
@@ -1529,19 +1620,320 @@ func use_art() -> void:
 		_rain_wait = 0.0
 	mana -= art_cost()
 	art_cd_left = float(d["cd"]) * m("art_cd")
-	_cast_kind = spec_id
+	_cast_kind = "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
-	Net.cast_anim()
+	Net.cast_anim(str(d.get("anim", "")))
 	Sfx.play("spell", -5.0, 1.3)
 
 
-func _inner_peace() -> void:
-	guard_left = maxf(guard_left, 2.5)
-	heal(50.0 if has_flag("enlightened") else 25.0)
-	world.fx_ring(global_position, 6.0, Color(1.0, 0.85, 0.45))
-	if has_flag("enlightened"):
-		world.burn_around(global_position, 6.0)
+# --- The Monk ----------------------------------------------------------------
+
+func gain_ki(amount: float) -> void:
+	if class_def().get("ki", false):
+		mana = minf(max_mana(), mana + amount * m("ki_gain"))
+
+
+func _tick_monk(delta: float) -> void:
+	if spirit_left > 0.0:
+		spirit_left -= delta
+		guard_left = maxf(guard_left, 0.15)
+		if has_flag("haunting"):
+			for z: Zombie in world.zombies_near(global_position, 2.0, 8):
+				z.slow(3.0)
+		if spirit_left <= 0.0:
+			_come_back()
+	if has_flag("iron_mountain"):
+		_tick_stone_skin(delta)
+
+
+## Stand still and it grows. Walk and it wears away.
+func _tick_stone_skin(delta: float) -> void:
+	if Vector2(velocity.x, velocity.z).length() < 0.5 and is_on_floor():
+		_still_for += delta
+		if _still_for >= SKIN_WAITS:
+			var top := SKIN_UNMOVED if has_flag("unmoved") else SKIN_MAX
+			stone_skin = minf(top, stone_skin + SKIN_GROWS * (2.0 if has_flag("deep_roots") else 1.0) * delta)
+			var step := int(stone_skin / 0.2 + 0.001)
+			if step > _skin_step:
+				_skin_step = step
+				world.fx_ring(global_position, 1.4 + step * 0.4, STANCE_COLOURS["stone"])
+				Sfx.play("thunk", -8.0, 0.7)
+	else:
+		_still_for = 0.0
+		stone_skin = maxf(0.0, stone_skin - SKIN_WEARS * (0.5 if has_flag("walking_mountain") else 1.0) * delta)
+		_skin_step = int(stone_skin / 0.2 + 0.001)
+
+
+## All around at once: the Bo's third hit, a change of stance, a landing.
+func _sweep(radius: float, power: float, stun_secs := 0.0, col := Color(0.95, 0.85, 0.6)) -> int:
+	var d := weapon_def()
+	var stats := melee_stats(d) if not d.is_empty() and d["kind"] == WeaponDefs.Kind.MELEE else {"damage": WeaponDefs.DAMAGE * m("melee_damage") * damage_multiplier(), "knock": 3.0}
+	var dmg: float = float(stats["damage"]) * power
+	world.fx_ring(global_position, radius, col)
+	if Net.active():
+		Net.blast_fx(global_position + Vector3.UP * 0.8, radius * 0.5, Color(col, 0.3))
+	var hits := 0
+	for z: Zombie in world.zombies_near(global_position, radius, 16):
+		z.take_damage(dmg, z.position - global_position, float(stats["knock"]), z.centre())
+		if stun_secs > 0.0:
+			z.stun(stun_secs)
+		if not d.is_empty() and d["kind"] == WeaponDefs.Kind.MELEE:
+			on_melee_connect(z, d)
+		on_hit(false)
+		hits += 1
+	for r: Avatar in world.rivals_near(global_position, radius):
+		Net.hit_player(r.peer, dmg, global_position)
+		if stun_secs > 0.0:
+			Net.status_peer(r.peer, Net.Status.STUN, stun_secs)
+		hits += 1
+	Sfx.play("swing", -2.0, 0.7)
+	if hits > 0:
+		shake(0.3)
+		Sfx.play("hit", -3.0)
+	return hits
+
+
+func _bo_sweep() -> void:
+	_sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), 1.0, 0.8 if has_flag("stun_sweep") else 0.0)
+
+
+func _ki_blast() -> void:
+	const REACH := 4.5
+	heal(10.0)
+	var col := Color(1.0, 0.8, 0.3)
+	world.fx_blast(global_position + Vector3.UP * 0.8, REACH * 0.7, Color(col, 0.45))
+	world.fx_ring(global_position, REACH, col)
+	if Net.active():
+		Net.blast_fx(global_position + Vector3.UP * 0.8, REACH * 0.7, Color(col, 0.45))
+	var dmg := 30.0 * m("melee_damage") * damage_multiplier()
+	for z: Zombie in world.zombies_near(global_position, REACH, 16):
+		z.take_damage(dmg, z.position - global_position, 6.0, z.centre())
+		on_hit(false)
+	for r: Avatar in world.rivals_near(global_position, REACH):
+		Net.hit_player(r.peer, dmg, global_position)
+	Sfx.play("blast", -6.0, 1.4)
+	shake(0.4)
+
+
+func _pole_vault() -> void:
+	_vaulting = true
+	_start_leap(VAULT_REACH * (1.5 if has_flag("high_vault") else 1.0))
+
+
+func _vault_landing() -> void:
+	_vaulting = false
+	var crushing := has_flag("crushing")
+	_sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), VAULT_POWER * (2.0 if crushing else 1.0), 1.5 if crushing else (0.8 if has_flag("stun_sweep") else 0.0))
+
+
+## The body stays and draws everything. The spirit walks away from it.
+func _leave_body() -> void:
+	spirit_left = SPIRIT_TIME + (2.0 if has_flag("longer_journey") else 0.0)
+	_spirit_home = global_position
+	_spirit_taken = 0.0
+	world.spawn_ally("body", global_position, spirit_left + 1.0)
+	for z: Zombie in world.zombies_near(global_position, 14.0, 16):
+		z.taunted_by(_spirit_home)
+	_fog_at(global_position + Vector3.UP, 1.4)
+	fog_flash = 1.0
+	_vm_root.visible = false
+	_vm_left.visible = false
+	Sfx.play("wraith", -6.0, 1.3)
+
+
+func body_hit(amount: float) -> void:
+	_spirit_taken += amount
+
+
+## Called when the body falls before the spirit is back: it returns at once, to what is left.
+func body_lost() -> void:
+	if spirit_left > 0.0:
+		_come_back()
+
+
+func _come_back() -> void:
+	spirit_left = 0.0
+	world.dismiss_ally("body")
+	global_position = _spirit_home + Vector3.UP * 0.04
+	velocity = Vector3.ZERO
+	_vm_root.visible = true
+	_equip()
+	heal(SPIRIT_HEAL + _spirit_taken + (20.0 if has_flag("mended") else 0.0))
+	_fog_at(global_position + Vector3.UP, 1.4)
+	fog_flash = 0.6
+	guard_left = maxf(guard_left, 0.3)
 	Sfx.play("bell", -6.0, 1.3)
+	if has_flag("spirit_strike"):
+		_next_hit_mult = 3.0
+	if has_flag("enlightened"):
+		const REACH := 6.0
+		var dmg := 80.0 * damage_multiplier()
+		world.fx_blast(global_position + Vector3.UP, REACH * 0.7, Color(0.7, 0.95, 1.0, 0.45))
+		world.fx_ring(global_position, REACH, Color(0.7, 0.95, 1.0))
+		if Net.active():
+			Net.blast_fx(global_position + Vector3.UP, REACH * 0.7, Color(0.7, 0.95, 1.0, 0.45))
+		for z: Zombie in world.zombies_near(global_position, REACH, 16):
+			z.take_damage(dmg, z.position - global_position, 3.0, z.centre())
+			z.stun(1.5)
+			on_hit(false)
+		for r: Avatar in world.rivals_near(global_position, REACH):
+			Net.hit_player(r.peer, dmg, global_position)
+			Net.status_peer(r.peer, Net.Status.STUN, 1.5)
+
+
+func _mountain_stomp() -> void:
+	var top := SKIN_UNMOVED if has_flag("unmoved") else SKIN_MAX
+	var built := clampf(stone_skin / top, 0.0, 1.0)
+	var radius := 4.0 + 5.0 * built
+	var dmg := (25.0 + 75.0 * built) * m("melee_damage") * damage_multiplier()
+	var throw_power := (6.0 + 6.0 * built) * (2.0 if has_flag("landslide") else 1.0)
+	var col := Color(0.8, 0.72, 0.55)
+	world.fx_blast(global_position + Vector3.UP * 0.2, radius * 0.6, Color(col, 0.45))
+	world.fx_ring(global_position, radius, col)
+	if Net.active():
+		Net.blast_fx(global_position + Vector3.UP * 0.2, radius * 0.6, Color(col, 0.45))
+	for z: Zombie in world.zombies_near(global_position, radius, 18):
+		z.take_damage(dmg, z.position - global_position, throw_power, z.centre())
+		if built >= 0.5:
+			z.stun(0.8)
+		if has_flag("aftershock"):
+			z.slow(3.0)
+		on_hit(false)
+	for r: Avatar in world.rivals_near(global_position, radius):
+		Net.hit_player(r.peer, dmg, global_position)
+		if has_flag("aftershock"):
+			Net.status_peer(r.peer, Net.Status.SLOW, 3.0)
+	stone_skin = 0.0
+	_skin_step = 0
+	_still_for = 0.0
+	_land_dip = 1.0
+	shake(1.0)
+	Sfx.play("blast", -2.0, 0.7)
+	_noise(12.0)
+
+
+# --- The Adept ---------------------------------------------------------------
+
+func _enter_stance(next: String) -> void:
+	if stance != "":
+		var leaving: Dictionary = STANCE_ADDS[stance]
+		for k: String in leaving:
+			mods[k] = float(mods[k]) - float(leaving[k])
+	stance = next
+	var coming: Dictionary = STANCE_ADDS[next]
+	for k: String in coming:
+		mods[k] = float(mods[k]) + float(coming[k])
+
+
+func _void_is_ready() -> bool:
+	return has_flag("void_walker") and void_left <= 0.0 and _void_hits.size() >= (2 if has_flag("quick_emptiness") else 3)
+
+
+func _change_stance() -> void:
+	var next: String = STANCES[(STANCES.find(stance) + 1) % STANCES.size()]
+	if _void_is_ready():
+		next = "void"
+		_void_hits = {}
+		void_left = VOID_TIME + (2.0 if has_flag("deeper_void") else 0.0)
+		invis_left = maxf(invis_left, void_left)
+		_fog_at(global_position + Vector3.UP, 1.5)
+		Sfx.play("wraith", -4.0, 0.8)
+	elif void_left > 0.0:
+		void_left = 0.0
+		_left_void()
+	_enter_stance(next)
+	var col: Color = STANCE_COLOURS[next]
+	world.fx_ring(global_position, 2.2, col)
+	Sfx.play("weapon_change", -3.0, 0.8)
+	say("%s stance" % STANCE_NAMES[next])
+	if has_flag("mirror_step"):
+		_undo_hit()
+	if has_flag("blade_dancer"):
+		_dance_sweep()
+		if has_flag("storm_of_steel"):
+			_second_sweep = 0.25
+
+
+func _dance_sweep() -> void:
+	var hits := _sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), 1.5 if has_flag("whirl") else 1.0, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
+	if hits <= 0:
+		return
+	if has_flag("stance_echo"):
+		for z: Zombie in world.zombies_near(global_position, SWEEP_REACH + 1.5, 16):
+			if stance == "wind":
+				z.slow(3.0)
+			elif stance == "flame":
+				z.ignite(ZombieDefs.BURN_SECONDS)
+	if has_flag("flowing_health"):
+		heal(6.0)
+	if has_flag("dance_on"):
+		_act({"do": "buff", "key": "dance_on", "stat": "melee_rate", "val": 0.15, "secs": 4.0, "max": 3}, {})
+
+
+## Mirror Step: the hit that just landed never happened.
+func _undo_hit() -> void:
+	if _last_hit_left <= 0.0 or dead:
+		return
+	var taken := _last_hit
+	_last_hit_left = 0.0
+	heal(taken + 10.0 + (10.0 if has_flag("still_reflection") else 0.0))
+	hurt_flash = 0.0
+	_fog_at(global_position + Vector3.UP, 1.1)
+	say("Stepped aside")
+	Sfx.play("wraith", -7.0, 1.8)
+	if has_flag("counterstep"):
+		_next_hit_mult = 2.0
+	if has_flag("blinding_step"):
+		world.stun_around(global_position, 4.0, 1.0)
+	if has_flag("patient_blade"):
+		_act({"do": "buff", "key": "patient_blade", "stat": "melee_damage", "val": 0.25, "secs": 4.0}, {})
+	if has_flag("perfect_reflection"):
+		const REACH := 5.0
+		world.fx_ring(global_position, REACH, Color(0.7, 0.85, 1.0))
+		for z: Zombie in world.zombies_near(global_position, REACH, 16):
+			z.take_damage(taken * 3.0, z.position - global_position, 3.0, z.centre())
+			on_hit(false)
+		for r: Avatar in world.rivals_near(global_position, REACH):
+			Net.hit_player(r.peer, taken * 3.0, global_position)
+
+
+func _left_void() -> void:
+	if has_flag("aftermath"):
+		world.stun_around(global_position, 6.0, 1.5)
+	invis_left = 0.0
+
+
+func _tick_adept(delta: float) -> void:
+	if class_id != "adept":
+		return
+	_last_hit_left = maxf(0.0, _last_hit_left - delta)
+	if void_left > 0.0:
+		void_left -= delta
+		if void_left <= 0.0:
+			_left_void()
+			_enter_stance("wind")
+			say("Wind stance")
+	if _echo_left >= 0.0:
+		_echo_left -= delta
+		if _echo_left < 0.0:
+			_echo_blow()
+	if _second_sweep >= 0.0:
+		_second_sweep -= delta
+		if _second_sweep < 0.0:
+			_dance_sweep()
+
+
+## In Wind stance each blow strikes twice, the second a moment later and weaker.
+func _echo_blow() -> void:
+	var d := weapon_def()
+	if d.is_empty() or d["kind"] != WeaponDefs.Kind.MELEE or dead:
+		return
+	var stats := melee_stats(d)
+	stats["damage"] = float(stats["damage"]) * ECHO_POWER
+	var hits := world.melee_hit(self, d, stats)
+	_show_smear(d)
+	if hits > 0:
+		Sfx.play("hit", -7.0, 1.3)
 
 
 func _healing_tonic() -> void:
@@ -1589,7 +1981,11 @@ func _tick_mist(delta: float) -> void:
 		"pyromaniac": _throw_bombs()
 		"inventor": _invent()
 		"illusionist": _mirror_swap()
-		"spirit": _inner_peace()
+		"ki_blast": _ki_blast()
+		"bo_master": _pole_vault()
+		"spirit_walker": _leave_body()
+		"iron_mountain": _mountain_stomp()
+		"stance": _change_stance()
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -1972,19 +2368,21 @@ func take_shared(amount: float) -> void:
 
 ## Forward, or the way the stick points. Over low things and water, up or down the land, and never
 ## through a wall or further uphill than a leap can carry you.
-func _start_leap() -> void:
+func _start_leap(reach := -1.0) -> void:
 	var dir := global_basis * Vector3(input_move.x, 0, input_move.y)
 	if dir.length_squared() < 0.04:
 		dir = -global_basis.z
 	dir = Vector3(dir.x, 0, dir.z).normalized()
 	_leap_from = global_position
-	_leap_to = leap_landing(global_position, dir, m("leap_range"))
+	_leap_to = leap_landing(global_position, dir, m("leap_range") if reach < 0.0 else reach)
 	_leap_t = 0.0
 	guard_left = maxf(guard_left, 0.55)
 	Sfx.play("jump_a", -2.0, 0.8)
+	_mist_trail = 0.0
+	if _vaulting:
+		return
 	Sfx.play("wraith", -9.0, 1.4, 0.3)
 	fog_flash = 1.0
-	_mist_trail = 0.0
 	_fog_at(global_position + Vector3.UP * 0.5, 1.5)
 
 
@@ -2017,7 +2415,7 @@ func _fog_at(at: Vector3, size: float) -> void:
 func _tick_leap(delta: float) -> void:
 	_leap_t += delta / 0.42
 	_mist_trail -= delta
-	if _mist_trail <= 0.0:
+	if _mist_trail <= 0.0 and not _vaulting:
 		_mist_trail = 0.07
 		_fog_at(global_position + Vector3.UP * 0.7, 0.8)
 	var f := minf(_leap_t, 1.0)
@@ -2032,6 +2430,9 @@ func _tick_leap(delta: float) -> void:
 		_land_dip = 1.0
 		Sfx.play("land", -3.0, 0.8)
 		_noise(8.0)
+		if _vaulting:
+			_vault_landing()
+			return
 		_fog_at(global_position + Vector3.UP * 0.4, 1.9)
 		fog_flash = 1.0
 		var hit := m("leap_damage")
@@ -2134,6 +2535,8 @@ func _summon_revenants() -> void:
 
 func damage_multiplier() -> float:
 	var mult := PowerDefs.DAEMON_MULTIPLIER if has_power("daemon") else 1.0
+	if void_left > 0.0:
+		mult *= 2.0
 	if has_flag("rage"):
 		mult *= 1.0 + 0.6 * (1.0 - clampf(hp / max_hp(), 0.0, 1.0))
 	return mult
@@ -2174,6 +2577,8 @@ func _physics_process(delta: float) -> void:
 	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
 	if is_riding():
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
+	if spirit_left > 0.0:
+		speed *= SPIRIT_SPEED * (SPIRIT_SPEED if has_flag("swift_spirit") else 1.0)
 	if slowed_left > 0.0:
 		speed *= 0.6
 	if bleed_left > 0.0:
@@ -2220,6 +2625,9 @@ func _tick_islands(delta: float) -> void:
 	_gate_wait -= delta
 	if is_on_floor() and world.terrain.height(global_position.x, global_position.z) > 0.0:
 		_safe_spot = global_position
+	if global_position.y < World.FALL_DEATH and spirit_left > 0.0:
+		_come_back()
+		return
 	if global_position.y < World.FALL_DEATH:
 		hit_by = "the fall"
 		guard_left = 0.0
@@ -2392,7 +2800,7 @@ func attack_interval(d: Dictionary) -> float:
 
 func _handle_fire() -> void:
 	var d := weapon_def()
-	if d.is_empty() or not input_fire or _cooldown > 0.0 or _is_moved_by_mist() or frozen_left > 0.0:
+	if d.is_empty() or not input_fire or _cooldown > 0.0 or _is_moved_by_mist() or frozen_left > 0.0 or spirit_left > 0.0:
 		return
 	if WeaponDefs.uses_arrows(d) and arrows <= 0:
 		_bash("No arrows")
@@ -2445,6 +2853,12 @@ func _start_swing(d: Dictionary) -> void:
 	_swing = 0.0
 	_swing_side = not _swing_side
 	_swing_keys = WeaponAnim.keys_for(str(d.get("swing", "")), _swing_side)
+	if has_flag("bo_master") and d.get("swing", "") == "bo":
+		_bo_hits += 1
+		if _bo_hits % (2 if has_flag("hundred_hands") else 3) == 0:
+			_sweep_now = true
+			_swing_keys = "bo_spin"
+			_swing_time = maxf(_swing_time, 0.5)
 	_melee_pending = minf(_swing_time * SWING_HIT, 0.24)
 	_smear_left = 0.0
 
@@ -2539,7 +2953,9 @@ func _cast_bolt(d: Dictionary) -> void:
 
 
 func melee_stats(d: Dictionary) -> Dictionary:
-	var mult := m("melee_damage") * damage_multiplier()
+	var mult := m("melee_damage") * damage_multiplier() * _next_hit_mult
+	if has_flag("rooted") and stone_skin >= SKIN_STRONG:
+		mult *= 1.35
 	if is_riding():
 		mult *= m("riding_damage") * (2.0 if has_flag("couched") else 1.0)
 	if d.get("charge", false) and (is_riding() or Vector2(velocity.x, velocity.z).length() > WALK_SPEED * 0.8):
@@ -2561,8 +2977,14 @@ func _do_melee_hit() -> void:
 	if d.is_empty() or d["kind"] != WeaponDefs.Kind.MELEE:
 		return
 	var hits := world.melee_hit(self, d, melee_stats(d))
+	_next_hit_mult = 1.0
 	if d != BASH:
 		_show_smear(d)
+	if _sweep_now:
+		_sweep_now = false
+		_bo_sweep()
+	if stance == "wind" and hits > 0 and d != BASH:
+		_echo_left = ECHO_AFTER
 	if hits > 0:
 		_shake = maxf(_shake, 0.1 + float(d.get("knock", 1.0)) * 0.05)
 		Sfx.play("hammer" if d.has("stun") else "hit", -3.0 if not d.has("stun") else -1.0)
@@ -2572,6 +2994,11 @@ func _do_melee_hit() -> void:
 
 ## Rules applied to every zombie a melee swing connects with.
 func on_melee_connect(z: Zombie, d: Dictionary) -> void:
+	gain_ki(KI_PER_HIT)
+	if stance == "flame":
+		z.ignite(ZombieDefs.BURN_SECONDS)
+	if has_flag("void_walker") and STANCES.has(stance):
+		_void_hits[stance] = true
 	if has_flag("execution") and z.is_alive() and z.hp < z.max_hp * 0.3:
 		z.take_damage(9999.0, Vector3.FORWARD, 0.0, z.centre())
 		return
@@ -2595,6 +3022,11 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 
 ## A melee blow that lands on another player brings its rules along.
 func on_melee_rival(peer: int, d: Dictionary) -> void:
+	gain_ki(KI_PER_HIT)
+	if stance == "flame":
+		Net.status_peer(peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
+	if has_flag("void_walker") and STANCES.has(stance):
+		_void_hits[stance] = true
 	if d.get("burns", false):
 		Net.status_peer(peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 	if d.has("stun"):
@@ -2606,6 +3038,7 @@ func on_melee_rival(peer: int, d: Dictionary) -> void:
 
 ## Arrows and bolts likewise.
 func on_shot_rival(peer: int, fire_shot: bool, frost_shot: bool) -> void:
+	gain_ki(KI_PER_SHOT)
 	if fire_shot:
 		Net.status_peer(peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 	if frost_shot:
@@ -2615,6 +3048,7 @@ func on_shot_rival(peer: int, fire_shot: bool, frost_shot: bool) -> void:
 
 ## Rules for arrows and bolts that reach a zombie.
 func on_shot_connect(z: Zombie) -> void:
+	gain_ki(KI_PER_SHOT)
 	fire("shot", {"z": z})
 
 
@@ -2682,7 +3116,7 @@ func pose_weapon(d: Dictionary, t: float) -> void:
 		var pulse := 0.85 + sin(Time.get_ticks_msec() * 0.006) * 0.12
 		var charge := 1.0 - clampf(_reload * 2.5, 0.0, 1.0)
 		_vm_orb.scale = Vector3.ONE * (pulse + charge * 0.5)
-	if d.get("swing", "") == "claw":
+	if WeaponAnim.both_hands(d):
 		_pose_claws(d, pos, q, rest)
 		return
 	if d.get("returning", false) and _axe_out:

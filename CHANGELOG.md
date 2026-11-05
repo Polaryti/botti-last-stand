@@ -2,6 +2,21 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.18.0 (6 November 2026)
+### New
+- New class: the Adept, a master of stances, opened with a code. One button changes stance at any moment. Wind: 25% faster, and each blow strikes twice for less. Stone: 30% less damage, and blows throw enemies back. Flame: blows burn, and you take 15% more.
+- Adept specializations. Blade Dancer: changing stance sweeps all around you. Mirror Step: changing stance within 1 s of a hit undoes it and heals. Void Walker: a hit in each stance opens Void stance, 5 s invisible with double damage.
+- Every class now has its own look, with clothes, colours and gear of its own, so it can be told from any side:
+  Infantry has an iron hat and a round shield; Ranger a quiver and feathers; Heavy Infantry a closed helm with a plume and huge shoulder plates; Chivalry gilded armour, a crested helmet and a blue cape; Magician a beard and a starry hat; Revenant a shroud in place of legs and a crown of spikes; Monk a wide straw hat and prayer beads; Adept a crescent helmet and a sword on the back; Plague Doctor a beak with red glass eyes and a long coat; Artificer goggles and a boiler on the back.
+- New attack animations for characters seen from outside: thrust, overhead, sweep, throw and the Bo's spin, and new moves for the Monk's and Adept's abilities. Armed enemies use them too.
+- New first-person animations for the punch and the Bo.
+
+### Changed
+- The Monk is now a Ki master. Hits fill the Ki bar, and Ki pays for the ability button. Before choosing a path the ability is Ki Blast.
+- Monk specializations are all new. Bo Master: every third hit sweeps all around, and Pole Vault leaps 9 m over enemies. Spirit Walker: Leave Your Body, for 4 s of walking unseen while the body draws enemies, then come back healed for what it took. Iron Mountain: stand still to grow Stone Skin, up to 60% less damage, and spend it on Mountain Stomp.
+- The Bo Staff is only for the Monk, and is no longer found on the map.
+- Bare hands are no longer a weapon. A Monk with no weapon can punch, but it is never listed, dropped or offered.
+
 ## 0.17.0 (5 November 2026)
 ### Changed
 - All new icons, painted in colour. Each class has its own crest with its own outline, and each specialization its own emblem. Purchases, pets and weapons have their own pictures, and the symbols used by abilities were redrawn.

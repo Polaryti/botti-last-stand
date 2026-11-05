@@ -6,8 +6,8 @@ extends Target
 
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
-const HEALTH := {"rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
-const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat"]
+const HEALTH := {"rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
+const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body"]
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
 const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
 const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 5.5, "fox": 7.5, "rat": 7.5}
@@ -61,12 +61,13 @@ func _init(owner_world: World, ally_kind: String) -> void:
 	if BEASTS.has(ally_kind):
 		_build_beast(_visual_root())
 		return
-	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever"}.get(ally_kind, "skeleton")
+	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
 		_scenes[model] = load("res://assets/characters/%s.glb" % model)
 	_visual = (_scenes[model] as PackedScene).instantiate()
 	add_child(_visual)
 	_anim = _visual.find_children("*", "AnimationPlayer", true, false)[0]
+	BodyAnim.install(_anim, _visual.find_children("*", "Skeleton3D", true, false)[0])
 	for n: String in ["Idle", "Running_A"]:
 		if _anim.has_animation(n):
 			_anim.get_animation(n).loop_mode = Animation.LOOP_LINEAR
@@ -77,9 +78,11 @@ func _init(owner_world: World, ally_kind: String) -> void:
 		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		p.extra_cull_margin = 1.0
 		top = maxf(top, p.get_aabb().end.y)
-		if ally_kind != "skeleton":
+		if ally_kind != "skeleton" and ally_kind != "body":
 			p.material_override = _ghost()
 	_visual.scale = Vector3.ONE * height / float(Zombie.BODY_TOP.get(model, maxf(top, 0.5)))
+	if ally_kind == "body":
+		ClassDefs.dress(_visual, "monk")
 
 
 ## Takes a resting body back into the fight.
@@ -98,7 +101,7 @@ func activate(seconds: float) -> void:
 	visible = true
 	process_mode = Node.PROCESS_MODE_INHERIT
 	_current = ""
-	_play("Idle")
+	_play("Meditate" if kind == "body" else "Idle")
 
 
 func deactivate() -> void:
@@ -218,6 +221,8 @@ func _play(n: String, speed := 1.0) -> void:
 
 
 func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
+	if kind == "body" and world.player and world.player.has_flag("empty_body"):
+		amount *= 0.5
 	if dead:
 		return
 	if remote_owner != 0:
@@ -230,8 +235,14 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 	if me and me.m("cover") > 0.0 and global_position.distance_to(me.global_position) <= me.m("cover_radius"):
 		amount *= 1.0 - me.m("cover")
 	hp -= amount
+	if kind == "body" and world.player:
+		world.player.body_hit(amount)
 	if hp <= 0.0:
 		_die()
+
+
+func set_dying(seconds: float) -> void:
+	_dying = seconds
 
 
 func _die() -> void:
@@ -248,6 +259,8 @@ func _die() -> void:
 		world.blast(position + Vector3.UP, 3.0, 25.0)
 	elif kind == "decoy":
 		world.player.decoy_burst(position + Vector3.UP)
+	elif kind == "body":
+		world.player.body_lost()
 
 
 func _physics_process(delta: float) -> void:
@@ -255,7 +268,8 @@ func _physics_process(delta: float) -> void:
 		var was := global_position
 		global_position = global_position.lerp(net_target, minf(1.0, delta * 9.0))
 		rotation.y = lerp_angle(rotation.y, net_yaw, minf(1.0, delta * 9.0))
-		_play("Running_A" if was.distance_squared_to(net_target) > 0.05 else "Idle")
+		if kind != "body":
+			_play("Running_A" if was.distance_squared_to(net_target) > 0.05 else "Idle")
 		_move_wolf(delta, was.distance_squared_to(net_target) > 0.05)
 		return
 	guarded = maxf(0.0, guarded - delta)
@@ -275,14 +289,14 @@ func _physics_process(delta: float) -> void:
 		_think = 0.25
 		_foe = world.nearest_zombie(global_position + Vector3.UP, 16.0, true)
 		_rival = world.nearest_rival(global_position + Vector3.UP, 16.0)
-		if kind == "decoy":
+		if kind == "decoy" or kind == "body":
 			_foe = null
 			_rival = null
 		elif _rival and _foe and _foe.position.distance_squared_to(position) < _rival.global_position.distance_squared_to(position):
 			_rival = null
 	var dir := Vector3.ZERO
 	var speed: float = BEAST_SPEED.get(kind, 5.0)
-	if kind == "decoy":
+	if kind == "decoy" or kind == "body":
 		velocity = Vector3.ZERO
 		return
 	if kind == "mirror":

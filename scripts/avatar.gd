@@ -4,7 +4,7 @@ extends Target
 ## body that zombies can hunt and that shots can hit, and anything that hurts them is sent over.
 
 const LAYER_AVATAR := 64
-const MODELS := {"monk": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
+const MODELS := {"monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
 
 var world: World
 var peer := 0
@@ -59,9 +59,6 @@ func _init(owner_world: World, peer_id: int, info: Dictionary) -> void:
 	add_child(shape)
 	_build_body(str(MODELS.get(str(info.get("class", "infantry")), "clever")))
 	ClassDefs.dress(_visual, str(info.get("class", "")))
-	if str(info.get("class", "")) == "revenant":
-		for mi in _visual.find_children("*", "MeshInstance3D", true, false):
-			(mi as MeshInstance3D).material_override = Ally._ghost()
 	add_child(World.make_blob_shadow(1.0))
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -85,6 +82,7 @@ func _build_body(model: String) -> void:
 		if _anim.has_animation(n):
 			_anim.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 	_skeleton = _visual.find_children("*", "Skeleton3D", true, false)[0]
+	BodyAnim.install(_anim, _skeleton)
 	var top := 0.0
 	for mi in _visual.find_children("*", "MeshInstance3D", true, false):
 		var part := mi as MeshInstance3D
@@ -170,34 +168,23 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 		if not dead:
 			_attack_left = 0.5
 			_current = ""
-			_play(_attack_anim(weapon), 1.6)
+			_play(BodyAnim.attack_for(weapon, attacks), 1.6)
 			Sfx.play_at("swing", global_position, world.player.global_position if world.player else global_position, -4.0)
 	if weapon != _weapon:
 		_weapon = weapon
-		_hand.mesh = WeaponDefs.mesh(weapon) if weapon != "" else null
+		_hand.mesh = WeaponDefs.mesh(weapon) if weapon != "" and weapon != "fists" else null
 		if weapon != "":
 			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * (0.8 if WeaponDefs.hand_rotation(weapon) != Vector3.ZERO else 1.6) / _fit
 			_hand.rotation = WeaponDefs.hand_rotation(weapon)
 
 
-static func _attack_anim(weapon: String) -> String:
-	if weapon == "":
-		return "1H_Melee_Attack_Chop"
-	var d: Dictionary = WeaponDefs.ALL[weapon]
-	if d["kind"] == WeaponDefs.Kind.SPELL:
-		return "Spellcast_Shoot"
-	if d["kind"] == WeaponDefs.Kind.RANGED:
-		return "Unarmed_Melee_Attack_Punch_A" if d.has("shot") or d.get("returning", false) else "2H_Ranged_Shoot"
-	return "Unarmed_Melee_Attack_Punch_A" if d.get("swing", "") in ["thrust", "claw"] else "1H_Melee_Attack_Chop"
-
-
 ## They used an ability: everyone can see them raise a hand.
-func play_cast() -> void:
+func play_cast(anim_name := "") -> void:
 	if dead:
 		return
 	_attack_left = 0.6
 	_current = ""
-	_play("Spellcast_Shoot", 1.4)
+	_play(anim_name if anim_name != "" else "Spellcast_Shoot", 1.4)
 
 
 ## They go down where they stood, and lie there until they come back.

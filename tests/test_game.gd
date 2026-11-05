@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_18()
 		await test_version_16()
 		await test_version_15()
 		await test_version_14()
@@ -79,6 +80,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_18()
 	await test_version_16()
 	await test_version_15()
 	await test_version_14()
@@ -686,6 +688,270 @@ func test_fort() -> void:
 	await start_clean()
 
 
+func _path(class_id: String, spec: int) -> void:
+	Game.player_class = class_id
+	await start_clean()
+	pl.points = 10
+	if spec >= 0:
+		for i in Player.CORE_STEPS:
+			pl.choose_ability(i, 0)
+		pl.choose_ability(Player.CORE_STEPS, spec)
+
+
+func test_version_18() -> void:
+	var unlocked_before := Game.unlocked.duplicate()
+	var redeemed_before := Game.redeemed.duplicate()
+	Game.unlocked.erase("adept")
+	Game.redeemed.erase(_code_of("adept"))
+	ok(not Game.owns_class("adept"), "the Adept is locked")
+	ok(ClassDefs.price("adept") == 0, "and cannot be bought")
+	ok(Game.redeem_key(_code_of("adept"))["class"] == "adept" and Game.owns_class("adept"), "its code opens it")
+	Game.unlocked["monk"] = true
+	# The Bo and the hands are nobody's item.
+	ok(WeaponDefs.ALL["bo"].get("hidden", false) and WeaponDefs.ALL["fists"].get("hidden", false), "neither the Bo nor empty hands are offered anywhere")
+	Game.player_class = "ranger"
+	await start_clean()
+	ok(not pl.can_use("bo"), "only a Monk can use the Bo")
+	await _path("monk", -1)
+	ok(pl.weapon_id() == "fists" and WeaponDefs.ALL["fists"]["name"] == "", "a Monk with no weapon punches, and it has no name")
+	ok(pl.has_empty_slot(), "and its hands count as free")
+	ok(pl.mana == 0.0 and pl.max_mana() == 100.0, "Ki starts empty")
+	clear_pickups()
+	var count_before: int = w.count_pickups(Pickup.Kind.WEAPON)
+	w.drop_weapon(pl.global_position, "sword")
+	await frames(3)
+	pl.nearby_weapon = w.pickups[w.pickups.size() - 1]
+	pl.take_nearby_weapon()
+	await frames(2)
+	ok(pl.weapon_id() == "sword" and pl.slots[1] == null, "taking a sword fills the hand")
+	ok(w.count_pickups(Pickup.Kind.WEAPON) == count_before, "and no fists are left on the ground")
+	pl.give_weapon("dagger")
+	pl.give_weapon("mace")
+	ok(not pl.slots.has("fists"), "the fists are never a slot in the way")
+	await _path("monk", -1)
+	var dummy := spawn("normal", front(1.6), true)
+	var hp0: float = dummy.hp
+	pl._do_melee_hit()
+	ok(dummy.hp < hp0, "the punch hits")
+	ok(is_equal_approx(pl.mana, Player.KI_PER_HIT), "and a hit gives Ki (%.1f)" % pl.mana)
+	ok(pl.has_art() and pl.art_def()["name"] == "Ki Blast", "before a path, the ability is Ki Blast")
+	pl.use_art()
+	ok(pl._cast_kind == "", "not enough Ki, nothing happens")
+	pl.mana = 40.0
+	var hp1: float = dummy.hp
+	pl.hp = 50.0
+	pl.use_art()
+	await seconds(0.3)
+	ok(dummy.hp < hp1 and pl.hp >= 60.0 and pl.mana == 10.0, "Ki Blast spends 30 Ki, hits and heals")
+	dummy.release()
+	# Bo Master.
+	await _path("monk", 0)
+	ok(pl.weapon_id() == "bo" and not pl.can_use("sword"), "Bo Master holds the Bo and only the Bo")
+	var ahead := spawn("normal", front(1.8), true)
+	var behind := spawn("normal", front(-2.0), true)
+	var behind0: float = behind.hp
+	for i in 2:
+		pl._start_swing(pl.weapon_def())
+		pl._do_melee_hit()
+	ok(behind.hp == behind0, "two blows leave what is behind you alone")
+	pl._start_swing(pl.weapon_def())
+	ok(pl._swing_keys == "bo_spin", "the third blow is the spin")
+	pl._do_melee_hit()
+	ok(behind.hp < behind0, "and it sweeps all around")
+	ahead.release()
+	behind.release()
+	var start: Vector3 = pl.global_position
+	place(Vector3(0, 0, 12))
+	await frames(2)
+	start = pl.global_position
+	var landed_on := spawn("normal", front(9.0), true)
+	var on_hp: float = landed_on.hp
+	pl.mana = 40.0
+	pl.use_art()
+	ok(pl.mana == 5.0, "Pole Vault costs 35 Ki")
+	await seconds(0.9)
+	ok(pl.global_position.distance_to(start) > 7.0, "Pole Vault carries you (%.1f m)" % pl.global_position.distance_to(start))
+	ok(landed_on.hp < on_hp, "and you land in a sweep")
+	landed_on.release()
+	# Spirit Walker.
+	await _path("monk", 1)
+	ok(pl.has_art() and pl.art_def()["name"] == "Leave Your Body", "Spirit Walker has Leave Your Body")
+	place(Vector3(0, 0, 12))
+	await frames(2)
+	pl.mana = 60.0
+	var regen_from: float = pl.mana
+	await seconds(0.5)
+	ok(pl.mana > regen_from, "its Ki fills by itself")
+	pl.mana = 60.0
+	var home: Vector3 = pl.global_position
+	pl.hp = 40.0
+	pl.use_art()
+	await seconds(0.35)
+	ok(pl.spirit_left > 0.0 and pl.is_unseen(), "out of the body, nothing sees you")
+	ok(w.count_allies("body") == 1, "and the body stays behind")
+	pl.hurt(50.0, pl.global_position)
+	ok(pl.hp == 40.0, "the spirit cannot be hurt")
+	var shots: int = pl.attack_count
+	pl.input_fire = true
+	pl._handle_fire()
+	pl.input_fire = false
+	ok(pl.attack_count == shots, "and cannot strike")
+	pl.global_position += Vector3(6, 0, 0)
+	var body: Ally = null
+	for a: Ally in w.allies:
+		if a.kind == "body":
+			body = a
+	body.hurt(30.0, body.global_position)
+	await seconds(4.5)
+	ok(pl.spirit_left <= 0.0 and pl.global_position.distance_to(home) < 1.0, "when it is over you are back in the body")
+	ok(pl.hp >= 79.0, "and healed for what the body took (%.0f)" % pl.hp)
+	ok(w.count_allies("body") == 0, "and the body is gone")
+	# Iron Mountain.
+	await _path("monk", 2)
+	ok(pl.art_def()["name"] == "Mountain Stomp", "Iron Mountain has Mountain Stomp")
+	place(Vector3(0, 0, 12))
+	await frames(2)
+	pl.velocity = Vector3.ZERO
+	pl.input_move = Vector2.ZERO
+	await seconds(3.0)
+	var skin: float = pl.stone_skin
+	ok(skin > 0.15 and skin < 0.35, "standing still grows Stone Skin (%.2f)" % skin)
+	var hp2: float = pl.hp
+	pl.guard_left = 0.0
+	pl.mods["dodge"] = 0.0
+	pl.hurt(20.0, pl.global_position + Vector3.FORWARD)
+	ok(absf((hp2 - pl.hp) - 20.0 * (1.0 - pl.stone_skin)) < 2.0, "and takes the damage off (%.1f)" % (hp2 - pl.hp))
+	await seconds(4.5)
+	ok(pl.stone_skin >= 0.59 and pl.stone_skin <= 0.6, "it stops at 60%% (%.2f)" % pl.stone_skin)
+	var near_z := spawn("normal", front(6.0), true)
+	var near0: float = near_z.hp
+	pl.mana = 45.0
+	pl.use_art()
+	await seconds(0.45)
+	ok(pl.stone_skin < 0.1 and near_z.hp < near0 and pl.mana == 5.0, "Mountain Stomp spends the skin and reaches further with it")
+	near_z.release()
+	var low := spawn("normal", front(6.0), true)
+	var low0: float = low.hp
+	pl.stone_skin = 0.0
+	pl.art_cd_left = 0.0
+	pl.mana = 45.0
+	pl.use_art()
+	await seconds(0.45)
+	ok(low.hp == low0, "with no skin it does not reach as far")
+	low.release()
+	pl.input_move = Vector2(0, -1)
+	pl.stone_skin = 0.5
+	await seconds(0.6)
+	ok(pl.stone_skin < 0.5, "walking wears it away")
+	pl.input_move = Vector2.ZERO
+	# The Adept.
+	await _path("adept", -1)
+	ok(pl.weapon_id() == "sword" and not pl.can_use("bow") and not pl.can_use("bo"), "the Adept starts with a sword and no ranged weapons")
+	ok(pl.has_art() and pl.stance == "wind" and pl.art_label() == "Wind stance", "and is in Wind stance from the start, with a button to change it")
+	var speed_wind: float = pl.m("speed")
+	var taken_wind: float = pl.m("damage_taken")
+	pl.use_art()
+	await frames(3)
+	ok(pl.stance == "stone" and pl.m("speed") < speed_wind and pl.m("damage_taken") < taken_wind, "Stone: slower than Wind, and takes 30% less")
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await frames(3)
+	ok(pl.stance == "flame" and is_equal_approx(pl.m("damage_taken"), 1.15), "Flame: takes 15% more")
+	var burning := spawn("normal", front(1.6), true)
+	pl._do_melee_hit()
+	ok(burning.burn_time > 0.0, "and its blows burn")
+	burning.release()
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await frames(3)
+	ok(pl.stance == "wind" and is_equal_approx(pl.m("damage_taken"), 1.0) and is_equal_approx(pl.m("speed"), speed_wind), "and back to Wind, with nothing left over")
+	var twice := spawn("normal", front(1.6), true)
+	var twice0: float = twice.hp
+	pl._do_melee_hit()
+	var once: float = twice0 - twice.hp
+	await seconds(0.3)
+	ok(twice0 - twice.hp > once * 1.3, "in Wind each blow strikes twice (%.0f then %.0f)" % [once, twice0 - twice.hp])
+	twice.release()
+	# Blade Dancer.
+	await _path("adept", 0)
+	var round_z := spawn("normal", front(-2.5), true)
+	var round0: float = round_z.hp
+	pl.use_art()
+	await frames(3)
+	ok(round_z.hp < round0, "Blade Dancer: changing stance sweeps all around")
+	round_z.release()
+	# Mirror Step.
+	await _path("adept", 1)
+	pl.hp = 80.0
+	pl.guard_left = 0.0
+	pl.hurt(20.0, pl.global_position + Vector3.FORWARD)
+	var after_hit: float = pl.hp
+	ok(after_hit < 80.0, "Mirror Step: the hit lands")
+	pl.use_art()
+	await frames(3)
+	ok(pl.hp >= minf(pl.max_hp(), 89.0), "and changing stance straight after undoes it and heals (%.0f)" % pl.hp)
+	var hp3: float = pl.hp
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await frames(3)
+	ok(pl.hp == hp3, "with no hit to undo it does nothing")
+	pl.guard_left = 0.0
+	pl.hurt(10.0, pl.global_position + Vector3.FORWARD)
+	var hp4: float = pl.hp
+	await seconds(1.2)
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await frames(3)
+	ok(pl.hp < hp4 + 1.0, "and after a second it is too late")
+	# Void Walker.
+	await _path("adept", 2)
+	var target_z := spawn("normal", front(1.6), true)
+	target_z.max_hp = 100000.0
+	target_z.hp = 100000.0
+	ok(not pl._void_is_ready(), "Void Walker: Void is shut")
+	for i in 3:
+		pl._do_melee_hit()
+		await seconds(0.25)
+		if i < 2:
+			pl.art_cd_left = 0.0
+			pl.use_art()
+			await frames(3)
+	ok(pl._void_is_ready() and pl.art_label() == "Void is open", "a hit in each stance opens it")
+	var plain_damage: float = pl.melee_stats(pl.weapon_def())["damage"]
+	pl.art_cd_left = 0.0
+	pl.use_art()
+	await frames(3)
+	ok(pl.stance == "void" and pl.is_unseen(), "the next change enters Void: unseen")
+	var void_dmg: float = pl.melee_stats(pl.weapon_def())["damage"]
+	ok(void_dmg > plain_damage * 1.9, "and double damage (%.0f, was %.0f)" % [void_dmg, plain_damage])
+	await seconds(5.5)
+	ok(pl.stance == "wind" and not pl.is_unseen(), "after 5 s it ends in Wind")
+	target_z.release()
+	# Every class wears something of its own.
+	for class_id: String in ClassDefs.ALL:
+		var dressed: Node3D = (load("res://assets/characters/%s.glb" % Avatar.MODELS[class_id]) as PackedScene).instantiate()
+		add_child(dressed)
+		ClassDefs.dress(dressed, class_id)
+		ok(dressed.find_children("*", "BoneAttachment3D", true, false).size() >= 2 or class_id == "ranger", "%s has its own gear" % class_id)
+		dressed.queue_free()
+	# Characters have the made attacks, and they exist on every model that can carry a weapon.
+	await _path("infantry", -1)
+	var body_view := Avatar.new(w, 991, {"name": "", "class": "adept", "team": 0})
+	w.add_child(body_view)
+	for anim_name: String in BodyAnim.POSES:
+		ok(body_view._anim.has_animation(anim_name), "a character can play %s" % anim_name)
+	ok(BodyAnim.attack_for("spear") == "Thrust" and BodyAnim.attack_for("mace") == "Overhead" and BodyAnim.attack_for("javelins") == "Throw", "weapons have the attack that suits them")
+	ok(BodyAnim.attack_for("bo", 3) == "BoSpin" and BodyAnim.attack_for("bo", 1) == "Sweep", "and the Bo spins every third blow")
+	body_view.queue_free()
+	for anim_name: String in ["Thrust", "Overhead", "Sweep"]:
+		ok(Net.ANIMS.has(anim_name), "%s reaches other phones" % anim_name)
+	Game.unlocked = unlocked_before
+	Game.redeemed = redeemed_before
+	Game.player_class = "infantry"
+	Game.save_settings()
+	await start_clean()
+
+
 func test_version_16() -> void:
 	for id: String in ["monk", "plague_doctor"]:
 		ok(not Game.owns_class(id) or Game.unlocked.has(id), "%s is locked until a code opens it" % id)
@@ -699,28 +965,6 @@ func test_version_16() -> void:
 	Game.unlocked.erase("plague_doctor")
 	Game.redeemed.erase(_code_of("plague_doctor"))
 	ok(Game.redeem_key(_code_of("plague_doctor"))["class"] == "plague_doctor", "and the other code the Plague Doctor")
-	# The Monk.
-	Game.player_class = "monk"
-	await start_clean()
-	ok(pl.weapon_id() == "fists", "the Monk starts with bare hands")
-	ok(pl.can_use("sword") and pl.can_use("bow"), "and can use any weapon")
-	pl.points = 10
-	for i in Player.CORE_STEPS:
-		pl.choose_ability(i, 0)
-	pl.choose_ability(Player.CORE_STEPS, 0)
-	ok(pl.weapon_id() == "bo", "Way of the Staff puts a bo in your hands")
-	ok(not pl.can_use("sword") and pl.can_use("bo"), "and nothing else")
-	Game.player_class = "monk"
-	await start_clean()
-	pl.points = 10
-	for i in Player.CORE_STEPS:
-		pl.choose_ability(i, 0)
-	pl.choose_ability(Player.CORE_STEPS, 1)
-	ok(pl.has_art(), "Way of the Spirit has its ability")
-	pl.hp = 40.0
-	pl.use_art()
-	await seconds(0.5)
-	ok(pl.guard_left > 0.0 and pl.hp >= 60.0, "Inner Peace heals, and nothing can touch you")
 	# The Plague Doctor.
 	Game.player_class = "plague_doctor"
 	await start_clean()

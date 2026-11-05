@@ -1843,7 +1843,7 @@ func spawn_ally(kind: String, at: Vector3, seconds: float) -> void:
 	for other in allies:
 		if other.remote_owner == 0:
 			mine += 1
-	if mine >= cap:
+	if mine >= cap and kind != "body":
 		return
 	var spare: Array = _spare_allies.get(kind, [])
 	var a: Ally
@@ -1907,6 +1907,15 @@ func remove_ally(a: Ally) -> void:
 
 
 ## Bodies are built when an ability is chosen, so summoning them later does not stutter.
+## Gone at once, with no falling down.
+func dismiss_ally(kind: String) -> void:
+	for a in allies:
+		if a.kind == kind and a.remote_owner == 0 and not a.dead:
+			a.dead = true
+			a.collision_layer = 0
+			a.set_dying(0.01)
+
+
 func prepare_allies(kind: String, count: int) -> void:
 	if not _spare_allies.has(kind):
 		_spare_allies[kind] = []

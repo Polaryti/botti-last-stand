@@ -8,6 +8,7 @@ signal tree_requested
 signal sandbox_requested
 
 const JOY_R := 88.0
+const KI_COLOUR := Color(1.0, 0.78, 0.28)
 const COL_BG := Color(0.05, 0.05, 0.07, 0.72)
 const COL_LINE := Color(1, 1, 1, 0.7)
 const COL_FIRE := Color(0.62, 0.13, 0.09, 0.8)
@@ -404,7 +405,7 @@ func _draw_status(s: Vector2) -> void:
 	var y := 66.0
 	if player.class_def().get("mana", false):
 		var mana_rect := Rect2(x, 53, 240, 16)
-		_bar(mana_rect, player.mana / maxf(player.max_mana(), 1.0), UiTheme.MIST)
+		_bar(mana_rect, player.mana / maxf(player.max_mana(), 1.0), KI_COLOUR if player.class_def().get("ki", false) else UiTheme.MIST)
 		_text("%d" % int(player.mana), Vector2(x + 9, 67), 14, Color.WHITE)
 		y = 84.0
 	y = maxf(y, 82.0)
@@ -422,6 +423,7 @@ func _draw_status(s: Vector2) -> void:
 			_centered("In the light", Vector2(s.x * 0.5, 102), 18, UiTheme.EMBER)
 	elif Game.mode == Game.Mode.SANDBOX:
 		_clock(s, "Sandbox")
+	_draw_way_of_fighting(s)
 	var ailments: Array[String] = []
 	if player.poison_left > 0.0:
 		ailments.append("Poisoned")
@@ -429,7 +431,7 @@ func _draw_status(s: Vector2) -> void:
 		ailments.append("Bleeding")
 	if not ailments.is_empty():
 		_centered(", ".join(ailments), Vector2(s.x * 0.5, 124), 18, UiTheme.EMBER)
-	if player.guard_left > 0.0 and player.guard_left < 100.0:
+	if player.guard_left > 0.0 and player.guard_left < 100.0 and player.spirit_left <= 0.0:
 		_centered("Invincible %d" % ceili(player.guard_left), Vector2(s.x * 0.5, s.y * 0.2), 24, UiTheme.EMBER)
 	if player.is_riding():
 		_text("%s %d" % [player.mount_name(), ceil(player.riding_left)], Vector2(_pad, y + 18), 20, UiTheme.EMBER)
@@ -595,6 +597,18 @@ func _sensor_arrow(centre: Vector2, to: Vector3, col: Color) -> void:
 	draw_colored_polygon(pts, Color(col, clampf(1.3 - dist / PowerDefs.SENSOR_RANGE, 0.35, 1.0)))
 
 
+## What the Monk's path and the Adept's stance are doing right now.
+func _draw_way_of_fighting(s: Vector2) -> void:
+	var y := 150.0
+	if player.spirit_left > 0.0:
+		_centered("Your spirit walks: %d s" % ceili(player.spirit_left), Vector2(s.x * 0.5, y), 24, Color(0.7, 0.95, 1.0))
+		draw_rect(Rect2(Vector2.ZERO, s), Color(0.5, 0.9, 1.0, 0.12))
+	elif player.void_left > 0.0:
+		_centered("Void stance: %d s" % ceili(player.void_left), Vector2(s.x * 0.5, y), 24, Player.STANCE_COLOURS["void"].lightened(0.3))
+	elif player.stone_skin > 0.0:
+		_centered("Stone Skin %d%%" % roundi(player.stone_skin * 100.0), Vector2(s.x * 0.5, y), 22, Player.STANCE_COLOURS["stone"])
+
+
 func _draw_weapon(s: Vector2) -> void:
 	var d := player.weapon_def()
 	if d.is_empty():
@@ -606,6 +620,8 @@ func _draw_weapon(s: Vector2) -> void:
 		_text("%d mana" % int(player.mana), Vector2(x, y), 22, UiTheme.MIST)
 	elif player.has_burst():
 		_text("%d mist" % int(player.mana), Vector2(x, y), 22, UiTheme.MIST)
+	elif player.class_def().get("ki", false):
+		_text("%d Ki" % int(player.mana), Vector2(x, y), 22, KI_COLOUR)
 	elif WeaponDefs.uses_arrows(d):
 		_text("%d arrows" % player.arrows, Vector2(x, y), 22, UiTheme.BONE if player.arrows > 0 else UiTheme.BLOOD.lightened(0.25))
 	elif player.arrows > 0:
@@ -659,6 +675,8 @@ func _draw_controls() -> void:
 			_centered(player.art_label(), pos + Vector2(0, -r - 14), 18, UiTheme.BONE)
 		if id == "burst" or id == "art":
 			var left: float = player.burst_cd_left if id == "burst" else player.art_cd_left
+			if id == "art" and player.spirit_left > 0.0:
+				left = 0.0
 			var total: float = player.m("burst_cd") if id == "burst" else maxf(float(player.art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
 			if left > 0.0:
 				draw_arc(pos, r - 5.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(left / total, 0.0, 1.0), 28, Color(0, 0, 0, 0.7), 9.0)

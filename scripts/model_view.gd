@@ -73,8 +73,6 @@ func show_class(id: String) -> void:
 		var part := mi as MeshInstance3D
 		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		top = maxf(top, part.get_aabb().end.y)
-		if id == "revenant":
-			part.material_override = Ally._ghost()
 	body.scale = Vector3.ONE * 1.8 / float(Zombie.BODY_TOP.get(model, maxf(top, 0.5)))
 	ClassDefs.dress(body, id)
 	var players := body.find_children("*", "AnimationPlayer", true, false)

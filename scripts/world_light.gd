@@ -19,7 +19,11 @@ const ARTS := {
 	"guardian": {"name": "Shield Dome", "cost": 0.0, "cast": 0.15, "cd": 24.0, "icon": "shield_rect"},
 	"pyromaniac": {"name": "Incendiary Bomb", "cost": 0.0, "cast": 0.25, "cd": 7.0, "icon": "bomb"},
 	"inventor": {"name": "Invention", "cost": 0.0, "cast": 0.3, "cd": 6.0, "icon": "gear"},
-	"spirit": {"name": "Inner Peace", "cost": 0.0, "cast": 0.2, "cd": 24.0, "icon": "sun"},
+	"ki_blast": {"name": "Ki Blast", "cost": 30.0, "cast": 0.15, "cd": 5.0, "icon": "ki", "anim": "Stance"},
+	"bo_master": {"name": "Pole Vault", "cost": 35.0, "cast": 0.1, "cd": 4.0, "icon": "leap", "anim": "Vault"},
+	"spirit_walker": {"name": "Leave Your Body", "cost": 50.0, "cast": 0.2, "cd": 12.0, "icon": "body_out", "anim": "Stance"},
+	"iron_mountain": {"name": "Mountain Stomp", "cost": 40.0, "cast": 0.3, "cd": 6.0, "icon": "wave", "anim": "Stomp"},
+	"stance": {"name": "Change Stance", "cost": 0.0, "cast": 0.0, "cd": 0.8, "icon": "wind", "anim": "Stance"},
 	"apothecary": {"name": "Healing Tonic", "cost": 0.0, "cast": 0.3, "cd": 14.0, "icon": "potion"},
 	"illusionist": {"name": "Mirror Swap", "cost": 0.0, "cast": 0.1, "cd": 8.0, "icon": "mirror"},
 }

@@ -247,6 +247,7 @@ func _build_visual() -> void:
 			if _anim.has_animation(n):
 				_anim.get_animation(n).loop_mode = Animation.LOOP_LINEAR
 		_skeleton = _visual.find_children("*", "Skeleton3D", true, false)[0]
+		BodyAnim.install(_anim, _skeleton)
 		for mi in _visual.find_children("*", "MeshInstance3D", true, false):
 			var part := mi as MeshInstance3D
 			_parts.append(part)
@@ -1270,7 +1271,7 @@ func _fort_strike(gate: int, at: Vector3) -> void:
 	_attack_cd = _attack_interval()
 	_attack_left = ATTACK_TIME
 	_current_anim = ""
-	_play("1H_Melee_Attack_Chop" if weapon_id != "" or def.get("claws", false) else "Unarmed_Melee_Attack_Punch_A", 1.2, 0.1)
+	_play(BodyAnim.mob_attack(weapon_id, def.get("claws", false)), 1.2, 0.1)
 	var dmg := maxf(_melee_damage(), 8.0)
 	if gate >= 0:
 		world.fort.hit_gate(world.fort.gates[gate], dmg * Fort.WOOD_TOUGHNESS, position)
@@ -1826,10 +1827,7 @@ func _combat(target: Target, dist: float, delta: float) -> void:
 		_attack_left = ATTACK_TIME
 		_attack_hit_pending = true
 		_current_anim = ""
-		if weapon_id != "" or def.get("claws", false):
-			_play("1H_Melee_Attack_Chop", 1.6, 0.1)
-		else:
-			_play("Unarmed_Melee_Attack_Punch_A", 1.2, 0.1)
+		_play(BodyAnim.mob_attack(weapon_id, def.get("claws", false)), 1.4, 0.1)
 		world.sfx_at("attack", position, -8.0)
 
 

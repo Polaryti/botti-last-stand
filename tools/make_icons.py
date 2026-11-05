@@ -334,7 +334,7 @@ CRESTS = [crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magic
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
-    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5d6680", "#1e2230")}
+    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -370,9 +370,6 @@ SPECS = {
     "bo_master": ("monk", lambda: x2(bo, 0.56)),
     "spirit_walker": ("monk", lambda: at(50, 50, 0.84, body_out())),
     "iron_mountain": ("monk", lambda: at(50, 50, 0.84, mountain())),
-    "way_staff": ("monk", lambda: x2(bo, 0.56)),
-    "spirit": ("monk", lambda: at(50, 50, 0.84, body_out())),
-    "iron_fist": ("monk", lambda: at(50, 50, 0.84, mountain())),
     "blade_dancer": ("adept", lambda: at(50, 50, 0.72, spiral()) + at(50, 50, 0.6, turn(35, sword()))),
     "mirror_step": ("adept", lambda: at(32, 50, 0.46, boot()) + at(68, 50, 0.46, f'<g transform="translate(100 0) scale(-1 1)">{boot()}</g>') + at(50, 22, 0.28, swap())),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),
