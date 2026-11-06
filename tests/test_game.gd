@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_19_1()
 		await test_version_19()
 		await test_version_18()
 		await test_version_16()
@@ -81,6 +82,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_19_1()
 	await test_version_19()
 	await test_version_18()
 	await test_version_16()
@@ -954,6 +956,161 @@ func test_version_18() -> void:
 	await start_clean()
 
 
+func test_version_19_1() -> void:
+	# Dropping a weapon.
+	Game.player_class = "infantry"
+	await start_clean()
+	ok(pl.slots[1] == null and not pl.can_drop_weapon(), "you can't drop your only weapon")
+	pl.give_weapon("mace")
+	var held: String = pl.weapon_id()
+	var other: String = str(pl.slots[1 - pl.current])
+	ok(pl.can_drop_weapon(), "with two, you can drop one")
+	var dropped_before: int = w.count_pickups(Pickup.Kind.WEAPON)
+	pl.drop_current_weapon()
+	await frames(2)
+	ok(w.count_pickups(Pickup.Kind.WEAPON) == dropped_before + 1 and not pl.carries(held) and pl.weapon_id() == other, "it lands on the ground and you hold the other")
+	# The Monk: one weapon, and the hands come back.
+	Game.unlocked["monk"] = true
+	Game.player_class = "monk"
+	await start_clean()
+	ok(not pl.can_drop_weapon(), "a Monk can't drop its hands")
+	pl.give_weapon("sword")
+	pl.give_weapon("mace")
+	ok(pl.weapon_id() == "mace" and pl.slots[1] == null, "a Monk carries one weapon")
+	ok(pl.can_drop_weapon(), "and can drop it")
+	pl.drop_current_weapon()
+	ok(pl.weapon_id() == "fists", "and is back to punching")
+	pl.points = 10
+	for i in Player.CORE_STEPS:
+		pl.choose_ability(i, 0)
+	pl.choose_ability(Player.CORE_STEPS, 0)
+	ok(pl.weapon_id() == "bo" and not pl.can_drop_weapon(), "the Bo can't be dropped")
+	# Who can be had, and how.
+	ok(ClassDefs.for_sale().has("monk") and ClassDefs.price("monk") > ClassDefs.price("artificer"), "the Monk is in the Store, above the Artificer")
+	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and not ClassDefs.for_sale().has("adept"), "and nothing that is earned")
+	var saved_mode := Game.mode
+	var saved_unlocks := Game.unlocked.duplicate()
+	var saved_poison := Game.poison_dealt
+	var saved_wins := Game.mists_wins
+	var saved_map := Game.night_map
+	Game.mode = Game.Mode.NIGHT
+	Game.unlocked.erase("plague_doctor")
+	Game.unlocked.erase("revenant")
+	Game.poison_dealt = 0.0
+	Game.mists_wins = 0
+	ok(Game.earn_text("plague_doctor").contains("poison") and Game.earn_text("revenant").contains("The Mists"), "the screens say how to earn them")
+	Game.note_poison(float(Game.POISON_FOR_PLAGUE) - 1.0)
+	ok(not Game.owns_class("plague_doctor"), "not quite enough poison")
+	Game.note_poison(2.0)
+	ok(Game.owns_class("plague_doctor"), "enough poison opens the Plague Doctor")
+	Game.night_map = "village"
+	Game.note_mists_win()
+	ok(Game.mists_wins == 0, "a dawn elsewhere doesn't count")
+	Game.night_map = "mists"
+	for i in 4:
+		Game.note_mists_win()
+	ok(not Game.owns_class("revenant"), "four dawns in the Mists are not enough")
+	Game.note_mists_win()
+	ok(Game.owns_class("revenant"), "five open the Revenant")
+	Game.fresh_unlocks.clear()
+	Game.unlocked = saved_unlocks
+	Game.poison_dealt = saved_poison
+	Game.mists_wins = saved_wins
+	Game.night_map = saved_map
+	Game.mode = saved_mode
+	# A blowgun dart counts as poison.
+	Game.mode = Game.Mode.NIGHT
+	Game.player_class = "ranger"
+	await start_clean()
+	Game.unlocked.erase("plague_doctor")
+	var poison_before := Game.poison_dealt
+	var dummy := spawn("normal", front(5.0), true)
+	pl.give_weapon("blowgun")
+	pl.arrows = 10
+	pl._cooldown = 0.0
+	pl.input_fire = true
+	await seconds(0.6)
+	pl.input_fire = false
+	ok(Game.poison_dealt > poison_before, "a dart counts as poison dealt (%.0f)" % (Game.poison_dealt - poison_before))
+	dummy.release()
+	Game.poison_dealt = poison_before
+	Game.unlocked = saved_unlocks
+	Game.mode = saved_mode
+	# Text fits, and lists drag.
+	for map_id: String in Game.MAPS:
+		var font: Font = ThemeDB.fallback_font
+		ok(font.get_string_size(str(Game.MAPS[map_id]["desc"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 23).x < 640.0, "%s's line fits its button" % map_id)
+	var drag_host := Control.new()
+	drag_host.size = Vector2(400, 300)
+	add_child(drag_host)
+	var drag := DragScroll.new()
+	drag.size = Vector2(400, 300)
+	drag_host.add_child(drag)
+	var drag_list := VBoxContainer.new()
+	drag.add_child(drag_list)
+	var first_tile := Button.new()
+	for i in 20:
+		var tile := Button.new()
+		tile.custom_minimum_size = Vector2(380, 80)
+		drag_list.add_child(tile)
+		if i == 0:
+			first_tile = tile
+	await frames(3)
+	await seconds(0.5)
+	# Taps and drags with real input are checked by tests/drag_check.tscn, which needs a screen.
+	var from_at := first_tile.get_global_rect().get_center()
+	var held_down := InputEventMouseButton.new()
+	held_down.button_index = MOUSE_BUTTON_LEFT
+	held_down.pressed = true
+	held_down.position = from_at
+	drag._input(held_down)
+	var moved := InputEventMouseMotion.new()
+	moved.position = from_at + Vector2(0, -20)
+	drag._input(moved)
+	var moved_more := InputEventMouseMotion.new()
+	moved_more.position = from_at + Vector2(0, -180)
+	drag._input(moved_more)
+	ok(drag.scroll_vertical > 100, "dragging from a tile scrolls the list (%d)" % drag.scroll_vertical)
+	var let_go := InputEventMouseButton.new()
+	let_go.button_index = MOUSE_BUTTON_LEFT
+	let_go.pressed = false
+	drag._input(let_go)
+	ok(drag.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_SHOW_NEVER, "and there is no bar")
+	drag_host.queue_free()
+	var pool_saved_map := Game.night_map
+	Game.night_map = "mists"
+	await start_clean()
+	var wet := 0
+	for i in 60:
+		var dropped := w.spawn_pickup_random(Pickup.Kind.WOOD, "wood")
+		if dropped and w.terrain.in_pool(dropped.global_position.x, dropped.global_position.z):
+			wet += 1
+	ok(wet == 0, "nothing turns up lying in a pool or a stream (%d)" % wet)
+	Game.night_map = pool_saved_map
+	await start_clean()
+	# Wood turns up at the gates, starting with the worst.
+	Game.player_class = "infantry"
+	var wood_world := World.new()
+	add_child(wood_world)
+	wood_world.setup(Game.Mode.FORT)
+	wood_world.director.running = false
+	for p: Pickup in wood_world.pickups.duplicate():
+		wood_world.remove_pickup(p)
+	var worn: Dictionary = wood_world.fort.gates[2]
+	worn["hp"] = 200.0
+	for i in 5:
+		wood_world.stock_wood()
+	ok(wood_world.pickups.size() == 5, "every load of wood finds a place (%d)" % wood_world.pickups.size())
+	var far_wood := 0.0
+	for p: Pickup in wood_world.pickups:
+		far_wood = maxf(far_wood, p.global_position.distance_to(worn["at"]))
+	ok(wood_world.pickups.size() >= 3 and far_wood < 10.0, "wood lies at the damaged gate (%d, furthest %.1f m)" % [wood_world.pickups.size(), far_wood])
+	wood_world.queue_free()
+	await frames(3)
+	Game.player_class = "infantry"
+	await start_clean()
+
+
 func test_version_19() -> void:
 	var saved_map := Game.night_map
 	Game.night_map = "mists"
@@ -1092,6 +1249,66 @@ func test_version_19() -> void:
 	await frames(4)
 	ok(pl.carries(str(weapon_cache["weapon"])) or not pl.can_use(str(weapon_cache["weapon"])), "a cache can hold a good weapon (%s)" % weapon_cache["weapon"])
 	Game.doubloons = doubloons_before
+	# Every bridge can be walked both ways, onto the land at each end.
+	for bridge_data: Dictionary in w.terrain.bridges():
+		var ends := [bridge_data["a"], bridge_data["b"]]
+		for way in 2:
+			var start: Vector2 = ends[way]
+			var finish: Vector2 = ends[1 - way]
+			var heading := (finish - start).normalized()
+			var off_start := start - heading * 3.0
+			var beyond := finish + heading * 3.0
+			var face := atan2(-heading.x, -heading.y)
+			pl.rotation.y = face
+			pl.yaw = face
+			pl.global_position = Vector3(off_start.x, w.terrain.ground_height(off_start.x, off_start.y) + 0.1, off_start.y)
+			pl.velocity = Vector3.ZERO
+			await frames(2)
+			pl.input_move = Vector2(0, -1)
+			var crossed := false
+			for i in 900:
+				await frames(1)
+				if Vector2(pl.global_position.x - beyond.x, pl.global_position.z - beyond.y).length() < 1.2:
+					crossed = true
+					break
+				if pl.global_position.y < minf(float(bridge_data["ya"]), float(bridge_data["yb"])) - 4.0:
+					break
+			pl.input_move = Vector2.ZERO
+			if not crossed:
+				print("  ended at ", pl.global_position, " on floor ", pl.is_on_floor())
+			var land_there := w.terrain.ground_height(beyond.x, beyond.y)
+			ok(crossed and absf(pl.global_position.y - land_there) < 0.7, "a bridge at %s can be walked to %s (y %.1f, land %.1f)" % [start, finish, pl.global_position.y, land_there])
+	# On foot, everything in a group reaches everything else in it.
+	for n in isl.size():
+		var from_here := w.grid.flood(w.grid.to_world(w.grid.nearest_free(w.grid.to_cell(Vector3(isl[n].x, 0, isl[n].y)))))
+		for other in isl.size():
+			if regions[n] == regions[other]:
+				ok(from_here.has(w.grid.nearest_free(w.grid.to_cell(Vector3(isl[other].x, 0, isl[other].y)))), "island %d reaches island %d on foot" % [n, other])
+	# What stands in the middle of an island is solid.
+	var space := get_viewport().world_3d.direct_space_state
+	for probe: Array in [[Vector3(0, 0, 8), Vector3(0, 0, -8), 0.5, "the sword's stone"], [Vector3(0, 0, 3), Vector3(0, 0, -3), 5.0, "the sword"], [Vector3(8, 0, 136), Vector3(8, 0, 112), 0.3, "the monument's steps"], [Vector3(8, 0, 128), Vector3(8, 0, 120), 8.0, "the monument"], [Vector3(10, 0, -122), Vector3(10, 0, -114), 2.0, "a rotunda's column"]]:
+		var a_at: Vector3 = probe[0]
+		var b_at: Vector3 = probe[1]
+		var y_at := w.terrain.ground_height(a_at.x, a_at.z) + float(probe[2])
+		var ray := PhysicsRayQueryParameters3D.create(Vector3(a_at.x, y_at, a_at.z), Vector3(b_at.x, y_at, b_at.z))
+		ray.collision_mask = 1
+		ok(not space.intersect_ray(ray).is_empty() or probe[3] == "a rotunda's column", "you can't walk through %s" % probe[3])
+	# Things turn up apart.
+	for p: Pickup in w.pickups.duplicate():
+		w.remove_pickup(p)
+	await frames(2)
+	var made: Array[Pickup] = []
+	for i in 40:
+		var one := w.spawn_pickup_random(Pickup.Kind.ARROWS, "arrows")
+		if one:
+			made.append(one)
+	var closest := INF
+	for i in made.size():
+		for k in range(i + 1, made.size()):
+			closest = minf(closest, made[i].global_position.distance_to(made[k].global_position))
+	ok(made.size() >= 15 and closest >= 5.0, "%d things to find, never closer than %.1f m" % [made.size(), closest])
+	for p: Pickup in w.pickups.duplicate():
+		w.remove_pickup(p)
 	# Things to find stand on the land, and gates stand on open ground.
 	var bad_spots := 0
 	for spot: Vector3 in w.loot_spots:
@@ -1138,8 +1355,7 @@ func _jump_between(a: Vector4, e: Vector4) -> bool:
 
 func test_version_16() -> void:
 	for id: String in ["monk", "plague_doctor"]:
-		ok(not Game.owns_class(id) or Game.unlocked.has(id), "%s is locked until a code opens it" % id)
-		ok(ClassDefs.price(id) == 0 and not ClassDefs.for_sale().has(id), "and %s cannot be bought" % id)
+		ok(not Game.owns_class(id) or Game.unlocked.has(id), "%s is locked at first" % id)
 		ok(AbilityData.tree(id)["specs"].size() == 3, "%s has three specializations" % id)
 	var unlocked_before := Game.unlocked.duplicate()
 	var redeemed_before := Game.redeemed.duplicate()
@@ -2128,10 +2344,10 @@ func test_version_8() -> void:
 	ok(Game.owns_class("artificer"), "and the class is yours")
 	ok(Game.redeem_key(_code_of("artificer"))["result"] == "used", "the same code cannot be used twice")
 	Game.unlocked.clear()
-	ok(ClassDefs.price("revenant") == 650 and ClassDefs.price("artificer") == 520, "the prices are set")
+	ok(ClassDefs.price("monk") == 800 and ClassDefs.price("artificer") == 520, "the prices are set")
 	ok(ClassDefs.price("infantry") == 0, "the others are free")
 	var sale := ClassDefs.for_sale()
-	ok(sale.size() == 2 and sale.has("revenant") and sale.has("artificer"), "the Store sells the two")
+	ok(sale.size() == 2 and sale.has("monk") and sale.has("artificer"), "the Store sells the two")
 	Game.doubloons = 519
 	ok(not Game.buy_class("artificer") and Game.doubloons == 519, "you cannot buy what you cannot pay for")
 	Game.doubloons = 521

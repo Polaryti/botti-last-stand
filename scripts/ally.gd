@@ -349,8 +349,12 @@ func _physics_process(delta: float) -> void:
 				_foe.stun(0.7)
 			if _foe.is_alive() and kind == "snake" and randf() < SNAKE_POISON:
 				_foe.add_dot(10.0, 4.0)
+				if remote_owner == 0:
+					Game.note_poison(40.0)
 			if _foe.is_alive() and kind == "rat" and player and player.has_flag("rat_poison") and randf() < 0.5:
 				_foe.add_dot(10.0, 4.0)
+				if remote_owner == 0:
+					Game.note_poison(40.0)
 			if kind == "fox" and randf() < FOX_FOOD:
 				world.spawn_pickup_at(position + Vector3(0.6, 0, 0.6), Pickup.Kind.FOOD, PowerDefs.FOODS.keys().pick_random())
 			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)

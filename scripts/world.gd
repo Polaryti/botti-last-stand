@@ -67,6 +67,7 @@ var church_door := Vector3(0, 0, -36)
 var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
+const PICKUP_APART := 6.0
 var perches: Array[Vector3] = []
 var crop_spots: Array[Vector3] = []
 var pois: Array[Vector3] = []
@@ -1522,16 +1523,28 @@ func player_start(peer: int) -> Vector3:
 	return Vector3(s.x, ground_at(s) + 0.05, s.z)
 
 
+## Wood turns up just inside a gate, where it is needed: the most damaged gate first.
 func stock_wood() -> void:
-	if wood_spots.is_empty():
+	if fort == null or fort.gates.is_empty():
 		return
-	var at: Vector3 = wood_spots[randi() % wood_spots.size()]
-	if randf() < 0.2 and not yard_wood_spots.is_empty():
-		at = yard_wood_spots[randi() % yard_wood_spots.size()]
-	for other in pickups:
-		if other.global_position.distance_to(at) < 1.0:
+	var g: Dictionary = fort.gates[randi() % fort.gates.size()]
+	for other: Dictionary in fort.gates:
+		if float(other["hp"]) < float(g["hp"]):
+			g = other
+	var dir: Vector3 = g["dir"]
+	var along := Vector3(dir.z, 0, -dir.x)
+	for attempt in 8:
+		var at: Vector3 = (g["at"] as Vector3) - dir * randf_range(3.0, 5.0) + along * randf_range(-Fort.GATE_W, Fort.GATE_W)
+		if not grid.is_free(grid.to_cell(at)):
+			at = grid.to_world(grid.nearest_free(grid.to_cell(at)))
+		var clash := false
+		for other in pickups:
+			if other.global_position.distance_to(at) < 1.0:
+				clash = true
+				break
+		if not clash:
+			spawn_pickup_at(at, Pickup.Kind.WOOD, "wood")
 			return
-	spawn_pickup_at(at, Pickup.Kind.WOOD, "wood")
 
 
 ## Somewhere to come back: as far as can be managed from everyone else. A bot asks from its own side.
@@ -1760,9 +1773,13 @@ func spawn_pickup_random(kind: int, id: String) -> Pickup:
 			continue
 		if fog and not fog.contains(at, -3.0):
 			continue
+		# Things to find lie apart, not in heaps.
+		at += Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
+		if not grid.is_free(grid.to_cell(at)) or terrain.in_pool(at.x, at.z):
+			continue
 		var clash := false
 		for other in pickups:
-			if other.global_position.distance_to(at) < 2.5:
+			if Vector2(other.global_position.x - at.x, other.global_position.z - at.z).length() < PICKUP_APART:
 				clash = true
 				break
 		if not clash:
@@ -2077,6 +2094,7 @@ func _tick_poison(delta: float) -> void:
 						z.ignite(ZombieDefs.BURN_SECONDS)
 					else:
 						z.take_damage(PowerDefs.POISON_DPS * 0.5, Vector3.ZERO, 0.0, z.centre())
+						Game.note_poison(PowerDefs.POISON_DPS * 0.5)
 
 
 ## The bell can be heard across the village. Roaming zombies walk over to see why.

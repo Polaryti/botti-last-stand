@@ -544,9 +544,8 @@ func _two_panes(title: String) -> Control:
 	panes.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panes.add_theme_constant_override("separation", 16)
 	box.add_child(panes)
-	var scroll := ScrollContainer.new()
+	var scroll := DragScroll.new()
 	scroll.custom_minimum_size.x = 340
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	panes.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -653,14 +652,14 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 					Game.choose_pet(chosen_pet)
 					_fill_class_detail(detail, id, mode, in_store), Vector2(120, 48), Game.pet == pet))
 	detail.add_child(_expand(true))
-	if not owned and c.has("earned"):
+	if not owned and c.get("unavailable", false):
+		var how := _body("Not available at this time.", 26)
+		how.add_theme_color_override("font_color", UiTheme.ASH)
+		detail.add_child(how)
+	elif not owned and c.has("earned"):
 		var how := _body(Game.earn_text(id), 26)
 		how.add_theme_color_override("font_color", UiTheme.EMBER)
 		how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		detail.add_child(how)
-	elif not owned and ClassDefs.price(id) <= 0:
-		var how := _body("This class opens with a code, in Settings.", 26)
-		how.add_theme_color_override("font_color", UiTheme.EMBER)
 		detail.add_child(how)
 	elif not owned:
 		_buy_row(detail, id, mode, in_store)
@@ -1220,6 +1219,7 @@ func _on_dawn() -> void:
 	if _run_over:
 		return
 	_run_over = true
+	Game.note_mists_win()
 	close_tree()
 	if hud:
 		hud.release_all()
@@ -1264,6 +1264,8 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 		return
 	_run_over = true
 	var won := reached_dawn or Net.last_winner == Net.my_id()
+	if reached_dawn:
+		Game.note_mists_win()
 	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp() and Net.humans() > 1))
 	close_tree()
 	if hud:

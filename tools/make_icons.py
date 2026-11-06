@@ -301,7 +301,9 @@ def rage():
     return at(50, 40, 0.92, flame()) + at(50, 60, 0.6, skull())
 def shroud():
     return path(("#4c4a78", "#14132a"), "M50 4 C20 4 12 34 12 60 C12 78 8 88 4 96 L96 96 C92 88 88 78 88 60 C88 34 80 4 50 4Z") + path(INK, "M28 62 C28 34 72 34 72 62 C72 76 60 84 50 84 C40 84 28 76 28 62Z", 0) + ell("#ffe68a", 40, 60, 5, 3, 12, 0) + ell("#ffe68a", 60, 60, 5, 3, -12, 0)
-for g in (longbow, bell_hammer, javelins, sling, blowgun, rain, satchel, flurry, rage, shroud):
+def let_go():
+    return at(38, 40, 0.62, turn(30, sword())) + poly(RED, (66, 88), (46, 62), (58, 62), (58, 40), (74, 40), (74, 62), (86, 62)) + rect(ROCK, 8, 88, 84, 8, 2)
+for g in (let_go, longbow, bell_hammer, javelins, sling, blowgun, rain, satchel, flurry, rage, shroud):
     PLAIN.append(g)
 
 # Class crests: every class has its own outline, colour and picture.

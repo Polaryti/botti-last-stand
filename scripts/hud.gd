@@ -70,6 +70,7 @@ func _layout() -> void:
 		"jump": {"pos": Vector2(right - 62, bottom - 276), "r": 52.0},
 		"switch": {"pos": Vector2(right - 248, bottom - 92), "r": 52.0},
 		"zoom": {"pos": Vector2(right - 208, bottom - 260), "r": 50.0},
+		"drop": {"pos": Vector2(right - 250, bottom - 184), "r": 38.0},
 		"take": {"pos": Vector2(s.x * 0.5, s.y * 0.68), "r": 62.0},
 		"pause": {"pos": Vector2(right - 28, 46), "r": 32.0},
 		"tree": {"pos": Vector2(right - 112, 46), "r": 38.0},
@@ -90,6 +91,8 @@ func _button_visible(id: String) -> bool:
 			return player.weapon_def().has("zoom_fov")
 		"switch":
 			return player.slots[0] != null and player.slots[1] != null
+		"drop":
+			return player.can_drop_weapon()
 		"horse":
 			return player.horse_ready() or player.is_riding() or player.ride_behind != 0 or player.can_board()
 		"burst":
@@ -142,6 +145,7 @@ func _touch_down(index: int, at: Vector2) -> void:
 			"fire": player.input_fire = true
 			"jump": player.input_jump = true
 			"switch": player.switch_weapon()
+			"drop": player.drop_current_weapon()
 			"zoom": player.toggle_zoom()
 			"take": player.take_nearby_weapon()
 			"pause": pause_requested.emit()
@@ -694,6 +698,7 @@ func _button_glyph(id: String) -> String:
 			return Icons.weapon(player.weapon_id()).split("+")[0]
 		"jump": return "jump"
 		"switch": return "swap"
+		"drop": return "let_go"
 		"zoom": return "eye"
 		"take": return "grab"
 		"pause": return "pause"

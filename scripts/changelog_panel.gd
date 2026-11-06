@@ -43,9 +43,8 @@ func build() -> void:
 		Sfx.play("ui_click", -4.0)
 		closed.emit())
 	top.add_child(close)
-	var scroll := ScrollContainer.new()
+	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL

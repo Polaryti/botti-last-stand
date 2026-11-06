@@ -485,6 +485,30 @@ func take_nearby_weapon() -> void:
 	nearby_weapon = null
 
 
+## You can put down what you hold, as long as it can lie on the ground and you are left with
+## something to fight with. A class's own weapon stays with it.
+func can_drop_weapon() -> bool:
+	var id: Variant = slots[current]
+	if id == null or dead or spirit_left > 0.0 or is_riding():
+		return false
+	if WeaponDefs.ALL[id].get("hidden", false):
+		return false
+	return class_id == "monk" or slots[1 - current] != null
+
+
+func drop_current_weapon() -> void:
+	if not can_drop_weapon():
+		return
+	world.drop_weapon(global_position - camera.global_basis.z * 1.6, slots[current])
+	Sfx.play("weapon_change", -3.0, 0.8)
+	if class_id == "monk":
+		slots[current] = "fists"
+	else:
+		slots[current] = null
+		current = 1 - current
+	_equip()
+
+
 func switch_weapon() -> void:
 	if slots[1 - current] == null:
 		return
@@ -946,6 +970,8 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 		"dot":
 			if z:
 				z.add_dot(float(e["dps"]), float(e["secs"]), e.get("bleed", false))
+				if not e.get("bleed", false):
+					Game.note_poison(float(e["dps"]) * float(e["secs"]))
 			elif ctx.has("rival"):
 				Net.status_peer(ctx["rival"], Net.Status.BLEED if e.get("bleed", false) else Net.Status.POISON, float(e["secs"]))
 		"ignite":
@@ -1099,6 +1125,7 @@ func on_kill(z: Zombie) -> void:
 		world.fx_ring(z.position, 6.0, Color(0.5, 0.95, 0.25))
 		for near: Zombie in world.zombies_near(z.position, 6.0, 8):
 			near.add_dot(14.0, 5.0)
+			Game.note_poison(70.0)
 	if has_item("shadow_shroud"):
 		shadow_kills = mini(SHROUD_KILLS, shadow_kills + 1)
 	if z.type_id == "rider" and not Game.unlocked.has("chivalry"):
@@ -2134,7 +2161,9 @@ func _bomblet_burst(at: Vector3, kind: String) -> void:
 			"fire": z.ignite(ZombieDefs.BURN_SECONDS)
 			"frost": z.freeze(1.5)
 			"thunder": z.stun(0.8)
-			"poison": z.add_dot(10.0, 4.0)
+			"poison":
+				z.add_dot(10.0, 4.0)
+				Game.note_poison(40.0)
 	for r: Avatar in world.rivals_near(at, REACH):
 		Net.hit_player(r.peer, dmg, at)
 		match kind:

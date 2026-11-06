@@ -263,6 +263,8 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		z.slow(ZombieDefs.BURN_SECONDS)
 	if poison.y > 0.0:
 		z.add_dot(poison.x, poison.y)
+		if from_player:
+			Game.note_poison(poison.x * poison.y)
 	if stagger > 0.0:
 		z.stun(stagger)
 	world.sfx_at("thunk", at, -3.0)

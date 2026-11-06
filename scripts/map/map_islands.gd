@@ -24,7 +24,7 @@ const RAMPS := [
 ]
 ## Bridges: from, to, how they curve, half their width, and whether they are stone.
 const BRIDGES := [
-	[Vector2(58, -2), Vector2(88, -6), 1.6, 2.2, true],
+	[Vector2(58, -2), Vector2(88, -6), 0.4, 2.2, true],
 	[Vector2(-58, 4), Vector2(-84, 6), -1.2, 1.6, false],
 	[Vector2(34, -120), Vector2(64, -118), -1.0, 1.6, false],
 	[Vector2(36, 130), Vector2(84, 112), -1.6, 1.6, false],
@@ -32,6 +32,17 @@ const BRIDGES := [
 ## The islands each bridge joins, and the shelves that belong to each island.
 const JOINED := [[0, 2], [0, 3], [1, 5], [4, 8], [1, 9], [2, 10], [4, 11], [3, 12]]
 const LINKS := [[0, 1], [0, 4], [0, 6], [0, 7], [3, 6], [3, 7], [2, 5], [2, 8], [1, 7], [4, 6]]
+
+## Rotundas: where, radius, how tall, and the height of the land around them.
+const ROTUNDAS := [[Vector2(0, -122), 10.0, 9.0, 40.0], [Vector2(-92, -100), 6.5, 6.5, 32.0], [Vector2(112, 108), 5.5, 5.5, 12.0]]
+const ROTUNDA_RISE := 0.5
+## Pools: where, how wide, the height of the land, and which ways the water runs off to fall from the edge.
+const WATERS := [
+	[Vector2(90, -122), 8.0, 46.0, [Vector2(1.0, -0.3), Vector2(0.5, 0.9), Vector2(0.72, -0.86)]],
+	[Vector2(-134, 36), 5.0, 14.0, [Vector2(-0.15, 1.0)]],
+	[Vector2(146, -2), 4.5, 26.0, [Vector2(1.0, 0.1)]],
+	[Vector2(-96, 100), 5.5, 8.0, []],
+]
 
 const STONE_RADIUS := 1.8
 const STONE_STEP := 5.3 # from one stone's middle to the next: a jump of a little under 2 m
@@ -62,6 +73,19 @@ func land(t: Terrain, _at: Transform3D) -> void:
 		t.add_island(ISLANDS[n], WOBBLE[n], ROUGH[n])
 	# The arena is a bowl: stone seats going up from a flat floor to the rim.
 	t.terrace(Vector2.ZERO, 30.0, 54.0, 10.0, 18.0)
+	# The rotundas stand on low mounds you can walk straight up.
+	for r: Array in ROTUNDAS:
+		var at: Vector2 = r[0]
+		t.terrace(at, float(r[1]) + 1.6, float(r[1]) + 6.0, float(r[3]) + ROTUNDA_RISE, float(r[3]))
+	for w: Array in WATERS:
+		var pool: Vector2 = w[0]
+		var bed: float = float(w[2]) - 0.7
+		var flat: Array[Vector3] = [Vector3(pool.x, bed, pool.y), Vector3(pool.x + 0.1, bed, pool.y)]
+		t.cut(flat, float(w[1]), 1.5)
+		for dir: Vector2 in w[3]:
+			var far: Vector2 = pool + dir.normalized() * 70.0
+			var line: Array[Vector3] = [Vector3(pool.x, bed, pool.y), Vector3(far.x, bed, far.y)]
+			t.cut(line, 1.7, 1.0)
 	for r: Array in RAMPS:
 		var line: Array[Vector3] = [r[0], r[1]]
 		t.cut(line, 3.0, 2.0)
@@ -194,6 +218,31 @@ func build(b: MapBuilder) -> void:
 		_bridge(b, br)
 	for line: Dictionary in stone_lines():
 		_stone_line(b, line, caches)
+	_scatter_loot(b)
+
+
+## Plenty of places for things to turn up, spread over every island and well apart.
+func _scatter_loot(b: MapBuilder) -> void:
+	var w: World = b.w
+	for i: Vector4 in ISLANDS:
+		var wanted := int(i.z / 3.0)
+		for tries in wanted * 8:
+			if wanted <= 0:
+				break
+			var a := _rng.randf() * TAU
+			var d := sqrt(_rng.randf()) * i.z * 0.82
+			var at := Vector3(i.x + cos(a) * d, 0, i.y + sin(a) * d)
+			if not w.grid.is_free(w.grid.to_cell(at)) or b.terrain.ground_height(at.x, at.z) <= 0.0:
+				continue
+			var clash := false
+			for other: Vector3 in w.loot_spots:
+				if Vector2(other.x - at.x, other.z - at.z).length() < 9.0:
+					clash = true
+					break
+			if clash:
+				continue
+			w.loot_spots.append(at)
+			wanted -= 1
 
 
 func _at(b: MapBuilder, x: float, z: float) -> Vector3:
@@ -293,10 +342,9 @@ static func _column(l: LowPoly, at: Vector3, h: float, r: float, col: Color) -> 
 func _rotunda(b: MapBuilder, c: Vector3, r: float, h: float, ribs := 12) -> void:
 	var w: World = b.w
 	var l := LowPoly.new()
-	l.prism(c + Vector3(0, -3.0, 0), c + Vector3(0, 0.0, 0), r + 2.8, r + 2.2, 16, DARK_STONE)
-	l.prism(c, c + Vector3(0, 0.36, 0), r + 2.2, r + 1.4, 16, STONE)
-	l.prism(c + Vector3(0, 0.36, 0), c + Vector3(0, 0.5, 0), r + 1.4, r + 1.3, 16, MARBLE)
-	var floor_y := c.y + 0.5
+	_annulus(l, c, 0.0, r + 1.6, c.y + 0.03, c.y + 0.03, MARBLE, 24)
+	_annulus(l, c, r + 1.6, r + 5.8, c.y + 0.03, c.y - ROTUNDA_RISE + 0.03, STONE, 24)
+	var floor_y := c.y + 0.03
 	for n in ribs:
 		var a := TAU * n / ribs
 		var foot := Vector3(c.x + cos(a) * r, floor_y, c.z + sin(a) * r)
@@ -494,7 +542,8 @@ func _arena(b: MapBuilder) -> void:
 	for s in 3:
 		var side := 9.0 - s * 2.4
 		l.box(o + Vector3(0, 0.45 + s * 0.9, 0), Vector3(side, 0.9, side), MARBLE.darkened(0.1 + s * 0.05))
-	b.w.add_solid(o + Vector3(0, 1.35, 0), Vector3(4.6, 2.7, 4.6))
+		b.w.add_solid(o + Vector3(0, 0.45 + s * 0.9, 0), Vector3(side, 0.9, side))
+	b.w.add_solid(o + Vector3(0, 8.4, 0), Vector3(1.2, 11.5, 0.5))
 	l.box(o + Vector3(0, 8.4, 0), Vector3(1.2, 11.5, 0.3), Color(0.72, 0.78, 0.86))
 	l.prism(o + Vector3(0, 2.7, 0), o + Vector3(0, 0.6, 0), 0.6, 0.0, 4, Color(0.72, 0.78, 0.86))
 	l.box(o + Vector3(0, 14.3, 0), Vector3(5.2, 0.6, 0.7), GOLD)
@@ -524,7 +573,7 @@ func _rotunda_island(b: MapBuilder) -> void:
 	for n in 5:
 		var p := Vector2(-56, -104).lerp(Vector2(-12, -120), n / 4.0) + Vector2(0, 5.5)
 		_column(l, _at(b, p.x, p.y), _rng.randf_range(2.0, 5.0), 0.5, STONE)
-		b.w.add_solid(_at(b, p.x, p.y) + Vector3.UP, Vector3(1.0, 2.0, 1.0))
+		b.w.add_solid(_at(b, p.x, p.y) + Vector3.UP * 2.5, Vector3(1.0, 5.0, 1.0))
 	_stairs(l, RAMPS[0][0], RAMPS[0][1], 6.0)
 	b.add(l)
 	for n in 6:
@@ -612,7 +661,8 @@ func _monument(b: MapBuilder) -> void:
 	for s in 4:
 		var side := 15.0 - s * 3.2
 		l.box(c + Vector3(0, 0.3 + s * 0.6, 0), Vector3(side, 0.6, side), MARBLE.darkened(0.08 + s * 0.04))
-	b.w.add_solid(c + Vector3(0, 1.2, 0), Vector3(5.8, 2.4, 5.8))
+		b.w.add_solid(c + Vector3(0, 0.3 + s * 0.6, 0), Vector3(side, 0.6, side))
+	b.w.add_solid(c + Vector3(0, 10.7, 0), Vector3(3.0, 16.6, 3.0))
 	l.prism(c + Vector3(0, 2.4, 0), c + Vector3(0, 19.0, 0), 1.9, 0.9, 4, MARBLE)
 	l.prism(c + Vector3(0, 19.0, 0), c + Vector3(0, 21.0, 0), 0.9, 0.0, 4, GOLD)
 	for n in 4:
@@ -632,38 +682,80 @@ func _monument(b: MapBuilder) -> void:
 		b.w.pois.append(at)
 
 
-## The highest rock. A pool on top, and the water goes over the edge all the way down to the mist.
+## The highest rock, and the pools of the other islands. The water runs to the edge and goes over,
+## all the way down to the mist.
 func _falls(b: MapBuilder) -> void:
-	var l := LowPoly.new()
 	_terrain_now = b.terrain
-	var c := _at(b, 90, -122)
-	var water := LowPoly.new()
-	water.prism(c + Vector3(0, -0.5, 0), c + Vector3(0, 0.12, 0), 8.0, 8.0, 14, Color(0.3, 0.75, 0.82))
-	for dir: Vector2 in [Vector2(1.0, -0.3), Vector2(0.5, 0.9), Vector2(0.72, -0.86)]:
-		var d := dir.normalized()
-		var edge := _edge_of(ISLANDS[5], Vector2(c.x, c.z), d)
-		var mid := (Vector2(c.x, c.z) + edge) * 0.5
-		var length := Vector2(c.x, c.z).distance_to(edge) + 2.0
-		water.box(Vector3(mid.x, c.y + 0.04, mid.y), Vector3(length, 0.16, 3.4), Color(0.34, 0.8, 0.86), Vector3(0, -rad_to_deg(atan2(d.y, d.x)), 0))
-		_waterfall(b.w, Vector3(edge.x + d.x * 1.8, c.y + 0.12, edge.y + d.y * 1.8), d, 4.6)
-	var mi := b.add(water)
-	var look := StandardMaterial3D.new()
-	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	look.vertex_color_use_as_albedo = true
-	mi.material_override = look
+	var l := LowPoly.new()
+	var c := _at(b, 76, -112)
 	_great_tree(b, l, _at(b, 72, -130), 0.9, Color(0.3, 0.6, 0.46))
 	_great_tree(b, l, _at(b, 78, -100), 0.8, Color(0.26, 0.52, 0.44))
+	var well := Vector3(90, 46.0, -122)
 	for n in 4:
 		var a := TAU * n / 4.0 + 0.3
-		_column(l, c + Vector3(cos(a) * 10.0, 0, sin(a) * 10.0), _rng.randf_range(3.0, 7.0), 0.5, MARBLE.darkened(0.08))
-		b.w.add_solid(c + Vector3(cos(a) * 10.0, 2.0, sin(a) * 10.0), Vector3(1.0, 4.0, 1.0))
+		var at := well + Vector3(cos(a) * 10.5, 0, sin(a) * 10.5)
+		at.y = b.terrain.ground_height(at.x, at.z)
+		var tall := _rng.randf_range(3.0, 7.0)
+		_column(l, at, tall, 0.5, MARBLE.darkened(0.08))
+		b.w.add_solid(at + Vector3.UP * tall * 0.5, Vector3(1.0, tall, 1.0))
 	b.add(l)
-	for at: Vector3 in [Vector3(76, 0, -116), Vector3(90, 0, -102), Vector3(72, 0, -138)]:
+	for at: Vector3 in [c, Vector3(90, 0, -102), Vector3(72, 0, -138)]:
 		b.w.loot_spots.append(at)
 		b.w.pois.append(at)
-	# And two more falls, smaller, off the forest and the battlements.
-	_waterfall(b.w, _edge_point(b, ISLANDS[3], Vector2(0.2, 1.0)), Vector2(0.2, 1.0).normalized(), 3.4)
-	_waterfall(b.w, _edge_point(b, ISLANDS[2], Vector2(1.0, 0.1)), Vector2(1.0, 0.1).normalized(), 3.0)
+	var water := ShaderMaterial.new()
+	water.shader = load("res://assets/shaders/water.gdshader")
+	water.set_shader_parameter("deep", Vector3(0.07, 0.34, 0.44))
+	water.set_shader_parameter("glint", Vector3(0.74, 0.96, 0.98))
+	water.set_shader_parameter("ripple", 0.22)
+	for w: Array in WATERS:
+		_pool(b, w, water)
+
+
+## A pool with a stone rim, and streams from it that run to the land's edge and fall.
+func _pool(b: MapBuilder, w: Array, water: ShaderMaterial) -> void:
+	var at: Vector2 = w[0]
+	var r: float = w[1]
+	var y: float = float(w[2]) - 0.25
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	const SEGMENTS := 18
+	var centre := Vector3(at.x, y, at.y)
+	b.terrain.add_pool(at, r)
+	for n in SEGMENTS:
+		var a0 := TAU * n / SEGMENTS
+		var a1 := TAU * (n + 1) / SEGMENTS
+		for p: Vector3 in [centre, centre + Vector3(cos(a1), 0, sin(a1)) * (r + 0.4), centre + Vector3(cos(a0), 0, sin(a0)) * (r + 0.4)]:
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(0.5 + (p.x - at.x) / 3.8, p.z))
+			st.add_vertex(p)
+	for dir: Vector2 in w[3]:
+		var d := dir.normalized()
+		var edge := _edge_of(ISLANDS[_island_at(at)], at, d)
+		var side := d.orthogonal() * 1.9
+		# From the pool's edge, not its middle, so that streams do not cross on the way out.
+		var mouth := at + d * r * 0.8
+		var run := mouth.distance_to(edge) + 2.4
+		var end := mouth + d * run
+		b.terrain.add_stream(mouth, end, 1.9)
+		var corners := [[mouth + side, 0.0, 0.0], [mouth - side, 1.0, 0.0], [end + side, 0.0, run], [end - side, 1.0, run]]
+		for q: int in [0, 2, 1, 1, 2, 3]:
+			var v: Array = corners[q]
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(v[1], v[2]))
+			st.add_vertex(Vector3(v[0].x, y + 0.01, v[0].y))
+		_waterfall(b.w, Vector3(end.x, y, end.y), d, 3.8)
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = water
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	b.w.add_child(mi)
+
+
+func _island_at(p: Vector2) -> int:
+	for n in ISLANDS.size():
+		if Vector2(p.x - ISLANDS[n].x, p.y - ISLANDS[n].y).length() < ISLANDS[n].z:
+			return n
+	return 0
 
 
 func _edge_of(i: Vector4, from: Vector2, dir: Vector2) -> Vector2:
@@ -680,13 +772,6 @@ var _terrain_now: Terrain
 
 func _height_low(p: Vector2) -> bool:
 	return _terrain_now != null and _terrain_now.ground_height(p.x, p.y) < 0.0
-
-
-func _edge_point(b: MapBuilder, i: Vector4, dir: Vector2) -> Vector3:
-	_terrain_now = b.terrain
-	var d := dir.normalized()
-	var e := _edge_of(i, Vector2(i.x, i.y), d)
-	return Vector3(e.x + d.x * 1.8, b.terrain.ground_height(e.x - d.x * 2.0, e.y - d.y * 2.0) + 0.05, e.y + d.y * 1.8)
 
 
 func _waterfall(w: World, top: Vector3, out: Vector2, width: float) -> void:
@@ -719,8 +804,7 @@ func _hollow(b: MapBuilder) -> void:
 	_tower(b, l, _at(b, -118, 112), 3.2, 8.0)
 	_great_tree(b, l, _at(b, -80, 112), 1.0, Color(0.32, 0.5, 0.36))
 	b.add(l)
-	_rune(b, c + Vector3(0, 0.1, 0), 7.5)
-	for at: Vector3 in [Vector3(-96, 0, 100), Vector3(-108, 0, 88), Vector3(-82, 0, 96), Vector3(-104, 0, 114)]:
+	for at: Vector3 in [Vector3(-96, 0, 84), Vector3(-108, 0, 88), Vector3(-82, 0, 96), Vector3(-104, 0, 114)]:
 		b.w.loot_spots.append(at)
 		b.w.pois.append(at)
 
@@ -735,7 +819,7 @@ func _terrace_island(b: MapBuilder) -> void:
 		at.y = b.terrain.ground_height(at.x, at.z)
 		var tall := _rng.randf_range(5.0, 12.0)
 		l.prism(at + Vector3.DOWN, at + Vector3.UP * tall, 2.2, 0.3, 6, ROCK)
-		b.w.add_solid(at + Vector3.UP, Vector3(2.2, 2.0, 2.2))
+		b.w.add_solid(at + Vector3.UP * tall * 0.25, Vector3(2.2, tall * 0.5, 2.2))
 	b.add(l)
 	for at: Vector3 in [Vector3(-104, 0, -110), Vector3(-80, 0, -88), Vector3(-92, 0, -84)]:
 		b.w.loot_spots.append(at)
@@ -759,20 +843,17 @@ func _harbour(b: MapBuilder) -> void:
 ## Nothing at the sides. A blow at the wrong moment and you go over.
 func _bridge(b: MapBuilder, br: Array) -> void:
 	var t := b.terrain
-	var from: Vector2 = br[0]
-	var to: Vector2 = br[1]
 	var half: float = br[3]
 	var stone: bool = br[4]
-	var data: Dictionary = {}
-	for d: Dictionary in t.bridges():
-		if d["a"] == from:
-			data = d
+	var data: Dictionary = t.bridges()[BRIDGES.find(br)]
+	var from: Vector2 = data["a"]
+	var to: Vector2 = data["b"]
 	var along := (to - from).normalized()
 	var yaw := atan2(along.x, along.y)
 	var length := from.distance_to(to)
 	var l := LowPoly.new()
 	var side := Vector3(along.y, 0, -along.x)
-	const STEP := 2.5
+	const STEP := 1.6
 	var parts := int(length / STEP)
 	var last := Vector3.ZERO
 	for n in parts + 1:
@@ -794,6 +875,12 @@ func _bridge(b: MapBuilder, br: Array) -> void:
 				l.prism(last + side * half + Vector3.DOWN * 0.1, at + side * half + Vector3.DOWN * 0.1, 0.07, 0.07, 4, ROPE)
 				l.prism(last - side * half + Vector3.DOWN * 0.1, at - side * half + Vector3.DOWN * 0.1, 0.07, 0.07, 4, ROPE)
 		last = at
+	# A flat step at each end, reaching a little onto the land, so that there is no lip to trip over.
+	for s: float in [0.0, 1.0]:
+		var p := from.lerp(to, s)
+		var out := along * (-1.0 if s == 0.0 else 1.0)
+		var flat := Vector3(p.x + out.x * 1.0, t.deck_y(data, s) - 0.2, p.y + out.y * 1.0)
+		b.w.add_ledge(Transform3D(Basis(Vector3.UP, yaw), flat), Vector3(half * 2.0, 0.4, 2.4))
 	# The ends: posts for a rope bridge, and a great arch under a stone one.
 	for s: float in [0.0, 1.0]:
 		var p := from.lerp(to, s)

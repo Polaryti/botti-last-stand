@@ -7,6 +7,7 @@ extends RefCounted
 
 static var HALF := 110
 const CELL := 2.0
+const DECK_FLAT := 2.6
 static var SIZE := 111 # vertices per side
 const WATER_Y := -0.7
 const VOID_Y := -40.0
@@ -40,6 +41,10 @@ var _bridges: Array[Dictionary] = []
 var _fords: Array[Dictionary] = []
 
 
+var _pools: Array[Vector3] = []
+var _streams: Array = []
+
+
 func _init() -> void:
 	_noise.seed = 71
 	_noise.frequency = 0.011
@@ -69,10 +74,10 @@ func terrace(c: Vector2, r0: float, r1: float, y0: float, y1: float) -> void:
 
 
 ## The land of the islands: the top of whichever is highest here, then the edge, then a long way down.
+## Stairs and bowls belong to every island they cross, so that a stair going over an island's edge onto
+## a lower shelf carries on as one slope.
 func _island_shape(x: float, z: float) -> float:
 	var best := VOID_Y
-	var top_best := VOID_Y
-	var drop := 1.0
 	for i in islands.size():
 		var g := islands[i]
 		var a := atan2(z - g.y, x - g.x)
@@ -81,21 +86,14 @@ func _island_shape(x: float, z: float) -> float:
 		if past >= ISLAND_RIM:
 			continue
 		var top := g.w + (_detail.get_noise_2d(x, z) * 0.5 + _noise.get_noise_2d(x * 2.0, z * 2.0)) * _island_rough[i] * clampf(-past / 6.0, 0.0, 1.0)
-		var fall := smoothstep(-0.5, ISLAND_RIM, past)
-		var here := lerpf(top, VOID_Y, fall)
-		if here > best:
-			best = here
-			top_best = top
-			drop = fall
-	if drop >= 1.0:
-		return VOID_Y
-	for t: Dictionary in _terraces:
-		var d := Vector2(x, z).distance_to(t["c"])
-		if d < float(t["r1"]):
-			top_best = lerpf(float(t["y0"]), float(t["y1"]), clampf((d - float(t["r0"])) / (float(t["r1"]) - float(t["r0"])), 0.0, 1.0))
-	for c: Dictionary in _cuts:
-		top_best = _apply_cut(c, x, z, top_best)
-	return lerpf(top_best, VOID_Y, drop)
+		for t: Dictionary in _terraces:
+			var d := Vector2(x, z).distance_to(t["c"])
+			if d < float(t["r1"]):
+				top = lerpf(float(t["y0"]), float(t["y1"]), clampf((d - float(t["r0"])) / (float(t["r1"]) - float(t["r0"])), 0.0, 1.0))
+		for c: Dictionary in _cuts:
+			top = _apply_cut(c, x, z, top)
+		best = maxf(best, lerpf(top, VOID_Y, smoothstep(-0.5, ISLAND_RIM, past)))
+	return best
 
 
 func has_islands() -> bool:
@@ -160,6 +158,11 @@ func bake() -> void:
 			visual[j * SIZE + i] = h
 			walk[j * SIZE + i] = h
 	for b: Dictionary in _bridges:
+		if not islands.is_empty():
+			var from: Vector2 = b["a"]
+			var to: Vector2 = b["b"]
+			b["a"] = _rim_towards(from, to)
+			b["b"] = _rim_towards(to, from)
 		b["ya"] = _sample(visual, b["a"].x, b["a"].y)
 		b["yb"] = _sample(visual, b["b"].x, b["b"].y)
 		_lay_deck(b)
@@ -246,6 +249,26 @@ func river_distance(x: float, z: float) -> float:
 
 
 ## Standing in the river, shallows and ford included. A bridge is well above this.
+## A pool on an island, with its streams: nothing to do with crossing, but nothing should lie in one.
+func add_pool(at: Vector2, radius: float) -> void:
+	_pools.append(Vector3(at.x, at.y, radius))
+
+
+func add_stream(from: Vector2, to: Vector2, half_width: float) -> void:
+	_streams.append([from, to, half_width])
+
+
+func in_pool(x: float, z: float) -> bool:
+	var p := Vector2(x, z)
+	for w: Vector3 in _pools:
+		if p.distance_to(Vector2(w.x, w.y)) < w.z + 1.0:
+			return true
+	for st: Array in _streams:
+		if Geometry2D.get_closest_point_to_segment(p, st[0], st[1]).distance_to(p) < float(st[2]) + 0.8:
+			return true
+	return false
+
+
 func in_water(x: float, z: float) -> bool:
 	return height(x, z) < WATER_Y + 0.03 and not river.is_empty()
 
@@ -266,11 +289,33 @@ func river_flow(x: float, z: float) -> Vector2:
 
 
 func deck_y(b: Dictionary, s: float) -> float:
+	if not islands.is_empty():
+		# Dead level for the first and last few metres, right over the land's edge, so that the
+		# slope only starts once you are clear of it and there is no lip to walk into.
+		var length := Vector2(b["a"]).distance_to(b["b"])
+		var flat := minf(DECK_FLAT / maxf(length, 0.01), 0.3)
+		var r := clampf((s - flat) / (1.0 - flat * 2.0), 0.0, 1.0)
+		var bulge := sin(r * PI)
+		return lerpf(float(b["ya"]), float(b["yb"]), r) + float(b["hump"]) * bulge * bulge + 0.03
 	return lerpf(float(b["ya"]), float(b["yb"]), s) + float(b["hump"]) * sin(s * PI)
 
 
 func bridges() -> Array[Dictionary]:
 	return _bridges
+
+
+## A bridge starts where the land stops, level with it, so that it meets the ground on both sides.
+func _rim_towards(from: Vector2, to: Vector2) -> Vector2:
+	var along := (to - from).normalized()
+	var level := _sample(visual, from.x, from.y)
+	var last := from
+	for n in int(from.distance_to(to) / 0.25):
+		var p := from + along * n * 0.25
+		if _sample(visual, p.x, p.y) < level - 0.35:
+			break
+		last = p
+	# And a little further in, so that the deck passes over the land's rounded edge.
+	return last - along * 1.2
 
 
 func _lay_deck(b: Dictionary) -> void:

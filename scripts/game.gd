@@ -21,14 +21,18 @@ var unlocked := {} # classes bought, or opened with a code
 var redeemed := {} # the hashes of codes already used on this phone
 var doubloons := 0
 var finished_games := 0
+var mists_wins := 0
+var poison_dealt := 0.0
 var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
 var night_map := "village"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
-	"mists": {"name": "The Mists", "desc": "Rock islands at every height in a sea of mist, joined by bridges and by gates that open and close. Falling is death. Lines of stones in the air lead to caches."}}
+	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."}}
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
+const WINS_FOR_REVENANT := 5
+const POISON_FOR_PLAGUE := 3000
 var sensitivity := 1.0
 var quality := 1 # 0 low, 1 medium, 2 high
 var difficulty := 1 # 0 easy, 1 normal, 2 hard
@@ -127,7 +131,30 @@ func earn_text(id: String) -> String:
 			return "Kill a Dread Rider to unlock this class."
 		"games":
 			return "Finish %d games to unlock this class, win or lose. So far: %d." % [GAMES_FOR_MAGICIAN, mini(finished_games, GAMES_FOR_MAGICIAN)]
+		"mists":
+			return "Survive until dawn %d times in The Mists to unlock this class. So far: %d." % [WINS_FOR_REVENANT, mini(mists_wins, WINS_FOR_REVENANT)]
+		"poison":
+			return "Deal %d poison damage to unlock this class. So far: %d." % [POISON_FOR_PLAGUE, mini(int(poison_dealt), POISON_FOR_PLAGUE)]
 	return ""
+
+
+## Poison you deal, counted over all your games. The Plague Doctor is earned with it.
+func note_poison(amount: float) -> void:
+	if mode == Mode.SANDBOX or unlocked.has("plague_doctor"):
+		return
+	poison_dealt += amount
+	if poison_dealt >= POISON_FOR_PLAGUE:
+		_earn("plague_doctor")
+
+
+## Surviving until dawn in the Mists, alone or with friends. Five of them earn the Revenant.
+func note_mists_win() -> void:
+	if current_map() != "mists" or mode == Mode.SANDBOX:
+		return
+	mists_wins += 1
+	if mists_wins >= WINS_FOR_REVENANT and not unlocked.has("revenant"):
+		_earn("revenant")
+	save_settings()
 
 
 func note_rider_killed() -> void:
@@ -246,6 +273,8 @@ func load_settings() -> void:
 	redeemed = c.get_value("progress", "redeemed", {})
 	doubloons = c.get_value("progress", "doubloons", 0)
 	finished_games = c.get_value("progress", "finished_games", 0)
+	mists_wins = c.get_value("progress", "mists_wins", 0)
+	poison_dealt = c.get_value("progress", "poison_dealt", 0.0)
 	owned_items = c.get_value("progress", "owned_items", {})
 	switched_off = c.get_value("progress", "switched_off", {})
 	pet = c.get_value("progress", "pet", "wolf")
@@ -278,6 +307,8 @@ func save_settings() -> void:
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
 	c.set_value("progress", "finished_games", finished_games)
+	c.set_value("progress", "mists_wins", mists_wins)
+	c.set_value("progress", "poison_dealt", poison_dealt)
 	c.set_value("progress", "owned_items", owned_items)
 	c.set_value("progress", "switched_off", switched_off)
 	c.set_value("progress", "pet", pet)

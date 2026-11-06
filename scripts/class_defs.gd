@@ -17,13 +17,13 @@ const ALL := {
 	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 70.0, "speed": 1.0, "ranged": true, "mana": true, "hidden": true, "earned": "games",
 		"desc": "Fragile caster. Keeps a Staff that uses refilling mana. Elements and summoned allies."},
 	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.5, "kill_mist": 5.0,
-		"no_weapons": true, "hidden": true, "price": 650,
+		"no_weapons": true, "hidden": true, "earned": "mists",
 		"desc": "Dead, and not done. No weapons, only claws of Mist, which it spends with every blow."},
-	"monk": {"name": "Monk", "weapon": "fists", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "mana": true, "ki": true, "mana_regen": 0.0, "hidden": true,
-		"desc": "Master of Ki. Every hit fills the Ki bar, and Ki pays for the Monk's ability. Punches when it has no weapon, can use any weapon it finds, and only a Monk can use the Bo."},
-	"adept": {"name": "Adept", "weapon": "sword", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": false, "hidden": true,
+	"monk": {"name": "Monk", "weapon": "fists", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "mana": true, "ki": true, "mana_regen": 0.0, "hidden": true, "price": 800, "one_weapon": true,
+		"desc": "Master of Ki. Every hit fills the Ki bar, and Ki pays for the Monk's ability. Carries one weapon at a time and punches when it has none. Only a Monk can use the Bo."},
+	"adept": {"name": "Adept", "weapon": "sword", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": false, "hidden": true, "unavailable": true,
 		"desc": "Master of stances. One button changes stance at any moment. Wind: 25% faster, and each blow strikes twice for less. Stone: 30% less damage, and blows throw enemies back. Flame: blows burn, and you take 15% more. Starts with a Sword. No ranged weapons."},
-	"plague_doctor": {"name": "Plague Doctor", "weapon": "blowgun", "arrows": 24, "hp": 90.0, "speed": 1.0, "ranged": true, "kill_arrows": 1, "hidden": true,
+	"plague_doctor": {"name": "Plague Doctor", "weapon": "blowgun", "arrows": 24, "hp": 90.0, "speed": 1.0, "ranged": true, "kill_arrows": 1, "hidden": true, "earned": "poison",
 		"desc": "The beaked mask has seen it all. Starts with a Blowgun and 24 darts. Cures friends, spreads sickness, or commands the rats."},
 	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 520,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
@@ -43,7 +43,7 @@ static func dress(body: Node3D, id: String) -> void:
 	ClassGear.wear(body, id)
 
 
-## The classes this phone can play. Some have to be bought or opened with a code first.
+## The classes this phone can play. Some have to be bought or earned first.
 static func available() -> Array[String]:
 	var out: Array[String] = []
 	for id: String in ALL:

@@ -7,7 +7,7 @@ signal closed
 const TABS := ["Classes", "Enemies", "Familiars", "Items", "Weapons"]
 
 var _list: VBoxContainer
-var _scroll: ScrollContainer
+var _scroll: DragScroll
 var _tabs: Array[Button] = []
 
 
@@ -56,9 +56,8 @@ func build() -> void:
 		Sfx.play("ui_click", -4.0)
 		closed.emit())
 	top.add_child(close)
-	_scroll = ScrollContainer.new()
+	_scroll = DragScroll.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(_scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
