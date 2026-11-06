@@ -622,8 +622,9 @@ func hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if push.length_squared() > 0.001:
 		# A bridge has no sides, and a good blow can put you over the edge.
 		var on_bridge := world.terrain.has_islands() and world.terrain.on_deck(global_position.x, global_position.z)
-		velocity += push.normalized() * (BRIDGE_KNOCK if on_bridge else 2.5)
-		if on_bridge:
+		var thrown: bool = on_bridge or (attacker != null and attacker.def.get("shoves", false))
+		velocity += push.normalized() * (BRIDGE_KNOCK if thrown else 2.5)
+		if thrown:
 			velocity.y = maxf(velocity.y, 3.5)
 	Sfx.play("hurt", -3.0, 1.0, 0.2)
 	if Game.vibration and world.now - _buzz_at > 0.3:

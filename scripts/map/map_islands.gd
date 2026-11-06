@@ -902,8 +902,11 @@ func _stone_line(b: MapBuilder, line: Dictionary, caches: MistCaches) -> void:
 	var l := LowPoly.new()
 	var w: World = b.w
 	var stones := stones_of(line)
+	var chain: Array = []
+	w.stone_chains.append(chain)
 	for s: Vector4 in stones:
 		var top := Vector3(s.x, s.y, s.z)
+		chain.append(top)
 		l.prism(top + Vector3.DOWN * 0.26, top, s.w * 1.05, s.w, 8, MOSS.lightened(0.12))
 		l.prism(top + Vector3.DOWN * 0.26, top + Vector3(0.1, -s.w * 0.9 - 0.3, -0.1), s.w * 1.05, 0.25, 7, STONE.darkened(0.25))
 		w.add_stone(top, s.w * 0.96)
@@ -912,6 +915,7 @@ func _stone_line(b: MapBuilder, line: Dictionary, caches: MistCaches) -> void:
 		var spot: Vector3 = line.get("landing", Vector3(stones[stones.size() - 1].x, stones[stones.size() - 1].y, stones[stones.size() - 1].z))
 		if line.has("landing"):
 			w.add_stone(spot, LANDING_RADIUS)
+			chain.append(spot)
 		caches.add(spot, int(line["coins"]), str(line.get("reward", "")), str(line.get("weapon", "")))
 
 

@@ -276,7 +276,13 @@ def lotus():
     return "".join(turn(a, path(PINK, "M50 74 C34 56 38 28 50 10 C62 28 66 56 50 74Z")) for a in (-60, 60, -30, 30, 0)) + poly(GREEN, (10, 80), (50, 92), (90, 80), (50, 74))
 def body_out():
     return path(DARK, "M30 94 L30 58 C30 46 38 42 44 40 C36 34 36 18 46 16 C58 14 60 34 52 40 C60 42 66 48 66 58 L66 94Z") + at(70, 28, 0.42, ghost())
-for g in (bo, ki, mountain, wave, lotus, body_out):
+def stalker():
+    # A crouched shape in mid-bound over a gap.
+    return path(("#7fe8dc", "#2d8f88"), "M8 66 C20 34 44 20 62 22 L72 10 L76 26 C86 30 92 38 92 44 L78 46 C70 52 60 54 52 54 L58 78 L44 72 L40 56 C30 60 20 66 8 66Z") + poly(ROCK, (2, 94), (2, 78), (30, 78), (22, 94)) + poly(ROCK, (98, 94), (98, 78), (68, 78), (76, 94))
+def harrier():
+    # A ray seen from above: broad wings and a whip of a tail.
+    return path(("#e2fbf5", "#5fc2b8"), "M50 12 C58 24 66 30 96 34 C84 50 66 56 56 60 L52 92 L50 96 L48 92 L44 60 C34 56 16 50 4 34 C34 30 42 24 50 12Z") + ell("#ff6a3a", 42, 28, 4, 4, 0, 0) + ell("#ff6a3a", 58, 28, 4, 4, 0, 0)
+for g in (bo, ki, mountain, wave, lotus, body_out, stalker, harrier):
     PLAIN.append(g)
 
 # Purchases and weapons with a picture of their own

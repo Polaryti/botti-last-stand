@@ -49,9 +49,13 @@ func _ready() -> void:
 		print("RESULT: %d checks, %d failures" % [checks, failures])
 		get_tree().quit(1 if failures > 0 else 0)
 		return
+	# Whatever an interrupted run left in the save, the tests start on the ordinary map.
+	Game.night_map = "village"
+	Game.pet = "wolf"
 	if args.has("new"):
 		await start_clean()
 		await test_version_19_1()
+		await test_version_20()
 		await test_version_19()
 		await test_version_18()
 		await test_version_16()
@@ -83,6 +87,7 @@ func _ready() -> void:
 		await test_night()
 	await test_land()
 	await test_version_19_1()
+	await test_version_20()
 	await test_version_19()
 	await test_version_18()
 	await test_version_16()
@@ -954,6 +959,130 @@ func test_version_18() -> void:
 	Game.player_class = "infantry"
 	Game.save_settings()
 	await start_clean()
+
+
+func test_version_20() -> void:
+	var saved_map := Game.night_map
+	# Only the Mists have the two new hunters.
+	for i in 300:
+		ok_quiet_roamer(ZombieDefs.pick_roamer(600.0))
+	ok(not _saw_mist_roamer, "no Rift Stalker walks the ordinary maps")
+	var in_mists := {}
+	for i in 300:
+		in_mists[ZombieDefs.pick_roamer(600.0, true)] = true
+	ok(in_mists.has("rift_stalker"), "the Mists have them")
+	Game.night_map = "village"
+	Game.mode = Game.Mode.NIGHT
+	ok(not Game.zombie_pool_plan().has("harrier"), "no harrier is kept ready on the Village")
+	Game.night_map = "mists"
+	ok(Game.zombie_pool_plan().has("harrier"), "but one is in the Mists")
+	await start_clean()
+	var pl := w.player
+	pl.guard_left = 9999.0
+	w.director.running = false
+	ok(w.stone_chains.size() == MapIslands.stone_lines().size(), "every line of stones is known to the mobs")
+	# Up the stones after you.
+	var chain: Array = w.stone_chains[0]
+	var stand: Vector3 = chain[2]
+	var from: Vector3 = chain[0]
+	var ground_start := from + (from - Vector3(0, from.y, 0)).normalized() * -5.0
+	ground_start.y = w.ground_at(ground_start)
+	ok(w.terrain.is_walkable(ground_start.x, ground_start.z), "the first line starts by walkable ground")
+	pl.global_position = stand + Vector3.UP * 0.1
+	pl.velocity = Vector3.ZERO
+	w.spawn_zombie("normal", ground_start)
+	var climber: Zombie = w.zombies[w.zombies.size() - 1]
+	climber._start_chase(pl.global_position)
+	var reached := false
+	for i in 2400:
+		await get_tree().physics_frame
+		pl.global_position = stand + Vector3.UP * 0.1
+		pl.velocity = Vector3.ZERO
+		if climber._perch_i >= 0 and absi(climber._perch_i - 2) <= 1:
+			reached = true
+			break
+	ok(reached, "a plain zombie jumps along the stones after you (stone %d, at %s)" % [climber._perch_i, climber.position])
+	ok(absf(climber.position.y - (chain[climber._perch_i] as Vector3).y) < 0.05 if climber._perch_i >= 0 else false, "and stands on the stone, not in the air")
+	# Comes back down when you go.
+	var ground_spot := ground_start + (ground_start - from).normalized() * 3.0
+	ground_spot.y = w.ground_at(ground_spot)
+	pl.global_position = ground_spot + Vector3.UP * 0.1
+	var came_down := false
+	for i in 3000:
+		await get_tree().physics_frame
+		if climber._perch_i < 0 and not climber._airborne and w.terrain.is_walkable(climber.position.x, climber.position.z):
+			came_down = true
+			break
+	ok(came_down, "and comes down after you when you leave (%s)" % climber.position)
+	climber.release()
+	# Over a gap with no bridge.
+	var near := Vector3.INF
+	var far := Vector3.INF
+	for tries in 6000:
+		var a := Vector3(randf_range(-160, 160), 0, randf_range(-160, 160))
+		if not w.terrain.is_walkable(a.x, a.z) or w.terrain.on_deck(a.x, a.z):
+			continue
+		var ang := randf() * TAU
+		var dir := Vector3(sin(ang), 0, cos(ang))
+		var b := a + dir * 9.0
+		var mid := a + dir * 4.5
+		if w.terrain.is_walkable(mid.x, mid.z) or not w.terrain.is_walkable(b.x, b.z) or w.terrain.on_deck(b.x, b.z):
+			continue
+		if w.terrain.on_deck(mid.x, mid.z) or w.ground_at(b) - w.ground_at(a) > 3.0:
+			continue
+		if not w.terrain.is_walkable((b + dir * 2.0).x, (b + dir * 2.0).z) or not w.terrain.is_walkable((a - dir).x, (a - dir).z):
+			continue
+		near = a
+		far = b + dir * 2.0
+		break
+	ok(near != Vector3.INF, "there is a gap to test on")
+	if near != Vector3.INF:
+		near.y = w.ground_at(near)
+		far.y = w.ground_at(far)
+		pl.global_position = far + Vector3.UP * 0.1
+		w.spawn_zombie("rift_stalker", near)
+		var bound: Zombie = w.zombies[w.zombies.size() - 1]
+		bound._start_chase(far)
+		var crossed := false
+		for i in 1800:
+			await get_tree().physics_frame
+			pl.global_position = far + Vector3.UP * 0.1
+			pl.velocity = Vector3.ZERO
+			if not bound._airborne and Vector2(bound.position.x - far.x, bound.position.z - far.z).length() < 4.0:
+				crossed = true
+				break
+		ok(crossed, "a Rift Stalker clears the gap from %s to %s (ended at %s)" % [near, far, bound.position])
+		ok(absf(bound.position.y - w.ground_at(bound.position)) < 0.3, "and lands on the ground")
+		bound.release()
+	# A blow from a Harrier throws you, even on open ground.
+	var spot := Vector3(0, 0, 18)
+	spot.y = w.ground_at(spot)
+	pl.global_position = spot + Vector3.UP * 0.05
+	pl.velocity = Vector3.ZERO
+	pl.guard_left = 0.0
+	ok(w.spawn_zombie("mist_harrier", spot + Vector3(6, 0, 0)), "a Mist Harrier takes to the air")
+	var harrier: Zombie = w.zombies[w.zombies.size() - 1]
+	ok(harrier.flies and harrier.position.y > spot.y + 3.0, "high over the ground")
+	pl.hurt(5.0, pl.global_position + Vector3(1, 0, 0), harrier)
+	ok(pl.velocity.length() >= Player.BRIDGE_KNOCK - 0.1, "its blow throws you back (%.1f)" % pl.velocity.length())
+	pl.velocity = Vector3.ZERO
+	pl.guard_left = 9999.0
+	w.director.elapsed = ZombieDefs.ALL["mist_harrier"]["from"]
+	harrier.release()
+	var before := w.count_type("mist_harrier")
+	w.director._next_harrier = 0.0
+	w.director._tick_specials()
+	ok(w.count_type("mist_harrier") == before + 1, "the night sends them in")
+	Game.night_map = saved_map
+	await start_clean()
+
+
+var _saw_mist_roamer := false
+
+
+func ok_quiet_roamer(id: String) -> void:
+	if ZombieDefs.ALL[id].get("only_islands", false):
+		_saw_mist_roamer = true
 
 
 func test_version_19_1() -> void:
@@ -4962,7 +5091,7 @@ func soak() -> void:
 	print("soak: night time reached ", Game.clock(w.director.elapsed), " kills=", pl.kills, " peak alive=", peak_alive, " types=", seen.keys())
 	print("soak: physics ms avg=%.2f peak=%.2f, hunted %d%% of the time" % [total / maxi(n, 1), peak, 100 * hunted_frames / maxi(frames_total, 1)])
 	# Rare ones depend on how many zombies die and get replaced, which varies from night to night.
-	ok(seen.size() >= ZombieDefs.ALL.size() - 3, "nearly all zombie types appear in a real night (%d of %d)" % [seen.size(), ZombieDefs.ALL.size()])
+	ok(seen.size() >= ZombieDefs.ALL.size() - 5, "nearly all zombie types appear in a real night (%d of %d)" % [seen.size(), ZombieDefs.ALL.size()])
 	var late := {}
 	for i in 600:
 		late[ZombieDefs.pick_roamer(420.0)] = true

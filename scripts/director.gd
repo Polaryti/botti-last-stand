@@ -15,6 +15,9 @@ const FIRST_CROWS := 120.0
 const CROWS_EVERY := 55.0
 const FIRST_GARGOYLE := 240.0
 const GARGOYLE_EVERY := 70.0
+const FIRST_HARRIER := 150.0
+const HARRIER_EVERY := 60.0
+const MAX_HARRIERS := 3
 const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
@@ -37,6 +40,7 @@ var _familiar_timer := FAMILIAR_EVERY
 var _next_hero := FIRST_HERO
 var _next_crows := FIRST_CROWS
 var _next_gargoyle := FIRST_GARGOYLE
+var _next_harrier := FIRST_HARRIER
 var _next_ambush := FIRST_AMBUSH
 var _hero_index := 0
 var _next_beast := FIRST_BEAST
@@ -91,7 +95,7 @@ func begin(with_zombies: bool) -> void:
 	if running:
 		_spawn_timer = 0.0
 		for i in target_population():
-			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed))
+			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands()))
 		var opening := "Survive until dawn"
 		if world.fort:
 			opening = "Hold the fort until dawn"
@@ -183,7 +187,7 @@ func _process(delta: float) -> void:
 		_spawn_timer = 1.25 if _last_stand else 2.5
 		var living := world.count_living()
 		if living < target_population():
-			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed))
+			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands()))
 	if elapsed >= _next_beast:
 		_next_beast = elapsed + (LAST_STAND_BEAST_EVERY if _last_stand else BEAST_EVERY)
 		if world.count_type("beast") < (LAST_STAND_BEASTS if _last_stand else MAX_BEASTS) and world.spawn_zombie("beast"):
@@ -274,6 +278,10 @@ func _tick_specials() -> void:
 	if elapsed >= _next_gargoyle:
 		_next_gargoyle = elapsed + GARGOYLE_EVERY
 		world.spawn_gargoyle()
+	if elapsed >= _next_harrier:
+		_next_harrier = elapsed + HARRIER_EVERY
+		if world.terrain.has_islands() and world.count_type("mist_harrier") < MAX_HARRIERS:
+			world.spawn_zombie("mist_harrier")
 	if elapsed >= _next_ambush:
 		_next_ambush = elapsed + AMBUSH_EVERY
 		if world.fort:

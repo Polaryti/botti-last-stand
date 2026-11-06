@@ -2,6 +2,12 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## 0.20.0 (6 November 2026)
+### The Mists
+- Nothing is safe up on the stones any more. Every zombie that walks now jumps gaps and follows you along the stone lines, and comes back down when you do.
+- Rift Stalker: a teal hunter found only in the Mists. It bounds over gaps a zombie could never clear, up to twenty metres.
+- Mist Harrier: a pale ray that glides over the void and dives at you. Its blow throws you back, so keep away from the edge when you hear it.
+
 ## 0.19.1 (6 November 2026)
 ### New
 - You can now drop the weapon in your hands, to leave it for a friend or make room. You always keep something to fight with, and a class's own weapon stays with it.

@@ -40,6 +40,27 @@ static func build(id: String) -> Node3D:
 			var wr := _part(root, wing, Vector3(-0.06, 0.05, 0))
 			wr.scale = Vector3(-1, 1, 1)
 			root.set_meta("wing_r", wr)
+		"harrier":
+			# A pale ray of the mist: all wing, with a long whip of a tail and a burning eye each side.
+			var pale := Color(0.74, 0.94, 0.9)
+			var under := Color(0.16, 0.42, 0.46)
+			_part(root, _mesh("harrier_body", func(l: LowPoly) -> void:
+				l.prism(Vector3(0, 0, -0.5), Vector3(0, 0, 0.42), 0.14, 0.3, 6, pale)
+				l.prism(Vector3(0, 0.02, 0.42), Vector3(0, 0, 0.82), 0.26, 0.05, 5, pale.lightened(0.15))
+				for x: float in [-0.14, 0.14]:
+					l.box(Vector3(x, 0.14, 0.56), Vector3(0.09, 0.07, 0.09), Color(1.0, 0.36, 0.2))
+					l.prism(Vector3(x, 0.0, 0.76), Vector3(x * 1.2, -0.12, 1.08), 0.05, 0.0, 4, under)
+				l.prism(Vector3(0, 0, -0.5), Vector3(0, 0.05, -1.1), 0.08, 0.05, 4, under)
+				l.prism(Vector3(0, 0.05, -1.1), Vector3(0, -0.04, -1.9), 0.05, 0.015, 4, under)
+				l.prism(Vector3(0, 0.1, -0.1), Vector3(0, 0.42, -0.42), 0.12, 0.0, 4, under)))
+			var ray_wing := _mesh("harrier_wing", func(l: LowPoly) -> void:
+				l.box(Vector3(0.42, 0, 0), Vector3(0.84, 0.05, 0.78), pale)
+				l.box(Vector3(1.08, -0.02, -0.08), Vector3(0.52, 0.04, 0.48), pale.darkened(0.12))
+				l.box(Vector3(1.52, -0.04, -0.18), Vector3(0.42, 0.03, 0.2), under))
+			root.set_meta("wing_l", _part(root, ray_wing, Vector3(0.14, 0.03, 0)))
+			var other_wing := _part(root, ray_wing, Vector3(-0.14, 0.03, 0))
+			other_wing.scale = Vector3(-1, 1, 1)
+			root.set_meta("wing_r", other_wing)
 		"gargoyle":
 			var stone := Color(0.4, 0.4, 0.44)
 			_part(root, _mesh("garg_body", func(l: LowPoly) -> void:

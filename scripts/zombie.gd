@@ -25,6 +25,12 @@ static var _ice_material: StandardMaterial3D
 static var _eye_mesh: Mesh
 static var _claw_mesh: Mesh
 
+const HOP_REACH := 9.5
+const HOP_UP := 6.0
+const HOP_GRAVITY := 18.0
+const HOP_THINK := 0.4
+const HOP_LOOK := 30.0
+
 var world: World
 var model_id := ""
 var type_id := ""
@@ -156,6 +162,19 @@ var _charges := false
 var _caster := false
 var _is_scarecrow := false
 var _leaps := false
+# In the Mists: jumping over gaps and along the stones after whoever it is chasing.
+var _can_hop := false
+var _hop_reach := HOP_REACH
+var _hop_up := HOP_UP
+var _hop_cd := 0.0
+var _hop_to := Vector3.INF
+var _hop_left := 0.0
+var _hop_line := -1
+var _hop_i := -1
+var _hop_walk := Vector3.INF
+var _perch_line := -1
+var _perch_i := -1
+var _perch_lost := 0.0
 var _sight := 0.0
 var _speed := 0.0
 var _roam_speed := 0.0
@@ -226,7 +245,7 @@ func _material_for(id: String, source: Material) -> ShaderMaterial:
 
 func _build_visual() -> void:
 	_setup_static()
-	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy"]
+	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy", "harrier"]
 	if _custom:
 		_visual = EnemyModels.build(model_id)
 		add_child(_visual)
@@ -343,6 +362,17 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_caster = def.get("caster", false)
 	_is_scarecrow = def.get("scarecrow", false)
 	_leaps = def.get("leaps", false) or (id == "hero_infantry" and minute >= 4)
+	_can_hop = world.terrain.has_islands() and not flies and not phases and not _is_dormant_type and not _is_scarecrow and not def.get("rider", false)
+	_hop_reach = float(def.get("hop_reach", HOP_REACH))
+	_hop_up = float(def.get("hop_up", HOP_UP))
+	_hop_cd = randf() * HOP_THINK
+	_hop_left = 0.0
+	_hop_line = -1
+	_hop_i = -1
+	_hop_walk = Vector3.INF
+	_perch_line = -1
+	_perch_i = -1
+	_perch_lost = 0.0
 	hero_minute = minute
 	weapon_id = ""
 	hp = float(def["hp"])
@@ -1449,7 +1479,9 @@ func _physics_process(delta: float) -> void:
 			_show_stun(false)
 		velocity = _knock
 		_knock = _knock.lerp(Vector3.ZERO, min(1.0, delta * 8.0))
-		if not flies and not phases:
+		if _perch_i >= 0:
+			pass # there is nowhere to stagger to on a stone
+		elif not flies and not phases:
 			move_and_slide()
 			position.y = world.ground_at(position)
 		else:
@@ -1477,6 +1509,16 @@ func _physics_process(delta: float) -> void:
 		_tick_rider(target, to, dist, delta)
 		HorseModel.set_gait(_horse_node, clampf(velocity.length() / 7.0, 0.0, 1.0))
 		return
+	if _can_hop:
+		_hop_cd -= delta
+		if _perch_i >= 0:
+			_tick_perch(target, to, dist, delta)
+			return
+		if _hop_cd <= 0.0:
+			_hop_cd = HOP_THINK
+			_think_hop(target, dist)
+			if _airborne:
+				return
 	_tick_hero(target, dist, delta)
 	_try_leap(target, dist)
 	if not _airborne:
@@ -1524,8 +1566,11 @@ func _try_leap(target: Target, dist: float) -> void:
 		return
 	if _special_cd > 0.0 or not _sees or dist < 3.5 or dist > 9.5 or _attack_left > 0.0:
 		return
-	_special_cd = randf_range(3.0, 4.5)
 	var aim := target.global_position + target.velocity * 0.35
+	# Over the void this is not a leap but a long way down. Crossing a gap is _think_hop's job.
+	if world.terrain.has_islands() and not world.terrain.is_walkable(aim.x, aim.z):
+		return
+	_special_cd = randf_range(3.0, 4.5)
 	var flight := clampf(dist / 9.0, 0.45, 0.8)
 	var flat := aim - position
 	flat.y = 0.0
@@ -1540,6 +1585,9 @@ func _try_leap(target: Target, dist: float) -> void:
 
 
 func _tick_leap(target: Target, delta: float) -> void:
+	if _hop_left > 0.0:
+		_tick_hop(target, delta)
+		return
 	_air_vel.y -= 18.0 * delta
 	position += _air_vel * delta
 	rotation.y = atan2(_air_vel.x, _air_vel.z)
@@ -1560,6 +1608,200 @@ func _tick_leap(target: Target, delta: float) -> void:
 			var free := world.grid.to_world(world.grid.nearest_free(c))
 			position.x = free.x
 			position.z = free.z
+
+
+# --- Jumping about the Mists --------------------------------------------------
+
+## Is whoever it is chasing on the stones, or across a gap? Then it comes the way they went.
+func _think_hop(target: Target, dist: float) -> void:
+	_hop_walk = Vector3.INF
+	if state != State.CHASE or _attack_left > 0.0 or _hold or dist > HOP_LOOK or _stun > 0.0:
+		return
+	var at := target.global_position
+	if at.y - world.ground_at(at) > 0.8:
+		var on := world.stone_near(at)
+		if on.x >= 0:
+			var best := _best_stone(on.x, on.y)
+			if best >= 0:
+				_hop_onto(on.x, best)
+			else:
+				_head_for(_closest_stone(on.x))
+			return
+	var flat := Vector3(at.x - position.x, 0.0, at.z - position.z)
+	if dist < 2.0:
+		return
+	var dir := flat / dist
+	var gap_at := -1.0
+	var d := 2.0
+	var terrain := world.terrain
+	while d < dist:
+		var p := position + dir * d
+		var walkable := terrain.is_walkable(p.x, p.z)
+		if gap_at < 0.0:
+			if not walkable:
+				gap_at = d
+		elif walkable:
+			var across := d + 1.5
+			if across - gap_at + 1.5 > _hop_reach:
+				return
+			var land := position + dir * across
+			if not terrain.is_walkable(land.x, land.z) or not world.grid.is_free(world.grid.to_cell(land)):
+				return
+			land.y = world.ground_at(land)
+			if land.y - position.y > _hop_up:
+				return
+			if gap_at - 1.5 > 2.0:
+				_head_for(position + dir * (gap_at - 1.5))
+			else:
+				_start_hop(land)
+			return
+		d += 2.0
+
+
+## Straight there on foot, when the grid has no way to get to a place that is about to be jumped from.
+func _head_for(at: Vector3) -> void:
+	if world.grid.line_is_open(position, at):
+		_hop_walk = at
+
+
+func _closest_stone(line: int) -> Vector3:
+	var best := Vector3.INF
+	var near := INF
+	for top: Vector3 in world.stone_chains[line]:
+		var d := Vector2(top.x - position.x, top.z - position.z).length()
+		if d < near:
+			near = d
+			best = top
+	return best
+
+
+## The stone in reach that is closest along the line to the one wanted, if nobody is on it.
+func _best_stone(line: int, want: int) -> int:
+	var chain: Array = world.stone_chains[line]
+	var best := -1
+	var best_gap := 1 << 20
+	for i in chain.size():
+		var top: Vector3 = chain[i]
+		if Vector2(top.x - position.x, top.z - position.z).length() > _hop_reach or top.y - position.y > _hop_up:
+			continue
+		var gap := absi(i - want)
+		if gap < best_gap and not _stone_taken(line, i):
+			best_gap = gap
+			best = i
+	return best
+
+
+func _stone_taken(line: int, i: int) -> bool:
+	for other in world.zombies:
+		if other != self and ((other._perch_line == line and other._perch_i == i) or (other._hop_line == line and other._hop_i == i)):
+			return true
+	return false
+
+
+func _hop_onto(line: int, i: int) -> void:
+	_start_hop(world.stone_chains[line][i])
+	_hop_line = line
+	_hop_i = i
+
+
+func _start_hop(land: Vector3) -> void:
+	var flat := land - position
+	flat.y = 0.0
+	var flight := clampf(flat.length() / 8.0, 0.45, 1.4)
+	_air_vel = flat / flight
+	_air_vel.y = (land.y - position.y + 0.5 * HOP_GRAVITY * flight * flight) / flight
+	_hop_to = land
+	_hop_left = flight
+	_hop_line = -1
+	_hop_i = -1
+	_perch_line = -1
+	_perch_i = -1
+	_perch_lost = 0.0
+	_hop_walk = Vector3.INF
+	_airborne = true
+	_shadow.visible = false
+	_tick_every = 1
+	_clear_path_only()
+	world.sfx_at("leaper", position, -6.0)
+	_current_anim = ""
+	_play("Running_A", 1.6, 0.05)
+
+
+func _tick_hop(target: Target, delta: float) -> void:
+	_hop_left -= delta
+	_air_vel.y -= HOP_GRAVITY * delta
+	position += _air_vel * delta
+	if Vector2(_air_vel.x, _air_vel.z).length_squared() > 0.1:
+		rotation.y = atan2(_air_vel.x, _air_vel.z)
+	if _hop_left > 0.0:
+		return
+	position = _hop_to
+	_airborne = false
+	_perch_line = _hop_line
+	_perch_i = _hop_i
+	_hop_line = -1
+	_hop_i = -1
+	_hop_cd = 0.5
+	_attack_cd = 0.3
+	_shadow.visible = _perch_i < 0
+	var d := position.distance_to(target.global_position)
+	if d < 2.2 and absf(target.global_position.y - position.y) < 2.4:
+		target.hurt(_melee_damage(), position, self)
+		world.sfx_at("attack", position, -3.0)
+
+
+## On a stone: fight whoever is in reach, follow them along the line, or come down after them.
+func _tick_perch(target: Target, to: Vector3, dist: float, delta: float) -> void:
+	velocity = Vector3.ZERO
+	if dist > 0.01:
+		rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
+	if _anim != null and _attack_left <= 0.0:
+		_play("Idle")
+	_combat(target, dist, delta)
+	if _custom:
+		_animate_custom(delta, 0.0)
+	if _hop_cd > 0.0 or _attack_left > 0.0:
+		return
+	_hop_cd = HOP_THINK
+	var at := target.global_position
+	var on := world.stone_near(at) if at.y - world.ground_at(at) > 0.8 else Vector2i(-1, -1)
+	if on.x == _perch_line and on.x >= 0:
+		if dist > _melee_reach():
+			var best := _best_stone(on.x, on.y)
+			if best >= 0 and absi(best - on.y) < absi(_perch_i - on.y):
+				_hop_onto(on.x, best)
+		return
+	var land := _land_towards(at)
+	if land != Vector3.INF:
+		_start_hop(land)
+		return
+	# Too far from anywhere to land: back down the line, the way it came.
+	var chain: Array = world.stone_chains[_perch_line]
+	for i in chain.size():
+		var top: Vector3 = chain[i]
+		if i < _perch_i and Vector2(top.x - position.x, top.z - position.z).length() <= _hop_reach and not _stone_taken(_perch_line, i):
+			_hop_onto(_perch_line, i)
+			return
+	_perch_lost += HOP_THINK
+	if _perch_lost > 8.0:
+		release()
+
+
+## Somewhere to come down: near the target if it can, otherwise any ground in reach.
+func _land_towards(at: Vector3) -> Vector3:
+	var flat := Vector3(at.x - position.x, 0.0, at.z - position.z)
+	var turn := atan2(flat.x, flat.z)
+	for a: float in [0.0, 0.8, -0.8, 1.6, -1.6, 2.4, -2.4, PI]:
+		var dir := Vector3(sin(turn + a), 0.0, cos(turn + a))
+		var r := minf(_hop_reach, flat.length()) if a == 0.0 else _hop_reach
+		while r >= 2.0:
+			var p := position + dir * r
+			if world.terrain.is_walkable(p.x, p.z) and world.grid.is_free(world.grid.to_cell(p)):
+				p.y = world.ground_at(p)
+				if p.y - position.y <= _hop_up:
+					return p
+			r -= 2.0
+	return Vector3.INF
 
 
 ## Banshee: hold still and scream, then every zombie around learns where you are.
@@ -1675,8 +1917,8 @@ func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 func _animate_custom(delta: float, moving: float) -> void:
 	_phase += delta * (9.0 if moving > 0.0 else 0.0)
 	match model_id:
-		"crow", "gargoyle":
-			var rate := 3.2 if model_id == "crow" else 1.0
+		"crow", "gargoyle", "harrier":
+			var rate := 3.2 if model_id == "crow" else (0.6 if model_id == "harrier" else 1.0)
 			var f := sin(_phase * rate) * 0.7
 			(_visual.get_meta("wing_l") as Node3D).rotation.z = f
 			(_visual.get_meta("wing_r") as Node3D).rotation.z = -f
@@ -1718,7 +1960,18 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 				_path = PackedVector3Array()
 	var dir := Vector3.ZERO
 	var speed := _desired_speed()
-	if speed > 0.0:
+	if speed > 0.0 and _hop_walk != Vector3.INF:
+		dir = _hop_walk - position
+		dir.y = 0.0
+		if dir.length() < 0.4:
+			dir = Vector3.ZERO
+		else:
+			dir = dir.normalized()
+			var ahead := position + dir * 0.8
+			if not world.terrain.is_walkable(ahead.x, ahead.z):
+				dir = Vector3.ZERO
+		_clear_path_only()
+	elif speed > 0.0:
 		if phases:
 			if state == State.CHASE and _sees:
 				if dist > _melee_reach() * 0.7:

@@ -3,6 +3,7 @@ extends Node
 
 enum Mode { MENU, NIGHT, SANDBOX, FORT }
 
+const MIST_HARRIERS := 3
 const SAVE_PATH := "user://settings.cfg"
 const NIGHT_LENGTH := 600.0
 ## Codes are kept as hashes, so they cannot simply be read out of the game files or the repository.
@@ -231,6 +232,8 @@ func zombie_pool_plan() -> Dictionary:
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:
 		plan["dummy"] = 6
+	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
+		plan["harrier"] = MIST_HARRIERS
 	return plan
 
 

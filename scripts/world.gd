@@ -30,6 +30,7 @@ static var _flame_mesh: BoxMesh
 static var _warmed_quality := -1
 static var _lands := {} # the land takes a moment to work out, and it never changes
 
+var stone_chains: Array = [] # each line of stones in the Mists, in order, by the middle of each top
 var mode: int = Game.Mode.MENU
 var grid: PathGrid
 var terrain: Terrain
@@ -507,6 +508,17 @@ func add_ledge(xf: Transform3D, size: Vector3) -> void:
 
 
 ## A round stone to land on. at is the middle of its top.
+## The line of stones nearest someone standing on one, and which stone: x is -1 if they are on none.
+func stone_near(p: Vector3) -> Vector2i:
+	for line in stone_chains.size():
+		var chain: Array = stone_chains[line]
+		for i in chain.size():
+			var top: Vector3 = chain[i]
+			if absf(top.y - p.y) < 3.0 and Vector2(top.x - p.x, top.z - p.z).length() < 2.8:
+				return Vector2i(line, i)
+	return Vector2i(-1, -1)
+
+
 func add_stone(at: Vector3, radius: float) -> void:
 	var shape := CylinderShape3D.new()
 	shape.radius = radius

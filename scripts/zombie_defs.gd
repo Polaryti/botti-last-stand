@@ -23,6 +23,11 @@ const ALL := {
 		"sight": 45.0, "tint": Color(0.46, 0.22, 0.2), "models": ["beast"], "from": 170.0, "weight": 0.0, "claws": true},
 	"leaper": {"name": "Leaper", "icon": "boot+up", "desc": "Small and quick. Jumps at you from up to nine metres away.", "hp": 55.0, "roam_speed": 1.5, "speed": 3.4, "damage": 12.0, "scale": 0.88, "xp": 14,
 		"sight": 30.0, "tint": Color(0.74, 0.72, 0.22), "models": ["normal_b"], "from": 100.0, "weight": 3.5, "leaps": true},
+	# Only in the Mists.
+	"rift_stalker": {"name": "Rift Stalker", "icon": "stalker", "desc": "Hunts only in the Mists. Bounds over gaps a Zombie could never clear, and a stone line is no escape from it.", "hp": 65.0, "roam_speed": 2.0, "speed": 3.6, "damage": 12.0, "scale": 0.95, "xp": 16,
+		"sight": 36.0, "tint": Color(0.3, 0.82, 0.76), "models": ["normal_b"], "from": 45.0, "weight": 3.0, "leaps": true, "only_islands": true, "hop_reach": 20.0, "hop_up": 10.0},
+	"mist_harrier": {"name": "Mist Harrier", "icon": "harrier", "desc": "Hunts only in the Mists. Glides over the void and dives. Its blow throws you back, so keep away from the edge.", "hp": 70.0, "roam_speed": 4.0, "speed": 5.4, "damage": 11.0, "scale": 1.0, "xp": 18,
+		"sight": 40.0, "models": ["harrier"], "from": 150.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 6.0, "only_islands": true, "shoves": true},
 	"crow": {"name": "Carrion Crow", "icon": "feather", "desc": "Comes in flocks that circle and dive. A roof stops them.", "hp": 25.0, "roam_speed": 5.0, "speed": 6.0, "damage": 5.0, "scale": 1.0, "xp": 6,
 		"sight": 32.0, "models": ["crow"], "from": 120.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 4.5},
 	"gargoyle": {"name": "Gargoyle", "icon": "wings", "desc": "A statue on a rooftop, until you walk too close. Then it hunts from the air.", "hp": 120.0, "roam_speed": 4.0, "speed": 7.5, "damage": 18.0, "scale": 1.0, "xp": 28,
@@ -61,14 +66,14 @@ static func def_of(id: String) -> Dictionary:
 	return DUMMY if id == "dummy" else ALL[id]
 
 
-static func pick_roamer(elapsed: float) -> String:
+static func pick_roamer(elapsed: float, islands := false) -> String:
 	var total := 0.0
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)):
+		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)):
 			total += float(ALL[id].get("weight", 0.0))
 	var r := randf() * total
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)):
+		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)):
 			var w: float = ALL[id].get("weight", 0.0)
 			if w <= 0.0:
 				continue
