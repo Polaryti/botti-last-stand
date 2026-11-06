@@ -26,7 +26,7 @@ var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
 var night_map := "village"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
-	"mists": {"name": "The Mists", "desc": "Floating islands, joined by gates that open and close. Mind the edge: falling is death."}}
+	"mists": {"name": "The Mists", "desc": "Rock islands at every height in a sea of mist, joined by bridges and by gates that open and close. Falling is death. Lines of stones in the air lead to caches."}}
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 var sensitivity := 1.0

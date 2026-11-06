@@ -1729,7 +1729,9 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 				dir = dir.normalized()
 		elif _direct:
 			if dist > _melee_reach() * 0.7:
-				var approach := to + _flank * clampf(dist - 2.5, 0.0, 4.0)
+				# Spreading out to surround you is for open ground. On a bridge there is only the one way.
+				var spread := 0.0 if world.terrain.has_islands() and world.terrain.near_deck(position.x, position.z) else 1.0
+				var approach := to + _flank * clampf(dist - 2.5, 0.0, 4.0) * spread
 				dir = approach.normalized()
 				_check_blocked(delta)
 			_clear_path_only()

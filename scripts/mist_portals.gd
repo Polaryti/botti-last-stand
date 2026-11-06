@@ -11,14 +11,27 @@ const SYNC_EVERY := 5.0
 
 var world: World
 var islands: Array[Vector4] = []
+var regions: Array[int] = [] # for each island, which group of islands you can walk between
 var links: Array[Dictionary] = [] # a, b: where each end stands. ia, ib: its island. open, closing: seconds left, or 0
 var _timer := CHANGE_EVERY
 var _sync := 1.0
 
 
-func _init(owner_world: World, island_list: Array[Vector4]) -> void:
+func _init(owner_world: World, island_list: Array[Vector4], island_regions: Array[int]) -> void:
 	world = owner_world
 	islands = island_list
+	regions = island_regions
+
+
+## Where the gates stand on this island.
+func ends_on(island: int) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	for link: Dictionary in links:
+		if int(link["ia"]) == island:
+			out.append(link["a"])
+		if int(link["ib"]) == island:
+			out.append(link["b"])
+	return out
 
 
 func add_link(ia: int, ib: int, a: Vector3, b: Vector3) -> void:
@@ -39,25 +52,25 @@ func _make_end(at: Vector3) -> Node3D:
 	for i in SIDES:
 		var a0 := PI * 2.0 * i / SIDES
 		var a1 := PI * 2.0 * (i + 1) / SIDES
-		l.prism(Vector3(cos(a0) * 1.25, 1.3 + sin(a0) * 1.25, 0), Vector3(cos(a1) * 1.25, 1.3 + sin(a1) * 1.25, 0), 0.17, 0.17, 5, Color(0.36, 0.33, 0.46))
+		l.prism(Vector3(cos(a0) * 2.1, 2.2 + sin(a0) * 2.1, 0), Vector3(cos(a1) * 2.1, 2.2 + sin(a1) * 2.1, 0), 0.26, 0.26, 5, Color(0.36, 0.33, 0.46))
 	stones.mesh = l.commit()
 	stones.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(stones)
 	var veil := MeshInstance3D.new()
 	var disc := CylinderMesh.new()
-	disc.top_radius = 1.12
-	disc.bottom_radius = 1.12
+	disc.top_radius = 1.95
+	disc.bottom_radius = 1.95
 	disc.height = 0.04
 	disc.radial_segments = 16
 	disc.rings = 1
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.66, 0.42, 1.0, 0.78)
+	mat.albedo_color = Color(0.5, 1.0, 0.95, 0.72)
 	disc.material = mat
 	veil.mesh = disc
 	veil.rotation.x = PI * 0.5
-	veil.position.y = 1.3
+	veil.position.y = 2.2
 	veil.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(veil)
 	node.set_meta("veil", veil)
@@ -68,7 +81,7 @@ func _make_end(at: Vector3) -> Node3D:
 ## Every other island reached from the middle, to begin with.
 func open_starting_links() -> void:
 	for link: Dictionary in links:
-		link["open"] = link["ia"] == 0 or link["ib"] == 0
+		link["open"] = int(link["ia"]) == 0 or int(link["ib"]) == 0
 		_show(link)
 
 
@@ -135,7 +148,10 @@ func _usable(link: Dictionary) -> bool:
 
 
 func _all_joined() -> bool:
-	return _hops_from(0).size() == islands.size()
+	var wanted := {}
+	for r: int in regions:
+		wanted[r] = true
+	return _hops_from(regions[0]).size() == wanted.size()
 
 
 ## How to reach every island from this one: island -> the gate to take first.
@@ -148,10 +164,10 @@ func _hops_from(start: int) -> Dictionary:
 			if not _usable(link):
 				continue
 			var next := -1
-			if int(link["ia"]) == here:
-				next = int(link["ib"])
-			elif int(link["ib"]) == here:
-				next = int(link["ia"])
+			if regions[int(link["ia"])] == here:
+				next = regions[int(link["ib"])]
+			elif regions[int(link["ib"])] == here:
+				next = regions[int(link["ia"])]
 			if next < 0 or seen.has(next):
 				continue
 			seen[next] = link if here == start else seen[here]
@@ -172,15 +188,15 @@ func island_of(at: Vector3) -> int:
 
 ## Where to walk to get to a spot: the spot itself, or the gate that leads towards it.
 func waypoint(from: Vector3, to: Vector3) -> Vector3:
-	var here := island_of(from)
-	var there := island_of(to)
+	var here := regions[island_of(from)]
+	var there := regions[island_of(to)]
 	if here == there:
 		return to
 	var hops := _hops_from(here)
 	if not hops.has(there):
 		return from
 	var link: Dictionary = hops[there]
-	return link["a"] if int(link["ia"]) == here else link["b"]
+	return link["a"] if regions[int(link["ia"])] == here else link["b"]
 
 
 ## If this spot is in an open gate, where it comes out. Otherwise Vector3.INF.

@@ -5,9 +5,9 @@ extends RefCounted
 ## pathing all share. walk is what you stand on, including bridge decks. visual is what is
 ## drawn, so the river bed stays visible under a bridge.
 
-const HALF := 110
+static var HALF := 110
 const CELL := 2.0
-const SIZE := 111 # vertices per side
+static var SIZE := 111 # vertices per side
 const WATER_Y := -0.7
 const VOID_Y := -40.0
 const ISLAND_RIM := 2.0
@@ -22,6 +22,8 @@ const CURRENT := 1.7 # metres a second the river carries you
 
 var islands: Array[Vector4] = [] # x, z, radius and height. With any at all, the rest of the map is empty sky.
 var _island_wobble: Array[float] = []
+var _island_rough: Array[float] = []
+var _terraces: Array[Dictionary] = []
 var river: Array[Vector2] = [] # flows from the first point to the last
 var river_width := 4.2
 var roughness := 5.5
@@ -49,14 +51,28 @@ func _init() -> void:
 	visual.resize(SIZE * SIZE)
 
 
-func add_island(island: Vector4, wobble: float) -> void:
+## How big the land is, from the centre to its edge. Set before making a Terrain for a map.
+static func use_half(half: int) -> void:
+	HALF = half
+	SIZE = int(half * 2.0 / CELL) + 1
+
+
+func add_island(island: Vector4, wobble: float, rough := 0.5) -> void:
 	islands.append(island)
 	_island_wobble.append(wobble)
+	_island_rough.append(rough)
 
 
-## The land of a floating island: nearly flat, then the edge, then nothing.
+## A bowl: flat at y0 inside r0, rising to y1 at r1.
+func terrace(c: Vector2, r0: float, r1: float, y0: float, y1: float) -> void:
+	_terraces.append({"c": c, "r0": r0, "r1": r1, "y0": y0, "y1": y1})
+
+
+## The land of the islands: the top of whichever is highest here, then the edge, then a long way down.
 func _island_shape(x: float, z: float) -> float:
 	var best := VOID_Y
+	var top_best := VOID_Y
+	var drop := 1.0
 	for i in islands.size():
 		var g := islands[i]
 		var a := atan2(z - g.y, x - g.x)
@@ -64,9 +80,22 @@ func _island_shape(x: float, z: float) -> float:
 		var past := Vector2(x - g.x, z - g.y).length() - edge
 		if past >= ISLAND_RIM:
 			continue
-		var top := g.w + _detail.get_noise_2d(x, z) * 0.5 * clampf(-past / 6.0, 0.0, 1.0)
-		best = maxf(best, lerpf(top, VOID_Y, smoothstep(-0.5, ISLAND_RIM, past)))
-	return best
+		var top := g.w + (_detail.get_noise_2d(x, z) * 0.5 + _noise.get_noise_2d(x * 2.0, z * 2.0)) * _island_rough[i] * clampf(-past / 6.0, 0.0, 1.0)
+		var fall := smoothstep(-0.5, ISLAND_RIM, past)
+		var here := lerpf(top, VOID_Y, fall)
+		if here > best:
+			best = here
+			top_best = top
+			drop = fall
+	if drop >= 1.0:
+		return VOID_Y
+	for t: Dictionary in _terraces:
+		var d := Vector2(x, z).distance_to(t["c"])
+		if d < float(t["r1"]):
+			top_best = lerpf(float(t["y0"]), float(t["y1"]), clampf((d - float(t["r0"])) / (float(t["r1"]) - float(t["r0"])), 0.0, 1.0))
+	for c: Dictionary in _cuts:
+		top_best = _apply_cut(c, x, z, top_best)
+	return lerpf(top_best, VOID_Y, drop)
 
 
 func has_islands() -> bool:
@@ -114,8 +143,8 @@ func cut(points: Array[Vector3], half_width: float, margin := 3.0) -> void:
 	_cuts.append({"p": points, "w": half_width, "margin": margin})
 
 
-func bridge(a: Vector2, b: Vector2, hump: float) -> void:
-	_bridges.append({"a": a, "b": b, "hump": hump, "ya": 0.0, "yb": 0.0})
+func bridge(a: Vector2, b: Vector2, hump: float, half := 5.0) -> void:
+	_bridges.append({"a": a, "b": b, "hump": hump, "ya": 0.0, "yb": 0.0, "half": half})
 
 
 func ford(centre: Vector2, half: Vector2, yaw: float) -> void:
@@ -254,6 +283,13 @@ func _lay_deck(b: Dictionary) -> void:
 			var at := Vector2(i * CELL - HALF, j * CELL - HALF) - a
 			var run := at.dot(along)
 			var side := absf(at.dot(along.orthogonal()))
+			if not islands.is_empty():
+				# Over the void this is only where mobs stand, a little wider than the deck so that they
+				# never read the bottom of the sky. The player stands on the deck itself.
+				if run < -CELL or run > length + CELL or side > float(b["half"]) + CELL * 1.5:
+					continue
+				walk[j * SIZE + i] = maxf(deck_y(b, clampf(run / length, 0.0, 1.0)), visual[j * SIZE + i])
+				continue
 			if run < 0.0 or run > length or side > 5.0:
 				continue
 			var y := deck_y(b, run / length)
@@ -320,7 +356,20 @@ func on_deck(x: float, z: float) -> bool:
 	for b: Dictionary in _bridges:
 		var q := _deck_place(b, x, z)
 		var length := (b["a"] as Vector2).distance_to(b["b"])
+		if not islands.is_empty():
+			if q.x > 0.0 and q.x < length and q.y < float(b["half"]) + 0.2:
+				return true
+			continue
 		if q.x > -5.0 and q.x < length + 5.0 and q.y < 5.0:
+			return true
+	return false
+
+
+## On a bridge or just coming up to one.
+func near_deck(x: float, z: float) -> bool:
+	for b: Dictionary in _bridges:
+		var q := _deck_place(b, x, z)
+		if q.x > -6.0 and q.x < (b["a"] as Vector2).distance_to(b["b"]) + 6.0 and q.y < float(b["half"]) + 3.0:
 			return true
 	return false
 
@@ -334,6 +383,12 @@ func over_water_on_deck(x: float, z: float) -> bool:
 
 
 func is_walkable(x: float, z: float) -> bool:
+	if not islands.is_empty():
+		if on_deck(x, z):
+			return true
+		var dx := ground_height(x + 0.5, z) - ground_height(x - 0.5, z)
+		var dz := ground_height(x, z + 0.5) - ground_height(x, z - 0.5)
+		return ground_height(x, z) > 0.0 and Vector2(dx, dz).length() < STEEP
 	if height(x, z) < WATER_Y - WADE:
 		return false
 	return on_deck(x, z) or slope(x, z) < STEEP
@@ -346,7 +401,8 @@ func collision_shape() -> HeightMapShape3D:
 	data.resize(side * side)
 	for j in side:
 		for i in side:
-			data[j * side + i] = height(i - HALF, j - HALF)
+			# On the islands the bridges are separate solid things: there is nothing under them.
+			data[j * side + i] = ground_height(i - HALF, j - HALF) if not islands.is_empty() else height(i - HALF, j - HALF)
 	var shape := HeightMapShape3D.new()
 	shape.map_width = side
 	shape.map_depth = side
@@ -396,8 +452,9 @@ func _tint(x: float, z: float, h: float, steep: float, river_dist: float) -> Col
 		col = col.lerp(Color(0.36, 0.42, 0.26), clampf((h - 3.0) / 6.0, 0.0, 0.6))
 	col = col.lerp(Color(0.36, 0.34, 0.32), smoothstep(0.42, 0.72, steep))
 	if not islands.is_empty():
-		var mossy := Color(0.2, 0.3, 0.3).lerp(Color(0.34, 0.28, 0.44), clampf(_noise.get_noise_2d(x * 2.0, z * 2.0) * 1.2 + 0.5, 0.0, 1.0))
-		return mossy.lerp(Color(0.2, 0.17, 0.27), smoothstep(0.42, 0.72, steep))
+		var mossy := Color(0.13, 0.3, 0.17).lerp(Color(0.24, 0.4, 0.2), clampf(_noise.get_noise_2d(x * 2.0, z * 2.0) * 1.2 + 0.5, 0.0, 1.0))
+		mossy = mossy.lerp(Color(0.34, 0.36, 0.32), clampf(_detail.get_noise_2d(x * 0.6, z * 0.6) * 2.0 - 0.35, 0.0, 0.55))
+		return mossy.lerp(Color(0.34, 0.36, 0.38), smoothstep(0.42, 0.72, steep))
 	if river_dist < river_width + BANK * 0.65:
 		col = col.lerp(Color(0.32, 0.28, 0.2), 1.0 - smoothstep(river_width, river_width + BANK * 0.65, river_dist))
 	return col

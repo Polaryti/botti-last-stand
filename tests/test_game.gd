@@ -51,6 +51,7 @@ func _ready() -> void:
 		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_19()
 		await test_version_18()
 		await test_version_16()
 		await test_version_15()
@@ -80,6 +81,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_19()
 	await test_version_18()
 	await test_version_16()
 	await test_version_15()
@@ -952,6 +954,188 @@ func test_version_18() -> void:
 	await start_clean()
 
 
+func test_version_19() -> void:
+	var saved_map := Game.night_map
+	Game.night_map = "mists"
+	await start_clean()
+	var isl := MapIslands.ISLANDS
+	ok(Terrain.HALF == 170 and World.HALF_SIZE == 170.0 and w.grid.size == 340, "the Mists are 340 m across")
+	var lowest := INF
+	var highest := -INF
+	for i: Vector4 in isl:
+		lowest = minf(lowest, w.terrain.ground_height(i.x, i.y))
+		highest = maxf(highest, w.terrain.ground_height(i.x, i.y))
+	ok(highest - lowest > 30.0, "the land runs from %.0f m up to %.0f m" % [lowest, highest])
+	# Who can walk to whom.
+	var from_arena := w.grid.flood(Vector3(20, 0, 20))
+	var regions := MapIslands.regions()
+	for n in isl.size():
+		var centre := w.grid.nearest_free(w.grid.to_cell(Vector3(isl[n].x, 0, isl[n].y)))
+		ok(from_arena.has(centre) == (regions[n] == regions[0]), "island %d is %s the arena on foot" % [n, "joined to" if regions[n] == regions[0] else "cut off from"])
+	var names: Array[int] = []
+	for r: int in regions:
+		if not names.has(r):
+			names.append(r)
+	ok(names.size() >= 4, "%d groups of islands need gates between them" % names.size())
+	# Every line of stones can be jumped, on paper.
+	var total_stones := 0
+	for line: Dictionary in MapIslands.stone_lines():
+		var stones := MapIslands.stones_of(line)
+		total_stones += stones.size()
+		var worst_gap := 0.0
+		var worst_rise := 0.0
+		for n in range(1, stones.size()):
+			var a: Vector4 = stones[n - 1]
+			var e: Vector4 = stones[n]
+			worst_gap = maxf(worst_gap, Vector2(a.x - e.x, a.z - e.z).length() - a.w - e.w)
+			worst_rise = maxf(worst_rise, e.y - a.y)
+		ok(worst_gap < 2.6 and worst_rise <= 0.75, "a line of %d stones: widest gap %.1f m, highest step %.2f m" % [stones.size(), worst_gap, worst_rise])
+		var first: Vector4 = stones[0]
+		var start_ok := false
+		for k in 16:
+			var dir := Vector2.RIGHT.rotated(TAU * k / 16.0)
+			var land := w.terrain.ground_height(first.x + dir.x * (first.w + 2.4), first.z + dir.y * (first.w + 2.4))
+			if land > 0.0 and absf(first.y - land) < 1.3:
+				start_ok = true
+		ok(start_ok, "and its first stone can be reached from the ground at (%.0f, %.0f)" % [first.x, first.z])
+	ok(total_stones > 150, "%d stones in the air" % total_stones)
+	# And for real: the first hops of each line, and the last.
+	pl.guard_left = 9999.0
+	for line: Dictionary in MapIslands.stone_lines():
+		var stones := MapIslands.stones_of(line)
+		var hops: Array[int] = [1, stones.size() - 1]
+		var steepest := 1
+		for n in range(1, stones.size()):
+			if stones[n].y - stones[n - 1].y > stones[steepest].y - stones[steepest - 1].y:
+				steepest = n
+		hops.append(steepest)
+		for n: int in hops:
+			# Low down, a stone is half in the ground, and you may land on either.
+			if w.terrain.ground_height(stones[n].x, stones[n].z) > stones[n].y - 2.5:
+				continue
+			ok(await _jump_between(stones[n - 1], stones[n]), "a jump between stones works, and lands (%.0f, %.0f, %.0f)" % [stones[n].x, stones[n].y, stones[n].z])
+	# The slowest class makes the hardest jump too.
+	var tall_stones := MapIslands.stones_of(MapIslands.stone_lines()[3])
+	pl.mods["speed"] = 0.9
+	ok(await _jump_between(tall_stones[tall_stones.size() - 2], tall_stones[tall_stones.size() - 1]), "even at Heavy Infantry's speed")
+	pl.mods["speed"] = 1.0
+	# Across a rope bridge, and off it.
+	var br: Array = MapIslands.BRIDGES[1]
+	var from: Vector2 = br[0]
+	var to: Vector2 = br[1]
+	var along := (to - from).normalized()
+	var yaw := atan2(-along.x, -along.y)
+	pl.rotation.y = yaw
+	pl.yaw = yaw
+	pl.global_position = Vector3(from.x, w.terrain.height(from.x, from.y) + 0.2, from.y)
+	pl.velocity = Vector3.ZERO
+	pl.input_move = Vector2(0, -1)
+	var over := false
+	var low := INF
+	for i in 400:
+		await frames(1)
+		low = minf(low, pl.global_position.y)
+		if Vector2(pl.global_position.x - to.x, pl.global_position.z - to.y).length() < 3.0:
+			over = true
+			break
+	pl.input_move = Vector2.ZERO
+	ok(over and low > 8.0, "you can walk across a rope bridge (lowest %.1f)" % low)
+	var mid := from.lerp(to, 0.5)
+	pl.guard_left = 9999.0
+	pl.global_position = Vector3(mid.x, w.terrain.height(mid.x, mid.y) + 0.1, mid.y)
+	pl.velocity = Vector3.ZERO
+	await frames(3)
+	pl.guard_left = 0.0
+	pl.mods["dodge"] = 0.0
+	pl.hurt(1.0, pl.global_position + Vector3(0, 0, -1.0))
+	pl.guard_left = 9999.0
+	await seconds(1.2)
+	ok(pl.global_position.y < w.terrain.height(mid.x, mid.y) - 3.0, "with no railing, a blow can knock you off it (at %.1f)" % pl.global_position.y)
+	# Mobs cross it, on their way to you.
+	var bait := to + along * 8.0
+	pl.global_position = Vector3(bait.x, w.terrain.height(bait.x, bait.y) + 0.2, bait.y)
+	pl.velocity = Vector3.ZERO
+	var walker := spawn("normal", Vector3(from.x + 4.0, w.ground_at(Vector3(from.x + 4.0, 0, from.y)), from.y), false)
+	# The familiars from the caches above would rather kill it than watch.
+	walker.max_hp = 1000000.0
+	walker.hp = 1000000.0
+	var walked := 0.0
+	var fell_off := false
+	walker._start_chase(pl.global_position)
+	while walked < 160.0 and walker.position.distance_to(pl.global_position) > 3.0:
+		await seconds(0.5)
+		walked += 0.5
+		if walker.position.y < 5.0:
+			fell_off = true
+	ok(walker.position.distance_to(pl.global_position) <= 3.0 and not fell_off, "mobs cross it too, and reach you (%.1f s, at %s)" % [walked, walker.position])
+	walker.release()
+	# The caches.
+	for c: Dictionary in w.caches.caches:
+		c["open"] = false
+	var doubloons_before := Game.doubloons
+	var cache: Dictionary = w.caches.caches[0]
+	ok(w.caches.caches.size() == 6, "six caches")
+	pl.global_position = (cache["at"] as Vector3) + Vector3.UP * 0.3
+	pl.velocity = Vector3.ZERO
+	await frames(4)
+	ok(cache["open"] and Game.doubloons == doubloons_before + int(cache["coins"]), "reaching a cache opens it and pays out (%d)" % int(cache["coins"]))
+	var after_one := Game.doubloons
+	await frames(4)
+	ok(Game.doubloons == after_one, "only once")
+	ok(pl.has_power(str(cache["power"])), "and gives what it holds")
+	var weapon_cache: Dictionary = {}
+	for c: Dictionary in w.caches.caches:
+		if c["weapon"] != "":
+			weapon_cache = c
+	pl.global_position = (weapon_cache["at"] as Vector3) + Vector3.UP * 0.3
+	pl.velocity = Vector3.ZERO
+	await frames(4)
+	ok(pl.carries(str(weapon_cache["weapon"])) or not pl.can_use(str(weapon_cache["weapon"])), "a cache can hold a good weapon (%s)" % weapon_cache["weapon"])
+	Game.doubloons = doubloons_before
+	# Things to find stand on the land, and gates stand on open ground.
+	var bad_spots := 0
+	for spot: Vector3 in w.loot_spots:
+		if w.terrain.ground_height(spot.x, spot.z) <= 0.0:
+			bad_spots += 1
+	ok(bad_spots == 0 and w.loot_spots.size() > 25, "%d places for loot, all on land" % w.loot_spots.size())
+	for link: Dictionary in w.portals.links:
+		for end: Vector3 in [link["a"], link["b"]]:
+			ok(end.y > 0.0, "a gate stands on land at %s" % end)
+	Game.night_map = saved_map
+	await start_clean()
+
+
+## Stands on one stone, faces the next, runs and jumps at the edge, and says whether it landed.
+func _jump_between(a: Vector4, e: Vector4) -> bool:
+	var dir := Vector2(e.x - a.x, e.z - a.z).normalized()
+	var yaw := atan2(-dir.x, -dir.y)
+	pl.rotation.y = yaw
+	pl.yaw = yaw
+	pl.global_position = Vector3(a.x - dir.x * a.w * 0.5, a.y + 0.05, a.z - dir.y * a.w * 0.5)
+	pl.velocity = Vector3.ZERO
+	await frames(2)
+	pl.input_move = Vector2(0, -1)
+	var jumped := false
+	var airborne := false
+	for i in 150:
+		await frames(1)
+		var from_middle := Vector2(pl.global_position.x - a.x, pl.global_position.z - a.z).length()
+		if not jumped and pl.is_on_floor() and from_middle > a.w * 0.72:
+			pl.input_jump = true
+			jumped = true
+		if jumped and not pl.is_on_floor():
+			airborne = true
+		if pl.global_position.y < minf(a.y, e.y) - 3.0:
+			break
+		if airborne and pl.is_on_floor():
+			break
+	pl.input_move = Vector2.ZERO
+	var near := Vector2(pl.global_position.x - e.x, pl.global_position.z - e.z).length() < e.w + 0.6
+	if not (airborne and pl.is_on_floor() and near and absf(pl.global_position.y - e.y) < 1.0):
+		print("  jump from %s to %s ended at %s, airborne %s, on floor %s" % [a, e, pl.global_position, airborne, pl.is_on_floor()])
+	return airborne and pl.is_on_floor() and near and absf(pl.global_position.y - e.y) < 1.0
+
+
 func test_version_16() -> void:
 	for id: String in ["monk", "plague_doctor"]:
 		ok(not Game.owns_class(id) or Game.unlocked.has(id), "%s is locked until a code opens it" % id)
@@ -1030,7 +1214,7 @@ func test_version_15() -> void:
 	var far_centre := Vector3(MapIslands.ISLANDS[1].x, 0, MapIslands.ISLANDS[1].y)
 	far_centre.y = w.ground_at(far_centre)
 	var way := gates.waypoint(Vector3(0, 4, 0), far_centre)
-	ok(way != far_centre and gates.island_of(way) == 0, "to reach another island you walk to a gate on your own")
+	ok(way != far_centre and gates.regions[gates.island_of(way)] == gates.regions[0], "to reach another island you walk to a gate on your own side")
 	ok(gates.waypoint(Vector3(0, 4, 0), Vector3(4, 4, 4)) == Vector3(4, 4, 4), "and on your own island you just walk")
 	# Through a gate.
 	var open_link: Dictionary = {}
@@ -1067,26 +1251,6 @@ func test_version_15() -> void:
 	await seconds(3.0)
 	ok(w.terrain.height(stuck.position.x, stuck.position.z) > 0.0, "a mob stays on its island (%s)" % stuck.position)
 	stuck.release()
-	# A brave jump over to a stepping stone.
-	var stone: Vector4 = MapIslands.STONES[0]
-	var from_x := MapIslands.ISLANDS[0].z - 3.0
-	var run_at := Vector3(from_x, w.ground_at(Vector3(from_x, 0, stone.y)) + 0.1, stone.y)
-	pl.global_position = run_at
-	pl.rotation.y = -PI * 0.5
-	pl.yaw = -PI * 0.5
-	pl.velocity = Vector3.ZERO
-	pl.input_move = Vector2(0, -1)
-	var jumped := false
-	for i in 150:
-		await frames(1)
-		var ahead := Vector3(pl.global_position.x + 1.4, 0, pl.global_position.z)
-		if pl.is_on_floor() and w.terrain.height(ahead.x, ahead.z) < 0.0 and not jumped:
-			pl.input_jump = true
-			jumped = true
-		if pl.global_position.x > stone.x - 2.0 and pl.is_on_floor():
-			break
-	pl.input_move = Vector2.ZERO
-	ok(pl.global_position.x > stone.x - 3.0 and pl.global_position.y > 2.0, "the stepping stones can be reached with a jump (%s)" % pl.global_position)
 	# A night here runs like any other.
 	pl.guard_left = 9999.0
 	w.director.running = true
@@ -1121,7 +1285,7 @@ func test_version_15() -> void:
 		gates._show(link)
 	t = 0.0
 	var moved_on := false
-	while t < 30.0:
+	while t < 60.0:
 		bot._has_goal = true
 		bot._goal = far_centre
 		bot._think = 5.0
@@ -1139,9 +1303,9 @@ func test_version_15() -> void:
 	# Falling is a normal death.
 	pl.set_physics_process(true)
 	pl.guard_left = 0.0
-	pl.global_position = Vector3(38.0, 8.0, 38.0)
+	pl.global_position = Vector3(62.0, 22.0, 62.0)
 	pl.velocity = Vector3.ZERO
-	await seconds(2.0)
+	await seconds(3.0)
 	ok(pl.dead, "falling off the world kills you")
 	# Choosing a map.
 	Game.night_map = saved_map

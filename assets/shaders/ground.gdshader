@@ -8,11 +8,16 @@ uniform sampler2D roads : hint_default_white, filter_linear, repeat_disable;
 uniform vec3 dirt;
 uniform float map_half = 110.0;
 uniform float mask_reach = 3.0;
+uniform float cliffs = 0.0; // on the islands, the steep faces are banded rock
 
 varying vec2 at;
+varying vec3 world_at;
+varying float flat_ground;
 
 void vertex() {
 	at = VERTEX.xz;
+	world_at = VERTEX;
+	flat_ground = NORMAL.y;
 }
 
 void fragment() {
@@ -26,6 +31,13 @@ void fragment() {
 	float road = 1.0 - smoothstep(-0.55, 0.45, worn);
 	vec3 surface = dirt * mix(1.08, 0.92, smoothstep(-2.0, 0.0, edge)) * (0.68 + grain.g * 0.64);
 	surface = mix(surface, land, 0.18);
-	ALBEDO = mix(land, surface, road);
+	vec3 ground = mix(land, surface, road);
+	if (cliffs > 0.5 && flat_ground < 0.75) {
+		float side_grain = texture(tile, vec2(at.x + at.y, world_at.y) * 0.09).g;
+		float band = 0.5 + 0.5 * sin(world_at.y * 0.9 + sin((at.x + at.y) * 0.05) * 3.0 + side_grain * 2.0);
+		vec3 rock = mix(vec3(0.27, 0.3, 0.35), vec3(0.47, 0.49, 0.52), band * 0.8 + side_grain * 0.2);
+		ground = mix(rock, ground, smoothstep(0.35, 0.75, flat_ground));
+	}
+	ALBEDO = ground;
 	ROUGHNESS = 1.0;
 }

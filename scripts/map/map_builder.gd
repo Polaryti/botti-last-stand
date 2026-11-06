@@ -165,6 +165,7 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(Terrain.HALF))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() else 0.0)
 	_ground_material = mat
 	var j := 0
 	while j < Terrain.SIZE - 1:
@@ -1463,6 +1464,9 @@ func grass(h: float) -> void:
 	for i in int(grass_tufts * 3 * area):
 		var p := Vector3(rng.randf_range(-h, h), 0, rng.randf_range(-h, h))
 		if not w.grid.is_free(w.grid.to_cell(p)) or _is_indoors(p):
+			continue
+		# No grass on the arena's paving and seats.
+		if terrain.has_islands() and Vector2(p.x, p.z).length() < 57.0 and Vector2(p.x, p.z).length() > 12.0:
 			continue
 		p.y = terrain.height(p.x, p.z)
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.z / 24.0)))

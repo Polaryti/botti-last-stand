@@ -19,7 +19,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 20
+const PROTOCOL := 21
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -1515,7 +1515,7 @@ func _set_watching(peer: int) -> void:
 		spectate_cam = Camera3D.new()
 		spectate_cam.fov = Player.BASE_FOV
 		spectate_cam.near = 0.06
-		spectate_cam.far = 100.0
+		spectate_cam.far = 460.0 if world.terrain.has_islands() else 100.0
 		spectate_cam.set_cull_mask_value(2, false)
 		var glow := OmniLight3D.new()
 		glow.light_color = Color(1.0, 0.8, 0.55)

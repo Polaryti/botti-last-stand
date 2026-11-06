@@ -7,6 +7,8 @@ extends Node3D
 
 ## How far from the centre players can go.
 @export var play_half := 110.0
+## How far from the centre the land itself goes.
+@export var land_half := 110
 ## A wall of trees just outside that edge.
 @export var forest_wall := true
 ## How rough the land is away from the centre, in metres.

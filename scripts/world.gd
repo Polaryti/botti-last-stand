@@ -7,7 +7,7 @@ signal player_died
 signal dawn_reached
 signal fort_lost
 
-const HALF_SIZE := 110.0
+static var HALF_SIZE := 110.0
 const PATHS_PER_FRAME := 1
 const SKY_EVERY := 0.15
 const BELL_GAP := 0.5
@@ -46,9 +46,17 @@ var rival_spots: Array[Vector3] = []
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
 var _enemy_blocks: StaticBody3D
 var portals: MistPortals
+var caches: MistCaches
+var _ledge_body: StaticBody3D
 var night_bg := NIGHT_BG
 var night_ambient := NIGHT_AMBIENT
-const FALL_DEATH := -6.0 # below this on the islands, you have fallen off the world
+var night_fog_colour := NIGHT_FOG
+var night_fog := 0.03
+var day_fog := 0.006
+var night_sky_shows := true
+var night_moon_colour := Color(0.6, 0.7, 1.0)
+var night_moon := 0.5
+const FALL_DEATH := -12.0 # below this on the islands, you have fallen off the world
 var director: Director
 var player: Player
 var players: Array[Target] = []
@@ -194,9 +202,11 @@ static func make_flames() -> CPUParticles3D:
 
 func setup(game_mode: int) -> void:
 	mode = game_mode
-	grid = PathGrid.new(int(HALF_SIZE * 2.0))
 	var file := _map_file()
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
+	Terrain.use_half(map.land_half)
+	HALF_SIZE = float(map.land_half)
+	grid = PathGrid.new(int(HALF_SIZE * 2.0))
 	if not _lands.has(file):
 		var t := Terrain.new()
 		map.plan_land(t)
@@ -485,6 +495,36 @@ func set_water(m: ShaderMaterial) -> void:
 	_water_material = m
 
 
+## Solid for players and nothing else, for what hangs in the air: mobs walk by the map's grid.
+func add_ledge(xf: Transform3D, size: Vector3) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = xf
+	_ledges().add_child(cs)
+
+
+## A round stone to land on. at is the middle of its top.
+func add_stone(at: Vector3, radius: float) -> void:
+	var shape := CylinderShape3D.new()
+	shape.radius = radius
+	shape.height = 0.5
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.position = at + Vector3.DOWN * 0.25
+	_ledges().add_child(cs)
+
+
+func _ledges() -> StaticBody3D:
+	if _ledge_body == null:
+		_ledge_body = StaticBody3D.new()
+		_ledge_body.collision_layer = Terrain.LAYER
+		_ledge_body.collision_mask = 0
+		add_child(_ledge_body)
+	return _ledge_body
+
+
 func add_collider(at: Vector3, size: Vector3) -> void:
 	var shape := BoxShape3D.new()
 	shape.size = size
@@ -550,11 +590,19 @@ func _build_environment() -> void:
 
 ## A violet night with nothing under it.
 func _mists_look() -> void:
-	night_bg = Color(0.11, 0.06, 0.2)
-	_env.fog_light_color = Color(0.2, 0.12, 0.32)
-	_env.fog_density = 0.012
-	night_ambient = Color(0.42, 0.36, 0.68)
-	_sky_material.set_shader_parameter("tint", Vector3(1.8, 0.85, 2.2))
+	night_bg = Color(0.3, 0.52, 0.58)
+	night_fog_colour = Color(0.4, 0.66, 0.7)
+	night_fog = 0.0062 if Game.quality > 0 else 0.011
+	day_fog = 0.0035 if Game.quality > 0 else 0.008
+	night_ambient = Color(0.74, 0.8, 0.76)
+	night_sky_shows = false
+	# The sky has to be further off than the furthest island, or it paints over them.
+	_sky_root.scale = Vector3.ONE * 4.6
+	night_moon_colour = Color(1.0, 0.94, 0.82)
+	night_moon = 0.62
+	_sky_material.set_shader_parameter("tint", Vector3(7.4, 8.0, 5.0))
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
 
 
 func _build_sky() -> void:
@@ -616,18 +664,18 @@ func _apply_sky(dawn: float) -> void:
 		_water_material.set_shader_parameter("dawn", bright)
 	_sky_material.set_shader_parameter("sun_dir", _sun_direction(dawn))
 	_star_material.albedo_color = Color(1, 1, 1, clampf(1.0 - dawn * 1.8, 0.0, 1.0))
-	_night_dome.visible = dawn < 0.56 and not wet
+	_night_dome.visible = dawn < 0.56 and not wet and night_sky_shows
 	_env.background_color = night_bg.lerp(DAWN_BG, bright)
 	_env.ambient_light_color = night_ambient.lerp(DAWN_AMBIENT, warm)
 	_ambient_now = lerpf(0.5, 0.8, bright) * (0.9 if wet else 1.0)
 	_env.ambient_light_energy = _ambient_now
-	_env.fog_light_color = NIGHT_FOG.lerp(DAWN_FOG, warm)
-	_fog_now = lerpf(0.03, 0.006, bright) * (1.35 if wet else 1.0)
+	_env.fog_light_color = night_fog_colour.lerp(DAWN_FOG, warm)
+	_fog_now = lerpf(night_fog, day_fog, bright) * (1.35 if wet else 1.0)
 	_env.fog_density = _fog_now * _fog_thick
 	_moon.rotation_degrees = Vector3(lerpf(-48.0, -13.0, bright), lerpf(-32.0, -150.0, bright), 0.0)
-	_moon_colour = Color(0.6, 0.7, 1.0).lerp(Color(1.0, 0.68, 0.42), warm)
+	_moon_colour = night_moon_colour.lerp(Color(1.0, 0.68, 0.42), warm)
 	_moon.light_color = _moon_colour
-	_moon_now = lerpf(0.5, 1.35, bright) * (0.55 if wet else 1.0)
+	_moon_now = lerpf(night_moon, 1.35, bright) * (0.55 if wet else 1.0)
 	_moon.light_energy = _moon_now
 	for l in _lanterns:
 		l.light_energy = lerpf(2.0, 0.25, bright)

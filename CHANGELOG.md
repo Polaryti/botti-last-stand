@@ -2,6 +2,13 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for one change.
 
+## 0.19.0 (6 November 2026)
+### Changed
+- The Mists are completely new, and over 50% wider: 340 m across, up from 220 m.
+- Tall rock islands standing in a sea of teal mist, from 8 m up to 46 m high: a sunken arena with stone seats and a great sword at its heart, a white rotunda under a glass dome, ruined battlements with towers and arched windows, an old forest, a monument, a hollow of broken columns, waterfalls pouring off the highest rock, and more. Several islands have a lower shelf reached by a stair.
+- Four bridges join islands, three of rope and one of stone. They have no railings, and a good blow from the side can knock you off. Everyone uses them. Other islands are reached only by gates, which open and close as before.
+- Lines of floating stones to jump along. Six of them end in a cache with doubloons, experience, some health, and a familiar or a good weapon. Each player can open each cache once. Two more are short cuts between islands that need no gate.
+
 ## 0.18.0 (6 November 2026)
 ### New
 - New class: the Adept, a master of stances, opened with a code. One button changes stance at any moment. Wind: 25% faster, and each blow strikes twice for less. Stone: 30% less damage, and blows throw enemies back. Flame: blows burn, and you take 15% more.

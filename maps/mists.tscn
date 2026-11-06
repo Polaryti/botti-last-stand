@@ -5,6 +5,8 @@
 
 [node name="Mists" type="Node3D"]
 script = ExtResource("1_root")
+play_half = 170.0
+land_half = 170
 forest_wall = false
 
 [node name="Islands" type="Node3D" parent="."]

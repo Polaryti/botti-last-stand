@@ -11,6 +11,7 @@ const BASE_ARROWS := 60
 const BURN_DPS := 5.0
 const BASE_MANA := 100.0
 const MANA_REGEN := 8.0
+const BRIDGE_KNOCK := 13.0
 # The Monk.
 const KI_PER_HIT := 10.0
 const KI_PER_SHOT := 5.0
@@ -268,7 +269,7 @@ func _init(owner_world: World) -> void:
 	camera = Camera3D.new()
 	camera.fov = BASE_FOV
 	camera.near = 0.06
-	camera.far = 100.0
+	camera.far = 460.0 if owner_world.terrain.has_islands() else 100.0
 	head.add_child(camera)
 	_vm_root = Node3D.new()
 	camera.add_child(_vm_root)
@@ -595,7 +596,11 @@ func hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	var push := global_position - from
 	push.y = 0
 	if push.length_squared() > 0.001:
-		velocity += push.normalized() * 2.5
+		# A bridge has no sides, and a good blow can put you over the edge.
+		var on_bridge := world.terrain.has_islands() and world.terrain.on_deck(global_position.x, global_position.z)
+		velocity += push.normalized() * (BRIDGE_KNOCK if on_bridge else 2.5)
+		if on_bridge:
+			velocity.y = maxf(velocity.y, 3.5)
 	Sfx.play("hurt", -3.0, 1.0, 0.2)
 	if Game.vibration and world.now - _buzz_at > 0.3:
 		_buzz_at = world.now
@@ -2607,7 +2612,7 @@ func _physics_process(delta: float) -> void:
 		var flow := world.terrain.river_flow(global_position.x, global_position.z)
 		move_and_collide(Vector3(flow.x, 0, flow.y) * Terrain.CURRENT * delta)
 	# However it happened, nobody stays under the ground.
-	var floor_y := world.terrain.height(global_position.x, global_position.z)
+	var floor_y := world.terrain.ground_height(global_position.x, global_position.z) if world.terrain.has_islands() else world.terrain.height(global_position.x, global_position.z)
 	if global_position.y < floor_y - 1.0:
 		global_position.y = floor_y + 0.1
 		velocity.y = 0.0
@@ -2647,7 +2652,7 @@ func _tick_islands(delta: float) -> void:
 		Sfx.play("spell", -4.0, 1.5)
 		hurt_flash = 0.0
 		level_flash = 0.5
-		world.fx_ring(out, 3.0, Color(0.66, 0.42, 1.0))
+		world.fx_ring(out, 3.0, Color(0.45, 0.98, 0.92))
 
 
 ## Riding behind a friend: their horse goes where they go. You can look around and fight.

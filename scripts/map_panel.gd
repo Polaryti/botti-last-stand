@@ -18,8 +18,9 @@ func _process(_delta: float) -> void:
 
 
 static func _bake(w: World) -> ImageTexture:
-	if _images.has(w.mode):
-		return _images[w.mode]
+	var key := "%d %s" % [w.mode, Terrain.HALF]
+	if _images.has(key):
+		return _images[key]
 	const SIDE := 240
 	var img := Image.create(SIDE, SIDE, false, Image.FORMAT_RGB8)
 	var t := w.terrain
@@ -29,7 +30,7 @@ static func _bake(w: World) -> ImageTexture:
 			var wx := (x + 0.5) / SIDE * half * 2.0 - half
 			var wz := (y + 0.5) / SIDE * half * 2.0 - half
 			var h := t.ground_height(wx, wz)
-			var col := Color(0.11, 0.17, 0.17).lerp(Color(0.22, 0.28, 0.26), clampf((h + 1.0) / 11.0, 0.0, 1.0))
+			var col := Color(0.11, 0.17, 0.17).lerp(Color(0.22, 0.28, 0.26), clampf((h + 1.0) / (11.0 if not t.has_islands() else 48.0), 0.0, 1.0))
 			if fmod(h + 40.0, 2.0) < 0.14:
 				col = col.lightened(0.09)
 			if t.has_islands() and h < 0.0:
@@ -62,8 +63,8 @@ static func _bake(w: World) -> ImageTexture:
 		img.fill_rect(Rect2i(a, b - 3, b - a, 3), wall)
 		img.fill_rect(Rect2i(a, a, 3, b - a), wall)
 		img.fill_rect(Rect2i(b - 3, a, 3, b - a), wall)
-	_images[w.mode] = ImageTexture.create_from_image(img)
-	return _images[w.mode]
+	_images[key] = ImageTexture.create_from_image(img)
+	return _images[key]
 
 
 func _to_map(x: float, z: float) -> Vector2:
