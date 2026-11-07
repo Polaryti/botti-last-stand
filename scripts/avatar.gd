@@ -40,7 +40,14 @@ var _has_turret := false
 var _watched := false
 var _view_pitch := 0.0
 var _ice_left := 0.0
+var bar_time := 0.0 # seconds left of the health bar shown over the head after a hit
+var _flash := 0.0
+var _flames: CPUParticles3D
+var _debuff_fx: CPUParticles3D
+var _stun_fx: CPUParticles3D
+var _statuses := 0
 static var _ice_material: StandardMaterial3D
+static var _flash_material: StandardMaterial3D
 
 
 func _init(owner_world: World, peer_id: int, info: Dictionary) -> void:
@@ -161,6 +168,9 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 	in_chariot = flags & 64 != 0 or (_seated and in_chariot)
 	_has_turret = flags & 128 != 0
 	_show_seat()
+	# Health that drops, from whatever did it, shows over the head for everyone.
+	if hp_left < hp_fraction - 0.004 and not dead:
+		bar_time = 2.5
 	hp_fraction = hp_left
 	set_fallen(flags & 1 != 0)
 	if attacks != _attack_seen:
@@ -193,6 +203,9 @@ func set_fallen(on: bool) -> void:
 		return
 	dead = on
 	collision_layer = 0 if dead else LAYER_AVATAR
+	if dead:
+		bar_time = 0.0
+		show_statuses(0)
 	_attack_left = 0.0
 	_current = ""
 	_play("Death_A" if dead else "Idle")
@@ -204,12 +217,115 @@ func teleport(at: Vector3) -> void:
 	global_position = at
 
 
+## A blow from this phone landed: the body flashes, bleeds and shows its health, right away.
+func show_hit(amount: float) -> void:
+	if dead:
+		return
+	bar_time = 2.5
+	hp_fraction = maxf(0.0, hp_fraction - amount / 140.0)
+	_flash = 0.09
+	_set_flash(true)
+	world.fx_gore(global_position + Vector3.UP * 1.1, Color(0.6, 0.1, 0.08))
+	Sfx.play_at("hurt", global_position, world._player_camera_position(), -6.0)
+
+
+func _set_flash(on: bool) -> void:
+	if _flash_material == null:
+		_flash_material = StandardMaterial3D.new()
+		_flash_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_flash_material.albedo_color = Color(1, 0.88, 0.82)
+	for mi in _visual.find_children("*", "MeshInstance3D", true, false):
+		var part := mi as MeshInstance3D
+		if on:
+			if not part.has_meta("before_flash"):
+				part.set_meta("before_flash", part.material_override)
+			part.material_override = _flash_material
+		elif part.has_meta("before_flash"):
+			part.material_override = part.get_meta("before_flash")
+			part.remove_meta("before_flash")
+
+
+## What is happening to this player, as their own phone or the host says: flames when burning,
+## green bubbles when poisoned, red drops when bleeding, stars when stunned, ice when frozen.
+func show_statuses(bits: int) -> void:
+	if bits == _statuses:
+		return
+	_statuses = bits
+	if dead:
+		bits = 0
+	var burning := bits & 1 != 0
+	if burning and _flames == null:
+		_flames = World.make_flames()
+		_flames.position = Vector3.UP * 0.9
+		add_child(_flames)
+	if _flames:
+		_flames.emitting = burning
+	var poisoned := bits & 2 != 0
+	var bleeding := bits & 4 != 0
+	var slowed := bits & 8 != 0
+	if (poisoned or bleeding or slowed) and _debuff_fx == null:
+		_debuff_fx = CPUParticles3D.new()
+		_debuff_fx.amount = 10
+		_debuff_fx.lifetime = 0.8
+		_debuff_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_debuff_fx.emission_sphere_radius = 0.35
+		_debuff_fx.position = Vector3.UP * 1.0
+		var dot := QuadMesh.new()
+		dot.size = Vector2(0.11, 0.11)
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		look.vertex_color_use_as_albedo = true
+		dot.material = look
+		_debuff_fx.mesh = dot
+		add_child(_debuff_fx)
+	if _debuff_fx:
+		_debuff_fx.emitting = poisoned or bleeding or slowed
+		_debuff_fx.color = Color(0.35, 0.95, 0.25) if poisoned else (Color(0.85, 0.08, 0.06) if bleeding else Color(0.6, 0.85, 1.0))
+		_debuff_fx.gravity = Vector3.UP * (1.0 if poisoned else (-3.0 if bleeding else -0.5))
+	var stunned := bits & 16 != 0
+	if stunned and _stun_fx == null:
+		_stun_fx = CPUParticles3D.new()
+		_stun_fx.amount = 5
+		_stun_fx.lifetime = 0.7
+		_stun_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+		_stun_fx.emission_sphere_radius = 0.3
+		_stun_fx.gravity = Vector3.ZERO
+		_stun_fx.local_coords = true
+		_stun_fx.orbit_velocity_min = 1.0
+		_stun_fx.orbit_velocity_max = 1.4
+		_stun_fx.position = Vector3.UP * 2.0
+		var star := BoxMesh.new()
+		star.size = Vector3(0.09, 0.09, 0.09)
+		var star_look := StandardMaterial3D.new()
+		star_look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		star_look.albedo_color = Color(1.0, 0.92, 0.4)
+		star.material = star_look
+		_stun_fx.mesh = star
+		add_child(_stun_fx)
+	if _stun_fx:
+		_stun_fx.emitting = stunned
+	var frozen := bits & 32 != 0
+	if frozen and _ice_left <= 0.0:
+		_ice_left = 0.4
+		_show_ice(true)
+	elif frozen:
+		_ice_left = maxf(_ice_left, 0.4)
+
+
 func _process(delta: float) -> void:
+	bar_time = maxf(0.0, bar_time - delta)
+	if _flash > 0.0:
+		_flash -= delta
+		if _flash <= 0.0:
+			_set_flash(false)
 	global_position = global_position.lerp(_target, minf(1.0, delta * 12.0))
 	rotation.y = lerp_angle(rotation.y, _yaw, minf(1.0, delta * 14.0))
 	_attack_left -= delta
 	# A name over someone's head gives them away, so only friends have one.
 	_label.visible = not _watched and not Net.is_foe(peer)
+	if _statuses & 32 != 0 and not dead:
+		_ice_left = maxf(_ice_left, 0.2)
 	if _ice_left > 0.0:
 		_ice_left -= delta
 		if _ice_left <= 0.0:

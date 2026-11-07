@@ -28,6 +28,7 @@ var chaos_left := 0 # bomblets: how many more times it bounces off and goes on
 var sparks := 0 # darts: how many others the spark jumps to
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
+var owner_player: Player # who shot it: this phone's player, or one of the host's bots
 var _returning := false
 var _spin := 0.0
 var _vel := Vector3.ZERO
@@ -83,11 +84,23 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	chaos_left = 0
 	sparks = 0
 	source = ""
+	owner_player = null
 	_returning = false
 	_flame.visible = on_fire or k == Kind.FIREBALL
 	_flame.modulate = Color(1.0, 0.6, 0.15)
 	_orient()
 	set_physics_process(true)
+
+
+## A bot's shot never hits its own body, and can hit this phone's player if they are on the other side.
+func set_owner_player(p: Player) -> void:
+	owner_player = p
+	if p and p.is_bot() and p.bot and is_instance_valid(p.bot.body):
+		_exclude.append(p.bot.body.get_rid())
+
+
+func _owner() -> Player:
+	return owner_player if owner_player != null and is_instance_valid(owner_player) else world.player
 
 
 func _orient() -> void:
@@ -96,8 +109,8 @@ func _orient() -> void:
 
 
 func stop() -> void:
-	if kind == Kind.AXE and active and world.player:
-		world.player.axe_returned()
+	if kind == Kind.AXE and active and _owner():
+		_owner().axe_returned()
 	active = false
 	visible = false
 	set_physics_process(false)
@@ -108,11 +121,21 @@ func _is_friendly() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if _is_friendly() and not visual:
+		var was := world.begin_act(_owner())
+		_fly(delta)
+		world.end_act(was)
+	else:
+		_fly(delta)
+
+
+func _fly(delta: float) -> void:
 	if kind == Kind.AXE and _returning:
-		if world.player.dead or position.distance_to(world.player.eye_position()) < 1.0:
+		var thrower := _owner()
+		if thrower == null or thrower.dead or position.distance_to(thrower.eye_position()) < 1.0:
 			stop()
 			return
-		var home := world.player.eye_position()
+		var home := thrower.eye_position()
 		_vel = (home - position).normalized() * _speed
 	_vel.y -= _gravity * delta
 	var step := _vel * delta
@@ -130,6 +153,12 @@ func _physics_process(delta: float) -> void:
 	if visual:
 		mask = 1 | Terrain.LAYER
 	elif _is_friendly() and Net.pvp():
+		mask |= Avatar.LAYER_AVATAR
+		# A bot's shot can find this phone's own player.
+		if _owner() != world.player:
+			mask |= Target.LAYER
+	elif not _is_friendly() and Net.is_host() and not Net.bot_players().is_empty():
+		# The host's enemies shoot at its bots too. Nobody else's phone fires these.
 		mask |= Avatar.LAYER_AVATAR
 	var q := PhysicsRayQueryParameters3D.create(position, next, mask, _exclude)
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
@@ -149,22 +178,35 @@ func _physics_process(delta: float) -> void:
 	if _is_friendly() and c is Zombie:
 		_hit_zombie(c as Zombie, at)
 		return
-	if c is Avatar:
-		var a := c as Avatar
-		_exclude.append(a.get_rid())
-		if Net.is_foe(a.peer):
+	if c is Ally and _is_friendly():
+		_exclude.append((c as Ally).get_rid())
+		return
+	if not _is_friendly() and c is Avatar:
+		var victim := c as Avatar
+		_exclude.append(victim.get_rid())
+		if Net.is_bot(victim.peer):
+			victim.hurt(damage, position)
+			if kind == Kind.FIREBALL or fire:
+				victim.ignite(ZombieDefs.BURN_SECONDS)
+			stop()
+		return
+	if _is_friendly() and (c is Avatar or (c is Player and c != _owner())):
+		var t := c as Target
+		_exclude.append(t.get_rid())
+		var shooter := _owner()
+		var peer := world.peer_of(t)
+		if shooter and shooter.is_foe_peer(peer):
 			if on_burst.is_valid():
 				_explode(at)
 				return
-			Net.hit_player(a.peer, damage, position)
+			world.hit_rival(t, damage, position)
 			world.fx_gore(at, Color(0.6, 0.1, 0.08))
-			if world.player:
-				world.player.on_hit(false)
-				world.player.on_shot_rival(a.peer, fire, frost)
-				if poison.y > 0.0:
-					Net.status_peer(a.peer, Net.Status.POISON, poison.y)
-				if sparks > 0:
-					Net.status_peer(a.peer, Net.Status.STUN, 0.5)
+			shooter.on_hit(false)
+			shooter.on_shot_rival(peer, fire, frost)
+			if poison.y > 0.0:
+				world.status_rival(t, Net.Status.POISON, poison.y)
+			if sparks > 0:
+				world.status_rival(t, Net.Status.STUN, 0.5)
 			if kind != Kind.AXE:
 				stop()
 		return
@@ -197,7 +239,7 @@ func _grazed_body(from: Vector3, step: Vector3, ray_hit: Dictionary) -> Dictiona
 		_graze_shape.radius = HIT_PAD
 		_graze_query = PhysicsShapeQueryParameters3D.new()
 		_graze_query.shape = _graze_shape
-	_graze_query.collision_mask = Zombie.LAYER | (Avatar.LAYER_AVATAR if Net.pvp() else 0)
+	_graze_query.collision_mask = Zombie.LAYER | (Avatar.LAYER_AVATAR if Net.pvp() else 0) | (Target.LAYER if Net.pvp() and _owner() != world.player else 0)
 	_graze_query.exclude = _exclude
 	_graze_query.transform = Transform3D(Basis.IDENTITY, from)
 	_graze_query.motion = step
@@ -224,6 +266,12 @@ func _turn_back() -> void:
 
 
 func _explode(at: Vector3) -> void:
+	var was := world.begin_act(_owner())
+	_burst_here(at)
+	world.end_act(was)
+
+
+func _burst_here(at: Vector3) -> void:
 	if on_burst.is_valid():
 		var burst := on_burst
 		if chaos_left > 0:
@@ -247,23 +295,24 @@ func _explode(at: Vector3) -> void:
 func _hit_zombie(z: Zombie, at: Vector3) -> void:
 	var head := z.headshot_at(at.y)
 	var amount := damage * (2.0 if head and sharp else 1.0)
-	if from_player and world.player:
-		amount = world.player.modify_damage(z, amount)
+	var shooter := _owner()
+	if from_player and shooter:
+		amount = shooter.modify_damage(z, amount)
 	if fire and z.phases:
 		amount *= 1.5
 	if amount > 0.0:
 		world.damage_zombie(z, amount, _vel.normalized(), knock, at, head)
-	if sparks > 0 and world.player:
-		world.player.spark_from(z, sparks, amount)
-	if from_player and world.player:
-		world.player.on_shot_connect(z)
+	if sparks > 0 and shooter:
+		shooter.spark_from(z, sparks, amount)
+	if from_player and shooter:
+		shooter.on_shot_connect(z)
 	if fire:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if frost:
 		z.slow(ZombieDefs.BURN_SECONDS)
 	if poison.y > 0.0:
 		z.add_dot(poison.x, poison.y)
-		if from_player:
+		if from_player and shooter == world.player:
 			Game.note_poison(poison.x * poison.y)
 	if stagger > 0.0:
 		z.stun(stagger)

@@ -19,7 +19,7 @@ const WOOD_TOUGHNESS := 0.4
 const HEART_TOUGHNESS := 0.3
 const CLOSES_AT := 0.35 # a broken gate shuts again when it has this much of its strength back
 const WOOD_MAX := 12
-const WOOD_PER_PICKUP := 3
+const WOOD_PER_PICKUP := 2
 const REPAIR_PER_WOOD := 110.0
 const REPAIR_EVERY := 0.3
 const REPAIR_REACH := 6.5
@@ -207,20 +207,24 @@ func _process(delta: float) -> void:
 
 
 func _tick_repair(delta: float) -> void:
-	var p := world.player
 	repairing = -1
-	if p == null or p.dead or p.wood <= 0:
-		return
-	var i := damaged_gate_near(p.global_position)
-	if i < 0:
-		return
-	repairing = i
 	_repair_timer -= delta
-	if _repair_timer <= 0.0:
+	var mend := _repair_timer <= 0.0
+	if mend:
 		_repair_timer = REPAIR_EVERY
-		p.wood -= 1
-		repair(i, REPAIR_PER_WOOD)
-		Sfx.play("hammer", -10.0, 1.3, 0.2)
+	# Everyone this phone moves mends what they stand by: its player, and on the host its bots.
+	for p: Player in world.local_players():
+		if p.dead or p.wood <= 0:
+			continue
+		var i := damaged_gate_near(p.global_position)
+		if i < 0:
+			continue
+		if p == world.player:
+			repairing = i
+		if mend:
+			p.wood -= 1
+			repair(i, REPAIR_PER_WOOD)
+			p.sfx("hammer", -10.0, 1.3, 0.2)
 
 
 func _state() -> PackedByteArray:

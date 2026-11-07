@@ -340,13 +340,13 @@ static func _ranger() -> Dictionary:
 			a("trapper", "Trapper", "Every 10 s a trap drops at your feet: 70 damage and a 2 s stun", "trap+plus", {"trap_damage": 20.0}, [t("every", "trap", {"secs_every": 10.0})]),
 			[[a("barbed", "Barbed Traps", "Traps bleed 16 per second for 4 s", "trap+drop", {}, [], "trap_bleed"),
 			a("burning_tar", "Burning Tar", "Traps set enemies on fire", "trap+flame", {}, [], "trap_fire")],
-			[a("spare_parts", "Spare Parts", "Keep 3 more traps on the ground", "trap+up", {"trap_cap": 3}),
+			[a("spare_parts", "Spare Parts", "Keep 3 more traps on the ground, and carry 3 more in the Trap Satchel", "trap+up", {"trap_cap": 3, "trap_carry": 3}),
 			a("quick_setup", "Quick Setup", "Traps come 4 s sooner", "trap+clock", {"trap_cd": -4.0})],
 			[a("snare_net", "Snare Net", "Traps hold enemies 2 s longer", "net+trap", {"trap_stun": 2.0}),
 			a("powder_keg", "Powder Keg", "Traps also explode in a blast", "flame+trap", {}, [], "trap_blast")],
 			[a("lure", "Lure", "Every trap also pulls roaming zombies to it", "horn+trap", {}, [], "trap_lure"),
 			a("ghillie", "Ghillie Suit", "Zombies see you 40% less far", "mask+feather", {"sight": -0.4})]],
-			a("field_snares", "Field of Snares", "Up to 8 traps, and each trap kill drops a new one", "net+crown", {"trap_cap": 5}, [], "field_snares")),
+			a("field_snares", "Field of Snares", "Up to 8 traps on the ground and 8 in the Trap Satchel, and each trap kill drops a new one", "net+crown", {"trap_cap": 5, "trap_carry": 3}, [], "field_snares")),
 		_spec("beastmaster", "Beastmaster", "You never hunt alone", Color(0.34, 0.5, 0.2),
 			a("beastmaster", "Beastmaster", "Your beast fights beside you, and returns 15 s after falling. Choose it in the Armory", "wolf+plus", {"wolves": 1}),
 			[[a("alpha", "Alpha", "Allies do 30% more damage", "wolf+up", {"ally_damage": 0.3}),
@@ -357,7 +357,7 @@ static func _ranger() -> Dictionary:
 			a("hawk", "Hunting Hawk", "Every 2.5 s a hawk strikes a nearby enemy", "feather+arrow", {}, [t("every", "hawk", {"secs_every": 2.5})])],
 			[a("pack_tactics", "Pack Tactics", "+30% damage to enemies near your allies", "claw+plus", {}, [], "pack_tactics"),
 			a("bond", "Blood Bond", "Heal 5 whenever one of your allies kills", "heart+wolf", {}, [], "bond")]],
-			a("wolf_pack", "The Pack", "4 beasts, and a howl every 20 s stuns all around you", "moon+crown", {"wolves": 3}, [t("every", "stun_around", {"secs_every": 20.0, "r": 9.0, "secs": 1.2, "sound": "howl"})])),
+			a("wolf_pack", "The Pack", "One more beast, and every 20 s the pack acts: wolves stun all around you, ravens mark every enemy near you, snakes poison them, foxes bring food or arrows", "moon+crown", {"wolves": 1}, [t("every", "pack_call", {"secs_every": 20.0})])),
 	]}
 
 

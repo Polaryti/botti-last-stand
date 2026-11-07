@@ -52,8 +52,15 @@ func _ready() -> void:
 	# Whatever an interrupted run left in the save, the tests start on the ordinary map.
 	Game.night_map = "village"
 	Game.pet = "wolf"
+	if args.has("v201"):
+		await start_clean()
+		await test_version_20_1()
+		print("RESULT: %d checks, %d failures" % [checks, failures])
+		get_tree().quit(1 if failures > 0 else 0)
+		return
 	if args.has("new"):
 		await start_clean()
+		await test_version_20_1()
 		await test_version_19_1()
 		await test_version_20()
 		await test_version_19()
@@ -86,6 +93,7 @@ func _ready() -> void:
 		await test_zombies()
 		await test_night()
 	await test_land()
+	await test_version_20_1()
 	await test_version_19_1()
 	await test_version_20()
 	await test_version_19()
@@ -668,7 +676,7 @@ func test_fort() -> void:
 	var wood := wf.spawn_pickup_at(Vector3(3, 0, 9), Pickup.Kind.WOOD, "wood")
 	place(Vector3(3, 0, 9))
 	await seconds(0.3)
-	ok(pl.wood == Fort.WOOD_PER_PICKUP and not wf.pickups.has(wood), "wood gets picked up")
+	ok(pl.wood == Fort.WOOD_PER_PICKUP and not (is_instance_valid(wood) and wf.pickups.has(wood)), "wood gets picked up")
 	pl.wood = Fort.WOOD_MAX
 	place((g["at"] as Vector3) + Vector3(0, 0, 4))
 	var repaired0: float = g["hp"]
@@ -959,6 +967,328 @@ func test_version_18() -> void:
 	Game.player_class = "infantry"
 	Game.save_settings()
 	await start_clean()
+
+
+## 0.20.1: bots are real players, and the list of fixes.
+func test_version_20_1() -> void:
+	await start_clean()
+	place(OPEN)
+	# Class weapons never lie about.
+	var found := {}
+	for i in 3000:
+		found[WeaponDefs.pick_random()] = true
+	ok(not found.has("bo") and not found.has("staff") and not found.has("claws") and not found.has("fists"), "no class's own weapon turns up on the map (%s)" % ", ".join(found.keys()))
+	var before := w.pickups.size()
+	w.drop_weapon(pl.global_position + Vector3(2, 0, 0), "bo")
+	ok(w.pickups.size() == before, "and a Bo never lands on the ground")
+	# Putting a weapon down, it stays down until you walk away.
+	pl.give_weapon("mace")
+	ok(pl.can_drop_weapon(), "a second weapon can be put down")
+	var held: String = pl.weapon_id()
+	pl.drop_current_weapon()
+	await seconds(0.6)
+	ok(not pl.carries(held) and w.count_pickups(Pickup.Kind.WEAPON) == 1, "a dropped weapon stays on the ground while you stand by it")
+	var spot := pl.global_position
+	pl.global_position = spot + Vector3(6, 0, 0)
+	await seconds(0.4)
+	pl.global_position = spot
+	await seconds(0.4)
+	ok(pl.carries(held), "and comes back to your hand once you have walked away and back")
+	# Monk Ki: once a blow, and a little for each other thing it catches.
+	Game.player_class = "monk"
+	await start_clean()
+	place(OPEN)
+	pl.mana = 0.0
+	for i in 3:
+		spawn("normal", front(1.4) + pl.global_basis.x * (i - 1) * 0.6, true)
+	pl.attack_count += 1
+	for z: Zombie in w.zombies:
+		pl.on_melee_connect(z, pl.weapon_def())
+	ok(is_equal_approx(pl.mana, Player.KI_PER_HIT + 2.0 * Player.KI_PER_EXTRA), "Ki comes once a blow, not once an enemy (%.1f)" % pl.mana)
+	await kill_all()
+	# The Ranger's traps and the Satchel.
+	await build("ranger", 1)
+	ok(pl.traps_carried() == 11 and int(pl.m("trap_cap")) == 11, "Spare Parts with Field of Snares: 11 on the ground and 11 in the Satchel (%d, %d)" % [int(pl.m("trap_cap")), pl.traps_carried()])
+	Game.player_class = "ranger"
+	await start_clean()
+	place(OPEN)
+	pl.points = ClassDefs.MAX_LEVEL - 1
+	for step in ClassDefs.MAX_LEVEL - 1:
+		var opt := 1 if step == Player.CORE_STEPS else 0
+		if step == Player.CORE_STEPS + 2:
+			opt = 1 # Quick Setup, not Spare Parts
+		pl.choose_ability(step, opt)
+	ok(pl.traps_carried() == 8 and int(pl.m("trap_cap")) == 8, "Field of Snares alone: 8 on the ground and 8 in the Satchel (%d, %d)" % [int(pl.m("trap_cap")), pl.traps_carried()])
+	# Pets.
+	ok(float(Ally.BEAST_SPEED["snake"]) >= 7.0, "the snake keeps up now")
+	Game.player_class = "ranger"
+	for pet: String in ShopDefs.PETS:
+		Game.pet = pet
+		await build("ranger", 2)
+		ok(int(pl.m("wolves")) == 3, "The Pack adds one %s (%d)" % [pet, int(pl.m("wolves"))])
+		var z := spawn("normal", front(3.0), true)
+		var items_before := w.pickups.size()
+		var did: bool = pl._pack_call()
+		match pet:
+			"wolf": ok(did and z._stun > 0.0, "the wolves' howl stuns")
+			"raven": ok(did and z._mark_time > 0.0, "the ravens mark")
+			"snake": ok(did and z.poison_left > 0.0, "the snakes poison")
+			"fox": ok(did and w.pickups.size() == items_before + 1, "the fox brings something")
+		await kill_all()
+		clear_pickups()
+	Game.pet = "wolf"
+	# The fox digs up food and arrows, but not every bite, and not twice in quick succession.
+	var fox := Ally.new(w, "fox")
+	w.add_child(fox)
+	fox.activate(INF)
+	fox.global_position = pl.global_position + Vector3(2, 0, 0)
+	var finds := {}
+	var times := 0
+	for i in 400:
+		w.now += 15.0
+		var n := w.pickups.size()
+		fox._forage()
+		if w.pickups.size() > n:
+			times += 1
+			finds[w.pickups[w.pickups.size() - 1].kind] = true
+	ok(finds.has(Pickup.Kind.FOOD) and finds.has(Pickup.Kind.ARROWS), "a fox finds food and arrows")
+	ok(times > 10 and times < 60, "now and then (%d of 400 bites)" % times)
+	var at_once := w.pickups.size()
+	fox._found_at = w.now
+	for i in 50:
+		fox._forage()
+	ok(w.pickups.size() == at_once, "never twice in quick succession")
+	fox.queue_free()
+	clear_pickups()
+	# Wood: mostly outside the gate, and less of it.
+	var fort_world := World.new()
+	add_child(fort_world)
+	fort_world.setup(Game.Mode.FORT)
+	fort_world.director.running = false
+	for p: Pickup in fort_world.pickups.duplicate():
+		fort_world.remove_pickup(p)
+	var outside := 0
+	for i in 40:
+		fort_world.stock_wood()
+	for p: Pickup in fort_world.pickups:
+		if not fort_world.fort.inside(p.global_position):
+			outside += 1
+	ok(outside >= fort_world.pickups.size() * 0.6, "wood lies mostly outside (%d of %d)" % [outside, fort_world.pickups.size()])
+	ok(Fort.WOOD_PER_PICKUP == 2 and Director.WOOD_ON_MAP == 4, "and there is less of it")
+	fort_world.queue_free()
+	# The menu, the Armory and the Store.
+	m.show_menu()
+	await frames(3)
+	var texts: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	ok(not texts.any(func(t: String) -> bool: return t.contains("Best night") or t.contains("Dawns reached")), "the menu no longer shows the best night or the dawns")
+	var pet_was := Game.pet
+	m.show_armory("ranger")
+	await frames(2)
+	var to_store: Button = null
+	for b: Button in m.panel.find_children("*", "Button", true, false):
+		if b.text == "In the Store" or b.text == "Raven":
+			to_store = b
+			break
+	ok(to_store != null, "the Armory sends you to the Store")
+	if to_store:
+		to_store.pressed.emit()
+		await frames(2)
+		m._back.call()
+		await frames(2)
+		var head: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		ok(head.has("Armory"), "and Back brings you back to the Armory")
+	# Tapping a pet's row may have chosen it, and saved that.
+	Game.pet = pet_was
+	Game.save_settings()
+	# Updates.
+	ok(Updates.is_newer("v0.20.2", "0.20.1") and Updates.is_newer("0.21.0", "0.20.9") and not Updates.is_newer("v0.20.1", "0.20.1") and not Updates.is_newer("0.19.9", "0.20.1"), "versions compare the right way")
+	var up: Updates = m.updates
+	var apk := {"name": "botti-last-stand-9.0.0.apk", "browser_download_url": "https://example.invalid/a.apk", "size": 1000}
+	up.apply_release({"tag_name": "v9.0.0", "draft": false, "prerelease": false, "html_url": "https://example.invalid/r", "assets": [apk]})
+	ok(up.state == Updates.State.AVAILABLE and up.latest == "9.0.0", "a newer version with its app is offered")
+	up.apply_release({"tag_name": "v9.0.0", "assets": []})
+	ok(up.state == Updates.State.NONE, "but not before its app is up")
+	up.apply_release({"tag_name": "v" + Updates.current(), "assets": [apk]})
+	ok(up.state == Updates.State.NONE, "nor the version already here")
+	up.apply_release({"tag_name": "v9.0.0", "draft": false, "prerelease": false, "html_url": "https://example.invalid/r", "assets": [apk]})
+	m.show_menu()
+	await frames(3)
+	texts = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	ok(texts.any(func(t: String) -> bool: return t.begins_with("Version 9.0.0 is out")), "the menu says a new version is out")
+	up.state = Updates.State.NONE
+	m._fill_update_box()
+	# The skill tree's words fit their cards, however long.
+	Game.player_class = "monk"
+	await start_clean()
+	place(OPEN)
+	pl.points = 4
+	for step in 3:
+		pl.choose_ability(step, 0)
+	m.toggle_tree()
+	await frames(4)
+	var tp: TreePanel = m.tree_panel
+	var fits := true
+	var shrunk := false
+	for card: Button in tp._zone.find_children("*", "Button", true, false):
+		var labels: Array = card.find_children("*", "Label", true, false)
+		var inner: Control = card.get_child(0)
+		var needed := inner.get_combined_minimum_size().y
+		if needed > card.size.y + 1.0:
+			fits = false
+		for l: Label in labels:
+			if l.get_theme_font_size("font_size") < 22:
+				shrunk = true
+	ok(fits, "every specialization fits its card")
+	ok(shrunk, "long ones in smaller letters")
+	m.close_tree()
+	# Online: the list of public games, read from what Epic sends back.
+	var e := EpicNet.new()
+	add_child(e)
+	var fake := FakeEpic.new()
+	add_child(fake)
+	e._ieos = fake
+	e._user = "me"
+	fake.rooms = [{"owner": "aaaa", "attrs": {"CODE": "ABC234", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Mara", "RULES": "1", "MAP": "village", "PLAYERS": "2"}},
+		{"owner": "bbbb", "attrs": {"CODE": "XYZ789", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Full", "RULES": "0", "MAP": "mists", "PLAYERS": str(Net.MAX_PLAYERS)}}]
+	var listed: Array[Dictionary] = await e.list_rooms()
+	ok(listed.size() == 1 and listed[0]["name"] == "Mara" and listed[0]["host"] == "aaaa" and int(listed[0]["players"]) == 2 and int(listed[0]["rules"]) == 1, "public games are read from the search, and full ones are left out (%s)" % str(listed))
+	ok(fake.searched.get("PUBLIC") == "1" and fake.searched.get("OPEN") == "1" and fake.searched.get("VER") == str(Net.PROTOCOL), "the search asks only for public games waiting, of this version")
+	var code: String = await e.open_room(false)
+	ok(code.length() == EpicNet.CODE_LENGTH and fake.written.get("PUBLIC") == "0" and fake.written.get("CODE") == code and fake.written.get("OPEN") == "1", "a private room keeps its code but stays off the list")
+	ok(await e.update_room(EpicNet.room_card(true, false)) and fake.written.get("OPEN") == "0" and fake.written.get("PUBLIC") == "1", "and a room can go public, and leave the list when its night starts")
+	e.queue_free()
+	fake.queue_free()
+	await start_clean()
+	place(OPEN)
+	await _bots_are_players()
+	await start_clean()
+
+
+func _revive(b: BotPlayer) -> void:
+	if b.pawn.dead:
+		b._come_back()
+	b.pawn.hp = b.pawn.max_hp()
+	b.pawn.frozen_left = 0.0
+	b.pawn.burn_time = 0.0
+
+
+## A bot on the host is a whole player: skills hit it, it uses its own, it is credited for its kills.
+func _bots_are_players() -> void:
+	ok(Net.host_game() == OK, "a game with bots")
+	Net.in_game = true
+	Net.world = w
+	Net.rules = Net.Rules.FFA
+	var made: Array[BotPlayer] = []
+	for i in 2:
+		var peer := Net.BOT_BASE + 70 + i
+		var info := {"name": "Bot", "class": "monk" if i == 0 else "infantry", "team": 0}
+		Net.roster[peer] = info.merged({"score": 0, "deaths": 0, "lives": Net.LIVES})
+		var body := Avatar.new(w, peer, info)
+		w.add_child(body)
+		body.teleport(pl.global_position + Vector3(2.0 + i * 3.0, 0, 0))
+		Net._avatars[peer] = body
+		w.players.append(body)
+		var bot := BotPlayer.new(w, body, info)
+		w.add_child(bot)
+		Net._bots[peer] = bot
+		made.append(bot)
+	await frames(3)
+	var monk: BotPlayer = made[0]
+	var other: BotPlayer = made[1]
+	for b: BotPlayer in made:
+		b.pawn.global_position = b.body.global_position
+		b._think = 9999.0
+	pl.guard_left = 9999.0
+	# Your area abilities reach a bot: a stun, fire.
+	w.stun_around(pl.global_position, 4.0, 1.0)
+	ok(monk.pawn.frozen_left > 0.0, "a stun around you stuns a bot")
+	await frames(20)
+	ok(monk.body._statuses & 16 != 0 and monk.body._stun_fx and monk.body._stun_fx.emitting, "and everyone sees the stars over it")
+	monk.pawn.frozen_left = 0.0
+	monk.pawn._status_immune = 0.0
+	var hp0 := monk.pawn.hp
+	w.burn_around(pl.global_position, 4.0)
+	await seconds(0.6)
+	ok(monk.pawn.burn_time > 0.0 and monk.pawn.hp < hp0, "fire burns a bot (%.1f)" % (hp0 - monk.pawn.hp))
+	ok(monk.body._flames and monk.body._flames.emitting, "and it shows flames")
+	monk.pawn.burn_time = 0.0
+	# Your blows show on it.
+	pl.yaw = atan2(-(monk.body.global_position.x - pl.global_position.x), -(monk.body.global_position.z - pl.global_position.z))
+	pl.rotation.y = pl.yaw
+	await frames(2)
+	var hp1 := monk.pawn.hp
+	var d := pl.weapon_def()
+	var hits := w.melee_hit(pl, d, pl.melee_stats(d))
+	ok(hits >= 1 and monk.pawn.hp < hp1, "a sword blow lands on a bot")
+	ok(monk.body.bar_time > 0.0 and monk.body._flash > 0.0, "and its body flashes and shows its health")
+	# A familiar goes for a bot too, when there is nothing else.
+	var hp2 := other.pawn.hp + monk.pawn.hp
+	pl.activate_power("thunder")
+	pl._thunder_timer = 0.0
+	await seconds(1.5)
+	ok(other.pawn.hp + monk.pawn.hp < hp2, "the thundercloud strikes a bot")
+	pl.powers.erase("thunder")
+	for b: BotPlayer in made:
+		_revive(b)
+	# A bot's own ability hits you back. The thundercloud may have felled it, so it stands by you again.
+	monk.pawn.global_position = pl.global_position + Vector3(2.0, 0, 0)
+	monk.body.teleport(monk.pawn.global_position)
+	pl.guard_left = 0.0
+	var mine := pl.hp
+	var was := w.begin_act(monk.pawn)
+	monk.pawn._sweep(6.0, 1.0)
+	w.end_act(was)
+	ok(pl.hp < mine, "a bot's sweep hurts you (%.1f)" % (mine - pl.hp))
+	pl.guard_left = 9999.0
+	# With enemies around it, a Monk bot spends its Ki on a Ki Blast, as a person would.
+	_revive(monk)
+	monk.pawn.hp = monk.pawn.max_hp() * 0.6
+	monk.pawn.mana = monk.pawn.max_mana()
+	monk.pawn.art_cd_left = 0.0
+	for i in 3:
+		spawn("normal", monk.pawn.global_position + Vector3(cos(i * 2.1), 0, sin(i * 2.1)) * 2.0, true)
+	var used := false
+	monk._think = 0.0
+	for i in 240:
+		await frames(1)
+		if monk.pawn.art_cd_left > 0.0:
+			used = true
+			break
+	ok(used, "a Monk bot uses Ki Blast when enemies crowd it")
+	await kill_all()
+	# It levels up and takes its branch.
+	_revive(monk)
+	monk.pawn.add_xp(3000)
+	monk._think = 0.0
+	await frames(3)
+	ok(monk.pawn.spec_id != "" and monk.pawn.has_art() and monk.pawn.chosen.size() == ClassDefs.MAX_LEVEL - 1, "a Monk bot takes a branch and its whole path (%s)" % monk.pawn.spec_id)
+	# Its kills are its own.
+	_revive(monk)
+	var z := spawn("normal", monk.pawn.global_position + Vector3(0, 0, 2.0), true)
+	var kills := monk.pawn.kills
+	var my_kills := pl.kills
+	was = w.begin_act(monk.pawn)
+	z.take_damage(99999.0, Vector3.FORWARD, 0.0, z.centre())
+	w.end_act(was)
+	await frames(2)
+	ok(monk.pawn.kills == kills + 1 and pl.kills == my_kills, "a bot's kill counts for the bot, not for you (%d, %d)" % [monk.pawn.kills - kills, pl.kills - my_kills])
+	# In co-op, friends' skills help it, and blows from friends do nothing.
+	Net.rules = Net.Rules.COOP
+	other.pawn.hp = 20.0
+	other.pawn.guard_left = 0.0
+	Net.guard_peer(other.peer, 2.0, 25.0)
+	ok(other.pawn.hp >= 45.0 and other.pawn.guard_left > 0.0, "a friend's tonic or dome heals and shields a bot")
+	var before := other.pawn.hp
+	other.pawn.guard_left = 0.0
+	Net.hit_player(other.peer, 50.0, pl.global_position)
+	ok(other.pawn.hp == before, "and a friend cannot hurt it")
+	for b: BotPlayer in made:
+		w.players.erase(b.body)
+		b.body.queue_free()
+		b.queue_free()
+	Net.in_game = false
+	Net.leave()
+	await frames(3)
 
 
 func test_version_20() -> void:
@@ -1908,16 +2238,12 @@ func test_version_13() -> void:
 	body.teleport(pl.global_position + Vector3(4, 0, 0))
 	var bot := BotPlayer.new(w, body, info)
 	w.add_child(bot)
-	var power_before := bot._power()
-	bot.gifts["damage"] = 1
-	ok(bot._power() > power_before, "a gift of damage makes its blows stronger")
-	bot.gifts.clear()
-	bot._gain_xp(40)
-	var taken := 0
-	for gift: String in bot.gifts:
-		taken += int(bot.gifts[gift])
-	ok(bot.level > 3 and taken == bot.level - 1, "it levels up and picks a gift each time (level %d, %d gifts)" % [bot.level, taken])
-	bot.hp = bot.max_hp * 0.3
+	await frames(3)
+	ok(bot.pawn.is_inside_tree() and bot.pawn.is_bot() and bot.pawn.class_id == "infantry", "a bot is a real player of its class")
+	bot.pawn.add_xp(3000)
+	await frames(4)
+	ok(bot.level == ClassDefs.MAX_LEVEL and bot.pawn.chosen.size() == bot.level - 1 and bot.pawn.spec_id != "", "it levels up and takes an ability each time, its branch too (level %d, %d taken, %s)" % [bot.level, bot.pawn.chosen.size(), bot.pawn.spec_id])
+	bot.pawn.hp = bot.pawn.max_hp() * 0.3
 	var food := w.spawn_pickup_at(bot.at + Vector3(0, 0, 4), Pickup.Kind.FOOD, PowerDefs.FOODS.keys()[0])
 	var low_hp := bot.hp
 	await seconds(3.0)
@@ -1925,7 +2251,7 @@ func test_version_13() -> void:
 	ok(bot.hp > low_hp, "and feels better")
 	var hard: Dictionary = BotPlayer.SMARTS[2]
 	var easy: Dictionary = BotPlayer.SMARTS[0]
-	ok(float(hard["aim"]) > float(easy["aim"]) and float(hard["think"]) < float(easy["think"]), "a harder game means sharper bots")
+	ok(float(hard["aim"]) < float(easy["aim"]) and float(hard["think"]) < float(easy["think"]), "a harder game means sharper bots")
 	bot.queue_free()
 	body.queue_free()
 	Net.in_game = false
@@ -2253,9 +2579,12 @@ func test_version_10() -> void:
 	# Everyone else out: the match ends.
 	for b: BotPlayer in bots:
 		while Net.lives_of(b.peer) > 0 and not m._run_over:
-			b._guard = 0.0
-			b.down = false
-			b.hurt(99999.0, 1)
+			if b.pawn.dead:
+				b._respawn = 0.001
+				await seconds(0.05)
+				continue
+			b.pawn.guard_left = 0.0
+			Net.hit_player(b.peer, 99999.0, pl.global_position)
 			await seconds(0.05)
 	await seconds(0.5)
 	ok(m._run_over and Net.last_winner == Net.my_id(), "last one standing beats the bots")
@@ -3830,11 +4159,12 @@ func test_finals() -> void:
 	ok(w._traps.size() >= traps0, "the kill drops a new trap")
 	await seconds(2.5)
 
+	Game.pet = "wolf"
 	await build("ranger", 2)
 	pl._wolf_timer = 0.0
 	await seconds(0.3)
 	ok(w.count_allies("wolf") >= 1, "wolves come to a Beastmaster")
-	ok(int(pl.m("wolves")) >= 5, "Wolf Pack raises the pack")
+	ok(int(pl.m("wolves")) == 3, "The Pack adds one beast: three with Second Beast (%d)" % int(pl.m("wolves")))
 	var wz := spawn("normal", w.allies[0].position + Vector3(0, 0, 2.0))
 	wz.hp = 1000.0
 	await seconds(3.0)

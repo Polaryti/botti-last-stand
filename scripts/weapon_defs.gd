@@ -42,13 +42,13 @@ const ALL := {
 		"knock": 2.0, "weight": 1.2, "pos": Vector3(0.24, -0.14, -0.44), "scale": 1.5},
 	"blowgun": {"power": 0.25, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.8, "range": 22.0, "speed": 40.0, "gravity": 2.0,
 		"knock": 0.0, "weight": 0.9, "pos": Vector3(0.14, -0.16, -0.25), "scale": 1.0},
-	"fists": {"power": 0.7, "name": "", "desc": "", "kind": Kind.MELEE, "rate": 0.34, "range": 2.4, "cone": 100.0, "max_hits": 2,
+	"fists": {"only": "monk", "power": 0.7, "name": "", "desc": "", "kind": Kind.MELEE, "rate": 0.34, "range": 2.4, "cone": 100.0, "max_hits": 2,
 		"knock": 1.4, "swing": "punch", "hidden": true, "weight": 0.0, "pos": Vector3(0.34, -0.36, -0.68), "scale": 0.58},
 	"bo": {"power": 0.95, "name": "Bo Staff", "desc": "A Monk's long staff, which sweeps wide and keeps them away.", "hidden": true, "kind": Kind.MELEE, "rate": 0.48, "range": 3.2, "cone": 130.0, "max_hits": 3,
-		"knock": 2.8, "swing": "bo", "weight": 0.9, "pos": Vector3(0.08, -0.3, -0.62), "scale": 0.8},
-	"claws": {"name": "Spectral Claws", "desc": "A Revenant's own hands, shrouded in mist. Each blow uses a little Mist.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.5, "cone": 100.0, "max_hits": 2,
+		"knock": 2.8, "swing": "bo", "weight": 0.0, "only": "monk", "pos": Vector3(0.08, -0.3, -0.62), "scale": 0.8},
+	"claws": {"only": "revenant", "name": "Spectral Claws", "desc": "A Revenant's own hands, shrouded in mist. Each blow uses a little Mist.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.5, "cone": 100.0, "max_hits": 2,
 		"knock": 1.2, "swing": "claw", "cost": 6.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
-	"staff": {"name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
+	"staff": {"only": "magician", "name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
 		"knock": 1.5, "weight": 0.0, "pos": Vector3(0.26, -0.38, -0.5), "scale": 0.6},
 }
 
@@ -62,16 +62,23 @@ static var _meshes := {}
 static var _shields := {}
 
 
+## Can this be found lying about? Not the weapons that belong to one class: a Monk's Bo, the
+## Revenant's claws, a Magician's staff, bare hands.
+static func lies_around(id: String) -> bool:
+	var d: Dictionary = ALL.get(id, {})
+	return not d.is_empty() and not d.get("hidden", false) and not d.has("only") and float(d.get("weight", 0.0)) > 0.0
+
+
 static func pick_random() -> String:
 	var total := 0.0
 	for id: String in ALL:
-		total += float(ALL[id]["weight"])
+		if lies_around(id):
+			total += float(ALL[id]["weight"])
 	var r := randf() * total
 	for id: String in ALL:
-		var weight: float = ALL[id]["weight"]
-		if weight <= 0.0:
+		if not lies_around(id):
 			continue
-		r -= weight
+		r -= float(ALL[id]["weight"])
 		if r <= 0.0:
 			return id
 	return "sword"

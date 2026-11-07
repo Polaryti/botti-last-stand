@@ -97,7 +97,7 @@ func _as_host() -> void:
 	if rules == "mists":
 		Net.set_night_map("mists")
 		ok(true, "the host picks the Mists")
-	Net.set_rules({"mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -111,6 +111,8 @@ func _as_host() -> void:
 		Net.set_my_class("artificer")
 	if rules == "bots" or rules == "botsffa":
 		Net.set_bots(2)
+	if rules == "room":
+		Net.set_bots(1)
 	if rules == "teams":
 		# Put the two on opposite teams.
 		Net.roster[1]["team"] = 0
@@ -227,6 +229,8 @@ func _play() -> void:
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
 		await _with_bots()
+	elif rules == "room":
+		await _room()
 	else:
 		await _fight()
 	await wait(0.5)
@@ -273,9 +277,16 @@ func _with_bots() -> void:
 	await wait(4.0)
 	await sync(51)
 	ok(body.global_position.distance_to(was) > 1.0 or rules == "bots", "the bots move on this phone")
-	# A blow from the phone that does not run the bot.
+	# A blow from the phone that does not run the bot. In co-op a friend's blow does nothing to it,
+	# so there the night's own damage is sent instead, the way a zombie's would be.
 	if not host:
-		Net.hit_player(bot_id, 99999.0, pl.global_position)
+		if rules == "botsffa":
+			Net.hit_player(bot_id, 99999.0, pl.global_position)
+		else:
+			Net.hit_player(bot_id, 99999.0, pl.global_position)
+			await wait(0.5)
+			ok(not body.dead, "a friend's blow does not hurt a bot in co-op")
+			Net.hurt_peer(bot_id, 99999.0, pl.global_position, null)
 	await wait(0.8)
 	await sync(52)
 	ok(body.dead, "a defeated bot falls on this phone")
@@ -310,6 +321,67 @@ func _with_bots() -> void:
 	await sync(55)
 	await wait(0.3)
 	await snap("bots")
+
+
+## After a night, the host takes everyone back to the room, and a second night starts from there.
+func _room() -> void:
+	pl.guard_left = 99999.0
+	await sync(80)
+	if host:
+		Net.roster[Net.my_id()]["score"] = 5
+		Net.finish("Test over", "The test ended the night.")
+	var t := 0.0
+	while not m._run_over and t < 10.0:
+		await wait(0.1)
+		t += 0.1
+	ok(m._run_over, "the night ends on this phone")
+	var names: Array = m.ui_layer.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	if host:
+		ok(names.has("Back to the room"), "the host can take everyone back to the room")
+	else:
+		ok(not names.has("Back to the room") and names.has("Menu"), "the others wait for the host, or leave")
+	await sync(81)
+	var first_world := m.world
+	if host:
+		_press("Back to the room")
+	t = 0.0
+	while (Net.in_game or m.world == first_world or m.panel == null) and t < 10.0:
+		await wait(0.1)
+		t += 0.1
+	await wait(0.4)
+	ok(not Net.in_game and Net.active(), "back in the room, still together")
+	ok(m.world != null and m.world.mode == Game.Mode.MENU and not is_instance_valid(first_world), "the night is cleared away")
+	var labels: Array = m.ui_layer.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	ok(labels.has("Infantry") and labels.has("Ranger"), "the room shows again, with the classes to pick")
+	ok(Net.roster.size() == 3 and _human_other() != 0 and Net.roster.keys().filter(Net.is_bot).size() == 1, "the other phone and the bot are still in the room (%d)" % Net.roster.size())
+	ok(Net.roster.values().all(func(r: Dictionary) -> bool: return int(r["score"]) == 0 and int(r["lives"]) == Net.LIVES), "scores start again from nothing")
+	if host:
+		ok(not multiplayer.multiplayer_peer.refuse_new_connections, "the room takes new players again")
+		if shots != "":
+			await snap("room_again")
+	await sync(82)
+	if host:
+		_press("Start the night")
+	t = 0.0
+	while (not Net.in_game or m.world == null or m.world.mode == Game.Mode.MENU or not m._net_go) and t < 40.0:
+		await wait(0.1)
+		t += 0.1
+	ok(Net.in_game and m._net_go, "a second night starts on this phone")
+	w = m.world
+	pl = w.player
+	pl.guard_left = 99999.0
+	await wait(0.6)
+	await sync(83)
+	ok(_avatar() != null and w.players.has(_avatar()), "the other player has a body again")
+	var bot_id: int = Net.roster.keys().filter(Net.is_bot)[0]
+	ok(Net._avatars.has(bot_id) and w.players.has(Net._avatars[bot_id]), "and so has the bot")
+	var bot_body: Avatar = Net._avatars.get(bot_id)
+	var was := bot_body.global_position if bot_body else Vector3.ZERO
+	await wait(4.0)
+	await sync(84)
+	ok(bot_body != null and bot_body.global_position.distance_to(was) > 1.0, "the bot plays the second night too")
+	ok(w.director.running and w.director.elapsed > 2.0, "the clock runs (%.1f)" % w.director.elapsed)
+	await sync(85)
 
 
 func _human_other() -> int:

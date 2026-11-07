@@ -40,6 +40,20 @@ An app signed with a different key will not install over one already on a phone 
 2. Add the notes to the top of `CHANGELOG.md`. The game shows this file on its Changelog screen, so write for players. It reads `## ` as a version, `### ` as a heading and `- ` as a line.
 3. Run the tests below, build the app, commit as `Version X.Y.Z` and push.
 
+## Releases and the in-game update
+
+Every push to `main` runs the "Android release" workflow. It builds the signed Android app and publishes it as a GitHub Release named after `config/version` (`v0.20.1`, say), with the newest `CHANGELOG.md` entry as its notes. The "iOS build" workflow adds the iPhone app to the same release. A version is published once: pushing again with the same version leaves its release alone.
+
+When the game opens its menu it asks GitHub for the latest release. If it is newer, the menu says so. On Android, Update downloads the app and opens Android's installer, which asks before it installs (the first time, Android also asks to allow this game to install apps). On an iPhone it only points to the release, because an iPhone app cannot install another.
+
+The workflow needs the signing key in the repository's Actions secrets (Settings > Secrets and variables > Actions > New repository secret). Without them it skips the release and leaves a warning:
+
+- `ANDROID_KEYSTORE_BASE64`: the key file in base64 (`base64 -w0 keys/botti-last-stand.keystore`).
+- `ANDROID_KEYSTORE_USER`: the key's alias, `bottilaststand`.
+- `ANDROID_KEYSTORE_PASSWORD`: its password.
+
+The workflow refuses to publish an app whose certificate is not the game's (SHA-256 `53c7a9b0...8fa79`), since phones would refuse it as an update.
+
 ## Online play
 
 The Epic plugin's compiled files (hundreds of MB) and the keys are not in the repository, so a fresh copy builds without online play until you add them. Android also needs a Gradle build with the Android SDK's android-36 platform and build-tools 36.1.0:

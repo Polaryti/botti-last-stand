@@ -143,6 +143,15 @@ def horseshoe():
     return path(STEEL, "M26 90 L14 90 C4 40 20 10 50 10 C80 10 96 40 86 90 L74 90 C82 50 70 28 50 28 C30 28 18 50 26 90Z") + "".join(circ(INK, x, y, 2.4, 0) for x, y in [(19, 70), (17, 50), (26, 30), (81, 70), (83, 50), (74, 30)])
 def chariot():
     return path(("#c98a3e", "#6d4522"), "M14 28 L54 28 L60 62 L18 62Z") + line("#8a5f35", 6, (56, 52), (94, 36)) + circ(WOOD, 34, 70, 21) + circ(DARK, 34, 70, 6) + line("#3b2a18", 3, (34, 52), (34, 88), ink=False) + line("#3b2a18", 3, (16, 70), (52, 70), ink=False)
+def war_chariot():
+    # Side on: an iron car with a raised front, one big spoked wheel with a scythe at the hub, and the pole.
+    spokes = "".join(line("#f2c96a", 3.4, (38 + 19 * math.cos(math.radians(d)), 66 + 19 * math.sin(math.radians(d))), (38 - 19 * math.cos(math.radians(d)), 66 - 19 * math.sin(math.radians(d)))) for d in (0, 45, 90, 135))
+    return (line("#5a3a1e", 7, (66, 50), (97, 28))
+        + path(DARK, "M8 28 L56 28 L64 14 L80 14 L74 58 L12 58Z")
+        + path(STEEL, "M58 28 L64 14 L80 14 L74 58 L62 58Z")
+        + line("#f2c96a", 3, (14, 36), (54, 36), ink=False)
+        + poly(STEEL, (38, 62), (0, 52), (8, 72))
+        + circ(DARK, 38, 66, 26) + circ(("#3a4150", "#1c2029"), 38, 66, 19) + spokes + circ(BRASS, 38, 66, 6.5))
 def noisebox():
     return rect(WOOD, 16, 44, 40, 38, 3) + poly(STEEL, (52, 38), (84, 18), (84, 92), (52, 76)) + curve("#ffe68a", 4, "M62 8 C50 14 42 20 34 40", ink=False)
 def magnet():
@@ -370,7 +379,7 @@ SPECS = {
     "rift": ("revenant", lambda: at(50, 50, 0.8, rift())),
     "summoner": ("revenant", lambda: at(30, 40, 0.42, ghost()) + at(70, 40, 0.42, ghost()) + at(50, 62, 0.5, ghost())),
     "pyromaniac": ("artificer", lambda: at(46, 56, 0.66, bomb()) + at(66, 34, 0.38, flame())),
-    "mechanic": ("artificer", lambda: at(50, 50, 0.8, turret())),
+    "mechanic": ("artificer", lambda: at(50, 52, 0.86, war_chariot())),
     "inventor": ("artificer", lambda: at(42, 54, 0.66, flask()) + at(70, 32, 0.42, gear())),
     "apothecary": ("plague_doctor", lambda: at(50, 50, 0.72, potion()) + at(68, 66, 0.3, cross())),
     "pestilence": ("plague_doctor", lambda: at(50, 44, 0.62, skull()) + at(26, 76, 0.2, circ(TOX, 50, 50, 40)) + at(50, 82, 0.26, circ(TOX, 50, 50, 40)) + at(74, 74, 0.2, circ(TOX, 50, 50, 40))),

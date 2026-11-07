@@ -2,6 +2,29 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## 0.20.1 (7 November 2026)
+### New
+- Bots now play like people. Each one levels up, picks its path in the skill tree and uses its abilities, familiars and Store items, picks up weapons and power-ups, and repairs the Fort.
+- Everything you do reaches bots too: skills, fire, poison, bleeding, stuns, traps, familiars and the thundercloud. A bot you hit flashes and shows its health, and you can see when it burns, is poisoned or is stunned. Bots on your side can heal you and guard you, and their blows never hurt you.
+- Online games are Public or Private. A public game is listed for everyone under Play Together, with its room code too; a private one can only be joined with its code. The list shows games still waiting for players, and you join with one tap.
+- After an online match, the host can take everyone back to the room for another round, and a public game shows in the list again.
+- When a new version is out, the main menu tells you. On Android, tap Update and the game downloads it and opens the installer (the first time, Android asks you to allow installs from the game). On iPhone it tells you where to get it.
+### Fixed
+- Dropping a weapon no longer picks it straight back up.
+- Class weapons, like the Monk's Bo, no longer lie around on the map.
+- In the Armory, Back from the Store now returns to the Armory.
+- Long skill descriptions in the skill tree now fit their cards.
+### Changed
+- The skill tree button is larger and golden, and glows with a count when you have points to spend.
+- Lists in the Store, the Armory and the rest follow your finger exactly, glide on when you flick them, and can be dragged with a mouse. A bar on the right shows where you are, and you can drag it too.
+- Ranger: Spare Parts also adds 3 traps to the Trap Satchel. Field of Snares holds 8 traps on the ground and 8 in the Satchel.
+- Beastmaster: The Pack now gives you one more beast, and every 20 seconds the pack acts by kind: wolves stun all around you, ravens mark every enemy near you, snakes poison them and foxes bring food or arrows.
+- The snake moves faster. The fox takes longer to find something, and now finds arrows as well as food.
+- The Monk gains Ki more slowly.
+- Defend the Fort: less wood, and most of it lies outside the walls.
+- The Mechanic's crest is now a war chariot instead of a turret.
+- The main menu no longer shows your best night and dawns reached.
+
 ## 0.20.0 (6 November 2026)
 ### The Mists
 - Nothing is safe up on the stones any more. Every zombie that walks now jumps gaps and follows you along the stone lines, and comes back down when you do.

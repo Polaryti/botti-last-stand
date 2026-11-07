@@ -60,6 +60,9 @@ var night_moon := 0.5
 const FALL_DEATH := -12.0 # below this on the islands, you have fallen off the world
 var director: Director
 var player: Player
+## Whose doing it is, while a bot acts on the host. Kills, hits and rivals are counted for them.
+var actor: Player
+var bots: Array[BotPlayer] = [] # the host's bots in this world
 var players: Array[Target] = []
 var allies: Array[Ally] = []
 var _spare_allies := {} # kind -> resting bodies, ready to be used again
@@ -69,6 +72,7 @@ var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
 const PICKUP_APART := 6.0
+const WOOD_OUTSIDE := 0.75 # how much of the wood lies outside the gate that needs it
 var perches: Array[Vector3] = []
 var crop_spots: Array[Vector3] = []
 var pois: Array[Vector3] = []
@@ -123,7 +127,7 @@ var _puddle_life: Array[float] = []
 var _puddle_fire: Array[bool] = []
 var _puddle_size: Array[float] = []
 var _puddle_shown_only: Array[bool] = []
-var _puddle_hurts_me: Array[bool] = []
+var _puddle_owner: Array[int] = [] # who made it, by peer id: whoever they fight is hurt by it
 var _sparks: Array[MeshInstance3D] = []
 var _spark_life: Array[float] = []
 var _next_spark := 0
@@ -785,6 +789,42 @@ func _tick_fx(delta: float) -> void:
 				_sparks[i].visible = false
 
 
+# --- Who is acting --------------------------------------------------------------
+
+## The person or bot whose turn this is. Outside a bot's turn, the player on this phone.
+func acting() -> Player:
+	return actor if actor != null and is_instance_valid(actor) else player
+
+
+func begin_act(p: Player) -> Player:
+	var was := actor
+	actor = p
+	return was
+
+
+func end_act(was: Player) -> void:
+	actor = was
+
+
+## Everyone this phone moves: its own player, and on the host the bots too.
+func local_players() -> Array[Player]:
+	var out: Array[Player] = []
+	if player:
+		out.append(player)
+	for bot: BotPlayer in bots:
+		if bot.pawn and bot.pawn.is_inside_tree():
+			out.append(bot.pawn)
+	return out
+
+
+func peer_of(t: Target) -> int:
+	if t is Avatar:
+		return (t as Avatar).peer
+	if t is Player:
+		return (t as Player).net_id()
+	return 0
+
+
 # --- Queries -----------------------------------------------------------------
 
 func nearest_player(from: Vector3) -> Target:
@@ -910,15 +950,15 @@ func call_all(at: Vector3) -> void:
 ## What area abilities do to other players in a fight. Returns how many there were.
 func status_rivals(at: Vector3, radius: float, kind: int, seconds: float) -> int:
 	var near := rivals_near(at, radius)
-	for r: Avatar in near:
-		Net.status_peer(r.peer, kind, seconds)
+	for r: Target in near:
+		status_rival(r, kind, seconds)
 	return near.size()
 
 
-func nearest_rival(from: Vector3, radius: float) -> Avatar:
-	var best: Avatar = null
+func nearest_rival(from: Vector3, radius: float) -> Target:
+	var best: Target = null
 	var best_d := radius * radius
-	for r: Avatar in rivals_near(from, radius):
+	for r: Target in rivals_near(from, radius):
 		var d := r.global_position.distance_squared_to(from)
 		if d < best_d and has_line_of_sight(from, r.eye_position()):
 			best_d = d
@@ -966,16 +1006,19 @@ func zombies_near(at: Vector3, radius: float, limit: int) -> Array[Zombie]:
 
 
 func ally_near(at: Vector3, radius: float) -> bool:
+	var owner_player := acting()
 	for a in allies:
-		if not a.dead and a.position.distance_to(at) <= radius:
+		if not a.dead and a.remote_owner == 0 and a.master == owner_player and a.position.distance_to(at) <= radius:
 			return true
 	return false
 
 
+## The acting player's own summons of one kind.
 func count_allies(kind: String) -> int:
+	var owner_player := acting()
 	var n := 0
 	for a in allies:
-		if a.kind == kind and not a.dead:
+		if a.kind == kind and not a.dead and a.remote_owner == 0 and a.master == owner_player:
 			n += 1
 	return n
 
@@ -1062,9 +1105,8 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 
 func _melee_rivals(attacker: Player, origin: Vector3, flat_forward: Vector3, range_m: float, cos_limit: float, damage: float) -> int:
 	var hits := 0
-	for t in players:
-		if not t is Avatar or t.dead or not Net.is_foe((t as Avatar).peer):
-			continue
+	var was := begin_act(attacker)
+	for t: Target in rivals_near(origin, range_m + 2.0):
 		var centre: Vector3 = t.global_position + Vector3.UP * 1.0
 		var to := centre - origin
 		var flat := Vector3(to.x, 0, to.z)
@@ -1074,18 +1116,19 @@ func _melee_rivals(attacker: Player, origin: Vector3, flat_forward: Vector3, ran
 		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos_limit:
 			continue
 		if has_line_of_sight(origin, centre):
-			Net.hit_player((t as Avatar).peer, damage, attacker.global_position)
+			hit_rival(t, damage, attacker.global_position)
 			fx_gore(centre, Color(0.6, 0.1, 0.08))
 			attacker.on_hit(false)
-			attacker.on_melee_rival((t as Avatar).peer, attacker.weapon_def())
+			attacker.on_melee_rival(peer_of(t), attacker.weapon_def())
 			hits += 1
+	end_act(was)
 	return hits
 
 
 func damage_zombie(z: Zombie, amount: float, dir: Vector3, knock: float, at: Vector3, head_shot: bool) -> void:
 	z.take_damage(amount, dir, knock, at)
-	if player:
-		player.on_hit(head_shot)
+	if acting():
+		acting().on_hit(head_shot)
 
 
 ## from_hand is false for familiars and hawks, whose arrows do not count as the player's own shots.
@@ -1108,6 +1151,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 	var d := p.weapon_def() if from_hand else {}
 	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
+		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
 		shot.stagger = float(d.get("stagger", 0.0))
@@ -1122,7 +1166,7 @@ func familiar_arrow(p: Player, target: Node3D) -> void:
 	var aim: Vector3 = (target as Zombie).centre() if target is Zombie else target.global_position + Vector3.UP
 	var dir := (aim - from).normalized()
 	spawn_player_arrow(p, from, dir * 40.0, 0.0, PowerDefs.ARCHER_RANGE + 5.0, 1.0, WeaponDefs.DAMAGE * p.damage_multiplier(), false)
-	Sfx.play("bow", -9.0, 1.2)
+	sfx_at("bow", from, -9.0)
 
 
 func spawn_axe(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: float, dmg: float) -> void:
@@ -1130,6 +1174,7 @@ func spawn_axe(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: fl
 	if shot == null:
 		p.axe_returned()
 	else:
+		shot.set_owner_player(p)
 		shot.from_player = true
 		if Net.active():
 			Net.shot(1, at, vel, 0.0, max_range, false, Color.WHITE)
@@ -1146,6 +1191,7 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 	if Net.active():
 		Net.shot(2, at, vel, 0.0, max_range, element == "fire", col)
 	if shot:
+		shot.set_owner_player(p)
 		shot.from_player = true
 		shot.frost = element == "frost"
 		if meteor:
@@ -1156,7 +1202,9 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 
 
 func mirror_bolt(from: Vector3, target: Vector3) -> void:
-	_launch(Projectile.Kind.BOLT, _orb_mesh(Color(0.75, 0.55, 1.0)), from, (target - from).normalized() * 26.0, 0.0, 26.0, WeaponDefs.DAMAGE, 1.0)
+	var shot := _launch(Projectile.Kind.BOLT, _orb_mesh(Color(0.75, 0.55, 1.0)), from, (target - from).normalized() * 26.0, 0.0, 26.0, WeaponDefs.DAMAGE, 1.0)
+	if shot:
+		shot.set_owner_player(acting())
 	sfx_at("spell", from, -8.0)
 
 
@@ -1184,10 +1232,10 @@ func blast(at: Vector3, radius: float, damage: float) -> void:
 	for z: Zombie in zombies.duplicate():
 		if z.is_alive() and z.centre().distance_to(at) <= radius:
 			z.take_damage(damage, z.position - at, 5.0, z.centre())
-			if player:
-				player.on_hit(false)
-	for r: Avatar in rivals_near(at, radius):
-		Net.hit_player(r.peer, damage, at)
+			if acting():
+				acting().on_hit(false)
+	for r: Target in rivals_near(at, radius):
+		hit_rival(r, damage, at)
 
 
 func flash_bolt(at: Vector3) -> void:
@@ -1198,15 +1246,17 @@ func flash_bolt(at: Vector3) -> void:
 
 
 func thunder_strike(p: Player, at: Vector3) -> void:
+	var was := begin_act(p)
 	flash_bolt(at)
-	Sfx.play("thunder", -3.0, 1.0, 0.2)
+	sfx_at("thunder", at, -3.0)
 	for z: Zombie in zombies.duplicate():
 		if z.is_alive() and z.position.distance_to(at) <= PowerDefs.THUNDER_RADIUS:
 			z.take_damage(PowerDefs.THUNDER_DAMAGE * p.damage_multiplier(), z.position - at, 4.0, z.centre())
 			p.on_hit(false)
-	for r: Avatar in rivals_near(at, PowerDefs.THUNDER_RADIUS):
-		Net.hit_player(r.peer, PowerDefs.THUNDER_DAMAGE * p.damage_multiplier(), at)
+	for r: Target in rivals_near(at, PowerDefs.THUNDER_RADIUS):
+		hit_rival(r, PowerDefs.THUNDER_DAMAGE * p.damage_multiplier(), at)
 	fx_gore(at + Vector3.UP * 0.5, Color(0.7, 0.85, 1.0))
+	end_act(was)
 
 
 func spawn_fireball(at: Vector3, target: Vector3, damage: float, source := "") -> void:
@@ -1238,8 +1288,7 @@ func set_up_stands() -> void:
 		match str(row["kind"]):
 			"weapon":
 				for id: String in WeaponDefs.ALL:
-					var d: Dictionary = WeaponDefs.ALL[id]
-					if not d.get("hidden", false) and id != "staff":
+					if WeaponDefs.lies_around(id):
 						entries.append([Pickup.Kind.WEAPON, id])
 			"item":
 				for id: String in PowerDefs.ALL:
@@ -1301,6 +1350,7 @@ func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burnin
 	if shot == null:
 		burst.call(at + vel * 0.5)
 		return null
+	shot.set_owner_player(acting())
 	shot.from_player = true
 	shot.blast_radius = 0.01
 	shot.on_burst = burst
@@ -1315,6 +1365,7 @@ func spawn_dart(at: Vector3, vel: Vector3, dmg: float, jumps: int) -> void:
 	var col := Color(0.6, 0.92, 1.0)
 	var shot := _launch(Projectile.Kind.BOLT, _orb_mesh(col), at, vel, 0.0, 40.0, dmg, 1.0)
 	if shot:
+		shot.set_owner_player(acting())
 		shot.from_player = true
 		shot.sparks = jumps
 		shot.scale = Vector3.ONE * 0.5
@@ -1343,7 +1394,7 @@ func place_sentry(p: Player, at: Vector3, seconds: float) -> void:
 	node.global_position = Vector3(at.x, ground_at(at), at.z)
 	_sentries.append({"node": node, "left": seconds, "timer": 0.4, "owner": p})
 	if p and Net.active():
-		Net.world_fx(Net.Fx.SENTRY, at, Vector3(seconds, 0, 0))
+		Net.world_fx(Net.Fx.SENTRY, at, Vector3(seconds, 0, 0), p.net_id())
 
 
 func _sentry_mesh() -> Mesh:
@@ -1371,20 +1422,24 @@ func _tick_sentries(delta: float) -> void:
 			_sentries.remove_at(i)
 			continue
 		var owner_player: Player = s["owner"]
-		if owner_player == null:
+		if owner_player == null or not is_instance_valid(owner_player):
 			continue
 		s["timer"] = float(s["timer"]) - delta
 		if float(s["timer"]) > 0.0:
 			continue
 		var from := node.global_position + Vector3.UP * 1.12
+		var was := begin_act(owner_player)
 		var aim_at := aim_point(from, WorldLight.SENTRY_REACH)
+		end_act(was)
 		if aim_at == Vector3.INF:
 			s["timer"] = 0.3
 			continue
 		s["timer"] = 0.55
 		node.rotation.y = atan2(-(aim_at.x - from.x), -(aim_at.z - from.z))
 		var dir := (aim_at - from).normalized()
+		var shooting := begin_act(owner_player)
 		spawn_player_arrow(owner_player, from + dir * 0.9, dir * 45.0, 0.0, WorldLight.SENTRY_REACH + 6.0, 1.0, WeaponDefs.DAMAGE * owner_player.m("inv_damage") * owner_player.damage_multiplier(), false)
+		end_act(shooting)
 		sfx_at("crossbow", from, -6.0)
 
 
@@ -1407,12 +1462,13 @@ func _launch(kind: int, m: Mesh, at: Vector3, vel: Vector3, grav: float, max_ran
 
 
 func burn_tick(z: Zombie) -> void:
-	var mult := player.m("burn_damage") if player else 1.0
+	var who := Net.local_player(z.last_hitter) if Net.active() else player
+	var mult := who.m("burn_damage") if who else 1.0
 	if z.phases:
 		mult *= 2.0
 	z.next_hitter = z.last_hitter
 	z.take_damage(6.0 * mult, Vector3.ZERO, 0.0, z.centre())
-	if player:
+	if who and who == player:
 		player.hit_marker = maxf(player.hit_marker, 0.35)
 
 
@@ -1545,8 +1601,11 @@ func stock_wood() -> void:
 			g = other
 	var dir: Vector3 = g["dir"]
 	var along := Vector3(dir.z, 0, -dir.x)
+	# Mostly outside the gate, where you have to step out to fetch it. Now and then just inside.
+	var outside := randf() < WOOD_OUTSIDE
 	for attempt in 8:
-		var at: Vector3 = (g["at"] as Vector3) - dir * randf_range(3.0, 5.0) + along * randf_range(-Fort.GATE_W, Fort.GATE_W)
+		var out := randf_range(4.0, 8.0) if outside else -randf_range(3.0, 5.0)
+		var at: Vector3 = (g["at"] as Vector3) + dir * out + along * randf_range(-Fort.GATE_W, Fort.GATE_W) * 0.8
 		if not grid.is_free(grid.to_cell(at)):
 			at = grid.to_world(grid.nearest_free(grid.to_cell(at)))
 		var clash := false
@@ -1710,6 +1769,9 @@ func on_zombie_killed(z: Zombie) -> void:
 
 
 func on_player_died(p: Player) -> void:
+	if p.is_bot():
+		p.bot.on_fell()
+		return
 	if Net.active():
 		Net.local_died(p.last_foe)
 	else:
@@ -1720,9 +1782,9 @@ func on_player_died(p: Player) -> void:
 func on_dawn() -> void:
 	_dawn_done = true
 	_apply_sky(1.0)
-	if player:
-		player.guard_left = 999.0
-		player.burn_time = 0.0
+	for p: Player in local_players():
+		p.guard_left = 999.0
+		p.burn_time = 0.0
 	for z: Zombie in zombies:
 		if z.is_alive():
 			z.ignite(ZombieDefs.BURN_SECONDS)
@@ -1822,6 +1884,9 @@ func _open_ground_near_players() -> Vector3:
 
 
 func drop_weapon(at: Vector3, id: String) -> void:
+	# A class's own weapon never ends up on the ground for someone else to find.
+	if not WeaponDefs.lies_around(id):
+		return
 	var c := grid.nearest_free(grid.to_cell(at))
 	var target := at if grid.is_free(grid.to_cell(at)) else grid.to_world(c)
 	spawn_pickup_at(target, Pickup.Kind.WEAPON, id)
@@ -1847,23 +1912,36 @@ func count_pickups(kind: int) -> int:
 	return n
 
 
-func collect_weapon(p: Pickup) -> void:
-	player.give_weapon(p.weapon_id)
-	player.add_arrows(p.bonus_arrows)
-	Sfx.play("weapon_change")
+func collect_weapon(who: Player, p: Pickup) -> void:
+	who.give_weapon(p.weapon_id)
+	who.add_arrows(p.bonus_arrows)
+	who.sfx("weapon_change")
 	remove_pickup(p)
 
 
 func _scan_pickups() -> void:
-	if player == null or player.dead:
+	for p: Player in local_players():
+		_scan_pickups_for(p)
+
+
+## What lies within reach of one player or bot: taken at once if it is wanted, or offered.
+func _scan_pickups_for(who: Player) -> void:
+	if who.dead:
 		return
 	var near: Pickup = null
 	var near_d := 2.0
-	var here := player.global_position
+	var here := who.global_position
 	var named: Pickup = null
 	var named_d := 3.5
+	# A weapon just put down stays down until you have walked away from where it fell.
+	if who.shun_weapon != "" and Vector2(here.x - who.shun_at.x, here.z - who.shun_at.z).length() > Pickup.SHUN_REACH:
+		who.shun_weapon = ""
 	for p: Pickup in pickups.duplicate():
+		if not is_instance_valid(p):
+			continue
 		var d := p.global_position.distance_to(here)
+		if p.kind == Pickup.Kind.WEAPON and p.weapon_id == who.shun_weapon and p.global_position.distance_to(who.shun_at) < 2.5:
+			continue
 		if d < named_d:
 			named = p
 			named_d = d
@@ -1871,54 +1949,55 @@ func _scan_pickups() -> void:
 			continue
 		match p.kind:
 			Pickup.Kind.WEAPON:
-				if not player.can_use(p.weapon_id):
+				if not who.can_use(p.weapon_id):
 					pass
-				elif player.carries(p.weapon_id):
+				elif who.carries(p.weapon_id):
 					# Spare copy: bows give their arrows, the rest stay on the ground.
 					if p.bonus_arrows > 0:
-						player.add_arrows(p.bonus_arrows)
-						Sfx.play("pickup", -5.0)
+						who.add_arrows(p.bonus_arrows)
+						who.sfx("pickup", -5.0)
 						remove_pickup(p)
-				elif player.has_empty_slot():
-					collect_weapon(p)
+				elif who.has_empty_slot():
+					collect_weapon(who, p)
 				elif d < near_d:
 					near = p
 					near_d = d
 			Pickup.Kind.FOOD:
-				if d < 1.6 and player.hp < player.max_hp():
-					player.heal(float(PowerDefs.FOODS[p.item_id]["heal"]))
-					player.say("+%d %s" % [int(PowerDefs.FOODS[p.item_id]["heal"]), p.display_name()])
-					Sfx.play("eat", -2.0)
+				if d < 1.6 and who.hp < who.max_hp():
+					who.heal(float(PowerDefs.FOODS[p.item_id]["heal"]))
+					who.say("+%d %s" % [int(PowerDefs.FOODS[p.item_id]["heal"]), p.display_name()])
+					who.sfx("eat", -2.0)
 					remove_pickup(p)
 			Pickup.Kind.ARROWS:
-				if d < 1.6 and player.arrows < player.max_arrows() and not player.class_def().get("no_weapons", false):
-					player.add_arrows(12)
-					player.say("+12 Arrows")
-					Sfx.play("pickup", -5.0)
+				if d < 1.6 and who.arrows < who.max_arrows() and not who.class_def().get("no_weapons", false):
+					who.add_arrows(12)
+					who.say("+12 Arrows")
+					who.sfx("pickup", -5.0)
 					remove_pickup(p)
 			Pickup.Kind.POWER:
 				if d < 1.6:
-					player.activate_power(p.item_id)
+					who.activate_power(p.item_id)
 					remove_pickup(p)
 			Pickup.Kind.WOOD:
-				if d < 1.8 and player.wood < Fort.WOOD_MAX:
-					player.wood = mini(Fort.WOOD_MAX, player.wood + Fort.WOOD_PER_PICKUP)
-					player.say("Wood: %d" % player.wood)
-					Sfx.play("pickup", -5.0, 0.7)
+				if d < 1.8 and who.wood < Fort.WOOD_MAX:
+					who.wood = mini(Fort.WOOD_MAX, who.wood + Fort.WOOD_PER_PICKUP)
+					who.say("Wood: %d" % who.wood)
+					who.sfx("pickup", -5.0, 0.7)
 					remove_pickup(p)
-	player.nearby_weapon = near
-	player.named_item = named
+	who.nearby_weapon = near
+	who.named_item = named
 
 
 # --- Allies, familiars and the church ----------------------------------------
 
 func spawn_ally(kind: String, at: Vector3, seconds: float) -> void:
-	var cap := int(player.m("ally_cap")) if player else 4
+	var master := acting()
+	var cap := int(master.m("ally_cap")) if master else 4
 	if Ally.BEASTS.has(kind):
 		cap += 4
 	var mine := 0
 	for other in allies:
-		if other.remote_owner == 0:
+		if other.remote_owner == 0 and other.master == master and not other.dead:
 			mine += 1
 	if mine >= cap and kind != "body":
 		return
@@ -1930,10 +2009,11 @@ func spawn_ally(kind: String, at: Vector3, seconds: float) -> void:
 	else:
 		a = spare.pop_back()
 	a.activate(seconds)
+	a.master = master
 	_ally_seq = (_ally_seq + 1) % 250
 	a.net_index = _ally_seq
-	if player:
-		a.hp *= player.m("ally_hp")
+	if master:
+		a.hp *= master.m("ally_hp")
 	a.global_position = grid.to_world(grid.nearest_free(grid.to_cell(at)))
 	allies.append(a)
 
@@ -1986,8 +2066,9 @@ func remove_ally(a: Ally) -> void:
 ## Bodies are built when an ability is chosen, so summoning them later does not stutter.
 ## Gone at once, with no falling down.
 func dismiss_ally(kind: String) -> void:
+	var master := acting()
 	for a in allies:
-		if a.kind == kind and a.remote_owner == 0 and not a.dead:
+		if a.kind == kind and a.remote_owner == 0 and a.master == master and not a.dead:
 			a.dead = true
 			a.collision_layer = 0
 			a.set_dying(0.01)
@@ -1997,7 +2078,11 @@ func prepare_allies(kind: String, count: int) -> void:
 	if not _spare_allies.has(kind):
 		_spare_allies[kind] = []
 	var spare: Array = _spare_allies[kind]
-	while spare.size() + count_allies(kind) < count:
+	var in_use := 0
+	for a in allies:
+		if a.kind == kind and not a.dead:
+			in_use += 1
+	while spare.size() + in_use < count:
 		var a := Ally.new(self, kind)
 		add_child(a)
 		a.deactivate()
@@ -2021,7 +2106,7 @@ func imp_steal(p: Player) -> void:
 		var t := best.create_tween() # dies with the item, if the item expires on the way
 		var target := Vector3(p.global_position.x, ground_at(p.global_position), p.global_position.z)
 		t.tween_property(best, "global_position", target, 0.6)
-		Sfx.play("pickup", -9.0, 0.8, 0.5)
+		p.sfx("pickup", -9.0, 0.8, 0.5)
 
 
 ## Real flames for fire, and rising bubbles for poison, on top of the glow on the ground.
@@ -2065,14 +2150,19 @@ func _dress_puddle(pd: MeshInstance3D, seed_from: int) -> void:
 	pd.add_child(bubbles)
 
 
-## shown_only: another player's patch. It looks the same here, and their phone does the burning.
-func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false, hurts_me := false) -> void:
+## shown_only: another player's patch, sent over. It looks the same here, and hurts whoever on this
+## phone is on the other side from by. Your own patches go out to the others the same way.
+func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false, by := 0) -> void:
 	var m := _puddles[_next_puddle]
-	_puddle_life[_next_puddle] = seconds if seconds > 0.0 else PowerDefs.POISON_TIME
+	var life := seconds if seconds > 0.0 else PowerDefs.POISON_TIME
+	var owner_peer := by
+	if not shown_only and acting():
+		owner_peer = acting().net_id()
+	_puddle_life[_next_puddle] = life
 	_puddle_fire[_next_puddle] = burning
 	_puddle_size[_next_puddle] = size
 	_puddle_shown_only[_next_puddle] = shown_only
-	_puddle_hurts_me[_next_puddle] = hurts_me
+	_puddle_owner[_next_puddle] = owner_peer
 	m.scale = Vector3(size / 1.6, 1.0, size / 1.6)
 	m.material_override = _fire_puddle if burning else null
 	(m.get_child(0) as Node3D).visible = burning
@@ -2082,6 +2172,8 @@ func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, sho
 	_next_puddle = (_next_puddle + 1) % _puddles.size()
 	m.global_position = Vector3(at.x, ground_at(at) + 0.07, at.z)
 	m.visible = true
+	if not shown_only and Net.active():
+		Net.world_fx(Net.Fx.FIRE_PATCH if burning else Net.Fx.POISON_PATCH, at, Vector3(life, size, 0), owner_peer)
 
 
 func _tick_poison(delta: float) -> void:
@@ -2095,18 +2187,32 @@ func _tick_poison(delta: float) -> void:
 		_puddle_life[i] -= delta
 		if _puddle_life[i] <= 0.0:
 			_puddles[i].visible = false
-		elif tick and _puddle_hurts_me[i]:
-			if player and Vector2(player.global_position.x - _puddles[i].global_position.x, player.global_position.z - _puddles[i].global_position.z).length() < _puddle_size[i]:
-				player.ignite(2.0)
-		elif tick and not _puddle_shown_only[i]:
-			var at := _puddles[i].global_position
-			for z: Zombie in zombies.duplicate():
-				if z.is_alive() and Vector2(z.position.x - at.x, z.position.z - at.z).length() < _puddle_size[i]:
+			continue
+		if not tick:
+			continue
+		var at := _puddles[i].global_position
+		var size := _puddle_size[i]
+		# Whoever fights its maker and stands in it here: this phone's player, and the host's bots.
+		if Net.pvp():
+			for p: Player in local_players():
+				if not p.dead and Net.bots_foes(_puddle_owner[i], p.net_id()) and Vector2(p.global_position.x - at.x, p.global_position.z - at.z).length() < size:
 					if _puddle_fire[i]:
-						z.ignite(ZombieDefs.BURN_SECONDS)
+						p.ignite(2.0)
 					else:
-						z.take_damage(PowerDefs.POISON_DPS * 0.5, Vector3.ZERO, 0.0, z.centre())
+						p.apply_status(Net.Status.POISON, 1.5)
+		if _puddle_shown_only[i]:
+			continue
+		var maker := Net.local_player(_puddle_owner[i]) if Net.active() else player
+		var was := begin_act(maker)
+		for z: Zombie in zombies.duplicate():
+			if z.is_alive() and Vector2(z.position.x - at.x, z.position.z - at.z).length() < size:
+				if _puddle_fire[i]:
+					z.ignite(ZombieDefs.BURN_SECONDS)
+				else:
+					z.take_damage(PowerDefs.POISON_DPS * 0.5, Vector3.ZERO, 0.0, z.centre())
+					if maker == player:
 						Game.note_poison(PowerDefs.POISON_DPS * 0.5)
+		end_act(was)
 
 
 ## The bell can be heard across the village. Roaming zombies walk over to see why.
@@ -2153,8 +2259,13 @@ static func trap_mesh() -> Mesh:
 
 func place_trap(p: Player, at: Vector3, arming := 0.0) -> void:
 	var limit := int(p.m("trap_cap"))
-	while _traps.size() >= limit:
-		var old: Dictionary = _traps.pop_front()
+	var theirs: Array[Dictionary] = []
+	for t: Dictionary in _traps:
+		if t["owner"] == p:
+			theirs.append(t)
+	while theirs.size() >= limit:
+		var old: Dictionary = theirs.pop_front()
+		_traps.erase(old)
 		(old["node"] as Node).queue_free()
 	var mi := MeshInstance3D.new()
 	mi.mesh = trap_mesh()
@@ -2163,32 +2274,47 @@ func place_trap(p: Player, at: Vector3, arming := 0.0) -> void:
 	mi.global_position = Vector3(at.x, ground_at(at) + 0.03, at.z)
 	if arming > 0.0:
 		mi.scale = Vector3.ONE * 0.6
-	_traps.append({"node": mi, "at": mi.global_position, "armed_at": now + arming})
-	Sfx.play("trap", -8.0, 1.3, 0.2)
+	_traps.append({"node": mi, "at": mi.global_position, "armed_at": now + arming, "owner": p})
+	sfx_at("trap", mi.global_position, -8.0)
 	if p.has_flag("trap_lure"):
 		for z in zombies:
 			if z.position.distance_to(at) < 22.0:
 				z.hear_bell(at)
 
 
+func traps_of(p: Player) -> int:
+	var n := 0
+	for t: Dictionary in _traps:
+		if t["owner"] == p:
+			n += 1
+	return n
+
+
 func _tick_traps(_delta: float) -> void:
-	if player == null:
-		return
 	for i in range(_traps.size() - 1, -1, -1):
+		if i >= _traps.size():
+			continue
+		var owner_player: Player = _traps[i]["owner"]
+		if owner_player == null or not is_instance_valid(owner_player):
+			(_traps[i]["node"] as Node).queue_free()
+			_traps.remove_at(i)
+			continue
 		var at: Vector3 = _traps[i]["at"]
 		if now < float(_traps[i]["armed_at"]):
 			continue
 		var trap_node := _traps[i]["node"] as Node3D
 		if trap_node.scale.x < 1.0:
 			trap_node.scale = Vector3.ONE
-			Sfx.play_at("trap", at, player.global_position, -6.0)
+			sfx_at("trap", at, -6.0)
+		var was := begin_act(owner_player)
 		var caught := rivals_near(at, 1.1)
 		if not caught.is_empty():
 			(_traps[i]["node"] as Node).queue_free()
 			_traps.remove_at(i)
-			Sfx.play_at("trap", at, player.global_position, 0.0)
-			Net.hit_player(caught[0].peer, player.m("trap_damage"), at)
-			Net.status_peer(caught[0].peer, Net.Status.STUN, 2.0 + player.m("trap_stun"))
+			sfx_at("trap", at, 0.0)
+			hit_rival(caught[0], owner_player.m("trap_damage"), at)
+			status_rival(caught[0], Net.Status.STUN, 2.0 + owner_player.m("trap_stun"))
+			end_act(was)
 			continue
 		for z: Zombie in zombies:
 			if not z.is_alive() or z.flies or z.dormant:
@@ -2196,13 +2322,14 @@ func _tick_traps(_delta: float) -> void:
 			if Vector2(z.position.x - at.x, z.position.z - at.z).length() < 1.05:
 				_spring_trap(i, z, at)
 				break
+		end_act(was)
 
 
 func _spring_trap(i: int, z: Zombie, at: Vector3) -> void:
-	var p := player
+	var p: Player = _traps[i]["owner"]
 	(_traps[i]["node"] as Node).queue_free()
 	_traps.remove_at(i)
-	Sfx.play_at("trap", at, p.global_position, 0.0)
+	sfx_at("trap", at, 0.0)
 	z.stun(2.0 + p.m("trap_stun"))
 	z.take_damage(p.m("trap_damage"), Vector3.UP, 0.0, z.centre())
 	if p.has_flag("trap_bleed"):
@@ -2455,7 +2582,7 @@ func _build_fx() -> void:
 		_puddle_fire.append(false)
 		_puddle_size.append(1.6)
 		_puddle_shown_only.append(false)
-		_puddle_hurts_me.append(false)
+		_puddle_owner.append(0)
 	for i in 3:
 		var l := OmniLight3D.new()
 		l.light_color = Color(1.0, 0.55, 0.2)
@@ -2494,15 +2621,59 @@ func sfx_at(sound: String, at: Vector3, volume := 0.0) -> void:
 		Net.sound_at(sound, at, volume)
 
 
-## Other players in a circle, if this is a game where you can hurt them.
-func rivals_near(at: Vector3, radius: float) -> Array[Avatar]:
-	var out: Array[Avatar] = []
+## Other players in a circle, if this is a game where you can hurt them: whoever is on the other
+## side from the acting player, on another phone or a bot, or this phone's own player when a bot acts.
+func rivals_near(at: Vector3, radius: float) -> Array[Target]:
+	var out: Array[Target] = []
 	if not Net.pvp():
 		return out
+	var by := acting()
+	if by == null:
+		return out
+	var me := by.net_id()
 	for t in players:
-		if t is Avatar and not t.dead and Net.is_foe((t as Avatar).peer) and t.global_position.distance_to(at) <= radius:
-			out.append(t as Avatar)
+		if t.dead:
+			continue
+		var peer := peer_of(t)
+		if peer == 0 or peer == me or not Net.bots_foes(me, peer):
+			continue
+		if t.global_position.distance_to(at) <= radius:
+			out.append(t)
 	return out
+
+
+## The acting player's friends in a circle, not counting themselves.
+func friends_near(at: Vector3, radius: float) -> Array[Target]:
+	var out: Array[Target] = []
+	if not Net.active():
+		return out
+	var by := acting()
+	if by == null:
+		return out
+	var me := by.net_id()
+	for t in players:
+		if t.dead:
+			continue
+		var peer := peer_of(t)
+		if peer == 0 or peer == me or Net.bots_foes(me, peer):
+			continue
+		if t.global_position.distance_to(at) <= radius:
+			out.append(t)
+	return out
+
+
+## A blow from the acting player on someone they fight. Their own phone applies it, and here the
+## body flashes and shows its health, so the one who struck can see it land.
+func hit_rival(t: Target, amount: float, from: Vector3) -> void:
+	var by := acting()
+	Net.hit_player(peer_of(t), amount, from, by.net_id() if by else 0)
+	if t is Avatar:
+		(t as Avatar).show_hit(amount * Net.PVP_DAMAGE)
+
+
+func status_rival(t: Target, kind: int, seconds: float) -> void:
+	var by := acting()
+	Net.status_peer(peer_of(t), kind, seconds, by.net_id() if by else 0)
 
 
 ## Puffs of fog that roll out and fade. Mist Leap leaves these behind it.
@@ -2585,22 +2756,36 @@ func fx_dome(at: Vector3, radius: float, seconds: float) -> void:
 	_dome_left = seconds
 
 
-func best_cover(at: Vector3) -> Avatar:
-	var best: Avatar = null
-	for t in players:
-		if t is Avatar and not t.dead:
-			var a := t as Avatar
-			if a.cover_pct > 0.0 and not Net.is_foe(a.peer) and at.distance_to(a.global_position) <= a.cover_radius:
-				if best == null or a.cover_pct > best.cover_pct:
-					best = a
+## The friendly Guardian whose shield reaches you, if any: another phone's, a bot's, or when a bot
+## asks, this phone's own player.
+func best_cover(at: Vector3) -> Target:
+	var best: Target = null
+	var best_pct := 0.0
+	for t: Target in friends_near(at, 255.0):
+		var pct := 0.0
+		var reach := 0.0
+		if t is Avatar:
+			pct = (t as Avatar).cover_pct
+			reach = (t as Avatar).cover_radius
+		elif t is Player:
+			pct = (t as Player).m("cover")
+			reach = (t as Player).m("cover_radius")
+		if pct > best_pct and at.distance_to(t.global_position) <= reach:
+			best = t
+			best_pct = pct
 	return best
 
 
+func cover_of(t: Target) -> float:
+	if t is Avatar:
+		return (t as Avatar).cover_pct
+	return (t as Player).m("cover") if t is Player else 0.0
+
+
 func near_friend() -> Vector3:
-	for t in players:
-		if t is Avatar and not t.dead and not Net.is_foe((t as Avatar).peer):
-			var c := grid.nearest_free(grid.to_cell(t.global_position + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2))))
-			return grid.to_world(c)
+	for t: Target in friends_near(Vector3.ZERO, INF):
+		var c := grid.nearest_free(grid.to_cell(t.global_position + Vector3(randf_range(-2, 2), 0, randf_range(-2, 2))))
+		return grid.to_world(c)
 	return far_from_rivals()
 
 

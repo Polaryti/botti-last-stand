@@ -1,0 +1,142 @@
+name: Android release
+
+# Builds the signed Android app on every push to main and publishes it as a GitHub Release named after
+# the version in project.godot (v0.20.1, say). The game looks for the latest release when it starts,
+# and on Android offers to update to it. The release is made once per version: pushing again with
+# the same version leaves it alone.
+#
+# The signing key lives only in the repository's secrets: ANDROID_KEYSTORE_BASE64 (the keystore file,
+# base64), ANDROID_KEYSTORE_USER (its alias) and ANDROID_KEYSTORE_PASSWORD. Without them this does
+# nothing and says so. See docs/BUILDING.md.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  GODOT_VERSION: "4.7.2"
+  # The certificate every version must be signed with, or phones refuse the update.
+  CERT_SHA256: "53c7a9b03923677ebd8102ac3836402f97e0a9d17dc8d4a747ae83138ea8fa79"
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Which version, and is it out already
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          v=$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          if [ -z "$KEYSTORE" ]; then
+            echo "::warning::No signing key in this repository's secrets, so no release. See docs/BUILDING.md."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          elif gh release view "v$v" --json assets --jq '.assets[].name' 2>/dev/null | grep -q '\.apk$'; then
+            echo "v$v is already out with its app."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # GitHub's Linux machines come with Java 21: Godot's Android build wants 17 or newer.
+      - name: Java 21
+        if: steps.version.outputs.go == 'true'
+        run: |
+          test -n "$JAVA_HOME_21_X64"
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+
+      - name: Android SDK pieces
+        if: steps.version.outputs.go == 'true'
+        run: |
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdk" --licenses > /dev/null
+          "$sdk" "platforms;android-36" "build-tools;36.1.0" "platform-tools" > /dev/null
+
+      - name: Fetch Godot and its export templates
+        if: steps.version.outputs.go == 'true'
+        run: |
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d "$RUNNER_TEMP/godot"
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz -d "$RUNNER_TEMP/tpz"
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest"
+          mv "$RUNNER_TEMP"/tpz/templates/* "$dest/"
+          rm godot.zip templates.tpz
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.config/godot"
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' \
+            "$ANDROID_HOME" "$JAVA_HOME" > "$HOME/.config/godot/editor_settings-4.7.tres"
+
+      - name: The signing key, for this run only
+        if: steps.version.outputs.go == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/keys/release.keystore"
+          {
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/keys/release.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEY_USER"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEY_PASSWORD"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/keys/release.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=$KEY_USER"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Gradle template and online play
+        if: steps.version.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EPIC_PRODUCT_ID: ${{ secrets.EPIC_PRODUCT_ID }}
+          EPIC_SANDBOX_ID: ${{ secrets.EPIC_SANDBOX_ID }}
+          EPIC_DEPLOYMENT_ID: ${{ secrets.EPIC_DEPLOYMENT_ID }}
+          EPIC_CLIENT_ID: ${{ secrets.EPIC_CLIENT_ID }}
+          EPIC_CLIENT_SECRET: ${{ secrets.EPIC_CLIENT_SECRET }}
+        run: |
+          mkdir -p build
+          "$GODOT" --headless --path . --install-android-build-template --export-release Android build/first.apk 2>&1 | tail -5 || true
+          test -d android/build
+          plugin=3ddelano/epic-online-services-godot
+          tag=$(gh api "repos/$plugin/releases" --jq '[.[] | select(.assets[].name | contains("56238973"))][0].tag_name')
+          gh release download "$tag" --repo "$plugin" --pattern '*-all-56238973*' --output plugin.zip
+          unzip -q plugin.zip -d "$RUNNER_TEMP/plugin"
+          rm plugin.zip
+          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" android
+          test -f scripts/epic_keys.gd
+
+      - name: Build and check the signature
+        if: steps.version.outputs.go == 'true'
+        run: |
+          "$GODOT" --headless --path . --import 2>&1 | tail -3 || true
+          rm -f build/botti-last-stand.apk
+          "$GODOT" --headless --path . --export-release Android build/botti-last-stand.apk 2>&1 | tail -20
+          test -f build/botti-last-stand.apk
+          signer=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort | tail -1)
+          "$signer" verify --print-certs build/botti-last-stand.apk | tee certs.txt
+          grep -qi "SHA-256 digest: $CERT_SHA256" certs.txt
+          rm -rf "$RUNNER_TEMP/keys"
+
+      - name: Publish the release
+        if: steps.version.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.version.outputs.version }}"
+          tag="${{ steps.version.outputs.tag }}"
+          # The notes are the newest entry of the changelog, the same words the game shows.
+          awk 'BEGIN{n=0} /^## /{n++} n==1' CHANGELOG.md > notes.md
+          cp build/botti-last-stand.apk "botti-last-stand-$v.apk"
+          gh release view "$tag" > /dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "Botti's Last Stand $v" --notes-file notes.md || true
+          gh release upload "$tag" "botti-last-stand-$v.apk" --clobber

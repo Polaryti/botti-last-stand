@@ -74,3 +74,14 @@ jobs:
           name: botti-last-stand-ios
           path: botti-last-stand-ios.ipa
           retention-days: 30
+
+      # The iPhone app goes on the version's release too, next to the Android one, so it is easy to find.
+      - name: Add it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)
+          awk 'BEGIN{n=0} /^## /{n++} n==1' CHANGELOG.md > notes.md
+          gh release view "v$v" > /dev/null 2>&1 || gh release create "v$v" --target "$GITHUB_SHA" --title "Botti's Last Stand $v" --notes-file notes.md || true
+          cp botti-last-stand-ios.ipa "botti-last-stand-$v-ios.ipa"
+          gh release upload "v$v" "botti-last-stand-$v-ios.ipa" --clobber

@@ -9,6 +9,8 @@ signal game_started
 signal all_ready
 signal left(reason: String)
 signal game_over(title: String, line: String, reached_dawn: bool)
+signal back_in_room
+signal public_rooms_changed
 
 enum Role { OFFLINE, HOST, CLIENT }
 enum Rules { COOP, FFA, TEAMS, FORT }
@@ -19,11 +21,11 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 23
+const PROTOCOL := 24
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
-enum Fx { FIRE_PATCH, SPARK, SENTRY }
+enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH }
 enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED }
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
@@ -49,6 +51,12 @@ var night_map := "village" # which map a co-op night is played on: the host's ch
 var online: EpicNet # stays once made, because its system can only start once
 var room_code := ""
 var room_problem := "" # why there is no short code
+var room_listed := true # online: shown in the list of public games, or found only by its code
+var public_rooms: Array[Dictionary] = [] # online games waiting for players, as last looked up
+var looking_up := false
+var lookup_problem := ""
+var _room_dirty := false
+var _room_wait := 0.0
 var _connect_wait := 0.0
 var rules: int = Rules.COOP
 var difficulty := 1
@@ -214,6 +222,7 @@ func _balance_bots() -> void:
 
 
 func _share_lobby() -> void:
+	_room_dirty = true
 	_balance_bots()
 	_lobby.rpc(roster, rules, difficulty, night_map)
 	lobby_changed.emit()
@@ -285,13 +294,15 @@ func join_game(address: String) -> Error:
 	return OK
 
 
-## Online. These return why it failed, or "" if all is well.
-func host_online() -> String:
+## Online. These return why it failed, or "" if all is well. A listed game shows in everyone's list
+## of public games; one that is not can only be joined with its code.
+func host_online(listed := true) -> String:
 	leave()
 	var e := _online_node()
 	if not await e.sign_in():
 		return e.last_error
-	var code := await e.open_room()
+	room_listed = listed
+	var code := await e.open_room(listed)
 	if code == "":
 		# Not fatal: the host's own ID works as a (long) code, because only the room lookup needs a room.
 		room_problem = e.last_error
@@ -308,9 +319,46 @@ func host_online() -> String:
 	_over = false
 	roster = {1: _my_entry(0)}
 	room_code = code
+	_room_dirty = true
 	set_process(true)
 	lobby_changed.emit()
 	return ""
+
+
+## Public or private, from the room. The list hears about it a moment later.
+func set_listed(listed: bool) -> void:
+	if not is_host() or way != Way.ONLINE:
+		return
+	room_listed = listed
+	_room_dirty = true
+	lobby_changed.emit()
+
+
+## Looks up the public games online. The list arrives through public_rooms_changed.
+func look_for_rooms() -> void:
+	if looking_up:
+		return
+	looking_up = true
+	lookup_problem = ""
+	var e := _online_node()
+	if not await e.sign_in():
+		lookup_problem = e.last_error
+	else:
+		public_rooms = await e.list_rooms()
+		lookup_problem = e.last_error
+	looking_up = false
+	public_rooms_changed.emit()
+
+
+## Tells the list what this room is like now, at most every couple of seconds.
+func _tick_room(delta: float) -> void:
+	_room_wait -= delta
+	if not _room_dirty or _room_wait > 0.0 or online == null or not is_host() or way != Way.ONLINE:
+		return
+	_room_dirty = false
+	_room_wait = 2.0
+	if not await online.update_room(EpicNet.room_card(room_listed, not in_game)):
+		_room_dirty = true
 
 
 func join_online(code: String) -> String:
@@ -649,6 +697,7 @@ func _process(delta: float) -> void:
 			_send_beacon()
 	if in_game and world and is_instance_valid(world):
 		_tick_respawn(delta)
+	_tick_room(delta)
 
 
 # --- Starting a game ---------------------------------------------------------
@@ -665,6 +714,8 @@ func start_match() -> void:
 		_answer = null
 	var tonight := Weather.roll()
 	var fog_at := Vector2(randf_range(-22.0, 22.0), randf_range(-22.0, 22.0))
+	# Off the list of games waiting for players.
+	_room_dirty = true
 	for p: int in roster:
 		roster[p]["lives"] = LIVES
 	_begin.rpc(rules, Game.quality, Game.difficulty, roster, tonight, fog_at)
@@ -812,16 +863,17 @@ func _ally_hurt(index: int, amount: float) -> void:
 
 
 ## Things other players should see, but that only one phone works out.
-func world_fx(kind: int, a: Vector3, b := Vector3.ZERO) -> void:
-	_world_fx.rpc(kind, a, b)
+func world_fx(kind: int, a: Vector3, b := Vector3.ZERO, by := 0) -> void:
+	_world_fx.rpc(kind, a, b, by if by != 0 else my_id())
 
 
 @rpc("any_peer", "unreliable", "call_remote")
-func _world_fx(kind: int, a: Vector3, b: Vector3) -> void:
+func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 	if world == null or not is_instance_valid(world):
 		return
 	match kind:
-		Fx.FIRE_PATCH: world.drop_poison(a, true, b.x, b.y, true, is_foe(multiplayer.get_remote_sender_id()))
+		Fx.FIRE_PATCH: world.drop_poison(a, true, b.x, b.y, true, by)
+		Fx.POISON_PATCH: world.drop_poison(a, false, b.x, b.y, true, by)
 		Fx.SPARK: world.fx_spark(a, b)
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
 
@@ -876,41 +928,14 @@ func _blast_fx(at: Vector3, radius: float, col: Color) -> void:
 
 
 func _send_pose() -> void:
-	var p := world.player
-	var b := PackedByteArray()
-	b.resize(38)
-	b.encode_float(0, p.global_position.x)
-	b.encode_float(4, p.global_position.y)
-	b.encode_float(8, p.global_position.z)
-	b.encode_float(12, p.yaw)
-	b.encode_float(16, p.pitch)
-	b.encode_float(20, p.velocity.x)
-	b.encode_float(24, p.velocity.z)
-	b.encode_float(28, p.sight_factor())
-	var flags := (1 if p.dead else 0) | (2 if p.is_unseen() else 0) | (4 if p.is_riding() else 0) | (8 if p.ride_behind != 0 else 0) \
-		| (16 if p.has_flag("rescuer") else 0) | (32 if p.passenger != 0 else 0) \
-		| (64 if p.is_riding() and p.mount_kind() == "chariot" else 0) | (128 if p.has_turret() else 0)
-	b[32] = flags
-	b[33] = p.attack_count & 255
-	b[34] = _weapon_ids.find(p.weapon_id()) + 1
-	b[35] = clampi(int(p.hp / maxf(p.max_hp(), 1.0) * 255.0), 0, 255)
-	b[36] = clampi(int(p.m("cover") * 100.0), 0, 90)
-	b[37] = clampi(int(p.m("cover_radius")), 0, 255)
-	_pose.rpc(b)
+	_pose.rpc(pose_bytes(world.player))
 
 
 @rpc("any_peer", "unreliable_ordered", "call_remote", 1)
 func _pose(b: PackedByteArray) -> void:
-	if b.size() < 38:
-		return
 	var a: Avatar = _avatars.get(multiplayer.get_remote_sender_id())
-	if a == null:
-		return
-	var weapon: int = b[34]
-	a.apply_pose(Vector3(b.decode_float(0), b.decode_float(4), b.decode_float(8)), b.decode_float(12), b.decode_float(16),
-		Vector3(b.decode_float(20), 0, b.decode_float(24)), b.decode_float(28), b[32], b[33], _weapon_ids[weapon - 1] if weapon > 0 else "", b[35] / 255.0)
-	a.cover_pct = b[36] / 100.0
-	a.cover_radius = float(b[37])
+	if a:
+		_apply_pose(a, b)
 
 
 ## What every zombie looks like right now: 12 bytes each. Losing a packet does not matter.
@@ -998,13 +1023,13 @@ func _z_died(net_id: int, killer: int) -> void:
 
 ## The killer gets the kill. In co-op the others learn something too.
 func _credit(z: Zombie, killer: int) -> void:
-	var p := world.player
-	if p == null or p.dead:
-		return
-	if killer == my_id():
-		p.on_kill(z)
-	elif not pvp():
-		p.add_xp(int(ceil(z.xp_value * 0.5)))
+	for p: Player in world.local_players():
+		if p.dead:
+			continue
+		if killer == p.net_id():
+			p.on_kill(z)
+		elif not pvp():
+			p.add_xp(int(ceil(z.xp_value * 0.5)))
 
 
 func zombie_gone(z: Zombie) -> void:
@@ -1097,65 +1122,125 @@ func _noise(at: Vector3, radius: float) -> void:
 # --- Hurting a player --------------------------------------------------------
 
 func hurt_peer(peer: int, amount: float, from: Vector3, attacker: Zombie) -> void:
+	var zombie_id := attacker.net_id if attacker else -1
 	if is_bot(peer):
-		_hurt_bot(peer, amount, 0)
+		_hurt_bot(peer, amount, from, zombie_id, 0)
 		return
-	_hurt.rpc_id(peer, amount, from, attacker.net_id if attacker else -1, 0)
+	_hurt.rpc_id(peer, amount, from, zombie_id, 0)
 
 
-## One player hitting another. The victim's own phone applies it, like any other damage.
-func hit_player(peer: int, amount: float, from: Vector3) -> void:
+## One player hitting another. The victim's own phone applies it, like any other damage. by is
+## whoever struck: this phone's player, or one of the host's bots.
+func hit_player(peer: int, amount: float, from: Vector3, by := 0) -> void:
+	if by == 0:
+		by = my_id()
+	amount *= PVP_DAMAGE
 	if is_bot(peer):
-		_hurt_bot(peer, amount * PVP_DAMAGE, my_id())
-		return
-	_hurt.rpc_id(peer, amount * PVP_DAMAGE, from, -1, my_id())
+		_hurt_bot(peer, amount, from, -1, by)
+	elif peer == my_id():
+		_hurt(amount, from, -1, by)
+	else:
+		_hurt.rpc_id(peer, amount, from, -1, by)
 
 
 # --- Bots: they live on the host, and the other phones only see their bodies ---
 
-func _hurt_bot(peer: int, amount: float, by_peer: int) -> void:
+func _hurt_bot(peer: int, amount: float, from: Vector3, zombie_id: int, by_peer: int) -> void:
 	if is_host():
 		if _bots.has(peer):
-			(_bots[peer] as BotPlayer).hurt(amount, by_peer)
+			(_bots[peer] as BotPlayer).hurt_by(amount, from, zombie_id, by_peer)
 	else:
-		_bot_hurt.rpc_id(1, peer, amount, by_peer)
+		_bot_hurt.rpc_id(1, peer, amount, from, zombie_id, by_peer)
 
 
 @rpc("any_peer", "reliable")
-func _bot_hurt(peer: int, amount: float, by_peer: int) -> void:
-	_hurt_bot(peer, amount, by_peer)
-
-
-## A bot's blow, on another bot or on a person's phone.
-func bot_hit(bot: int, victim: int, amount: float, from: Vector3) -> void:
-	if is_bot(victim):
-		_hurt_bot(victim, amount * PVP_DAMAGE, bot)
-	elif victim == my_id():
-		_hurt(amount * PVP_DAMAGE, from, -1, bot)
-	else:
-		_hurt.rpc_id(victim, amount * PVP_DAMAGE, from, -1, bot)
+func _bot_hurt(peer: int, amount: float, from: Vector3, zombie_id: int, by_peer: int) -> void:
+	_hurt_bot(peer, amount, from, zombie_id, by_peer)
 
 
 func note_bot_fell(peer: int, by_peer: int) -> void:
 	_note_death(peer, by_peer)
 
 
-func bot_pose(bot: BotPlayer, at: Vector3, yaw: float, vel: Vector3, attacks: int, weapon: String, hp_left: float) -> void:
-	var id := _weapon_ids.find(weapon) + 1
-	var flags := 1 if bot.down else 0
-	bot.body.apply_pose(at, yaw, 0.0, vel, 1.0, flags, attacks, weapon, hp_left)
-	_bot_pose.rpc(bot.peer, at, yaw, vel, flags, attacks, id, hp_left)
+## What every phone needs to draw a player: where they are, how they look, what they hold and
+## what is happening to them. The same for a person's phone and for a bot on the host.
+func pose_bytes(p: Player) -> PackedByteArray:
+	var b := PackedByteArray()
+	b.resize(39)
+	b.encode_float(0, p.global_position.x)
+	b.encode_float(4, p.global_position.y)
+	b.encode_float(8, p.global_position.z)
+	b.encode_float(12, p.yaw)
+	b.encode_float(16, p.pitch)
+	b.encode_float(20, p.velocity.x)
+	b.encode_float(24, p.velocity.z)
+	b.encode_float(28, p.sight_factor())
+	var flags := (1 if p.dead else 0) | (2 if p.is_unseen() else 0) | (4 if p.is_riding() else 0) | (8 if p.ride_behind != 0 else 0) \
+		| (16 if p.has_flag("rescuer") else 0) | (32 if p.passenger != 0 else 0) \
+		| (64 if p.is_riding() and p.mount_kind() == "chariot" else 0) | (128 if p.has_turret() else 0)
+	b[32] = flags
+	b[33] = p.attack_count & 255
+	b[34] = _weapon_ids.find(p.weapon_id()) + 1
+	b[35] = clampi(int(p.hp / maxf(p.max_hp(), 1.0) * 255.0), 0, 255)
+	b[36] = clampi(int(p.m("cover") * 100.0), 0, 90)
+	b[37] = clampi(int(p.m("cover_radius")), 0, 255)
+	b[38] = p.status_bits()
+	return b
+
+
+func _apply_pose(a: Avatar, b: PackedByteArray) -> void:
+	if b.size() < 39:
+		return
+	var weapon: int = b[34]
+	a.apply_pose(Vector3(b.decode_float(0), b.decode_float(4), b.decode_float(8)), b.decode_float(12), b.decode_float(16),
+		Vector3(b.decode_float(20), 0, b.decode_float(24)), b.decode_float(28), b[32], b[33], _weapon_ids[weapon - 1] if weapon > 0 else "", b[35] / 255.0)
+	a.cover_pct = b[36] / 100.0
+	a.cover_radius = float(b[37])
+	a.show_statuses(b[38])
+
+
+func bot_pose(bot: BotPlayer) -> void:
+	var b := pose_bytes(bot.pawn)
+	_apply_pose(bot.body, b)
+	_bot_pose.rpc(bot.peer, b)
 
 
 @rpc("authority", "unreliable_ordered", "call_remote", 1)
-func _bot_pose(peer: int, at: Vector3, yaw: float, vel: Vector3, flags: int, attacks: int, weapon: int, hp_left: float) -> void:
+func _bot_pose(peer: int, b: PackedByteArray) -> void:
 	var a: Avatar = _avatars.get(peer)
 	if a:
-		a.apply_pose(at, yaw, 0.0, vel, 1.0, flags, attacks, _weapon_ids[weapon - 1] if weapon > 0 else "", hp_left)
+		_apply_pose(a, b)
+
+
+## A bot raising its hand for an ability, on the host and on every other phone.
+func bot_cast(peer: int, anim_name := "") -> void:
+	var a: Avatar = _avatars.get(peer)
+	if a:
+		a.play_cast(anim_name)
+	_bot_cast.rpc(peer, anim_name)
+
+
+@rpc("authority", "unreliable", "call_remote")
+func _bot_cast(peer: int, anim_name: String) -> void:
+	var a: Avatar = _avatars.get(peer)
+	if a and (anim_name == "" or BodyAnim.POSES.has(anim_name)):
+		a.play_cast(anim_name)
 
 
 func bot_players() -> Array:
 	return _bots.values()
+
+
+## The host's player or one of its bots, by peer id. Null for anyone on another phone.
+func local_player(peer: int) -> Player:
+	if world == null or not is_instance_valid(world):
+		return null
+	if peer == my_id() or not active():
+		return world.player
+	for bot: BotPlayer in world.bots:
+		if bot.peer == peer:
+			return bot.pawn
+	return null
 
 
 @rpc("any_peer", "reliable")
@@ -1175,19 +1260,21 @@ func _hurt(amount: float, from: Vector3, zombie_id: int, by_peer: int) -> void:
 
 
 ## Frozen, stunned, slowed or set alight by another player. Everyone hears, so they can all see it.
-func status_peer(peer: int, kind: int, seconds: float) -> void:
-	_status.rpc(peer, kind, seconds)
-	_status(peer, kind, seconds)
+func status_peer(peer: int, kind: int, seconds: float, by := 0) -> void:
+	if by == 0:
+		by = my_id()
+	_status.rpc(peer, kind, seconds, by)
+	_status(peer, kind, seconds, by)
 
 
 @rpc("any_peer", "reliable", "call_remote")
-func _status(peer: int, kind: int, seconds: float) -> void:
+func _status(peer: int, kind: int, seconds: float, by: int) -> void:
 	if world == null or not is_instance_valid(world) or world.player == null:
 		return
+	if not bots_foes(by, peer):
+		return
 	if peer == my_id():
-		var from := multiplayer.get_remote_sender_id()
-		if from != 0 and is_foe(from):
-			world.player.apply_status(kind, seconds)
+		world.player.apply_status(kind, seconds)
 	elif _avatars.has(peer):
 		(_avatars[peer] as Avatar).show_status(kind, seconds)
 		if is_host() and _bots.has(peer):
@@ -1240,7 +1327,10 @@ func _item_drop(at: Vector3, kind: int, item: String, bonus: int) -> void:
 		world.spawn_pickup_at(at, kind, item, bonus)
 
 
+## A familiar turned up near this person. A bot has no ears; it finds familiars by looking.
 func familiar_near(peer: int) -> void:
+	if is_bot(peer) or not multiplayer.get_peers().has(peer):
+		return
 	_chime.rpc_id(peer)
 
 
@@ -1414,6 +1504,10 @@ func _note_death(peer: int, by_peer: int) -> void:
 func _note_pvp(killer: int, victim: int) -> void:
 	if world == null or not is_instance_valid(world) or world.player == null:
 		return
+	if is_host() and _bots.has(killer) and (_bots[killer] as BotPlayer).pawn:
+		var pawn: Player = (_bots[killer] as BotPlayer).pawn
+		pawn.add_xp(80 if fog_rules() else 50)
+		pawn.heal(25.0)
 	if killer == my_id():
 		world.player.add_xp(80 if fog_rules() else 50)
 		world.player.heal(25.0)
@@ -1558,7 +1652,20 @@ func watching_name() -> String:
 # --- Guardians and passengers -------------------------------------------------
 
 func share_hit(peer: int, amount: float) -> void:
+	if is_bot(peer):
+		if is_host():
+			var pawn := local_player(peer)
+			if pawn:
+				pawn.take_shared(amount)
+		else:
+			_bot_share.rpc_id(1, peer, amount)
+		return
 	_share.rpc_id(peer, amount)
+
+
+@rpc("any_peer", "reliable")
+func _bot_share(peer: int, amount: float) -> void:
+	share_hit(peer, amount)
 
 
 @rpc("any_peer", "reliable")
@@ -1567,16 +1674,37 @@ func _share(amount: float) -> void:
 		world.player.take_shared(amount)
 
 
+## A friend's Apothecary or Guardian: a moment nobody can hurt you, and some health back.
 func guard_peer(peer: int, seconds: float, healing: float) -> void:
+	if is_bot(peer):
+		if is_host():
+			_guard_player(local_player(peer), seconds, healing)
+		else:
+			_bot_guard.rpc_id(1, peer, seconds, healing)
+		return
+	if peer == my_id():
+		_guard_player(world.player, seconds, healing)
+		return
 	_guard.rpc_id(peer, seconds, healing)
 
 
 @rpc("any_peer", "reliable")
+func _bot_guard(peer: int, seconds: float, healing: float) -> void:
+	guard_peer(peer, seconds, healing)
+
+
+@rpc("any_peer", "reliable")
 func _guard(seconds: float, healing: float) -> void:
-	if world and is_instance_valid(world) and world.player and not world.player.dead:
-		world.player.guard_left = maxf(world.player.guard_left, seconds)
-		if healing > 0.0:
-			world.player.heal(healing)
+	if world and is_instance_valid(world):
+		_guard_player(world.player, seconds, healing)
+
+
+func _guard_player(p: Player, seconds: float, healing: float) -> void:
+	if p == null or p.dead:
+		return
+	p.guard_left = maxf(p.guard_left, seconds)
+	if healing > 0.0:
+		p.heal(healing)
 
 
 func dome(at: Vector3, radius: float, seconds: float) -> void:
@@ -1603,7 +1731,7 @@ func _mist_fx(at: Vector3, size: float) -> void:
 func nearby_horse(at: Vector3) -> int:
 	for peer: int in _avatars:
 		var a: Avatar = _avatars[peer]
-		if a.is_mounted() and not a.has_passenger and not is_foe(peer) and at.distance_to(a.global_position) < 3.5:
+		if a.is_mounted() and not a.has_passenger and not is_foe(peer) and not is_bot(peer) and at.distance_to(a.global_position) < 3.5:
 			return peer
 	return 0
 
@@ -1650,6 +1778,41 @@ func drop_passenger(peer: int) -> void:
 func _ride_end() -> void:
 	if world and is_instance_valid(world) and world.player and world.player.ride_behind == multiplayer.get_remote_sender_id():
 		world.player.ride_behind = 0
+
+
+## After a match, the host takes everyone still here back to the room, ready for another night.
+func return_to_room() -> void:
+	if not is_host():
+		return
+	_back_to_room.rpc()
+	_back_to_room()
+
+
+@rpc("authority", "reliable")
+func _back_to_room() -> void:
+	in_game = false
+	started_loading = false
+	_over = false
+	_dawn_ending = false
+	last_winner = 0
+	world = null
+	_loaded.clear()
+	_avatars.clear()
+	_bots.clear()
+	_stop_watching()
+	spectate_cam = null
+	_respawn_left = -1.0
+	set_physics_process(false)
+	for p: int in roster:
+		roster[p]["score"] = 0
+		roster[p]["deaths"] = 0
+		roster[p]["lives"] = LIVES
+	if is_host():
+		multiplayer.multiplayer_peer.refuse_new_connections = false
+		if way == Way.LOCAL:
+			_start_beacon()
+		_share_lobby()
+	back_in_room.emit()
 
 
 func respawn_seconds() -> float:

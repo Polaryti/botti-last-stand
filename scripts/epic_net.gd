@@ -11,9 +11,19 @@ const CODE_LETTERS := "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 6
 const USER_ID_LENGTH := 32 # a host's own Epic ID also works as a code, if a room could not be opened
 const CODE_ATTRIBUTE := "CODE"
+## What a room says about itself, for the list of public games. Every value is text.
+const LISTED := "PUBLIC" # "1": shown in the list. "0": found only by its code
+const WAITING := "OPEN" # "1" while it waits in its room for players, "0" once the night has begun
+const VERSION := "VER" # only games this version can join are shown
+const HOST_NAME := "HOST"
+const RULES := "RULES"
+const MAP := "MAP"
+const PLAYERS := "PLAYERS"
+const LIST_MAX := 20
 const PUBLIC := 0 # EOS_LAT_Public
 const EQUAL := 0 # EOS_CO_EQUAL
 const SUCCESS := 0
+const NOT_FOUND := 18 # EOS_NotFound: a search with nothing in it
 const ALREADY_STARTED := 15 # EOS_AlreadyConfigured
 const DUPLICATE := 24 # EOS_DuplicateNotAllowed: this phone already has its anonymous ID
 const DEVICE_LOGIN := 10 # EOS_ECT_DEVICEID_ACCESS_TOKEN
@@ -23,6 +33,7 @@ const KEYS := "res://scripts/epic_keys.gd"
 var _ieos: Object
 var _user := ""
 var _lobby_id := ""
+var _updating := false
 var last_error := ""
 
 
@@ -121,6 +132,11 @@ class SearchOptions:
 	var max_results := 1
 
 
+class ListOptions:
+	extends RefCounted
+	var max_results := LIST_MAX
+
+
 class LeaveOptions:
 	extends Options
 	var local_user_id := ""
@@ -186,9 +202,9 @@ func sign_in() -> bool:
 	return _user != "" or _fail("Could not go online.")
 
 
-## A short code for friends to type: Epic gives the room its own ID, and the code is written on it.
-## Returns "" if no room could be made.
-func open_room() -> String:
+## A short code for friends to type: Epic gives the room its own ID, and the code is written on it,
+## with what the list of public games shows. Returns "" if no room could be made.
+func open_room(listed := true) -> String:
 	var room := RoomOptions.new()
 	room.local_user_id = _user
 	room.bucket_id = "botti-%d" % Net.PROTOCOL
@@ -211,6 +227,8 @@ func open_room() -> String:
 		code += CODE_LETTERS[randi() % CODE_LETTERS.length()]
 	var modification: Object = opened["lobby_modification"]
 	modification.call("add_attribute", CODE_ATTRIBUTE, code, PUBLIC)
+	for key: String in room_card(listed, true).keys():
+		modification.call("add_attribute", key, room_card(listed, true)[key], PUBLIC)
 	var update := UpdateOptions.new()
 	update.lobby_modification = modification
 	_ieos.call("lobby_interface_update_lobby", update)
@@ -220,6 +238,92 @@ func open_room() -> String:
 		close_room()
 		return ""
 	return code
+
+
+## What the list shows about this phone's room right now.
+static func room_card(listed: bool, waiting: bool) -> Dictionary:
+	return {
+		LISTED: "1" if listed else "0",
+		WAITING: "1" if waiting else "0",
+		VERSION: str(Net.PROTOCOL),
+		HOST_NAME: Game.player_name,
+		RULES: str(Net.rules),
+		MAP: Net.night_map,
+		PLAYERS: str(maxi(1, Net.roster.size())),
+	}
+
+
+## The host tells the list what changed: who is in, what game, whether it still waits. Returns false
+## and sets last_error if Epic would not take it. One change at a time: the next waits for this one.
+func update_room(card: Dictionary) -> bool:
+	if _ieos == null or _lobby_id == "" or _updating:
+		return false
+	_updating = true
+	var change := ChangeOptions.new()
+	change.local_user_id = _user
+	change.lobby_id = _lobby_id
+	var opened: Dictionary = _ieos.call("lobby_interface_update_lobby_modification", change)
+	if int(opened["result_code"]) != SUCCESS:
+		_updating = false
+		return _fail("Could not update the room (%d)." % int(opened["result_code"]))
+	var modification: Object = opened["lobby_modification"]
+	for key: String in card:
+		modification.call("add_attribute", key, str(card[key]), PUBLIC)
+	var update := UpdateOptions.new()
+	update.lobby_modification = modification
+	_ieos.call("lobby_interface_update_lobby", update)
+	var updated: Dictionary = await _ieos.get("lobby_interface_update_lobby_callback")
+	_updating = false
+	if int(updated["result_code"]) != SUCCESS:
+		return _fail("Could not update the room (%d)." % int(updated["result_code"]))
+	return true
+
+
+## Public games waiting for players, that this version can join. Each is a Dictionary: host (the
+## owner's ID, which works as a code), name, rules, map, players. Returns [] and sets last_error when
+## the search fails; an empty list with no error means there are none.
+func list_rooms() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	last_error = ""
+	if _ieos == null or _user == "":
+		_fail("Not online.")
+		return out
+	var made: Dictionary = _ieos.call("lobby_interface_create_lobby_search", ListOptions.new())
+	if int(made["result_code"]) != SUCCESS:
+		_fail("Could not look for games (%d)." % int(made["result_code"]))
+		return out
+	var search: Object = made["lobby_search"]
+	search.call("set_parameter", LISTED, "1", EQUAL)
+	search.call("set_parameter", WAITING, "1", EQUAL)
+	search.call("set_parameter", VERSION, str(Net.PROTOCOL), EQUAL)
+	search.call("find", _user)
+	var found: Dictionary = await _ieos.get("lobby_search_find_callback")
+	if int(found["result_code"]) == NOT_FOUND:
+		return out
+	if int(found["result_code"]) != SUCCESS:
+		_fail("Could not look for games (%d)." % int(found["result_code"]))
+		return out
+	for i in int(search.call("get_search_result_count")):
+		var copy: Dictionary = search.call("copy_search_result_by_index", i)
+		if int(copy["result_code"]) != SUCCESS:
+			continue
+		var details: Object = copy["lobby_details"]
+		var owner := str(details.call("get_lobby_owner"))
+		if owner == "" or owner == _user:
+			continue
+		var card := {}
+		for a in int(details.call("get_attribute_count")):
+			var got: Dictionary = details.call("copy_attribute_by_index", a)
+			if int(got.get("result_code", -1)) != SUCCESS:
+				continue
+			var data: Dictionary = (got["attribute"] as Dictionary).get("data", {})
+			card[str(data.get("key", "")).to_upper()] = str(data.get("value", ""))
+		var players := int(card.get(PLAYERS, "1"))
+		if players >= Net.MAX_PLAYERS:
+			continue
+		out.append({"host": owner, "name": str(card.get(HOST_NAME, "Someone")), "rules": int(card.get(RULES, "0")),
+			"map": str(card.get(MAP, "village")), "players": players, "code": str(card.get(CODE_ATTRIBUTE, ""))})
+	return out
 
 
 ## If Epic will not give this phone a room, friends can still reach it directly with its ID.

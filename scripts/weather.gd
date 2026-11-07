@@ -200,8 +200,10 @@ func _strike(at: Vector3) -> void:
 		if a.remote_owner == 0 and not a.dead and a.global_position.distance_to(at) <= STRIKE_RADIUS:
 			a.hurt(PLAYER_DAMAGE * 1.5, at)
 	for bot: BotPlayer in Net.bot_players():
-		if bot.at.distance_to(at) <= STRIKE_RADIUS:
-			bot.hurt(PLAYER_DAMAGE, 0)
+		if bot.pawn and not bot.pawn.dead and bot.at.distance_to(at) <= STRIKE_RADIUS:
+			bot.pawn.last_foe = 0
+			bot.pawn.hit_by = "lightning"
+			bot.pawn.hurt(PLAYER_DAMAGE, at)
 	if Net.is_client():
 		return
 	for z: Zombie in world.zombies.duplicate():

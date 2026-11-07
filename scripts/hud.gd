@@ -73,8 +73,8 @@ func _layout() -> void:
 		"drop": {"pos": Vector2(right - 250, bottom - 184), "r": 38.0},
 		"take": {"pos": Vector2(s.x * 0.5, s.y * 0.68), "r": 62.0},
 		"pause": {"pos": Vector2(right - 28, 46), "r": 32.0},
-		"tree": {"pos": Vector2(right - 112, 46), "r": 38.0},
-		"sandbox": {"pos": Vector2(right - 204, 46), "r": 38.0},
+		"tree": {"pos": Vector2(right - 124, 52), "r": 46.0},
+		"sandbox": {"pos": Vector2(right - 228, 46), "r": 38.0},
 		"horse": {"pos": Vector2(right - 372, bottom - 130), "r": 58.0},
 		"burst": {"pos": Vector2(right - 372, bottom - 110), "r": 60.0},
 		"art": {"pos": Vector2(right - 352, bottom - 260), "r": 56.0},
@@ -557,6 +557,22 @@ func _draw_enemy_bars() -> void:
 		draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(z.hp / z.max_hp, 0.0, 1.0), r.size.y)), Color(0.72, 0.13, 0.1) if not z.hero else Color(0.72, 0.28, 0.72))
 		if z.hero:
 			_centered(z.display_name(), at + Vector2(0, -16.0), 20, Color(1.0, 0.84, 0.95))
+	# Other players and bots: their health for a moment after a hit, red for foes and green for friends.
+	for t: Target in player.world.players:
+		if not is_instance_valid(t) or not t is Avatar:
+			continue
+		var a := t as Avatar
+		if a.dead or a.bar_time <= 0.0 or a.is_unseen():
+			continue
+		var top: Vector3 = a.global_position + Vector3.UP * 2.35
+		if cam.is_position_behind(top) or top.distance_squared_to(cam.global_position) > 2500.0:
+			continue
+		var at := cam.unproject_position(top) * scale
+		var r := Rect2(at - Vector2(36.0, 4.0), Vector2(72.0, 8.0))
+		var fade := minf(1.0, a.bar_time * 2.0)
+		draw_rect(r.grow(2.0), Color(0, 0, 0, 0.7 * fade))
+		var col := Color(0.8, 0.16, 0.12) if Net.is_foe(a.peer) else Color(0.32, 0.78, 0.36)
+		draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(a.hp_fraction, 0.0, 1.0), r.size.y)), Color(col, fade))
 
 
 ## Red diamonds on enemies marked through walls: by a Raven, a scent or a hunter's eye.
@@ -664,10 +680,13 @@ func _draw_controls() -> void:
 				if player.zoomed:
 					tint = UiTheme.EMBER
 			"tree":
+				tint = Color(1.0, 0.82, 0.45)
 				if player.points > 0:
-					tint = Color(UiTheme.EMBER, 0.65 + sin(Time.get_ticks_msec() * 0.006) * 0.35)
+					tint = Color(1.0, 0.62 + sin(Time.get_ticks_msec() * 0.008) * 0.2, 0.25)
 		if held:
 			rect = rect.grow(-3.0)
+		if id == "tree" and player.points > 0:
+			_draw_points_call(pos, r)
 		draw_texture_rect(_glass, rect, false, tint)
 		var glyph := _button_glyph(id)
 		var inset := r * 0.42
@@ -689,7 +708,26 @@ func _draw_controls() -> void:
 			if cost > 0.0:
 				_centered("%d" % int(cost), pos + Vector2(0, r + 12), 18, UiTheme.MIST)
 		if id == "tree":
-			_centered("%d" % player.level, pos + Vector2(0, r + 14), 20, UiTheme.EMBER if player.points > 0 else UiTheme.BONE)
+			# Always marked out from the other buttons, with the level under it.
+			draw_arc(pos, r + 2.0, 0.0, TAU, 40, Color(UiTheme.EMBER, 0.9), 3.0)
+			_centered("Skills  Lv %d" % player.level, pos + Vector2(0, r + 16), 19, UiTheme.EMBER if player.points > 0 else UiTheme.BONE)
+			if player.points > 0:
+				_draw_points_badge(pos + Vector2(r * 0.74, -r * 0.62), player.points)
+
+
+## Rings that keep spreading out from the tree while there is a point to spend.
+func _draw_points_call(pos: Vector2, r: float) -> void:
+	var t := fmod(Time.get_ticks_msec() * 0.001, 1.4) / 1.4
+	for k in 2:
+		var f := fmod(t + k * 0.5, 1.0)
+		draw_arc(pos, r + 4.0 + f * 26.0, 0.0, TAU, 48, Color(1.0, 0.7, 0.2, (1.0 - f) * 0.75), 4.0 - f * 2.5)
+
+
+## How many points are waiting, on a red badge at the corner of the button.
+func _draw_points_badge(at: Vector2, points: int) -> void:
+	draw_circle(at, 17.0, Color(0.05, 0.04, 0.05, 0.9))
+	draw_circle(at, 15.0, UiTheme.BLOOD.lightened(0.15))
+	_centered("%d" % points, at + Vector2(0, 1), 22, Color.WHITE)
 
 
 func _button_glyph(id: String) -> String:

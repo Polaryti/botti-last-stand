@@ -8,6 +8,10 @@ extends Control
 signal closed
 
 const LABELS_HIGH := 30.0
+const ZONE_HIGH := 232.0 # the top half's usual height: cards and what you are reading
+const ZONE_MOST := 0.62 # the most of the panel it may take when a text needs more room
+const PANEL_PAD := 12.0
+const CARD_PAD := 12.0
 
 var player: Player
 var _class_name: Label
@@ -44,7 +48,7 @@ func build() -> void:
 	panel.add_child(box)
 	box.add_child(_build_header())
 	_zone = VBoxContainer.new()
-	_zone.custom_minimum_size.y = 232.0
+	_zone.custom_minimum_size.y = ZONE_HIGH
 	_zone.add_theme_constant_override("separation", 6)
 	box.add_child(_zone)
 	_map = TreeMap.new()
@@ -130,6 +134,51 @@ func refresh(rebuild := false) -> void:
 		_fill_zone()
 
 
+## How wide the top half is, from the screen, before anything is laid out.
+func _zone_width() -> float:
+	return get_viewport_rect().size.x - 36.0 - PANEL_PAD * 2.0
+
+
+## How tall these words stand in a Label this wide, wrapped by word, with the gap between lines.
+static func text_height(font: Font, text: String, width: float, size: int, spacing: int) -> float:
+	var h := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, width, size).y
+	var lines := maxi(1, roundi(h / maxf(font.get_height(size), 1.0)))
+	return h + spacing * (lines - 1) + 2.0
+
+
+## The largest of the sizes at which these words fit in a box this wide and this high. When even the
+## smallest does not fit, the smallest, and the caller makes room.
+static func fit_size(font: Font, text: String, width: float, height: float, sizes: Array, spacing := 3) -> int:
+	for size: int in sizes:
+		if text_height(font, text, width, size, spacing) <= height:
+			return size
+	return sizes[sizes.size() - 1]
+
+
+## A name over its description, sized so that both fit the space they have. Long descriptions get
+## smaller letters first, then the name. If nothing fits at the smallest, the top half grows instead,
+## up to most of the panel, and the map below gives way.
+func _fit_pair(name_label: Label, desc: Label, width: float, height: float, name_sizes: Array, desc_sizes: Array) -> void:
+	var bold := UiTheme.bold_font()
+	var plain := get_theme_default_font()
+	var spacing := get_theme_constant("line_spacing", "Label")
+	var name_size: int = name_sizes[0]
+	var desc_size: int = desc_sizes[0]
+	var need := 0.0
+	for n: int in name_sizes:
+		name_size = n
+		var name_h := text_height(bold, name_label.text, width, n, spacing)
+		desc_size = fit_size(plain, desc.text, width, height - name_h - 6.0, desc_sizes, spacing)
+		need = name_h + 6.0 + text_height(plain, desc.text, width, desc_size, spacing)
+		if need <= height:
+			break
+	name_label.add_theme_font_size_override("font_size", name_size)
+	desc.add_theme_font_size_override("font_size", desc_size)
+	if need > height:
+		var most := get_viewport_rect().size.y * ZONE_MOST
+		_zone.custom_minimum_size.y = minf(maxf(_zone.custom_minimum_size.y, ZONE_HIGH + need - height), most)
+
+
 func _clear_zone() -> void:
 	for c: Node in _zone.get_children():
 		_zone.remove_child(c)
@@ -138,6 +187,7 @@ func _clear_zone() -> void:
 
 func _fill_zone() -> void:
 	_clear_zone()
+	_zone.custom_minimum_size.y = ZONE_HIGH
 	if _reading != null and is_instance_valid(_reading):
 		_show_reading()
 		return
@@ -170,18 +220,22 @@ func _show_cards(step: int, options: Array) -> void:
 	row.add_theme_constant_override("separation", 10)
 	_zone.add_child(row)
 	var specs: Array = player.tree_data()["specs"]
-	for i in options.size():
+	var count := options.size()
+	var card_w := (_zone_width() - 10.0 * (count - 1)) / count
+	var text_w := card_w - CARD_PAD * 2.0 - (96.0 if count < 3 else 80.0) - 14.0
+	var text_h := ZONE_HIGH - 42.0 - CARD_PAD * 2.0
+	for i in count:
 		var a: Dictionary = options[i]
 		var col := ClassDefs.color(player.class_id)
 		if picking_spec:
 			col = specs[i]["color"]
 		elif player.spec_id != "":
 			col = player.spec_def()["color"]
-		row.add_child(_card(step, i, a, col, options.size()))
+		row.add_child(_card(step, i, a, col, count, text_w, text_h))
 
 
 ## One choice, large enough to read in a hurry. One tap takes it.
-func _card(step: int, index: int, a: Dictionary, col: Color, count: int) -> Button:
+func _card(step: int, index: int, a: Dictionary, col: Color, count: int, text_w := 0.0, text_h := 0.0) -> Button:
 	var b := Button.new()
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -221,6 +275,10 @@ func _card(step: int, index: int, a: Dictionary, col: Color, count: int) -> Butt
 	desc.add_theme_color_override("font_color", UiTheme.BONE)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(desc)
+	if text_w > 0.0:
+		var big := 30 if count < 3 else 27
+		var small := 25 if count < 3 else 22
+		_fit_pair(name_label, desc, text_w, text_h, [big, big - 3, big - 6, 20], range(small, 14, -1))
 	return b
 
 
@@ -264,6 +322,9 @@ func _show_reading() -> void:
 	desc.add_theme_font_size_override("font_size", 27)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(desc)
+	# Room for the words: the width left beside the picture and the buttons, and the height left
+	# under the name, above the line that says where it stands.
+	_fit_pair(name_label, desc, _zone_width() - 120.0 - 18.0 * 2.0 - 190.0, ZONE_HIGH - 34.0, [34, 30, 26], range(27, 15, -1))
 	var state := Label.new()
 	state.text = _state_words(_reading)
 	state.add_theme_font_size_override("font_size", 23)

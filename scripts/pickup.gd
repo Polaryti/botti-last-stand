@@ -9,6 +9,7 @@ const ITEM_LIFE := 45.0
 const FAMILIAR_LIFE := 80.0
 const WOOD_LIFE := 150.0
 const BLINK_TIME := 10.0
+const SHUN_REACH := 3.2 # how far you walk from a weapon you put down before it can be picked up again
 
 static var _beacon_mesh: CylinderMesh
 static var _beacon_mats := {}

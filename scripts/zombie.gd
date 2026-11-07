@@ -794,7 +794,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 	if next_hitter != 0:
 		last_hitter = next_hitter
 	elif Net.active():
-		last_hitter = Net.my_id()
+		# Whoever is acting right now: this phone's player, or a bot on the host.
+		last_hitter = world.acting().net_id() if world.acting() else Net.my_id()
 	next_hitter = 0
 	if dormant:
 		_wake()
@@ -1840,7 +1841,7 @@ func _tick_hero(target: Target, dist: float, delta: float) -> void:
 		_special_cd = 10.0
 		world.fx_blast(position + Vector3.UP * 0.2, 3.5, Color(0.7, 0.55, 0.35, 0.4))
 		world.sfx_at("hammer", position, 0.0)
-		if target is Player:
+		if target.global_position.distance_to(position) < 5.0:
 			target.hurt(_melee_damage(), position, self)
 	elif type_id == "hero_magician" and hero_minute >= 7 and _special_cd <= 0.0 and _sees:
 		_special_cd = 22.0

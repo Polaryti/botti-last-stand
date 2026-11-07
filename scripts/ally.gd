@@ -10,10 +10,12 @@ const HEALTH := {"rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost
 const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body"]
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
 const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
-const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 5.5, "fox": 7.5, "rat": 7.5}
+const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}
 const RAVEN_HEIGHT := 2.1
 const SNAKE_POISON := 0.35
-const FOX_FOOD := 0.1
+const FOX_FOOD := 0.07 # a bite that turns something up, and of those, how many are food
+const FOX_FINDS_FOOD := 0.56 # the rest are arrows, a little less often
+const FOX_FIND_GAP := 14.0 # seconds before the fox can find anything again
 
 static var _scenes := {}
 static var _ghost_material: StandardMaterial3D
@@ -25,6 +27,7 @@ var hp := 90.0
 var life := 20.0
 var height := 1.8
 var remote_owner := 0 # someone else's summon, shown here because it is there
+var master: Player # whose summon it is, on this phone: its player, or one of the host's bots
 var net_index := 0
 var net_target := Vector3.ZERO
 var net_yaw := 0.0
@@ -37,7 +40,8 @@ var _cooldown := 0.0
 var _attack_left := 0.0
 var _think := 0.0
 var _foe: Zombie
-var _rival: Avatar
+var _rival: Target
+var _found_at := -100.0
 var _dying := 0.0
 var _legs: Array[Node3D] = []
 var _run := 0.0
@@ -89,6 +93,8 @@ func _init(owner_world: World, ally_kind: String) -> void:
 func activate(seconds: float) -> void:
 	life = seconds
 	remote_owner = 0
+	master = null
+	_found_at = -100.0
 	dead = false
 	hp = HEALTH[kind]
 	_dying = 0.0
@@ -220,8 +226,13 @@ func _play(n: String, speed := 1.0) -> void:
 	_anim.play(n, 0.15)
 
 
+func _master() -> Player:
+	return master if master != null and is_instance_valid(master) else world.player
+
+
 func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
-	if kind == "body" and world.player and world.player.has_flag("empty_body"):
+	var me := _master()
+	if kind == "body" and me and me.has_flag("empty_body"):
 		amount *= 0.5
 	if dead:
 		return
@@ -231,12 +242,11 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 	if guarded > 0.0:
 		return
 	# A Guardian shields its own summons too.
-	var me := world.player
 	if me and me.m("cover") > 0.0 and global_position.distance_to(me.global_position) <= me.m("cover_radius"):
 		amount *= 1.0 - me.m("cover")
 	hp -= amount
-	if kind == "body" and world.player:
-		world.player.body_hit(amount)
+	if kind == "body" and me:
+		me.body_hit(amount)
 	if hp <= 0.0:
 		_die()
 
@@ -246,21 +256,23 @@ func set_dying(seconds: float) -> void:
 
 
 func _die() -> void:
-	if kind == "revenant" and world.player and world.player.has_flag("host_burst"):
-		world.player.mist_burst_at(position + Vector3.UP, 0.4)
+	var me := _master()
+	var was := world.begin_act(me)
+	if kind == "revenant" and me and me.has_flag("host_burst"):
+		me.mist_burst_at(position + Vector3.UP, 0.4)
 	dead = true
 	collision_layer = 0
 	_dying = 1.2 if _anim else 0.3
 	_current = ""
 	_play("Death_A", 1.3)
-	if not world.player:
-		return
-	if kind == "skeleton" and world.player.has_flag("corpse_blast"):
-		world.blast(position + Vector3.UP, 3.0, 25.0)
-	elif kind == "decoy":
-		world.player.decoy_burst(position + Vector3.UP)
-	elif kind == "body":
-		world.player.body_lost()
+	if me:
+		if kind == "skeleton" and me.has_flag("corpse_blast"):
+			world.blast(position + Vector3.UP, 3.0, 25.0)
+		elif kind == "decoy":
+			me.decoy_burst(position + Vector3.UP)
+		elif kind == "body":
+			me.body_lost()
+	world.end_act(was)
 
 
 func _physics_process(delta: float) -> void:
@@ -272,6 +284,12 @@ func _physics_process(delta: float) -> void:
 			_play("Running_A" if was.distance_squared_to(net_target) > 0.05 else "Idle")
 		_move_wolf(delta, was.distance_squared_to(net_target) > 0.05)
 		return
+	var was := world.begin_act(_master())
+	_tick_own(delta)
+	world.end_act(was)
+
+
+func _tick_own(delta: float) -> void:
 	guarded = maxf(0.0, guarded - delta)
 	if dead:
 		_dying -= delta
@@ -316,7 +334,7 @@ func _physics_process(delta: float) -> void:
 			var look := _foe.position - position
 			rotation.y = lerp_angle(rotation.y, atan2(look.x, look.z), min(1.0, delta * 9.0))
 		return
-	var player := world.player
+	var player := _master()
 	var dmg_mult: float = player.m("ally_damage") if player else 1.0
 	if _rival and not _rival.dead:
 		var to := _rival.global_position - position
@@ -328,7 +346,7 @@ func _physics_process(delta: float) -> void:
 			_attack_left = 0.5 if _anim else 0.25
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
-			Net.hit_player(_rival.peer, WeaponDefs.DAMAGE * dmg_mult * 0.7, position)
+			world.hit_rival(_rival, WeaponDefs.DAMAGE * dmg_mult * 0.7, position)
 			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
@@ -349,23 +367,23 @@ func _physics_process(delta: float) -> void:
 				_foe.stun(0.7)
 			if _foe.is_alive() and kind == "snake" and randf() < SNAKE_POISON:
 				_foe.add_dot(10.0, 4.0)
-				if remote_owner == 0:
+				if player == world.player:
 					Game.note_poison(40.0)
 			if _foe.is_alive() and kind == "rat" and player and player.has_flag("rat_poison") and randf() < 0.5:
 				_foe.add_dot(10.0, 4.0)
-				if remote_owner == 0:
+				if player == world.player:
 					Game.note_poison(40.0)
-			if kind == "fox" and randf() < FOX_FOOD:
-				world.spawn_pickup_at(position + Vector3(0.6, 0, 0.6), Pickup.Kind.FOOD, PowerDefs.FOODS.keys().pick_random())
+			if kind == "fox":
+				_forage()
 			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
-	elif world.player:
-		var to := world.player.global_position - position
+	elif player:
+		var to := player.global_position - position
 		to.y = 0.0
 		if world.portals and to.length() > 26.0:
 			# You went through a gate. It finds its own way.
-			position = world.player.global_position + Vector3(1.5, 0.0, 1.5)
+			position = player.global_position + Vector3(1.5, 0.0, 1.5)
 		if to.length() > 4.0:
 			dir = to.normalized()
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 7.0))
@@ -378,6 +396,18 @@ func _physics_process(delta: float) -> void:
 	if _attack_left <= 0.0:
 		_play("Running_A" if dir != Vector3.ZERO else "Idle")
 	_move_wolf(delta, dir != Vector3.ZERO)
+
+
+## Now and then a bite turns something up: food, or a few arrows. Never twice in quick succession.
+func _forage() -> void:
+	if world.now - _found_at < FOX_FIND_GAP or randf() >= FOX_FOOD:
+		return
+	_found_at = world.now
+	var spot := position + Vector3(0.6, 0, 0.6)
+	if randf() < FOX_FINDS_FOOD:
+		world.spawn_pickup_at(spot, Pickup.Kind.FOOD, PowerDefs.FOODS.keys().pick_random())
+	else:
+		world.spawn_pickup_at(spot, Pickup.Kind.ARROWS, "arrows")
 
 
 ## Legs, a bounce in its stride, a tail that never quite stops, and a lunge when it bites.

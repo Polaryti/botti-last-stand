@@ -11,6 +11,11 @@ var tree_panel: TreePanel
 var _together_tab := 0
 var _run_over := false
 var _back := Callable() # what the phone's back button does on the current screen
+var _store_return := Callable() # where the Store's Back goes
+var _start_listed := true # online: a new game is public unless you choose private
+var updates: Updates
+var _update_box: HBoxContainer
+var _checked_updates := false
 var _pause_root: Control
 var _net_go := false
 
@@ -57,6 +62,9 @@ func _ready() -> void:
 	Net.left.connect(_on_net_left)
 	Net.game_over.connect(_on_net_over)
 	Net.all_ready.connect(func() -> void: _net_go = true)
+	Net.back_in_room.connect(_return_to_room)
+	updates = Updates.new()
+	add_child(updates)
 	if Game.test_map != "":
 		# Someone pressed F6 on a map in the editor, so go straight to it.
 		var map := Game.test_map
@@ -144,13 +152,17 @@ func show_menu(rebuild := false) -> void:
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 12)
 	box.add_child(foot)
-	var best := "No nights played yet."
-	if Game.best_time > 0.0:
-		best = "Best night %s with %d kills. Dawns reached: %d." % [Game.clock(Game.best_time), Game.best_kills, Game.nights_survived]
-	var record := _soft(best, 22)
-	record.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	record.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	foot.add_child(record)
+	# Where a new version shows, when there is one.
+	_update_box = HBoxContainer.new()
+	_update_box.add_theme_constant_override("separation", 10)
+	_update_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	foot.add_child(_update_box)
+	if not updates.changed.is_connected(_fill_update_box):
+		updates.changed.connect(_fill_update_box)
+	_fill_update_box()
+	if not _checked_updates:
+		_checked_updates = true
+		updates.check()
 	foot.add_child(_button("Codex", show_codex, Vector2(132, 56)))
 	foot.add_child(_button("Changelog", show_changelog, Vector2(168, 56)))
 	foot.add_child(_button("Settings", show_settings, Vector2(146, 56)))
@@ -158,6 +170,50 @@ func show_menu(rebuild := false) -> void:
 	version.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	foot.add_child(version)
 	panel = root
+
+
+## A new version on the game's page: on Android, one tap fetches it and Android asks to install it.
+## On an iPhone, where the game cannot install itself, it says where to find it.
+func _fill_update_box() -> void:
+	if _update_box == null or not is_instance_valid(_update_box):
+		return
+	for c in _update_box.get_children():
+		_update_box.remove_child(c)
+		c.queue_free()
+	var line := ""
+	var action := ""
+	var press := Callable()
+	match updates.state:
+		Updates.State.AVAILABLE:
+			if Updates.can_install():
+				line = "Version %s is out." % updates.latest
+				action = "Update"
+				press = updates.download
+			else:
+				line = "Version %s is out. Install it the way you installed this one." % updates.latest
+				action = "See it"
+				press = func() -> void: OS.shell_open(updates.page)
+		Updates.State.DOWNLOADING:
+			line = "Downloading version %s: %d%%" % [updates.latest, roundi(updates.progress() * 100.0)]
+			get_tree().create_timer(0.3).timeout.connect(_fill_update_box)
+		Updates.State.READY:
+			line = "Version %s is ready." % updates.latest
+			action = "Install"
+			press = updates.install
+		Updates.State.FAILED:
+			line = updates.problem
+			action = "Try again"
+			press = updates.download
+	if line == "":
+		return
+	var l := _body(line, 22)
+	l.add_theme_color_override("font_color", UiTheme.EMBER)
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_update_box.add_child(l)
+	if action != "":
+		_update_box.add_child(_button(action, press, Vector2(150, 56), true))
 
 
 ## A margin that also keeps clear of the camera cut-out, on whichever side it is.
@@ -713,9 +769,18 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 
 
 ## Everything for sale, by section. What you pick turns slowly beside its description.
-func show_store(focus := "", from_mode := -1, section := "") -> void:
+## back_to: where Back goes, when the Store was opened from somewhere other than the menu or a class.
+## Moving around inside the Store keeps it.
+func show_store(focus := "", from_mode := -1, section := "", back_to := Callable()) -> void:
 	_clear_ui()
-	_back = show_menu if from_mode < 0 else func() -> void: show_class_picker(from_mode)
+	if back_to.is_valid():
+		_store_return = back_to
+	elif from_mode >= 0:
+		_store_return = func() -> void: show_class_picker(from_mode)
+	else:
+		_store_return = show_menu
+	_back = _store_return
+	var here := _store_return
 	if section == "":
 		section = "classes"
 		if ShopDefs.ITEMS.has(focus):
@@ -734,7 +799,7 @@ func show_store(focus := "", from_mode := -1, section := "") -> void:
 	list.add_child(tabs)
 	for key: String in ShopDefs.SECTIONS:
 		var chosen_section := key
-		var tab := _button(ShopDefs.SECTIONS[key], func() -> void: show_store("", from_mode, chosen_section), Vector2(0, 52), key == section)
+		var tab := _button(ShopDefs.SECTIONS[key], func() -> void: show_store("", from_mode, chosen_section, here), Vector2(0, 52), key == section)
 		tab.add_theme_font_size_override("font_size", 19)
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tabs.add_child(tab)
@@ -854,7 +919,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 			return
 		if Game.buy_item(id):
 			Sfx.play("level", -3.0)
-			show_store(id, from_mode))
+			show_store(id, from_mode, "", _store_return))
 	row.add_child(buy)
 
 
@@ -939,7 +1004,7 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		line.add_child(name_label)
 		if not Game.owns_item(item):
-			line.add_child(_button("In the Store", func() -> void: show_store(item), Vector2(190, 50)))
+			line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, 50)))
 			continue
 		var on := Game.item_active(item)
 		line.add_child(_button("Equipped" if on else "Not equipped", func() -> void:
@@ -968,7 +1033,7 @@ func _pet_row() -> Control:
 		var label: String = pet.capitalize()
 		var b := _button(label, func() -> void:
 			if not owned:
-				show_store(chosen)
+				show_store(chosen, -1, "", func() -> void: show_armory("ranger"))
 				return
 			Game.choose_pet(chosen)
 			if panel:
@@ -1278,7 +1343,27 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 	var l := _body(line, 26)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(l)
-	box.add_child(_button("Menu", show_menu, Vector2(480, 72), true))
+	if Net.is_host():
+		box.add_child(_button("Back to the room", Net.return_to_room, Vector2(480, 72), true))
+		box.add_child(_button("Menu", show_menu, Vector2(480, 64)))
+	else:
+		var wait := _soft("Your host can take everyone back to the room for another night.", 22)
+		wait.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		box.add_child(wait)
+		box.add_child(_button("Menu", show_menu, Vector2(480, 72), true))
+
+
+## Everyone still here, back in the room the night began from.
+func _return_to_room() -> void:
+	get_tree().paused = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_run_over = false
+	_clear_world()
+	_clear_ui()
+	_new_world(Game.Mode.MENU)
+	Game.mode = Game.Mode.MENU
+	Sfx.set_mood(0.0, 0.0)
+	show_lobby()
 
 
 func _on_net_left(reason: String) -> void:
@@ -1450,6 +1535,20 @@ func _online_tab(box: VBoxContainer) -> void:
 		missing.add_theme_color_override("font_color", UiTheme.EMBER)
 		box.add_child(missing)
 		return
+	# Whether the game you start shows in everyone's list, or is found only with its code.
+	var kind := HBoxContainer.new()
+	kind.add_theme_constant_override("separation", 8)
+	box.add_child(kind)
+	kind.add_child(_body("New game", 24))
+	kind.add_child(_button("Public", func() -> void:
+		_start_listed = true
+		show_together(ONLINE_TAB), Vector2(150, 54), _start_listed))
+	kind.add_child(_button("Private", func() -> void:
+		_start_listed = false
+		show_together(ONLINE_TAB), Vector2(150, 54), not _start_listed))
+	var says := _soft("Anyone can find it in the list below, or join with its code." if _start_listed else "Only friends with its code can join.", 21)
+	says.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	kind.add_child(says)
 	var join := HBoxContainer.new()
 	join.add_theme_constant_override("separation", 10)
 	box.add_child(join)
@@ -1463,6 +1562,58 @@ func _online_tab(box: VBoxContainer) -> void:
 	join.add_child(_button("Join", func() -> void:
 		if code_edit.text.strip_edges() != "":
 			_join_online(code_edit.text), Vector2(160, 60)))
+	_public_games(box)
+
+
+## Games other people started as public, waiting for players. Looked up again every few seconds.
+func _public_games(box: VBoxContainer) -> void:
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	box.add_child(head)
+	var title := _body("Public games", 26)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	head.add_child(_button("Refresh", func() -> void: Net.look_for_rooms(), Vector2(150, 50)))
+	var scroll := DragScroll.new()
+	scroll.custom_minimum_size = Vector2(860, 150)
+	box.add_child(scroll)
+	var rows := VBoxContainer.new()
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rows.add_theme_constant_override("separation", 6)
+	scroll.add_child(rows)
+	var fill := func() -> void:
+		if not is_instance_valid(rows):
+			return
+		for c in rows.get_children():
+			rows.remove_child(c)
+			c.queue_free()
+		if Net.public_rooms.is_empty():
+			var empty := "Looking..." if Net.looking_up else ("Could not look: %s" % Net.lookup_problem if Net.lookup_problem != "" else "No public games right now. Start one, or join a friend's with a code.")
+			var l := _soft(empty, 22)
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			rows.add_child(l)
+		for room: Dictionary in Net.public_rooms:
+			rows.add_child(_public_room_row(room))
+	Net.public_rooms_changed.connect(fill)
+	var timer := Timer.new()
+	timer.wait_time = 6.0
+	timer.autostart = true
+	timer.timeout.connect(func() -> void: Net.look_for_rooms())
+	box.add_child(timer)
+	box.tree_exiting.connect(func() -> void:
+		if Net.public_rooms_changed.is_connected(fill):
+			Net.public_rooms_changed.disconnect(fill))
+	fill.call()
+	Net.look_for_rooms()
+
+
+func _public_room_row(room: Dictionary) -> Button:
+	var map_name: String = Game.MAPS.get(str(room["map"]), {}).get("name", "")
+	var rules: String = Net.RULE_NAMES[clampi(int(room["rules"]), 0, Net.RULE_NAMES.size() - 1)]
+	var what := rules if int(room["rules"]) != Net.Rules.COOP or map_name == "" else "%s, %s" % [rules, map_name]
+	var b := _button("%s's game: %s. %d of %d players" % [room["name"], what, int(room["players"]), Net.MAX_PLAYERS], func() -> void: _join_online(str(room["host"])), Vector2(840, 58))
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	return b
 
 
 func _online_wait() -> void:
@@ -1475,7 +1626,7 @@ func _online_wait() -> void:
 
 func _start_online() -> void:
 	_online_wait()
-	var problem := await Net.host_online()
+	var problem := await Net.host_online(_start_listed)
 	if problem != "":
 		_on_online_failed(problem)
 	else:
@@ -1552,6 +1703,8 @@ func _fill_lobby(body: VBoxContainer) -> void:
 			shown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(shown)
 			row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(Net.room_code), Vector2(120, 48)))
+			row.add_child(_button("Public", func() -> void: Net.set_listed(true), Vector2(130, 48), Net.room_listed))
+			row.add_child(_button("Private", func() -> void: Net.set_listed(false), Vector2(130, 48), not Net.room_listed))
 			if Net.room_problem != "":
 				var why := _soft("%s This longer code still works: copy it and send it to your friends." % Net.room_problem, 22)
 				why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
