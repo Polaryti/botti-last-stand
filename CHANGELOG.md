@@ -13,6 +13,7 @@ Newest first. The game shows this file on its Changelog screen, so keep the same
 - Revenant spends less Mist on claws, refills more quickly and recovers more on kills. Inventor devices gain a modest damage increase.
 ### Fixed
 - Maps of different sizes keep independent terrain dimensions, avoiding invalid height samples when changing maps.
+- Fort gate changes reach every phone reliably, including a repaired doorway closing after enemies leave it.
 - Lingering traps and sentries safely handle an owner leaving. Exclusive weapons reject pickups by other classes.
 - Tests use deterministic seeds, isolated scenarios, named groups and strict process results. Skill-tree build coverage reuses the map and runs substantially faster.
 

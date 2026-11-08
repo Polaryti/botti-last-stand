@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_meshes()
 	_test_paths()
 	_test_terrain_dimensions()
+	_test_fort_state()
 	_test_weather()
 	await _test_previews()
 	print("RESULT: %d checks, %d failures" % [checks, failures])
@@ -178,3 +179,11 @@ func _test_terrain_dimensions() -> void:
 	check(small.height(0, 0) == 3.0 and small.ground_height(4, 4) == 2.0, "a different map cannot change an existing terrain's sampling dimensions")
 	check(large.height(12, 12) == 7.0 and large.vertices_per_side > small.vertices_per_side, "mixed-size terrain instances retain independent extents")
 	Terrain.use_half(previous)
+
+
+func _test_fort_state() -> void:
+	var fort := Fort.new(null)
+	fort.repair(-1, 1.0)
+	fort.repair(0, NAN)
+	check(fort.gates.is_empty(), "invalid gate repairs leave an uninitialized fort untouched")
+	fort.free()

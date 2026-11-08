@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 25
+const PROTOCOL := 26
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -1441,7 +1441,7 @@ func send_fort(state: PackedByteArray) -> void:
 	_fort_state.rpc(state)
 
 
-@rpc("authority", "unreliable_ordered", "call_remote", 5)
+@rpc("authority", "reliable", "call_remote", 5)
 func _fort_state(state: PackedByteArray) -> void:
 	if world and is_instance_valid(world) and world.fort:
 		world.fort.apply_state(state)

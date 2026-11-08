@@ -479,7 +479,7 @@ func _fort() -> void:
 	var g: Dictionary = f.gates[1]
 	if host:
 		f.hit_gate(g, 99999.0, g["at"])
-	await wait(0.6)
+	await until(func() -> bool: return not g["closed"], 4.0)
 	await sync(3)
 	ok(not g["closed"], "a gate falling reaches both phones")
 	ok(f.any_open(), "and it is open on both")
@@ -488,7 +488,7 @@ func _fort() -> void:
 	if not host:
 		pl.wood = Fort.WOOD_MAX
 		pl.global_position = (g["at"] as Vector3) + Vector3(-4, 0.1, 0)
-	await wait(3.2)
+	await until(func() -> bool: return float(g["hp"]) > 0.0 and bool(g["closed"]), 6.0)
 	await sync(4)
 	ok(float(g["hp"]) > 0.0, "wood from the other phone mends the gate (%.0f)" % float(g["hp"]))
 	ok(g["closed"], "and it closes on both")
@@ -496,13 +496,13 @@ func _fort() -> void:
 		ok(pl.wood < Fort.WOOD_MAX, "using up what I carried")
 	if host:
 		f.hit_heart(100.0)
-	await wait(0.6)
+	await until(func() -> bool: return f.heart_hp < Fort.HEART_HP, 4.0)
 	await sync(5)
 	ok(f.heart_hp < Fort.HEART_HP, "the heart's health reaches both phones (%.0f)" % f.heart_hp)
 	# The heart falls: the game ends for everyone, and it is not a win.
 	if host:
 		f.hit_heart(999999.0)
-	await wait(0.8)
+	await until(func() -> bool: return m._run_over, 4.0)
 	await sync(6)
 	ok(m._run_over, "when the heart falls it ends on this phone")
 	await snap("fort_over")
@@ -1116,3 +1116,10 @@ func _commander() -> void:
 	await wait(0.3)
 	await sync(106)
 	ok(absf(w._bolt.global_position.x - strike.x) < 0.1 and absf(w._bolt.global_position.z - strike.z) < 0.1, "Commander lightning and impact visuals reach both phones")
+
+
+## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.
+func until(condition: Callable, timeout: float) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout * 1000.0)
+	while not condition.call() and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
