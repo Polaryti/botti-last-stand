@@ -44,8 +44,14 @@ func _init(size_wanted: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	if _spin:
+	if _spin and is_visible_in_tree():
 		_spin.rotation.y += delta * TURN_SPEED
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and _stage:
+		# Hiding a CanvasItem does not pause AnimationPlayer in its separate 3D world.
+		_stage.process_mode = Node.PROCESS_MODE_INHERIT if is_visible_in_tree() else Node.PROCESS_MODE_DISABLED
 
 
 func _begin(height: float) -> Node3D:
@@ -112,5 +118,5 @@ func show_item(id: String) -> void:
 		piece.position = Vector3(0, 0.6, 0) - box.get_center() * piece.scale
 		if box.size.z > box.size.y:
 			piece.rotation.x = PI * 0.5
-			piece.position = Vector3(0, 0.6, 0)
+			piece.position = Vector3(0, 0.6, 0) - piece.basis * box.get_center()
 	root.add_child(piece)

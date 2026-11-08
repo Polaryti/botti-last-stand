@@ -10,8 +10,13 @@ on:
 env:
   GODOT_VERSION: "4.7.2"
 
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   ios:
+    if: github.ref == 'refs/heads/main'
     runs-on: macos-latest
     permissions:
       contents: write
@@ -45,15 +50,16 @@ jobs:
           gh release download "$tag" --repo "$plugin" --pattern '*-all-56238973*' --output plugin.zip
           unzip -q plugin.zip -d "$RUNNER_TEMP/plugin"
           rm plugin.zip
-          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" ios
+          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" ios,macos
 
       - name: Are the Epic keys there
         run: test -f scripts/epic_keys.gd
 
       - name: Export the Xcode project
         run: |
-          "$GODOT" --headless --path . --import 2>&1 | tail -5 || true
           mkdir -p build/ios
+          "$GODOT" --headless --path . --import 2>&1 | tee build/import.log
+          ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' build/import.log
           "$GODOT" --headless --path . --export-release iOS build/ios/botti.ipa 2>&1 | tee build/ios-export.log | tail -20
           test -d build/ios/botti.xcodeproj
 

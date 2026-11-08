@@ -1,54 +1,78 @@
 # Botti's Last Stand
 
-A low-poly, first-person medieval zombie survival game for phones, made with Godot 4.7.2. Free, with no servers and no internet needed: friends play together over the same Wi-Fi or one phone's hotspot.
+A first-person, low-poly medieval zombie survival game built with **Godot 4.7.2**, designed for landscape play on Android phones. Fight through a ten-minute night, defend a fort, or compete with friends while the undead hunt everyone. Touch controls support moving, looking and attacking at the same time; keyboard and mouse are available for desktop development.
 
-The game's own Changelog screen, in `CHANGELOG.md`, lists what changed in each version.
+Play solo, add bots, or make a room for **up to four players total**. LAN games work on the same Wi-Fi or a phone hotspot without internet. Online rooms use Epic Online Services and require internet, the optional plugin and build-time credentials. One player hosts the simulation; there is no dedicated game-server service in this repository.
 
-## The game
+## Play modes
 
-**Ways to play**
+| Mode | What you do |
+| --- | --- |
+| Survive the Night | Survive until dawn, ten minutes after the match starts. Enemies grow more dangerous as the clock advances; the final two minutes trigger the last stand. Choose the Village or the Mists. |
+| Defend the Fort | Protect the Heart in the keep and repair damaged gates with wood. Stairs lead onto the walls and small exits let you venture outside. Losing the Heart or everyone falling ends the defence. |
+| Co-op Night | Survive together on the Village or Mists map. Fallen players normally return after 20 seconds, provided someone is still standing. |
+| All vs All | Fight players and zombies with three lives each. Respawns take six seconds while lives remain. A shrinking, damaging fog forces survivors together; the last player with lives remaining wins. |
+| Teams | Team-based PvP with zombies, abilities that affect opponents, friendly support and respawns. |
+| Sandbox | Try owned classes with skill points available immediately. Weapon/item stands, durable target dummies, enemy spawning and weather controls let you test builds without a normal night timer. |
 
-- **Survive the Night:** zombies roam the village, and more arrive as the night goes on. In the last two minutes they sense the dawn and all come for you. Last 10 minutes and a real sunrise burns them away. Played in the village, or in The Mists: floating islands joined by gates that open and close, where falling is death.
-- **Defend the Fort:** zombies break down the fort's gates and go for the Heart in the keep. Lose it, or lose everyone, and the night is over. Wood mends the gates, stairs climb the walls and small doors let you out.
-- **Play Together:** up to 4 players, on phones or as bots: on the same Wi-Fi, through one phone's hotspot, or online with a room code. Co-op Night, Defend the Fort, All vs All or Teams. Fallen players come back after 20 seconds.
-- **All vs All:** three lives each, and a deadly fog closes in on the village. The last one standing wins, in about six minutes. Zombies are still out there, and abilities work on other players.
-- **Sandbox:** a small map with every weapon, item and familiar on stands, and any class you own. All your skill points from the start, dummies to hit that never die, any enemy on call, and the weather of your choice.
+Bots occupy player slots and support multiplayer rules, levelling, skill choices, weapons, abilities, familiars and fort repairs. Multiplayer also includes spectating fallen players and riding as a passenger on another player's horse or war chariot.
 
-Most nights are clear. Some bring rain, and a few a storm whose lightning hurts anyone under it, players and enemies alike. The ground glows first.
+## Maps and combat
 
-**Classes**
+**The Village** has enterable buildings, farmland, hills, a castle and a river crossed by bridges and fords. Crops hide you, firelight makes you easier to see, and sound attracts enemies. The church bell marks elapsed minutes and draws attention.
 
-Each class has its own start and rules, and an ability tree with one big choice per level, up to level 10: three shared choices, one of three specializations, four either/or choices, and a final ability.
+**The Mists** is a separate survival map of floating islands, ruins, bridges, stepping stones and timed portals. Falling into the void is fatal. Its hazards include jumping enemies, Rift Stalkers and airborne Mist Harriers.
 
-| Class | Specializations |
-|---|---|
-| Infantry | Duelist, Berserker, Shadow Blade |
-| Ranger | Sharpshooter, Trapper, Beastmaster |
-| Heavy Infantry | Guardian, Warpriest, Warlord |
-| Chivalry | Lancer, Paladin, Horse Archer |
-| Magician | Necromancer, Elementalist, Illusionist |
-| Revenant (Store or code) | Mist Leaper, Rift Traveller, Summoner |
-| Artificer (Store or code) | Pyromaniac, Mechanic, Inventor |
+Fight with melee weapons, bows, crossbows, thrown weapons and class-specific attacks. Collect food, ammunition, potions, powers and familiars. Enemy types include ordinary zombies, beasts, spellcasters, ambushers, flying enemies, Dread Riders and Fallen Heroes. Most nights are clear; rain and thunderstorms alter visibility, and lightning warns with a glowing ground marker before it strikes.
 
-The Artificer carries one weapon at a time and starts with a Torch. The Pyromaniac throws incendiary bombs, ending with Chaotic bomblets. The Mechanic builds a slow war chariot that absorbs damage, takes a friend along, and gains a turret and spikes. The Inventor gets a different device with every use, and the button shows which comes next.
+Each match build progresses to **level 10**: three early choices, one of three specializations, four branch choices and a final ability. Builds combine damage, movement, defence, status effects, summons and active skills.
 
-**The world**
+## Classes and permanent progression
 
-- A large map at night with hills, fog, firelight, crops to hide in, and a river that carries you along and can only be crossed on bridges and fords.
-- The church bell strikes once for each minute gone, half a second apart, across the whole map, and draws zombies towards it.
-- Many kinds of enemy, from the plain Zombie to the Dread Rider and Fallen Heroes who grow stronger each minute. Zombies notice by sight and sound, call each other, surround you and search where you were heading.
-- Melee and ranged weapons, food, potions and familiars appear around the map and vanish if nobody takes them.
-- Botti Doubloons come from every match and buy the two extra classes in the Store.
+The standard progression includes nine classes. Unlocks and purchases are saved on the device; Botti Doubloons are earned in matches and spent in the in-game Store. They are not a real-money checkout implemented by this repository.
 
-The Codex in the game describes every class, enemy, familiar, item and weapon.
+| Class | Normal availability | Specializations |
+| --- | --- | --- |
+| Infantry | Available from the start | Duelist, Berserker, Shadow Blade |
+| Ranger | Available from the start | Sharpshooter, Trapper, Beastmaster |
+| Heavy Infantry | Available from the start | Guardian, Warpriest, Warlord |
+| Chivalry | Defeat a Dread Rider outside Sandbox | Lancer, Paladin, Horse Archer |
+| Magician | Finish five games outside Sandbox | Necromancer, Elementalist, Illusionist |
+| Revenant | Survive until dawn in the Mists five times | Mist Leaper, Rift Traveller, Summoner |
+| Plague Doctor | Deal 3,000 cumulative poison damage outside Sandbox | Apothecary, Pestilence, Rat King |
+| Monk | 800 Botti Doubloons in the Store | Bo Master, Spirit Walker, Iron Mountain |
+| Artificer | 520 Botti Doubloons in the Store | Pyromaniac, Mechanic, Inventor |
 
-## Changing the game
+Redeem codes can also unlock supported classes. **Adept** is an additional code-only class implemented in the source, with Wind/Stone/Flame stances and Blade Dancer, Mirror Step and Void Walker specializations; it is not sold or earned through the normal progression above.
 
-- [Editing the maps](docs/EDITING_MAPS.md): every map is a Godot scene you can open and change. Move, turn, copy or delete any building, tree or fire, and drag hills, roads and the river. Press F6 to walk around it.
-- [Building and testing](docs/BUILDING.md): building the Android app, the signing key, the tests and the art tools.
+Store upgrades can add specialization abilities, and the Armory manages owned upgrades and selected familiars. The in-game Codex documents classes, enemies, weapons, items and familiars. The in-game Changelog reads [CHANGELOG.md](CHANGELOG.md).
 
-iOS is not built yet.
+## Android downloads: production and development
 
-## Licence
+Download APKs from [GitHub Releases](https://github.com/Polaryti/botti-last-stand/releases). Check the release label before installing.
 
-All rights reserved: see `LICENSE`. Free assets and fonts stay under their own licences, listed in `CREDITS.md`.
+| Channel | Branch / release | Android app | Intended use |
+| --- | --- | --- | --- |
+| Production | `main`; stable `v…` releases | **Botti's Last Stand**, `com.botti.laststand` | Normal play; signed production updates are offered in the menu. |
+| Development | `dev`; `dev-…` prereleases | **Botti's Last Stand Dev**, `com.botti.laststand.dev` | Test changes before promotion to production. Installs alongside production with separate saves. |
+
+Every push to `dev` builds a uniquely versioned **Android-only** APK and publishes a prerelease with its checksum and source-commit metadata. It does not replace the latest stable release and does not build iOS. Development builds use a separate multiplayer compatibility namespace and do not offer production updates; everyone in a dev test session should install a compatible dev APK. Download newer dev APKs from their prerelease pages to update the dev app.
+
+Both channels use the existing signing identity, but Android treats their different package IDs as different apps. The dev APK is an optimized release export, not a change to the production package. Online play is included when all Epic credentials are configured; otherwise its release notes identify it as solo/bots/LAN only.
+
+The production iOS workflow exports an unsigned app for sideloading; it is not an App Store release. See [iPhone builds](docs/BUILDING.md#iphone). The primary supported build target remains Android.
+
+## Development
+
+Open the project in Godot 4.7.2 and press F5, or run `godot --path .`. Export templates, Android SDK configuration and signing keys are separate prerequisites for an APK build. The repository does not contain signing keys, Epic credentials or the compiled Epic plugin.
+
+- [Building and testing](docs/BUILDING.md): Android/iOS setup, signing, online-play dependencies, checks and art tools.
+- [Development Android releases](docs/BUILDING.md#development-android-releases): dev package identity, versioning and release workflow.
+- [Editing maps](docs/EDITING_MAPS.md): edit map scenes in Godot and use F6 to walk around them.
+- [Mobile review](docs/MOBILE_REVIEW.md): maintenance fixes, mesh measurements, validation and remaining architecture/device work.
+
+`Validate game` checks pull requests and pushes to `main` and `dev`. It imports resources, runs gameplay and regression tests, exercises paired LAN scenarios, and captures weather/UI with the Compatibility renderer. The dev release workflow additionally verifies package identity and signing before publishing its APK. Engine tests and desktop captures do not substitute for real Android/iOS device profiling.
+
+## Licence and credits
+
+**All rights reserved**; see [LICENSE](LICENSE). A public repository is not an open-source licence. Third-party models, sprites, fonts and engine components retain their own licences, listed in [CREDITS.md](CREDITS.md).

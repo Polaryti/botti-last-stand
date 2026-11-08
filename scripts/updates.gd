@@ -47,7 +47,7 @@ static func current() -> String:
 
 ## Whether this phone can put the new version on by itself, with one more tap on Android's screen.
 static func can_install() -> bool:
-	return OS.has_feature("android")
+	return OS.has_feature("android") and not Game.is_dev_build()
 
 
 func _headers() -> PackedStringArray:
@@ -55,6 +55,10 @@ func _headers() -> PackedStringArray:
 
 
 func check() -> void:
+	if Game.is_dev_build():
+		state = State.NONE
+		changed.emit()
+		return
 	if state == State.CHECKING or state == State.DOWNLOADING or state == State.READY:
 		return
 	# Whatever was fetched last time has been installed or given up on.
@@ -87,7 +91,7 @@ func apply_release(data: Variant) -> void:
 	latest = ""
 	apk_url = ""
 	apk_size = 0
-	if typeof(data) != TYPE_DICTIONARY or data.get("draft", false) or data.get("prerelease", false):
+	if Game.is_dev_build() or typeof(data) != TYPE_DICTIONARY or data.get("draft", false) or data.get("prerelease", false):
 		changed.emit()
 		return
 	var tag := str(data.get("tag_name", ""))
@@ -111,6 +115,8 @@ func apply_release(data: Variant) -> void:
 
 ## Android: fetch the new app, then open it. Android asks the player before it installs anything.
 func download() -> void:
+	if Game.is_dev_build():
+		return
 	if not (state == State.AVAILABLE or state == State.FAILED) or apk_url == "":
 		return
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(FOLDER))
@@ -155,7 +161,7 @@ func _on_downloaded(result: int, code: int, _headers_got: PackedStringArray, _bo
 ## Opens the new app with Android's installer. The first time, Android asks to allow this game to
 ## install apps; after allowing it, tap Install again.
 func install() -> void:
-	if state == State.READY:
+	if state == State.READY and not Game.is_dev_build():
 		OS.shell_open(ProjectSettings.globalize_path(FILE))
 
 

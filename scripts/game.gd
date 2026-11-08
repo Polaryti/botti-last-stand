@@ -48,6 +48,10 @@ var best_kills := 0
 var nights_survived := 0
 
 
+func is_dev_build() -> bool:
+	return OS.has_feature("dev") or ProjectSettings.get_setting("botti/release_channel", "production") == "dev"
+
+
 func _ready() -> void:
 	load_settings()
 	apply_quality()
@@ -255,42 +259,51 @@ func apply_quality() -> void:
 	vp.scaling_3d_scale = [0.65, 0.85, 1.0][quality]
 
 
+## A valid ConfigFile can still contain values of the wrong type. Reject those before assigning
+## typed properties; non-finite numbers must not reach rendering, audio or progress calculations.
+static func _saved(config: ConfigFile, section: String, key: String, fallback: Variant) -> Variant:
+	var value: Variant = config.get_value(section, key, fallback)
+	if typeof(fallback) == TYPE_FLOAT and (typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT):
+		return float(value) if is_finite(float(value)) else fallback
+	return value if typeof(value) == typeof(fallback) else fallback
+
+
 func load_settings() -> void:
 	var c := ConfigFile.new()
 	if c.load(SAVE_PATH) != OK:
 		return
-	sensitivity = c.get_value("input", "sensitivity", 1.0)
-	player_class = c.get_value("progress", "player_class", "infantry")
+	sensitivity = clampf(_saved(c, "input", "sensitivity", 1.0), 0.4, 2.5)
+	player_class = _saved(c, "progress", "player_class", "infantry")
 	if not ClassDefs.ALL.has(player_class):
 		player_class = "infantry"
-	auto_jump = c.get_value("input", "auto_jump", true)
-	vibration = c.get_value("input", "vibration", true)
-	steady_brightness = c.get_value("video", "steady_brightness", true)
-	brightness = c.get_value("video", "brightness", -1.0)
-	music_volume = c.get_value("audio", "music", 0.8)
-	sound_volume = c.get_value("audio", "sound", 1.0)
-	quality = clampi(c.get_value("video", "quality", 1), 0, 2)
-	difficulty = clampi(c.get_value("progress", "difficulty", 1), 0, 2)
-	player_name = str(c.get_value("progress", "player_name", ""))
-	unlocked = c.get_value("progress", "unlocked", {})
-	redeemed = c.get_value("progress", "redeemed", {})
-	doubloons = c.get_value("progress", "doubloons", 0)
-	finished_games = c.get_value("progress", "finished_games", 0)
-	mists_wins = c.get_value("progress", "mists_wins", 0)
-	poison_dealt = c.get_value("progress", "poison_dealt", 0.0)
-	owned_items = c.get_value("progress", "owned_items", {})
-	switched_off = c.get_value("progress", "switched_off", {})
-	pet = c.get_value("progress", "pet", "wolf")
-	night_map = c.get_value("progress", "night_map", "village")
+	auto_jump = _saved(c, "input", "auto_jump", true)
+	vibration = _saved(c, "input", "vibration", true)
+	steady_brightness = _saved(c, "video", "steady_brightness", true)
+	brightness = clampf(_saved(c, "video", "brightness", -1.0), -1.0, 1.0)
+	music_volume = clampf(_saved(c, "audio", "music", 0.8), 0.0, 1.0)
+	sound_volume = clampf(_saved(c, "audio", "sound", 1.0), 0.0, 1.0)
+	quality = clampi(_saved(c, "video", "quality", 1), 0, 2)
+	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
+	player_name = str(_saved(c, "progress", "player_name", ""))
+	unlocked = _saved(c, "progress", "unlocked", {})
+	redeemed = _saved(c, "progress", "redeemed", {})
+	doubloons = maxi(0, _saved(c, "progress", "doubloons", 0))
+	finished_games = maxi(0, _saved(c, "progress", "finished_games", 0))
+	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
+	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
+	owned_items = _saved(c, "progress", "owned_items", {})
+	switched_off = _saved(c, "progress", "switched_off", {})
+	pet = _saved(c, "progress", "pet", "wolf")
+	night_map = _saved(c, "progress", "night_map", "village")
 	if not MAPS.has(night_map):
 		night_map = "village"
 	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
 		pet = "wolf"
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class):
 		player_class = "infantry"
-	best_time = c.get_value("progress", "best_time", 0.0)
-	best_kills = c.get_value("progress", "best_kills", 0)
-	nights_survived = c.get_value("progress", "nights_survived", 0)
+	best_time = maxf(0.0, _saved(c, "progress", "best_time", 0.0))
+	best_kills = maxi(0, _saved(c, "progress", "best_kills", 0))
+	nights_survived = maxi(0, _saved(c, "progress", "nights_survived", 0))
 
 
 func save_settings() -> void:
@@ -319,7 +332,13 @@ func save_settings() -> void:
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)
-	c.save(SAVE_PATH)
+	# Replace only after the complete file is written, so a failed write keeps the previous save.
+	var temporary := SAVE_PATH + ".tmp"
+	var error := c.save(temporary)
+	if error == OK:
+		error = DirAccess.rename_absolute(temporary, SAVE_PATH)
+	if error != OK:
+		push_error("Could not save settings: %s" % error_string(error))
 
 
 func record_run(seconds: float, kills: int, won: bool) -> bool:

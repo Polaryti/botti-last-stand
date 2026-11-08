@@ -48,6 +48,10 @@ func _exit_tree() -> void:
 
 
 func set_kind(new_kind: int) -> void:
+	# Retire pending strikes when weather changes, including their pooled warning rings.
+	for warning: Dictionary in _warnings:
+		(warning["ring"] as MeshInstance3D).visible = false
+	_warnings.clear()
 	kind = new_kind
 	var wet := kind != Kind.CLEAR
 	if wet and _rain == null:
@@ -57,6 +61,7 @@ func set_kind(new_kind: int) -> void:
 	Sfx.rain(wet, -9.0)
 	flash = 0.0
 	world.weather_changed()
+	_set_flash(0.0) # reset the sky shader too if the player changes weather during a flash
 
 
 func is_wet() -> bool:
@@ -156,6 +161,7 @@ func _pick_spot() -> Vector3:
 func announce(at: Vector3) -> void:
 	var ground := Vector3(at.x, world.ground_at(at), at.z)
 	var ring := _free_ring()
+	(ring.material_override as ShaderMaterial).set_shader_parameter("progress", 0.0)
 	ring.global_position = ground + Vector3.UP * 0.12
 	ring.visible = true
 	_warnings.append({"at": ground, "left": STRIKE_WARNING, "ring": ring})

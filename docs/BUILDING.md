@@ -34,6 +34,40 @@ The app ends up in `build/botti-last-stand.apk`. Without the key, make your own 
 
 An app signed with a different key will not install over one already on a phone until that one is uninstalled.
 
+## Development Android releases
+
+Every push to `dev` runs **Android dev release** and creates a GitHub prerelease tagged
+`dev-<workflow-run-number>-<short-commit>`. The APK is named after that tag. Its release also
+contains a SHA-256 checksum and `build-info.json` with the exact source commit and online-play status.
+No iOS build runs for dev. The production Android and iOS jobs also refuse manual dispatch on
+branches other than `main`.
+
+The workflow prepares a disposable checkout with `tools/prepare_dev_build.py`. Production
+`project.godot` and the existing Android/iOS export presets stay unchanged in Git. The generated
+**Android Dev** preset uses `com.botti.laststand.dev`, the launcher name **Botti's Last Stand Dev**,
+a `dev` feature tag, and version `<base>-dev.<run>+<commit>` with Android code `100000 + run`.
+The existing signing secrets are reused so later dev APKs can update earlier dev installs.
+Different package IDs allow dev and production to coexist with separate Android app data.
+
+Dev multiplayer has a separate compatibility namespace for LAN handshakes and online room lists.
+Dev builds never query or offer the production updater and omit the install-packages permission.
+Testers update the dev app by installing the next dev APK from GitHub Releases. Prereleases are
+published with `latest=false`, so the stable update channel remains on production releases.
+
+The workflow uses Godot 4.7.2 and Epic plugin release 2.3.1. If all Epic secrets are available it
+includes online play; if any are missing it builds solo/bots/LAN and says so in the release notes.
+It runs packaging unit tests and GDScript regressions, verifies the certificate and APK package /
+version metadata, and publishes only after those steps pass. The separate **Validate game** run
+provides the complete gameplay, paired-network and render checks for the pushed commit.
+
+To inspect preparation locally, use a disposable project copy:
+
+    python3 tools/prepare_dev_build.py --build-number 1 --commit <git-commit-sha>
+
+This command rewrites configuration in that copy. Do not run it in a production working tree
+whose configuration edits you want to retain. The normal `Android` and `iOS` preset definitions
+are preserved, and the generated preset is idempotent for the same build number and commit.
+
 ## Making a new version
 
 1. Raise `config/version` in `project.godot`, and `version/code` and `version/name` in `export_presets.cfg`. The code has to go up by one each time, or phones refuse the update.
@@ -74,6 +108,24 @@ Every push to `main` builds an unsigned iPhone app on one of GitHub's Macs. Noth
 With a free Apple ID the app stops opening after 7 days. Install it again to renew it.
 
 ## Tests
+
+Pull requests and pushes to `main` and `dev` run `Validate game` without signing keys or Epic credentials.
+It imports resources, runs gameplay and regression checks, exercises paired LAN sessions, and
+captures weather and UI with the Compatibility renderer. Logs and images are attached to the run.
+Release workflows still run only on `main` or by manual dispatch.
+
+For strict checks on Linux, with separate temporary saves for each process:
+
+    python3 tools/run_checks.py regressions
+    python3 tools/run_checks.py gameplay
+    python3 tools/run_checks.py network --mode coop
+    python3 tools/run_checks.py network --mode mists
+
+Set `GODOT` or pass `--godot /path/to/godot`. The runner rejects engine errors, failed assertions,
+missing result summaries and timeouts. Logs go in `build/checks/`. Run network modes sequentially:
+they share the game's fixed LAN ports. These checks do not test Epic relays, phone GPU speed,
+Android signing or iOS device installation. Run gameplay and network suites sequentially on
+one machine because the gameplay suite also exercises hosting and discovery on the fixed ports.
 
     godot --headless --path . res://tests/test_game.tscn              # everything, about 8 minutes
     godot --headless --path . res://tests/test_game.tscn -- new       # the newest features and map checks

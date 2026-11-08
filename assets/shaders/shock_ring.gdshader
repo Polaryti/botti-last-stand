@@ -13,7 +13,7 @@ void vertex() {
 void fragment() {
 	float r = length(at);
 	float wave = smoothstep(progress - 0.22, progress, r) * (1.0 - smoothstep(progress, progress + 0.05, r));
-	float wash = (1.0 - smoothstep(0.0, progress, r)) * 0.14;
+	float wash = (1.0 - smoothstep(0.0, max(progress, 0.0001), r)) * 0.14;
 	ALBEDO = tint;
 	ALPHA = (wave * 0.9 + wash) * (1.0 - progress * progress) * step(r, 1.0);
 }

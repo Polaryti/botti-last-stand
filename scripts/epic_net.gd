@@ -207,7 +207,7 @@ func sign_in() -> bool:
 func open_room(listed := true) -> String:
 	var room := RoomOptions.new()
 	room.local_user_id = _user
-	room.bucket_id = "botti-%d" % Net.PROTOCOL
+	room.bucket_id = "botti-%d" % Net.protocol_version()
 	_ieos.call("lobby_interface_create_lobby", room)
 	var made: Dictionary = await _ieos.get("lobby_interface_create_lobby_callback")
 	if int(made["result_code"]) != SUCCESS:
@@ -245,7 +245,7 @@ static func room_card(listed: bool, waiting: bool) -> Dictionary:
 	return {
 		LISTED: "1" if listed else "0",
 		WAITING: "1" if waiting else "0",
-		VERSION: str(Net.PROTOCOL),
+		VERSION: str(Net.protocol_version()),
 		HOST_NAME: Game.player_name,
 		RULES: str(Net.rules),
 		MAP: Net.night_map,
@@ -295,7 +295,7 @@ func list_rooms() -> Array[Dictionary]:
 	var search: Object = made["lobby_search"]
 	search.call("set_parameter", LISTED, "1", EQUAL)
 	search.call("set_parameter", WAITING, "1", EQUAL)
-	search.call("set_parameter", VERSION, str(Net.PROTOCOL), EQUAL)
+	search.call("set_parameter", VERSION, str(Net.protocol_version()), EQUAL)
 	search.call("find", _user)
 	var found: Dictionary = await _ieos.get("lobby_search_find_callback")
 	if int(found["result_code"]) == NOT_FOUND:

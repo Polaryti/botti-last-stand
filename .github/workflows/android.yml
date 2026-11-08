@@ -18,8 +18,13 @@ env:
   # The certificate every version must be signed with, or phones refuse the update.
   CERT_SHA256: "53c7a9b03923677ebd8102ac3836402f97e0a9d17dc8d4a747ae83138ea8fa79"
 
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   android:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -57,7 +62,8 @@ jobs:
         if: steps.version.outputs.go == 'true'
         run: |
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$sdk" --licenses > /dev/null
+          # sdkmanager exits after accepting; yes may then receive SIGPIPE.
+          "$sdk" --licenses <<< "$(printf 'y\n%.0s' {1..100})" > /dev/null
           "$sdk" "platforms;android-36" "build-tools;36.1.0" "platform-tools" > /dev/null
 
       - name: Fetch Godot and its export templates
@@ -113,13 +119,14 @@ jobs:
           gh release download "$tag" --repo "$plugin" --pattern '*-all-56238973*' --output plugin.zip
           unzip -q plugin.zip -d "$RUNNER_TEMP/plugin"
           rm plugin.zip
-          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" android
+          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" android,linux
           test -f scripts/epic_keys.gd
 
       - name: Build and check the signature
         if: steps.version.outputs.go == 'true'
         run: |
-          "$GODOT" --headless --path . --import 2>&1 | tail -3 || true
+          "$GODOT" --headless --path . --import 2>&1 | tee build/import.log
+          ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' build/import.log
           rm -f build/botti-last-stand.apk
           "$GODOT" --headless --path . --export-release Android build/botti-last-stand.apk 2>&1 | tail -20
           test -f build/botti-last-stand.apk
@@ -140,3 +147,7 @@ jobs:
           cp build/botti-last-stand.apk "botti-last-stand-$v.apk"
           gh release view "$tag" > /dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "Botti's Last Stand $v" --notes-file notes.md || true
           gh release upload "$tag" "botti-last-stand-$v.apk" --clobber
+
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"

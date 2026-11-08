@@ -1,0 +1,99 @@
+name: Validate game
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: gameplay
+            mode: coop
+          - suite: regressions
+            mode: coop
+          - suite: render
+            mode: coop
+          - suite: network
+            mode: coop
+          - suite: network
+            mode: ffa
+          - suite: network
+            mode: teams
+          - suite: network
+            mode: fort
+          - suite: network
+            mode: mists
+          - suite: network
+            mode: bots
+          - suite: network
+            mode: ride
+          - suite: network
+            mode: chariot
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the project's Godot version
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fsSL --retry 3 -o "$archive" "$base/$archive"
+          curl -fsSL --retry 3 -o SHA512-SUMS.txt "$base/SHA512-SUMS.txt"
+          grep " $archive\$" SHA512-SUMS.txt | sha512sum --check --strict
+          unzip -q "$archive" -d "$RUNNER_TEMP/godot"
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+          rm "$archive" SHA512-SUMS.txt
+      - name: Import all resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/checks
+          "$GODOT" --headless --path . --editor --import 2>&1 | tee build/checks/import.log
+          ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' build/checks/import.log
+      - name: Run checks with isolated saves
+        if: matrix.suite != 'render'
+        run: python3 tools/run_checks.py ${{ matrix.suite }} --mode ${{ matrix.mode }}
+      - name: Check development packaging
+        if: matrix.suite == 'regressions'
+        run: python3 -m unittest discover -s tests -p test_dev_build.py
+      - name: Compile shaders and capture UI and weather
+        if: matrix.suite == 'render'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb libgl1-mesa-dri
+          export XDG_DATA_HOME="$RUNNER_TEMP/visual-profile"
+          export LIBGL_ALWAYS_SOFTWARE=1
+          mkdir -p build/checks/screens
+          for scene in weather_shots ui_shots; do
+            timeout 180s xvfb-run -a -s '-screen 0 1280x720x24' "$GODOT" --path . \
+              --rendering-driver opengl3 --audio-driver Dummy "res://tests/$scene.tscn" \
+              -- "$PWD/build/checks/screens" 2>&1 | tee "build/checks/$scene.log"
+            ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' "build/checks/$scene.log"
+          done
+          test -f build/checks/screens/storm_warning.png
+          test -f build/checks/screens/settings_pause.png
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: checks-${{ matrix.suite }}-${{ matrix.mode }}
+          path: build/checks
+          retention-days: 14

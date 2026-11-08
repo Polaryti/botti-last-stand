@@ -6,7 +6,14 @@ extends RefCounted
 
 static var _material: StandardMaterial3D
 
-var base := Transform3D.IDENTITY # everything added goes through this, so a shape can be placed and turned
+var base := Transform3D.IDENTITY: # everything added goes through this, so a shape can be placed and turned
+	set(value):
+		base = value
+		var determinant := value.basis.determinant()
+		_normal_basis = value.basis.inverse().transposed() if absf(determinant) > 0.000001 else Basis.IDENTITY
+		_mirrored = determinant < 0.0
+var _normal_basis := Basis.IDENTITY
+var _mirrored := false
 var _st := SurfaceTool.new()
 
 
@@ -37,7 +44,11 @@ func _tri(a: Vector3, b: Vector3, c: Vector3, centre: Vector3, col: Color) -> vo
 		b = c
 		c = t
 		n = -n
-	n = (base.basis * n).normalized()
+	n = (_normal_basis * n).normalized()
+	if _mirrored:
+		var t := b
+		b = c
+		c = t
 	for v: Vector3 in [a, b, c]:
 		_st.set_color(col)
 		_st.set_normal(n)
@@ -78,6 +89,14 @@ func gable(a: Vector3, b: Vector3, c: Vector3, col: Color) -> LowPoly:
 	var mid := (a + b + c) / 3.0
 	_tri(a, b, c, mid - n, col)
 	_tri(a, b, c, mid + n, col)
+	return self
+
+
+## One face for materials with culling disabled, such as foliage. Duplicating its back face
+## would draw the same pixels twice and double vertex work for every plant instance.
+func leaf(a: Vector3, b: Vector3, c: Vector3, col: Color) -> LowPoly:
+	var n := (b - a).cross(c - a).normalized()
+	_tri(a, b, c, (a + b + c) / 3.0 - n, col)
 	return self
 
 

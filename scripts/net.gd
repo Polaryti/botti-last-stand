@@ -115,6 +115,11 @@ func active() -> bool:
 	return role != Role.OFFLINE
 
 
+## Development APKs use their own compatibility namespace for LAN and online rooms.
+func protocol_version() -> int:
+	return PROTOCOL + (100000 if Game.is_dev_build() else 0)
+
+
 func is_host() -> bool:
 	return role == Role.HOST
 
@@ -432,7 +437,7 @@ func _my_entry(team: int) -> Dictionary:
 
 func _on_connected() -> void:
 	_connect_wait = 0.0
-	_hello.rpc_id(1, PROTOCOL, Game.player_name, Game.player_class)
+	_hello.rpc_id(1, protocol_version(), Game.player_name, Game.player_class)
 
 
 func _on_failed() -> void:
@@ -462,7 +467,7 @@ func _on_peer_disconnected(id: int) -> void:
 	_loaded.erase(id)
 	_remove_peer(id)
 	if in_game:
-		_lobby.rpc(roster, rules, difficulty)
+		_lobby.rpc(roster, rules, difficulty, night_map)
 		lobby_changed.emit()
 	else:
 		_share_lobby()
@@ -488,8 +493,10 @@ func _hello(protocol: int, player_name: String, cls: String) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
-	if protocol != PROTOCOL:
+	if protocol != protocol_version():
 		_refused.rpc_id(id, "That phone has a different version of the game.")
+		return
+	if not ClassDefs.ALL.has(cls) or roster.has(id):
 		return
 	# A real person takes a bot's place.
 	if not in_game and roster.size() >= MAX_PLAYERS and bot_count() > 0:
@@ -526,16 +533,19 @@ func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map
 
 ## Lobby choices: anyone can change their own class and team, only the host the rules.
 func set_my_class(cls: String) -> void:
+	if in_game or not ClassDefs.ALL.has(cls):
+		return
 	Game.player_class = cls
 	if is_host():
 		roster[1]["class"] = cls
-		_lobby.rpc(roster, rules, difficulty)
-		lobby_changed.emit()
+		_share_lobby()
 	elif active():
 		_choice.rpc_id(1, cls, -1)
 
 
 func switch_team() -> void:
+	if in_game or not roster.has(my_id()):
+		return
 	var team := 1 - int(roster[my_id()]["team"])
 	if is_host():
 		roster[1]["team"] = team
@@ -545,28 +555,26 @@ func switch_team() -> void:
 
 
 func set_difficulty(d: int) -> void:
-	if is_host():
+	if is_host() and not in_game and d >= 0 and d <= 2:
 		difficulty = d
 		Game.difficulty = d
-		_lobby.rpc(roster, rules, difficulty)
-		lobby_changed.emit()
+		_share_lobby()
 
 
 func set_rules(r: int) -> void:
-	if is_host():
+	if is_host() and not in_game and r >= Rules.COOP and r <= Rules.FORT:
 		rules = r
-		_lobby.rpc(roster, rules, difficulty)
-		lobby_changed.emit()
+		_share_lobby()
 
 
 @rpc("any_peer", "reliable")
 func _choice(cls: String, team: int) -> void:
 	var id := multiplayer.get_remote_sender_id()
-	if not is_host() or not roster.has(id):
+	if not is_host() or in_game or not roster.has(id):
 		return
-	if cls != "":
+	if cls != "" and ClassDefs.ALL.has(cls):
 		roster[id]["class"] = cls
-	if team >= 0:
+	if team == 0 or team == 1:
 		roster[id]["team"] = team
 	_share_lobby()
 
@@ -587,12 +595,14 @@ func _start_beacon() -> void:
 	_beacon_timer = 0.0
 	# Hotspots and some routers drop broadcasts, so a joining phone can also ask around directly.
 	_answer = PacketPeerUDP.new()
-	if _answer.bind(ASK_PORT) != OK:
+	var answer_error := _answer.bind(ASK_PORT)
+	if answer_error != OK:
+		push_warning("Could not bind LAN discovery responder: %s" % error_string(answer_error))
 		_answer = null
 
 
 func _beacon_text() -> PackedByteArray:
-	return JSON.stringify({"g": "botti-last-stand", "v": PROTOCOL, "n": Game.player_name, "p": roster.size(), "r": rules}).to_utf8_buffer()
+	return JSON.stringify({"g": "botti-last-stand", "v": protocol_version(), "n": Game.player_name, "p": roster.size(), "r": rules}).to_utf8_buffer()
 
 
 func _answer_questions() -> void:
@@ -634,7 +644,9 @@ func start_search() -> void:
 	PhoneNet.use_wifi()
 	_listener = PacketPeerUDP.new()
 	_listener.set_broadcast_enabled(true) # on Android this also lets broadcasts in
-	if _listener.bind(DISCOVERY_PORT) != OK:
+	var listen_error := _listener.bind(DISCOVERY_PORT)
+	if listen_error != OK:
+		push_warning("Could not bind LAN discovery listener: %s" % error_string(listen_error))
 		_listener = null
 		return
 	rooms.clear()
@@ -667,7 +679,7 @@ func _read_beacons(delta: float) -> void:
 		var d: Dictionary = parsed
 		if not rooms.has(from):
 			changed = true
-		rooms[from] = {"name": str(d.get("n", "?")), "players": int(d.get("p", 1)), "rules": int(d.get("r", 0)), "version_ok": int(d.get("v", 0)) == PROTOCOL, "seen": 0.0}
+		rooms[from] = {"name": str(d.get("n", "?")), "players": int(d.get("p", 1)), "rules": int(d.get("r", 0)), "version_ok": int(d.get("v", 0)) == protocol_version(), "seen": 0.0}
 	for a: String in rooms.keys():
 		rooms[a]["seen"] = float(rooms[a]["seen"]) + delta
 		if float(rooms[a]["seen"]) > 4.0:
@@ -879,7 +891,7 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 
 
 func set_night_map(id: String) -> void:
-	if is_host():
+	if is_host() and not in_game and Game.MAPS.has(id):
 		night_map = id
 		_share_lobby()
 
@@ -1189,7 +1201,7 @@ func pose_bytes(p: Player) -> PackedByteArray:
 
 
 func _apply_pose(a: Avatar, b: PackedByteArray) -> void:
-	if b.size() < 39:
+	if not valid_pose(b):
 		return
 	var weapon: int = b[34]
 	a.apply_pose(Vector3(b.decode_float(0), b.decode_float(4), b.decode_float(8)), b.decode_float(12), b.decode_float(16),
@@ -1197,6 +1209,17 @@ func _apply_pose(a: Avatar, b: PackedByteArray) -> void:
 	a.cover_pct = b[36] / 100.0
 	a.cover_radius = float(b[37])
 	a.show_statuses(b[38])
+
+
+## Validate before touching an avatar: truncated packets, unknown weapon indices and NaN/Inf
+## transforms must never reach physics or the renderer. The wire format remains unchanged.
+func valid_pose(b: PackedByteArray) -> bool:
+	if b.size() != 39 or b[34] > _weapon_ids.size():
+		return false
+	for offset in range(0, 32, 4):
+		if not is_finite(b.decode_float(offset)):
+			return false
+	return true
 
 
 func bot_pose(bot: BotPlayer) -> void:

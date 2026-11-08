@@ -47,7 +47,7 @@ func _ready() -> void:
 	if args.has("soakonly"):
 		await soak()
 		print("RESULT: %d checks, %d failures" % [checks, failures])
-		get_tree().quit(1 if failures > 0 else 0)
+		await finish()
 		return
 	# Whatever an interrupted run left in the save, the tests start on the ordinary map.
 	Game.night_map = "village"
@@ -56,7 +56,7 @@ func _ready() -> void:
 		await start_clean()
 		await test_version_20_1()
 		print("RESULT: %d checks, %d failures" % [checks, failures])
-		get_tree().quit(1 if failures > 0 else 0)
+		await finish()
 		return
 	if args.has("new"):
 		await start_clean()
@@ -78,7 +78,7 @@ func _ready() -> void:
 		await test_new_things()
 		await test_fort()
 		print("RESULT: %d checks, %d failures" % [checks, failures])
-		get_tree().quit(1 if failures > 0 else 0)
+		await finish()
 		return
 	var only := args.has("quick")
 	if not only:
@@ -122,6 +122,18 @@ func _ready() -> void:
 	if OS.get_cmdline_user_args().has("soak"):
 		await soak()
 	print("RESULT: %d checks, %d failures" % [checks, failures])
+	await finish()
+
+
+func finish() -> void:
+	get_tree().paused = false
+	Net.leave()
+	if is_instance_valid(m):
+		m.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	Sfx.stop_all()
+	await get_tree().create_timer(0.1).timeout
 	get_tree().quit(1 if failures > 0 else 0)
 
 
@@ -1507,7 +1519,7 @@ func test_version_19_1() -> void:
 	drag_host.add_child(drag)
 	var drag_list := VBoxContainer.new()
 	drag.add_child(drag_list)
-	var first_tile := Button.new()
+	var first_tile: Button
 	for i in 20:
 		var tile := Button.new()
 		tile.custom_minimum_size = Vector2(380, 80)
@@ -2448,6 +2460,7 @@ func test_version_11() -> void:
 	ok(not " ".join(words).contains("Epic"), "and does not say what it runs on")
 	ok(not Main.TOGETHER_TABS.has("Direct"), "there is no Direct tab")
 	# Leaving a game goes back to Play Together, and a failed join stays there.
+	m.show_together(0) # Exercise a local host from the local tab, even after checking Online.
 	ok(Net.host_game() == OK, "a game starts")
 	m.show_lobby()
 	await frames(2)

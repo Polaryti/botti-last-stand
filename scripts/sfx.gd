@@ -67,6 +67,19 @@ func apply_volumes() -> void:
 	_set_bus(SOUND_BUS, Game.sound_volume)
 
 
+## Stop playback before teardown, so audio-thread playback objects can release their streams.
+func stop_all() -> void:
+	_music_on = false
+	_rain_target = -60.0
+	for child in get_children():
+		if child is AudioStreamPlayer:
+			(child as AudioStreamPlayer).stop()
+
+
+func _exit_tree() -> void:
+	stop_all()
+
+
 func _set_bus(bus: String, linear: float) -> void:
 	var i := AudioServer.get_bus_index(bus)
 	AudioServer.set_bus_mute(i, linear <= 0.01)

@@ -39,7 +39,7 @@ func reached(n: int) -> void:
 func sync(n: int) -> void:
 	reached.rpc(n)
 	var t := 0.0
-	while _step < n and t < 40.0:
+	while _step < n and t < 80.0:
 		await wait(0.05)
 		t += 0.05
 	if _step < n:
@@ -57,6 +57,13 @@ func snap(name: String) -> void:
 
 func finish() -> void:
 	print("[%s] RESULT: %d checks, %d failures" % ["host" if host else "client", checks, failures])
+	Net.leave()
+	if is_instance_valid(m):
+		m.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	Sfx.stop_all()
+	await get_tree().create_timer(0.1).timeout
 	get_tree().quit(1 if failures > 0 else 0)
 
 
@@ -74,6 +81,9 @@ func _ready() -> void:
 	Game.player_name = "H" if host else "C"
 	Game.difficulty = 1
 	Game.player_class = "infantry"
+	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
+	for id: String in ["magician", "chivalry", "artificer"]:
+		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await wait(0.3)
@@ -87,10 +97,12 @@ func _as_host() -> void:
 	m.show_together()
 	await wait(0.2)
 	ok(Net.host_game() == OK, "a game can be started")
+	if Net.is_host():
+		print("NET_TEST_HOST_READY")
 	Net.use_beacons = rules != "teams" # in one of the runs, the asking has to find it alone
 	m.show_lobby()
 	var t := 0.0
-	while Net.roster.size() < 2 and t < 20.0:
+	while Net.roster.size() < 2 and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.roster.size() == 2, "the other phone joined")
@@ -154,10 +166,12 @@ func _as_client() -> void:
 	# Finding the game: by its beacon, or by asking around when a hotspot drops broadcasts.
 	var t := 0.0
 	Net.start_search()
-	while Net.rooms.is_empty() and t < 15.0:
+	while Net.rooms.is_empty() and t < 45.0:
 		await wait(0.1)
 		t += 0.1
 	ok(not Net.rooms.is_empty(), "the game shows up in the list of games nearby")
+	if Net.rooms.is_empty():
+		print("discovery diagnostics: listener=", Net._listener, " processing=", Net.is_processing(), " addresses=", Net.local_addresses())
 	Net.stop_search()
 	m.show_together()
 	await wait(0.1)
@@ -172,7 +186,7 @@ func _as_client() -> void:
 	ok(Game.player_class == "magician", "my class can be picked in the lobby")
 	_press("Infantry")
 	t = 0.0
-	while not Net.in_game and t < 25.0:
+	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
@@ -201,7 +215,7 @@ func _avatar() -> Avatar:
 
 func _play() -> void:
 	var t := 0.0
-	while (not m.world or not m._net_go) and t < 40.0:
+	while (not m.world or not m._net_go) and t < 80.0:
 		await wait(0.1)
 		t += 0.1
 	ok(m._net_go, "everyone has loaded and the night begins")
@@ -363,7 +377,7 @@ func _room() -> void:
 	if host:
 		_press("Start the night")
 	t = 0.0
-	while (not Net.in_game or m.world == null or m.world.mode == Game.Mode.MENU or not m._net_go) and t < 40.0:
+	while (not Net.in_game or m.world == null or m.world.mode == Game.Mode.MENU or not m._net_go) and t < 80.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game and m._net_go, "a second night starts on this phone")

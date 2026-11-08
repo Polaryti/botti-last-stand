@@ -44,6 +44,18 @@ func _ready() -> void:
 	_pos = get_v_scroll_bar().value
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or (what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree()):
+		# A touch release can be lost when a phone switches apps or a modal hides this list.
+		_held = false
+		_touch = -1
+		_dragging = false
+		_on_bar = false
+		_speed = 0.0
+		_wheel_to = -1.0
+		_samples.clear()
+
+
 func _longest() -> float:
 	var bar := get_v_scroll_bar()
 	return maxf(0.0, bar.max_value - bar.page)
