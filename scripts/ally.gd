@@ -457,6 +457,7 @@ func _equip_retinue() -> void:
 		var hand := MeshInstance3D.new()
 		var weapon := "torch" if side == "l" else "staff" if kind == "magician" else "musket" if kind == "gunner" else "sword"
 		hand.mesh = WeaponDefs.mesh(weapon)
+		hand.rotation = WeaponDefs.hand_rotation(weapon)
 		hand.scale = Vector3.ONE * 0.8 / _visual.scale.x
 		hand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		attachment.add_child(hand)

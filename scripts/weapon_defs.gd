@@ -90,7 +90,7 @@ static func pick_random() -> String:
 ## How a weapon sits in a character's hand. Poles and bows are drawn along their length, so they need
 ## a quarter turn to point where the character is looking.
 static func hand_rotation(id: String) -> Vector3:
-	if id in ["spear", "lance", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow"]:
+	if id in ["spear", "lance", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow", "musket"]:
 		return Vector3(HAND_TURN, 0.0, 0.0)
 	return Vector3.ZERO
 

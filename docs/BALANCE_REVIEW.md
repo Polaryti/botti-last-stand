@@ -1,5 +1,7 @@
 # Class and profession balance review
 
+Combat screening revision: [`6666615`](https://github.com/Polaryti/botti-last-stand/commit/6666615c8e3883f707e35df7fcf3f237253f9334). Later visual replication and weapon attachment fixes are covered by the network and render checks.
+
 This pass screened **all 11 classes and 33 professions**, including Commander, and tested both sides of every binary skill-tree choice: **4,224 level-10 builds**. The runtime probes use the real class definitions, ability application, attack intervals and damage modifiers.
 
 The survival sample contains **66 valid post-change nights**, two per profession, using seeds 731 and 1907. Twelve baseline nights cover Adept and Plague Doctor before the rework. Every accepted run produced a result with no engine errors. Raw outcomes are in [survival.csv](balance/survival.csv); stat ranges are in [loadouts.json](balance/loadouts.json).

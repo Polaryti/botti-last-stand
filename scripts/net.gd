@@ -2028,3 +2028,14 @@ func _apply_rally_player(p: Player, last: bool) -> void:
 		p._act({"do": "buff", "key": "command_ranged", "stat": "ranged_damage", "val": 0.2, "secs": duration}, {})
 		p._act({"do": "buff", "key": "command_spell", "stat": "spell_damage", "val": 0.2, "secs": duration}, {})
 	p.say("Last Command!" if last else "Forward!")
+
+
+func command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
+	if is_host():
+		_command_impact_visual.rpc(at, radius, storm)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
+	if world and is_instance_valid(world):
+		CommandField.visual_impact(world, at, radius, storm)

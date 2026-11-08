@@ -124,13 +124,9 @@ func _lightning() -> void:
 
 
 func _impact(at: Vector3, radius: float, damage: float) -> void:
-	if kind == "warlock":
-		world.flash_bolt(at)
-	else:
-		world.sfx_at("blast", at, -4.0)
-	world.fx_blast(at + Vector3.UP, radius, Color(0.75, 0.6, 1.0, 0.6) if kind == "warlock" else Color(1, 0.55, 0.2, 0.6))
+	visual_impact(world, at, radius, kind == "warlock")
 	if Net.active():
-		Net.blast_fx(at + Vector3.UP, radius, Color(0.8, 0.55, 0.3, 0.6))
+		Net.command_impact_visual(at, radius, kind == "warlock")
 	for z: Zombie in world.zombies_near(at, radius, 128):
 		z.next_hitter = peer
 		z.take_damage(damage, z.position - at, 2.0, z.centre())
@@ -159,3 +155,12 @@ func _tick_shells(delta: float) -> void:
 			_shells.remove_at(i)
 		else:
 			node.global_position = (shell["at"] as Vector3) + Vector3.UP * float(shell["left"]) * 90.0
+
+
+static func visual_impact(w: World, at: Vector3, radius: float, storm: bool) -> void:
+	if storm:
+		w.flash_bolt(at)
+		w.sfx_at("thunder", at, -8.0)
+	else:
+		w.sfx_at("blast", at, -4.0)
+	w.fx_blast(at + Vector3.UP, radius, Color(0.75, 0.6, 1.0, 0.6) if storm else Color(1, 0.55, 0.2, 0.6))

@@ -1109,3 +1109,10 @@ func _commander() -> void:
 	var fields := w.get_children().filter(func(n: Node) -> bool: return n is CommandField)
 	ok(fields.size() == 1 and w.director.banner == "The Commander has called in an artillery barrage", "client artillery is scheduled by the host and announced on both phones")
 	await sync(105)
+	var strike := pl.global_position + Vector3(3, 0, -2)
+	if host:
+		CommandField.visual_impact(w, strike, 3.5, true)
+		Net.command_impact_visual(strike, 3.5, true)
+	await wait(0.3)
+	await sync(106)
+	ok(absf(w._bolt.global_position.x - strike.x) < 0.1 and absf(w._bolt.global_position.z - strike.z) < 0.1, "Commander lightning and impact visuals reach both phones")
