@@ -112,7 +112,7 @@ With a free Apple ID the app stops opening after 7 days. Install it again to ren
 Pull requests and pushes to `main` and `dev` run `Validate game` without signing keys or Epic credentials.
 It imports resources, runs gameplay and regression checks, exercises paired LAN sessions, and
 captures weather and UI with the Compatibility renderer. Logs and images are attached to the run.
-Release workflows still run only on `main` or by manual dispatch.
+Production releases run on `main`; Android development prereleases run on `dev`.
 
 For strict checks on Linux, with separate temporary saves for each process:
 
@@ -127,12 +127,19 @@ they share the game's fixed LAN ports. These checks do not test Epic relays, pho
 Android signing or iOS device installation. Run gameplay and network suites sequentially on
 one machine because the gameplay suite also exercises hosting and discovery on the fixed ports.
 
-    godot --headless --path . res://tests/test_game.tscn              # everything, about 8 minutes
-    godot --headless --path . res://tests/test_game.tscn -- new       # the newest features and map checks
-    godot --headless --path . res://tests/test_game.tscn -- quick     # the later half of the checks, without the first play-through
-    godot --headless --path . res://tests/test_game.tscn -- soak      # a long night with everything going on
+    python3 tools/run_checks.py gameplay                           # full ordered suite
+    python3 tools/run_checks.py gameplay --group classes           # one isolated group
+    python3 tools/run_checks.py gameplay --case test_version_18     # one named scenario
+    python3 tools/run_checks.py rework                             # Commander, Adept and Epic score contracts
+    python3 -m unittest discover -s tests -p 'test_*.py'             # runner and packaging checks
+    godot --headless --path . res://tests/test_game.tscn -- soakonly # optional long soak
 
-Multiplayer has its own test, which runs two copies of the game talking to each other. Start the host and the client in two terminals. The third word can be `bots`, `botsffa`, `coop`, `ffa`, `teams`, `fort`, `ride`, `chariot` or `soak`:
+Gameplay uses fixed 1/60 game-second physics steps and uncapped headless rendering, with a stable
+seed per scenario. Groups are `core`, `recent`, `legacy`, `classes` and `world`. Each scenario prints
+its check count and elapsed time; add `verbose` to the direct Godot invocation for individual successes.
+The former overlapping `new`, `quick` and `v201` plans have been replaced by named groups/cases.
+
+Multiplayer has its own test, which runs two copies of the game talking to each other. Start the host and the client in two terminals. The third word can be `bots`, `botsffa`, `coop`, `ffa`, `teams`, `fort`, `ride`, `chariot`, `commander`, `room` or `soak`:
 
     godot --headless --path . res://tests/net_test.tscn -- host coop
     godot --headless --path . res://tests/net_test.tscn -- client coop
@@ -141,7 +148,15 @@ Multiplayer has its own test, which runs two copies of the game talking to each 
 
 `tests/sim.tscn` is a balance simulator. A bot with human limits plays whole nights at high speed and prints one line of results per night:
 
-    godot --headless --path . res://tests/sim.tscn -- class=ranger spec=2 nights=3 skill=good quality=2
+    godot --headless --path . --fixed-fps 240 res://tests/sim.tscn -- class=ranger spec=2 nights=2 seed=731 skill=good quality=0
+    godot --headless --path . --fixed-fps 240 res://tests/sim.tscn -- class=adept spec=0 seed=731 loadout=full quality=0
+    godot --headless --path . res://tests/balance_probe.tscn
+
+`loadout=full` starts with a level-10 left-choice build. Omit it to test normal progression.
+The exhaustive probe evaluates all 128 binary choice combinations per profession. These tools
+are balance diagnostics; headless timing is not phone GPU performance. See [the balance review](BALANCE_REVIEW.md).
+
+The leaderboard reuses Epic but needs [portal definitions and policy setup](EPIC_LEADERBOARD.md).
 
 Screenshots and performance need a display:
 

@@ -2,6 +2,20 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## Development — Commander and stance rework
+### New
+- Commander: First prize in VRAIN tournaments, unlocked by code. Only one per match, and never a bot. Choose Warlock, Gunner or Vanguard; Command becomes Last Command at level 10.
+- Warlocks wield a War Staff, firing magic on every fifth attack. Gunners wield a Musket with a melee bayonet. Vanguards carry a banner. Summons, storm lightning, warned artillery and rallying revives complete their command skills.
+- Choose a display name the next time you start. Names may repeat. The new Epic leaderboard tracks lifetime match points and your favourite class and profession, with offline rewards queued for sync.
+### Changed
+- Adept stances require commitment and a short visible transition. Three landed attacks build mastery; each stance has a persistent HUD card. Blade Dancer rewards prepared sweeps, Mirror Step gains a defensive counter window, and Void kill extensions have a limit.
+- Plague Doctor gains health, protection, movement, darts and stronger direct hits. Strong profession poison can no longer be overwritten by a weaker dart; bleeding and poison have independent damage timers.
+- Revenant spends less Mist on claws, refills more quickly and recovers more on kills. Inventor devices gain a modest damage increase.
+### Fixed
+- Maps of different sizes keep independent terrain dimensions, avoiding invalid height samples when changing maps.
+- Lingering traps and sentries safely handle an owner leaving. Exclusive weapons reject pickups by other classes.
+- Tests use deterministic seeds, isolated scenarios, named groups and strict process results. Skill-tree build coverage reuses the map and runs substantially faster.
+
 ## 0.20.2 (8 November 2026)
 - No changes to the game. This version is here to try the in-game update: on Android, the main menu offers it and Update installs it. It plays together with 0.20.1.
 

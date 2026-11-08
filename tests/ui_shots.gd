@@ -14,6 +14,7 @@ func wait(t: float) -> void:
 
 
 func _ready() -> void:
+	Game.confirm_name("Test Player")
 	out = OS.get_cmdline_user_args()[0]
 	Game.quality = 2
 	Game.apply_quality()

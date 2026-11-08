@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 24
+const PROTOCOL := 25
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -202,7 +202,7 @@ func set_bots(count: int) -> void:
 		if roster.has(id):
 			continue
 		mine.append(id)
-		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("hidden", false) or ClassDefs.ALL[c].has("earned"))
+		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("no_bots", false) and (not ClassDefs.ALL[c].get("hidden", false) or ClassDefs.ALL[c].has("earned")))
 		# Each bot something different, as long as there are enough to go round.
 		for other: int in mine:
 			if roster.has(other):
@@ -424,6 +424,7 @@ func leave(reason := "") -> void:
 	_stop_watching()
 	spectate_cam = null
 	_respawn_left = -1.0
+	_command_ready.clear()
 	_over = false
 	set_physics_process(false)
 	set_process(_listener != null)
@@ -504,6 +505,8 @@ func _hello(protocol: int, player_name: String, cls: String) -> void:
 	if in_game or roster.size() >= MAX_PLAYERS:
 		_refused.rpc_id(id, "That game has already started." if in_game else "That game is full.")
 		return
+	if not class_slot_available(cls, id):
+		cls = "infantry"
 	var team := _smaller_team()
 	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0, "lives": LIVES}
 	_share_lobby()
@@ -526,6 +529,8 @@ func _refused(reason: String) -> void:
 func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map: String) -> void:
 	night_map = new_map
 	roster = new_roster
+	if roster.has(my_id()):
+		Game.player_class = str(roster[my_id()]["class"])
 	rules = new_rules
 	difficulty = new_difficulty
 	lobby_changed.emit()
@@ -533,7 +538,7 @@ func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map
 
 ## Lobby choices: anyone can change their own class and team, only the host the rules.
 func set_my_class(cls: String) -> void:
-	if in_game or not ClassDefs.ALL.has(cls):
+	if in_game or not ClassDefs.ALL.has(cls) or not class_slot_available(cls, my_id()):
 		return
 	Game.player_class = cls
 	if is_host():
@@ -572,7 +577,7 @@ func _choice(cls: String, team: int) -> void:
 	var id := multiplayer.get_remote_sender_id()
 	if not is_host() or in_game or not roster.has(id):
 		return
-	if cls != "" and ClassDefs.ALL.has(cls):
+	if cls != "" and ClassDefs.ALL.has(cls) and class_slot_available(cls, id):
 		roster[id]["class"] = cls
 	if team == 0 or team == 1:
 		roster[id]["team"] = team
@@ -739,6 +744,8 @@ func start_match() -> void:
 func _begin(new_rules: int, quality: int, difficulty: int, new_roster: Dictionary, tonight: int, fog_at: Vector2) -> void:
 	rules = new_rules
 	roster = new_roster
+	if roster.has(my_id()):
+		Game.player_class = str(roster[my_id()]["class"])
 	weather = tonight
 	fog_centre = fog_at
 	last_winner = 0
@@ -754,6 +761,7 @@ func _begin(new_rules: int, quality: int, difficulty: int, new_roster: Dictionar
 
 
 func attach(w: World) -> void:
+	_command_ready.clear()
 	world = w
 	for peer: int in roster:
 		if peer != my_id():
@@ -1886,3 +1894,137 @@ func score_lines() -> String:
 
 func team_colour(team: int) -> Color:
 	return Color(0.95, 0.72, 0.2) if team == 0 else Color(0.35, 0.6, 1.0)
+
+
+## The host serializes reservations, including simultaneous join/choice requests.
+func class_slot_available(cls: String, peer: int) -> bool:
+	if not ClassDefs.ALL.has(cls):
+		return false
+	if is_bot(peer) and ClassDefs.ALL[cls].get("no_bots", false):
+		return false
+	if ClassDefs.ALL[cls].get("unique", false):
+		for other: int in roster:
+			if other != peer and roster[other]["class"] == cls:
+				return false
+	return true
+
+
+var _command_ready := {} # host-only cooldowns, in this world's clock
+
+
+func _commander_source(peer: int) -> Target:
+	if not world or not is_instance_valid(world) or not roster.has(peer) or roster[peer]["class"] != "commander" or is_bot(peer):
+		return null
+	for target: Target in world.players:
+		if world.peer_of(target) == peer and not target.dead:
+			return target
+	return null
+
+
+func command_field(kind: String, at: Vector3, local_world: World = null) -> void:
+	if not active():
+		if local_world:
+			var field := CommandField.new()
+			local_world.add_child(field)
+			field.setup(local_world, 1, kind, at)
+			if kind == "gunner":
+				local_world.director.show_banner("The Commander has called in an artillery barrage", 5.0)
+	elif is_host():
+		_accept_command_field(my_id(), kind, at)
+	else:
+		_request_command_field.rpc_id(1, kind, at)
+
+
+@rpc("any_peer", "reliable")
+func _request_command_field(kind: String, at: Vector3) -> void:
+	if is_host():
+		_accept_command_field(multiplayer.get_remote_sender_id(), kind, at)
+
+
+func _accept_command_field(peer: int, kind: String, at: Vector3) -> void:
+	var source := _commander_source(peer)
+	if source == null or not kind in ["warlock", "gunner"] or not at.is_finite():
+		return
+	if absf(at.x) > world.half_size or absf(at.z) > world.half_size or world.now < float(_command_ready.get(peer, -1.0)):
+		return
+	_command_ready[peer] = world.now + CommanderKit.LAST_CD
+	if kind == "warlock":
+		at = source.global_position
+	else:
+		at.y = world.ground_at(at)
+	_spawn_command_field.rpc(peer, kind, at)
+
+
+@rpc("authority", "call_local", "reliable")
+func _spawn_command_field(peer: int, kind: String, at: Vector3) -> void:
+	if world == null or not is_instance_valid(world):
+		return
+	var field := CommandField.new()
+	world.add_child(field)
+	field.setup(world, peer, kind, at)
+	if kind == "gunner":
+		world.director.show_banner("The Commander has called in an artillery barrage", 5.0)
+
+
+func command_rally(peer: int, radius: float, last: bool, local_world: World = null) -> void:
+	if not active():
+		if local_world:
+			_apply_rally_player(local_world.player, last)
+			local_world.fx_ring(local_world.player.global_position, radius, ClassDefs.color("commander"))
+	elif is_host():
+		_accept_rally(peer, radius, last)
+	else:
+		_request_rally.rpc_id(1, radius, last)
+
+
+@rpc("any_peer", "reliable")
+func _request_rally(radius: float, last: bool) -> void:
+	if is_host():
+		_accept_rally(multiplayer.get_remote_sender_id(), radius, last)
+
+
+func _accept_rally(peer: int, radius: float, last: bool) -> void:
+	var source := _commander_source(peer)
+	if source == null or not is_finite(radius) or world.now < float(_command_ready.get(peer, -1.0)):
+		return
+	radius = clampf(radius, 0.0, 16.0)
+	_command_ready[peer] = world.now + (CommanderKit.LAST_CD if last else CommanderKit.COMMAND_CD)
+	world.fx_ring(source.global_position, radius, ClassDefs.color("commander"))
+	blast_fx(source.global_position, radius, Color(0.85, 0.65, 0.25, 0.25))
+	for target: Target in world.players:
+		var other := world.peer_of(target)
+		if other <= 0 or bots_foes(peer, other) or target.global_position.distance_to(source.global_position) > radius:
+			continue
+		if target is Player:
+			_apply_rally_player(target, last)
+		else:
+			_receive_rally.rpc_id(other, last)
+
+
+@rpc("authority", "reliable")
+func _receive_rally(last: bool) -> void:
+	if world and is_instance_valid(world):
+		_apply_rally_player(world.player, last)
+
+
+func _apply_rally_player(p: Player, last: bool) -> void:
+	if p == null:
+		return
+	if last and p.dead:
+		if fog_rules() and lives_of(p.net_id()) <= 0:
+			return
+		p.respawn(p.global_position)
+		if p == world.player:
+			_respawn_left = -1.0
+			_stop_watching()
+	if p.dead:
+		return
+	var duration := 8.0 if last else 6.0
+	p._act({"do": "buff", "key": "command_speed", "stat": "speed", "val": 0.25, "secs": duration}, {})
+	if last:
+		p.heal(35.0)
+		p.guard_left = maxf(p.guard_left, 2.0)
+		p._act({"do": "buff", "key": "command_melee", "stat": "melee_damage", "val": 0.2, "secs": duration}, {})
+		p._act({"do": "buff", "key": "command_ranged", "stat": "ranged_damage", "val": 0.2, "secs": duration}, {})
+		p._act({"do": "buff", "key": "command_spell", "stat": "spell_damage", "val": 0.2, "secs": duration}, {})
+	p.say("Last Command!" if last else "Forward!")

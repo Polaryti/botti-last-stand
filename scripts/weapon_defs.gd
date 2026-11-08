@@ -40,16 +40,19 @@ const ALL := {
 		"knock": 3.5, "weight": 1.0, "pos": Vector3(0.22, -0.22, -0.1), "scale": 1.0},
 	"sling": {"power": 0.5, "free_ammo": true, "stagger": 0.35, "shot": "stone", "name": "Sling", "desc": "Stones are everywhere, so it never needs arrows. Weak, but it staggers what it hits.", "kind": Kind.RANGED, "rate": 0.55, "range": 24.0, "speed": 28.0, "gravity": 7.0,
 		"knock": 2.0, "weight": 1.2, "pos": Vector3(0.24, -0.14, -0.44), "scale": 1.5},
-	"blowgun": {"power": 0.25, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.8, "range": 22.0, "speed": 40.0, "gravity": 2.0,
+	"blowgun": {"power": 0.65, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.65, "range": 22.0, "speed": 40.0, "gravity": 2.0,
 		"knock": 0.0, "weight": 0.9, "pos": Vector3(0.14, -0.16, -0.25), "scale": 1.0},
 	"fists": {"only": "monk", "power": 0.7, "name": "", "desc": "", "kind": Kind.MELEE, "rate": 0.34, "range": 2.4, "cone": 100.0, "max_hits": 2,
 		"knock": 1.4, "swing": "punch", "hidden": true, "weight": 0.0, "pos": Vector3(0.34, -0.36, -0.68), "scale": 0.58},
 	"bo": {"power": 0.95, "name": "Bo Staff", "desc": "A Monk's long staff, which sweeps wide and keeps them away.", "hidden": true, "kind": Kind.MELEE, "rate": 0.48, "range": 3.2, "cone": 130.0, "max_hits": 3,
 		"knock": 2.8, "swing": "bo", "weight": 0.0, "only": "monk", "pos": Vector3(0.08, -0.3, -0.62), "scale": 0.8},
 	"claws": {"only": "revenant", "name": "Spectral Claws", "desc": "A Revenant's own hands, shrouded in mist. Each blow uses a little Mist.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.5, "cone": 100.0, "max_hits": 2,
-		"knock": 1.2, "swing": "claw", "cost": 6.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
+		"knock": 1.2, "swing": "claw", "cost": 5.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
 	"staff": {"only": "magician", "name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
 		"knock": 1.5, "weight": 0.0, "pos": Vector3(0.26, -0.38, -0.5), "scale": 0.6},
+	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.1, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
+	"musket": {"only": "commander", "hidden": true, "name": "Musket", "desc": "Fire shoots; Melee thrusts the bayonet. Powder replenishes while reloading.", "kind": Kind.RANGED, "rate": 1.5, "range": 55.0, "speed": 90.0, "gravity": 0.0, "power": 2.4, "free_ammo": true, "knock": 3.0, "weight": 0.0, "pos": Vector3(0.17, -0.22, -0.4), "scale": 0.8},
+
 }
 
 const STEEL := Color(0.62, 0.66, 0.72)
@@ -124,7 +127,8 @@ static func mesh(id: String) -> Mesh:
 		"bo": m = _bo()
 		"sling": m = _sling()
 		"blowgun": m = _blowgun()
-		"staff": m = _staff()
+		"staff", "war_staff": m = _staff()
+		"musket": m = _musket()
 		"claws": m = _claws()
 	_meshes[id] = m
 	return m
@@ -412,3 +416,27 @@ static func _bow(half: float, depth: float) -> Mesh:
 	l.prism(Vector3(0, 0, 0.1), Vector3(0, 0, -0.42), 0.007, 0.007, 4, WOOD)
 	l.prism(Vector3(0, 0, -0.42), Vector3(0, 0, -0.5), 0.018, 0.0, 4, STEEL)
 	return l.commit()
+
+
+static func _musket() -> Mesh:
+	var l := LowPoly.new()
+	l.box(Vector3(0, 0, 0.2), Vector3(0.11, 0.16, 0.7), WOOD)
+	l.prism(Vector3(0, 0.07, -0.05), Vector3(0, 0.07, -1.15), 0.045, 0.045, 6, DARK)
+	for z: float in [-0.2, -0.8]:
+		l.box(Vector3(0, 0.04, z), Vector3(0.13, 0.14, 0.06), BRASS)
+	l.prism(Vector3(0.07, 0.07, -0.95), Vector3(0.07, 0.07, -1.55), 0.035, 0.0, 4, STEEL)
+	return l.commit()
+
+
+static func banner_mesh() -> Mesh:
+	if _meshes.has("banner"):
+		return _meshes["banner"]
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.5, 0), Vector3(0, 1.5, 0), 0.025, 0.025, 5, WOOD)
+	l.prism(Vector3(0, 1.5, 0), Vector3(0, 1.75, 0), 0.08, 0.0, 4, BRASS)
+	l.box(Vector3(0.35, 1.05, 0), Vector3(0.7, 0.7, 0.025), Color(0.42, 0.13, 0.6))
+	for side: float in [-0.018, 0.018]:
+		l.box(Vector3(0.35, 1.05, side), Vector3(0.09, 0.5, 0.02), BRASS)
+		l.box(Vector3(0.35, 1.05, side), Vector3(0.4, 0.09, 0.02), BRASS)
+	_meshes["banner"] = l.commit()
+	return _meshes["banner"]

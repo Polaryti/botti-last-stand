@@ -17,6 +17,9 @@ const SKILLS := {
 var cls := "infantry"
 var spec := 0
 var nights := 1
+var simulation_seed := 731
+var _night_seed := 731
+var full_build := false
 var skill: Dictionary = SKILLS["good"]
 var skill_name := "good"
 var map_mode: int = Game.Mode.NIGHT
@@ -74,6 +77,8 @@ func _ready() -> void:
 			continue
 		match kv[0]:
 			"class": cls = kv[1]
+			"seed": simulation_seed = int(kv[1])
+			"loadout": full_build = kv[1] == "full"
 			"spec": spec = int(kv[1])
 			"nights": nights = int(kv[1])
 			"mode": map_mode = Game.Mode.FORT if kv[1] == "fort" else Game.Mode.NIGHT
@@ -91,13 +96,39 @@ func _ready() -> void:
 	Game.player_class = cls
 	Game.auto_jump = true
 	Game.set("vibration", false)
-	_rng.randomize()
 	for i in nights:
+		_night_seed = simulation_seed + i
+		seed(_night_seed)
+		_rng.seed = _night_seed
 		await _night()
+	Sfx.stop_all()
+	OS.delay_msec(120) # allow the audio mixing thread to release stopped playback
+	await get_tree().create_timer(0.1, true, false, true).timeout
 	get_tree().quit()
 
 
 func _night() -> void:
+	_heart_fell = false
+	_seen_for = 0.0
+	_aim_timer = 0.0
+	_aim_err = Vector2.ZERO
+	_near3 = 0
+	_near8 = 0
+	_closest = INF
+	_closest_dir = Vector3.ZERO
+	_dodge_dir = Vector3.ZERO
+	_sweep = 0.0
+	_points_wait = 0.0
+	_path_i = 0
+	_repath = 0.0
+	_stuck_time = 0.0
+	_unstick_left = 0.0
+	_last_hurt = -10.0
+	_think = 0.0
+	_dodge_left = 0.0
+	_away = Vector3.ZERO
+	_shots = 0
+	_trace_left = 0.0
 	_done = false
 	_won = false
 	_target = null
@@ -118,6 +149,12 @@ func _night() -> void:
 	add_child(w)
 	w.setup(map_mode)
 	pl = w.player
+	if full_build:
+		pl.grant_all_points()
+		while pl.points > 0:
+			var step := pl.next_step()
+			pl.choose_ability(step, spec if step == 3 else 0)
+		pl.hp = pl.max_hp()
 	w.player_died.connect(func() -> void: _done = true)
 	w.fort_lost.connect(func() -> void:
 		_heart_fell = true
@@ -133,7 +170,7 @@ func _night() -> void:
 		await get_tree().physics_frame
 		_tick(1.0 / 60.0)
 	var result := {
-		"class": cls, "spec": _spec_name(), "skill": skill_name, "won": _won, "time": snappedf(w.director.elapsed, 0.1),
+		"seed": _night_seed, "loadout": "full" if full_build else "progression", "class": cls, "spec": _spec_name(), "skill": skill_name, "won": _won, "time": snappedf(w.director.elapsed, 0.1),
 		"heart_fell": _heart_fell, "heart": snappedf(w.fort.heart_hp, 1.0) if w.fort else 0.0,
 		"kills": pl.kills, "level": pl.level, "hp": snappedf(pl.hp, 1.0), "damage": _rounded(_damage), "heal": int(_heals),
 		"levels": _levels, "weapons": pl.slots, "by": str(pl.get("hit_by")), "hunters_max": _hunters_max,
@@ -166,9 +203,12 @@ func _revenant_arts() -> void:
 		# Bombs, inventions and swaps: used as soon as anything is close enough to be worth it.
 		var wanted := 3 if pl.get("spec_id") == "guardian" else 1
 		if pl.has_art() and pl.art_cd_left <= 0.0 and _near8 >= wanted:
+			if cls == "commander" and pl.spec_id == "gunner" and pl.has_flag("last_command"):
+				if _target == null or not is_instance_valid(_target):
+					return
+				pl.set("command_target", _target.position)
+				pl.set("command_target_ready", true)
 			pl.use_art()
-		return
-	if not pl.call("has_burst"):
 		return
 	if _near8 >= 3 and pl.get("burst_cd_left") <= 0.0:
 		pl.call("use_burst")
@@ -398,6 +438,12 @@ func _fight(dt: float) -> void:
 	var eye := pl.eye_position()
 	var point := _target.centre()
 	var melee: bool = d["kind"] == WeaponDefs.Kind.MELEE
+	if pl.weapon_id() == "war_staff" and int(pl.get("_war_attacks")) % 5 == 4:
+		melee = false
+		d = {"range": 34.0, "speed": 34.0, "gravity": 0.0}
+	if pl.weapon_id() == "musket" and point.distance_to(eye) < 3.5:
+		pl.call("use_bayonet")
+		return
 	if not melee:
 		var flight := eye.distance_to(point) / maxf(float(d["speed"]), 1.0)
 		point += _target.velocity * flight

@@ -68,6 +68,7 @@ func finish() -> void:
 
 
 func _ready() -> void:
+	Game.confirm_name("Test Player")
 	name = "NetTest"
 	Game.force_weather = Weather.Kind.CLEAR
 	var args := OS.get_cmdline_user_args()
@@ -82,7 +83,7 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander"]:
 		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
@@ -109,7 +110,7 @@ func _as_host() -> void:
 	if rules == "mists":
 		Net.set_night_map("mists")
 		ok(true, "the host picks the Mists")
-	Net.set_rules({"mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -185,12 +186,14 @@ func _as_client() -> void:
 	await wait(0.4)
 	ok(Game.player_class == "magician", "my class can be picked in the lobby")
 	_press("Infantry")
+	if rules == "commander":
+		Net.set_my_class("commander")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == "infantry", "with the class I picked")
+	ok(Game.player_class == ("commander" if rules == "commander" else "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -239,6 +242,8 @@ func _play() -> void:
 		await _chariot()
 	elif rules == "mists":
 		await _mists()
+	elif rules == "commander":
+		await _commander()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -1056,3 +1061,51 @@ func _fight() -> void:
 	await sync(8)
 	ok(m._run_over, "dawn ends the game on this phone")
 	await snap("over")
+
+
+## A remote Commander asks the host to revive and buff allies, then place artillery.
+func _commander() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	pl.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)) + 0.05, 36)
+	pl.input_move = Vector2.ZERO
+	pl.input_fire = false
+	pl.guard_left = 0.0
+	await wait(0.5)
+	await sync(100)
+	if not host:
+		pl.grant_all_points()
+		for step in 9:
+			pl.choose_ability(step, 2 if step == 3 else 0)
+		ok(pl.spec_id == "vanguard" and pl.has_flag("last_command"), "client Commander unlocks Last Command at level ten")
+	else:
+		pl._kill()
+	await wait(0.6)
+	await sync(101)
+	if not host:
+		pl.use_art()
+	await wait(1.0)
+	await sync(102)
+	ok(not pl.dead and pl._buffs.has("command_speed"), "host-authorized Last Command revives and buffs nearby players")
+	if host:
+		ok(Net.respawn_seconds() < 0.0, "Commander revival cancels the old respawn timer")
+	else:
+		ok(w.count_allies("infantry") == 2, "Commander summons two Infantry")
+	# The host rejects a second Last Command within the cooldown, regardless of client state.
+	if not host:
+		Net.command_field("gunner", pl.global_position)
+	await wait(0.4)
+	ok(w.get_children().filter(func(n: Node) -> bool: return n is CommandField).is_empty(), "host rejects Commander cooldown bypass")
+	await sync(103)
+	if host:
+		Net._command_ready.clear() # advance only the test's authority clock for the next scenario
+	await sync(104)
+	if not host:
+		Net.command_field("gunner", pl.global_position + Vector3(0, 0, -8))
+	await wait(0.6)
+	var fields := w.get_children().filter(func(n: Node) -> bool: return n is CommandField)
+	ok(fields.size() == 1 and w.director.banner == "The Commander has called in an artillery barrage", "client artillery is scheduled by the host and announced on both phones")
+	await sync(105)

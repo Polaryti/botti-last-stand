@@ -346,10 +346,13 @@ def crest_plague_doctor():
 def crest_adept():
     t = '<path d="M50 3 L95 80 Q97 94 84 96 L16 96 Q3 94 5 80Z" fill="%s" stroke="%s" stroke-width="4" stroke-linejoin="round"/>' % (grad("#5d6680", "#1e2230"), INK)
     return t + at(50, 36, 0.3, wind()) + at(31, 72, 0.3, mountain()) + at(69, 72, 0.3, flame())
-CRESTS = [crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
+def crest_commander():
+    return lozenge("commander", at(50, 55, 0.68, banner()) + at(50, 23, 0.35, crown()))
+
+CRESTS = [crest_commander, crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
 
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
-COL = {"infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
+COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
     "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368")}
 
@@ -360,6 +363,9 @@ def x2(g, s=0.72):
     return at(50, 50, s, turn(45, g()) + turn(-45, g()))
 
 SPECS = {
+    "warlock": ("commander", lambda: at(50, 50, 0.7, staff()) + at(72, 24, 0.28, bolt())),
+    "gunner": ("commander", lambda: at(50, 50, 0.72, crossbow())),
+    "vanguard": ("commander", lambda: at(50, 50, 0.76, banner())),
     "duelist": ("infantry", lambda: x2(sword)),
     "berserker": ("infantry", lambda: at(42, 50, 0.72, axe()) + at(76, 28, 0.3, drop()) + at(78, 64, 0.22, drop())),
     "shadow": ("infantry", lambda: at(50, 44, 0.62, moon()) + at(56, 58, 0.62, turn(25, dagger()))),
@@ -411,4 +417,5 @@ def main():
         _defs.clear(); render("spec_" + name, lozenge(cls, g()), out, 200); made.append("spec_" + name)
     print(len(made), "icons")
 
-main()
+if __name__ == "__main__":
+    main()

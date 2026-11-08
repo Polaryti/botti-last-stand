@@ -163,14 +163,14 @@ func ground() -> void:
 	mat.shader = load("res://assets/shaders/ground.gdshader")
 	mat.set_shader_parameter("tile", load("res://assets/sprites/ground_tile.png"))
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
-	mat.set_shader_parameter("map_half", float(Terrain.HALF))
+	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
 	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() else 0.0)
 	_ground_material = mat
 	var j := 0
-	while j < Terrain.SIZE - 1:
+	while j < terrain.vertices_per_side - 1:
 		var i := 0
-		while i < Terrain.SIZE - 1:
+		while i < terrain.vertices_per_side - 1:
 			_ground_mesh(terrain.patch_mesh(i, j, CELLS), mat)
 			i += CELLS
 		j += CELLS
@@ -195,7 +195,7 @@ func boundary(h: float) -> void:
 	w.add_collider(Vector3(h + t * 0.5, 15, 0), Vector3(t, 70, h * 2 + 4))
 	# Cliffs and deep water.
 	for r in terrain.blocked_rects():
-		var c := Vector2(r.position) + Vector2(r.size) * 0.5 - Vector2.ONE * Terrain.HALF
+		var c := Vector2(r.position) + Vector2(r.size) * 0.5 - Vector2.ONE * terrain.half_extent
 		var y := terrain.height(c.x, c.y)
 		if terrain.has_islands():
 			# You can walk off the edge. Mobs know better.
@@ -203,8 +203,8 @@ func boundary(h: float) -> void:
 		else:
 			w.add_barrier(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
 	# Everything outside a smaller map is closed to pathing too.
-	if h < Terrain.HALF - 0.5:
-		var far := float(Terrain.HALF)
+	if h < terrain.half_extent - 0.5:
+		var far := float(terrain.half_extent)
 		var band := far - h
 		for box: Array in [[Vector3(0, 0, -(h + band * 0.5)), Vector3(far * 2, 4, band)], [Vector3(0, 0, h + band * 0.5), Vector3(far * 2, 4, band)],
 				[Vector3(-(h + band * 0.5), 0, 0), Vector3(band, 4, far * 2)], [Vector3(h + band * 0.5, 0, 0), Vector3(band, 4, far * 2)]]:
@@ -224,7 +224,7 @@ func road(points: Array[Vector2], width: float) -> void:
 func _paint_roads() -> void:
 	if _road_lines.is_empty() and _dirt_patches.is_empty():
 		return
-	var side := Terrain.HALF * ROAD_PIXELS_PER_METRE * 2
+	var side := terrain.half_extent * ROAD_PIXELS_PER_METRE * 2
 	var far := 255
 	var mask := PackedByteArray()
 	mask.resize(side * side)
@@ -238,14 +238,14 @@ func _paint_roads() -> void:
 			var b: Vector2 = points[i + 1]
 			var ab := b - a
 			var ab_len2 := maxf(ab.length_squared(), 0.001)
-			var x0 := clampi(int((minf(a.x, b.x) - reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
-			var x1 := clampi(int((maxf(a.x, b.x) + reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
-			var z0 := clampi(int((minf(a.y, b.y) - reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
-			var z1 := clampi(int((maxf(a.y, b.y) + reach + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+			var x0 := clampi(int((minf(a.x, b.x) - reach + terrain.half_extent) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+			var x1 := clampi(int((maxf(a.x, b.x) + reach + terrain.half_extent) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+			var z0 := clampi(int((minf(a.y, b.y) - reach + terrain.half_extent) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+			var z1 := clampi(int((maxf(a.y, b.y) + reach + terrain.half_extent) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
 			for z in range(z0, z1 + 1):
-				var wz := (z + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+				var wz := (z + 0.5) / ROAD_PIXELS_PER_METRE - terrain.half_extent
 				for x in range(x0, x1 + 1):
-					var wx := (x + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+					var wx := (x + 0.5) / ROAD_PIXELS_PER_METRE - terrain.half_extent
 					var t := clampf(((wx - a.x) * ab.x + (wz - a.y) * ab.y) / ab_len2, 0.0, 1.0)
 					var edge := Vector2(wx - a.x - ab.x * t, wz - a.y - ab.y * t).length() - half
 					if edge >= ROAD_REACH:
@@ -261,14 +261,14 @@ func _paint_roads() -> void:
 		var round_off := minf(3.0, minf(half_size.x, half_size.y))
 		var far_corner := half_size.length() + ROAD_REACH
 		var mid := Vector2(at.origin.x, at.origin.z)
-		var x0 := clampi(int((mid.x - far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
-		var x1 := clampi(int((mid.x + far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
-		var z0 := clampi(int((mid.y - far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE), 1, side - 2)
-		var z1 := clampi(int((mid.y + far_corner + Terrain.HALF) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+		var x0 := clampi(int((mid.x - far_corner + terrain.half_extent) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+		var x1 := clampi(int((mid.x + far_corner + terrain.half_extent) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
+		var z0 := clampi(int((mid.y - far_corner + terrain.half_extent) * ROAD_PIXELS_PER_METRE), 1, side - 2)
+		var z1 := clampi(int((mid.y + far_corner + terrain.half_extent) * ROAD_PIXELS_PER_METRE) + 1, 1, side - 2)
 		for z in range(z0, z1 + 1):
-			var wz := (z + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+			var wz := (z + 0.5) / ROAD_PIXELS_PER_METRE - terrain.half_extent
 			for x in range(x0, x1 + 1):
-				var wx := (x + 0.5) / ROAD_PIXELS_PER_METRE - Terrain.HALF
+				var wx := (x + 0.5) / ROAD_PIXELS_PER_METRE - terrain.half_extent
 				var local := inverse * Vector3(wx, at.origin.y, wz)
 				var q := Vector2(absf(local.x), absf(local.z)) - half_size + Vector2.ONE * round_off
 				var edge := Vector2(maxf(q.x, 0.0), maxf(q.y, 0.0)).length() + minf(maxf(q.x, q.y), 0.0) - round_off
@@ -449,7 +449,7 @@ func _reeds() -> void:
 		var p := line[seg].lerp(line[seg + 1], rng.randf())
 		var off := Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)).normalized() * rng.randf_range(t.river_width + 0.2, t.river_width + 1.8)
 		p += off
-		if absf(p.x) > Terrain.HALF or absf(p.y) > Terrain.HALF or t.on_deck(p.x, p.y):
+		if absf(p.x) > terrain.half_extent or absf(p.y) > terrain.half_extent or t.on_deck(p.x, p.y):
 			continue
 		var y := t.ground_height(p.x, p.y)
 		if y < Terrain.WATER_Y - 0.3 or y > 0.5:
@@ -1460,7 +1460,7 @@ func grass(h: float) -> void:
 	var patches := {}
 	var tuft := _grass_tuft()
 	# The same thickness of grass on any size of map.
-	var area := pow(h / Terrain.HALF, 2.0)
+	var area := pow(h / terrain.half_extent, 2.0)
 	for i in int(grass_tufts * 3 * area):
 		var p := Vector3(rng.randf_range(-h, h), 0, rng.randf_range(-h, h))
 		if not w.grid.is_free(w.grid.to_cell(p)) or _is_indoors(p):

@@ -12,11 +12,12 @@ static func tex(path: String) -> Texture2D:
 
 
 static func glyph(name: String) -> Texture2D:
-	return tex("res://assets/icons/%s.png" % name)
+	var vector := "res://assets/icons/%s.svg" % name
+	return tex(vector if ResourceLoader.exists(vector) else "res://assets/icons/%s.png" % name)
 
 
 static func exists(name: String) -> bool:
-	return ResourceLoader.exists("res://assets/icons/%s.png" % name)
+	return ResourceLoader.exists("res://assets/icons/%s.png" % name) or ResourceLoader.exists("res://assets/icons/%s.svg" % name)
 
 
 ## Crests and specialization emblems have their own outline. Everything else sits on a dark disc,
@@ -49,7 +50,7 @@ static func weapon(id: String) -> String:
 	return {"dagger": "dagger", "sword": "sword", "spear": "spear", "mace": "mace", "lance": "lance", "scythe": "scythe",
 		"flail": "flail", "bell_hammer": "bell_hammer", "pitchfork": "pitchfork", "torch": "torch", "bow": "bow",
 		"crossbow": "crossbow", "longbow": "longbow", "axes": "axe", "javelins": "javelins", "fists": "hand", "bo": "bo",
-		"sling": "sling", "blowgun": "blowgun", "staff": "staff", "claws": "claw"}.get(id, "sword")
+		"sling": "sling", "blowgun": "blowgun", "war_staff": "staff", "musket": "crossbow", "staff": "staff", "claws": "claw"}.get(id, "sword")
 
 
 static func power(id: String) -> String:

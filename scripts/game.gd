@@ -7,7 +7,8 @@ const MIST_HARRIERS := 3
 const SAVE_PATH := "user://settings.cfg"
 const NIGHT_LENGTH := 600.0
 ## Codes are kept as hashes, so they cannot simply be read out of the game files or the repository.
-const CODES := {"7d81dd39a273704c54618b070924a179bb3f9bd7b7b0854aead3dfaaa0f3f385": "monk",
+const CODES := {"c734137a1f7468ebdb5cf20deae67c89b15dc5de26ff06b497548a4a62a33706": "commander",
+	"7d81dd39a273704c54618b070924a179bb3f9bd7b7b0854aead3dfaaa0f3f385": "monk",
 	"87d952a34c98ffc8a98c3f809286c052d94848c42ee7c09828ffd205c468c90a": "plague_doctor",
 	"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b36": "revenant",
 	"28e314800565692691a7af4606286f26fc0f53b2201fe1fb4c8feaa018e3a6ad": "artificer",
@@ -17,6 +18,15 @@ var mode: int = Mode.MENU
 var test_map := "" # a map scene to play instead of the usual one: see MapRoot
 var force_weather := -1 # a test can ask for a certain weather
 var player_class := "infantry"
+const NAME_SCHEMA := 1
+var name_schema := 0
+var pending_points := 0
+var pending_plays := {}
+var sync_snapshot := {}
+var total_points := 0
+var class_plays := {}
+var run_profession := ""
+var _run_awarded := false
 var player_name := ""
 var unlocked := {} # classes bought, or opened with a code
 var redeemed := {} # the hashes of codes already used on this phone
@@ -57,8 +67,7 @@ func _ready() -> void:
 	apply_quality()
 	PhoneScreen.apply_orientation()
 	PhoneScreen.apply_brightness()
-	if player_name == "":
-		player_name = ["Aldric", "Bertrand", "Cedric", "Edith", "Godfrey", "Isolde", "Matilda", "Roland", "Rowena", "Wilfred"][randi() % 10]
+
 
 
 ## Each code works once on a phone. Returns {"result": "opened", "class": id}, or "used", or "bad".
@@ -204,7 +213,15 @@ func match_doubloons(seconds: float, kills: int, reached_dawn: bool, coop: bool)
 
 
 func award_doubloons(seconds: float, kills: int, reached_dawn: bool, coop: bool) -> int:
+	if mode == Mode.SANDBOX or _run_awarded:
+		return 0
+	_run_awarded = true
 	var earned := match_doubloons(seconds, kills, reached_dawn, coop)
+	total_points += earned
+	pending_points += earned
+	var pair := player_class + "|" + run_profession
+	class_plays[pair] = int(class_plays.get(pair, 0)) + 1
+	pending_plays[pair] = int(pending_plays.get(pair, 0)) + 1
 	doubloons += earned
 	save_settings()
 	return earned
@@ -284,7 +301,19 @@ func load_settings() -> void:
 	sound_volume = clampf(_saved(c, "audio", "sound", 1.0), 0.0, 1.0)
 	quality = clampi(_saved(c, "video", "quality", 1), 0, 2)
 	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
-	player_name = str(_saved(c, "progress", "player_name", ""))
+	player_name = clean_name(str(_saved(c, "progress", "player_name", "")))
+	name_schema = maxi(0, _saved(c, "progress", "name_schema", 0))
+	total_points = maxi(0, _saved(c, "progress", "total_points", 0))
+	pending_points = clampi(_saved(c, "progress", "pending_points", 0), 0, total_points)
+	pending_plays = _saved(c, "progress", "pending_plays", {})
+	sync_snapshot = _saved(c, "progress", "sync_snapshot", {})
+	class_plays = _saved(c, "progress", "class_plays", {})
+	for counters: Dictionary in [class_plays, pending_plays]:
+		for pair: Variant in counters.keys():
+			if not pair is String or not counters[pair] is int or int(counters[pair]) < 0:
+				counters.erase(pair)
+	if not valid_sync_snapshot(sync_snapshot):
+		sync_snapshot.clear()
 	unlocked = _saved(c, "progress", "unlocked", {})
 	redeemed = _saved(c, "progress", "redeemed", {})
 	doubloons = maxi(0, _saved(c, "progress", "doubloons", 0))
@@ -319,6 +348,12 @@ func save_settings() -> void:
 	c.set_value("video", "quality", quality)
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
+	c.set_value("progress", "name_schema", name_schema)
+	c.set_value("progress", "total_points", total_points)
+	c.set_value("progress", "pending_points", pending_points)
+	c.set_value("progress", "pending_plays", pending_plays)
+	c.set_value("progress", "sync_snapshot", sync_snapshot)
+	c.set_value("progress", "class_plays", class_plays)
 	c.set_value("progress", "unlocked", unlocked)
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
@@ -355,3 +390,46 @@ func record_run(seconds: float, kills: int, won: bool) -> bool:
 static func clock(seconds: float) -> String:
 	var s := int(ceil(seconds))
 	return "%02d:%02d" % [s / 60, s % 60]
+
+
+static func clean_name(value: String) -> String:
+	var clean := ""
+	for character: String in value:
+		var point := character.unicode_at(0)
+		if point >= 32 and not (point >= 127 and point <= 159) and point not in [0x2028, 0x2029]:
+			clean += character
+	return clean.strip_edges().substr(0, 16)
+
+
+func needs_name() -> bool:
+	return name_schema < NAME_SCHEMA or clean_name(player_name) == ""
+
+
+func confirm_name(value: String) -> bool:
+	var clean := clean_name(value)
+	if clean == "":
+		return false
+	player_name = clean
+	name_schema = NAME_SCHEMA
+	save_settings()
+	return true
+
+
+func begin_run() -> void:
+	_run_awarded = false
+	run_profession = ""
+
+
+static func valid_sync_snapshot(value: Dictionary) -> bool:
+	if value.is_empty():
+		return true
+	for key: String in ["points", "covered_points"]:
+		if not value.get(key) is int or int(value[key]) < 0:
+			return false
+	for key: String in ["plays", "covered_plays"]:
+		if not value.get(key) is Dictionary:
+			return false
+		for pair: Variant in value[key]:
+			if not pair is String or not value[key][pair] is int or int(value[key][pair]) < 0:
+				return false
+	return true

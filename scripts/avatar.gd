@@ -4,7 +4,7 @@ extends Target
 ## body that zombies can hunt and that shots can hit, and anything that hurts them is sent over.
 
 const LAYER_AVATAR := 64
-const MODELS := {"monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
+const MODELS := {"commander": "clever", "monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
 
 var world: World
 var peer := 0
@@ -46,6 +46,7 @@ var _flames: CPUParticles3D
 var _debuff_fx: CPUParticles3D
 var _stun_fx: CPUParticles3D
 var _statuses := 0
+var _banner: MeshInstance3D
 static var _ice_material: StandardMaterial3D
 static var _flash_material: StandardMaterial3D
 
@@ -251,6 +252,7 @@ func show_statuses(bits: int) -> void:
 	if bits == _statuses:
 		return
 	_statuses = bits
+	_show_banner(bits & 128 != 0)
 	if dead:
 		bits = 0
 	var burning := bits & 1 != 0
@@ -391,3 +393,17 @@ func hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 func ignite(seconds: float) -> void:
 	if not dead:
 		Net.ignite_peer(peer, seconds)
+
+
+func _show_banner(on: bool) -> void:
+	if on and _banner == null:
+		var attach := BoneAttachment3D.new()
+		attach.bone_name = "handslot.l"
+		_skeleton.add_child(attach)
+		_banner = MeshInstance3D.new()
+		_banner.mesh = WeaponDefs.banner_mesh()
+		_banner.scale = Vector3.ONE / _fit
+		_banner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		attach.add_child(_banner)
+	if _banner:
+		_banner.visible = on and not dead

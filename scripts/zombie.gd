@@ -110,15 +110,16 @@ var _slow := 0.0
 var _flank := Vector3.ZERO
 var _predicted := false
 var _custom := false
-var _dot_time := 0.0
-var _dot_dps := 0.0
+var _dot_pending := 0.0
+var _dot_wait := 0.25
+var _poison_dps := 0.0
+var _bleed_dps := 0.0
 var poison_left := 0.0
 var bleed_left := 0.0
 var _debuff_fx: CPUParticles3D
 var _gate_wait := 0.0
 var _stun_fx: CPUParticles3D
 var shown_debuffs := 0 # on another phone: which of them the host last told us about
-var _dot_tick := 0.0
 var _mark_time := 0.0
 var _mark_mult := 1.0
 var _airborne := false
@@ -410,7 +411,10 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_direct = false
 	_tick_every = 1
 	_tick_time = 0.0
-	_dot_time = 0.0
+	_dot_pending = 0.0
+	_dot_wait = 0.25
+	_poison_dps = 0.0
+	_bleed_dps = 0.0
 	poison_left = 0.0
 	bleed_left = 0.0
 	show_debuffs(false, false)
@@ -711,11 +715,13 @@ func add_dot(dps: float, seconds: float, bleeding := false) -> void:
 	if puppet:
 		Net.effect_zombie(self, Effect.BLEED if bleeding else Effect.DOT, dps, seconds)
 		return
-	_dot_dps = dps
-	_dot_time = maxf(_dot_time, seconds)
+	if not is_finite(dps) or not is_finite(seconds) or dps < 0.0 or seconds <= 0.0:
+		return
 	if bleeding:
+		_bleed_dps = maxf(_bleed_dps if bleed_left > 0.0 else 0.0, dps)
 		bleed_left = maxf(bleed_left, seconds)
 	else:
+		_poison_dps = maxf(_poison_dps if poison_left > 0.0 else 0.0, dps)
 		poison_left = maxf(poison_left, seconds)
 	show_debuffs(poison_left > 0.0, bleed_left > 0.0)
 
@@ -1164,7 +1170,7 @@ func _arrived() -> bool:
 func _random_spot(radius: float) -> Vector3:
 	for i in 6:
 		var p := position + Vector3(randf_range(-radius, radius), 0, randf_range(-radius, radius))
-		if absf(p.x) < World.HALF_SIZE - 1.0 and absf(p.z) < World.HALF_SIZE - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
+		if absf(p.x) < world.half_size - 1.0 and absf(p.z) < world.half_size - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
 			return p
 	return position
 
@@ -1538,19 +1544,23 @@ func _idle_sound() -> String:
 
 
 func _tick_dot(delta: float) -> void:
-	if poison_left > 0.0 or bleed_left > 0.0:
-		poison_left -= delta
-		bleed_left -= delta
-		if poison_left <= 0.0 or bleed_left <= 0.0:
-			show_debuffs(poison_left > 0.0, bleed_left > 0.0)
-	if _dot_time <= 0.0:
+	var had_poison := poison_left > 0.0
+	var had_bleed := bleed_left > 0.0
+	if not had_poison and not had_bleed:
 		return
-	_dot_time -= delta
-	_dot_tick -= delta
-	if _dot_tick <= 0.0:
-		_dot_tick = 0.5
+	# Integrate each channel over its remaining life; no extra half-second tick at expiry.
+	var amount := _poison_dps * minf(delta, maxf(poison_left, 0.0)) + _bleed_dps * minf(delta, maxf(bleed_left, 0.0))
+	_dot_pending += amount
+	_dot_wait -= delta
+	if _dot_pending > 0.0 and (_dot_wait <= 0.0 or maxf(poison_left, bleed_left) <= delta):
 		next_hitter = last_hitter
-		take_damage(_dot_dps * 0.5, Vector3.ZERO, 0.0, centre())
+		take_damage(_dot_pending, Vector3.ZERO, 0.0, centre())
+		_dot_pending = 0.0
+		_dot_wait = 0.25
+	poison_left = maxf(0.0, poison_left - delta)
+	bleed_left = maxf(0.0, bleed_left - delta)
+	if had_poison != (poison_left > 0.0) or had_bleed != (bleed_left > 0.0):
+		show_debuffs(poison_left > 0.0, bleed_left > 0.0)
 
 
 ## A scarecrow only moves while you are not looking at it.
@@ -1907,8 +1917,8 @@ func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 	position += (velocity + _knock) * delta
 	_knock = _knock.lerp(Vector3.ZERO, min(1.0, delta * 6.0))
 	position.y = maxf(position.y, world.ground_at(position) + 0.6)
-	position.x = clampf(position.x, -World.HALF_SIZE + 1.0, World.HALF_SIZE - 1.0)
-	position.z = clampf(position.z, -World.HALF_SIZE + 1.0, World.HALF_SIZE - 1.0)
+	position.x = clampf(position.x, -world.half_size + 1.0, world.half_size - 1.0)
+	position.z = clampf(position.z, -world.half_size + 1.0, world.half_size - 1.0)
 	var flat := Vector3(velocity.x, 0, velocity.z)
 	if flat.length_squared() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(flat.x, flat.z), min(1.0, delta * 6.0))

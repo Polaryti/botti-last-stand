@@ -7,7 +7,8 @@ signal player_died
 signal dawn_reached
 signal fort_lost
 
-static var HALF_SIZE := 110.0
+static var HALF_SIZE := 110.0 # default for legacy callers; each world keeps its own extent
+var half_size := 110.0
 const PATHS_PER_FRAME := 1
 const SKY_EVERY := 0.15
 const BELL_GAP := 0.5
@@ -211,8 +212,9 @@ func setup(game_mode: int) -> void:
 	var file := _map_file()
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	Terrain.use_half(map.land_half)
-	HALF_SIZE = float(map.land_half)
-	grid = PathGrid.new(int(HALF_SIZE * 2.0))
+	half_size = float(map.land_half)
+	HALF_SIZE = half_size
+	grid = PathGrid.new(int(half_size * 2.0))
 	if not _lands.has(file):
 		var t := Terrain.new()
 		map.plan_land(t)
@@ -1421,9 +1423,9 @@ func _tick_sentries(delta: float) -> void:
 			node.queue_free()
 			_sentries.remove_at(i)
 			continue
-		var owner_player: Player = s["owner"]
-		if owner_player == null or not is_instance_valid(owner_player):
+		if not is_instance_valid(s["owner"]):
 			continue
+		var owner_player: Player = s["owner"]
 		s["timer"] = float(s["timer"]) - delta
 		if float(s["timer"]) > 0.0:
 			continue
@@ -1722,13 +1724,13 @@ func _pick_spawn_point() -> Vector3:
 	for i in 16:
 		var p: Vector3
 		if players.is_empty():
-			p = Vector3(randf_range(-HALF_SIZE + 2, HALF_SIZE - 2), 0, randf_range(-HALF_SIZE + 2, HALF_SIZE - 2))
+			p = Vector3(randf_range(-half_size + 2, half_size - 2), 0, randf_range(-half_size + 2, half_size - 2))
 		else:
 			var a := randf() * TAU
 			p = random_player_position() + Vector3(cos(a), 0, sin(a)) * randf_range(28.0, 62.0)
 			if fort:
 				p = Vector3(cos(a), 0, sin(a)) * randf_range(44.0, 72.0)
-			if absf(p.x) > HALF_SIZE - 2.0 or absf(p.z) > HALF_SIZE - 2.0:
+			if absf(p.x) > half_size - 2.0 or absf(p.z) > half_size - 2.0:
 				continue
 		p.y = 0.0
 		if fog and not fog.contains(p, -4.0):
@@ -1810,7 +1812,7 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < HALF_SIZE - 2.0 and absf(at.z) < HALF_SIZE - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z):
+		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z):
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -1877,10 +1879,10 @@ func _loot_near_players() -> Vector3:
 
 func _open_ground_near_players() -> Vector3:
 	if players.is_empty():
-		return Vector3(randf_range(-HALF_SIZE + 3, HALF_SIZE - 3), 0, randf_range(-HALF_SIZE + 3, HALF_SIZE - 3))
+		return Vector3(randf_range(-half_size + 3, half_size - 3), 0, randf_range(-half_size + 3, half_size - 3))
 	var a := randf() * TAU
 	var at := players[randi() % players.size()].global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 55.0)
-	return Vector3(clampf(at.x, -HALF_SIZE + 3, HALF_SIZE - 3), 0, clampf(at.z, -HALF_SIZE + 3, HALF_SIZE - 3))
+	return Vector3(clampf(at.x, -half_size + 3, half_size - 3), 0, clampf(at.z, -half_size + 3, half_size - 3))
 
 
 func drop_weapon(at: Vector3, id: String) -> void:
@@ -1913,6 +1915,8 @@ func count_pickups(kind: int) -> int:
 
 
 func collect_weapon(who: Player, p: Pickup) -> void:
+	if not who.can_use(p.weapon_id):
+		return
 	who.give_weapon(p.weapon_id)
 	who.add_arrows(p.bonus_arrows)
 	who.sfx("weapon_change")
@@ -2294,11 +2298,11 @@ func _tick_traps(_delta: float) -> void:
 	for i in range(_traps.size() - 1, -1, -1):
 		if i >= _traps.size():
 			continue
-		var owner_player: Player = _traps[i]["owner"]
-		if owner_player == null or not is_instance_valid(owner_player):
+		if not is_instance_valid(_traps[i]["owner"]):
 			(_traps[i]["node"] as Node).queue_free()
 			_traps.remove_at(i)
 			continue
+		var owner_player: Player = _traps[i]["owner"]
 		var at: Vector3 = _traps[i]["at"]
 		if now < float(_traps[i]["armed_at"]):
 			continue

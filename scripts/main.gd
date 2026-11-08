@@ -146,6 +146,7 @@ func show_menu(rebuild := false) -> void:
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
 	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
+	box.add_child(_menu_row("Leaderboard", "Lifetime points and favourite professions.", show_leaderboard))
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Sandbox", "Try any weapon, item or class you own.", func() -> void: show_class_picker(Game.Mode.SANDBOX)))
 	box.add_child(_expand(true))
@@ -160,6 +161,8 @@ func show_menu(rebuild := false) -> void:
 	if not updates.changed.is_connected(_fill_update_box):
 		updates.changed.connect(_fill_update_box)
 	_fill_update_box()
+	if Game.needs_name():
+		show_name_prompt.call_deferred()
 	if not _checked_updates:
 		_checked_updates = true
 		updates.check()
@@ -245,7 +248,7 @@ func _expand(tall := false) -> Control:
 ## One way to play: a large name and what it means, with nothing around it until you touch it.
 func _menu_row(title: String, line: String, action: Callable, first := false) -> Button:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(680, 92)
+	b.custom_minimum_size = Vector2(680, 80)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var clear := UiTheme.flat(Color(0, 0, 0, 0), Color.TRANSPARENT, 8, 12.0)
 	b.add_theme_stylebox_override("normal", clear)
@@ -1085,6 +1088,7 @@ func close_tree() -> void:
 
 
 func start_game(mode: int) -> void:
+	Game.begin_run()
 	Game.mode = mode
 	get_tree().paused = false
 	_run_over = false
@@ -1103,6 +1107,7 @@ func start_game(mode: int) -> void:
 	hud = Hud.new()
 	hud.theme = _theme
 	hud.player = world.player
+	world.player.command_target_requested.connect(show_command_map)
 	hud.director = world.director
 	hud.visible = false
 	ui_layer.add_child(hud)
@@ -1321,6 +1326,8 @@ func _earned_line(earned: int) -> String:
 	for id: String in Game.fresh_unlocks:
 		line += "\n%s unlocked!" % ClassDefs.ALL[id]["name"]
 	Game.fresh_unlocks.clear()
+	if EpicNet.available():
+		Scores.refresh.call_deferred(true)
 	return line
 
 
@@ -1461,7 +1468,7 @@ func show_together(tab := -1) -> void:
 	name_edit.custom_minimum_size = Vector2(290, 58)
 	name_edit.add_theme_font_size_override("font_size", 26)
 	name_edit.text_changed.connect(func(t: String) -> void:
-		Game.player_name = t.strip_edges() if t.strip_edges() != "" else Game.player_name
+		Game.player_name = Game.clean_name(t) if Game.clean_name(t) != "" else Game.player_name
 		Game.save_settings())
 	top.add_child(name_edit)
 	if _together_tab == ONLINE_TAB:
@@ -1669,9 +1676,13 @@ func show_lobby() -> void:
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
 	box.custom_minimum_size.x = 900
+	var scroll := DragScroll.new()
+	scroll.custom_minimum_size = Vector2(900, 520)
+	box.add_child(scroll)
 	var body := VBoxContainer.new()
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 8)
-	box.add_child(body)
+	scroll.add_child(body)
 	var refresh := func() -> void: _fill_lobby(body)
 	Net.lobby_changed.connect(refresh)
 	root.tree_exiting.connect(func() -> void: Net.lobby_changed.disconnect(refresh))
@@ -1767,15 +1778,19 @@ func _fill_lobby(body: VBoxContainer) -> void:
 			var team := _body("Team %s" % ("Gold" if int(info["team"]) == 0 else "Blue"), 26)
 			team.add_theme_color_override("font_color", Net.team_colour(int(info["team"])))
 			row.add_child(team)
-	var classes := HBoxContainer.new()
-	classes.add_theme_constant_override("separation", 6)
+	var classes := GridContainer.new()
+	classes.columns = 6
+	classes.add_theme_constant_override("h_separation", 6)
+	classes.add_theme_constant_override("v_separation", 6)
 	body.add_child(classes)
 	var offered := ClassDefs.available()
 	for id: String in offered:
 		var pick := id
 		var mine := str(Net.roster[Net.my_id()]["class"]) == id
-		var b := _button(String(ClassDefs.ALL[id]["name"]).get_slice(" ", 0), func() -> void: Net.set_my_class(pick), Vector2(850.0 / offered.size(), 56), mine)
+		var b := _button(String(ClassDefs.ALL[id]["name"]).get_slice(" ", 0), func() -> void: Net.set_my_class(pick), Vector2(136, 56), mine)
 		b.add_theme_font_size_override("font_size", 22)
+		b.disabled = not Net.class_slot_available(id, Net.my_id())
+		b.tooltip_text = "Only one Commander per match" if b.disabled else ""
 		classes.add_child(b)
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 10)
@@ -1815,3 +1830,115 @@ func _notification(what: int) -> void:
 			show_pause()
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST and _back.is_valid():
 		_back.call()
+
+
+func show_command_map() -> void:
+	if world == null or world.player.dead or hud.menu_open:
+		return
+	hud.release_all()
+	hud.menu_open = true
+	world.player.input_fire = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var root := _modal("Artillery target")
+	var box: VBoxContainer = root.get_meta("box")
+	box.add_child(_soft("Choose a circle. Impact in 10 seconds; barrage lasts 5 seconds.", 22))
+	var map := MapPanel.new()
+	map.world = world
+	map.targeting = true
+	map.selected_spot = world.player.global_position
+	map.custom_minimum_size = Vector2(440, 440)
+	map.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(map)
+	var row := HBoxContainer.new()
+	box.add_child(row)
+	var close := func() -> void:
+		root.queue_free()
+		if hud:
+			hud.menu_open = false
+		_back = show_pause
+		if not DisplayServer.is_touchscreen_available():
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	row.add_child(_button("Cancel", close, Vector2(210, 60)))
+	var confirm := _button("Call barrage", func() -> void:
+		if world == null or world.player.dead:
+			close.call()
+			return
+		world.player.command_target = map.selected_spot
+		world.player.command_target_ready = true
+		close.call()
+		world.player.use_art(), Vector2(230, 60), true)
+	confirm.disabled = true
+	map.selected.connect(func(_at: Vector3) -> void: confirm.disabled = false)
+	row.add_child(confirm)
+	_back = close
+
+
+var _name_prompt: Control
+
+
+func show_name_prompt() -> void:
+	if is_instance_valid(_name_prompt) and not _name_prompt.is_queued_for_deletion():
+		return
+	if not Game.needs_name() or Game.mode != Game.Mode.MENU:
+		return
+	var root := _modal("Choose your name")
+	_name_prompt = root
+	var box: VBoxContainer = root.get_meta("box")
+	box.add_child(_soft("Shown to other players and on the leaderboard. Names may repeat.", 22))
+	var edit := LineEdit.new()
+	edit.max_length = 16
+	edit.text = Game.player_name
+	edit.placeholder_text = "Your name"
+	edit.custom_minimum_size = Vector2(480, 60)
+	edit.add_theme_font_size_override("font_size", 28)
+	box.add_child(edit)
+	var submit := func() -> void:
+		if Game.confirm_name(edit.text):
+			root.queue_free()
+			_back = _quit
+	var button := _button("Continue", submit, Vector2(480, 64), true)
+	button.disabled = Game.clean_name(edit.text) == ""
+	edit.text_changed.connect(func(value: String) -> void: button.disabled = Game.clean_name(value) == "")
+	edit.text_submitted.connect(func(_text: String) -> void: submit.call())
+	box.add_child(button)
+	_back = Callable() # Android Back cannot silently accept a generated name.
+	edit.grab_focus()
+
+
+func show_leaderboard() -> void:
+	_clear_ui()
+	var root := _modal("Player leaderboard")
+	var box: VBoxContainer = root.get_meta("box")
+	box.custom_minimum_size.x = 940
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 18)
+	box.add_child(header)
+	for field: Array in [["Name", 220], ["Points (total)", 180], ["Favourite Class–Profession", 490]]:
+		var label := _soft(field[0], 23)
+		label.custom_minimum_size.x = field[1]
+		header.add_child(label)
+	var status := _soft("Connecting…", 22)
+	box.add_child(status)
+	var scroll := DragScroll.new()
+	scroll.custom_minimum_size = Vector2(940, 360)
+	box.add_child(scroll)
+	var rows := VBoxContainer.new()
+	scroll.add_child(rows)
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(_soft("Your lifetime points: %d. Sandbox earns no points." % Game.total_points, 21))
+	box.add_child(_button("Back", show_menu, Vector2(240, 60)))
+	_back = show_menu
+	var results := await Scores.refresh()
+	if not is_instance_valid(root) or root.is_queued_for_deletion():
+		return
+	status.text = Scores.last_error if Scores.last_error != "" else "Top %d players" % results.size()
+	for entry: Dictionary in results:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 18)
+		rows.add_child(row)
+		for field: Array in [[str(entry["name"]), 220], [str(entry["points"]), 180], [Scores.pair_label(str(entry["favourite"])), 490]]:
+			var label := _body(field[0], 24)
+			label.custom_minimum_size.x = field[1]
+			label.clip_text = true
+			label.tooltip_text = field[0]
+			row.add_child(label)

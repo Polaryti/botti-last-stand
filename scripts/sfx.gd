@@ -34,6 +34,7 @@ func _ready() -> void:
 	for group: String in VARIANTS:
 		for n: String in VARIANTS[group]:
 			_streams[n] = load("res://assets/sounds/%s.ogg" % n)
+	_streams["command"] = _command_cry()
 	_music = [_stem("night"), _stem("hunted"), _stem("dawn")]
 	for i in POOL:
 		var p := AudioStreamPlayer.new()
@@ -177,3 +178,21 @@ func play_at(sound: String, pos: Vector3, listener: Vector3, volume_db := 0.0, m
 	if d > 38.0:
 		return
 	play(sound, volume_db - d * 0.55, 1.0, min_gap)
+
+
+## A short voiced rally, generated once at startup; no extra audio file or streaming cost.
+func _command_cry() -> AudioStreamWAV:
+	var data := PackedByteArray()
+	const RATE := 16000
+	data.resize(RATE * 2)
+	for i in RATE:
+		var t := float(i) / RATE
+		var envelope := minf(t * 18.0, 1.0) * pow(1.0 - t, 1.5)
+		var phase := TAU * (130.0 * t - 12.0 * t * t)
+		var voice := (sin(phase) + 0.45 * sin(phase * 2.0) + 0.25 * sin(phase * 3.0)) * envelope * 0.35
+		data.encode_s16(i * 2, int(voice * 32767.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = RATE
+	stream.data = data
+	return stream

@@ -23,7 +23,7 @@ const ARTS := {
 	"bo_master": {"name": "Pole Vault", "cost": 35.0, "cast": 0.1, "cd": 4.0, "icon": "leap", "anim": "Vault"},
 	"spirit_walker": {"name": "Leave Your Body", "cost": 50.0, "cast": 0.2, "cd": 12.0, "icon": "body_out", "anim": "Stance"},
 	"iron_mountain": {"name": "Mountain Stomp", "cost": 40.0, "cast": 0.3, "cd": 6.0, "icon": "wave", "anim": "Stomp"},
-	"stance": {"name": "Change Stance", "cost": 0.0, "cast": 0.0, "cd": 0.8, "icon": "wind", "anim": "Stance"},
+	"stance": {"name": "Change Stance", "cost": 0.0, "cast": 0.3, "cd": 6.0, "icon": "wind", "anim": "Stance"},
 	"apothecary": {"name": "Healing Tonic", "cost": 0.0, "cast": 0.3, "cd": 14.0, "icon": "potion"},
 	"illusionist": {"name": "Mirror Swap", "cost": 0.0, "cast": 0.1, "cd": 8.0, "icon": "mirror"},
 }

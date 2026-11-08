@@ -1,0 +1,389 @@
+{
+  "purpose": "Epic Developer Portal configuration reference",
+  "channels": [
+    {
+      "channel": "development",
+      "stats": [
+        {
+          "name": "BLS_DEV_POINTS",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_INFANTRY_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_INFANTRY_DUELIST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_INFANTRY_SHADOW",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_INFANTRY_BERSERKER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_RANGER_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_RANGER_SHARPSHOOTER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_RANGER_TRAPPER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_RANGER_BEASTMASTER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_HEAVY_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_HEAVY_GUARDIAN",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_HEAVY_WARPRIEST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_HEAVY_WARLORD",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_CHIVALRY_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_CHIVALRY_LANCER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_CHIVALRY_PALADIN",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_CHIVALRY_HORSE_ARCHER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MAGICIAN_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MAGICIAN_NECROMANCER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MAGICIAN_ELEMENTALIST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MAGICIAN_ILLUSIONIST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_REVENANT_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_REVENANT_LEAPER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_REVENANT_RIFT",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_REVENANT_SUMMONER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MONK_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MONK_BO_MASTER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MONK_SPIRIT_WALKER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_MONK_IRON_MOUNTAIN",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ADEPT_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ADEPT_BLADE_DANCER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ADEPT_MIRROR_STEP",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ADEPT_VOID_WALKER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_PLAGUE_DOCTOR_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_PLAGUE_DOCTOR_APOTHECARY",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_PLAGUE_DOCTOR_PESTILENCE",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_PLAGUE_DOCTOR_RAT_KING",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ARTIFICER_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ARTIFICER_PYROMANIAC",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ARTIFICER_MECHANIC",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_ARTIFICER_INVENTOR",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_COMMANDER_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_COMMANDER_WARLOCK",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_COMMANDER_GUNNER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_DEV_PLAY_COMMANDER_VANGUARD",
+          "aggregation": "MAX"
+        }
+      ],
+      "leaderboard": {
+        "name": "BLS_DEV_LIFETIME",
+        "stat": "BLS_DEV_POINTS",
+        "sort": "descending",
+        "aggregation": "MAX",
+        "end_date": null
+      }
+    },
+    {
+      "channel": "production",
+      "stats": [
+        {
+          "name": "BLS_POINTS",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_INFANTRY_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_INFANTRY_DUELIST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_INFANTRY_SHADOW",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_INFANTRY_BERSERKER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_RANGER_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_RANGER_SHARPSHOOTER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_RANGER_TRAPPER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_RANGER_BEASTMASTER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_HEAVY_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_HEAVY_GUARDIAN",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_HEAVY_WARPRIEST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_HEAVY_WARLORD",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_CHIVALRY_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_CHIVALRY_LANCER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_CHIVALRY_PALADIN",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_CHIVALRY_HORSE_ARCHER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MAGICIAN_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MAGICIAN_NECROMANCER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MAGICIAN_ELEMENTALIST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MAGICIAN_ILLUSIONIST",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_REVENANT_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_REVENANT_LEAPER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_REVENANT_RIFT",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_REVENANT_SUMMONER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MONK_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MONK_BO_MASTER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MONK_SPIRIT_WALKER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_MONK_IRON_MOUNTAIN",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ADEPT_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ADEPT_BLADE_DANCER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ADEPT_MIRROR_STEP",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ADEPT_VOID_WALKER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_PLAGUE_DOCTOR_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_PLAGUE_DOCTOR_APOTHECARY",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_PLAGUE_DOCTOR_PESTILENCE",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_PLAGUE_DOCTOR_RAT_KING",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ARTIFICER_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ARTIFICER_PYROMANIAC",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ARTIFICER_MECHANIC",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_ARTIFICER_INVENTOR",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_COMMANDER_",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_COMMANDER_WARLOCK",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_COMMANDER_GUNNER",
+          "aggregation": "MAX"
+        },
+        {
+          "name": "BLS_PLAY_COMMANDER_VANGUARD",
+          "aggregation": "MAX"
+        }
+      ],
+      "leaderboard": {
+        "name": "BLS_LIFETIME",
+        "stat": "BLS_POINTS",
+        "sort": "descending",
+        "aggregation": "MAX",
+        "end_date": null
+      }
+    }
+  ]
+}

@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_dev_channel()
 	_test_meshes()
 	_test_paths()
+	_test_terrain_dimensions()
 	_test_weather()
 	await _test_previews()
 	print("RESULT: %d checks, %d failures" % [checks, failures])
@@ -162,3 +163,18 @@ func _test_weather() -> void:
 	check(weather._warnings.is_empty() and not ring.visible, "changing weather retires pending lightning and its warning")
 	check(weather.flash == 0.0 and world.shown_flash == 0.0, "changing weather clears the sky flash")
 	world.free()
+
+
+func _test_terrain_dimensions() -> void:
+	var previous := Terrain.HALF
+	Terrain.use_half(4)
+	var small := Terrain.new()
+	small.walk.fill(3.0)
+	small.visual.fill(2.0)
+	Terrain.use_half(12)
+	var large := Terrain.new()
+	large.walk.fill(7.0)
+	large.visual.fill(6.0)
+	check(small.height(0, 0) == 3.0 and small.ground_height(4, 4) == 2.0, "a different map cannot change an existing terrain's sampling dimensions")
+	check(large.height(12, 12) == 7.0 and large.vertices_per_side > small.vertices_per_side, "mixed-size terrain instances retain independent extents")
+	Terrain.use_half(previous)

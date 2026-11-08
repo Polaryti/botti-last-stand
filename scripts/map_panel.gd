@@ -5,6 +5,11 @@ extends Control
 
 static var _images := {}
 
+signal selected(at: Vector3)
+var targeting := false
+var selected_spot := Vector3.ZERO
+var target_radius := 12.0
+
 var world: World
 
 
@@ -18,13 +23,13 @@ func _process(_delta: float) -> void:
 
 
 static func _bake(w: World) -> ImageTexture:
-	var key := "%d %s" % [w.mode, Terrain.HALF]
+	var key := "%d %s" % [w.mode, w.terrain.half_extent]
 	if _images.has(key):
 		return _images[key]
 	const SIDE := 240
 	var img := Image.create(SIDE, SIDE, false, Image.FORMAT_RGB8)
 	var t := w.terrain
-	var half := float(Terrain.HALF)
+	var half := float(t.half_extent)
 	for y in SIDE:
 		for x in SIDE:
 			var wx := (x + 0.5) / SIDE * half * 2.0 - half
@@ -57,7 +62,7 @@ static func _bake(w: World) -> ImageTexture:
 		img.fill_rect(Rect2i(p0, size), UiTheme.BONE.darkened(0.15))
 	if w.fort:
 		var wall := UiTheme.ASH
-		var a := int((float(Terrain.HALF) - Fort.HALF) / (float(Terrain.HALF) * 2.0) * SIDE)
+		var a := int((half - Fort.HALF) / (half * 2.0) * SIDE)
 		var b := SIDE - a
 		img.fill_rect(Rect2i(a, a, b - a, 3), wall)
 		img.fill_rect(Rect2i(a, b - 3, b - a, 3), wall)
@@ -68,7 +73,7 @@ static func _bake(w: World) -> ImageTexture:
 
 
 func _to_map(x: float, z: float) -> Vector2:
-	return Vector2((x + Terrain.HALF) / (Terrain.HALF * 2.0), (z + Terrain.HALF) / (Terrain.HALF * 2.0)) * size
+	return Vector2((x + world.terrain.half_extent) / (world.terrain.half_extent * 2.0), (z + world.terrain.half_extent) / (world.terrain.half_extent * 2.0)) * size
 
 
 func _draw() -> void:
@@ -76,14 +81,20 @@ func _draw() -> void:
 		return
 	draw_texture_rect(_bake(world), Rect2(Vector2.ZERO, size), false)
 	draw_rect(Rect2(Vector2.ZERO, size), UiTheme.STEEL, false, 2.0)
+	if targeting:
+		var point := _to_map(selected_spot.x, selected_spot.z)
+		var radius := target_radius / (world.terrain.half_extent * 2.0) * size.x
+		draw_circle(point, radius, Color(1.0, 0.5, 0.15, 0.2))
+		draw_arc(point, radius, 0.0, TAU, 48, UiTheme.EMBER, 3.0, true)
 	var font := UiTheme.bold_font()
 	for mark: Dictionary in world.map_marks:
 		var at: Vector2 = mark["at"]
 		var p := _to_map(at.x, at.y)
 		var text: String = mark["name"]
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-		draw_string_outline(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
-		draw_string(font, p - Vector2(w * 0.5, 0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
+		var label_at := Vector2(clampf(p.x - w * 0.5, 4.0, maxf(4.0, size.x - w - 4.0)), clampf(p.y, 20.0, size.y - 4.0))
+		draw_string_outline(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
+		draw_string(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
 	if world.portals:
 		for link: Dictionary in world.portals.links:
 			if link["open"]:
@@ -94,7 +105,7 @@ func _draw() -> void:
 				draw_circle(pb, 4.0, Color(0.66, 0.42, 1.0))
 	if world.fog:
 		var c := _to_map(world.fog.centre.x, world.fog.centre.y)
-		var r := world.fog.radius / (Terrain.HALF * 2.0) * size.x
+		var r := world.fog.radius / (world.terrain.half_extent * 2.0) * size.x
 		draw_arc(c, r, 0.0, TAU, 72, Color(UiTheme.MIST, 0.9), 3.0, true)
 	for t in world.players:
 		if t is Avatar and not t.dead and not Net.is_foe((t as Avatar).peer):
@@ -107,3 +118,20 @@ func _draw() -> void:
 		var d := Vector2(-sin(me.yaw), -cos(me.yaw))
 		var side := d.orthogonal()
 		draw_colored_polygon(PackedVector2Array([p + d * 12.0, p - d * 6.0 + side * 7.0, p - d * 6.0 - side * 7.0]), UiTheme.EMBER)
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not targeting:
+		return
+	var at := Vector2.ZERO
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		at = event.position
+	elif event is InputEventScreenTouch and event.pressed:
+		at = event.position
+	else:
+		return
+	selected_spot = Vector3((at.x / size.x * 2.0 - 1.0) * world.terrain.half_extent, 0, (at.y / size.y * 2.0 - 1.0) * world.terrain.half_extent)
+	selected_spot.y = world.ground_at(selected_spot)
+	selected.emit(selected_spot)
+	accept_event()
+	queue_redraw()

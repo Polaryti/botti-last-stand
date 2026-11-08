@@ -32,6 +32,8 @@ const KEYS := "res://scripts/epic_keys.gd"
 
 var _ieos: Object
 var _user := ""
+var _display_name := ""
+var _signing_in := false
 var _lobby_id := ""
 var _updating := false
 var last_error := ""
@@ -161,7 +163,16 @@ func _exit_tree() -> void:
 
 ## Starts Epic's system once, and signs this phone in. Returns false and sets last_error if it cannot.
 func sign_in() -> bool:
-	if _user != "":
+	while _signing_in:
+		await get_tree().process_frame
+	_signing_in = true
+	var signed_in := await _sign_in_once()
+	_signing_in = false
+	return signed_in
+
+
+func _sign_in_once() -> bool:
+	if _user != "" and _display_name == Game.player_name:
 		return true
 	if not available():
 		return _fail("This build has no online play.")
@@ -199,6 +210,7 @@ func sign_in() -> bool:
 	if int(done["result_code"]) != SUCCESS:
 		return _fail("Could not go online (%d). Are you connected?" % int(done["result_code"]))
 	_user = str(done["local_user_id"])
+	_display_name = Game.player_name
 	return _user != "" or _fail("Could not go online.")
 
 

@@ -71,6 +71,7 @@ const SWING_HIT := 0.3 # how far through a swing the blow lands
 const BASH := {"kind": WeaponDefs.Kind.MELEE, "rate": 0.8, "range": 2.3, "cone": 110.0, "max_hits": 1, "knock": 3.5, "power": 0.6}
 
 signal damaged(amount: float, source: String)
+signal command_target_requested
 
 var world: World
 var class_id := "infantry"
@@ -145,6 +146,16 @@ var _next_hit_mult := 1.0
 var stone_skin := 0.0
 var _still_for := 0.0
 var _skin_step := 0
+var command_target := Vector3.ZERO
+var command_target_ready := false
+var _banner: MeshInstance3D
+var _war_attacks := 0
+var _bayonet_pending := false
+var _stance_mastered := false
+var stance_hits := 0
+var _transition_power := 1.0
+var mirror_guard_left := 0.0
+var _void_extensions := 0
 var stance := ""
 var void_left := 0.0
 var _void_hits := {}
@@ -265,7 +276,6 @@ func _init(owner_world: World, as_bot := 0) -> void:
 	collision_mask = 1 | Terrain.LAYER | Terrain.BARRIER
 	floor_snap_length = 0.55
 	floor_constant_speed = true
-	floor_constant_speed = true
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.36
 	capsule.height = 1.75
@@ -343,12 +353,15 @@ func _add_lights(on: bool) -> void:
 
 
 func setup_class(id: String) -> void:
+	if bot_peer != 0 and ClassDefs.ALL.get(id, {}).get("no_bots", false):
+		id = "infantry"
 	class_id = id
 	var c: Dictionary = ClassDefs.ALL[id]
 	slots = [c["weapon"], null]
 	current = 0
 	arrows = int(c["arrows"])
 	mods["speed"] = float(c["speed"])
+	mods["damage_taken"] = float(c.get("damage_taken", 1.0))
 	mods["mana_regen"] = float(c.get("mana_regen", 1.0))
 	hp = max_hp()
 	mana = 0.0 if c.get("ki", false) else max_mana()
@@ -396,7 +409,7 @@ func status_on(peer: int, kind: int, seconds: float) -> void:
 func status_bits() -> int:
 	return (1 if burn_time > 0.0 else 0) | (2 if poison_left > 0.0 else 0) | (4 if bleed_left > 0.0 else 0) \
 		| (8 if slowed_left > 0.0 else 0) | (16 if frozen_left > 0.0 and not is_iced else 0) | (32 if frozen_left > 0.0 and is_iced else 0) \
-		| (64 if guard_left > 0.0 and guard_left < 900.0 else 0)
+		| (64 if guard_left > 0.0 and guard_left < 900.0 else 0) | (128 if spec_id == "vanguard" else 0)
 
 
 func _cast_anim(anim_name := "") -> void:
@@ -485,6 +498,13 @@ func has_empty_slot() -> bool:
 
 ## Class rule: Heavy Infantry and Chivalry cannot use ranged weapons, unless unlocked.
 func can_use(id: String) -> bool:
+	if not WeaponDefs.ALL.has(id):
+		return false
+	var exclusive: String = WeaponDefs.ALL[id].get("only", "")
+	if exclusive != "" and exclusive != class_id:
+		return false
+	if class_id == "commander" and spec_id in ["warlock", "gunner"]:
+		return id == ("war_staff" if spec_id == "warlock" else "musket")
 	if class_def().get("no_weapons", false):
 		return false
 	if has_flag("bo_master"):
@@ -535,7 +555,7 @@ func say(text: String) -> void:
 
 func take_nearby_weapon() -> void:
 	var p := nearby_weapon
-	if p == null or not is_instance_valid(p):
+	if p == null or not is_instance_valid(p) or not can_use(p.weapon_id):
 		return
 	if not has_empty_slot():
 		_swap_slot_index()
@@ -656,7 +676,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		sfx("block", 0.0)
 		say("Perfect Riposte!")
 		return
-	var dmg := amount * m("damage_taken") * (POISON_HURT if poison_left > 0.0 else 1.0)
+	var dmg := amount * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0)
 	if Net.active():
 		# A Guardian nearby takes part of it.
 		var cover: Target = world.best_cover(global_position)
@@ -933,6 +953,8 @@ func choose_ability(step: int, index: int) -> bool:
 	points -= 1
 	if step == CORE_STEPS:
 		spec_id = (tree_data()["specs"] as Array)[index]["id"]
+		if bot_peer == 0:
+			Game.run_profession = spec_id
 	_apply_ability(a)
 	if step == CORE_STEPS:
 		spec_chosen()
@@ -1226,7 +1248,8 @@ func _on_kill(z: Zombie) -> void:
 	if void_left > 0.0:
 		if has_flag("hungry_void"):
 			heal(12.0)
-		if has_flag("walker_between"):
+		if has_flag("walker_between") and _void_extensions < 6:
+			_void_extensions += 1
 			void_left += 1.0
 			invis_left = maxf(invis_left, void_left)
 	add_arrows(int(class_def().get("kill_arrows", 0)))
@@ -1588,6 +1611,8 @@ func _familiar_mark(reach: float, need_sight: bool) -> Node3D:
 
 
 func _tick_ability_timers(delta: float) -> void:
+	if _banner != null:
+		_banner.rotation.z = sin(world.now * (12.0 if _cast_kind == "command" else 2.0)) * (0.45 if _cast_kind == "command" else 0.035)
 	for key: String in _buffs.keys():
 		_buffs[key]["left"] = float(_buffs[key]["left"]) - delta
 		if float(_buffs[key]["left"]) <= 0.0:
@@ -1633,6 +1658,8 @@ func has_burst() -> bool:
 
 
 func art_def() -> Dictionary:
+	if class_id == "commander":
+		return CommanderKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -1736,6 +1763,8 @@ func art_glyph() -> String:
 
 
 func art_label() -> String:
+	if class_id == "commander":
+		return "Last Command" if has_flag("last_command") else "Command"
 	if class_id == "adept":
 		return "Void is open" if _void_is_ready() else "%s stance" % STANCE_NAMES.get(stance, "")
 	if spirit_left > 0.0:
@@ -1807,9 +1836,12 @@ func use_art() -> void:
 			return
 		arrows -= RAIN_ARROWS
 		_rain_wait = 0.0
+	if class_id == "commander" and spec_id == "gunner" and has_flag("last_command") and not command_target_ready:
+		command_target_requested.emit()
+		return
 	mana -= art_cost()
-	art_cd_left = float(d["cd"]) * m("art_cd")
-	_cast_kind = "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * m("art_cd"))
+	_cast_kind = "command" if class_id == "commander" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -2013,6 +2045,10 @@ func _mountain_stomp() -> void:
 # --- The Adept ---------------------------------------------------------------
 
 func _enter_stance(next: String) -> void:
+	if _stance_mastered:
+		mods["melee_damage"] -= 0.15
+		_stance_mastered = false
+	stance_hits = 0
 	if stance != "":
 		var leaving: Dictionary = STANCE_ADDS[stance]
 		for k: String in leaving:
@@ -2028,10 +2064,13 @@ func _void_is_ready() -> bool:
 
 
 func _change_stance() -> void:
+	_transition_power = 1.6 if stance_hits >= 3 else 1.0
+	stance_hits = 0
 	var next: String = STANCES[(STANCES.find(stance) + 1) % STANCES.size()]
 	if _void_is_ready():
 		next = "void"
 		_void_hits = {}
+		_void_extensions = 0
 		void_left = VOID_TIME + (2.0 if has_flag("deeper_void") else 0.0)
 		invis_left = maxf(invis_left, void_left)
 		_fog_at(global_position + Vector3.UP, 1.5)
@@ -2045,6 +2084,8 @@ func _change_stance() -> void:
 	sfx("weapon_change", -3.0, 0.8)
 	say("%s stance" % STANCE_NAMES[next])
 	if has_flag("mirror_step"):
+		mirror_guard_left = 1.2 + (0.6 if _transition_power > 1.0 else 0.0)
+		_next_hit_mult = maxf(_next_hit_mult, 1.5)
 		_undo_hit()
 	if has_flag("blade_dancer"):
 		_dance_sweep()
@@ -2053,7 +2094,7 @@ func _change_stance() -> void:
 
 
 func _dance_sweep() -> void:
-	var hits := _sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), 1.5 if has_flag("whirl") else 1.0, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
+	var hits := _sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), (1.5 if has_flag("whirl") else 1.0) * _transition_power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
 	if hits <= 0:
 		return
 	if has_flag("stance_echo"):
@@ -2105,6 +2146,7 @@ func _tick_adept(delta: float) -> void:
 	if class_id != "adept":
 		return
 	_last_hit_left = maxf(0.0, _last_hit_left - delta)
+	mirror_guard_left = maxf(0.0, mirror_guard_left - delta)
 	if void_left > 0.0:
 		void_left -= delta
 		if void_left <= 0.0:
@@ -2182,6 +2224,7 @@ func _tick_mist(delta: float) -> void:
 		"spirit_walker": _leave_body()
 		"iron_mountain": _mountain_stomp()
 		"stance": _change_stance()
+		"command": CommanderKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -2341,6 +2384,8 @@ func _bomblet_burst(at: Vector3, kind: String) -> void:
 
 
 func spec_chosen() -> void:
+	if class_id == "commander":
+		CommanderKit.equip(self)
 	if spec_id == "inventor":
 		_roll_invention()
 
@@ -3033,6 +3078,11 @@ func _handle_fire() -> void:
 	attack_count += 1
 	match d["kind"]:
 		WeaponDefs.Kind.MELEE:
+			if weapon_id() == "war_staff":
+				_war_attacks += 1
+				if _war_attacks % 5 == 0:
+					_cast_bolt(CommanderKit.STAFF_BOLT)
+					return
 			_start_swing(d)
 			_flail_idle = 0.0
 			if d.get("momentum", false):
@@ -3185,6 +3235,9 @@ func melee_stats(d: Dictionary) -> Dictionary:
 
 func _do_melee_hit() -> void:
 	var d := weapon_def()
+	if _bayonet_pending:
+		d = musket_bayonet()
+		_bayonet_pending = false
 	if _bashing:
 		d = BASH
 		_bashing = false
@@ -3197,6 +3250,11 @@ func _do_melee_hit() -> void:
 	if _sweep_now:
 		_sweep_now = false
 		_bo_sweep()
+	if class_id == "adept" and hits > 0 and d != BASH and STANCES.has(stance):
+		stance_hits = mini(3, stance_hits + 1)
+		if stance_hits == 3 and not _stance_mastered:
+			mods["melee_damage"] += 0.15
+			_stance_mastered = true
 	if stance == "wind" and hits > 0 and d != BASH:
 		_echo_left = ECHO_AFTER
 	if hits > 0:
@@ -3369,7 +3427,7 @@ func _pose_shot(d: Dictionary, pos: Vector3, q: Quaternion) -> void:
 	var loosed := 1.0 - smoothstep(0.0, 0.32, r)
 	var drawing := smoothstep(0.3, 0.72, r) * (1.0 - smoothstep(0.8, 1.0, r))
 	var aim := Quaternion.IDENTITY
-	if weapon_id() == "crossbow":
+	if weapon_id() in ["crossbow", "musket"]:
 		pos += Vector3(0, loosed * 0.03 - drawing * 0.14, loosed * 0.09 + drawing * 0.06)
 		aim = Quaternion(Vector3(1, 0, 0), loosed * 0.32 - drawing * 0.55)
 	else:
@@ -3377,7 +3435,7 @@ func _pose_shot(d: Dictionary, pos: Vector3, q: Quaternion) -> void:
 		aim = Quaternion(Vector3(0, 0, 1), -loosed * 0.14) * Quaternion(Vector3(1, 0, 0), loosed * 0.1)
 	_vm_root.position = pos
 	_vm_root.basis = Basis(q * aim).scaled(Vector3.ONE * float(d["scale"]))
-	_vm_arrow.visible = r >= 0.55 and (arrows > 0 or r < 1.0)
+	_vm_arrow.visible = weapon_id() != "musket" and r >= 0.55 and (arrows > 0 or r < 1.0)
 	if _vm_arrow.visible:
 		var nock: Vector3 = d.get("nock", Vector3.ZERO)
 		var slide := 1.0 - smoothstep(0.55, 0.85, r)
@@ -3404,6 +3462,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F: mount()
 			KEY_R: use_burst()
 			KEY_T: use_art()
+			KEY_V: use_bayonet()
 			KEY_SPACE: input_jump = true
 
 
@@ -3417,3 +3476,34 @@ func poll_keyboard() -> void:
 	if kb != Vector2.ZERO or _keyboard_moving:
 		input_move = kb
 	_keyboard_moving = kb != Vector2.ZERO
+
+
+static func musket_bayonet() -> Dictionary:
+	var d: Dictionary = WeaponDefs.ALL["spear"].duplicate()
+	d["power"] = 0.95
+	d["range"] = 3.8
+	d["rate"] = 0.65
+	return d
+
+
+func use_bayonet() -> void:
+	if weapon_id() != "musket" or dead or _cooldown > 0.0 or _cast_kind != "" or frozen_left > 0.0:
+		return
+	var d := musket_bayonet()
+	_cooldown = attack_interval(d)
+	_bayonet_pending = true
+	attack_count += 1
+	_start_swing(d)
+	sfx("swing", -4.0)
+
+
+func _refresh_banner() -> void:
+	if _banner != null:
+		return
+	_banner = MeshInstance3D.new()
+	_banner.mesh = WeaponDefs.banner_mesh()
+	_banner.layers = 2
+	_banner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_banner.position = Vector3(-0.58, -0.78, -0.95)
+	_banner.scale = Vector3.ONE * 0.42
+	camera.add_child(_banner)

@@ -1,7 +1,7 @@
 class_name AbilityData
 ## Every class's tree: 3 shared choices, then 1 of 3 specializations, then 4 either/or choices on that
 ## branch, then its final ability. Nine picks in a night, so each one should change how you play.
-## "add" changes a stat, "on" reacts to events through Player._act, and "flag" switches on a rule coded
+## "add" changes a stat, "on" reacts to events through Player._act, and "banner" switches on a rule coded
 ## elsewhere. Icons are "shape" or "shape+corner badge".
 
 static var _cache := {}
@@ -37,6 +37,7 @@ static func tree(class_id: String) -> Dictionary:
 			"monk": _cache[class_id] = _monk()
 			"adept": _cache[class_id] = _adept()
 			"plague_doctor": _cache[class_id] = _plague_doctor()
+			"commander": _cache[class_id] = _commander()
 	return _cache[class_id]
 
 
@@ -90,14 +91,14 @@ static func _adept() -> Dictionary:
 		[a("discipline", "Discipline", "+15% melee damage", "sword+up", {"melee_damage": 0.15}),
 		a("balance", "Balance", "10% chance to avoid any hit", "wind+shield", {"dodge": 0.1})],
 		[a("breath_control", "Breath Control", "+20 max health", "heart+wind", {"max_hp": 20.0}),
-		a("quick_change", "Quick Change", "Stances change 30% sooner", "swap+clock", {"art_cd": -0.3})],
+		a("quick_change", "Quick Change", "Stances change 20% sooner (minimum 3.5 s)", "swap+clock", {"art_cd": -0.2})],
 		[a("sure_footing", "Sure Footing", "+8% move speed", "boot+up", {"speed": 0.08}),
 		a("clean_cuts", "Clean Cuts", "10% crit chance", "target+sword", {"crit_chance": 0.1})],
 	], "specs": [
 		_spec("blade_dancer", "Blade Dancer", "Every change of stance is a sweep all around you", Color(0.74, 0.32, 0.5),
-			a("blade_dancer", "Blade Dancer", "Changing stance sweeps everything within 3.4 m", "spiral", {}, [], "blade_dancer"),
+			a("blade_dancer", "Blade Dancer", "Changing stance sweeps within 3.4 m. Land three blows first for a 60% stronger sweep", "spiral", {}, [], "blade_dancer"),
 			[[a("wide_arc", "Wide Arc", "The sweep reaches 1.5 m further", "spiral+plus", {}, [], "wide_sweep"),
-			a("quick_feet", "Quick Feet", "Stances change 40% sooner", "boot+clock", {"art_cd": -0.4})],
+			a("quick_feet", "Quick Feet", "Stances change 20% sooner (minimum 3.5 s)", "boot+clock", {"art_cd": -0.2})],
 			[a("stance_echo", "Stance Echo", "The sweep brings what you change to: Wind slows, Stone stuns, Flame burns", "wave+star", {}, [], "stance_echo"),
 			a("dance_on", "Dance On", "Each sweep that hits: +15% attack speed for 4 s, up to 3 times", "wind+sword", {}, [], "dance_on")],
 			[a("focused_edge", "Focused Edge", "+30% melee damage", "sword+star", {"melee_damage": 0.3}),
@@ -105,8 +106,8 @@ static func _adept() -> Dictionary:
 			[a("flowing_health", "Flowing Health", "Each sweep that hits heals 6", "heart+spiral", {}, [], "flowing_health"),
 			a("whirl", "Whirl", "The sweep does 50% more damage", "spiral+up", {}, [], "whirl")]],
 			a("storm_of_steel", "Storm of Steel", "Every sweep comes around a second time", "", {}, [], "storm_of_steel")),
-		_spec("mirror_step", "Mirror Step", "Changing stance right after a hit undoes that hit", Color(0.5, 0.72, 0.9),
-			a("mirror_step", "Mirror Step", "Changing stance within 1 s of being hit undoes the hit and heals 10", "mirror", {}, [], "mirror_step"),
+		_spec("mirror_step", "Mirror Step", "A timed transition turns defence into a counterattack", Color(0.5, 0.72, 0.9),
+			a("mirror_step", "Mirror Step", "Changing stance within 1 s of a hit undoes it and heals 10. Each transition grants 70% protection for 1.2 s and a 50% stronger next blow; three blows extend protection to 1.8 s", "mirror", {}, [], "mirror_step"),
 			[[a("long_mirror", "Long Mirror", "You have 1.5 s to change after a hit", "mirror+clock", {}, [], "long_mirror"),
 			a("still_water", "Still Reflection", "Undoing a hit heals 10 more", "mirror+heart", {}, [], "still_reflection")],
 			[a("tempered_skin", "Tempered Skin", "+30 max health", "heart+up", {"max_hp": 30.0}),
@@ -126,7 +127,7 @@ static func _adept() -> Dictionary:
 			a("void_cut", "Void Cut", "Hits 2 more enemies at a time", "sword+moon", {"melee_hits": 2})],
 			[a("long_stride", "Long Stride", "+15% move speed", "boot+moon", {"speed": 0.15}),
 			a("aftermath", "Aftermath", "Leaving Void stance stuns everything within 6 m for 1.5 s", "star+moon", {}, [], "aftermath")]],
-			a("walker_between", "Walker Between", "Each kill in Void stance adds 1 s to it", "", {}, [], "walker_between")),
+			a("walker_between", "Walker Between", "Each kill in Void stance adds 1 s, up to six extra seconds per opening", "", {}, [], "walker_between")),
 	]}
 
 
@@ -181,7 +182,7 @@ static func _revenant() -> Dictionary:
 		[a("cold_hands", "Cold Hands", "+25% claw damage", "claw+up", {"melee_damage": 0.25}),
 		a("long_claws", "Long Claws", "+1 m reach, and claws hit one more", "claw+plus", {"melee_reach": 1.0, "melee_hits": 1})],
 		[a("thick_mist", "Thick Mist", "+40 max Mist, and quieter steps", "mist+plus", {"mana": 40.0, "noise": -0.25}),
-		a("deep_breath", "Deep Breath", "Mist refills 60% faster", "mist+clock", {"mana_regen": 0.3})],
+		a("deep_breath", "Deep Breath", "Mist refills 60% faster", "mist+clock", {"mana_regen": 0.45})],
 		[a("hungry_dead", "Hungry Dead", "Kills give 4 more Mist, and heal 2", "skull+mist", {}, [t("kill", "mana", {"n": 4.0}), t("kill", "heal", {"n": 2.0})]),
 		a("restless", "Restless", "+15% move speed", "boot+mist", {"speed": 0.15})],
 	], "specs": [
@@ -258,7 +259,7 @@ static func _artificer() -> Dictionary:
 			a("better_axles", "Better Axles", "The chariot is 30% faster, and tramples twice as hard", "chariot+up", {"horse_speed": 0.3, "trample": 1.0})]],
 			a("war_machine", "War Machine", "Both turret and spikes. Bolts burst into flame, and the chariot lasts 15 s longer", "turret+flame", {"horse_time": 15.0}, [], "war_machine")),
 		_spec("inventor", "Inventor", "A different device every time, and the button shows which is next.", brass,
-			a("inventor", "Inventor", "Unlocks Invention: a random device each use, and the button shows the next one. Starts with Electric Volley and Cryo Flask", "gear+star"),
+			a("inventor", "Inventor", "Unlocks Invention: a random device each use, and the button shows the next one. Starts with Electric Volley and Cryo Flask; devices deal 15% more damage", "gear+star", {"inv_damage": 0.15}),
 			[[a("sentry_plans", "Clockwork Sentry", "New invention: a turret that shoots for 14 s", "turret+gear", {}, [], "inv_sentry"),
 			a("overcharge", "Overcharge", "Electric Volley: 3 more darts, and each spark jumps twice more", "dart+up", {"volley_darts": 3.0, "volley_jumps": 2.0})],
 			[a("boots_plans", "Steam Boots", "New invention: a burst of speed, untouchable for 2 s", "steam+plus", {}, [], "inv_boots"),
@@ -493,4 +494,49 @@ static func _magician() -> Dictionary:
 			[a("stunning_burst", "Stunning Burst", "Bursts stun what they hit for 1.5 s", "star+mirror", {}, [], "swap_stun"),
 			a("dazzle", "Dazzle", "Each swap makes enemies within 10 m forget you", "star+spiral", {}, [], "swap_forget")]],
 			a("mirror_legion", "Mirror Legion", "Each swap also calls 3 mirror images that cast bolts at enemies for 8 s", "mirror+crown", {"ally_cap": 3}, [], "swap_legion")),
+	]}
+
+
+static func _commander() -> Dictionary:
+	return {"core": [
+		[a("command_training", "Drilled Strikes", "+15% melee and ranged damage", "sword+up", {"melee_damage": 0.15, "ranged_damage": 0.15}),
+		a("officers_boots", "Officer's Boots", "+10% movement speed", "boot+up", {"speed": 0.1})],
+		[a("officers_coat", "Officer's Coat", "+25 max health", "heart+up", {"max_hp": 25.0}),
+		a("composure", "Composure", "Take 10% less damage", "shield+up", {"damage_taken": -0.1})],
+		[a("supply_lines", "Supply Lines", "Heal 3 per kill", "heart+horn", {}, [t("kill", "heal", {"n": 3.0})]),
+		a("trained_retinue", "Trained Retinue", "Summons have 25% more health and damage", "ghost+up", {"ally_hp": 0.25, "ally_damage": 0.25})]
+	], "specs": [
+		_spec("warlock", "Warlock", "A fragile officer of battle magic. Every fifth War Staff attack fires a bolt", Color(0.55, 0.32, 0.85),
+			a("warlock", "Warlock", "Your only weapon becomes a War Staff. Every fifth attack fires magic instead of striking. -30 max health. Command summons a Magician for 16 s", "staff", {"max_hp": -30.0}, [], "warlock"),
+			[[a("war_channel", "War Channel", "+25% War Staff and bolt damage", "staff+up", {"melee_damage": 0.25, "spell_damage": 0.25}),
+			a("war_cadence", "War Cadence", "+20% attack speed", "staff+clock", {"melee_rate": 0.2})],
+			[a("arcane_retinue", "Arcane Retinue", "Magicians deal 35% more damage", "ghost+bolt", {"ally_damage": 0.35}),
+			a("long_retinue", "Long Retinue", "Summons stay 25% longer", "ghost+clock", {"ally_time": 0.25})],
+			[a("war_ward", "War Ward", "Take 12% less damage", "shield+staff", {"damage_taken": -0.12}),
+			a("arcane_reach", "Arcane Reach", "+0.7 m staff reach", "staff+plus", {"melee_reach": 0.7})],
+			[a("storm_training", "Storm Training", "+25% spell damage", "bolt+up", {"spell_damage": 0.25}),
+			a("arcane_recovery", "Arcane Recovery", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
+			a("last_command_warlock", "Last Command", "Replaces Command: an 8 s storm follows you within 11 m, slowing enemies and striking them with AoE lightning. 60 s cooldown", "", {}, [], "last_command")),
+		_spec("gunner", "Gunner", "A musket officer with a bayonet for close quarters", Color(0.64, 0.46, 0.23),
+			a("gunner", "Gunner", "Your only weapon becomes a Musket. Fire shoots; the melee button thrusts its bayonet. Command summons a torch-bearing Gunner for 16 s", "crossbow", {}, [], "gunner"),
+			[[a("powder_charge", "Powder Charge", "+25% musket damage", "crossbow+up", {"ranged_damage": 0.25}),
+			a("quick_reload", "Quick Reload", "+20% shooting rate", "crossbow+clock", {"ranged_rate": 0.2})],
+			[a("bayonet_drill", "Bayonet Drill", "+30% melee damage", "spear+up", {"melee_damage": 0.3}),
+			a("gun_coat", "Padded Coat", "+25 max health", "heart+up", {"max_hp": 25.0})],
+			[a("veteran_gunners", "Veteran Gunners", "Summons deal 35% more damage", "ghost+up", {"ally_damage": 0.35}),
+			a("steady_barrel", "Steady Barrel", "+20% range and shot speed", "target+up", {"ranged_power": 0.2})],
+			[a("powder_reserve", "Powder Reserve", "+15% shooting rate", "arrows+clock", {"ranged_rate": 0.15}),
+			a("field_rations", "Field Rations", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
+			a("last_command_gunner", "Last Command", "Replaces Command: choose a 12 m radius on the map. Warns everyone, waits 10 s, then bombards enemies for 5 s. 60 s cooldown", "", {}, [], "last_command")),
+		_spec("vanguard", "Vanguard", "A resilient banner bearer who rallies the line", Color(0.78, 0.57, 0.18),
+			a("vanguard", "Vanguard", "+30 max health, take 10% less damage. Carry an off-hand banner. Command gives nearby allies +25% speed for 6 s", "banner", {"max_hp": 30.0, "damage_taken": -0.1}, [], "vanguard"),
+			[[a("hold_line", "Hold the Line", "Take 12% less damage", "shield+banner", {"damage_taken": -0.12}),
+			a("forward", "Forward", "+12% speed", "boot+banner", {"speed": 0.12})],
+			[a("banner_reach", "Close Ranks", "Rally reaches 16 m instead of 12 m", "banner+plus", {}, [], "banner_reach"),
+			a("iron_retinue", "Iron Retinue", "Summons have 40% more health", "ghost+heart", {"ally_hp": 0.4})],
+			[a("vanguard_steel", "Vanguard Steel", "+25% melee damage", "sword+up", {"melee_damage": 0.25}),
+			a("vanguard_vigor", "Vanguard Vigor", "+30 max health", "heart+up", {"max_hp": 30.0})],
+			[a("rally_recovery", "Rally Recovery", "Heal 1 per second", "heart+clock", {"regen": 1.0}),
+			a("infantry_drill", "Infantry Drill", "Summons deal 30% more damage", "ghost+sword", {"ally_damage": 0.3})]],
+			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry for 20 s. 60 s cooldown", "", {}, [], "last_command"))
 	]}

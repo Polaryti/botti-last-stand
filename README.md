@@ -29,7 +29,7 @@ Each match build progresses to **level 10**: three early choices, one of three s
 
 ## Classes and permanent progression
 
-The standard progression includes nine classes. Unlocks and purchases are saved on the device; Botti Doubloons are earned in matches and spent in the in-game Store. They are not a real-money checkout implemented by this repository.
+The standard progression includes nine classes, plus two code-only classes. Unlocks and purchases are saved on the device; Botti Doubloons are earned in matches and spent in the in-game Store. They are not a real-money checkout implemented by this repository.
 
 | Class | Normal availability | Specializations |
 | --- | --- | --- |
@@ -42,8 +42,16 @@ The standard progression includes nine classes. Unlocks and purchases are saved 
 | Plague Doctor | Deal 3,000 cumulative poison damage outside Sandbox | Apothecary, Pestilence, Rat King |
 | Monk | 800 Botti Doubloons in the Store | Bo Master, Spirit Walker, Iron Mountain |
 | Artificer | 520 Botti Doubloons in the Store | Pyromaniac, Mechanic, Inventor |
+| Adept | Redeem code | Blade Dancer, Mirror Step, Void Walker |
+| Commander | Tournament prize code: “First prize in VRAIN tournaments” | Warlock, Gunner, Vanguard |
 
-Redeem codes can also unlock supported classes. **Adept** is an additional code-only class implemented in the source, with Wind/Stone/Flame stances and Blade Dancer, Mirror Step and Void Walker specializations; it is not sold or earned through the normal progression above.
+Redeem codes can also unlock supported classes. Codes are stored as hashes. Adept and Commander cannot be bought or earned through normal match progression.
+
+**Adept** commits to Wind, Stone or Flame for six seconds, with a visible transition and a persistent stance card. Three connected melee attacks grant +15% damage until the next switch and empower that transition. Blade Dancer converts transitions into sweeps; Mirror Step combines timed damage recovery, protection and counters; Void Walker earns a temporary invisible stance through hits in different stances.
+
+**Commander** is limited to one human per match; bots cannot choose it. Command becomes Last Command at level 10. Warlock keeps a War Staff whose fifth attack fires magic, summons a Magician, then commands an enemy-only storm. Gunner keeps a Musket with a melee bayonet, summons a torch-bearing Gunner, then selects an artillery circle on the map: everyone receives a warning, followed ten seconds later by five seconds of shelling. Vanguard carries an off-hand banner, rallies nearby allies, then revives eligible allies, grants buffs and calls two Infantry. Exclusive weapons never appear as loot and cannot be dropped.
+
+On first launch after this update, choose or confirm a display name; duplicates are allowed. The new **Leaderboard** button uses Epic to show total lifetime points and the most-played class–profession pair. Match rewards add to lifetime points independently of currency spending, and Sandbox is excluded. Offline rewards are queued for sync. The existing Epic deployment needs the [leaderboard configuration](docs/EPIC_LEADERBOARD.md); the UI reports unavailable online data until that setup is active.
 
 Store upgrades can add specialization abilities, and the Armory manages owned upgrades and selected familiars. The in-game Codex documents classes, enemies, weapons, items and familiars. The in-game Changelog reads [CHANGELOG.md](CHANGELOG.md).
 
@@ -69,6 +77,8 @@ Open the project in Godot 4.7.2 and press F5, or run `godot --path .`. Export te
 - [Building and testing](docs/BUILDING.md): Android/iOS setup, signing, online-play dependencies, checks and art tools.
 - [Development Android releases](docs/BUILDING.md#development-android-releases): dev package identity, versioning and release workflow.
 - [Editing maps](docs/EDITING_MAPS.md): edit map scenes in Godot and use F6 to walk around them.
+- [Balance review](docs/BALANCE_REVIEW.md): all class/profession screening, simulation results and limitations.
+- [Epic leaderboard setup](docs/EPIC_LEADERBOARD.md): exact stats, channel isolation and live verification.
 - [Mobile review](docs/MOBILE_REVIEW.md): maintenance fixes, mesh measurements, validation and remaining architecture/device work.
 
 `Validate game` checks pull requests and pushes to `main` and `dev`. It imports resources, runs gameplay and regression tests, exercises paired LAN scenarios, and captures weather/UI with the Compatibility renderer. The dev release workflow additionally verifies package identity and signing before publishing its APK. Engine tests and desktop captures do not substitute for real Android/iOS device profiling.

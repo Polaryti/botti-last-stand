@@ -79,6 +79,8 @@ func _init(owner_world: World, avatar: Avatar, info: Dictionary) -> void:
 	peer = avatar.peer
 	name = "Bot%d" % (peer - Net.BOT_BASE)
 	_class_id = str(info.get("class", "infantry"))
+	if not ClassDefs.ALL.has(_class_id) or ClassDefs.ALL[_class_id].get("no_bots", false):
+		_class_id = "infantry"
 	_smart = SMARTS[clampi(Game.difficulty, 0, SMARTS.size() - 1)]
 	pawn = Player.new(world, peer)
 	pawn.bot = self
