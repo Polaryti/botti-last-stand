@@ -81,4 +81,4 @@ func _ready() -> void:
 	m.show_sandbox_menu()
 	await wait(0.2)
 	await snap("sandbox_menu")
-	get_tree().quit()
+	await preload("res://tests/scene_cleanup.gd").finish(m)

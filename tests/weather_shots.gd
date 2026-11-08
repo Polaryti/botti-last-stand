@@ -72,4 +72,4 @@ func _ready() -> void:
 	pl.rotation.y = 0.0
 	await wait(1.5)
 	await snap("fog_outside")
-	get_tree().quit()
+	await preload("res://tests/scene_cleanup.gd").finish(m)
