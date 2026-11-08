@@ -2,6 +2,9 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## 0.20.2 (8 November 2026)
+- No changes to the game. This version is here to try the in-game update: on Android, the main menu offers it and Update installs it. It plays together with 0.20.1.
+
 ## 0.20.1 (7 November 2026)
 ### New
 - Bots now play like people. Each one levels up, picks its path in the skill tree and uses its abilities, familiars and Store items, picks up weapons and power-ups, and repairs the Fort.
