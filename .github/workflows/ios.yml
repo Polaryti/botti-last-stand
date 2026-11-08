@@ -58,8 +58,7 @@ jobs:
       - name: Export the Xcode project
         run: |
           mkdir -p build/ios
-          "$GODOT" --headless --path . --import 2>&1 | tee build/import.log
-          ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' build/import.log
+          python3 tools/import_project.py --log build/import.log
           "$GODOT" --headless --path . --export-release iOS build/ios/botti.ipa 2>&1 | tee build/ios-export.log | tail -20
           test -d build/ios/botti.xcodeproj
 

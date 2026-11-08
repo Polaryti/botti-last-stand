@@ -3,6 +3,11 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import contextlib
+import io
+import subprocess
+import sys
+from unittest.mock import patch
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +57,25 @@ class DevBuildTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 dev.prepare(self.root, number, commit)
         self.assertEqual(before, (self.root / "project.godot").read_bytes())
+
+
+class ImportProjectTests(unittest.TestCase):
+    def test_bootstrap_errors_are_not_accepted_in_verification(self):
+        spec = importlib.util.spec_from_file_location("import_project", ROOT / "tools/import_project.py")
+        importer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(importer)
+        for verification, expected_error in [("Imported successfully\n", False), ("SCRIPT ERROR: broken game script\n", True)]:
+            with self.subTest(verification=verification), tempfile.TemporaryDirectory() as temp:
+                messages = iter(["ERROR: cold custom font cache\n", verification])
+                def fake_run(command, stdout, **kwargs):
+                    stdout.write(next(messages))
+                    return subprocess.CompletedProcess(command, 0)
+                with patch.object(importer.subprocess, "run", side_effect=fake_run), contextlib.redirect_stdout(io.StringIO()):
+                    if expected_error:
+                        with self.assertRaises(RuntimeError):
+                            importer.import_project(sys.executable, Path(temp), Path(temp) / "import.log")
+                    else:
+                        importer.import_project(sys.executable, Path(temp), Path(temp) / "import.log")
 
 
 if __name__ == "__main__":

@@ -65,8 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/checks
-          "$GODOT" --headless --path . --editor --import 2>&1 | tee build/checks/import.log
-          ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' build/checks/import.log
+          python3 tools/import_project.py --log build/checks/import.log
       - name: Run checks with isolated saves
         if: matrix.suite != 'render'
         run: python3 tools/run_checks.py ${{ matrix.suite }} --mode ${{ matrix.mode }}
@@ -87,7 +86,7 @@ jobs:
             timeout 180s xvfb-run -a -s '-screen 0 1280x720x24' "$GODOT" --path . \
               --rendering-driver opengl3 --audio-driver Dummy "res://tests/$scene.tscn" \
               -- "$PWD/build/checks/screens" 2>&1 | tee "build/checks/$scene.log"
-            ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' "build/checks/$scene.log"
+            if grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' "build/checks/$scene.log"; then exit 1; fi
           done
           test -f build/checks/screens/storm_warning.png
           test -f build/checks/screens/settings_pause.png

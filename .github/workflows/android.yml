@@ -125,8 +125,7 @@ jobs:
       - name: Build and check the signature
         if: steps.version.outputs.go == 'true'
         run: |
-          "$GODOT" --headless --path . --import 2>&1 | tee build/import.log
-          ! grep -E 'SCRIPT ERROR:|SHADER ERROR:|^ERROR:' build/import.log
+          python3 tools/import_project.py --log build/import.log
           rm -f build/botti-last-stand.apk
           "$GODOT" --headless --path . --export-release Android build/botti-last-stand.apk 2>&1 | tail -20
           test -f build/botti-last-stand.apk
