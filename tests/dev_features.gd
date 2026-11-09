@@ -26,9 +26,11 @@ func _ready() -> void:
 	p.position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
 	p.guard_left = 0
 	_prices()
+	_store_upgrades()
 	_heavy()
 	await _snakes()
 	await _wood_and_gates()
+	await _traversal()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -48,7 +50,8 @@ func _prices() -> void:
 	check(CodexPanel.acquisition("adept").contains("1150"), "Codex shows Adept's current Store acquisition")
 	check(MistStorm.EVERY == 70.0, "scheduled Mist Storms use the new seventy-second cadence")
 func _heavy() -> void:
-	p.flags["oathkeeper"] = true
+	Game.owned_items["oathkeeper"] = true
+	p.spec_id = "guardian"
 	p.mods["dodge"] = 0.0
 	p.hp = p.max_hp()
 	for i in 9: p.hurt(1.0, p.position + Vector3.FORWARD * 3)
@@ -187,3 +190,57 @@ func _wood_and_gates() -> void:
 		check(Vector2(bot.pawn.position.x - goal.x, bot.pawn.position.z - goal.z).length() < 1.5, "a wood-gathering bot traverses the side door to %s (ended %s)" % [goal, bot.pawn.position])
 	space.queue_free()
 	await frames(2)
+
+func _walk_surface(pawn: Player, from: Vector3, toward: Vector3, label: String) -> void:
+	pawn.position = from + Vector3.UP * 0.25
+	var direction := Vector3(toward.x - from.x, 0, toward.z - from.z).normalized()
+	for tick in 900:
+		if Vector2(pawn.position.x - toward.x, pawn.position.z - toward.z).length() < 0.8: break
+		pawn.velocity = direction * 6 + Vector3.DOWN * 4
+		pawn.move_and_slide()
+		await frames(1)
+	if pawn.get_slide_collision_count() > 0:
+		var contact := pawn.get_slide_collision(0)
+		print(label, " collider=", contact.get_collider(), " normal=", contact.get_normal(), " at=", contact.get_position())
+	check(Vector2(pawn.position.x - toward.x, pawn.position.z - toward.z).length() < 1.0 and pawn.position.y > toward.y - 1.0, label + " ended " + str(pawn.position))
+
+func _traversal() -> void:
+	var viewport := SubViewport.new()
+	viewport.own_world_3d = true
+	add_child(viewport)
+	Game.night_map = "mists"
+	var mist := World.new()
+	viewport.add_child(mist)
+	mist.setup(Game.Mode.NIGHT)
+	mist.director.running = false
+	for z: Zombie in mist.zombies.duplicate(): z.release()
+	var pawn := mist.player
+	pawn.set_physics_process(false)
+	await frames(3)
+	for ramp: Array in MapIslands.RAMPS:
+		await _walk_surface(pawn, ramp[0], ramp[1], "ascending shelf ramp")
+		await _walk_surface(pawn, ramp[1], ramp[0], "descending shelf ramp")
+	for shrine: Array in MapIslands.ROTUNDAS:
+		var centre: Vector2 = shrine[0]
+		for n in 4:
+			var dir := Vector2(cos(n * PI / 2), sin(n * PI / 2))
+			var at := centre + dir * (float(shrine[1]) + 4)
+			var from := Vector3(at.x, mist.ground_at(Vector3(at.x, 0, at.y)), at.y)
+			await _walk_surface(pawn, from, Vector3(centre.x, float(shrine[3]) + MapIslands.ROTUNDA_RISE, centre.y), "open shrine approach")
+	check(mist.map_marks.size() >= MapIslands.ISLANDS.size(), "every Mists zone has a map label")
+	viewport.queue_free()
+	await frames(2)
+
+func _store_upgrades() -> void:
+	for id: String in ["oathkeeper", "last_rites", "faultline"]:
+		check(ShopDefs.for_class("heavy").has(id), "Heavy upgrade is listed in the Store: " + id)
+		Game.owned_items.erase(id)
+		var price := int(ShopDefs.ITEMS[id]["price"])
+		Game.doubloons = price - 1
+		check(not Game.buy_item(id), "purchase rejects insufficient funds: " + id)
+		Game.doubloons = price
+		check(Game.buy_item(id) and Game.doubloons == 0, "purchase charges the exact upgrade price: " + id)
+		Game.set_item_on(id, false)
+		check(not Game.item_active(id), "Armory can disable " + id)
+		Game.set_item_on(id, true)
+		check(Game.item_active(id), "Armory can equip " + id)

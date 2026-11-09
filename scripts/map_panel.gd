@@ -95,6 +95,19 @@ func _draw() -> void:
 		var label_at := Vector2(clampf(p.x - w * 0.5, 4.0, maxf(4.0, size.x - w - 4.0)), clampf(p.y, 20.0, size.y - 4.0))
 		draw_string_outline(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
 		draw_string(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
+	if world.mist_storm:
+		var storm := world.mist_storm
+		var affected: Array[int] = []
+		if storm.finale:
+			for index in range(1, MapIslands.ISLANDS.size()): affected.append(index)
+		else: affected.append(storm.island)
+		for index in affected:
+			var land := MapIslands.ISLANDS[index]
+			var centre := _to_map(land.x, land.y)
+			var radius := land.z / (world.terrain.half_extent * 2.0) * size.x
+			draw_circle(centre, radius, Color(0.65, 0.3, 0.9, 0.3))
+			draw_arc(centre, radius, 0, TAU, 48, Color(0.85, 0.55, 1), 3)
+			draw_string(font, centre + Vector2(-32, 24), "MIST STORM", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.7, 1))
 	if world.portals:
 		for link: Dictionary in world.portals.links:
 			if link["open"]:

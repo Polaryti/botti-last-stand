@@ -208,7 +208,10 @@ func boundary(h: float) -> void:
 			# You can walk off the edge. Mobs know better.
 			w.add_enemy_block(Vector3(c.x, 0.0, c.y), Vector3(r.size.x, 120.0, r.size.y))
 		else:
-			w.add_barrier(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
+			if terrain.height(c.x, c.y) < Terrain.WATER_Y - Terrain.WADE:
+				w.add_barrier(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
+			else:
+				w.add_enemy_block(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
 	# Everything outside a smaller map is closed to pathing too.
 	if h < terrain.half_extent - 0.5:
 		var far := float(terrain.half_extent)
@@ -744,7 +747,15 @@ func windmill() -> void:
 	l.box(Vector3(0, 1.2, 3.4), Vector3(1.4, 2.4, 0.3), Color(0.2, 0.13, 0.08))
 	l.box(Vector3(0, 4.5, 2.95), Vector3(0.7, 1.0, 0.2), Color(1.0, 0.76, 0.34))
 	add(l).material_override = no_fog()
-	solid(Vector3.UP * 4.0, Vector3(5.6, 8.0, 5.6))
+	var hull := LowPoly.new()
+	hull.prism(Vector3.ZERO, Vector3.UP * 8.5, 3.5, 2.2, 10, Color.WHITE)
+	var body := StaticBody3D.new()
+	body.transform = xf
+	var shape := CollisionShape3D.new()
+	shape.shape = hull.commit().create_convex_shape()
+	body.add_child(shape)
+	w.add_child(body)
+	w.grid.block_box(xf.origin, Vector3(6.5, 8.5, 6.5))
 	var sails := LowPoly.new()
 	sails.prism(Vector3(0, 0, -0.5), Vector3(0, 0, 0.5), 0.2, 0.2, 6, Color(0.2, 0.14, 0.1))
 	for i in 4:
@@ -1483,6 +1494,18 @@ func fort_keep() -> void:
 
 ## A forest wall outside the playable edge. It needs no collision, so it may depend on quality.
 func forest_wall(h: float) -> void:
+	var apron := LowPoly.new()
+	for side in 4:
+		var outward := Vector3(sin(side * PI * 0.5), 0, cos(side * PI * 0.5))
+		var tangent := outward.cross(Vector3.UP)
+		for n in range(-int(h), int(h), 4):
+			var a := outward * h + tangent * n
+			var z := outward * h + tangent * minf(n + 4, h)
+			a.y = terrain.height(a.x, a.z) - 0.03
+			z.y = terrain.height(z.x, z.z) - 0.03
+			apron._tri(a, z, z + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
+			apron._tri(a, z + outward * 24, a + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
+	add(apron)
 	var step: float = [7.5, 5.5, 4.2][quality]
 	var depth: int = [2, 2, 3][quality]
 	for row in depth:

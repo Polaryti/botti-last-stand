@@ -1,5 +1,19 @@
 # Changelog
 
+## Development — Living upgrades and safer paths
+### Store and Armory
+- Heavy Infantry upgrades are now permanent Store purchases: Oathkeeper (240 Doubloons), Last Rites (260) and Faultline (280). Equip or disable them in the Armory; they work on their matching professions. The original free skill-tree choices return.
+- Upgrade displays demonstrate their effects: a shower of arrows, a Berserker rising through flames, moving pets, flurries, shrouds, funeral flames, healing motes and ground fissures.
+### The Village
+- Dry hillside navigation restrictions no longer form invisible walls for players. Deep-water and map-boundary barriers remain.
+- The Windmill has collision matching its tapered tower. Bonfires have level ground beneath their full footprints, and the fires near Windmill Hill and Castle Road have clearer positions.
+- Ground continues behind the boundary forest, covering the visible seam. A small memorial resting place fills the clearing north of the Church.
+### The Mists
+- The map names every island and shelf, and highlights the islands affected by Mist Storms, including the final retreat.
+- Shelf stairs have matching continuous walking surfaces and solid ramp connections across island rims. Shrines have wider, clearly open approaches.
+- The northern parkour shortcut reaches its shelf. Floating stones have matching upper and lower facets; the southern monument has a smaller, centred base and a clearer staircase landing.
+- Everyone in a multiplayer room needs this version.
+
 ## Development — Iron vows and woodland expeditions
 ### Classes and skills
 - Monk now costs 920 Doubloons and Artificer costs 598. Adept is available in the Store for 1,150; existing owners keep their unlocks, and its class code still works.

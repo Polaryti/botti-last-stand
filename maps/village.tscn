@@ -2276,12 +2276,12 @@ script = ExtResource("13_thing")
 kind = "bonfire"
 
 [node name="Bonfire10" type="Node3D" parent="Beyond/FiresAlongTheWay"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 83, 0, 42)
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, 86, 0, 40)
 script = ExtResource("13_thing")
 kind = "bonfire"
 
 [node name="Bonfire11" type="Node3D" parent="Beyond/FiresAlongTheWay"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -30, 0, -29.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, -0, 0, 1, -32, 0, -25)
 script = ExtResource("13_thing")
 kind = "bonfire"
 
@@ -3644,3 +3644,17 @@ script = ExtResource("7_prop")
 kind = "rock"
 grow = 0.7052
 
+
+[node name="ChurchNorthRest" type="Node3D" parent="Beyond"]
+[node name="BenchLogs" type="Node3D" parent="Beyond/ChurchNorthRest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, -68)
+script = ExtResource("13_thing")
+kind = "log_pile"
+[node name="WaysideLight" type="Node3D" parent="Beyond/ChurchNorthRest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, -66)
+script = ExtResource("13_thing")
+kind = "bonfire"
+[node name="RestingPlace" type="Node3D" parent="Beyond/ChurchNorthRest"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 0, -70)
+script = ExtResource("13_thing")
+kind = "grave_cross"

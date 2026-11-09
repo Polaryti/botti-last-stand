@@ -110,7 +110,7 @@ static func create(w: World, index: int, final_storm := false) -> MistStorm:
 		w.director.show_banner("Mist Storm gathering on %s — evacuate in 8 seconds" % NAMES[index], 8.0)
 	return storm
 
-const NAMES := ["the Arena", "the Rotunda", "the Battlements", "the Old Forest", "the Monument", "the Falls", "the Hollow", "the Terrace", "the Harbour", "the Northern Shelf", "the Eastern Shelf", "the Southern Shelf", "the Western Shelf"]
+const NAMES := MapIslands.ZONE_NAMES
 
 func contains(at: Vector3) -> bool:
 	if finale: return Vector2(at.x, at.z).length() > MapIslands.ISLANDS[0].z

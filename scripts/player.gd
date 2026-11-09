@@ -699,7 +699,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if _shield_blocks(from):
 		dmg *= 1.0 - minf(0.88, SHIELD_BASE + m("shield"))
 		sfx("block", -6.0, 1.0, 0.1)
-		if has_flag("oathkeeper") and amount > 0.0:
+		if has_item("oathkeeper") and amount > 0.0:
 			oath_reserve = minf(20.0, oath_reserve + 4.0)
 		fire("block", {"attacker": attacker})
 	if has_flag("mana_shield") and mana > 0.0:
@@ -965,6 +965,9 @@ func choose_ability(step: int, index: int) -> bool:
 	_apply_ability(a)
 	if step == CORE_STEPS:
 		spec_chosen()
+		for item: String in ShopDefs.for_class(class_id):
+			if has_item(item) and ShopDefs.ITEMS[item].has("effect"):
+				_apply_ability({"on": [ShopDefs.ITEMS[item]["effect"].duplicate(true)]})
 	sfx("ui_choose", -3.0)
 	return true
 
@@ -1778,7 +1781,7 @@ func art_glyph() -> String:
 
 
 func art_label() -> String:
-	if spec_id == "guardian" and has_flag("oathkeeper"):
+	if spec_id == "guardian" and has_item("oathkeeper"):
 		return "Oath %d / 20" % int(oath_reserve)
 	if class_id == "commander":
 		return "Last Command" if has_flag("last_command") else "Command"
