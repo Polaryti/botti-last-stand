@@ -3,6 +3,7 @@ render_mode diffuse_burley, specular_schlick_ggx;
 // The land, with the roads painted on it. "roads" holds how far each spot is from the nearest
 // road's edge, so a road follows the ground exactly and has a clean edge at any distance.
 
+uniform vec4 hearths[8];
 uniform sampler2D tile : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D roads : hint_default_white, filter_linear, repeat_disable;
 uniform vec3 dirt;
@@ -39,5 +40,14 @@ void fragment() {
 		ground = mix(rock, ground, smoothstep(0.35, 0.75, flat_ground));
 	}
 	ALBEDO = ground;
+	float warmth = 0.0;
+	for (int i = 0; i < 8; i++) {
+		if (hearths[i].w > 0.0) {
+			vec3 delta = world_at - hearths[i].xyz;
+			float falloff = max(0.0, 1.0 - dot(delta, delta) / (hearths[i].w * hearths[i].w));
+			warmth += falloff * falloff;
+		}
+	}
+	EMISSION = ground * vec3(0.9, 0.45, 0.12) * min(warmth, 1.5);
 	ROUGHNESS = 1.0;
 }

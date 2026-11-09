@@ -94,6 +94,7 @@ func _init(owner_world: World, ally_kind: String) -> void:
 
 ## Takes a resting body back into the fight.
 func activate(seconds: float) -> void:
+	guarded = 0.0
 	life = seconds
 	remote_owner = 0
 	master = null
@@ -243,7 +244,7 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 		Net.ally_hurt(remote_owner, net_index, amount)
 		return
 	if guarded > 0.0:
-		return
+		amount *= 1.0 - WorldLight.DOME_REDUCTION
 	# A Guardian shields its own summons too.
 	if me and me.m("cover") > 0.0 and global_position.distance_to(me.global_position) <= me.m("cover_radius"):
 		amount *= 1.0 - me.m("cover")

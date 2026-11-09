@@ -9,6 +9,7 @@ const TORCH_REACH := 3.5
 const LANTERN_REACH := 4.0
 const WARMTH := 1.5 # health per second, close to a bonfire
 
+const DOME_REDUCTION := 0.6
 const BURST_FREEZE := 2.0
 const LEAP_CLIMB := 4.0 # as high above where you stand as a leap can land
 const RIFT_REACH := 16.0

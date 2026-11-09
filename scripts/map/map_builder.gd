@@ -29,6 +29,7 @@ var terrain: Terrain
 var quality := 1 # 0 low, 1 medium, 2 high
 var grass_tufts := 350 # how much grass the whole map gets
 var is_preview := false
+var _ground_patches: Array[MeshInstance3D] = []
 var _ground_material: ShaderMaterial
 var _road_lines: Array[Dictionary] = []
 var _dirt_patches: Array[Dictionary] = []
@@ -39,6 +40,8 @@ var rng := RandomNumberGenerator.new() # for looks only: phones may disagree abo
 var _props := {}
 var _trees := {}
 var _indoors: Array[Rect2] = []
+var _plant_clearings: Array[Vector3] = []
+var _plant_rooms: Array[Dictionary] = []
 var _cells := {} # small things, merged by map area into one mesh each
 static var _cow_mesh: Mesh
 
@@ -51,6 +54,7 @@ func _init(world: Variant, p_terrain: Terrain) -> void:
 
 ## The whole map, for the game.
 func build(root: MapRoot) -> void:
+	_reserve_plants(root, Transform3D.IDENTITY)
 	ground()
 	w.play_half = root.play_half
 	boundary(root.play_half)
@@ -59,6 +63,7 @@ func build(root: MapRoot) -> void:
 		forest_wall(root.play_half)
 	grass(root.play_half)
 	_paint_roads()
+	_warm_ground()
 	flush()
 	w.indoors = _indoors
 
@@ -183,6 +188,8 @@ func _ground_mesh(m: Mesh, mat: Material) -> void:
 	var g := MeshInstance3D.new()
 	g.mesh = m
 	g.material_override = mat
+	if not is_preview: g.layers = 4
+	_ground_patches.append(g)
 	g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	w.add_child(g)
 
@@ -754,24 +761,32 @@ func windmill() -> void:
 
 ## The wheel, its frame and the race. Stand it where the mill meets the water, with +Z toward the mill.
 func mill_wheel() -> void:
-	var frame := mesh()
-	for x: float in [-1.6, 1.6]:
-		frame.box(Vector3(x, -0.6, 0), Vector3(0.3, 4.4, 0.3), BEAM)
-	frame.box(Vector3(0, 1.5, 0), Vector3(3.8, 0.24, 0.3), BEAM)
-	frame.box(Vector3(0, 1.5, 1.2), Vector3(0.3, 0.24, 2.6), BEAM)
+	var hub := xf * Vector3(0, 0, -1.0)
+	hub.y = Terrain.WATER_Y + 2.1
+	var frame := LowPoly.new()
+	for side: float in [-1.0, 1.0]:
+		var foot := hub + xf.basis.x * side * 2.75 + xf.basis.z * 0.8
+		foot.y = terrain.height(foot.x, foot.z) - 0.2
+		var top := Vector3(foot.x, hub.y + 0.5, foot.z)
+		frame.prism(foot, top, 0.14, 0.14, 4, BEAM)
+	frame.prism(hub - xf.basis.x * 2.9 + xf.basis.z * 0.8, hub + xf.basis.x * 2.9 + xf.basis.z * 0.8, 0.14, 0.14, 4, BEAM)
+	frame.prism(hub - xf.basis.z * 0.7, hub + xf.basis.z * 8.4, 0.17, 0.17, 8, BEAM)
 	add(frame)
 	var wheel := LowPoly.new()
-	for i in 10:
-		var a := TAU * i / 10.0
-		var q := Vector3(0, cos(a) * 2.4, sin(a) * 2.4)
-		wheel.box(q, Vector3(1.1, 0.14, 0.72), PLANK.lightened(0.1), Vector3(rad_to_deg(a), 0, 0))
-		wheel.box(q * 0.5, Vector3(0.14, 2.4, 0.14), BEAM, Vector3(rad_to_deg(a), 0, 0))
-	wheel.prism(Vector3(-0.8, 0, 0), Vector3(0.8, 0, 0), 0.2, 0.2, 6, BEAM)
+	for i in 12:
+		var angle := TAU * i / 12.0
+		var next := TAU * (i + 1) / 12.0
+		var rim := Vector3(cos(angle), sin(angle), 0) * 2.25
+		var rim_next := Vector3(cos(next), sin(next), 0) * 2.25
+		wheel.prism(Vector3.ZERO, rim, 0.07, 0.07, 4, BEAM)
+		for side: float in [-0.5, 0.5]: wheel.prism(rim + Vector3(0, 0, side), rim_next + Vector3(0, 0, side), 0.09, 0.09, 4, BEAM)
+		wheel.box(rim, Vector3(0.75, 0.14, 1.1), PLANK.lightened(0.1), Vector3(0, 0, rad_to_deg(angle)))
 	var node := MeshInstance3D.new()
+	node.name = "WaterMillWheel"
 	node.mesh = wheel.commit()
-	node.transform = xf.translated_local(Vector3(0, -0.6, -1.0))
+	node.transform = Transform3D(xf.basis, hub)
 	w.add_child(node)
-	w.add_spinner(node, Vector3.RIGHT, 0.7)
+	w.add_spinner(node, Vector3.BACK, 0.7)
 
 
 # --- Small things --------------------------------------------------------------
@@ -843,6 +858,7 @@ func bonfire() -> void:
 	var light: OmniLight3D = null
 	if quality > 0:
 		light = OmniLight3D.new()
+		light.light_cull_mask = 3
 		light.position = at + Vector3.UP * 1.5
 		light.light_color = Color(1.0, 0.62, 0.28)
 		light.light_energy = 2.5
@@ -864,6 +880,7 @@ func torch() -> void:
 	var light: OmniLight3D = null
 	if quality == 2:
 		light = OmniLight3D.new()
+		light.light_cull_mask = 3
 		light.position = at + Vector3.UP * 2.6
 		light.light_color = Color(1.0, 0.66, 0.32)
 		light.light_energy = 2.5
@@ -1163,6 +1180,9 @@ func _garden(size: Vector2) -> void:
 		var x := -size.x * 0.5 + 1.3
 		while x < size.x * 0.5 - 1.0:
 			var at := on_ground(Vector3(x + rng.randf_range(-0.12, 0.12), 0.13, z + rng.randf_range(-0.14, 0.14)))
+			if not _plant_allowed(at):
+				x += 1.0
+				continue
 			var key := Vector3i(pick, int(floor(at.x / 16.0)), int(floor(at.z / 16.0)))
 			if not groups.has(key):
 				groups[key] = [[], PackedColorArray()]
@@ -1197,6 +1217,9 @@ func _grain(size: Vector2, barley: bool) -> void:
 		var z := -size.y * 0.5 + 0.6
 		while z < size.y * 0.5 - 0.4:
 			var p := on_ground(Vector3(x + rng.randf_range(-0.25, 0.25), 0.06, z + rng.randf_range(-0.25, 0.25)))
+			if not _plant_allowed(p):
+				z += spacing
+				continue
 			var k := Vector2i(int(floor(p.x / 10.0)), int(floor(p.z / 10.0)))
 			if not chunks.has(k):
 				chunks[k] = [[], PackedColorArray()]
@@ -1224,6 +1247,9 @@ func _corn(size: Vector2) -> void:
 		var z := -size.y * 0.5 + 0.7
 		while z < size.y * 0.5 - 0.4:
 			var p := on_ground(Vector3(x + rng.randf_range(-0.08, 0.08), 0.06, z + rng.randf_range(-0.2, 0.2)))
+			if not _plant_allowed(p):
+				z += along
+				continue
 			var k := Vector2i(int(floor(p.x / 12.0)), int(floor(p.z / 12.0)))
 			if not chunks.has(k):
 				chunks[k] = [[], PackedColorArray()]
@@ -1252,6 +1278,9 @@ func _orchard(size: Vector2) -> void:
 		var z := -size.y * 0.5 + 2.5
 		while z < size.y * 0.5 - 1.0:
 			var at := on_ground(Vector3(x + r.randf_range(-0.4, 0.4), 0, z + r.randf_range(-0.4, 0.4)))
+			if not _plant_allowed(at, 2.0):
+				z += 5.0
+				continue
 			var s := r.randf_range(0.9, 1.2)
 			trees.append(Transform3D(Basis(Vector3.UP, r.randf() * TAU).scaled(Vector3(s, s, s)), at))
 			tints.append(Color(r.randf_range(0.9, 1.08), r.randf_range(0.9, 1.08), r.randf_range(0.9, 1.0)))
@@ -1280,7 +1309,11 @@ func _vines(size: Vector2) -> void:
 	while x < size.x * 0.5:
 		var z := -size.y * 0.5
 		while z < size.y * 0.5:
-			vines.append(Transform3D(xf.basis, on_ground(Vector3(x, 0, z))))
+			var at := on_ground(Vector3(x, 0, z))
+			if not _plant_allowed(at, 0.4):
+				z += 2.0
+				continue
+			vines.append(Transform3D(xf.basis, at))
 			tints.append(Color(1, 1, 1) * r.randf_range(0.85, 1.1))
 			z += 2.0
 		x += 2.6
@@ -1464,7 +1497,7 @@ func grass(h: float) -> void:
 	for i in int(grass_tufts * 3 * area):
 		var p := Vector3(rng.randf_range(-h, h), 0, rng.randf_range(-h, h))
 		if terrain.has_islands() and Vector2(p.x, p.z).length() < 57.1: continue
-		if not w.grid.is_free(w.grid.to_cell(p)) or _is_indoors(p):
+		if not _plant_allowed(p) or not w.grid.is_free(w.grid.to_cell(p)) or _is_indoors(p):
 			continue
 		if terrain.on_deck(p.x, p.z) or terrain.in_pool(p.x, p.z): continue
 		if terrain.has_islands():
@@ -1501,3 +1534,42 @@ func _grass_tuft() -> Mesh:
 		var tip := off * 3.0 + Vector3.UP * (0.36 + 0.09 * (i % 3))
 		l.gable(off - side, off + side, tip, GRASS.lerp(GRASS_TIP, 0.45 * (i % 3)))
 	return l.commit()
+
+
+func _reserve_plants(node: Node, parent: Transform3D) -> void:
+	for child: Node in node.get_children():
+		if not child is Node3D: continue
+		var at := parent * (child as Node3D).transform
+		if child is MapThing and (child as MapThing).kind == "bonfire":
+			_plant_clearings.append(Vector3(at.origin.x, at.origin.z, 2.6))
+		if child is MapHouse:
+			_plant_rooms.append({"inverse": at.affine_inverse(), "half": Vector2((child as MapHouse).width, (child as MapHouse).depth) * 0.5 + Vector2.ONE})
+		_reserve_plants(child, at)
+
+func _plant_allowed(at: Vector3, margin := 0.0) -> bool:
+	for clearing: Vector3 in _plant_clearings:
+		if Vector2(at.x - clearing.x, at.z - clearing.y).length() < clearing.z + margin: return false
+	for room: Dictionary in _plant_rooms:
+		var local: Vector3 = (room["inverse"] as Transform3D) * at
+		var half: Vector2 = room["half"]
+		if absf(local.x) < half.x + margin and absf(local.z) < half.y + margin: return false
+	return true
+
+
+## GLES limits point lights per mesh. Consistent ground warmth avoids square light seams between patches.
+func _warm_ground() -> void:
+	if is_preview: return
+	for patch: MeshInstance3D in _ground_patches:
+		var centre := patch.get_aabb().get_center()
+		var nearby: Array = w.fires.duplicate()
+		nearby.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return centre.distance_squared_to(a["at"]) < centre.distance_squared_to(b["at"]))
+		var hearths := PackedVector4Array()
+		hearths.resize(8)
+		for i in mini(8, nearby.size()):
+			var fire: Dictionary = nearby[i]
+			var at: Vector3 = fire["at"]
+			var radius := 8.0 if fire["heals"] else 5.0
+			hearths[i] = Vector4(at.x, at.y + 1.2, at.z, radius)
+		var material := _ground_material.duplicate() as ShaderMaterial
+		material.set_shader_parameter("hearths", hearths)
+		patch.material_override = material

@@ -30,7 +30,7 @@ func _ready() -> void:
 	w.player.set_process(false)
 	w.player._vm_root.visible = false
 	cam = w.player.camera
-	cam.cull_mask = 1
+	cam.cull_mask = 5
 	cam.current = true
 	for z: Zombie in w.zombies.duplicate():
 		z.release()
@@ -39,6 +39,8 @@ func _ready() -> void:
 	await snap("rotunda_night", Vector3(18, 22, -55), Vector3(0, 45, -122))
 	await snap("stones_night", Vector3(-48, 21, -46), Vector3(-68, 24, -66))
 	await snap("arena_ramp_close", Vector3(26, 12, 4), Vector3(38, 14, 4))
+	await snap("arena_torch_approach", Vector3(34, 13, 10), Vector3(0, 11, 10))
+	await snap("obelisk_approach", Vector3(22, 27, 133), Vector3(8, 27, 124))
 	await snap("rotunda_entry", Vector3(0, 42, -103), Vector3(0, 43, -122))
 	await snap("falls_pool", Vector3(90, 51, -110), Vector3(90, 46, -122))
 	for island in range(1, 9):
@@ -65,4 +67,7 @@ func _ready() -> void:
 	var storm := MistStorm.create(w, 0)
 	storm.elapsed = 9.0
 	await snap("mist_storm", Vector3(0, 13, 26), Vector3(0, 18, 0))
+	storm = MistStorm.create(w, 0, true)
+	storm.elapsed = 21.0
+	await snap("finale_outer_storms", Vector3(18, 44, -103), Vector3(0, 44, -122))
 	await preload("res://tests/scene_cleanup.gd").finish(w)

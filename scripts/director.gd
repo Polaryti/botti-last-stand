@@ -58,6 +58,7 @@ var _next_storm := MistStorm.EVERY
 var _storm_index := 0
 var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
+var _mist_boss_defeated := false
 
 
 func _init(owner_world: World) -> void:
@@ -104,6 +105,8 @@ func begin(with_zombies: bool) -> void:
 		var opening := "Survive until dawn"
 		if world.fort:
 			opening = "Hold the fort until dawn"
+		elif requires_regent():
+			opening = "Survive ten minutes and defeat the Veil Regent"
 		elif Net.fog_rules():
 			opening = "Three lives. Last one standing"
 		show_banner(opening, 4.0)
@@ -129,7 +132,8 @@ func night_left() -> float:
 func dawn_amount() -> float:
 	if not running or Net.fog_rules():
 		return 0.0
-	return clampf(1.0 - night_left() / DAWN_GLOW, 0.0, 1.0)
+	var dawn := clampf(1.0 - night_left() / DAWN_GLOW, 0.0, 1.0)
+	return minf(dawn, 0.45) if requires_regent() and not _mist_boss_defeated else dawn
 
 
 ## The night starts calm and fills up to the phone's zombie limit.
@@ -187,7 +191,7 @@ func _process(delta: float) -> void:
 	if not running:
 		return
 	elapsed += delta
-	if world.terrain.has_islands() and not Net.fog_rules() and elapsed >= _next_storm:
+	if world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _next_storm:
 		_next_storm = elapsed + MistStorm.EVERY
 		var island := 0 if _storm_index == 0 else randi_range(1, 8)
 		_storm_index += 1
@@ -211,7 +215,7 @@ func _process(delta: float) -> void:
 		_far_timer = 4.0
 		if world.fort == null:
 			_clear_far_zombies()
-	if elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules():
+	if elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules() and (not requires_regent() or _mist_boss_defeated):
 		_won = true
 		_sound("rooster", 0.0)
 		if Net.is_host():
@@ -292,7 +296,8 @@ func _tick_mist_boss() -> void:
 			_mist_boss_spawned = true
 			CommandField.visual_impact(world, throne, 12.0, true)
 			if Net.is_host(): Net.command_impact_visual(throne, 12.0, true)
-			show_banner("The Veil Regent awakens in the arena", 5.0)
+			if Net.active(): Net.start_mist_storm(-1)
+			else: MistStorm.create(world, 0, true)
 			_sound("mist_regent", 0.0)
 
 
@@ -355,7 +360,7 @@ func _spawn_roamer() -> void:
 		world.spawn_zombie(_pick_roamer())
 		return
 	# Keep pressure near explorers and replenish the least populated outer island.
-	if world.count_living() >= 8 and randf() < 0.5:
+	if (world.mist_storm and world.mist_storm.finale) or (world.count_living() >= 8 and randf() < 0.5):
 		world.spawn_zombie(_pick_roamer())
 		return
 	var counts := PackedInt32Array()
@@ -375,3 +380,7 @@ func _spawn_roamer() -> void:
 		if world.grid.is_free(world.grid.to_cell(at)) and world.terrain.is_walkable(at.x, at.z) and not world.terrain.in_pool(at.x, at.z):
 			world.spawn_zombie(_pick_roamer(), at)
 			return
+
+
+func requires_regent() -> bool:
+	return world.terrain.has_islands() and not sandbox and not Net.fog_rules()

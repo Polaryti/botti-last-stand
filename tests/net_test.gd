@@ -316,10 +316,12 @@ func _mists() -> void:
 		(w.zombies.back() as Zombie).set_physics_process(false)
 	await until(func() -> bool: return w.count_type("veil_regent") == 1, 4.0)
 	ok(w.count_type("veil_regent") == 1, "one scheduled Veil Regent appears on both phones")
+	await until(func() -> bool: return w.mist_storm != null and w.mist_storm.finale, 4.0)
+	ok(w.mist_storm != null and w.mist_storm.finale and w.mist_storm.contains(Vector3(0, 40, -122)) and not w.mist_storm.contains(Vector3(16, 10, 0)), "boss arrival replicates outer-island storms with a safe arena")
 	await sync(19)
 
 	if host: Net.start_mist_storm(0)
-	await until(func() -> bool: return w.mist_storm != null, 4.0)
+	await until(func() -> bool: return w.mist_storm != null and not w.mist_storm.finale, 4.0)
 	ok(w.mist_storm != null, "Mist Storm warning replicates to both phones")
 	var storm_hp := pl.hp
 	await wait(0.25)
@@ -332,6 +334,15 @@ func _mists() -> void:
 	await wait(0.7)
 	ok(pl.hp == storm_hp, "leaving the storm island stops its damage on both phones")
 	await sync(20)
+	pl.guard_left = 0.0
+	pl.dome_left = 0.0
+	await sync(21)
+	if host: Net.protect_peer(int(Net.roster.keys().filter(func(peer: int) -> bool: return peer != 1)[0]), 3.0, 0.0)
+	if not host:
+		await until(func() -> bool: return pl.dome_left > 0.0, 3.0)
+		ok(pl.dome_left > 0.0 and pl.guard_left == 0.0, "remote Guardian protection uses mitigation rather than invulnerability")
+	await sync(22)
+
 
 
 func _with_bots() -> void:

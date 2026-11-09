@@ -2,6 +2,20 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## Development — Foundations, monument access and the final stand
+### Fixed
+- Village house foundations remain level after terrain and river shaping, including the barn and hillside cabins. Crops and grass leave houses and bonfires clear.
+- The mill wheel has continuous rims, grounded supports and an axle reaching the mill; its paddles turn in the river rather than the bank.
+- Mobs can enter and leave all Mists rotundas. Shrine floors and sloping monument bases no longer act as invisible walls to ground-following enemies.
+- Mists torches stand on their actual walking surface and leave access ramps clear. Monument rune rings follow the paving rather than floating above slopes.
+- Firelight blends smoothly across Village terrain instead of producing rectangular ground-light seams.
+### Changed
+- Guardian's dome grants 60% damage reduction for three seconds to nearby allies and summons, replacing invulnerability.
+- Winning the Mists requires surviving ten minutes AND defeating the Veil Regent. If it survives until dawn, the fight continues.
+- When the Regent awakens around 8:30, all outer islands and shelves gather permanent Mist Storms. Return to the central arena within the 20-second warning; gates remain open. The arena stays safe from these storms.
+### Validation
+- Actual mob-body traversal tests cover shrine doors and monument bases in both directions. Render checks capture every Village house interior, repaired props and the Mists finale. Multiplayer checks cover the finale and Guardian protection.
+
 ## Development — Mists traversal and night atmosphere
 ### Fixed
 - Portals no longer flash a level-up announcement. Gates stand on clear, level landings, face their island's approach and leave space for trees, players and mobs.

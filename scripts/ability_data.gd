@@ -372,7 +372,7 @@ static func _heavy() -> Dictionary:
 		a("second_wind", "Second Wind", "Heal 5 per kill", "wind+heart", {}, [t("kill", "heal", {"n": 5.0})])],
 	], "specs": [
 		_spec("guardian", "Guardian", "Stands between the others and the dark", Color(0.34, 0.38, 0.46),
-			a("guardian", "Guardian", "Iron shield, and Shield Dome: nobody inside can be hurt for 3 s. Friends near you take 25% less, and you bear part of it", "shield_rect+up", {"shield": 0.2, "cover": 0.25, "cover_radius": 8.0}, [t("take", "shield_max")]),
+			a("guardian", "Guardian", "Iron shield, and Shield Dome: you and nearby allies take 60% less damage for 3 s. Friends near you take 25% less, and you bear part of it", "shield_rect+up", {"shield": 0.2, "cover": 0.25, "cover_radius": 8.0}, [t("take", "shield_max")]),
 			[[a("take_the_blow", "Take the Blow", "Friends near you take 20% less, and get back up twice as fast", "shield_rect+heart", {"cover": 0.2}, [], "rescuer"),
 			a("second_skin", "Second Skin", "+60 max health", "helm+heart", {"max_hp": 60.0})],
 			[a("long_dome", "Long Dome", "The dome lasts 3 s longer", "shield_rect+clock", {"dome_time": 3.0}),

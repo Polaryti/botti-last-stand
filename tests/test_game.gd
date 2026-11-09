@@ -1740,7 +1740,7 @@ func test_version_19() -> void:
 		var b_at: Vector3 = probe[1]
 		var y_at := w.terrain.ground_height(a_at.x, a_at.z) + float(probe[2])
 		var ray := PhysicsRayQueryParameters3D.create(Vector3(a_at.x, y_at, a_at.z), Vector3(b_at.x, y_at, b_at.z))
-		ray.collision_mask = 1
+		ray.collision_mask = (1 | Terrain.LAYER) if probe[3] in ["the sword's stone", "the monument's steps"] else 1
 		ok(not space.intersect_ray(ray).is_empty() or probe[3] == "a rotunda's column", "you can't walk through %s" % probe[3])
 	# Things turn up apart.
 	for p: Pickup in w.pickups.duplicate():
@@ -4172,7 +4172,7 @@ func test_finals() -> void:
 	pl.use_art()
 	await seconds(0.3)
 	pl.hurt(50.0, front(2.0))
-	ok(pl.hp == pl.max_hp(), "the Shield Dome stops every blow")
+	ok(pl.hp < pl.max_hp() and pl.max_hp() - pl.hp <= 20.01, "the Shield Dome mitigates damage without invulnerability")
 	ok(pl.art_cd_left > 0.0, "and it needs a long time to come back")
 	pl.guard_left = 0.0
 	pl.hurt(99999.0, pl.global_position + pl.global_basis.z)

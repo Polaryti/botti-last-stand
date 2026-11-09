@@ -119,6 +119,7 @@ var _buffs := {} # key -> {stat, val, left, stacks}
 var _triggers := {} # event -> list of effect dictionaries with runtime counters
 var invis_left := 0.0
 var guard_left := 0.0
+var dome_left := 0.0
 var _riposte_cd := 0.0
 var _kill_shot_cd := 0.0
 var _sacred_cd := 0.0
@@ -681,7 +682,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		sfx("block", 0.0)
 		say("Perfect Riposte!")
 		return
-	var dmg := amount * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0)
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0)
 	if Net.active():
 		# A Guardian nearby takes part of it.
 		var cover: Target = world.best_cover(global_position)
@@ -1626,6 +1627,7 @@ func _tick_ability_timers(delta: float) -> void:
 	_tick_triggers(delta)
 	invis_left = maxf(0.0, invis_left - delta)
 	guard_left = maxf(0.0, guard_left - delta)
+	dome_left = maxf(0.0, dome_left - delta)
 	_riposte_cd -= delta
 	_kill_shot_cd -= delta
 	flurry_left -= delta
@@ -2265,23 +2267,23 @@ func mist_burst_at(at: Vector3, power: float) -> void:
 		world.status_rival(r, Net.Status.FREEZE, WorldLight.BURST_FREEZE)
 
 
-## Nobody inside can be hurt for a moment, including the summons.
+## A timed damage reduction for the Guardian and nearby allies, including summons.
 func raise_dome() -> void:
 	var r := m("dome_radius")
 	var secs := m("dome_time")
 	world.fx_dome(global_position + Vector3.UP * 0.5, r, secs)
 	sfx("block", 0.0, 0.7, 0.1)
-	guard_left = maxf(guard_left, secs)
+	dome_left = maxf(dome_left, secs)
 	var healing := has_flag("aegis")
 	if healing:
 		heal(30.0)
 	for a in world.allies:
 		if a.remote_owner == 0 and not a.dead and a.global_position.distance_to(global_position) <= r:
-			a.guarded = secs
+			a.guarded = maxf(a.guarded, secs)
 	if Net.active():
 		Net.dome(global_position + Vector3.UP * 0.5, r, secs)
 		for t: Target in world.friends_near(global_position, r):
-			Net.guard_peer(world.peer_of(t), secs, 30.0 if healing else 0.0)
+			Net.protect_peer(world.peer_of(t), secs, 30.0 if healing else 0.0)
 	if has_flag("dome_taunt"):
 		for z: Zombie in world.zombies:
 			if z.is_alive() and z.position.distance_to(global_position) < 22.0:
@@ -2606,7 +2608,7 @@ func decoy_burst(at: Vector3) -> void:
 func take_shared(amount: float) -> void:
 	if dead or guard_left > 0.0:
 		return
-	var dmg := amount * m("damage_taken") * (1.0 - minf(0.6, m("shield")))
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (1.0 - minf(0.6, m("shield")))
 	hp -= dmg
 	hurt_flash = maxf(hurt_flash, 0.4)
 	sfx("block", -8.0, 1.0, 0.15)

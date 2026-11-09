@@ -21,7 +21,7 @@ func _ready() -> void:
 		at.y = world.ground_at(at)
 		world.player.global_position = at
 		var camera := world.player.camera
-		camera.cull_mask = 1
+		camera.cull_mask = 5
 		camera.global_position = at + Vector3.UP * 1.7
 		camera.look_at(Vector3(0, world.ground_at(Vector3.ZERO) + 3, 0))
 		await get_tree().create_timer(4.0).timeout

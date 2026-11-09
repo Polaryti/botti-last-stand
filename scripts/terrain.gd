@@ -212,12 +212,14 @@ func _shape(x: float, z: float) -> float:
 	for c: Dictionary in _cuts:
 		h = _apply_cut(c, x, z, h)
 	if river.is_empty():
+		for pad: Dictionary in _auto_pads: h = _apply_pad(pad, x, z, h)
 		return h
 	# Hollows in the land stay above the water, or they would be pits with no water in them.
 	h = maxf(h, WATER_Y + 0.3)
 	var dist := river_distance(x, z)
 	if dist < river_width + BANK:
 		h = lerpf(BED_Y, minf(h, 2.2), smoothstep(river_width - 1.2, river_width + BANK, dist))
+	for pad: Dictionary in _auto_pads: h = _apply_pad(pad, x, z, h)
 	return h
 
 

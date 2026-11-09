@@ -67,7 +67,7 @@ func build(b: MapBuilder) -> void:
 
 func land(t: Terrain, at: Transform3D) -> void:
 	if level_ground and on_ground:
-		t.level_auto(Vector2(at.origin.x, at.origin.z), Vector2(width, depth) * 0.5 + Vector2(1.0, 1.0), at.basis.get_euler().y, 3.0)
+		t.level_auto(Vector2(at.origin.x, at.origin.z), Vector2(width, depth) * 0.5 + Vector2(2.0, 2.0), at.basis.get_euler().y, 3.0)
 
 
 func shapes_land() -> bool:

@@ -397,11 +397,17 @@ func _rotunda(b: MapBuilder, c: Vector3, r: float, h: float, ribs := 12) -> void
 ## A glowing ring on the ground, with marks around it.
 func _rune(b: MapBuilder, c: Vector3, r: float) -> void:
 	var l := LowPoly.new()
-	_annulus(l, c, r - 0.28, r, c.y, c.y, GLOW, 28)
-	_annulus(l, c, r * 0.5 - 0.12, r * 0.5, c.y, c.y, GLOW, 18)
-	for n in 8:
-		var a := TAU * n / 8.0
-		l.box(c + Vector3(cos(a) * r * 0.76, 0, sin(a) * r * 0.76), Vector3(r * 0.09, 0.02, r * 0.28), GLOW, Vector3(0, -rad_to_deg(a) + 90.0, 0))
+	for band: Vector2 in [Vector2(r - 0.28, r), Vector2(r * 0.5 - 0.12, r * 0.5)]:
+		for n in 64:
+			var points: Array[Vector3] = []
+			for corner: Vector2 in [Vector2(band.x, n), Vector2(band.x, n + 1), Vector2(band.y, n + 1), Vector2(band.y, n)]:
+				var angle := corner.y / 64.0 * TAU
+				var p := Vector3(c.x + cos(angle) * corner.x, 0, c.z + sin(angle) * corner.x)
+				p.y = b.w.ground_at(p) + 0.025
+				points.append(p)
+			var under := (points[0] + points[2]) * 0.5 - Vector3.UP
+			l._tri(points[0], points[1], points[2], under, GLOW)
+			l._tri(points[0], points[2], points[3], under, GLOW)
 	var mi := b.add(l)
 	var look := StandardMaterial3D.new()
 	look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -497,6 +503,11 @@ func _pine(b: MapBuilder, x: float, z: float, size: float) -> void:
 
 func _brazier(b: MapBuilder, x: float, z: float) -> void:
 	var at := _at(b, x, z)
+	for ramp: Array in RAMPS:
+		var a := Vector2(ramp[0].x, ramp[0].z)
+		var end := Vector2(ramp[1].x, ramp[1].z)
+		if Vector2(x, z).distance_to(Geometry2D.get_closest_point_to_segment(Vector2(x, z), a, end)) < 4.5: return
+	at.y = b.w.ground_at(at)
 	if b.w.grid.is_free(b.w.grid.to_cell(at)):
 		b.stand_at(Transform3D(Basis.IDENTITY, at))
 		b.torch()
@@ -542,10 +553,7 @@ func _arena(b: MapBuilder) -> void:
 			l.prism(at + Vector3.UP * tall, at2, 0.45, 0.45, 4, STONE.darkened(0.1))
 	# In the middle, a sword as tall as a house, driven into a stepped stone.
 	var o := Vector3(0, 10.0, 0)
-	for s in 3:
-		var side := 9.0 - s * 2.4
-		l.box(o + Vector3(0, 0.45 + s * 0.9, 0), Vector3(side, 0.9, side), MARBLE.darkened(0.1 + s * 0.05))
-		b.w.add_solid(o + Vector3(0, 0.45 + s * 0.9, 0), Vector3(side, 0.9, side))
+	_plinth(b, l, o, 6.0, 1.8, 2.7, 3)
 	b.w.add_solid(o + Vector3(0, 8.4, 0), Vector3(1.2, 11.5, 0.5))
 	l.box(o + Vector3(0, 8.4, 0), Vector3(1.2, 11.5, 0.3), Color(0.72, 0.78, 0.86))
 	l.prism(o + Vector3(0, 2.7, 0), o + Vector3(0, 0.6, 0), 0.6, 0.0, 4, Color(0.72, 0.78, 0.86))
@@ -674,10 +682,7 @@ func _forest(b: MapBuilder) -> void:
 func _monument(b: MapBuilder) -> void:
 	var l := LowPoly.new()
 	var c := _at(b, 8, 124)
-	for s in 4:
-		var side := 15.0 - s * 3.2
-		l.box(c + Vector3(0, 0.3 + s * 0.6, 0), Vector3(side, 0.6, side), MARBLE.darkened(0.08 + s * 0.04))
-		b.w.add_solid(c + Vector3(0, 0.3 + s * 0.6, 0), Vector3(side, 0.6, side))
+	_plinth(b, l, c, 8.5, 3.0, 2.4, 4)
 	b.w.add_solid(c + Vector3(0, 10.7, 0), Vector3(3.0, 16.6, 3.0))
 	l.prism(c + Vector3(0, 2.4, 0), c + Vector3(0, 19.0, 0), 1.9, 0.9, 4, MARBLE)
 	l.prism(c + Vector3(0, 19.0, 0), c + Vector3(0, 21.0, 0), 0.9, 0.0, 4, GOLD)
@@ -1010,7 +1015,7 @@ static func _near_gate(w: World, at: Vector3, radius: float) -> bool:
 static func _surface_collision(w: World, mesh: Mesh, label: String) -> void:
 	var body := StaticBody3D.new()
 	body.name = label
-	body.collision_layer = 1
+	body.collision_layer = Terrain.LAYER
 	var shape := CollisionShape3D.new()
 	shape.shape = mesh.create_trimesh_shape()
 	body.add_child(shape)
@@ -1097,3 +1102,26 @@ func _waystations(b: MapBuilder) -> void:
 	var shrines := b.add(l)
 	shrines.name = "IslandSupplyShrines"
 	shrines.set_meta("islands", placed)
+
+
+static func plinth_height(at: Vector3, centre: Vector3, outer: float, inner: float, rise: float) -> float:
+	var extent := maxf(absf(at.x - centre.x), absf(at.z - centre.z))
+	return centre.y + rise * clampf((outer - extent) / (outer - inner), 0.0, 1.0)
+
+func _plinth(b: MapBuilder, l: LowPoly, c: Vector3, outer: float, inner: float, rise: float, bands: int) -> void:
+	var ramp := LowPoly.new()
+	for band in bands:
+		var f0 := float(band) / bands
+		var f1 := float(band + 1) / bands
+		for side in 4:
+			var yaw := side * PI * 0.5
+			var corners: Array[Vector3] = []
+			for v: Vector2 in [Vector2(-1, f0), Vector2(1, f0), Vector2(1, f1), Vector2(-1, f1)]:
+				var extent := lerpf(outer, inner, v.y)
+				corners.append(c + Vector3(v.x * extent, rise * v.y + 0.08, extent).rotated(Vector3.UP, yaw))
+			var below := (corners[0] + corners[2]) * 0.5 - Vector3.UP
+			for target: LowPoly in [l, ramp]:
+				target._tri(corners[0], corners[1], corners[2], below, MARBLE.darkened(0.08 + band * 0.04))
+				target._tri(corners[0], corners[2], corners[3], below, MARBLE.darkened(0.08 + band * 0.04))
+	for target: LowPoly in [l, ramp]: target.box(c + Vector3(0, rise + 0.04, 0), Vector3(inner * 2, 0.08, inner * 2), MARBLE)
+	_surface_collision(b.w, ramp.commit(), "WalkablePlinth")

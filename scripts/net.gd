@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 32
+const PROTOCOL := 33
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -1037,6 +1037,7 @@ func _z_died(net_id: int, killer: int) -> void:
 	var z: Zombie = world.zombie_by_id(net_id)
 	if z == null or not z.active:
 		return
+	if z.def.get("mist_boss", false): world.director._mist_boss_defeated = true
 	z.net_die()
 	_credit(z, killer)
 
@@ -1706,7 +1707,7 @@ func _share(amount: float) -> void:
 		world.player.take_shared(amount)
 
 
-## A friend's Apothecary or Guardian: a moment nobody can hurt you, and some health back.
+## A friend's Apothecary: a moment nobody can hurt you, and some health back.
 func guard_peer(peer: int, seconds: float, healing: float) -> void:
 	if is_bot(peer):
 		if is_host():
@@ -1747,6 +1748,9 @@ func dome(at: Vector3, radius: float, seconds: float) -> void:
 func _dome_fx(at: Vector3, radius: float, seconds: float) -> void:
 	if world and is_instance_valid(world):
 		world.fx_dome(at, radius, seconds)
+		for ally: Ally in world.allies:
+			if ally.remote_owner == 0 and not ally.dead and ally.global_position.distance_to(at - Vector3.UP * 0.5) <= radius:
+				ally.guarded = maxf(ally.guarded, clampf(seconds, 0.0, 6.0))
 
 
 func mist(at: Vector3, size: float) -> void:
@@ -2095,8 +2099,8 @@ func start_mist_storm(island: int) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _mist_storm_start(island: int) -> void:
-	if world and is_instance_valid(world) and island >= 0 and island < 9:
-		MistStorm.create(world, island)
+	if world and is_instance_valid(world) and island >= -1 and island < 9:
+		MistStorm.create(world, maxi(0, island), island == -1)
 
 
 var _last_command_voice := -10.0
@@ -2121,3 +2125,23 @@ func _relay_command_voice(peer: int) -> void:
 func _command_voice(peer: int, at: Vector3) -> void:
 	if peer != my_id() and world and world.player:
 		Sfx.play_at("command", at, world.player.global_position, -1.0, 0.1)
+
+
+func protect_peer(peer: int, seconds: float, healing: float) -> void:
+	if peer == my_id() or (is_host() and is_bot(peer)):
+		_protect_player(local_player(peer), seconds, healing)
+	elif is_bot(peer): _bot_protect.rpc_id(1, peer, seconds, healing)
+	else: _protect.rpc_id(peer, seconds, healing)
+
+@rpc("any_peer", "reliable")
+func _bot_protect(peer: int, seconds: float, healing: float) -> void:
+	if is_host() and is_bot(peer): _protect_player(local_player(peer), seconds, healing)
+
+@rpc("any_peer", "reliable")
+func _protect(seconds: float, healing: float) -> void:
+	if world and is_instance_valid(world): _protect_player(world.player, seconds, healing)
+
+func _protect_player(p: Player, seconds: float, healing: float) -> void:
+	if p == null or p.dead: return
+	p.dome_left = maxf(p.dome_left, clampf(seconds, 0, 6))
+	if healing > 0: p.heal(minf(healing, 30))

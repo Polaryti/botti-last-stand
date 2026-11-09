@@ -45,6 +45,8 @@ func _ready() -> void:
 	_remote_animation()
 	_equipment()
 	_ownership_and_poison()
+	_foundations()
+	_guardian_protection()
 	await _mists()
 	print("REWORK progress")
 	_progress()
@@ -425,8 +427,11 @@ func _mists() -> void:
 	w.process_mode = Node.PROCESS_MODE_DISABLED
 	Game.night_map = "mists"
 	Game.player_class = "infantry"
+	var map_space := SubViewport.new()
+	map_space.own_world_3d = true
+	add_child(map_space)
 	var mw := World.new()
-	add_child(mw)
+	map_space.add_child(mw)
 	mw.setup(Game.Mode.NIGHT)
 	mw.director.running = false
 	for z: Zombie in mw.zombies.duplicate():
@@ -440,7 +445,7 @@ func _mists() -> void:
 	for step in 13:
 		var radius := 30.0 + (step + 0.5) * 24.0 / 13.0
 		var point := Vector3(radius * 0.7, 0, radius * sqrt(0.51))
-		var query := PhysicsRayQueryParameters3D.create(point + Vector3.UP * 25.0, point + Vector3.UP * 8.0, 1)
+		var query := PhysicsRayQueryParameters3D.create(point + Vector3.UP * 25.0, point + Vector3.UP * 8.0, Terrain.LAYER)
 		var hit := mw.get_world_3d().direct_space_state.intersect_ray(query)
 		treads_match = treads_match and not hit.is_empty() and absf((hit["position"] as Vector3).y - mw.ground_at(point)) < 0.03
 	check(treads_match, "all thirteen arena bands have continuous ramp collision at the visible surface")
@@ -499,6 +504,41 @@ func _mists() -> void:
 		var outside := Vector3(centre.x, 0, centre.y) + direction * (radius + 7.0)
 		var inside := Vector3(centre.x, 0, centre.y) + direction * (radius - 2.0)
 		check(mw.grid.line_is_open(outside, inside), "shrine entry remains open between its columns")
+	# Use the real NPC mover and body, in an isolated physics world, in both directions.
+	var approaches: Array[Array] = []
+	for shrine: Array in MapIslands.ROTUNDAS:
+		var centre: Vector2 = shrine[0]
+		var radius := float(shrine[1])
+		var angle := PI / (12.0 if radius > 9 else 10.0 if radius > 6 else 8.0)
+		var direction := Vector3(cos(angle), 0, sin(angle))
+		var outside := Vector3(centre.x, 0, centre.y) + direction * (radius + 7.0)
+		var inside := Vector3(centre.x, 0, centre.y) + direction * (radius - 2.0)
+		approaches.append([outside, inside])
+	approaches.append([Vector3(11, 0, 0), Vector3(3, 0, 0)])
+	approaches.append([Vector3(19, 0, 124), Vector3(12, 0, 124)])
+	for approach: Array in approaches:
+		var outside: Vector3 = approach[0]
+		var inside: Vector3 = approach[1]
+		outside.y = mw.ground_at(outside)
+		mw.spawn_zombie("normal", outside)
+		var walker: Zombie = mw.zombies.back()
+		walker.set_physics_process(false)
+		walker.state = Zombie.State.CHASE
+		walker._sees = true
+		walker._direct = true
+		walker._flank = Vector3.ZERO
+		walker._speed = 8.0
+		for goal: Vector3 in [inside, outside]:
+			mp.position = Vector3(goal.x, mw.ground_at(goal), goal.z)
+			for tick in 480:
+				var to := mp.position - walker.position
+				to.y = 0.0
+				if to.length() < 1.8: break
+				walker._move(mp, to, to.length(), 0.016)
+				await frames(1)
+			check(Vector2(walker.position.x - goal.x, walker.position.z - goal.z).length() < 2.0, "physical mob can enter/exit monument approach at %s" % outside)
+		walker.release()
+	mp.position = Vector3(0, 10.06, 16)
 	check(mw.night_bg.get_luminance() < 0.06 and mw.night_moon <= 0.35 and mw.night_sky_shows, "Mists uses a moonlit night palette with stars")
 	check(mw.find_children("MistBridgeInlays*", "MeshInstance3D", false, false).size() == MapIslands.BRIDGES.size(), "every existing bridge has deck-following night inlays")
 	for kind: String in MistModels.KINDS:
@@ -543,7 +583,7 @@ func _mists() -> void:
 	grounded.free()
 	MistSeal.cast(spirit, Vector3(2.0, 12.72, 0), 3.0, 1.5, 10.0)
 	var raised: MistSeal = mw.mist_seals.back()
-	check(absf(raised.position.y - 12.7) < 0.1, "seals on raised plinths warn on their visible standing surface")
+	check(absf(raised.position.y - mw.ground_at(Vector3(2, 0, 0))) < 0.15, "seals on raised plinths warn on their visible standing surface")
 	raised.free()
 	for i in MistSeal.LIMIT:
 		MistSeal.create(mw, mp.position, 3.0, 0.0, 1.5, 0.0, -1)
@@ -614,9 +654,42 @@ func _mists() -> void:
 	check(mp.hp == safe_hp, "another island is safe from the active storm")
 	check(storm.escape(Vector3(0, 10, 16)) != Vector3.INF, "storm island has an evacuation gate")
 	storm.free()
+	var finale := MistStorm.create(mw, 0, true)
+	finale.set_physics_process(false)
+	var covered := true
+	for island in range(1, MapIslands.ISLANDS.size()):
+		var land := MapIslands.ISLANDS[island]
+		covered = covered and finale.contains(Vector3(land.x, land.w, land.y))
+	check(covered and not finale.contains(Vector3(16, 10, 0)), "finale storms cover every outer island and shelf while sparing the arena")
+	mp.position = Vector3(0, 40.6, -122)
+	mp.hp = mp.max_hp()
+	mp.dome_left = 0.0
+	var before_finale := mp.hp
+	finale._physics_process(MistStorm.FINALE_WARNING)
+	check(mp.hp == before_finale, "finale gives twenty seconds to evacuate")
+	finale._physics_process(1.0)
+	check(is_equal_approx(mp.hp, before_finale - MistStorm.DPS), "simultaneous outer storms apply damage once, without overlap stacking")
+	finale._physics_process(30.0)
+	check(is_instance_valid(finale) and not finale.is_queued_for_deletion(), "finale storms persist rather than expiring after twenty seconds")
+	finale.free()
+	mp.position = Vector3(16, 10.06, 0)
+	mp.hp = mp.max_hp()
+	mp.dead = false
+	mw.director.running = true
+	mw.director.elapsed = 600.0
+	mw.director._mist_boss_defeated = false
+	mw.director._process(0.0)
+	check(not mw._dawn_done and not mw.director._won, "ten minutes alone cannot win Mists while the boss survives")
+	mw.director.elapsed = 599.0
+	mw.director._mist_boss_defeated = true
+	mw.director._process(0.0)
+	check(not mw._dawn_done, "an early boss kill still requires ten minutes of survival")
+	mw.director.elapsed = 600.0
+	mw.director._process(0.0)
+	check(mw._dawn_done and mw.director._won, "Mists victory requires both ten minutes and the boss kill")
 	Game.night_map = old_map
 	Game.player_class = old_class
-	mw.queue_free()
+	map_space.queue_free()
 	await frames(2)
 	w.process_mode = Node.PROCESS_MODE_INHERIT
 
@@ -642,3 +715,43 @@ func _ownership_and_poison() -> void:
 	pawn("plague_doctor")
 	p.slots[1] = "sword"
 	check(not p.can_drop_weapon() and not WeaponDefs.lies_around("blowgun"), "Plague Doctor's blowgun is exclusive, undroppable and absent from loot")
+
+
+func _foundations() -> void:
+	var map := (load("res://maps/village.tscn") as PackedScene).instantiate()
+	_check_rooms(map, Transform3D.IDENTITY)
+	map.free()
+
+func _check_rooms(node: Node, parent: Transform3D) -> void:
+	for child: Node in node.get_children():
+		if not child is Node3D: continue
+		var at := parent * (child as Node3D).transform
+		if child is MapHouse and (child as MapHouse).on_ground:
+			var house := child as MapHouse
+			var base := w.terrain.height(at.origin.x, at.origin.z)
+			var flat := true
+			for x in 7:
+				for z in 7:
+					var point := at * Vector3((float(x) / 6.0 - 0.5) * (house.width - 0.3), 0, (float(z) / 6.0 - 0.5) * (house.depth - 0.3))
+					flat = flat and absf(w.terrain.ground_height(point.x, point.z) - base) < 0.04
+			check(flat, "flat interior terrain throughout %s" % child.name)
+		_check_rooms(child, at)
+
+func _guardian_protection() -> void:
+	pawn("heavy", 0)
+	p.hp = p.max_hp()
+	p.guard_left = 0.0
+	w.spawn_ally("ghost", p.position + Vector3.RIGHT * 2, 20.0)
+	var ally: Ally = w.allies.back()
+	p.raise_dome()
+	var before := p.hp
+	p.hurt(100.0, p.position + Vector3.BACK * 4)
+	check(p.hp < before and is_equal_approx(before - p.hp, 100.0 * p.m("damage_taken") * 0.4), "Guardian dome reduces damage by sixty percent instead of granting invulnerability")
+	var ally_before := ally.hp
+	ally.hurt(100.0, p.position)
+	check(ally.hp < ally_before and ally_before - ally.hp <= 40.01, "Guardian-protected summons take reduced damage rather than ignoring it")
+	ally.guarded = 0.0
+	Net.world = w
+	Net._dome_fx(p.position + Vector3.UP * 0.5, 6.0, 3.0)
+	check(ally.guarded == 3.0, "a remotely cast Guardian dome protects locally owned summons")
+	w.remove_ally(ally)

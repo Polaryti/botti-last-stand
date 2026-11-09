@@ -416,6 +416,11 @@ func grid_mark_crops(t: Transform3D, size: Vector2) -> void:
 func ground_at(at: Vector3) -> float:
 	if terrain.has_islands():
 		var radius := Vector2(at.x, at.z).length()
+		if maxf(absf(at.x), absf(at.z)) < 6.0:
+			return MapIslands.plinth_height(at, Vector3(0, 10, 0), 6.0, 1.8, 2.7) + 0.08
+		if maxf(absf(at.x - 8), absf(at.z - 124)) < 8.5:
+			var base := Vector3(8, terrain.ground_height(8, 124), 124)
+			return MapIslands.plinth_height(at, base, 8.5, 3.0, 2.4) + 0.08
 		if radius >= 54.0 and radius <= 57.0: return 18.1
 		if radius >= 13.0 and radius < 30.0: return 10.06
 		if radius >= 30.0 and radius < 54.0:
@@ -636,6 +641,7 @@ func _build_environment() -> void:
 	we.environment = _env
 	add_child(we)
 	_moon = DirectionalLight3D.new()
+	_moon.light_cull_mask = 7
 	_moon.rotation_degrees = Vector3(-48, -32, 0)
 	_moon.shadow_enabled = Game.quality == 2
 	_moon.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
@@ -1806,6 +1812,7 @@ func recycle_zombie(z: Zombie) -> void:
 
 
 func on_zombie_killed(z: Zombie) -> void:
+	if z.def.get("mist_boss", false): director._mist_boss_defeated = true
 	make_noise(z.position, 6.0)
 	if Net.is_host():
 		Net.zombie_died(z, z.last_hitter)
@@ -1825,6 +1832,7 @@ func on_player_died(p: Player) -> void:
 
 ## Sunrise burns away everything still standing.
 func on_dawn() -> void:
+	if mist_storm: mist_storm.queue_free()
 	_dawn_done = true
 	_apply_sky(1.0)
 	for p: Player in local_players():
@@ -2794,7 +2802,7 @@ func _build_mist() -> void:
 		_mist_pool.append(p)
 
 
-## A Guardian's dome: everyone inside it is safe while it lasts.
+## A Guardian's dome marks its timed damage reduction.
 func fx_dome(at: Vector3, radius: float, seconds: float) -> void:
 	if _dome == null:
 		var s := SphereMesh.new()
