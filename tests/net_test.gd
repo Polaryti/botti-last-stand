@@ -68,7 +68,7 @@ func finish() -> void:
 
 
 func _ready() -> void:
-	Game.confirm_name("Test Player")
+	Game.player_name = "Test Player"
 	name = "NetTest"
 	Game.force_weather = Weather.Kind.CLEAR
 	var args := OS.get_cmdline_user_args()

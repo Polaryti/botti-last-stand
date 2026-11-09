@@ -24,7 +24,7 @@ func _ready() -> void:
 	Engine.physics_ticks_per_second = 240
 	Engine.time_scale = 4.0
 	Engine.max_physics_steps_per_frame = 16
-	Game.confirm_name("Test Player")
+	Game.player_name = "Test Player"
 	Game.quality = 0
 	Game.force_weather = Weather.Kind.CLEAR
 	Game.mode = Game.Mode.NIGHT
@@ -252,13 +252,6 @@ func _statuses() -> void:
 
 
 func _progress() -> void:
-	Game.name_schema = 0
-	Game.player_name = "Old generated name"
-	check(Game.needs_name(), "existing installations get a one-time name prompt")
-	check(not Game.confirm_name(" \n\t"), "blank names cannot bypass the prompt")
-	check(Game.confirm_name("  Mara  ") and not Game.needs_name(), "confirming a valid name completes migration")
-	check(Game.confirm_name("Mara"), "duplicate display names are allowed")
-	check(Game.clean_name("A\nB\tC") == "ABC", "network names strip control characters")
 	Game.mode = Game.Mode.NIGHT
 	Game.begin_run()
 	var before := Game.doubloons

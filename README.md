@@ -53,7 +53,7 @@ Redeem codes can also unlock supported classes. Codes are stored as hashes. Adep
 
 
 
-Players choose a display name on first launch or after upgrading from older builds; duplicates are allowed.
+Multiplayer uses the original generated names, with the existing optional name field in Play Together. There is no first-launch or upgrade name prompt.
 
 Store upgrades can add specialization abilities, and the Armory manages owned upgrades and selected familiars. The in-game Codex documents classes, enemies, weapons, items and familiars. The in-game Changelog reads [CHANGELOG.md](CHANGELOG.md).
 

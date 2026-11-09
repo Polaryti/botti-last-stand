@@ -99,7 +99,7 @@ jobs:
           test -f build/checks/screens/storm_warning.png
           test -f build/checks/screens/settings_pause.png
           test -f build/checks/screens/artillery_map.png
-          test -f build/checks/screens/choose_name.png
+          test -f build/checks/screens/menu.png
       - uses: actions/upload-artifact@v6
         if: always()
         with:

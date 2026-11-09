@@ -18,8 +18,6 @@ var mode: int = Mode.MENU
 var test_map := "" # a map scene to play instead of the usual one: see MapRoot
 var force_weather := -1 # a test can ask for a certain weather
 var player_class := "infantry"
-const NAME_SCHEMA := 1
-var name_schema := 0
 var _run_awarded := false
 var player_name := ""
 var unlocked := {} # classes bought, or opened with a code
@@ -61,6 +59,8 @@ func _ready() -> void:
 	apply_quality()
 	PhoneScreen.apply_orientation()
 	PhoneScreen.apply_brightness()
+	if player_name == "":
+		player_name = ["Aldric", "Bertrand", "Cedric", "Edith", "Godfrey", "Isolde", "Matilda", "Roland", "Rowena", "Wilfred"][randi() % 10]
 
 
 
@@ -290,8 +290,7 @@ func load_settings() -> void:
 	sound_volume = clampf(_saved(c, "audio", "sound", 1.0), 0.0, 1.0)
 	quality = clampi(_saved(c, "video", "quality", 1), 0, 2)
 	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
-	player_name = clean_name(str(_saved(c, "progress", "player_name", "")))
-	name_schema = maxi(0, _saved(c, "progress", "name_schema", 0))
+	player_name = str(_saved(c, "progress", "player_name", ""))
 	unlocked = _saved(c, "progress", "unlocked", {})
 	redeemed = _saved(c, "progress", "redeemed", {})
 	doubloons = maxi(0, _saved(c, "progress", "doubloons", 0))
@@ -326,7 +325,6 @@ func save_settings() -> void:
 	c.set_value("video", "quality", quality)
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
-	c.set_value("progress", "name_schema", name_schema)
 	c.set_value("progress", "unlocked", unlocked)
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
@@ -363,29 +361,6 @@ func record_run(seconds: float, kills: int, won: bool) -> bool:
 static func clock(seconds: float) -> String:
 	var s := int(ceil(seconds))
 	return "%02d:%02d" % [s / 60, s % 60]
-
-
-static func clean_name(value: String) -> String:
-	var clean := ""
-	for character: String in value:
-		var point := character.unicode_at(0)
-		if point >= 32 and not (point >= 127 and point <= 159) and point not in [0x2028, 0x2029]:
-			clean += character
-	return clean.strip_edges().substr(0, 16)
-
-
-func needs_name() -> bool:
-	return name_schema < NAME_SCHEMA or clean_name(player_name) == ""
-
-
-func confirm_name(value: String) -> bool:
-	var clean := clean_name(value)
-	if clean == "":
-		return false
-	player_name = clean
-	name_schema = NAME_SCHEMA
-	save_settings()
-	return true
 
 
 func begin_run() -> void:

@@ -1,5 +1,5 @@
 extends Node
-## Render the name migration, Commander equipment, Adept phase card and artillery selection.
+## Render Commander equipment, Adept phase card and artillery selection.
 var out := ""
 var m: Main
 
@@ -15,8 +15,7 @@ func wait(seconds: float) -> void:
 func _ready() -> void:
 	out = OS.get_cmdline_user_args()[0]
 	seed(771)
-	Game.player_name = ""
-	Game.name_schema = 0
+	Game.player_name = "Mara"
 	Game.quality = 1
 	Game.force_weather = Weather.Kind.CLEAR
 	Game.unlocked["commander"] = true
@@ -24,9 +23,6 @@ func _ready() -> void:
 	m = Main.new()
 	add_child(m)
 	await wait(0.4)
-	await snap("choose_name")
-	Game.confirm_name("Mara")
-	m.show_menu()
 	await snap("menu")
 	m.show_class_picker(Game.Mode.NIGHT)
 	m._fill_class_detail(m.panel.get_meta("detail"), "commander", Game.Mode.NIGHT)

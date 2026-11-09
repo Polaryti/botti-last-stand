@@ -160,8 +160,6 @@ func show_menu(rebuild := false) -> void:
 	if not updates.changed.is_connected(_fill_update_box):
 		updates.changed.connect(_fill_update_box)
 	_fill_update_box()
-	if Game.needs_name():
-		show_name_prompt.call_deferred()
 	if not _checked_updates:
 		_checked_updates = true
 		updates.check()
@@ -1465,7 +1463,7 @@ func show_together(tab := -1) -> void:
 	name_edit.custom_minimum_size = Vector2(290, 58)
 	name_edit.add_theme_font_size_override("font_size", 26)
 	name_edit.text_changed.connect(func(t: String) -> void:
-		Game.player_name = Game.clean_name(t) if Game.clean_name(t) != "" else Game.player_name
+		Game.player_name = t.strip_edges() if t.strip_edges() != "" else Game.player_name
 		Game.save_settings())
 	top.add_child(name_edit)
 	if _together_tab == ONLINE_TAB:
@@ -1868,35 +1866,3 @@ func show_command_map() -> void:
 	map.selected.connect(func(_at: Vector3) -> void: confirm.disabled = false)
 	row.add_child(confirm)
 	_back = close
-
-
-var _name_prompt: Control
-
-
-func show_name_prompt() -> void:
-	if is_instance_valid(_name_prompt) and not _name_prompt.is_queued_for_deletion():
-		return
-	if not Game.needs_name() or Game.mode != Game.Mode.MENU:
-		return
-	var root := _modal("Choose your name")
-	_name_prompt = root
-	var box: VBoxContainer = root.get_meta("box")
-	box.add_child(_soft("Shown to other players. Names may repeat.", 22))
-	var edit := LineEdit.new()
-	edit.max_length = 16
-	edit.text = Game.player_name
-	edit.placeholder_text = "Your name"
-	edit.custom_minimum_size = Vector2(480, 60)
-	edit.add_theme_font_size_override("font_size", 28)
-	box.add_child(edit)
-	var submit := func() -> void:
-		if Game.confirm_name(edit.text):
-			root.queue_free()
-			_back = _quit
-	var button := _button("Continue", submit, Vector2(480, 64), true)
-	button.disabled = Game.clean_name(edit.text) == ""
-	edit.text_changed.connect(func(value: String) -> void: button.disabled = Game.clean_name(value) == "")
-	edit.text_submitted.connect(func(_text: String) -> void: submit.call())
-	box.add_child(button)
-	_back = Callable() # Android Back cannot silently accept a generated name.
-	edit.grab_focus()

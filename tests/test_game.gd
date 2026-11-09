@@ -34,7 +34,7 @@ func seconds(t: float) -> void:
 
 
 func _ready() -> void:
-	Game.confirm_name("Test Player")
+	Game.player_name = "Test Player"
 	# Same 1/60 s steps as the real game, four times as fast.
 	Engine.physics_ticks_per_second = 240
 	Engine.time_scale = 4.0

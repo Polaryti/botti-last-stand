@@ -32,7 +32,6 @@ const KEYS := "res://scripts/epic_keys.gd"
 
 var _ieos: Object
 var _user := ""
-var _display_name := ""
 var _signing_in := false
 var _lobby_id := ""
 var _updating := false
@@ -172,7 +171,7 @@ func sign_in() -> bool:
 
 
 func _sign_in_once() -> bool:
-	if _user != "" and _display_name == Game.player_name:
+	if _user != "":
 		return true
 	if not available():
 		return _fail("This build has no online play.")
@@ -210,7 +209,6 @@ func _sign_in_once() -> bool:
 	if int(done["result_code"]) != SUCCESS:
 		return _fail("Could not go online (%d). Are you connected?" % int(done["result_code"]))
 	_user = str(done["local_user_id"])
-	_display_name = Game.player_name
 	return _user != "" or _fail("Could not go online.")
 
 
