@@ -110,6 +110,7 @@ func _each_piece(node: Node, action: Callable) -> void:
 
 
 func _draw_ground() -> void:
+	_builder.configure_expeditions(self)
 	if is_instance_valid(_land_holder):
 		_land_holder.free()
 	_land_holder = Node3D.new()

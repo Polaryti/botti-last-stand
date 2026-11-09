@@ -35,6 +35,8 @@ func _ready() -> void:
 		for n: String in VARIANTS[group]:
 			_streams[n] = load("res://assets/sounds/%s.ogg" % n)
 	_streams["command"] = _command_cry()
+	for sound in ["warning", "fall", "impact"]:
+		_streams["artillery_" + sound] = _artillery_sound(sound)
 	_music = [_stem("night"), _stem("hunted"), _stem("dawn")]
 	for i in POOL:
 		var p := AudioStreamPlayer.new()
@@ -191,6 +193,34 @@ func _command_cry() -> AudioStreamWAV:
 		var phase := TAU * (130.0 * t - 12.0 * t * t)
 		var voice := (sin(phase) + 0.45 * sin(phase * 2.0) + 0.25 * sin(phase * 3.0)) * envelope * 0.35
 		data.encode_s16(i * 2, int(voice * 32767.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = RATE
+	stream.data = data
+	return stream
+
+
+func _artillery_sound(kind: String) -> AudioStreamWAV:
+	const RATE := 16000
+	var duration := 1.8 if kind == "impact" else (1.1 if kind == "warning" else 0.35)
+	var count := int(RATE * duration)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 641
+	var rumble := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var x := t / duration
+		var value := 0.0
+		if kind == "impact":
+			rumble = lerpf(rumble, rng.randf_range(-1, 1), 0.18)
+			value = (rumble * 1.8 + sin(TAU * (70.0 * t - 12.0 * t * t)) * 0.4) * exp(-t * 3.0) * minf(t * 250, 1.0)
+		elif kind == "fall":
+			value = sin(TAU * (1500.0 * t - 1000.0 * t * t)) * sin(PI * x) * 0.22
+		else:
+			value = (sin(TAU * 195 * t) + 0.3 * sin(TAU * 390 * t)) * sin(PI * x) * (0.35 + 0.15 * sin(TAU * 5 * t))
+		data.encode_s16(i * 2, int(clampf(value, -0.95, 0.95) * 32767))
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = RATE

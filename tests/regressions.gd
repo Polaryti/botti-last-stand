@@ -79,11 +79,49 @@ func _test_dev_channel() -> void:
 	check(EpicNet.room_card(true, true)[EpicNet.VERSION] == str(Net.protocol_version()), "online room cards use the development compatibility namespace")
 	var updates := Updates.new()
 	add_child(updates)
-	updates.check()
-	check(updates.state == Updates.State.NONE and updates._http == null, "development builds do not query production updates")
+	check(Updates.endpoint() == Updates.DEV_RELEASES, "dev uses the prerelease feed")
 	updates.apply_release({"tag_name": "v999.0.0", "assets": [{"name": "production.apk", "browser_download_url": "https://example.invalid/production.apk", "size": 1}]})
-	check(updates.state == Updates.State.NONE and updates.apk_url == "", "development builds do not offer a production APK")
-	check(not Updates.can_install(), "development builds cannot invoke the production installer")
+	check(updates.state == Updates.State.NONE and updates.apk_url == "", "dev never offers production APKs")
+	var version_was: Variant = ProjectSettings.get_setting("application/config/version")
+	ProjectSettings.set_setting("application/config/version", "0.20.2-dev.6+abcdef0")
+	var releases: Array = []
+	for number in [9, 7, 8, 6]:
+		var tag := "dev-%d-abcdef0" % number
+		var asset := "botti-last-stand-%s.apk" % tag
+		releases.append({"tag_name": tag, "prerelease": true, "assets": [{"name": asset, "browser_download_url": Updates.DOWNLOADS + tag + "/" + asset, "size": 100, "digest": "sha256:" + "a".repeat(64)}]})
+	updates.apply_dev_releases(releases)
+	check(updates.latest == "dev-9-abcdef0" and updates.apk_digest == "a".repeat(64), "dev chooses newest complete build regardless of feed ordering")
+	updates.apply_dev_releases([releases[-1]])
+	check(updates.state == Updates.State.NONE, "installed dev APK is not offered again")
+	var bad: Dictionary = releases[0].duplicate(true)
+	bad["assets"][0]["browser_download_url"] = "https://example.invalid/fake.apk"
+	updates.apply_dev_releases([bad, releases[1]])
+	check(updates.latest == "dev-7-abcdef0", "malformed dev download cannot hide a valid update")
+	bad["draft"] = true
+	updates.apply_dev_releases([bad, {"tag_name": "v999.0.0", "prerelease": false}])
+	check(updates.state == Updates.State.NONE, "drafts and stable releases cannot cross into dev")
+	check(Updates.dev_build("dev-12-abcdef0") == 12 and Updates.dev_build("dev-12-abcdefg") == 0, "dev build identity is validated")
+	ProjectSettings.set_setting(key, "production")
+	check(Updates.endpoint() == Updates.LATEST, "production keeps its stable release feed")
+	updates.apply_dev_releases(releases)
+	check(updates.state == Updates.State.NONE, "production cannot offer dev APKs")
+	ProjectSettings.set_setting("application/config/version", version_was)
+	# Exercise the actual completed-download path without an HTTP server or Android installer.
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(Updates.FOLDER))
+	var file := FileAccess.open(Updates.FILE, FileAccess.WRITE)
+	file.store_string("test apk bytes")
+	file.close()
+	updates.apk_size = 14
+	updates.apk_digest = FileAccess.get_sha256(Updates.FILE)
+	updates._http = HTTPRequest.new()
+	updates.add_child(updates._http)
+	updates._on_downloaded(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), PackedByteArray())
+	check(updates.state == Updates.State.READY, "a matching download reaches the installer-ready state")
+	updates.apk_digest = "0".repeat(64)
+	updates._http = HTTPRequest.new()
+	updates.add_child(updates._http)
+	updates._on_downloaded(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), PackedByteArray())
+	check(updates.state == Updates.State.FAILED and not FileAccess.file_exists(Updates.FILE), "a corrupt download is deleted and never offered for installation")
 	updates.free()
 	ProjectSettings.set_setting(key, previous)
 

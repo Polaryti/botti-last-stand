@@ -1091,7 +1091,7 @@ func test_version_20_1() -> void:
 	# Updates.
 	ok(Updates.is_newer("v0.20.2", "0.20.1") and Updates.is_newer("0.21.0", "0.20.9") and not Updates.is_newer("v0.20.1", "0.20.1") and not Updates.is_newer("0.19.9", "0.20.1"), "versions compare the right way")
 	var up: Updates = m.updates
-	var apk := {"name": "botti-last-stand-9.0.0.apk", "browser_download_url": "https://example.invalid/a.apk", "size": 1000}
+	var apk := {"name": "botti-last-stand-9.0.0.apk", "browser_download_url": "https://github.com/Polaryti/botti-last-stand/releases/download/v9.0.0/botti-last-stand-9.0.0.apk", "size": 1000}
 	up.apply_release({"tag_name": "v9.0.0", "draft": false, "prerelease": false, "html_url": "https://example.invalid/r", "assets": [apk]})
 	ok(up.state == Updates.State.AVAILABLE and up.latest == "9.0.0", "a newer version with its app is offered")
 	up.apply_release({"tag_name": "v9.0.0", "assets": []})
@@ -1678,7 +1678,7 @@ func test_version_19() -> void:
 		c["open"] = false
 	var doubloons_before := Game.doubloons
 	var cache: Dictionary = w.caches.caches[0]
-	ok(w.caches.caches.size() == 6, "six caches")
+	ok(w.caches.caches.size() == 9, "six challenge caches and three exploration supply caches")
 	pl.global_position = (cache["at"] as Vector3) + Vector3.UP * 0.3
 	pl.velocity = Vector3.ZERO
 	await frames(4)

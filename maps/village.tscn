@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=3]
+[gd_scene load_steps=35 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_bridge.gd" id="1_bridge"]
 [ext_resource type="Script" path="res://scripts/map/map_field.gd" id="2_field"]
@@ -16,6 +16,8 @@
 [ext_resource type="Script" path="res://scripts/map/map_tower.gd" id="14_tower"]
 [ext_resource type="Script" path="res://scripts/map/map_tree.gd" id="15_tree"]
 [ext_resource type="Script" path="res://scripts/map/map_wall.gd" id="16_wall"]
+
+[ext_resource type="Script" path="res://scripts/map/map_expedition.gd" id="expedition"]
 
 [sub_resource type="Curve3D" id="Curve_1"]
 _data = {
@@ -135,6 +137,7 @@ _data = {
 "tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
 point_count = 14
+
 
 [node name="Village" type="Node3D"]
 script = ExtResource("10_root")
@@ -3644,3 +3647,27 @@ script = ExtResource("7_prop")
 kind = "rock"
 grow = 0.7052
 
+
+[node name="ForestersRest" type="Node3D" parent="Beyond"]
+position = Vector3(-76, 0, -28)
+script = ExtResource("expedition")
+title = "Foresters’ Rest"
+style = "camp"
+trail = PackedVector2Array(-74, 0, -76, -14, -76, -24, -86, -24, -86, -10, -72, -8, -74, 0)
+reward = "speed"
+
+[node name="MillersStore" type="Node3D" parent="Beyond"]
+position = Vector3(96, 0, 32)
+script = ExtResource("expedition")
+title = "Millers’ Store"
+style = "camp"
+trail = PackedVector2Array(88, 0, 104, 4, 106, 22, 104, 36, 96, 36, 90, 36)
+reward = "sensor"
+
+[node name="FerryCamp" type="Node3D" parent="Beyond"]
+position = Vector3(-59, 0, 92)
+script = ExtResource("expedition")
+title = "Ferry Camp"
+style = "camp"
+trail = PackedVector2Array(0, 78, -18, 76, -28, 75, -40, 74, -54, 78, -59, 96, -56, 104, -24, 105, -22, 96, -22, 80, -18, 76)
+reward = "speed"

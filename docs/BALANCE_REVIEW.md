@@ -84,3 +84,7 @@ The old Blade Dancer and Mirror Step won both baseline samples with over 200 kil
 ## Remaining validation
 
 Test the dev APK on low- and mid-tier Android devices in four-player sessions, with dense poison, summoned allies, a Warlock storm and artillery. Measure frame-time percentiles, memory, temperature and touch response. Include human trials for all three Adept paths, the three Commander roles, Plague Doctor survival and Revenant resource pressure. Test Epic against the portal configuration in [EPIC_LEADERBOARD.md](EPIC_LEADERBOARD.md).
+
+## Subsequent dev artillery tuning
+
+The artillery/expedition update changes Gunner Last Command to an 18 m radius, a 4 s warning and 20 shells over 5 s. Each impact leaves a 3.2 m radius fire zone for 8 s at 10 damage/s; overlaps do not stack and allies are excluded. The 60 s cooldown and 45 impact damage remain. The earlier simulation sample above predates these changes and the added expedition rewards; it is not evidence of the new build’s win rates.

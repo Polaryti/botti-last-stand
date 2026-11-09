@@ -138,6 +138,7 @@ jobs:
           assert f"name='{info['package']}'" in badging.splitlines()[0]
           assert f"versionCode='{info['version_code']}'" in badging.splitlines()[0]
           assert f"versionName='{info['version']}'" in badging.splitlines()[0]
+          assert "android.permission.REQUEST_INSTALL_PACKAGES" in badging
           info['online_play'] = os.environ['DEV_ONLINE'] == 'true'
           Path('build/dev/build-info.json').write_text(json.dumps(info, indent=2) + '\n')
           PY
@@ -172,10 +173,10 @@ jobs:
               f"Android development test build **{info['version']}**.\n\n"
               f"Source: `{info['commit']}` on `dev`.\n\n"
               "Install the APK below. It appears as **Botti's Last Stand Dev** and can coexist with production. "
-              "Its saves and multiplayer compatibility are separate. Production update prompts are disabled.\n\n"
+              "Its saves and multiplayer compatibility are separate. Its menu offers future dev APK updates through Android’s installer.\n\n"
               f"Online play included: **{'yes' if info['online_play'] else 'no; solo, bots and LAN are available'}**.\n\n"
               "This prerelease does not replace the latest production release. No iOS build is included. "
-              "The maintenance changes, source validation and dev-isolation checks are in this build; "
+              "Includes dev in-game updates, four-second artillery with eight-second fires, and exploration supply routes. "
               "full gameplay/LAN/render CI results are available in the separate Validate game workflow.\n"
           )
           PY

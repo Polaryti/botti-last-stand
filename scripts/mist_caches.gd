@@ -1,6 +1,6 @@
 class_name MistCaches
 extends Node3D
-## Chests at the end of the lines of stones, each with a beam of light that can be seen from far away.
+## Supply chests at expedition stops and the ends of Mists stone challenges, marked by light beams.
 ## Each player opens each chest once, on their own phone: nobody takes it from the others.
 
 const REACH := 2.4
@@ -14,7 +14,7 @@ func _init(owner_world: World) -> void:
 	world = owner_world
 
 
-func add(at: Vector3, coins: int, power: String, weapon: String) -> void:
+func add(at: Vector3, coins: int, power: String, weapon: String, title := "Mist cache", beam_height := 60.0, team_bonus := false) -> void:
 	var node := Node3D.new()
 	add_child(node)
 	node.position = at
@@ -37,7 +37,7 @@ func add(at: Vector3, coins: int, power: String, weapon: String) -> void:
 	var tube := CylinderMesh.new()
 	tube.top_radius = 0.7
 	tube.bottom_radius = 0.7
-	tube.height = 60.0
+	tube.height = beam_height
 	tube.radial_segments = 8
 	tube.rings = 1
 	tube.cap_top = false
@@ -49,10 +49,10 @@ func add(at: Vector3, coins: int, power: String, weapon: String) -> void:
 	look.albedo_color = Color(1.0, 0.82, 0.35, 0.3)
 	tube.material = look
 	beam.mesh = tube
-	beam.position.y = 30.0
+	beam.position.y = beam_height * 0.5
 	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(beam)
-	caches.append({"at": at, "coins": coins, "power": power, "weapon": weapon, "open": false, "lid": lid, "beam": beam})
+	caches.append({"title": title, "team_bonus": team_bonus, "at": at, "coins": coins, "power": power, "weapon": weapon, "open": false, "lid": lid, "beam": beam})
 
 
 func _process(_delta: float) -> void:
@@ -65,13 +65,16 @@ func _process(_delta: float) -> void:
 
 
 func open_cache(c: Dictionary, p: Player) -> void:
+	if c["open"]:
+		return
 	c["open"] = true
 	(c["lid"] as Node3D).rotation.x = -1.9
 	(c["beam"] as Node3D).visible = false
 	Game.doubloons += int(c["coins"])
 	Game.save_settings()
-	p.add_xp(XP)
-	p.heal(30.0)
+	var together := bool(c["team_bonus"]) and nearby_friend(p)
+	p.add_xp(XP + (15 if together else 0))
+	p.heal(40.0 if together else 30.0)
 	var got := "%d doubloons" % int(c["coins"])
 	var weapon: String = c["weapon"]
 	if weapon != "" and p.can_use(weapon):
@@ -80,6 +83,15 @@ func open_cache(c: Dictionary, p: Player) -> void:
 	elif c["power"] != "":
 		p.activate_power(c["power"])
 		got += " and %s" % PowerDefs.ALL[c["power"]]["name"]
-	world.banner("Mist cache: %s" % got, 3.5)
+	if together:
+		got += " • travelling together: +15 XP, +10 healing"
+	world.banner("%s: %s" % [c["title"], got], 3.5)
 	world.fx_ring(c["at"], 3.0, Color(1.0, 0.82, 0.35))
 	Sfx.play("bell", -3.0, 1.2)
+
+
+func nearby_friend(p: Player) -> bool:
+	for other: Target in world.players:
+		if other != p and not other.dead and not Net.bots_foes(p.net_id(), world.peer_of(other)) and other.global_position.distance_squared_to(p.global_position) <= 64.0:
+			return true
+	return false

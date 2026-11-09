@@ -527,7 +527,7 @@ static func _commander() -> Dictionary:
 			a("steady_barrel", "Steady Barrel", "+20% range and shot speed", "target+up", {"ranged_power": 0.2})],
 			[a("powder_reserve", "Powder Reserve", "+15% shooting rate", "arrows+clock", {"ranged_rate": 0.15}),
 			a("field_rations", "Field Rations", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
-			a("last_command_gunner", "Last Command", "Replaces Command: choose a 12 m radius on the map. Warns everyone, waits 10 s, then bombards enemies for 5 s. 60 s cooldown", "", {}, [], "last_command")),
+			a("last_command_gunner", "Last Command", "Replaces Command: choose an 18 m radius. Warns everyone for 4 s, bombards enemies for 5 s, leaving 8 s fire zones (10 damage/s; no stacking). 60 s cooldown", "", {}, [], "last_command")),
 		_spec("vanguard", "Vanguard", "A resilient banner bearer who rallies the line", Color(0.78, 0.57, 0.18),
 			a("vanguard", "Vanguard", "+30 max health, take 10% less damage. Carry an off-hand banner. Command gives nearby allies +25% speed for 6 s", "banner", {"max_hp": 30.0, "damage_taken": -0.1}, [], "vanguard"),
 			[[a("hold_line", "Hold the Line", "Take 12% less damage", "shield+banner", {"damage_taken": -0.12}),

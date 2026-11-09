@@ -50,9 +50,12 @@ The existing signing secrets are reused so later dev APKs can update earlier dev
 Different package IDs allow dev and production to coexist with separate Android app data.
 
 Dev multiplayer has a separate compatibility namespace for LAN handshakes and online room lists.
-Dev builds never query or offer the production updater and omit the install-packages permission.
-Testers update the dev app by installing the next dev APK from GitHub Releases. Prereleases are
-published with `latest=false`, so the stable update channel remains on production releases.
+Dev builds query the prerelease feed and select the newest complete `dev-<run>-<sha>` APK by
+run number, independently of production’s stable `/latest` feed. Both Android presets include
+`REQUEST_INSTALL_PACKAGES`; Android asks the player before installation. The downloaded file’s
+size and GitHub SHA-256 digest (when supplied) are verified. Prereleases remain `latest=false`.
+Install dev build 7 or later manually once when upgrading from earlier builds, whose updater was
+disabled. Future dev updates appear in the menu. Production never offers a dev APK.
 
 The workflow uses Godot 4.7.2 and Epic plugin release 2.3.1. If all Epic secrets are available it
 includes online play; if any are missing it builds solo/bots/LAN and says so in the release notes.

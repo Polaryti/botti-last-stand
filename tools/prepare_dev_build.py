@@ -62,7 +62,7 @@ def prepare(root: Path, build_number: int, commit: str) -> dict:
         "package/unique_name": json.dumps(DEV_PACKAGE),
         "package/name": json.dumps("Botti's Last Stand Dev"),
         "version/code": str(code), "version/name": json.dumps(version),
-        "permissions/custom_permissions": "PackedStringArray()",
+        "permissions/custom_permissions": 'PackedStringArray("android.permission.REQUEST_INSTALL_PACKAGES")',
     }.items():
         dev = setting(dev, f"preset.{dev_index}.options", key, value)
     if dev_index in indices:

@@ -37,7 +37,7 @@ class DevBuildTests(unittest.TestCase):
         self.assertIn('custom_features="dev"', dev.section(after, "preset.2").group(1))
         options = dev.section(after, "preset.2.options").group(1)
         self.assertIn('package/unique_name="com.botti.laststand.dev"', options)
-        self.assertIn("permissions/custom_permissions=PackedStringArray()", options)
+        self.assertIn('permissions/custom_permissions=PackedStringArray("android.permission.REQUEST_INSTALL_PACKAGES")', options)
         self.assertIn('release_channel="dev"', (self.root / "project.godot").read_text())
 
     def test_reruns_are_idempotent_and_new_builds_increment(self):

@@ -6,9 +6,14 @@ const COMMAND_CD := 24.0
 const LAST_CD := 60.0
 const RALLY_RADIUS := 12.0
 const STORM_RADIUS := 11.0
-const BARRAGE_RADIUS := 12.0
-const BARRAGE_DELAY := 10.0
+const BARRAGE_RADIUS := 18.0
+const BARRAGE_DELAY := 4.0
 const BARRAGE_TIME := 5.0
+const BARRAGE_INTERVAL := 0.25
+const SHELL_FALL := 0.35
+const FIRE_TIME := 8.0
+const FIRE_RADIUS := 3.2
+const FIRE_DPS := 10.0
 const STAFF_BOLT := {"range": 34.0, "speed": 34.0, "knock": 2.0}
 
 const COMMAND_ART := {"name": "Command", "cost": 0.0, "cast": 0.45, "cd": COMMAND_CD, "icon": "horn", "anim": "Stance"}

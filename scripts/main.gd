@@ -1841,7 +1841,7 @@ func show_command_map() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var root := _modal("Artillery target")
 	var box: VBoxContainer = root.get_meta("box")
-	box.add_child(_soft("Choose a circle. Impact in 10 seconds; barrage lasts 5 seconds.", 22))
+	box.add_child(_soft("Choose a circle: 18 m radius. Impact in 4 seconds; 5-second barrage, 8-second fires.", 22))
 	var map := MapPanel.new()
 	map.world = world
 	map.targeting = true

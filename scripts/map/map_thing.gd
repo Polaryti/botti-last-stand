@@ -20,6 +20,8 @@ extends MapPiece
 
 
 func build(b: MapBuilder) -> void:
+	if kind in ["fallen_log", "stump", "rubble"] and b.expedition_lane(b.xf.origin):
+		return
 	match kind:
 		"bed": b.bed()
 		"table": b.table()

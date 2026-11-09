@@ -1117,6 +1117,17 @@ func _commander() -> void:
 	await sync(106)
 	ok(absf(w._bolt.global_position.x - strike.x) < 0.1 and absf(w._bolt.global_position.z - strike.z) < 0.1, "Commander lightning and impact visuals reach both phones")
 
+	var field := fields[0] as CommandField
+	await until(func() -> bool: return field._fires.size() > 0, 6.0)
+	ok(field._fires.size() > 0, "four-second artillery warning produces fire on both peers")
+	var hp_before := pl.hp
+	pl.global_position = field._fires[0]["at"]
+	pl.guard_left = 0.0
+	await until(func() -> bool: return field.elapsed > CommanderKit.BARRAGE_DELAY + CommanderKit.BARRAGE_TIME + 0.2, 7.0)
+	ok(field._fires.size() == 20 and field._spawned == 20, "all twenty shells and lingering zones appear on both peers")
+	ok(pl.hp == hp_before, "cooperative artillery and fire never hurt allies")
+	await sync(107)
+
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.
 func until(condition: Callable, timeout: float) -> void:

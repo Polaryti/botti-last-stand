@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_root.gd" id="1_root"]
 [ext_resource type="Script" path="res://scripts/map/map_islands.gd" id="2_islands"]
+
+[ext_resource type="Script" path="res://scripts/map/map_expedition.gd" id="expedition"]
 
 [node name="Mists" type="Node3D"]
 script = ExtResource("1_root")
@@ -11,3 +13,27 @@ forest_wall = false
 
 [node name="Islands" type="Node3D" parent="."]
 script = ExtResource("2_islands")
+
+[node name="WatchRefuge" type="Node3D" parent="."]
+position = Vector3(110, 0, -16)
+script = ExtResource("expedition")
+title = "Watch Refuge"
+style = "ruin"
+trail = PackedVector2Array(94, -6, 102, -6, 104, -12, 110, -12, 120, -8, 126, 2)
+reward = "sensor"
+
+[node name="RootSanctuary" type="Node3D" parent="."]
+position = Vector3(-105, 0, 24)
+script = ExtResource("expedition")
+title = "Root Sanctuary"
+style = "ruin"
+trail = PackedVector2Array(-86, 6, -95, 14, -96, 30, -105, 28, -118, 30, -128, 26)
+reward = "speed"
+
+[node name="PilgrimsRest" type="Node3D" parent="."]
+position = Vector3(20, 0, -110)
+script = ExtResource("expedition")
+title = "Pilgrims’ Rest"
+style = "ruin"
+trail = PackedVector2Array(14, -102, 20, -106, 28, -106, 32, -112, 30, -120)
+reward = "sensor"

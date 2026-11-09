@@ -48,6 +48,7 @@ func _ready() -> void:
 	Net.leave()
 	w.queue_free()
 	await frames(2)
+	await _exploration()
 	Sfx.stop_all()
 	OS.delay_msec(120) # allow the audio mixing thread to release stopped playback
 	await get_tree().create_timer(0.1, true, false, true).timeout
@@ -191,13 +192,29 @@ func _commander() -> void:
 	var hp := z.hp
 	barrage.set_physics_process(false)
 	barrage.elapsed = 0.0
-	barrage._physics_process(9.99)
-	check(z.hp == hp, "artillery cannot damage before the ten-second warning")
+	barrage._physics_process(CommanderKit.BARRAGE_DELAY - 0.01)
+	check(z.hp == hp, "artillery cannot damage before the four-second warning")
 	for i in 20:
 		barrage._physics_process(0.25)
 	check(z.hp < hp, "artillery rains during its five-second window")
 	barrage._physics_process(0.25)
-	check(barrage.is_queued_for_deletion(), "barrage ends after five seconds")
+	check(not barrage.is_queued_for_deletion() and barrage._fires.size() == 20, "twenty shells leave fire after the five-second barrage")
+	var fire_at: Vector3 = barrage._fires[-1]["at"]
+	z.global_position = fire_at
+	p.global_position = fire_at
+	p.hp = 50.0
+	var before_fire := z.hp
+	barrage._fires.append(barrage._fires[-1].duplicate())
+	barrage._fire_tick = 0.0
+	barrage._tick_fire(0.5, true)
+	check(is_equal_approx(before_fire - z.hp, CommanderKit.FIRE_DPS * 0.5), "overlapping fire applies one damage tick and credits the Commander")
+	check(p.hp == 50.0, "artillery fire leaves its allied Commander unharmed")
+	before_fire = z.hp
+	barrage._fire_tick = 0.0
+	barrage._tick_fire(0.5, false)
+	check(z.hp == before_fire, "client visual fire cannot apply damage")
+	barrage._physics_process(CommanderKit.FIRE_TIME)
+	check(barrage.is_queued_for_deletion(), "field is cleaned after the final eight-second fire")
 	await frames(2)
 	pawn("commander", 0, true)
 	p.use_art()
@@ -301,3 +318,84 @@ func _online() -> void:
 	epic._ieos = null
 	epic._user = ""
 	fake.queue_free()
+
+
+func _exploration() -> void:
+	var map_was := Game.night_map
+	var coins_were := Game.doubloons
+	for map_id: String in ["village", "mists", "fort"]:
+		Game.night_map = map_id
+		var area := World.new()
+		add_child(area)
+		area.setup(Game.Mode.FORT if map_id == "fort" else Game.Mode.NIGHT)
+		area.director.running = false
+		area.player.set_physics_process(false)
+		var sites := area.caches.caches.filter(func(c: Dictionary) -> bool: return c["title"] != "Mist cache")
+		check(sites.size() == (4 if map_id == "fort" else 3), "%s has independent expedition stops" % map_id)
+		for c: Dictionary in sites:
+			var at: Vector3 = c["at"]
+			check(not area.terrain.in_water(at.x, at.z), "%s is on dry land" % c["title"])
+			check(area.grid.is_free(area.grid.to_cell(at)), "%s cache is on a walkable cell" % c["title"])
+			check(absf(at.y - area.ground_at(at)) < 0.1, "%s chest rests on the ground" % c["title"])
+			for side: float in [-1, 1]:
+				var from := at + Vector3(side * 5, 0, 3)
+				var route: Array[Vector2i] = area.grid.astar.get_id_path(area.grid.to_cell(from), area.grid.to_cell(at)) if area.grid.is_free(area.grid.to_cell(from)) else ([] as Array[Vector2i])
+				check(not route.is_empty(), "%s has a clear %s approach" % [c["title"], side])
+			area.player.hp = 40.0
+			var before := Game.doubloons
+			area.caches.open_cache(c, area.player)
+			area.caches.open_cache(c, area.player)
+			check(Game.doubloons == before + 15 and area.player.hp > 40, "%s rewards and heals exactly once" % c["title"])
+		var source: MapRoot = (load("res://maps/%s.tscn" % map_id) as PackedScene).instantiate()
+		for piece: Node in source.find_children("*", "Node3D", true, false):
+			if not piece is MapExpedition:
+				continue
+			var trail: PackedVector2Array = piece.trail
+			for segment in trail.size() - 1:
+				var steps := ceili(trail[segment].distance_to(trail[segment + 1]))
+				var blocked := Vector2.INF
+				for step in steps + 1:
+					var spot := trail[segment].lerp(trail[segment + 1], float(step) / steps)
+					if not area.grid.is_free(area.grid.to_cell(Vector3(spot.x, 0, spot.y))):
+						blocked = spot
+						for body: Node3D in [area._body, area._barriers, area._enemy_blocks]:
+							for collider: CollisionShape3D in body.get_children():
+								if collider.shape is BoxShape3D:
+									var local := collider.global_transform.affine_inverse() * Vector3(spot.x, collider.global_position.y, spot.y)
+									var size := (collider.shape as BoxShape3D).size * 0.5 + Vector3.ONE * 0.4
+									if absf(local.x) <= size.x and absf(local.z) <= size.z:
+										print("TRAIL_OBSTACLE ", piece.title, " ", collider.global_position, " size=", (collider.shape as BoxShape3D).size)
+						break
+				check(blocked == Vector2.INF, "%s trail segment %d is clear (blocked at %s)" % [piece.title, segment, blocked])
+		source.free()
+		if map_id != "fort":
+			var field := CommandField.new()
+			area.add_child(field)
+			field.set_physics_process(false)
+			field.world = area
+			var wet := Vector3(20, 0, 64) if map_id == "village" else Vector3(60, -100, 100)
+			wet.y = area.terrain.height(wet.x, wet.z)
+			field._add_fire(wet, 0.0)
+			check(field._fires.is_empty(), "%s artillery leaves no floating fire in water or void" % map_id)
+			field.queue_free()
+		var friend := Avatar.new(area, 42, {"name": "Companion", "class": "infantry"})
+		area.add_child(friend)
+		friend.set_process(false)
+		friend.set_physics_process(false)
+		area.players.append(friend)
+		var cache: Dictionary = sites[0]
+		area.player.global_position = cache["at"]
+		friend.global_position = area.player.global_position + Vector3.RIGHT * 3
+		check(area.caches.nearby_friend(area.player), "%s recognises a nearby travelling companion" % map_id)
+		friend.dead = true
+		check(not area.caches.nearby_friend(area.player), "fallen allies cannot trigger expedition bonuses")
+		friend.dead = false
+		cache["open"] = false
+		area.player.hp = 30.0
+		area.caches.open_cache(cache, area.player)
+		check(area.player.hp == 70.0, "%s group exploration grants ten extra healing" % map_id)
+		area.queue_free()
+		await frames(2)
+	Game.night_map = map_was
+	Game.doubloons = coins_were
+	Game.save_settings()
