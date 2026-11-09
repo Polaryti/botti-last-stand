@@ -43,7 +43,4 @@ func _ready() -> void:
 	var seal := MistSeal.create(w, Vector3(0, 10, 16), 9.0, 3.0, 10.0, 20.0, -1)
 	seal.elapsed = 5.0
 	await snap("regent_crown_warning", Vector3(14, 22, 32), Vector3(0, 10, 16))
-	w.queue_free()
-	await get_tree().process_frame
-	Sfx.stop_all()
-	get_tree().quit()
+	await preload("res://tests/scene_cleanup.gd").finish(w)

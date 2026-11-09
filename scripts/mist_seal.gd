@@ -15,6 +15,11 @@ var _material: ShaderMaterial
 static func cast(z: Zombie, at: Vector3, reach: float, delay: float, amount: float, eye := 0.0) -> void:
 	if z.world.mist_seals.size() >= LIMIT or not z.world.terrain.is_walkable(at.x, at.z):
 		return
+	# Aim at the surface below a jumping target, never at an invisible plane in mid-air.
+	var ground := z.world.ground_at(at)
+	var query := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.35, Vector3(at.x, ground - 0.5, at.z), 1)
+	var hit := z.world.get_world_3d().direct_space_state.intersect_ray(query)
+	at.y = (hit["position"] as Vector3).y if not hit.is_empty() else ground
 	if Net.active():
 		if Net.is_host():
 			Net.mist_seal(at, reach, eye, delay, amount, z.net_id)

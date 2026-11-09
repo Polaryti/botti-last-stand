@@ -467,6 +467,15 @@ func _mists() -> void:
 	check(mw.mist_seals.size() == before + 1, "a spirit that sees its target casts a warning")
 	for seal: MistSeal in mw.mist_seals.duplicate():
 		seal.free()
+	MistSeal.cast(spirit, mp.position + Vector3.UP * 6.0, 3.0, 1.5, 10.0)
+	var grounded: MistSeal = mw.mist_seals.back()
+	check(absf(grounded.position.y - mp.position.y) < 0.2 and grounded.contains(mp.position), "a seal aimed at a high jump warns on the ground below")
+	check(not grounded.contains(mp.position + Vector3.UP * 6.0), "a sufficiently high airborne player stays clear of a ground seal")
+	grounded.free()
+	MistSeal.cast(spirit, Vector3(2.0, 12.72, 0), 3.0, 1.5, 10.0)
+	var raised: MistSeal = mw.mist_seals.back()
+	check(absf(raised.position.y - 12.7) < 0.1, "seals on raised plinths warn on their visible standing surface")
+	raised.free()
 	for i in MistSeal.LIMIT:
 		MistSeal.create(mw, mp.position, 3.0, 0.0, 1.5, 0.0, -1)
 	MistSeal.cast(spirit, mp.position, 3.0, 1.5, 10.0)
