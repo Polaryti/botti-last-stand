@@ -132,8 +132,8 @@ static func stone_lines() -> Array[Dictionary]:
 	# Up from the hollow, over the void.
 	out.append({"points": [Vector3(-73, 8.5, 77), Vector3(-58, 11, 56), Vector3(-66, 14, 40)], "coins": 25, "weapon": "longbow"})
 	# Short cuts that need no gate: the arena's south rim to the monument, and its north rim to the rotunda's shelf.
-	out.append({"points": [Vector3(12, 18.5, 67), Vector3(38, 19.8, 72), Vector3(44, 21.6, 92), Vector3(28, 23.5, 100)]})
-	out.append({"points": [Vector3(-19.5, 18.5, -63), Vector3(-6, 20, -74), Vector3(14, 22, -70), Vector3(16, 24.5, -86), Vector3(-6, 26.5, -88), Vector3(-29, 27.8, -84.5)]})
+	out.append({"points": [Vector3(12, 18.5, 67), Vector3(38, 19.8, 72), Vector3(44, 21.6, 92), Vector3(26, 24.5, 108)]})
+	out.append({"points": [Vector3(-19.5, 18.5, -63), Vector3(-6, 20, -74), Vector3(14, 22, -70), Vector3(16, 24.5, -86), Vector3(-6, 26.5, -88), Vector3(-30, 28.5, -98)]})
 	return out
 
 
@@ -500,7 +500,7 @@ func _arena(b: MapBuilder) -> void:
 	var l := LowPoly.new()
 	var c := Vector3.ZERO
 	# A green in the middle, a ring of paving, then the seats going up to the rim.
-	_annulus(l, c, 13.0, 30.0, 10.06, 10.06, STONE.lerp(MARBLE, 0.35), 40)
+	_annulus(l, c, 12.95, 30.1, 10.06, 10.06, STONE.lerp(MARBLE, 0.35), 40)
 	_annulus(l, c, 12.2, 13.0, 10.1, 10.1, GOLD.darkened(0.2), 40)
 	const SEATS := 13
 	for n in SEATS:
@@ -549,7 +549,14 @@ func _arena(b: MapBuilder) -> void:
 	l.box(o + Vector3(0, 14.3, 0), Vector3(5.2, 0.6, 0.7), GOLD)
 	l.box(o + Vector3(0, 16.0, 0), Vector3(0.5, 3.0, 0.5), WOOD)
 	l.prism(o + Vector3(0, 17.4, 0), o + Vector3(0, 18.2, 0), 0.5, 0.2, 6, GOLD)
-	b.add(l)
+	var arena_mesh := b.add(l)
+	var body := StaticBody3D.new()
+	body.name = "ArenaTreadCollision"
+	body.collision_layer = 1
+	var shape := CollisionShape3D.new()
+	shape.shape = arena_mesh.mesh.create_trimesh_shape()
+	body.add_child(shape)
+	b.w.add_child(body)
 	_rune(b, Vector3(0, 10.14, 0), 11.5)
 	for n in 8:
 		var a := TAU * (n + 0.5) / 8.0

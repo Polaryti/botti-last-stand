@@ -1463,6 +1463,7 @@ func grass(h: float) -> void:
 	var area := pow(h / terrain.half_extent, 2.0)
 	for i in int(grass_tufts * 3 * area):
 		var p := Vector3(rng.randf_range(-h, h), 0, rng.randf_range(-h, h))
+		if terrain.has_islands() and Vector2(p.x, p.z).length() < 57.1: continue
 		if not w.grid.is_free(w.grid.to_cell(p)) or _is_indoors(p):
 			continue
 		# No grass on the arena's paving and seats.

@@ -44,6 +44,7 @@ func _ready() -> void:
 	_projectile_lifecycle()
 	_remote_animation()
 	_equipment()
+	_ownership_and_poison()
 	await _mists()
 	print("REWORK progress")
 	_progress()
@@ -387,6 +388,11 @@ func _equipment() -> void:
 	w.spawn_bolt(p, p.eye_position(), Vector3.FORWARD * 30.0, 26.0, 1.0, 25.0, false)
 	var summon_bolts := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.owner_player == p)
 	check(summon_bolts.size() == 1 and summon_bolts[0].pierce == 0 and summon_bolts[0].sparks == 0 and summon_bolts[0].stagger == 0.0, "a Warlock's summoned Magician does not inherit fifth-hit bolt talents")
+	w.spawn_ally("magician", p.position + Vector3.RIGHT, 16.0)
+	p.flags["last_command"] = true
+	p.level = 9
+	CommanderKit.cast(p)
+	check(w.count_allies("magician") == 0, "Last Command never falls back to the Warlock summon")
 	check("poison damage" in CodexPanel.acquisition("plague_doctor") and not "Store" in CodexPanel.acquisition("plague_doctor"), "Codex explains the Plague Doctor poison unlock")
 	check("VRAIN" in CodexPanel.acquisition("commander") and "code" in CodexPanel.acquisition("commander"), "Codex explains the tournament prize code")
 	for id: String in PowerDefs.ALL:
@@ -430,6 +436,14 @@ func _mists() -> void:
 	mp.guard_left = 0.0
 	mp.position = Vector3(0, mw.ground_at(Vector3(0, 0, 16)), 16)
 	await frames(2)
+	var treads_match := true
+	for step in 13:
+		var radius := 30.0 + (step + 0.5) * 24.0 / 13.0
+		var point := Vector3(radius * 0.7, 0, radius * sqrt(0.51))
+		var query := PhysicsRayQueryParameters3D.create(point + Vector3.UP * 25.0, point + Vector3.UP * 8.0, 1)
+		var hit := mw.get_world_3d().direct_space_state.intersect_ray(query)
+		treads_match = treads_match and not hit.is_empty() and absf((hit["position"] as Vector3).y - mw.ground_at(point)) < 0.03
+	check(treads_match, "all thirteen central treads have collision at the visible stair height")
 	check(mw.night_bg.get_luminance() < 0.06 and mw.night_moon <= 0.35 and mw.night_sky_shows, "Mists uses a moonlit night palette with stars")
 	check(mw.find_children("MistBridgeInlays*", "MeshInstance3D", false, false).size() == MapIslands.BRIDGES.size(), "every existing bridge has deck-following night inlays")
 	for kind: String in MistModels.KINDS:
@@ -500,7 +514,7 @@ func _mists() -> void:
 	check(mp.hp == 90.0, "standing in the safe eye avoids the crown attack")
 	crown.free()
 	mw.director._mist_boss_spawned = false
-	check(mw.director._mist_boss_at >= 525.0 and mw.director._mist_boss_at <= 540.0, "boss scheduling is inside 8:45-9:00")
+	check(mw.director._mist_boss_at >= 505.0 and mw.director._mist_boss_at <= 515.0, "boss scheduling is around 8:30")
 	mw.director.elapsed = mw.director._mist_boss_at - 0.01
 	mw.director._tick_mist_boss()
 	check(mw.count_type("veil_regent") == 0, "Regent does not arrive early")
@@ -528,8 +542,48 @@ func _mists() -> void:
 	var angels := mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size()
 	boss._die()
 	check(mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size() == angels + 1, "defeating the Regent drops an Angel familiar")
+
+	mp.position = Vector3(0, 10.1, 16)
+	mp.hp = mp.max_hp()
+	mp.guard_left = 0.0
+	var storm := MistStorm.create(mw, 0)
+	storm.set_physics_process(false)
+	var hp_before := mp.hp
+	storm._physics_process(MistStorm.WARNING)
+	check(mp.hp == hp_before, "Mist Storm provides a damage-free evacuation warning")
+	storm._physics_process(1.0)
+	check(is_equal_approx(mp.hp, hp_before - MistStorm.DPS), "Mist Storm integrates its configured damage per second")
+	mp.position = Vector3(0, 40, -122)
+	var safe_hp := mp.hp
+	storm._physics_process(1.0)
+	check(mp.hp == safe_hp, "another island is safe from the active storm")
+	check(storm.escape(Vector3(0, 10, 16)) != Vector3.INF, "storm island has an evacuation gate")
+	storm.free()
 	Game.night_map = old_map
 	Game.player_class = old_class
 	mw.queue_free()
 	await frames(2)
 	w.process_mode = Node.PROCESS_MODE_INHERIT
+
+
+func _ownership_and_poison() -> void:
+	pawn("infantry")
+	var bot := Player.new(w, Net.BOT_BASE)
+	w.add_child(bot)
+	w.players.append(bot)
+	bot.position = p.position + Vector3.RIGHT * 12.0
+	bot.activate_power("ghost")
+	var ghost: Ally = w.allies.back()
+	check(ghost.master == bot and ghost.global_position.distance_to(bot.position) < 5.0, "bot Ghost Knight familiar belongs to and appears near the collecting bot")
+	w.remove_ally(ghost)
+	w.players.erase(bot)
+	bot.free()
+	var victim := target(p.position + Vector3.FORWARD * 8.0)
+	victim.add_dot(10.0, 3.0)
+	victim._hurt_stun = 0.0
+	victim._tick_dot(0.25)
+	check(victim._hurt_stun == 0.0, "poison ticks never cause hit flinches or micro-stuns")
+	victim.release()
+	pawn("plague_doctor")
+	p.slots[1] = "sword"
+	check(not p.can_drop_weapon() and not WeaponDefs.lies_around("blowgun"), "Plague Doctor's blowgun is exclusive, undroppable and absent from loot")

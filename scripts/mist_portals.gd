@@ -124,6 +124,7 @@ func _process(delta: float) -> void:
 
 ## One more gate opens, and one that is not needed starts to close.
 func _change_one() -> void:
+	if world.mist_storm != null: return # Evacuation routes remain open throughout a storm.
 	var closed: Array[Dictionary] = []
 	for link: Dictionary in links:
 		if not link["open"]:

@@ -39,7 +39,7 @@ static func create(w: World, at: Vector3, reach: float, eye: float, delay: float
 	w.mist_seals.append(seal)
 	seal.tree_exiting.connect(func() -> void: w.mist_seals.erase(seal))
 	seal._build()
-	w.sfx_at("mist_warning", at, -8.0)
+	w.sfx_at("mist_warning", at, 0.0)
 	return seal
 
 func _build() -> void:
@@ -90,7 +90,9 @@ func _physics_process(delta: float) -> void:
 
 func strike() -> void:
 	world.fx_ring(position, radius, Color(0.45, 0.85, 1.0))
-	world.sfx_at("mist_burst", position, -6.0)
+	world.fx_blast(position + Vector3.UP * 0.5, radius, Color(0.5, 0.7, 1.0, 0.65))
+	world.fx_mist(position + Vector3.UP, radius * 0.5)
+	world.sfx_at("mist_burst", position, 0.0)
 	var source := world.zombie_by_id(source_id)
 	var targets: Array = world.players.duplicate()
 	if not Net.active() or Net.is_host():

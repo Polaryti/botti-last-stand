@@ -159,13 +159,13 @@ static func _heavy() -> Dictionary:
 static func _chivalry() -> Dictionary:
 	const BLUE := Color(0.1, 0.2, 0.62)
 	var head := LowPoly.new()
-	head.prism(Vector3(0, 0.6, 0), Vector3(0, 1.14, 0), 0.74, 0.38, 8, GOLD)
-	head.prism(Vector3(0, 0.56, 0), Vector3(0, 0.66, 0), 0.8, 0.76, 8, BRASS)
+	head.prism(Vector3(0, 0.69, 0), Vector3(0, 1.22, 0), 0.82, 0.45, 8, GOLD)
+	head.prism(Vector3(0, 0.56, 0), Vector3(0, 0.68, 0), 0.9, 0.86, 8, BRASS)
 	head.box(Vector3(0, 0.46, 0.74), Vector3(0.1, 0.42, 0.05), BRASS)
 	for i in 9:
 		var a := lerpf(-0.45, 2.2, float(i) / 8.0)
 		var at := Vector3(0, 0.62 + sin(a + 0.55) * 0.68, cos(a + 0.55) * 0.82)
-		head.box(at, Vector3(0.1, 0.34, 0.2), Color(0.85, 0.12, 0.1) if i % 2 == 0 else WHITE, Vector3(rad_to_deg(0.55 + a) - 90.0, 0, 0))
+		head.box(at, Vector3(0.1, 0.28, 0.14), Color(0.85, 0.12, 0.1) if i % 2 == 0 else WHITE, Vector3(rad_to_deg(0.55 + a) - 90.0, 0, 0))
 	var chest := LowPoly.new()
 	# The cape falls from the shoulders and widens down to the heels.
 	chest.prism(Vector3(0, 0.34, -0.04), Vector3(0, 0.1, -0.1), 0.44, 0.66, 8, BLUE)

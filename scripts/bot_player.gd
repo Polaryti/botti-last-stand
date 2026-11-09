@@ -30,6 +30,7 @@ var pawn: Player
 var _class_id := "infantry"
 var _smart: Dictionary = SMARTS[1]
 var _target: Node3D
+var _explore := Vector3.INF
 var _goal := Vector3.ZERO
 var _has_goal := false
 var _path := PackedVector3Array()
@@ -240,7 +241,10 @@ func _decide_goal() -> void:
 	var fog := world.fog
 	_away = false
 	_errand = "fight"
-	if fog and not fog.contains(here, -3.0):
+	if world.mist_storm and world.mist_storm.contains(here):
+		_goal = world.mist_storm.escape(here)
+		_errand = "evacuate"
+	elif fog and not fog.contains(here, -3.0):
 		_goal = fog.centre3()
 		_errand = "fog"
 	elif _item:
@@ -268,6 +272,12 @@ func _decide_goal() -> void:
 			_goal = fog.centre3()
 		else:
 			_has_goal = false
+	elif world.portals:
+		if _explore == Vector3.INF or here.distance_to(_explore) < 8.0:
+			var land := MapIslands.ISLANDS[randi_range(1, 8)]
+			_explore = Vector3(land.x + 8, land.w, land.y)
+		_goal = _explore
+		_errand = "explore"
 	else:
 		var friend := _nearest_friend()
 		_errand = "follow"

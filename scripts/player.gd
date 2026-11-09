@@ -1486,7 +1486,10 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 			"imp": _imp_timer = 0.3
 			"bell_spirit": _bell_timer = 1.0
 			"rat": _rat_timer = 0.0
-			"ghost": world.spawn_ally("ghost", global_position - global_basis.z * 1.5, time)
+			"ghost":
+				var previous := world.begin_act(self)
+				world.spawn_ally("ghost", global_position - global_basis.z * 1.5, time)
+				world.end_act(previous)
 		if not _familiars.has(id):
 			var mi := MeshInstance3D.new()
 			mi.mesh = PowerDefs.mesh(id)
@@ -2851,6 +2854,7 @@ func _physics_step(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta
 	input_jump = false
+	world.assist_arena_step(self, delta)
 	move_and_slide()
 	if world.portals:
 		_tick_islands(delta)

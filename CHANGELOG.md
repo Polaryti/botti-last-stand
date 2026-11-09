@@ -2,6 +2,24 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## Development — Island storms and combat fixes
+### Fixed
+- Ghost Knights picked up by bots appear beside and follow their bot owner.
+- Poison damage no longer causes repeated hit flinches. The Plague Doctor's Blowgun cannot be dropped or found as loot.
+- Last Command consistently replaces the normal Warlock/Gunner summon, including retiring a still-active ordinary Command retinue.
+- Humans can board bot horses and war chariots; boarding is checked by the host, and dismount releases the passenger.
+- Mist-born enemies disperse into drifting fragments when defeated. Their seal impacts have brighter bursts, mist and stronger audio cues.
+- Mob shadows project onto the ground and fade with height. Revised Cavalry helmet, War Bell Hammer and Vanguard banner surfaces avoid overlapping faces; remote banners extend away from the body.
+- Central arena paving reaches the stair edge. Collision follows all thirteen visible treads, with step assistance for players and mobs; grass no longer grows through the arena paving.
+### The Mists
+- The Veil Regent awakens around 8:30, with orbiting crown rings, an arrival lightning shockwave and a second-phase burst.
+- Fallen Revenants fight with life-draining spectral claws and a marked mist leap that bursts at its destination.
+- Roaming enemies populate the outer islands and stay there. Bots explore between islands rather than following the human indefinitely, and evacuate storms. Food and arrows spawn outside the arena; most other supplies also favour outer islands.
+- The two inter-island stepping-stone shortcuts now finish on their destination land.
+- A Mist Storm gathers every 90 seconds. It warns for 8 seconds, then deals 6 damage per second for 20 seconds to players, bots, mobs and summons remaining on that island. The first storm pressures the arena; later storms select an outer island. Gates open for evacuation. Violet fog, moving cloud banks, boundary rings, a local countdown and audio signal the danger. Storm kills do not award free player XP.
+### Multiplayer
+- Updated protocol; everyone in a match needs the updated dev build.
+
 ## Development — The Mists awaken
 ### Fixed
 - Mist attack warnings mark the ground below high jumps and the top of raised platforms.

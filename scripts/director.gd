@@ -54,13 +54,15 @@ var _last_stand := false
 var _call_timer := 0.0
 var _far_timer := 4.0
 var _next_rider := FIRST_RIDER
-var _mist_boss_at := 532.5
+var _next_storm := MistStorm.EVERY
+var _storm_index := 0
+var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
 
 
 func _init(owner_world: World) -> void:
 	world = owner_world
-	_mist_boss_at = randf_range(525.0, 540.0)
+	_mist_boss_at = randf_range(505.0, 515.0)
 
 
 ## In a multiplayer game this waits for all phones to load. A joined phone only keeps the clock.
@@ -98,7 +100,7 @@ func begin(with_zombies: bool) -> void:
 	if running:
 		_spawn_timer = 0.0
 		for i in target_population():
-			world.spawn_zombie(_pick_roamer())
+			_spawn_roamer()
 		var opening := "Survive until dawn"
 		if world.fort:
 			opening = "Hold the fort until dawn"
@@ -183,6 +185,12 @@ func _process(delta: float) -> void:
 	if not running:
 		return
 	elapsed += delta
+	if world.terrain.has_islands() and not Net.fog_rules() and elapsed >= _next_storm:
+		_next_storm = elapsed + MistStorm.EVERY
+		var island := 0 if _storm_index == 0 else randi_range(1, 8)
+		_storm_index += 1
+		if Net.active(): Net.start_mist_storm(island)
+		else: MistStorm.create(world, island)
 	_tick_specials()
 	_tick_last_stand(delta)
 	_spawn_timer -= delta
@@ -190,7 +198,7 @@ func _process(delta: float) -> void:
 		_spawn_timer = 1.25 if _last_stand else 2.5
 		var living := world.count_living()
 		if living < target_population():
-			world.spawn_zombie(_pick_roamer())
+			_spawn_roamer()
 	if elapsed >= _next_beast:
 		_next_beast = elapsed + (LAST_STAND_BEAST_EVERY if _last_stand else BEAST_EVERY)
 		if world.count_type("beast") < (LAST_STAND_BEASTS if _last_stand else MAX_BEASTS) and world.spawn_zombie("beast"):
@@ -225,6 +233,7 @@ func _sound(sound: String, volume: float, pitch := 1.0) -> void:
 ## The map is big, and a zombie that wandered off into the distance is a zombie nobody will meet.
 ## It comes back around where the players are instead.
 func _clear_far_zombies() -> void:
+	if world.terrain.has_islands(): return # Keep the island garrisons rather than recycling them around the centre.
 	for z: Zombie in world.zombies.duplicate():
 		if not z.is_alive() or z.flies or z.dormant or z.hero or z.def.get("mist_boss", false) or z.is_hunting():
 			continue
@@ -279,6 +288,8 @@ func _tick_mist_boss() -> void:
 		throne.y = world.ground_at(throne)
 		if world.spawn_zombie("veil_regent", throne):
 			_mist_boss_spawned = true
+			CommandField.visual_impact(world, throne, 12.0, true)
+			if Net.is_host(): Net.command_impact_visual(throne, 12.0, true)
 			show_banner("The Veil Regent awakens in the arena", 5.0)
 			_sound("mist_regent", 0.0)
 
@@ -335,3 +346,12 @@ func _restock() -> void:
 			potions += 1
 	if potions < 3:
 		stock(Pickup.Kind.POWER)
+
+
+func _spawn_roamer() -> void:
+	if world.terrain.has_islands() and randf() < 0.75:
+		var land := MapIslands.ISLANDS[randi_range(1, 8)]
+		var at := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3(land.x + 8, land.w, land.y))))
+		world.spawn_zombie(_pick_roamer(), at)
+	else:
+		world.spawn_zombie(_pick_roamer())

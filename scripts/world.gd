@@ -32,6 +32,7 @@ static var _mist_warmed_quality := -1
 static var _warmed_quality := -1
 static var _lands := {} # the land takes a moment to work out, and it never changes
 
+var mist_storm: MistStorm
 var mist_seals: Array[MistSeal] = []
 var stone_chains: Array = [] # each line of stones in the Mists, in order, by the middle of each top
 var mode: int = Game.Mode.MENU
@@ -407,6 +408,12 @@ func grid_mark_crops(t: Transform3D, size: Vector2) -> void:
 
 
 func ground_at(at: Vector3) -> float:
+	if terrain.has_islands():
+		var radius := Vector2(at.x, at.z).length()
+		if radius >= 54.0 and radius <= 57.0: return 18.1
+		if radius >= 13.0 and radius < 30.0: return 10.06
+		if radius >= 30.0 and radius < 54.0:
+			return 10.08 + (floorf((radius - 30.0) / 24.0 * 13.0) + 1.0) * 8.0 / 13.0
 	var h := terrain.height(at.x, at.z)
 	if h < FALL_DEATH and terrain.has_islands():
 		return terrain.island_floor(at.x, at.z) # over the void, what flies stays level with the islands
@@ -1774,7 +1781,7 @@ func on_zombie_killed(z: Zombie) -> void:
 	make_noise(z.position, 6.0)
 	if Net.is_host():
 		Net.zombie_died(z, z.last_hitter)
-	elif player:
+	elif player and z.last_hitter >= 0:
 		player.on_kill(z)
 
 
@@ -1846,7 +1853,10 @@ func spawn_pickup_at(at: Vector3, kind: int, id: String, bonus := 0) -> Pickup:
 func spawn_pickup_random(kind: int, id: String) -> Pickup:
 	for i in 14:
 		var at: Vector3
-		if i < 6 and not loot_spots.is_empty():
+		if terrain.has_islands() and not loot_spots.is_empty():
+			at = loot_spots[randi() % loot_spots.size()]
+			if portals.island_of(at) == 0 and (kind in [Pickup.Kind.FOOD, Pickup.Kind.ARROWS] or randf() < 0.85): continue
+		elif i < 6 and not loot_spots.is_empty():
 			at = _loot_near_players()
 		else:
 			at = _open_ground_near_players()
@@ -2896,3 +2906,17 @@ func fx_gore(at: Vector3, col: Color) -> void:
 	g.global_position = at
 	g.color = col.darkened(0.25)
 	g.restart()
+
+
+## Step over the arena's 0.615 m risers before sweeping the capsule against their front edges.
+func assist_arena_step(actor: CharacterBody3D, delta: float) -> void:
+	if not terrain.has_islands() or actor.velocity.y > 0.1: return
+	var at := actor.global_position
+	var radius := Vector2(at.x, at.z).length()
+	if radius < 29.5 or radius > 54.5 or absf(at.y - ground_at(at)) > 0.2: return
+	var motion := Vector3(actor.velocity.x, 0, actor.velocity.z)
+	if motion.length_squared() < 0.01: return
+	var ahead := at + motion.normalized() * (0.5 + motion.length() * delta)
+	var rise := ground_at(ahead) - at.y
+	if rise > 0.02 and rise < 0.72:
+		actor.global_position.y += rise + 0.01

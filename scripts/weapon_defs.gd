@@ -39,7 +39,7 @@ const ALL := {
 		"knock": 2.0, "returning": true, "weight": 1.1, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
 	"javelins": {"power": 2.2, "pierce": 1, "shot": "javelin", "name": "Javelins", "desc": "Heavy, with a falling arc. Passes through the first enemy. Uses arrows.", "kind": Kind.RANGED, "rate": 1.0, "range": 30.0, "speed": 27.0, "gravity": 8.0,
 		"knock": 3.5, "weight": 1.0, "pos": Vector3(0.22, -0.22, -0.1), "scale": 1.0},
-	"blowgun": {"power": 0.65, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.65, "range": 22.0, "speed": 40.0, "gravity": 2.0,
+	"blowgun": {"only": "plague_doctor", "power": 0.65, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.65, "range": 22.0, "speed": 40.0, "gravity": 2.0,
 		"knock": 0.0, "weight": 0.9, "pos": Vector3(0.14, -0.16, -0.25), "scale": 1.0},
 	"fists": {"only": "monk", "power": 0.7, "name": "", "desc": "", "kind": Kind.MELEE, "rate": 0.34, "range": 2.4, "cone": 100.0, "max_hits": 2,
 		"knock": 1.4, "swing": "punch", "hidden": true, "weight": 0.0, "pos": Vector3(0.34, -0.36, -0.68), "scale": 0.58},
@@ -282,8 +282,8 @@ static func _bell_hammer() -> Mesh:
 	l.box(Vector3(0, 0.8, 0.3), Vector3(0.38, 0.34, 0.1), STEEL)
 	l.prism(Vector3(0, 0.8, -0.1), Vector3(0, 0.85, -0.45), 0.09, 0.0, 4, STEEL)
 	for x: float in [-0.17, 0.17]:
-		l.box(Vector3(x, 0.8, 0.17), Vector3(0.04, 0.34, 0.3), DARK)
-	l.box(Vector3(0, 0.99, 0.08), Vector3(0.38, 0.05, 0.38), STEEL)
+		l.box(Vector3(x, 0.8, 0.12), Vector3(0.04, 0.34, 0.22), DARK)
+	l.box(Vector3(0, 1.0, 0.08), Vector3(0.38, 0.05, 0.3), STEEL)
 	return l.commit()
 
 
@@ -446,12 +446,12 @@ static func banner_mesh() -> Mesh:
 		var x := 0.05 + i * 0.09
 		var z := sin(i * 1.15) * 0.055
 		var h := 0.62 + (0.09 if i < 3 or i > 4 else 0.0)
-		l.box(Vector3(x, 1.4 - h * 0.5, z), Vector3(0.095, h, 0.025), Color(0.37, 0.09, 0.48))
-		l.box(Vector3(x, 1.36, z), Vector3(0.095, 0.045, 0.033), BRASS)
-		l.box(Vector3(x, 1.4 - h, z), Vector3(0.095, 0.035, 0.033), BRASS)
+		l.box(Vector3(x, 1.4 - h * 0.5, z), Vector3(0.088, h, 0.025), Color(0.37, 0.09, 0.48))
+		l.box(Vector3(x, 1.36, z), Vector3(0.088, 0.045, 0.04), BRASS)
+		l.box(Vector3(x, 1.4 - h, z), Vector3(0.088, 0.035, 0.04), BRASS)
 		if i in [3, 4]:
-			l.box(Vector3(x, 1.1, z), Vector3(0.06, 0.34, 0.04), BRASS)
-		if i in [2, 3, 4, 5]:
+			l.box(Vector3(x, 1.1, z), Vector3(0.06, 0.34, 0.045), BRASS)
+		if i in [2, 5]:
 			l.box(Vector3(x, 1.14, z), Vector3(0.095, 0.06, 0.04), BRASS)
 	_meshes["banner"] = l.commit()
 	var cloth := ShaderMaterial.new()

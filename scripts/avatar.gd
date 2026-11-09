@@ -347,7 +347,7 @@ func _process(delta: float) -> void:
 		HorseModel.set_gait(_horse, clampf(velocity.length() / 8.0, 0.0, 1.0))
 	if _banner and _banner.visible:
 		var wave := sin(world.now * (10.0 if _attack_left > 0.0 else 2.0)) * (0.18 if _attack_left > 0.0 else 0.035)
-		_banner.global_transform = Transform3D(global_basis * Basis.from_euler(Vector3(0, -0.65, wave)), (_banner.get_parent() as Node3D).global_position)
+		_banner.global_transform = Transform3D(global_basis * Basis.from_euler(Vector3(0, PI - 0.4, wave)), (_banner.get_parent() as Node3D).global_position)
 	if not dead and _attack_left <= 0.0:
 		_play("Running_A" if velocity.length_squared() > 0.5 else "Idle", maxf(0.8, velocity.length() / 5.0))
 

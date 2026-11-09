@@ -318,8 +318,24 @@ func _mists() -> void:
 	ok(w.count_type("veil_regent") == 1, "one scheduled Veil Regent appears on both phones")
 	await sync(19)
 
+	if host: Net.start_mist_storm(0)
+	await until(func() -> bool: return w.mist_storm != null, 4.0)
+	ok(w.mist_storm != null, "Mist Storm warning replicates to both phones")
+	var storm_hp := pl.hp
+	await wait(0.25)
+	ok(pl.hp == storm_hp, "network storm warning is damage-free")
+	w.mist_storm.elapsed = MistStorm.WARNING
+	await wait(0.7)
+	ok(pl.hp < storm_hp and pl.hp > storm_hp - 7.0, "network storm applies damage once to each locally owned player")
+	pl.position = Vector3(0, 40.1, -122)
+	storm_hp = pl.hp
+	await wait(0.7)
+	ok(pl.hp == storm_hp, "leaving the storm island stops its damage on both phones")
+	await sync(20)
+
 
 func _with_bots() -> void:
+	if rules == "bots": await _bot_mounts()
 	pl.guard_left = 99999.0
 	var ids: Array = Net.roster.keys().filter(Net.is_bot)
 	ok(ids.size() == 2, "two bots in the match")
@@ -1207,3 +1223,45 @@ func until(condition: Callable, timeout: float) -> void:
 	var deadline := Time.get_ticks_msec() + int(timeout * 1000.0)
 	while not condition.call() and Time.get_ticks_msec() < deadline:
 		await get_tree().process_frame
+
+
+func _bot_mounts() -> void:
+	await _clear_zombies_on_host()
+	var ids: Array = Net.roster.keys().filter(Net.is_bot)
+	var carrier := int(ids[0])
+	pl.set_physics_process(false)
+	pl.position = Vector3(1.0 if host else 2.0, 0.05, 36)
+	var original_class := ""
+	var original_spec := ""
+	if host:
+		var bot := Net.local_player(carrier)
+		original_class = bot.class_id
+		original_spec = bot.spec_id
+		bot.set_physics_process(false)
+		bot.position = Vector3(0, 0.05, 36)
+	for phase in 2:
+		if host:
+			var bot := Net.local_player(carrier)
+			bot.class_id = "chivalry" if phase == 0 else "artificer"
+			bot.spec_id = "" if phase == 0 else "mechanic"
+			bot.horse_progress = bot.horses_needed()
+			bot.mount()
+		await wait(0.5)
+		await sync(30 + phase * 3)
+		var boarding := not host if phase == 0 else host
+		if boarding: pl.board()
+		await wait(0.5)
+		if boarding: ok(pl.ride_behind == carrier, "human can board a bot horse/chariot through its authority")
+		await sync(31 + phase * 3)
+		if host:
+			ok(Net.local_player(carrier).passenger != 0, "bot carrier records its passenger")
+			Net.local_player(carrier).dismount()
+		await wait(0.5)
+		if boarding: ok(pl.ride_behind == 0, "bot dismount releases its human passenger")
+		await sync(32 + phase * 3)
+	if host:
+		var bot := Net.local_player(carrier)
+		bot.class_id = original_class
+		bot.spec_id = original_spec
+		bot.set_physics_process(true)
+	pl.set_physics_process(true)

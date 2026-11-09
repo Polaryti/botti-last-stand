@@ -33,7 +33,7 @@ func _ready() -> void:
 	await snap("bridge_night", Vector3(-56, 20, 4), Vector3(-100, 17, 8))
 	await snap("rotunda_night", Vector3(18, 22, -55), Vector3(0, 45, -122))
 	await snap("stones_night", Vector3(-48, 21, -46), Vector3(-68, 24, -66))
-	for i in 3:
+	for i in MistModels.KINDS.size():
 		w.spawn_zombie(MistModels.KINDS[i], Vector3((i - 1) * 5, 10, 16))
 		var z: Zombie = w.zombies.back()
 		z.set_physics_process(false)
@@ -43,4 +43,11 @@ func _ready() -> void:
 	var seal := MistSeal.create(w, Vector3(0, 10, 16), 9.0, 3.0, 10.0, 20.0, -1)
 	seal.elapsed = 5.0
 	await snap("regent_crown_warning", Vector3(14, 22, 32), Vector3(0, 10, 16))
+	for z: Zombie in w.zombies.duplicate():
+		z._die()
+		z.set_physics_process(true)
+	await snap("spirit_deaths", Vector3(8, 13, 31), Vector3(0, 12, 16))
+	var storm := MistStorm.create(w, 0)
+	storm.elapsed = 9.0
+	await snap("mist_storm", Vector3(0, 13, 26), Vector3(0, 18, 0))
 	await preload("res://tests/scene_cleanup.gd").finish(w)

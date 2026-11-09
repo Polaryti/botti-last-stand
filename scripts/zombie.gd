@@ -247,12 +247,13 @@ func _material_for(id: String, source: Material) -> ShaderMaterial:
 
 func _build_visual() -> void:
 	_setup_static()
-	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy", "harrier", "lantern_wisp", "mist_weaver", "veil_regent"]
+	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy", "harrier", "lantern_wisp", "mist_weaver", "veil_regent", "fallen_revenant"]
 	if _custom:
 		_visual = MistModels.build(model_id) if model_id in MistModels.KINDS else EnemyModels.build(model_id)
 		add_child(_visual)
 		for mi in _visual.find_children("*", "MeshInstance3D", false, false):
 			_parts.append(mi as MeshInstance3D)
+			(mi as MeshInstance3D).set_meta("mist_rest", (mi as MeshInstance3D).transform)
 		_fit[model_id] = 1.0
 		if model_id == "mimic":
 			_build_lure()
@@ -345,6 +346,9 @@ func _set_enabled(on: bool) -> void:
 
 func spawn(id: String, at: Vector3, minute := 0) -> void:
 	type_id = id
+	if model_id in MistModels.KINDS:
+		for part in _parts:
+			part.transform = part.get_meta("mist_rest", Transform3D.IDENTITY)
 	mist_mind = MistMind.new() if id in MistModels.KINDS else null
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
@@ -570,6 +574,7 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		_ride_pass -= delta
 		velocity = _ride_dir * _speed * (0.5 if _slow > 0.0 else 1.0)
 		rotation.y = lerp_angle(rotation.y, atan2(_ride_dir.x, _ride_dir.z), min(1.0, delta * 10.0))
+		world.assist_arena_step(self, delta)
 		move_and_slide()
 		position.y = world.ground_at(position)
 		if not _ride_hit and dist < 2.7 and absf(target.global_position.y - position.y) < 2.6:
@@ -589,6 +594,7 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		_ride_turn -= delta
 		velocity = Vector3(sin(rotation.y), 0, cos(rotation.y)) * _speed * 0.45
 		rotation.y += delta * 2.6
+		world.assist_arena_step(self, delta)
 		move_and_slide()
 		position.y = world.ground_at(position)
 		return
@@ -1004,7 +1010,10 @@ func _show_death() -> void:
 	_knock = Vector3.ZERO
 	_current_anim = ""
 	_play("Death_A" if randf() < 0.5 else "Death_B", 1.2, 0.1)
-	if _anim == null:
+	if model_id in MistModels.KINDS:
+		_dying = 1.6
+		world.fx_mist(centre(), 2.0)
+	elif _anim == null:
 		_visual.rotation.x = -PI * 0.5
 		_visual.position.y = 0.2
 		_dying = 0.9
@@ -1066,6 +1075,7 @@ func net_weapon(id: String) -> void:
 
 
 func _puppet_tick(delta: float) -> void:
+	_update_ground_shadow()
 	var was := position
 	position = position.lerp(_net_pos, minf(1.0, delta * 10.0))
 	rotation.y = lerp_angle(rotation.y, _net_rot, minf(1.0, delta * 10.0))
@@ -1085,7 +1095,7 @@ func _puppet_tick(delta: float) -> void:
 		var d := position.distance_to(p.global_position) if p else 0.0
 		if _eyes:
 			_eyes.visible = d < FAR
-		_shadow.visible = d < FAR and position.y - world.ground_at(position) < 0.5
+		_shadow.visible = _shadow.visible and d < FAR
 
 
 # --- Senses ------------------------------------------------------------------
@@ -1211,7 +1221,7 @@ func _decide(target: Target, to: Vector3, dist: float, dt: float) -> void:
 	# Lost in the fog anyway, and each of these is one more draw call.
 	if _eyes:
 		_eyes.visible = dist < FAR
-	_shadow.visible = dist < FAR and position.y - world.ground_at(position) < 0.5 and not _airborne
+	_shadow.visible = _shadow.visible and dist < FAR
 	if dormant and _is_dormant_type:
 		# A mimic only reacts to something right next to it, so it needs no sight check.
 		if dist < 3.0:
@@ -1445,6 +1455,13 @@ func _physics_process(delta: float) -> void:
 	if _dying > 0.0:
 		_dying -= delta
 		_tick_flash(delta)
+		if model_id in MistModels.KINDS:
+			var t := clampf(1.0 - _dying / 1.6, 0.0, 1.0)
+			for i in _parts.size():
+				var rest: Transform3D = _parts[i].get_meta("mist_rest", Transform3D.IDENTITY)
+				_parts[i].transform = rest
+				_parts[i].position += Vector3(sin(i * 2.4), 1.0, cos(i * 2.4)) * t
+				_parts[i].scale *= maxf(0.01, 1.0 - t)
 		var floor_y := world.ground_at(position)
 		if position.y > floor_y:
 			position.y = maxf(floor_y, position.y - 14.0 * delta) # flyers and leapers fall out of the air
@@ -1469,6 +1486,7 @@ func _physics_process(delta: float) -> void:
 	if _is_dummy:
 		_tick_dummy(delta)
 		return
+	_update_ground_shadow()
 	_tick_time += delta
 	_tick_count += 1
 	if _tick_every > 1 and _tick_count % _tick_every != 0:
@@ -1528,6 +1546,13 @@ func _physics_process(delta: float) -> void:
 		_groan_cd = randf_range(5.0, 12.0)
 		world.sfx_at(_idle_sound(), position, -14.0)
 
+	if world.mist_storm and world.mist_storm.contains(position) and not def.get("mist_boss", false) and not mist_mind:
+		var exit := world.mist_storm.escape(position)
+		if exit != Vector3.INF:
+			if not _has_goal or _goal.distance_squared_to(exit) > 1.0: _set_goal(exit)
+			state = State.INVESTIGATE
+			_move(target, exit - position, position.distance_to(exit), delta)
+			return
 	if mist_mind:
 		mist_mind.tick(self, target, delta)
 		return
@@ -1584,7 +1609,9 @@ func _tick_dot(delta: float) -> void:
 	_dot_wait -= delta
 	if _dot_pending > 0.0 and (_dot_wait <= 0.0 or maxf(poison_left, bleed_left) <= delta):
 		next_hitter = last_hitter
+		var previous_flinch := _hurt_stun
 		take_damage(_dot_pending, Vector3.ZERO, 0.0, centre())
+		_hurt_stun = previous_flinch
 		_dot_pending = 0.0
 		_dot_wait = 0.25
 	poison_left = maxf(0.0, poison_left - delta)
@@ -1999,6 +2026,9 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 			var out := world.portals.exit_from(position)
 			if out != Vector3.INF:
 				position = out
+				if world.mist_storm and not world.mist_storm.contains(out):
+					_clear_goal()
+					state = State.ROAM
 				_gate_wait = 2.0
 				_needs_path = true
 				_path = PackedVector3Array()
@@ -2056,14 +2086,19 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 	if phases:
 		position += velocity * delta
 	elif _tick_every > 1:
+		world.assist_arena_step(self, delta)
 		# move_and_slide always uses one physics step, so a skipped tick needs a longer stride.
 		var plain := velocity
 		velocity *= float(_tick_every)
 		move_and_slide()
 		velocity = plain
 	else:
+		world.assist_arena_step(self, delta)
 		move_and_slide()
-	position.y = world.ground_at(position) + (0.25 if phases else 0.0)
+	var floor_y := world.ground_at(position)
+	if world.terrain.has_islands() and not phases and Vector2(position.x, position.z).length() >= 29.5 and Vector2(position.x, position.z).length() <= 54.5:
+		floor_y = maxf(floor_y, world.ground_at(position + _move_dir * 0.36))
+	position.y = floor_y + (0.25 if phases else 0.0)
 	if _sees or _hold or state == State.CHASE and dist < 4.0:
 		if dist > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
@@ -2200,3 +2235,11 @@ func _process(delta: float) -> void:
 	if _anim != null and (_frame + get_instance_id()) % every == 0:
 		_anim.advance(_anim_accum)
 		_anim_accum = 0.0
+
+
+func _update_ground_shadow() -> void:
+	var floor_y := world.ground_at(position)
+	var gap := maxf(0.0, position.y - floor_y)
+	_shadow.global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3(_scale, 1, _scale) / (1.0 + gap * 0.08)), Vector3(position.x, floor_y + 0.035, position.z))
+	_shadow.visible = is_alive() and world.terrain.is_walkable(position.x, position.z) and gap < 12.0
+	_shadow.transparency = clampf(gap / 12.0, 0.0, 1.0)

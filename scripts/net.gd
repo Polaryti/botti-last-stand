@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 30
+const PROTOCOL := 31
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -1043,6 +1043,7 @@ func _z_died(net_id: int, killer: int) -> void:
 
 ## The killer gets the kill. In co-op the others learn something too.
 func _credit(z: Zombie, killer: int) -> void:
+	if killer < 0: return
 	for p: Player in world.local_players():
 		if p.dead:
 			continue
@@ -1762,13 +1763,17 @@ func _mist_fx(at: Vector3, size: float) -> void:
 func nearby_horse(at: Vector3) -> int:
 	for peer: int in _avatars:
 		var a: Avatar = _avatars[peer]
-		if a.is_mounted() and not a.has_passenger and not is_foe(peer) and not is_bot(peer) and at.distance_to(a.global_position) < 3.5:
+		if a.is_mounted() and not a.has_passenger and not is_foe(peer) and at.distance_to(a.global_position) < 3.5:
 			return peer
 	return 0
 
 
 func ask_to_ride(peer: int) -> void:
-	_ride_ask.rpc_id(peer)
+	if is_bot(peer):
+		if is_host(): _accept_bot_ride(my_id(), peer)
+		else: _bot_ride_ask.rpc_id(1, peer)
+	else:
+		_ride_ask.rpc_id(peer)
 
 
 @rpc("any_peer", "reliable")
@@ -1790,6 +1795,10 @@ func _ride_answer(yes: bool) -> void:
 
 
 func stop_riding(peer: int) -> void:
+	if is_bot(peer):
+		if is_host(): _clear_bot_seat(my_id(), peer)
+		else: _bot_ride_stop.rpc_id(1, peer)
+		return
 	if _avatars.has(peer):
 		_ride_stop.rpc_id(peer)
 
@@ -1801,13 +1810,16 @@ func _ride_stop() -> void:
 
 
 func drop_passenger(peer: int) -> void:
+	if peer == my_id() and world and world.player:
+		world.player.ride_behind = 0
+		return
 	if _avatars.has(peer):
 		_ride_end.rpc_id(peer)
 
 
 @rpc("any_peer", "reliable")
 func _ride_end() -> void:
-	if world and is_instance_valid(world) and world.player and world.player.ride_behind == multiplayer.get_remote_sender_id():
+	if world and is_instance_valid(world) and world.player and (world.player.ride_behind == multiplayer.get_remote_sender_id() or (multiplayer.get_remote_sender_id() == 1 and is_bot(world.player.ride_behind))):
 		world.player.ride_behind = 0
 
 
@@ -2052,3 +2064,36 @@ func mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: flo
 func _spawn_mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int) -> void:
 	if world and is_instance_valid(world):
 		MistSeal.create(world, at, radius, eye, delay, damage, source)
+
+
+@rpc("any_peer", "reliable")
+func _bot_ride_ask(carrier: int) -> void:
+	if is_host(): _accept_bot_ride(multiplayer.get_remote_sender_id(), carrier)
+
+func _accept_bot_ride(who: int, carrier: int) -> void:
+	var bot := local_player(carrier)
+	var rider: Target = world.player if who == my_id() else avatar(who)
+	var yes := bot != null and rider != null and not rider.dead and bot.is_riding() and bot.passenger == 0 and not bots_foes(who, carrier) and rider.global_position.distance_to(bot.global_position) < 3.5
+	if yes: bot.passenger = who
+	if who == my_id(): _bot_ride_answer(yes, carrier)
+	else: _bot_ride_answer.rpc_id(who, yes, carrier)
+
+@rpc("authority", "reliable")
+func _bot_ride_answer(yes: bool, carrier: int) -> void:
+	if yes and world and world.player: world.player.ride_behind = carrier
+
+@rpc("any_peer", "reliable")
+func _bot_ride_stop(carrier: int) -> void:
+	if is_host(): _clear_bot_seat(multiplayer.get_remote_sender_id(), carrier)
+
+func _clear_bot_seat(who: int, carrier: int) -> void:
+	var bot := local_player(carrier)
+	if bot and bot.passenger == who: bot.passenger = 0
+
+func start_mist_storm(island: int) -> void:
+	if is_host(): _mist_storm_start.rpc(island)
+
+@rpc("authority", "call_local", "reliable")
+func _mist_storm_start(island: int) -> void:
+	if world and is_instance_valid(world) and island >= 0 and island < 9:
+		MistStorm.create(world, island)

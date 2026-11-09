@@ -247,6 +247,7 @@ func zombie_pool_plan() -> Dictionary:
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent
 		plan["mist_weaver"] = 2
 		plan["veil_regent"] = 1
+		plan["fallen_revenant"] = 2
 	return plan
 
 

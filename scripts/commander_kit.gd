@@ -42,10 +42,15 @@ static func equip(p: Player) -> void:
 
 
 static func cast(p: Player) -> void:
-	var last := p.has_flag("last_command") and p.level >= ClassDefs.MAX_LEVEL
+	var last := p.has_flag("last_command")
 	if last and p.spec_id == "gunner" and not p.command_target_ready:
 		return
 	if last and p.spec_id in ["warlock", "gunner"]:
+		# Last Command replaces the retinue; retire any still-active ordinary Command summon.
+		var old_kind := "magician" if p.spec_id == "warlock" else "artificer"
+		for ally: Ally in p.world.allies.duplicate():
+			if ally.master == p and ally.remote_owner == 0 and ally.kind == old_kind:
+				p.world.remove_ally(ally)
 		Net.command_field(p.spec_id, p.command_target if p.spec_id == "gunner" else p.global_position, p.world)
 	elif p.spec_id == "warlock":
 		p.world.spawn_ally("magician", p.global_position + Vector3(2, 0, 0), 16.0 * p.m("ally_time"))
