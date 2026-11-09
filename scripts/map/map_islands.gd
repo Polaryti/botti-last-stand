@@ -193,7 +193,7 @@ func build(b: MapBuilder) -> void:
 	w.portals = gates
 	for index in ISLANDS.size():
 		var island := ISLANDS[index]
-		w.map_marks.append({"at": Vector2(island.x, island.y), "name": ZONE_NAMES[index]})
+		w.map_marks.append({"at": Vector2(island.x, island.y), "name": ZONE_NAMES[index], "label_offset": 20.0 if index == 7 else 0.0})
 	var used := {}
 	for pair: Array in LINKS:
 		var ia: int = pair[0]
