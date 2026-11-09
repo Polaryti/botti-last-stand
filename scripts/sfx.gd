@@ -34,6 +34,11 @@ func _ready() -> void:
 	for group: String in VARIANTS:
 		for n: String in VARIANTS[group]:
 			_streams[n] = load("res://assets/sounds/%s.ogg" % n)
+	_streams["command"] = _command_cry()
+	for kind in ["warning", "burst", "regent"]:
+		_streams["mist_" + kind] = _mist_sound(kind)
+	for sound in ["warning", "fall", "impact"]:
+		_streams["artillery_" + sound] = _artillery_sound(sound)
 	_music = [_stem("night"), _stem("hunted"), _stem("dawn")]
 	for i in POOL:
 		var p := AudioStreamPlayer.new()
@@ -65,6 +70,19 @@ func _build_buses() -> void:
 func apply_volumes() -> void:
 	_set_bus(MUSIC_BUS, Game.music_volume)
 	_set_bus(SOUND_BUS, Game.sound_volume)
+
+
+## Stop playback before teardown, so audio-thread playback objects can release their streams.
+func stop_all() -> void:
+	_music_on = false
+	_rain_target = -60.0
+	for child in get_children():
+		if child is AudioStreamPlayer:
+			(child as AudioStreamPlayer).stop()
+
+
+func _exit_tree() -> void:
+	stop_all()
 
 
 func _set_bus(bus: String, linear: float) -> void:
@@ -164,3 +182,93 @@ func play_at(sound: String, pos: Vector3, listener: Vector3, volume_db := 0.0, m
 	if d > 38.0:
 		return
 	play(sound, volume_db - d * 0.55, 1.0, min_gap)
+
+
+## A short voiced rally, generated once at startup; no extra audio file or streaming cost.
+func _command_cry() -> AudioStreamWAV:
+	const RATE := 16000
+	const LENGTH := 1.15
+	var count := int(RATE * LENGTH)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 712
+	var phase := 0.0
+	var breath := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var x := t / LENGTH
+		var envelope := smoothstep(0.0, 0.07, x) * (1.0 - smoothstep(0.55, 1.0, x))
+		# A rough glottal source through the resonant formants of an open 'ah', with breath and pitch fall.
+		var fundamental := 155.0 - x * 35.0 + sin(t * 47.0) * 2.8 + rng.randf_range(-1.2, 1.2)
+		phase += TAU * fundamental / RATE
+		var voiced := 0.0
+		for harmonic in range(1, 33):
+			var f := harmonic * fundamental
+			var vowel := exp(-pow((f - 820.0) / 180.0, 2.0)) + exp(-pow((f - 1230.0) / 240.0, 2.0)) * 0.7 + exp(-pow((f - 2700.0) / 420.0, 2.0)) * 0.25
+			voiced += sin(phase * harmonic) * (0.07 / harmonic + vowel * 0.14)
+		breath = lerpf(breath, rng.randf_range(-1, 1), 0.6)
+		var voice := tanh((voiced + breath * 0.035) * 1.8) * envelope * 0.8
+		data.encode_s16(i * 2, int(clampf(voice, -1.0, 1.0) * 32767.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = RATE
+	stream.data = data
+	return stream
+
+
+func _artillery_sound(kind: String) -> AudioStreamWAV:
+	const RATE := 16000
+	var duration := 1.8 if kind == "impact" else (1.1 if kind == "warning" else 0.35)
+	var count := int(RATE * duration)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 641
+	var rumble := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var x := t / duration
+		var value := 0.0
+		if kind == "impact":
+			rumble = lerpf(rumble, rng.randf_range(-1, 1), 0.18)
+			value = (rumble * 1.8 + sin(TAU * (70.0 * t - 12.0 * t * t)) * 0.4) * exp(-t * 3.0) * minf(t * 250, 1.0)
+		elif kind == "fall":
+			value = sin(TAU * (1500.0 * t - 1000.0 * t * t)) * sin(PI * x) * 0.22
+		else:
+			value = (sin(TAU * 195 * t) + 0.3 * sin(TAU * 390 * t)) * sin(PI * x) * (0.35 + 0.15 * sin(TAU * 5 * t))
+		data.encode_s16(i * 2, int(clampf(value, -0.95, 0.95) * 32767))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = RATE
+	stream.data = data
+	return stream
+
+
+## Original mist cues: a rising glass note, a hollow impact and the Regent's low chord.
+func _mist_sound(kind: String) -> AudioStreamWAV:
+	const RATE := 16000
+	var duration := 1.8 if kind == "regent" else 1.2 if kind == "warning" else 0.65
+	var count := int(duration * RATE)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8931
+	var air := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var x := t / duration
+		var envelope := sin(PI * x) * minf(t * 25.0, 1.0)
+		air = lerpf(air, rng.randf_range(-1.0, 1.0), 0.06)
+		var phase := TAU * (420.0 * t + 90.0 * t * t)
+		var tone := sin(phase) * 0.2 + sin(phase * 1.502) * 0.11
+		if kind == "burst":
+			tone = sin(TAU * (115.0 * t - 55.0 * t * t)) * 0.34 + air * 0.55
+		elif kind == "regent":
+			tone = sin(TAU * 73.4 * t) * 0.22 + sin(TAU * 110.0 * t) * 0.15 + sin(TAU * 155.6 * t) * 0.12 + air * 0.1
+		data.encode_s16(i * 2, int(clampf(tone * envelope, -0.8, 0.8) * 32767.0))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = RATE
+	stream.data = data
+	return stream

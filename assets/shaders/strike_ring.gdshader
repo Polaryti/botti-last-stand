@@ -12,7 +12,8 @@ void vertex() {
 
 void fragment() {
 	float r = length(at);
-	float inside = 1.0 - smoothstep(0.97, 1.0, r);
+	float edge_width = max(fwidth(r), 0.001);
+	float inside = 1.0 - smoothstep(1.0 - max(0.03, edge_width), 1.0, r);
 	float rim = smoothstep(0.9, 0.97, r);
 	float wave = smoothstep(progress - 0.16, progress, r) * (1.0 - smoothstep(progress, progress + 0.015, r));
 	float pulse = 0.84 + 0.16 * sin(TIME * 22.0);

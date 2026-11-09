@@ -1,0 +1,194 @@
+name: Android dev release
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-dev-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.7.2"
+  EPIC_RELEASE: "2.3.1"
+  EPIC_ASSET: "epic-online-services-godot-all-56238973e2cd7ac9ac99ca14f88934465f0a8997.zip"
+  CERT_SHA256: "53c7a9b03923677ebd8102ac3836402f97e0a9d17dc8d4a747ae83138ea8fa79"
+
+jobs:
+  android-dev:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Require the existing signing identity
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_USER: ${{ secrets.ANDROID_KEYSTORE_USER }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE" && test -n "$KEY_USER" && test -n "$KEY_PASSWORD"
+          mkdir -p "$RUNNER_TEMP/dev-keys"
+          printf '%s' "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/dev-keys/release.keystore"
+          {
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$RUNNER_TEMP/dev-keys/release.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_USER=$KEY_USER"
+            echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$KEY_PASSWORD"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/dev-keys/release.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=$KEY_USER"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Java and Android SDK
+        run: |
+          test -n "$JAVA_HOME_21_X64"
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$sdk" --licenses <<< "$(printf 'y\n%.0s' {1..100})" > /dev/null
+          "$sdk" "platforms;android-36" "build-tools;36.1.0" "platform-tools"
+
+      - name: Install Godot and export templates
+        run: |
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          templates="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          curl -fsSL --retry 3 -o "$archive" "$base/$archive"
+          curl -fsSL --retry 3 -o "$templates" "$base/$templates"
+          curl -fsSL --retry 3 -o SHA512-SUMS.txt "$base/SHA512-SUMS.txt"
+          grep -E " ($archive|$templates)\$" SHA512-SUMS.txt | sha512sum --check --strict
+          unzip -q "$archive" -d "$RUNNER_TEMP/godot"
+          unzip -q "$templates" -d "$RUNNER_TEMP/tpz"
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest" "$HOME/.config/godot"
+          mv "$RUNNER_TEMP"/tpz/templates/* "$dest/"
+          rm "$archive" "$templates" SHA512-SUMS.txt
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' \
+            "$ANDROID_HOME" "$JAVA_HOME" > "$HOME/.config/godot/editor_settings-4.7.tres"
+
+      - name: Validate source and dev isolation
+        run: |
+          mkdir -p build/checks
+          python3 -m unittest discover -s tests -p test_dev_build.py
+          python3 tools/import_project.py --log build/checks/import.log
+          python3 tools/run_checks.py regressions
+
+      - name: Prepare the separate development app
+        id: dev
+        run: python3 tools/prepare_dev_build.py --build-number "$GITHUB_RUN_NUMBER" --commit "$GITHUB_SHA"
+
+      - name: Install Android Gradle template
+        run: |
+          # Template installation requires an export invocation; its first export may fail
+          # before the optional plugin/Gradle setup is complete.
+          "$GODOT" --headless --path . --install-android-build-template \
+            --export-release 'Android Dev' build/dev/bootstrap.apk > build/dev/bootstrap.log 2>&1 || true
+          test -f android/build/build.gradle
+          rm -f build/dev/bootstrap.apk
+
+      - name: Include online play when configured
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EPIC_PRODUCT_ID: ${{ secrets.EPIC_PRODUCT_ID }}
+          EPIC_SANDBOX_ID: ${{ secrets.EPIC_SANDBOX_ID }}
+          EPIC_DEPLOYMENT_ID: ${{ secrets.EPIC_DEPLOYMENT_ID }}
+          EPIC_CLIENT_ID: ${{ secrets.EPIC_CLIENT_ID }}
+          EPIC_CLIENT_SECRET: ${{ secrets.EPIC_CLIENT_SECRET }}
+        run: |
+          if [ -n "$EPIC_PRODUCT_ID" ] && [ -n "$EPIC_SANDBOX_ID" ] && [ -n "$EPIC_DEPLOYMENT_ID" ] && [ -n "$EPIC_CLIENT_ID" ] && [ -n "$EPIC_CLIENT_SECRET" ]; then
+            gh release download "$EPIC_RELEASE" --repo 3ddelano/epic-online-services-godot \
+              --pattern "$EPIC_ASSET" --output "$RUNNER_TEMP/epic.zip"
+            unzip -q "$RUNNER_TEMP/epic.zip" -d "$RUNNER_TEMP/epic"
+            source=$(find "$RUNNER_TEMP/epic" -name eosg.gdextension -print -quit)
+            test -n "$source"
+            # Linux libraries are needed by the Linux importer; Android libraries ship in the APK.
+            python3 tools/setup_epic.py "$(dirname "$source")" android,linux
+            test -f scripts/epic_keys.gd
+            echo "DEV_ONLINE=true" >> "$GITHUB_ENV"
+          else
+            echo '::warning::Epic credentials are incomplete; this dev APK supports solo, bots and LAN only.'
+            echo "DEV_ONLINE=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build and verify the development APK
+        env:
+          APK_NAME: ${{ steps.dev.outputs.apk_name }}
+        run: |
+          python3 tools/import_project.py --log build/dev/import.log
+          python3 tools/run_checks.py regressions
+          "$GODOT" --headless --path . --export-release 'Android Dev' "build/dev/$APK_NAME" 2>&1 | tee build/dev/export.log
+          test -s "build/dev/$APK_NAME"
+          tools="$ANDROID_HOME/build-tools/36.1.0"
+          "$tools/apksigner" verify --print-certs "build/dev/$APK_NAME" | tee build/dev/certificate.txt
+          grep -qi "SHA-256 digest: $CERT_SHA256" build/dev/certificate.txt
+          "$tools/aapt" dump badging "build/dev/$APK_NAME" > build/dev/badging.txt
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          info = json.loads(Path('build/dev/build-info.json').read_text())
+          badging = Path('build/dev/badging.txt').read_text()
+          assert f"name='{info['package']}'" in badging.splitlines()[0]
+          assert f"versionCode='{info['version_code']}'" in badging.splitlines()[0]
+          assert f"versionName='{info['version']}'" in badging.splitlines()[0]
+          assert "android.permission.REQUEST_INSTALL_PACKAGES" in badging
+          info['online_play'] = os.environ['DEV_ONLINE'] == 'true'
+          Path('build/dev/build-info.json').write_text(json.dumps(info, indent=2) + '\n')
+          PY
+          cd build/dev
+          sha256sum "$APK_NAME" > "$APK_NAME.sha256"
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: android-dev-${{ github.run_number }}
+          path: |
+            build/dev/*.apk
+            build/dev/*.sha256
+            build/dev/build-info.json
+            build/dev/*.log
+            build/dev/badging.txt
+            build/checks
+          retention-days: 14
+
+      - name: Publish an Android-only prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.dev.outputs.tag }}
+          VERSION: ${{ steps.dev.outputs.version }}
+          APK_NAME: ${{ steps.dev.outputs.apk_name }}
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          info = json.loads(Path('build/dev/build-info.json').read_text())
+          changes = Path('CHANGELOG.md').read_text().split('\n## ', 2)[1].rstrip()
+          Path('build/dev/notes.md').write_text(
+              f"Android development test build **{info['version']}**.\n\n"
+              f"Source: `{info['commit']}` on `dev`.\n\n"
+              "Install the APK below. It appears as **Botti's Last Stand Dev** and can coexist with production. "
+              "Its saves and multiplayer compatibility are separate. Its menu offers future dev APK updates through Android’s installer.\n\n"
+              f"Online play included: **{'yes' if info['online_play'] else 'no; solo, bots and LAN are available'}**.\n\n"
+              "This prerelease does not replace the latest production release. No iOS build is included. "
+              "Full gameplay/LAN/render CI results are available in the separate Validate game workflow.\n\n"
+              f"## {changes}\n"
+          )
+          PY
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --prerelease --latest=false
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Dev $VERSION (Android)" \
+              --prerelease --latest=false --notes-file build/dev/notes.md
+          fi
+          gh release upload "$TAG" "build/dev/$APK_NAME" "build/dev/$APK_NAME.sha256" build/dev/build-info.json --clobber
+
+      - name: Remove the temporary signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/dev-keys"

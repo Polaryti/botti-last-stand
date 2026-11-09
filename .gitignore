@@ -1,6 +1,8 @@
 # Godot's cache and build output
 .godot/
 build/
+__pycache__/
+*.pyc
 
 # The Android signing key never goes in this repository. See docs/BUILDING.md.
 keys/

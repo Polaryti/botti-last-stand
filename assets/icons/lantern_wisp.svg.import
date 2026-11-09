@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dptch0nhdmo4b"
-path="res://.godot/imported/sling.png-75940c73f64d45e5e9190a100cbcbaf2.ctex"
+uid="uid://dfhkwnl2ed320"
+path="res://.godot/imported/lantern_wisp.svg-922bc98931be59b1e1df404c5613c449.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/sling.png"
-dest_files=["res://.godot/imported/sling.png-75940c73f64d45e5e9190a100cbcbaf2.ctex"]
+source_file="res://assets/icons/lantern_wisp.svg"
+dest_files=["res://.godot/imported/lantern_wisp.svg-922bc98931be59b1e1df404c5613c449.ctex"]
 
 [params]
 
@@ -38,3 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
+svg/scale=1.0
+editor/scale_with_editor_scale=false
+editor/convert_colors_with_editor_theme=false

@@ -8,6 +8,8 @@ extends Node
 signal changed
 
 const LATEST := "https://api.github.com/repos/Polaryti/botti-last-stand/releases/latest"
+const DEV_RELEASES := "https://api.github.com/repos/Polaryti/botti-last-stand/releases?per_page=100"
+const DOWNLOADS := "https://github.com/Polaryti/botti-last-stand/releases/download/"
 const PAGE := "https://github.com/Polaryti/botti-last-stand/releases/latest"
 const FOLDER := "user://update"
 const FILE := "user://update/botti-last-stand.apk"
@@ -18,6 +20,7 @@ var state: int = State.IDLE
 var latest := "" # the newer version, as "0.20.2"
 var apk_url := ""
 var apk_size := 0
+var apk_digest := ""
 var page := PAGE
 var problem := ""
 var _http: HTTPRequest
@@ -64,49 +67,125 @@ func check() -> void:
 	_http = HTTPRequest.new()
 	_http.timeout = 12.0
 	add_child(_http)
-	_http.request_completed.connect(_on_checked)
-	if _http.request(LATEST, _headers()) != OK:
+	_http.request_completed.connect(_on_checked.bind(_http))
+	if _http.request(endpoint(), _headers()) != OK:
 		_http.queue_free()
+		_http = null
 		state = State.NONE
 		changed.emit()
 
 
-func _on_checked(result: int, code: int, _headers_got: PackedStringArray, body: PackedByteArray) -> void:
+func _on_checked(result: int, code: int, _headers_got: PackedStringArray, body: PackedByteArray, request: HTTPRequest) -> void:
+	if request != _http or not is_instance_valid(_http):
+		return
 	_http.queue_free()
 	_http = null
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		state = State.NONE
 		changed.emit()
 		return
-	apply_release(JSON.parse_string(body.get_string_from_utf8()))
+	var data: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if Game.is_dev_build():
+		apply_dev_releases(data)
+	else:
+		apply_release(data)
 
 
-## What GitHub says about the latest version. A version is only offered once its app is there.
-func apply_release(data: Variant) -> void:
+## Production uses GitHub's stable release; dev scans prereleases because /latest excludes them.
+static func endpoint() -> String:
+	return DEV_RELEASES if Game.is_dev_build() else LATEST
+
+
+static func dev_build(tag: String) -> int:
+	var bits := tag.split("-")
+	if bits.size() != 3 or bits[0] != "dev" or not bits[1].is_valid_int() or bits[2].length() != 7:
+		return 0
+	for ch in bits[2]:
+		if not ch in "0123456789abcdef":
+			return 0
+	return maxi(0, bits[1].to_int())
+
+
+static func _stable_tag(tag: String) -> bool:
+	var parts := tag.trim_prefix("v").split(".")
+	if parts.size() != 3:
+		return false
+	for part: String in parts:
+		if part.is_empty() or not part.is_valid_int() or part.to_int() < 0:
+			return false
+	return true
+
+
+static func installed_dev_build() -> int:
+	return current().split("-dev.")[-1].split("+")[0].to_int() if "-dev." in current() else 0
+
+
+func _reset_offer() -> void:
 	state = State.NONE
 	latest = ""
 	apk_url = ""
 	apk_size = 0
-	if typeof(data) != TYPE_DICTIONARY or data.get("draft", false) or data.get("prerelease", false):
-		changed.emit()
-		return
-	var tag := str(data.get("tag_name", ""))
-	if not is_newer(tag, current()):
-		changed.emit()
-		return
-	# The app for this phone: the Android one, or on an iPhone the one to install with Sideloadly.
-	var wanted := ".ipa" if OS.has_feature("ios") else ".apk"
-	for asset: Variant in data.get("assets", []):
-		if typeof(asset) == TYPE_DICTIONARY and str(asset.get("name", "")).ends_with(wanted):
-			apk_url = str(asset.get("browser_download_url", ""))
-			apk_size = int(asset.get("size", 0))
-	if apk_url == "":
-		changed.emit()
-		return
-	latest = tag.trim_prefix("v")
-	page = str(data.get("html_url", PAGE))
-	state = State.AVAILABLE
+	apk_digest = ""
+	page = PAGE
+
+
+## Ignore drafts, stable builds and incomplete uploads; compare Android's monotonic dev run number.
+func apply_dev_releases(data: Variant) -> void:
+	_reset_offer()
+	var best := installed_dev_build()
+	if Game.is_dev_build() and typeof(data) == TYPE_ARRAY:
+		for release: Variant in data:
+			if typeof(release) != TYPE_DICTIONARY or release.get("draft", false) or not release.get("prerelease", false):
+				continue
+			var tag := str(release.get("tag_name", ""))
+			var number := dev_build(tag)
+			if number > best and _select_asset(release, tag, "botti-last-stand-%s.apk" % tag):
+				best = number
 	changed.emit()
+
+
+## A version is offered only once the correct channel's Android app is published.
+func apply_release(data: Variant) -> void:
+	_reset_offer()
+	if not Game.is_dev_build() and typeof(data) == TYPE_DICTIONARY and not data.get("draft", false) and not data.get("prerelease", false):
+		var tag := str(data.get("tag_name", ""))
+		if _stable_tag(tag) and is_newer(tag, current()):
+			_select_asset(data, tag)
+	changed.emit()
+
+
+func _select_asset(release: Dictionary, tag: String, exact_name := "") -> bool:
+	var assets: Variant = release.get("assets", [])
+	if typeof(assets) != TYPE_ARRAY:
+		return false
+	var wanted := ".ipa" if OS.has_feature("ios") and not Game.is_dev_build() else ".apk"
+	if exact_name == "":
+		exact_name = "botti-last-stand-" + tag.trim_prefix("v") + ("-ios" if wanted == ".ipa" else "") + wanted
+	for asset: Variant in assets:
+		if typeof(asset) != TYPE_DICTIONARY:
+			continue
+		var asset_name := str(asset.get("name", ""))
+		var url := str(asset.get("browser_download_url", ""))
+		if asset_name != exact_name:
+			continue
+		if not url.begins_with(DOWNLOADS + tag + "/") or url.get_file() != asset_name or int(asset.get("size", 0)) <= 0:
+			continue
+		var digest: Variant = asset.get("digest")
+		var checksum := ""
+		if digest != null and digest != "":
+			if typeof(digest) != TYPE_STRING or not digest.begins_with("sha256:"):
+				continue
+			checksum = digest.trim_prefix("sha256:")
+			if checksum.length() != 64 or not checksum.is_valid_hex_number():
+				continue
+		apk_url = url
+		apk_size = int(asset["size"])
+		apk_digest = checksum
+		latest = tag if Game.is_dev_build() else tag.trim_prefix("v")
+		page = "https://github.com/Polaryti/botti-last-stand/releases/tag/" + tag
+		state = State.AVAILABLE
+		return true
+	return false
 
 
 ## Android: fetch the new app, then open it. Android asks the player before it installs anything.
@@ -118,9 +197,10 @@ func download() -> void:
 	_http.download_file = ProjectSettings.globalize_path(FILE)
 	_http.timeout = 900.0
 	add_child(_http)
-	_http.request_completed.connect(_on_downloaded)
+	_http.request_completed.connect(_on_downloaded.bind(_http))
 	problem = ""
-	if _http.request(apk_url, _headers()) != OK:
+	var download_url := apk_url + "?download=1&check=%d" % int(Time.get_unix_time_from_system())
+	if _http.request(download_url, _headers()) != OK:
 		_http.queue_free()
 		_http = null
 		_failed("Could not start the download.")
@@ -136,7 +216,9 @@ func progress() -> float:
 	return clampf(float(_http.get_downloaded_bytes()) / float(apk_size), 0.0, 1.0)
 
 
-func _on_downloaded(result: int, code: int, _headers_got: PackedStringArray, _body: PackedByteArray) -> void:
+func _on_downloaded(result: int, code: int, _headers_got: PackedStringArray, _body: PackedByteArray, request: HTTPRequest = null) -> void:
+	if (request != null and request != _http) or not is_instance_valid(_http):
+		return
 	_http.queue_free()
 	_http = null
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
@@ -147,6 +229,10 @@ func _on_downloaded(result: int, code: int, _headers_got: PackedStringArray, _bo
 	if apk_size > 0 and got != apk_size:
 		_failed("The download came out wrong. Try again.")
 		return
+	if apk_digest != "" and FileAccess.get_sha256(FILE) != apk_digest:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(FILE))
+		_failed("The download failed verification. Try again.")
+		return
 	state = State.READY
 	changed.emit()
 	install()
@@ -155,7 +241,7 @@ func _on_downloaded(result: int, code: int, _headers_got: PackedStringArray, _bo
 ## Opens the new app with Android's installer. The first time, Android asks to allow this game to
 ## install apps; after allowing it, tap Install again.
 func install() -> void:
-	if state == State.READY:
+	if state == State.READY and can_install():
 		OS.shell_open(ProjectSettings.globalize_path(FILE))
 
 

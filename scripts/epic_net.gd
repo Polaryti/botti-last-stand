@@ -32,6 +32,7 @@ const KEYS := "res://scripts/epic_keys.gd"
 
 var _ieos: Object
 var _user := ""
+var _signing_in := false
 var _lobby_id := ""
 var _updating := false
 var last_error := ""
@@ -161,6 +162,15 @@ func _exit_tree() -> void:
 
 ## Starts Epic's system once, and signs this phone in. Returns false and sets last_error if it cannot.
 func sign_in() -> bool:
+	while _signing_in:
+		await get_tree().process_frame
+	_signing_in = true
+	var signed_in := await _sign_in_once()
+	_signing_in = false
+	return signed_in
+
+
+func _sign_in_once() -> bool:
 	if _user != "":
 		return true
 	if not available():
@@ -207,7 +217,7 @@ func sign_in() -> bool:
 func open_room(listed := true) -> String:
 	var room := RoomOptions.new()
 	room.local_user_id = _user
-	room.bucket_id = "botti-%d" % Net.PROTOCOL
+	room.bucket_id = "botti-%d" % Net.protocol_version()
 	_ieos.call("lobby_interface_create_lobby", room)
 	var made: Dictionary = await _ieos.get("lobby_interface_create_lobby_callback")
 	if int(made["result_code"]) != SUCCESS:
@@ -245,7 +255,7 @@ static func room_card(listed: bool, waiting: bool) -> Dictionary:
 	return {
 		LISTED: "1" if listed else "0",
 		WAITING: "1" if waiting else "0",
-		VERSION: str(Net.PROTOCOL),
+		VERSION: str(Net.protocol_version()),
 		HOST_NAME: Game.player_name,
 		RULES: str(Net.rules),
 		MAP: Net.night_map,
@@ -295,7 +305,7 @@ func list_rooms() -> Array[Dictionary]:
 	var search: Object = made["lobby_search"]
 	search.call("set_parameter", LISTED, "1", EQUAL)
 	search.call("set_parameter", WAITING, "1", EQUAL)
-	search.call("set_parameter", VERSION, str(Net.PROTOCOL), EQUAL)
+	search.call("set_parameter", VERSION, str(Net.protocol_version()), EQUAL)
 	search.call("find", _user)
 	var found: Dictionary = await _ieos.get("lobby_search_find_callback")
 	if int(found["result_code"]) == NOT_FOUND:

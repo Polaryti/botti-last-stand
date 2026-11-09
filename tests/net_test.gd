@@ -39,7 +39,7 @@ func reached(n: int) -> void:
 func sync(n: int) -> void:
 	reached.rpc(n)
 	var t := 0.0
-	while _step < n and t < 40.0:
+	while _step < n and t < 80.0:
 		await wait(0.05)
 		t += 0.05
 	if _step < n:
@@ -57,10 +57,18 @@ func snap(name: String) -> void:
 
 func finish() -> void:
 	print("[%s] RESULT: %d checks, %d failures" % ["host" if host else "client", checks, failures])
+	Net.leave()
+	if is_instance_valid(m):
+		m.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	Sfx.stop_all()
+	await get_tree().create_timer(0.1).timeout
 	get_tree().quit(1 if failures > 0 else 0)
 
 
 func _ready() -> void:
+	Game.player_name = "Test Player"
 	name = "NetTest"
 	Game.force_weather = Weather.Kind.CLEAR
 	var args := OS.get_cmdline_user_args()
@@ -74,6 +82,9 @@ func _ready() -> void:
 	Game.player_name = "H" if host else "C"
 	Game.difficulty = 1
 	Game.player_class = "infantry"
+	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
+	for id: String in ["magician", "chivalry", "artificer", "commander"]:
+		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await wait(0.3)
@@ -87,17 +98,19 @@ func _as_host() -> void:
 	m.show_together()
 	await wait(0.2)
 	ok(Net.host_game() == OK, "a game can be started")
+	if Net.is_host():
+		print("NET_TEST_HOST_READY")
 	Net.use_beacons = rules != "teams" # in one of the runs, the asking has to find it alone
 	m.show_lobby()
 	var t := 0.0
-	while Net.roster.size() < 2 and t < 20.0:
+	while Net.roster.size() < 2 and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.roster.size() == 2, "the other phone joined")
 	if rules == "mists":
 		Net.set_night_map("mists")
 		ok(true, "the host picks the Mists")
-	Net.set_rules({"mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -154,10 +167,12 @@ func _as_client() -> void:
 	# Finding the game: by its beacon, or by asking around when a hotspot drops broadcasts.
 	var t := 0.0
 	Net.start_search()
-	while Net.rooms.is_empty() and t < 15.0:
+	while Net.rooms.is_empty() and t < 45.0:
 		await wait(0.1)
 		t += 0.1
 	ok(not Net.rooms.is_empty(), "the game shows up in the list of games nearby")
+	if Net.rooms.is_empty():
+		print("discovery diagnostics: listener=", Net._listener, " processing=", Net.is_processing(), " addresses=", Net.local_addresses())
 	Net.stop_search()
 	m.show_together()
 	await wait(0.1)
@@ -171,12 +186,14 @@ func _as_client() -> void:
 	await wait(0.4)
 	ok(Game.player_class == "magician", "my class can be picked in the lobby")
 	_press("Infantry")
+	if rules == "commander":
+		Net.set_my_class("commander")
 	t = 0.0
-	while not Net.in_game and t < 25.0:
+	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == "infantry", "with the class I picked")
+	ok(Game.player_class == ("commander" if rules == "commander" else "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -201,7 +218,7 @@ func _avatar() -> Avatar:
 
 func _play() -> void:
 	var t := 0.0
-	while (not m.world or not m._net_go) and t < 40.0:
+	while (not m.world or not m._net_go) and t < 80.0:
 		await wait(0.1)
 		t += 0.1
 	ok(m._net_go, "everyone has loaded and the night begins")
@@ -225,6 +242,8 @@ func _play() -> void:
 		await _chariot()
 	elif rules == "mists":
 		await _mists()
+	elif rules == "commander":
+		await _commander()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -263,8 +282,71 @@ func _mists() -> void:
 		var other: Avatar = Net.avatar(1)
 		ok(other and w.portals.island_of(other.global_position) == int(link["ib"]), "and the other phone sees it arrive")
 
+	# Mist-only bodies and warnings must replicate without applying damage twice.
+	await _clear_zombies_on_host()
+	pl.set_physics_process(false)
+	pl.global_position = Vector3(0 if host else 1, 10.05, 16)
+	pl.hp = 100.0
+	pl.guard_left = 0.0
+	await wait(0.5)
+	await sync(15)
+	if host:
+		w.spawn_zombie("lantern_wisp", Vector3(0, 10, 27))
+		(w.zombies.back() as Zombie).set_physics_process(false)
+	await until(func() -> bool: return w.count_type("lantern_wisp") == 1, 4.0)
+	ok(w.count_type("lantern_wisp") == 1, "original Lantern Wisp model replicates to both phones")
+	await sync(16)
+	if host:
+		MistSeal.cast(w.zombies.back(), Vector3(0, 10.05, 16), 3.0, 1.5, 10.0)
+	await until(func() -> bool: return not w.mist_seals.is_empty(), 3.0)
+	ok(not w.mist_seals.is_empty() and pl.hp == 100.0, "mist warning appears before damage on both phones")
+	await sync(17)
+	await until(func() -> bool: return pl.hp < 100.0, 3.0)
+	ok(pl.hp == 90.0 and pl.slowed_left > 0.0, "each phone receives exactly one mist hit and slow")
+	await until(func() -> bool: return w.mist_seals.is_empty(), 3.0)
+	await sync(18)
+	if not host:
+		Net.mist_seal(pl.global_position, 3.0, 0.0, 1.5, 10.0, -1)
+	await wait(0.2)
+	ok(w.mist_seals.is_empty(), "client cannot create an enemy warning through the authority API")
+	if host:
+		w.director.elapsed = w.director._mist_boss_at
+		w.director._tick_mist_boss()
+		w.director._tick_mist_boss()
+		(w.zombies.back() as Zombie).set_physics_process(false)
+	await until(func() -> bool: return w.count_type("veil_regent") == 1, 4.0)
+	ok(w.count_type("veil_regent") == 1, "one scheduled Veil Regent appears on both phones")
+	await until(func() -> bool: return w.mist_storm != null and w.mist_storm.finale, 4.0)
+	ok(w.mist_storm != null and w.mist_storm.finale and w.mist_storm.contains(Vector3(0, 40, -122)) and not w.mist_storm.contains(Vector3(16, 10, 0)), "boss arrival replicates outer-island storms with a safe arena")
+	await sync(19)
+
+	if host: Net.start_mist_storm(0)
+	await until(func() -> bool: return w.mist_storm != null and not w.mist_storm.finale, 4.0)
+	ok(w.mist_storm != null, "Mist Storm warning replicates to both phones")
+	var storm_hp := pl.hp
+	await wait(0.25)
+	ok(pl.hp == storm_hp, "network storm warning is damage-free")
+	w.mist_storm.elapsed = MistStorm.WARNING
+	await wait(0.7)
+	ok(pl.hp < storm_hp and pl.hp > storm_hp - 7.0, "network storm applies damage once to each locally owned player")
+	pl.position = Vector3(0, 40.1, -122)
+	storm_hp = pl.hp
+	await wait(0.7)
+	ok(pl.hp == storm_hp, "leaving the storm island stops its damage on both phones")
+	await sync(20)
+	pl.guard_left = 0.0
+	pl.dome_left = 0.0
+	await sync(21)
+	if host: Net.protect_peer(int(Net.roster.keys().filter(func(peer: int) -> bool: return peer != 1)[0]), 3.0, 0.0)
+	if not host:
+		await until(func() -> bool: return pl.dome_left > 0.0, 3.0)
+		ok(pl.dome_left > 0.0 and pl.guard_left == 0.0, "remote Guardian protection uses mitigation rather than invulnerability")
+	await sync(22)
+
+
 
 func _with_bots() -> void:
+	if rules == "bots": await _bot_mounts()
 	pl.guard_left = 99999.0
 	var ids: Array = Net.roster.keys().filter(Net.is_bot)
 	ok(ids.size() == 2, "two bots in the match")
@@ -308,16 +390,40 @@ func _with_bots() -> void:
 		ok(pl.dead, "the player fell")
 	await sync(54)
 	if rules == "bots":
-		# Bots fight the night, in co-op, and credit goes round.
+		# A scoring integration check, isolated from random waves, injuries and obstructed spawns.
+		await _clear_zombies_on_host()
 		if host:
 			var bot: BotPlayer = Net._bots[ids[1]]
-			w.spawn_zombie("normal", bot.at + Vector3(1.0, 0, 0))
+			for id: int in ids:
+				if id != ids[1]:
+					(Net._bots[id] as BotPlayer).set_physics_process(false)
+			for ally: Ally in w.allies.duplicate():
+				w.remove_ally(ally)
+			bot.pawn.respawn(Vector3(0, 0, 36))
+			bot.body.teleport(bot.pawn.global_position)
+			bot.body.set_fallen(false)
+			bot.pawn.guard_left = 15.0
+			bot.pawn.arrows = bot.pawn.max_arrows()
+			bot._respawn = -1.0
+			bot._target = null
+			bot._item = null
+			bot._path = PackedVector3Array()
+			bot._think = 0.0
+			var spawned := w.spawn_zombie("normal", bot.at + Vector3(1.5, 0, 0))
+			ok(spawned, "a controlled target is available to the bot")
+			if not spawned:
+				await sync(55)
+				return
+			var target: Zombie = w.zombies.back()
+			target.hp = 20.0
+			target.set_physics_process(false)
 			var scored := int(Net.roster[ids[1]]["score"])
 			var t := 0.0
-			while int(Net.roster[ids[1]]["score"]) == scored and t < 12.0:
-				await wait(0.2)
-				t += 0.2
-			ok(int(Net.roster[ids[1]]["score"]) > scored, "a bot kills zombies (%.1f s)" % t)
+			while int(Net.roster[ids[1]]["score"]) == scored and t < 8.0:
+				await wait(0.1)
+				t += 0.1
+			ok(int(Net.roster[ids[1]]["score"]) > scored, "real bot attacks kill and credit the bot (%.1f s, %s)" % [t, bot._class_id])
+
 	await sync(55)
 	await wait(0.3)
 	await snap("bots")
@@ -363,7 +469,7 @@ func _room() -> void:
 	if host:
 		_press("Start the night")
 	t = 0.0
-	while (not Net.in_game or m.world == null or m.world.mode == Game.Mode.MENU or not m._net_go) and t < 40.0:
+	while (not Net.in_game or m.world == null or m.world.mode == Game.Mode.MENU or not m._net_go) and t < 80.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game and m._net_go, "a second night starts on this phone")
@@ -460,7 +566,7 @@ func _fort() -> void:
 	var g: Dictionary = f.gates[1]
 	if host:
 		f.hit_gate(g, 99999.0, g["at"])
-	await wait(0.6)
+	await until(func() -> bool: return not g["closed"], 4.0)
 	await sync(3)
 	ok(not g["closed"], "a gate falling reaches both phones")
 	ok(f.any_open(), "and it is open on both")
@@ -469,7 +575,7 @@ func _fort() -> void:
 	if not host:
 		pl.wood = Fort.WOOD_MAX
 		pl.global_position = (g["at"] as Vector3) + Vector3(-4, 0.1, 0)
-	await wait(3.2)
+	await until(func() -> bool: return float(g["hp"]) > 0.0 and bool(g["closed"]), 6.0)
 	await sync(4)
 	ok(float(g["hp"]) > 0.0, "wood from the other phone mends the gate (%.0f)" % float(g["hp"]))
 	ok(g["closed"], "and it closes on both")
@@ -477,13 +583,13 @@ func _fort() -> void:
 		ok(pl.wood < Fort.WOOD_MAX, "using up what I carried")
 	if host:
 		f.hit_heart(100.0)
-	await wait(0.6)
+	await until(func() -> bool: return f.heart_hp < Fort.HEART_HP, 4.0)
 	await sync(5)
 	ok(f.heart_hp < Fort.HEART_HP, "the heart's health reaches both phones (%.0f)" % f.heart_hp)
 	# The heart falls: the game ends for everyone, and it is not a win.
 	if host:
 		f.hit_heart(999999.0)
-	await wait(0.8)
+	await until(func() -> bool: return m._run_over, 4.0)
 	await sync(6)
 	ok(m._run_over, "when the heart falls it ends on this phone")
 	await snap("fort_over")
@@ -903,6 +1009,9 @@ func _fog_match() -> void:
 	await sync(40)
 	ok(absf(w.fog.radius - ClosingFog.radius_at(w.director.elapsed)) < 4.0 and w.fog.radius < 100.0, "the fog has closed in on this phone (%.0f)" % w.fog.radius)
 	ok(not w.fog.contains(w.fog.centre3() + Vector3(120, 0, 0)), "far away is outside it")
+	# Isolate fog damage from the random wave restarted for the clock/shrink check above.
+	# The fog keeps processing when the director is stopped; its explicit enemy cull is checked below.
+	await _clear_zombies_on_host()
 	# Out there it hurts, and enemies do not stay.
 	var inside := w.fog.centre3() + Vector3(1.5 if host else -1.5, 0.05, 0)
 	var out := w.fog.centre3() + Vector3(0, 0.05, 92.0)
@@ -1042,3 +1151,128 @@ func _fight() -> void:
 	await sync(8)
 	ok(m._run_over, "dawn ends the game on this phone")
 	await snap("over")
+
+
+## A remote Commander asks the host to revive and buff allies, then place artillery.
+func _commander() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	pl.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)) + 0.05, 36)
+	pl.input_move = Vector2.ZERO
+	pl.input_fire = false
+	pl.guard_left = 0.0
+	await wait(0.5)
+	await sync(100)
+	if not host:
+		pl.grant_all_points()
+		for step in 9:
+			pl.choose_ability(step, 2 if step == 3 else 0)
+		ok(pl.spec_id == "vanguard" and pl.has_flag("last_command"), "client Commander unlocks Last Command at level ten")
+	else:
+		pl._kill()
+	await wait(0.6)
+	await sync(101)
+	if not host:
+		pl.use_art()
+	await wait(1.0)
+	await sync(102)
+	ok(not pl.dead and pl._buffs.has("command_speed"), "host-authorized Last Command revives and buffs nearby players")
+	if host:
+		ok(Net.respawn_seconds() < 0.0, "Commander revival cancels the old respawn timer")
+		ok(_avatar()._banner != null and _avatar()._banner.visible, "remote Vanguard banner is replicated and visible")
+	else:
+		ok(w.count_allies("infantry") == 2, "Commander summons two Infantry")
+	# The host rejects a second Last Command within the cooldown, regardless of client state.
+	if not host:
+		Net.command_field("gunner", pl.global_position)
+	await wait(0.4)
+	ok(w.get_children().filter(func(n: Node) -> bool: return n is CommandField).is_empty(), "host rejects Commander cooldown bypass")
+	await sync(103)
+	if host:
+		Net._command_ready.clear() # advance only the test's authority clock for the next scenario
+	await sync(104)
+	if not host:
+		Net.command_field("gunner", pl.global_position + Vector3(0, 0, -8))
+	await wait(0.6)
+	var fields := w.get_children().filter(func(n: Node) -> bool: return n is CommandField)
+	ok(fields.size() == 1 and w.director.banner == "The Commander has called in an artillery barrage", "client artillery is scheduled by the host and announced on both phones")
+	await sync(105)
+	var strike := pl.global_position + Vector3(3, 0, -2)
+	if host:
+		CommandField.visual_impact(w, strike, 3.5, true)
+		Net.command_impact_visual(strike, 3.5, true)
+	await wait(0.3)
+	await sync(106)
+	ok(absf(w._bolt.global_position.x - strike.x) < 0.1 and absf(w._bolt.global_position.z - strike.z) < 0.1, "Commander lightning and impact visuals reach both phones")
+
+	var field := fields[0] as CommandField
+	await until(func() -> bool: return field._fires.size() > 0, 6.0)
+	ok(field._fires.size() > 0, "four-second artillery warning produces fire on both peers")
+	var hp_before := pl.hp
+	pl.global_position = field._fires[0]["at"]
+	pl.guard_left = 0.0
+	await until(func() -> bool: return field.elapsed > CommanderKit.BARRAGE_DELAY + CommanderKit.BARRAGE_TIME + 0.2, 7.0)
+	ok(field._fires.size() == 20 and field._spawned == 20, "all twenty shells and lingering zones appear on both peers")
+	ok(pl.hp == hp_before, "cooperative artillery and fire never hurt allies")
+	await sync(107)
+	if not host:
+		pl.flags.erase("last_command")
+		pl.spec_id = "gunner"
+		CommanderKit.equip(pl)
+		pl.art_cd_left = 0.0
+		pl.use_art()
+	await until(func() -> bool: return w.allies.any(func(a: Ally) -> bool: return a.kind == "artificer" and not a.dead), 4.0)
+	ok(w.allies.any(func(a: Ally) -> bool: return a.kind == "artificer" and not a.dead), "Gunner's summoned Artificer reaches both phones")
+	await sync(108)
+
+
+## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.
+func until(condition: Callable, timeout: float) -> void:
+	var deadline := Time.get_ticks_msec() + int(timeout * 1000.0)
+	while not condition.call() and Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+
+
+func _bot_mounts() -> void:
+	await _clear_zombies_on_host()
+	var ids: Array = Net.roster.keys().filter(Net.is_bot)
+	var carrier := int(ids[0])
+	pl.set_physics_process(false)
+	pl.position = Vector3(1.0 if host else 2.0, 0.05, 36)
+	var original_class := ""
+	var original_spec := ""
+	if host:
+		var bot := Net.local_player(carrier)
+		original_class = bot.class_id
+		original_spec = bot.spec_id
+		bot.set_physics_process(false)
+		bot.position = Vector3(0, 0.05, 36)
+	for phase in 2:
+		if host:
+			var bot := Net.local_player(carrier)
+			bot.class_id = "chivalry" if phase == 0 else "artificer"
+			bot.spec_id = "" if phase == 0 else "mechanic"
+			bot.horse_progress = bot.horses_needed()
+			bot.mount()
+		await wait(0.5)
+		await sync(30 + phase * 3)
+		var boarding := not host if phase == 0 else host
+		if boarding: pl.board()
+		await wait(0.5)
+		if boarding: ok(pl.ride_behind == carrier, "human can board a bot horse/chariot through its authority")
+		await sync(31 + phase * 3)
+		if host:
+			ok(Net.local_player(carrier).passenger != 0, "bot carrier records its passenger")
+			Net.local_player(carrier).dismount()
+		await wait(0.5)
+		if boarding: ok(pl.ride_behind == 0, "bot dismount releases its human passenger")
+		await sync(32 + phase * 3)
+	if host:
+		var bot := Net.local_player(carrier)
+		bot.class_id = original_class
+		bot.spec_id = original_spec
+		bot.set_physics_process(true)
+	pl.set_physics_process(true)

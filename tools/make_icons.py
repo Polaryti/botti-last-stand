@@ -301,8 +301,6 @@ def bell_hammer():
     return line("#9a6a3a", 7, (20, 92), (54, 46)) + at(66, 32, 0.56, turn(40, bell()))
 def javelins():
     return "".join(line("#a8743e", 4, (x0, 92), (x1, 28)) + poly(STEEL, (x1 + (x1 - x0) * .3, 8), (x1 - 7, 28), (x1 + 7, 28)) for x0, x1 in [(26, 34), (50, 50), (74, 66)])
-def sling():
-    return curve("#b98a58", 5, "M18 8 C22 40 40 60 50 72") + curve("#b98a58", 5, "M82 8 C78 40 60 60 50 72") + ell(LEATHER, 50, 76, 20, 13) + circ(ROCK, 50, 70, 10)
 def blowgun():
     return line("#7f8c3f", 8, (6, 86), (82, 18)) + "".join(line("#2a2f3f", 9, a, b, ink=False) for a, b in [((24, 70), (29, 65)), ((58, 40), (63, 35))]) + poly(TOX, (98, 4), (84, 12), (90, 20))
 def rain():
@@ -318,7 +316,7 @@ def shroud():
     return path(("#4c4a78", "#14132a"), "M50 4 C20 4 12 34 12 60 C12 78 8 88 4 96 L96 96 C92 88 88 78 88 60 C88 34 80 4 50 4Z") + path(INK, "M28 62 C28 34 72 34 72 62 C72 76 60 84 50 84 C40 84 28 76 28 62Z", 0) + ell("#ffe68a", 40, 60, 5, 3, 12, 0) + ell("#ffe68a", 60, 60, 5, 3, -12, 0)
 def let_go():
     return at(38, 40, 0.62, turn(30, sword())) + poly(RED, (66, 88), (46, 62), (58, 62), (58, 40), (74, 40), (74, 62), (86, 62)) + rect(ROCK, 8, 88, 84, 8, 2)
-for g in (let_go, longbow, bell_hammer, javelins, sling, blowgun, rain, satchel, flurry, rage, shroud):
+for g in (let_go, longbow, bell_hammer, javelins, blowgun, rain, satchel, flurry, rage, shroud):
     PLAIN.append(g)
 
 # Class crests: every class has its own outline, colour and picture.
@@ -346,10 +344,13 @@ def crest_plague_doctor():
 def crest_adept():
     t = '<path d="M50 3 L95 80 Q97 94 84 96 L16 96 Q3 94 5 80Z" fill="%s" stroke="%s" stroke-width="4" stroke-linejoin="round"/>' % (grad("#5d6680", "#1e2230"), INK)
     return t + at(50, 36, 0.3, wind()) + at(31, 72, 0.3, mountain()) + at(69, 72, 0.3, flame())
-CRESTS = [crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
+def crest_commander():
+    return lozenge("commander", at(50, 55, 0.68, banner()) + at(50, 23, 0.35, crown()))
+
+CRESTS = [crest_commander, crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
 
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
-COL = {"infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
+COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
     "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368")}
 
@@ -360,6 +361,9 @@ def x2(g, s=0.72):
     return at(50, 50, s, turn(45, g()) + turn(-45, g()))
 
 SPECS = {
+    "warlock": ("commander", lambda: at(50, 50, 0.7, staff()) + at(72, 24, 0.28, bolt())),
+    "gunner": ("commander", lambda: at(50, 50, 0.72, crossbow())),
+    "vanguard": ("commander", lambda: at(50, 50, 0.76, banner())),
     "duelist": ("infantry", lambda: x2(sword)),
     "berserker": ("infantry", lambda: at(42, 50, 0.72, axe()) + at(76, 28, 0.3, drop()) + at(78, 64, 0.22, drop())),
     "shadow": ("infantry", lambda: at(50, 44, 0.62, moon()) + at(56, 58, 0.62, turn(25, dagger()))),
@@ -411,4 +415,5 @@ def main():
         _defs.clear(); render("spec_" + name, lozenge(cls, g()), out, 200); made.append("spec_" + name)
     print(len(made), "icons")
 
-main()
+if __name__ == "__main__":
+    main()

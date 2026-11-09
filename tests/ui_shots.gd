@@ -14,6 +14,7 @@ func wait(t: float) -> void:
 
 
 func _ready() -> void:
+	Game.player_name = "Test Player"
 	out = OS.get_cmdline_user_args()[0]
 	Game.quality = 2
 	Game.apply_quality()
@@ -22,6 +23,7 @@ func _ready() -> void:
 	var m: Main = load("res://scripts/main.gd").new()
 	add_child(m)
 	await wait(1.0)
+	await snap("mists_title")
 	m.show_together()
 	await wait(0.2)
 	await snap("together")
@@ -81,4 +83,4 @@ func _ready() -> void:
 	m.show_sandbox_menu()
 	await wait(0.2)
 	await snap("sandbox_menu")
-	get_tree().quit()
+	await preload("res://tests/scene_cleanup.gd").finish(m)

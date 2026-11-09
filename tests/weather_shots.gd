@@ -14,6 +14,7 @@ func wait(t: float) -> void:
 
 
 func _ready() -> void:
+	Game.player_name = "Test Player"
 	out = OS.get_cmdline_user_args()[0]
 	Game.quality = 2
 	Game.apply_quality()
@@ -72,4 +73,4 @@ func _ready() -> void:
 	pl.rotation.y = 0.0
 	await wait(1.5)
 	await snap("fog_outside")
-	get_tree().quit()
+	await preload("res://tests/scene_cleanup.gd").finish(m)

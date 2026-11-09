@@ -1,6 +1,34 @@
 # Changelog
 
-Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
+## 0.21.0 — The Mists Update (9 November 2026)
+### Enter The Mists
+- The Mists takes over the title screen. Explore its floating islands beneath a blue moon, with drifting mist, glowing portals, rippling pools and waterfalls disappearing into the dark.
+- Bridges, stepping stones and portals lead to scattered supplies and small island shrines. Food and arrows favour the outer islands: leave the arena, explore and prepare for the final stand.
+- Mist Storms gather every 90 seconds. You have eight seconds to evacuate before the island becomes dangerous for 20 seconds. Watch the violet mist and warning rings, and use the open gates to escape.
+### The Veil Regent awaits
+- Face new mist-born enemies: Lantern Wisps mark you with delayed magical strikes, Mist Weavers cover your escape routes, and Fallen Revenants hunt with spectral claws and mist leaps. Their attacks warn you with distinct sights and sounds.
+- Around 8:30, the Veil Regent awakens in the central arena. Dodge its seals, find the safe eye of its crown attack, and brace for reinforcements when the fight turns against it. Defeat it to claim an Angel familiar.
+- The Regent's arrival brings permanent storms to every outer island. You have 20 seconds to return to the centre; portals stay open for the retreat.
+- To win The Mists, survive ten minutes AND defeat the Regent. If the boss still stands at dawn, your fight continues. Bring allies: the Regent grows stronger with your party.
+### Commander joins the battle
+- A new tournament-prize class, obtained as the “First prize in VRAIN tournaments” and unlocked by code. Only one human Commander can join a match; bots cannot take the role.
+- Warlock wields a War Staff whose fifth attack unleashes piercing magic. Command calls a Magician; at level 10, Last Command replaces the summon with a storm of slowing winds and enemy-only lightning.
+- Gunner fights with a Musket and bayonet, and calls a torch-bearing Artificer. Last Command lets you choose an artillery zone: a four-second warning, five seconds of shelling, and lingering fires that spare allies.
+- Vanguard carries a battle banner and rallies nearby allies with a voiced battle cry and a burst of speed. Last Command revives eligible fallen allies, strengthens the group and calls two Infantry into the fight.
+### Refined classes and combat
+- Adept stances now demand commitment. A clear stance display and a short transition make each change easier to follow; landing three attacks empowers your next transition. Blade Dancer gains prepared sweeps, Mirror Step gains defensive counters, and Void Walker keeps its hit-driven invisible stance.
+- Plague Doctor gains stronger darts, better survivability and improved poison reliability. Poison wears enemies down without repeatedly stunning them. Revenant recovers Mist more readily, and Inventor's devices hit harder.
+- Guardian's Shield Dome now reduces incoming damage by 60% instead of granting invulnerability. Familiars stay for 20 seconds.
+- Chivalry's Lance and the Plague Doctor's Blowgun belong to their classes: they cannot be dropped or found as loot. The Sling has been removed.
+### A clearer, livelier world
+- Revised lance thrusts, scythe sweeps and flail swings give weapons more natural movement. The War Bell Hammer has a new armoured model; bows and crossbows visibly loose and reload their arrows.
+- Vanguard's banner has animated cloth and clearer placement in both first-person and other players' views. Mist-born enemies dissolve when defeated, and their attacks have stronger warning and impact effects.
+- The Village gains drifting haze and fireflies; Defend the Fort gains smoke and embers. Village house floors stay clear of terrain, crops leave bonfires open, and the mill wheel turns in the river.
+- Mists portals and monuments have clearer approaches. Mobs can enter shrines, arena ramps are walkable slopes, and torches, paving and runes sit on their proper surfaces.
+### Better together
+- Bots explore the islands and escape Mist Storms. Their Ghost Knight familiars follow the correct owner, and players can ride bot-summoned horses and war chariots.
+- Improved shared combat, fort gate repairs, projectile behaviour and player animations make multiplayer more consistent. Everyone in a room needs this version to play together.
+- The Codex explains how earned and prize classes are obtained, with a cleaner item list. Your existing saves and unlocks carry forward.
 
 ## 0.20.2 (8 November 2026)
 - No changes to the game. This version is here to try the in-game update: on Android, the main menu offers it and Update installs it. It plays together with 0.20.1.

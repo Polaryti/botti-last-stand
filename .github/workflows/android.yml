@@ -18,11 +18,18 @@ env:
   # The certificate every version must be signed with, or phones refuse the update.
   CERT_SHA256: "53c7a9b03923677ebd8102ac3836402f97e0a9d17dc8d4a747ae83138ea8fa79"
 
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   android:
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 55
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v5
 
@@ -32,6 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
+          python3 tools/check_production_build.py
           v=$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "tag=v$v" >> "$GITHUB_OUTPUT"
@@ -57,7 +65,8 @@ jobs:
         if: steps.version.outputs.go == 'true'
         run: |
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$sdk" --licenses > /dev/null
+          # sdkmanager exits after accepting; yes may then receive SIGPIPE.
+          "$sdk" --licenses <<< "$(printf 'y\n%.0s' {1..100})" > /dev/null
           "$sdk" "platforms;android-36" "build-tools;36.1.0" "platform-tools" > /dev/null
 
       - name: Fetch Godot and its export templates
@@ -113,20 +122,28 @@ jobs:
           gh release download "$tag" --repo "$plugin" --pattern '*-all-56238973*' --output plugin.zip
           unzip -q plugin.zip -d "$RUNNER_TEMP/plugin"
           rm plugin.zip
-          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" android
+          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" android,linux
           test -f scripts/epic_keys.gd
 
       - name: Build and check the signature
         if: steps.version.outputs.go == 'true'
         run: |
-          "$GODOT" --headless --path . --import 2>&1 | tail -3 || true
+          python3 tools/import_project.py --log build/import.log
           rm -f build/botti-last-stand.apk
           "$GODOT" --headless --path . --export-release Android build/botti-last-stand.apk 2>&1 | tail -20
           test -f build/botti-last-stand.apk
           signer=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort | tail -1)
           "$signer" verify --print-certs build/botti-last-stand.apk | tee certs.txt
           grep -qi "SHA-256 digest: $CERT_SHA256" certs.txt
+          "$ANDROID_HOME/build-tools/36.1.0/aapt" dump badging build/botti-last-stand.apk > build/badging.txt
+          python3 tools/check_production_build.py --badging build/badging.txt
           rm -rf "$RUNNER_TEMP/keys"
+
+      - name: Require full validation before publishing
+        if: steps.version.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/wait_for_validation.py
 
       - name: Publish the release
         if: steps.version.outputs.go == 'true'
@@ -138,5 +155,11 @@ jobs:
           # The notes are the newest entry of the changelog, the same words the game shows.
           awk 'BEGIN{n=0} /^## /{n++} n==1' CHANGELOG.md > notes.md
           cp build/botti-last-stand.apk "botti-last-stand-$v.apk"
-          gh release view "$tag" > /dev/null 2>&1 || gh release create "$tag" --target "$GITHUB_SHA" --title "Botti's Last Stand $v" --notes-file notes.md || true
-          gh release upload "$tag" "botti-last-stand-$v.apk" --clobber
+          gh release view "$tag" > /dev/null 2>&1 || gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Botti's Last Stand $v — The Mists Update" --notes-file notes.md
+          sha256sum "botti-last-stand-$v.apk" > "botti-last-stand-$v.apk.sha256"
+          gh release upload "$tag" "botti-last-stand-$v.apk" "botti-last-stand-$v.apk.sha256" --clobber
+          gh release edit "$tag" --draft=false --latest
+
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"

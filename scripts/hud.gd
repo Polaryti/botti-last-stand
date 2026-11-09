@@ -6,6 +6,7 @@ extends Control
 signal pause_requested
 signal tree_requested
 signal sandbox_requested
+signal command_map_requested
 
 const JOY_R := 88.0
 const KI_COLOUR := Color(1.0, 0.78, 0.28)
@@ -68,6 +69,7 @@ func _layout() -> void:
 	_buttons = {
 		"fire": {"pos": Vector2(right - 96, bottom - 118), "r": 96.0},
 		"jump": {"pos": Vector2(right - 62, bottom - 276), "r": 52.0},
+		"bayonet": {"pos": Vector2(right - 248, bottom - 92), "r": 52.0},
 		"switch": {"pos": Vector2(right - 248, bottom - 92), "r": 52.0},
 		"zoom": {"pos": Vector2(right - 208, bottom - 260), "r": 50.0},
 		"drop": {"pos": Vector2(right - 250, bottom - 184), "r": 38.0},
@@ -89,6 +91,8 @@ func _button_visible(id: String) -> bool:
 			return player.nearby_weapon != null
 		"zoom":
 			return player.weapon_def().has("zoom_fov")
+		"bayonet":
+			return player.weapon_id() == "musket"
 		"switch":
 			return player.slots[0] != null and player.slots[1] != null
 		"drop":
@@ -146,6 +150,7 @@ func _touch_down(index: int, at: Vector2) -> void:
 			"jump": player.input_jump = true
 			"switch": player.switch_weapon()
 			"drop": player.drop_current_weapon()
+			"bayonet": player.use_bayonet()
 			"zoom": player.toggle_zoom()
 			"take": player.take_nearby_weapon()
 			"pause": pause_requested.emit()
@@ -222,6 +227,9 @@ func _process(_delta: float) -> void:
 
 func _banner_text(t: String, centre: Vector2, a: float) -> void:
 	var fs := 46
+	var full_width := title.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	if full_width > size.x - 100.0:
+		fs = maxi(18, int(fs * (size.x - 100.0) / full_width))
 	var w := title.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var at := centre - Vector2(w * 0.5, -fs * 0.32)
 	draw_string_outline(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 7, Color(0, 0, 0, 0.6 * a))
@@ -268,6 +276,8 @@ func _draw() -> void:
 		_draw_hurt_direction(centre)
 	_draw_dive_warning(centre)
 	_draw_status(s)
+	if player.class_id == "adept":
+		_draw_stance(s)
 	_draw_fog(s, centre)
 	if player.frozen_left > 0.0:
 		if player.is_iced:
@@ -735,6 +745,7 @@ func _button_glyph(id: String) -> String:
 		"fire":
 			return Icons.weapon(player.weapon_id()).split("+")[0]
 		"jump": return "jump"
+		"bayonet": return "spear"
 		"switch": return "swap"
 		"drop": return "let_go"
 		"zoom": return "eye"
@@ -749,3 +760,17 @@ func _button_glyph(id: String) -> String:
 		"burst": return "burst"
 		"art": return player.art_glyph()
 	return "plus"
+
+
+func _draw_stance(s: Vector2) -> void:
+	var at := Vector2(s.x * 0.5, 135)
+	var tint: Color = Player.STANCE_COLOURS[player.stance]
+	draw_style_box(_capsule, Rect2(at - Vector2(158, 26), Vector2(316, 74)))
+	Icons.draw(self, Rect2(at - Vector2(146, 19), Vector2(38, 38)), str(Player.STANCE_ICONS[player.stance]), tint)
+	_centered("%s STANCE" % str(Player.STANCE_NAMES[player.stance]).to_upper(), at + Vector2(14, 0), 23, tint)
+	var detail: String = {"wind": "Speed / echo strikes", "stone": "Protection / knockback", "flame": "Burning strikes / exposed", "void": "Invisible / double damage"}[player.stance]
+	if player.stance_hits >= 3:
+		detail = "+15% damage / transition ready"
+	_centered(detail, at + Vector2(0, 27), 18, UiTheme.BONE)
+	for i in 3:
+		draw_circle(at + Vector2(130 + i * 9, -17), 3.0, tint if player.stance_hits > i else UiTheme.ASH.darkened(0.5))

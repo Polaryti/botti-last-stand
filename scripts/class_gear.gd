@@ -17,7 +17,7 @@ const BLACK := Color(0.06, 0.06, 0.08)
 const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
-const ROBES := {"infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22)}
+const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5)}
 
@@ -82,6 +82,7 @@ static func _pieces(id: String) -> Dictionary:
 	if not _made.has(id):
 		var built := {}
 		match id:
+			"commander": built = _commander()
 			"infantry": built = _infantry()
 			"ranger": built = _ranger()
 			"heavy": built = _heavy()
@@ -158,13 +159,13 @@ static func _heavy() -> Dictionary:
 static func _chivalry() -> Dictionary:
 	const BLUE := Color(0.1, 0.2, 0.62)
 	var head := LowPoly.new()
-	head.prism(Vector3(0, 0.6, 0), Vector3(0, 1.14, 0), 0.74, 0.38, 8, GOLD)
-	head.prism(Vector3(0, 0.56, 0), Vector3(0, 0.66, 0), 0.8, 0.76, 8, BRASS)
+	head.prism(Vector3(0, 0.69, 0), Vector3(0, 1.22, 0), 0.82, 0.45, 8, GOLD)
+	head.prism(Vector3(0, 0.56, 0), Vector3(0, 0.68, 0), 0.9, 0.86, 8, BRASS)
 	head.box(Vector3(0, 0.46, 0.74), Vector3(0.1, 0.42, 0.05), BRASS)
 	for i in 9:
 		var a := lerpf(-0.45, 2.2, float(i) / 8.0)
 		var at := Vector3(0, 0.62 + sin(a + 0.55) * 0.68, cos(a + 0.55) * 0.82)
-		head.box(at, Vector3(0.1, 0.34, 0.2), Color(0.85, 0.12, 0.1) if i % 2 == 0 else WHITE, Vector3(rad_to_deg(0.55 + a) - 90.0, 0, 0))
+		head.box(at, Vector3(0.1, 0.28, 0.14), Color(0.85, 0.12, 0.1) if i % 2 == 0 else WHITE, Vector3(rad_to_deg(0.55 + a) - 90.0, 0, 0))
 	var chest := LowPoly.new()
 	# The cape falls from the shoulders and widens down to the heels.
 	chest.prism(Vector3(0, 0.34, -0.04), Vector3(0, 0.1, -0.1), 0.44, 0.66, 8, BLUE)
@@ -301,3 +302,18 @@ static func _artificer() -> Dictionary:
 	hips.box(Vector3(0.46, 0.04, 0.12), Vector3(0.05, 0.44, 0.07), STEEL)
 	hips.box(Vector3(0.46, -0.2, 0.12), Vector3(0.1, 0.1, 0.13), STEEL)
 	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+
+
+static func _commander() -> Dictionary:
+	var helm := LowPoly.new()
+	helm.prism(Vector3(0, 0.72, 0), Vector3(0, 1.02, 0), 0.64, 0.58, 8, GOLD)
+	for i in 5:
+		var angle := i * TAU / 5.0
+		var at := Vector3(cos(angle) * 0.58, 1.0, sin(angle) * 0.58)
+		helm.prism(at, at + Vector3.UP * 0.38, 0.14, 0.0, 4, GOLD)
+	var chest := LowPoly.new()
+	chest.box(Vector3(0, -0.3, -0.38), Vector3(1.1, 1.1, 0.06), Color(0.38, 0.12, 0.55))
+	for side: float in [-1.0, 1.0]:
+		chest.box(Vector3(side * 0.55, 0.18, 0), Vector3(0.36, 0.2, 0.5), GOLD)
+	_disc(chest, Vector3(0, 0.16, 0.38), Vector3.BACK, 0.12, 0.05, GOLD, 6)
+	return {"head": helm.commit(), "chest": chest.commit()}

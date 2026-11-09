@@ -147,6 +147,8 @@ func hit_heart(damage: float) -> void:
 
 ## Mending: only the host writes the result, whoever is holding the wood.
 func repair(i: int, amount: float) -> void:
+	if i < 0 or i >= gates.size() or not is_finite(amount) or amount <= 0.0:
+		return
 	if Net.is_client():
 		Net.repair_gate(i, amount)
 		return
@@ -167,6 +169,7 @@ func _doorway_busy(g: Dictionary) -> bool:
 
 
 func _set_closed(g: Dictionary, closed: bool) -> void:
+	_dirty = true
 	g["closed"] = closed
 	(g["shape"] as CollisionShape3D).set_deferred("disabled", not closed)
 	world.grid.set_box(g["at"], g["size"], closed)

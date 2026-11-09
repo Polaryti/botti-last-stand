@@ -4,6 +4,7 @@ class_name WeaponDefs
 enum Kind { MELEE, RANGED, SPELL }
 
 const DAMAGE := 25.0
+const ALIGNED_HELD := ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow"]
 const HAND_TURN := PI * 0.5
 const TORCH_FIRE := 0.575 # how high up a torch the fire starts
 
@@ -16,12 +17,12 @@ const ALL := {
 		"knock": 2.0, "swing": "thrust", "weight": 1.6, "pos": Vector3(0.22, -0.24, 0.05), "scale": 1.0},
 	"mace": {"power": 1.05, "name": "Mace", "desc": "Short but very broad. Sends enemies flying.", "kind": Kind.MELEE, "rate": 0.6, "range": 2.2, "cone": 170.0, "max_hits": 6,
 		"knock": 4.0, "swing": "smash", "weight": 1.6, "pos": Vector3(0.28, -0.3, -0.46), "scale": 0.72},
-	"lance": {"power": 1.5, "name": "Lance", "charge": true, "desc": "The longest reach of all, through up to two enemies. Half as strong again while you run or ride.", "kind": Kind.MELEE, "rate": 0.75, "range": 5.2, "cone": 16.0, "max_hits": 2,
+	"lance": {"only": "chivalry", "power": 1.5, "name": "Lance", "charge": true, "desc": "Chivalry only. Cannot be dropped or found as loot. The longest reach, through up to two enemies. Half as strong again while you run or ride.", "kind": Kind.MELEE, "rate": 0.75, "range": 5.2, "cone": 16.0, "max_hits": 2,
 		"knock": 3.0, "swing": "thrust", "weight": 0.7, "pos": Vector3(0.24, -0.22, 0.35), "scale": 1.0},
 	"scythe": {"power": 0.8, "name": "Scythe", "bleed": true, "desc": "Slow, and sweeps a huge arc through a whole crowd. Leaves them bleeding.", "kind": Kind.MELEE, "rate": 0.95, "range": 3.3, "cone": 210.0, "max_hits": 8,
-		"knock": 2.0, "swing": "reap", "arc": 1.2, "weight": 1.2, "pos": Vector3(0.28, -0.32, -0.42), "scale": 0.72},
+		"knock": 2.0, "swing": "reap", "arc": 1.2, "weight": 1.2, "pos": Vector3(0.4, -0.4, -0.65), "scale": 0.72},
 	"flail": {"power": 0.95, "name": "Flail", "desc": "Gets faster the longer you keep swinging.", "kind": Kind.MELEE, "rate": 0.85, "range": 2.5, "cone": 100.0, "max_hits": 3,
-		"knock": 2.0, "swing": "smash", "momentum": true, "weight": 1.2, "pos": Vector3(0.28, -0.28, -0.46), "scale": 0.72},
+		"knock": 2.0, "swing": "flail", "momentum": true, "weight": 1.2, "pos": Vector3(0.28, -0.1, -0.7), "scale": 0.72},
 	"bell_hammer": {"power": 1.3, "name": "Bell Hammer", "desc": "Stuns all it hits, and everyone can hear it.", "kind": Kind.MELEE, "rate": 1.05, "range": 2.5, "cone": 130.0, "max_hits": 6,
 		"knock": 4.0, "swing": "overhead", "stun": 1.3, "loud": 22.0, "weight": 1.0, "pos": Vector3(0.22, -0.4, -0.5), "scale": 0.5},
 	"pitchfork": {"power": 0.8, "name": "Pitchfork", "desc": "Stabs straight through up to three in a row.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.8, "cone": 16.0, "max_hits": 3,
@@ -31,25 +32,26 @@ const ALL := {
 	"bow": {"nock": Vector3(-0.01, 0.0, -0.02), "name": "Short Bow", "desc": "Medium range and steady.", "kind": Kind.RANGED, "rate": 0.65, "range": 36.0, "speed": 38.0, "gravity": 3.5,
 		"knock": 1.5, "weight": 1.6, "pos": Vector3(0.17, -0.1, -0.45), "scale": 0.5, "tilt": -0.42},
 	"crossbow": {"power": 0.6, "nock": Vector3(0.0, 0.03, -0.16), "name": "Crossbow", "desc": "Short range and very fast, but each bolt is light.", "kind": Kind.RANGED, "rate": 0.3, "range": 16.0, "speed": 30.0, "gravity": 3.5,
-		"knock": 1.0, "weight": 1.3, "pos": Vector3(0.17, -0.2, -0.3), "scale": 0.2, "mesh_yaw": 3.1416},
+		"knock": 1.0, "weight": 1.3, "pos": Vector3(0.17, -0.2, -0.3), "scale": 0.2},
 	"longbow": {"power": 3.2, "nock": Vector3(-0.01, 0.0, -0.02), "name": "Long Bow", "pierce": 2, "desc": "Slow, but one arrow kills a zombie and goes on through two more. Reaches across the map. Zoom in to aim.", "kind": Kind.RANGED, "rate": 1.25, "range": 75.0, "speed": 64.0, "gravity": 1.5,
 		"knock": 2.5, "zoom_fov": 38.0, "weight": 1.0, "pos": Vector3(0.17, -0.1, -0.5), "scale": 0.7, "tilt": -0.42},
 	"axes": {"power": 0.9, "name": "Throwing Axes", "desc": "They come back to you, cutting on the way out and back. No arrows needed.", "kind": Kind.RANGED, "rate": 0.5, "range": 15.0, "speed": 24.0, "gravity": 0.0,
 		"knock": 2.0, "returning": true, "weight": 1.1, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
 	"javelins": {"power": 2.2, "pierce": 1, "shot": "javelin", "name": "Javelins", "desc": "Heavy, with a falling arc. Passes through the first enemy. Uses arrows.", "kind": Kind.RANGED, "rate": 1.0, "range": 30.0, "speed": 27.0, "gravity": 8.0,
 		"knock": 3.5, "weight": 1.0, "pos": Vector3(0.22, -0.22, -0.1), "scale": 1.0},
-	"sling": {"power": 0.5, "free_ammo": true, "stagger": 0.35, "shot": "stone", "name": "Sling", "desc": "Stones are everywhere, so it never needs arrows. Weak, but it staggers what it hits.", "kind": Kind.RANGED, "rate": 0.55, "range": 24.0, "speed": 28.0, "gravity": 7.0,
-		"knock": 2.0, "weight": 1.2, "pos": Vector3(0.24, -0.14, -0.44), "scale": 1.5},
-	"blowgun": {"power": 0.25, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.8, "range": 22.0, "speed": 40.0, "gravity": 2.0,
+	"blowgun": {"only": "plague_doctor", "power": 0.65, "silent": true, "poison": Vector2(12.0, 5.0), "name": "Blowgun", "desc": "Silent darts that poison what they hit: damage over time, and it takes 5% more from everything. Uses arrows.", "kind": Kind.RANGED, "rate": 0.65, "range": 22.0, "speed": 40.0, "gravity": 2.0,
 		"knock": 0.0, "weight": 0.9, "pos": Vector3(0.14, -0.16, -0.25), "scale": 1.0},
 	"fists": {"only": "monk", "power": 0.7, "name": "", "desc": "", "kind": Kind.MELEE, "rate": 0.34, "range": 2.4, "cone": 100.0, "max_hits": 2,
 		"knock": 1.4, "swing": "punch", "hidden": true, "weight": 0.0, "pos": Vector3(0.34, -0.36, -0.68), "scale": 0.58},
 	"bo": {"power": 0.95, "name": "Bo Staff", "desc": "A Monk's long staff, which sweeps wide and keeps them away.", "hidden": true, "kind": Kind.MELEE, "rate": 0.48, "range": 3.2, "cone": 130.0, "max_hits": 3,
 		"knock": 2.8, "swing": "bo", "weight": 0.0, "only": "monk", "pos": Vector3(0.08, -0.3, -0.62), "scale": 0.8},
 	"claws": {"only": "revenant", "name": "Spectral Claws", "desc": "A Revenant's own hands, shrouded in mist. Each blow uses a little Mist.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.5, "cone": 100.0, "max_hits": 2,
-		"knock": 1.2, "swing": "claw", "cost": 6.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
+		"knock": 1.2, "swing": "claw", "cost": 5.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
 	"staff": {"only": "magician", "name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
 		"knock": 1.5, "weight": 0.0, "pos": Vector3(0.26, -0.38, -0.5), "scale": 0.6},
+	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.1, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
+	"musket": {"only": "commander", "hidden": true, "name": "Musket", "desc": "Fire shoots; Melee thrusts the bayonet. Powder replenishes while reloading.", "kind": Kind.RANGED, "rate": 1.25, "range": 55.0, "speed": 90.0, "gravity": 0.0, "power": 2.4, "free_ammo": true, "knock": 3.0, "weight": 0.0, "pos": Vector3(0.17, -0.22, -0.4), "scale": 0.8},
+
 }
 
 const STEEL := Color(0.62, 0.66, 0.72)
@@ -87,9 +89,18 @@ static func pick_random() -> String:
 ## How a weapon sits in a character's hand. Poles and bows are drawn along their length, so they need
 ## a quarter turn to point where the character is looking.
 static func hand_rotation(id: String) -> Vector3:
-	if id in ["spear", "lance", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow"]:
+	if id in ["spear", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow", "musket"]:
 		return Vector3(HAND_TURN, 0.0, 0.0)
 	return Vector3.ZERO
+
+
+## Procedural models use metres; imported models retain their authored size.
+static func held_size(id: String) -> float:
+	match id:
+		"lance": return 1.0
+		"bow", "longbow": return 1.1
+		"crossbow": return 0.5
+	return float(ALL[id]["scale"]) * 1.6
 
 
 static func is_ranged(id: String) -> bool:
@@ -107,7 +118,7 @@ static func mesh(id: String) -> Mesh:
 	match id:
 		"dagger": m = Models.merged("res://assets/weapons/dagger.gltf")
 		"sword": m = Models.merged("res://assets/weapons/sword_1handed.gltf")
-		"crossbow": m = Models.merged("res://assets/weapons/crossbow_2handed.gltf")
+		"crossbow": m = _crossbow()
 		"spear": m = _spear()
 		"mace": m = _mace()
 		"bow": m = _bow(0.45, 0.17)
@@ -122,9 +133,9 @@ static func mesh(id: String) -> Mesh:
 		"javelins": m = _javelins()
 		"fists": m = _fists()
 		"bo": m = _bo()
-		"sling": m = _sling()
 		"blowgun": m = _blowgun()
-		"staff": m = _staff()
+		"staff", "war_staff": m = _staff()
+		"musket": m = _musket()
 		"claws": m = _claws()
 	_meshes[id] = m
 	return m
@@ -190,15 +201,6 @@ static func _javelins() -> Mesh:
 	return l.commit()
 
 
-static func _sling() -> Mesh:
-	var l := LowPoly.new()
-	l.prism(Vector3(0, 0.02, 0), Vector3(0.05, -0.1, -0.08), 0.006, 0.006, 3, WOOD)
-	l.prism(Vector3(0, 0.02, 0), Vector3(-0.05, -0.1, -0.08), 0.006, 0.006, 3, WOOD)
-	l.box(Vector3(0, -0.13, -0.09), Vector3(0.09, 0.05, 0.07), Color(0.3, 0.2, 0.12))
-	l.box(Vector3(0, -0.1, -0.09), Vector3(0.05, 0.04, 0.05), Color(0.5, 0.5, 0.5))
-	return l.commit()
-
-
 static func _blowgun() -> Mesh:
 	var l := LowPoly.new()
 	l.prism(Vector3(0, 0, 0.2), Vector3(0, 0, -0.62), 0.016, 0.012, 6, Color(0.46, 0.5, 0.26))
@@ -243,35 +245,45 @@ static func _scythe() -> Mesh:
 
 
 static func _flail() -> Mesh:
+	return LowPoly.new() \
+		.prism(Vector3(0, -0.2, 0), Vector3(0, 0.34, 0), 0.028, 0.024, 6, WOOD) \
+		.box(Vector3(0, 0.34, 0), Vector3(0.07, 0.07, 0.07), DARK) \
+		.box(Vector3(0, -0.1, 0), Vector3(0.065, 0.22, 0.065), DARK).commit()
+
+
+static func flail_chain() -> Mesh:
+	if _meshes.has("chain"):
+		return _meshes["chain"]
 	var l := LowPoly.new()
-	l.prism(Vector3(0, -0.2, 0), Vector3(0, 0.34, 0), 0.024, 0.024, 6, WOOD)
-	l.box(Vector3(0, 0.34, 0), Vector3(0.06, 0.05, 0.06), DARK)
-	var p := Vector3(0, 0.36, 0)
-	for i in 5:
-		var q := p + Vector3(-0.045, 0.055, 0)
-		l.box((p + q) * 0.5, Vector3(0.03, 0.05, 0.03), STEEL if i % 2 == 0 else DARK)
-		p = q
-	var c := p + Vector3(-0.07, 0.07, 0)
-	l.prism(c - Vector3(0, 0.09, 0), c + Vector3(0, 0.09, 0), 0.09, 0.09, 7, DARK)
-	for d: Vector3 in [Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 0, -1), Vector3(0, 1, 0)]:
-		l.prism(c + d * 0.07, c + d * 0.17, 0.03, 0.0, 4, STEEL)
-	return l.commit()
+	for i in 8:
+		var y := -0.035 - i * 0.055
+		# Alternating open links, rather than a rigid rod.
+		for offset: float in [-0.018, 0.018]:
+			var centre := Vector3(offset, y, 0) if i % 2 == 0 else Vector3(0, y, offset)
+			l.box(centre, Vector3(0.009, 0.055, 0.009), STEEL)
+		for offset: float in [-0.026, 0.026]:
+			l.box(Vector3(0, y + offset, 0), Vector3(0.04, 0.009, 0.009) if i % 2 == 0 else Vector3(0.009, 0.009, 0.04), DARK)
+	var c := Vector3(0, -0.55, 0)
+	l.prism(c - Vector3.UP * 0.1, c + Vector3.UP * 0.1, 0.12, 0.12, 8, DARK)
+	for d: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.FORWARD, Vector3.BACK]:
+		l.prism(c + d * 0.08, c + d * 0.23, 0.045, 0.0, 4, STEEL)
+	_meshes["chain"] = l.commit()
+	return _meshes["chain"]
 
 
-## A long two-handed shaft with a church bell for a head. It lands mouth first.
+## Armoured war hammer with a solid striking face and rear pick.
 static func _bell_hammer() -> Mesh:
 	var l := LowPoly.new()
-	l.prism(Vector3(0, -0.5, 0), Vector3(0, 0.74, 0), 0.03, 0.026, 6, WOOD)
-	for y: float in [-0.34, -0.1]:
-		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.1, 0), 0.036, 0.036, 6, DARK)
-	# The yoke that holds the bell on the end of the shaft.
-	l.box(Vector3(0, 0.76, 0), Vector3(0.1, 0.14, 0.34), DARK)
-	# The bell lies along the swing, so its mouth meets whatever it hits.
-	l.prism(Vector3(0, 0.76, -0.18), Vector3(0, 0.76, -0.04), 0.04, 0.09, 10, BRASS.darkened(0.12))
-	l.prism(Vector3(0, 0.76, -0.04), Vector3(0, 0.76, 0.2), 0.09, 0.15, 10, BRASS)
-	l.prism(Vector3(0, 0.76, 0.2), Vector3(0, 0.76, 0.28), 0.15, 0.22, 10, BRASS.lightened(0.05))
-	l.prism(Vector3(0, 0.76, 0.28), Vector3(0, 0.76, 0.31), 0.22, 0.23, 10, BRASS.lightened(0.14))
-	l.prism(Vector3(0, 0.76, 0.31), Vector3(0, 0.76, 0.315), 0.14, 0.14, 10, Color(0.08, 0.06, 0.04))
+	l.prism(Vector3(0, -0.5, 0), Vector3(0, 0.85, 0), 0.035, 0.03, 8, WOOD)
+	for y: float in [-0.35, -0.12, 0.6]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.13, 0), 0.043, 0.043, 8, DARK)
+	l.box(Vector3(0, 0.8, 0), Vector3(0.3, 0.32, 0.22), DARK)
+	# Solid striking face. The old bell, mouth and clapper are gone.
+	l.box(Vector3(0, 0.8, 0.3), Vector3(0.38, 0.34, 0.1), STEEL)
+	l.prism(Vector3(0, 0.8, -0.1), Vector3(0, 0.85, -0.45), 0.09, 0.0, 4, STEEL)
+	for x: float in [-0.17, 0.17]:
+		l.box(Vector3(x, 0.8, 0.12), Vector3(0.04, 0.34, 0.22), DARK)
+	l.box(Vector3(0, 1.0, 0.08), Vector3(0.38, 0.05, 0.3), STEEL)
 	return l.commit()
 
 
@@ -409,6 +421,54 @@ static func _bow(half: float, depth: float) -> Mesh:
 	var string_col := Color(0.9, 0.9, 0.85)
 	l.prism(Vector3(0, half, 0), Vector3(0, 0, 0.1), 0.004, 0.004, 3, string_col)
 	l.prism(Vector3(0, -half, 0), Vector3(0, 0, 0.1), 0.004, 0.004, 3, string_col)
-	l.prism(Vector3(0, 0, 0.1), Vector3(0, 0, -0.42), 0.007, 0.007, 4, WOOD)
-	l.prism(Vector3(0, 0, -0.42), Vector3(0, 0, -0.5), 0.018, 0.0, 4, STEEL)
+	return l.commit()
+
+
+static func _musket() -> Mesh:
+	var l := LowPoly.new()
+	l.box(Vector3(0, 0, 0.2), Vector3(0.11, 0.16, 0.7), WOOD)
+	l.prism(Vector3(0, 0.07, -0.05), Vector3(0, 0.07, -1.15), 0.045, 0.045, 6, DARK)
+	for z: float in [-0.2, -0.8]:
+		l.box(Vector3(0, 0.04, z), Vector3(0.13, 0.14, 0.06), BRASS)
+	l.prism(Vector3(0.07, 0.07, -0.95), Vector3(0.07, 0.07, -1.55), 0.035, 0.0, 4, STEEL)
+	return l.commit()
+
+
+## Folded, double-sided cloth with a split hem and raised heraldry.
+static func banner_mesh() -> Mesh:
+	if _meshes.has("banner"):
+		return _meshes["banner"]
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.5, 0), Vector3(0, 1.5, 0), 0.028, 0.025, 6, WOOD)
+	l.prism(Vector3(0, 1.5, 0), Vector3(0, 1.75, 0), 0.075, 0.0, 4, BRASS)
+	l.prism(Vector3(-0.04, 1.43, 0), Vector3(0.78, 1.43, 0), 0.018, 0.018, 6, BRASS)
+	_meshes["banner"] = l.commit()
+	var fabric := SurfaceTool.new()
+	fabric.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for x in 8:
+		for y in 4:
+			for corner: Vector2 in [Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(0, 0), Vector2(1, 1), Vector2(1, 0)]:
+				var uv := Vector2((x + corner.x) / 8.0, (y + corner.y) / 4.0)
+				var drop := 0.6 + 0.06 * absf(uv.x * 2.0 - 1.0)
+				fabric.set_normal(Vector3.FORWARD)
+				fabric.set_uv(uv)
+				fabric.add_vertex(Vector3(0.045 + uv.x * 0.62, 1.4 - uv.y * drop, sin(uv.x * TAU * 1.3) * 0.035 * uv.y))
+	var mesh := _meshes["banner"] as ArrayMesh
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, fabric.commit_to_arrays())
+	var cloth := ShaderMaterial.new()
+	cloth.shader = preload("res://assets/shaders/banner.gdshader")
+	mesh.surface_set_material(1, cloth)
+	return mesh
+
+
+
+static func _crossbow() -> Mesh:
+	# Stock points down -Z, like the projectile. Ammunition is a separate animated mesh.
+	var l := LowPoly.new()
+	l.box(Vector3(0, 0, 0), Vector3(0.2, 0.24, 2.0), WOOD)
+	l.box(Vector3(0, 0.14, -0.1), Vector3(0.09, 0.04, 1.6), DARK)
+	l.box(Vector3(0, -0.23, 0.35), Vector3(0.14, 0.4, 0.25), DARK)
+	for side: float in [-1.0, 1.0]:
+		l.prism(Vector3(0, 0, -0.7), Vector3(side * 0.9, 0, -0.4), 0.07, 0.04, 6, STEEL)
+		l.prism(Vector3(side * 0.9, 0, -0.4), Vector3(0, 0.12, 0.5), 0.012, 0.012, 3, LIGHT_WOOD)
 	return l.commit()

@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 24
+const PROTOCOL := 33
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -115,6 +115,11 @@ func active() -> bool:
 	return role != Role.OFFLINE
 
 
+## Development APKs use their own compatibility namespace for LAN and online rooms.
+func protocol_version() -> int:
+	return PROTOCOL + (100000 if Game.is_dev_build() else 0)
+
+
 func is_host() -> bool:
 	return role == Role.HOST
 
@@ -197,7 +202,7 @@ func set_bots(count: int) -> void:
 		if roster.has(id):
 			continue
 		mine.append(id)
-		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("hidden", false) or ClassDefs.ALL[c].has("earned"))
+		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("no_bots", false) and (not ClassDefs.ALL[c].get("hidden", false) or ClassDefs.ALL[c].has("earned")))
 		# Each bot something different, as long as there are enough to go round.
 		for other: int in mine:
 			if roster.has(other):
@@ -419,6 +424,7 @@ func leave(reason := "") -> void:
 	_stop_watching()
 	spectate_cam = null
 	_respawn_left = -1.0
+	_command_ready.clear()
 	_over = false
 	set_physics_process(false)
 	set_process(_listener != null)
@@ -432,7 +438,7 @@ func _my_entry(team: int) -> Dictionary:
 
 func _on_connected() -> void:
 	_connect_wait = 0.0
-	_hello.rpc_id(1, PROTOCOL, Game.player_name, Game.player_class)
+	_hello.rpc_id(1, protocol_version(), Game.player_name, Game.player_class)
 
 
 func _on_failed() -> void:
@@ -462,7 +468,7 @@ func _on_peer_disconnected(id: int) -> void:
 	_loaded.erase(id)
 	_remove_peer(id)
 	if in_game:
-		_lobby.rpc(roster, rules, difficulty)
+		_lobby.rpc(roster, rules, difficulty, night_map)
 		lobby_changed.emit()
 	else:
 		_share_lobby()
@@ -488,8 +494,10 @@ func _hello(protocol: int, player_name: String, cls: String) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
-	if protocol != PROTOCOL:
+	if protocol != protocol_version():
 		_refused.rpc_id(id, "That phone has a different version of the game.")
+		return
+	if not ClassDefs.ALL.has(cls) or roster.has(id):
 		return
 	# A real person takes a bot's place.
 	if not in_game and roster.size() >= MAX_PLAYERS and bot_count() > 0:
@@ -497,6 +505,8 @@ func _hello(protocol: int, player_name: String, cls: String) -> void:
 	if in_game or roster.size() >= MAX_PLAYERS:
 		_refused.rpc_id(id, "That game has already started." if in_game else "That game is full.")
 		return
+	if not class_slot_available(cls, id):
+		cls = "infantry"
 	var team := _smaller_team()
 	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0, "lives": LIVES}
 	_share_lobby()
@@ -519,6 +529,8 @@ func _refused(reason: String) -> void:
 func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map: String) -> void:
 	night_map = new_map
 	roster = new_roster
+	if roster.has(my_id()):
+		Game.player_class = str(roster[my_id()]["class"])
 	rules = new_rules
 	difficulty = new_difficulty
 	lobby_changed.emit()
@@ -526,16 +538,19 @@ func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map
 
 ## Lobby choices: anyone can change their own class and team, only the host the rules.
 func set_my_class(cls: String) -> void:
+	if in_game or not ClassDefs.ALL.has(cls) or not class_slot_available(cls, my_id()):
+		return
 	Game.player_class = cls
 	if is_host():
 		roster[1]["class"] = cls
-		_lobby.rpc(roster, rules, difficulty)
-		lobby_changed.emit()
+		_share_lobby()
 	elif active():
 		_choice.rpc_id(1, cls, -1)
 
 
 func switch_team() -> void:
+	if in_game or not roster.has(my_id()):
+		return
 	var team := 1 - int(roster[my_id()]["team"])
 	if is_host():
 		roster[1]["team"] = team
@@ -545,28 +560,26 @@ func switch_team() -> void:
 
 
 func set_difficulty(d: int) -> void:
-	if is_host():
+	if is_host() and not in_game and d >= 0 and d <= 2:
 		difficulty = d
 		Game.difficulty = d
-		_lobby.rpc(roster, rules, difficulty)
-		lobby_changed.emit()
+		_share_lobby()
 
 
 func set_rules(r: int) -> void:
-	if is_host():
+	if is_host() and not in_game and r >= Rules.COOP and r <= Rules.FORT:
 		rules = r
-		_lobby.rpc(roster, rules, difficulty)
-		lobby_changed.emit()
+		_share_lobby()
 
 
 @rpc("any_peer", "reliable")
 func _choice(cls: String, team: int) -> void:
 	var id := multiplayer.get_remote_sender_id()
-	if not is_host() or not roster.has(id):
+	if not is_host() or in_game or not roster.has(id):
 		return
-	if cls != "":
+	if cls != "" and ClassDefs.ALL.has(cls) and class_slot_available(cls, id):
 		roster[id]["class"] = cls
-	if team >= 0:
+	if team == 0 or team == 1:
 		roster[id]["team"] = team
 	_share_lobby()
 
@@ -587,12 +600,14 @@ func _start_beacon() -> void:
 	_beacon_timer = 0.0
 	# Hotspots and some routers drop broadcasts, so a joining phone can also ask around directly.
 	_answer = PacketPeerUDP.new()
-	if _answer.bind(ASK_PORT) != OK:
+	var answer_error := _answer.bind(ASK_PORT)
+	if answer_error != OK:
+		push_warning("Could not bind LAN discovery responder: %s" % error_string(answer_error))
 		_answer = null
 
 
 func _beacon_text() -> PackedByteArray:
-	return JSON.stringify({"g": "botti-last-stand", "v": PROTOCOL, "n": Game.player_name, "p": roster.size(), "r": rules}).to_utf8_buffer()
+	return JSON.stringify({"g": "botti-last-stand", "v": protocol_version(), "n": Game.player_name, "p": roster.size(), "r": rules}).to_utf8_buffer()
 
 
 func _answer_questions() -> void:
@@ -634,7 +649,9 @@ func start_search() -> void:
 	PhoneNet.use_wifi()
 	_listener = PacketPeerUDP.new()
 	_listener.set_broadcast_enabled(true) # on Android this also lets broadcasts in
-	if _listener.bind(DISCOVERY_PORT) != OK:
+	var listen_error := _listener.bind(DISCOVERY_PORT)
+	if listen_error != OK:
+		push_warning("Could not bind LAN discovery listener: %s" % error_string(listen_error))
 		_listener = null
 		return
 	rooms.clear()
@@ -667,7 +684,7 @@ func _read_beacons(delta: float) -> void:
 		var d: Dictionary = parsed
 		if not rooms.has(from):
 			changed = true
-		rooms[from] = {"name": str(d.get("n", "?")), "players": int(d.get("p", 1)), "rules": int(d.get("r", 0)), "version_ok": int(d.get("v", 0)) == PROTOCOL, "seen": 0.0}
+		rooms[from] = {"name": str(d.get("n", "?")), "players": int(d.get("p", 1)), "rules": int(d.get("r", 0)), "version_ok": int(d.get("v", 0)) == protocol_version(), "seen": 0.0}
 	for a: String in rooms.keys():
 		rooms[a]["seen"] = float(rooms[a]["seen"]) + delta
 		if float(rooms[a]["seen"]) > 4.0:
@@ -727,6 +744,8 @@ func start_match() -> void:
 func _begin(new_rules: int, quality: int, difficulty: int, new_roster: Dictionary, tonight: int, fog_at: Vector2) -> void:
 	rules = new_rules
 	roster = new_roster
+	if roster.has(my_id()):
+		Game.player_class = str(roster[my_id()]["class"])
 	weather = tonight
 	fog_centre = fog_at
 	last_winner = 0
@@ -742,6 +761,7 @@ func _begin(new_rules: int, quality: int, difficulty: int, new_roster: Dictionar
 
 
 func attach(w: World) -> void:
+	_command_ready.clear()
 	world = w
 	for peer: int in roster:
 		if peer != my_id():
@@ -879,7 +899,7 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 
 
 func set_night_map(id: String) -> void:
-	if is_host():
+	if is_host() and not in_game and Game.MAPS.has(id):
 		night_map = id
 		_share_lobby()
 
@@ -1017,12 +1037,14 @@ func _z_died(net_id: int, killer: int) -> void:
 	var z: Zombie = world.zombie_by_id(net_id)
 	if z == null or not z.active:
 		return
+	if z.def.get("mist_boss", false): world.director._mist_boss_defeated = true
 	z.net_die()
 	_credit(z, killer)
 
 
 ## The killer gets the kill. In co-op the others learn something too.
 func _credit(z: Zombie, killer: int) -> void:
+	if killer < 0: return
 	for p: Player in world.local_players():
 		if p.dead:
 			continue
@@ -1189,7 +1211,7 @@ func pose_bytes(p: Player) -> PackedByteArray:
 
 
 func _apply_pose(a: Avatar, b: PackedByteArray) -> void:
-	if b.size() < 39:
+	if not valid_pose(b):
 		return
 	var weapon: int = b[34]
 	a.apply_pose(Vector3(b.decode_float(0), b.decode_float(4), b.decode_float(8)), b.decode_float(12), b.decode_float(16),
@@ -1197,6 +1219,17 @@ func _apply_pose(a: Avatar, b: PackedByteArray) -> void:
 	a.cover_pct = b[36] / 100.0
 	a.cover_radius = float(b[37])
 	a.show_statuses(b[38])
+
+
+## Validate before touching an avatar: truncated packets, unknown weapon indices and NaN/Inf
+## transforms must never reach physics or the renderer. The wire format remains unchanged.
+func valid_pose(b: PackedByteArray) -> bool:
+	if b.size() != 39 or b[34] > _weapon_ids.size():
+		return false
+	for offset in range(0, 32, 4):
+		if not is_finite(b.decode_float(offset)):
+			return false
+	return true
 
 
 func bot_pose(bot: BotPlayer) -> void:
@@ -1410,7 +1443,7 @@ func send_fort(state: PackedByteArray) -> void:
 	_fort_state.rpc(state)
 
 
-@rpc("authority", "unreliable_ordered", "call_remote", 5)
+@rpc("authority", "reliable", "call_remote", 5)
 func _fort_state(state: PackedByteArray) -> void:
 	if world and is_instance_valid(world) and world.fort:
 		world.fort.apply_state(state)
@@ -1674,7 +1707,7 @@ func _share(amount: float) -> void:
 		world.player.take_shared(amount)
 
 
-## A friend's Apothecary or Guardian: a moment nobody can hurt you, and some health back.
+## A friend's Apothecary: a moment nobody can hurt you, and some health back.
 func guard_peer(peer: int, seconds: float, healing: float) -> void:
 	if is_bot(peer):
 		if is_host():
@@ -1715,6 +1748,9 @@ func dome(at: Vector3, radius: float, seconds: float) -> void:
 func _dome_fx(at: Vector3, radius: float, seconds: float) -> void:
 	if world and is_instance_valid(world):
 		world.fx_dome(at, radius, seconds)
+		for ally: Ally in world.allies:
+			if ally.remote_owner == 0 and not ally.dead and ally.global_position.distance_to(at - Vector3.UP * 0.5) <= radius:
+				ally.guarded = maxf(ally.guarded, clampf(seconds, 0.0, 6.0))
 
 
 func mist(at: Vector3, size: float) -> void:
@@ -1731,13 +1767,17 @@ func _mist_fx(at: Vector3, size: float) -> void:
 func nearby_horse(at: Vector3) -> int:
 	for peer: int in _avatars:
 		var a: Avatar = _avatars[peer]
-		if a.is_mounted() and not a.has_passenger and not is_foe(peer) and not is_bot(peer) and at.distance_to(a.global_position) < 3.5:
+		if a.is_mounted() and not a.has_passenger and not is_foe(peer) and at.distance_to(a.global_position) < 3.5:
 			return peer
 	return 0
 
 
 func ask_to_ride(peer: int) -> void:
-	_ride_ask.rpc_id(peer)
+	if is_bot(peer):
+		if is_host(): _accept_bot_ride(my_id(), peer)
+		else: _bot_ride_ask.rpc_id(1, peer)
+	else:
+		_ride_ask.rpc_id(peer)
 
 
 @rpc("any_peer", "reliable")
@@ -1759,6 +1799,10 @@ func _ride_answer(yes: bool) -> void:
 
 
 func stop_riding(peer: int) -> void:
+	if is_bot(peer):
+		if is_host(): _clear_bot_seat(my_id(), peer)
+		else: _bot_ride_stop.rpc_id(1, peer)
+		return
 	if _avatars.has(peer):
 		_ride_stop.rpc_id(peer)
 
@@ -1770,13 +1814,16 @@ func _ride_stop() -> void:
 
 
 func drop_passenger(peer: int) -> void:
+	if peer == my_id() and world and world.player:
+		world.player.ride_behind = 0
+		return
 	if _avatars.has(peer):
 		_ride_end.rpc_id(peer)
 
 
 @rpc("any_peer", "reliable")
 func _ride_end() -> void:
-	if world and is_instance_valid(world) and world.player and world.player.ride_behind == multiplayer.get_remote_sender_id():
+	if world and is_instance_valid(world) and world.player and (world.player.ride_behind == multiplayer.get_remote_sender_id() or (multiplayer.get_remote_sender_id() == 1 and is_bot(world.player.ride_behind))):
 		world.player.ride_behind = 0
 
 
@@ -1863,3 +1910,238 @@ func score_lines() -> String:
 
 func team_colour(team: int) -> Color:
 	return Color(0.95, 0.72, 0.2) if team == 0 else Color(0.35, 0.6, 1.0)
+
+
+## The host serializes reservations, including simultaneous join/choice requests.
+func class_slot_available(cls: String, peer: int) -> bool:
+	if not ClassDefs.ALL.has(cls):
+		return false
+	if is_bot(peer) and ClassDefs.ALL[cls].get("no_bots", false):
+		return false
+	if ClassDefs.ALL[cls].get("unique", false):
+		for other: int in roster:
+			if other != peer and roster[other]["class"] == cls:
+				return false
+	return true
+
+
+var _command_ready := {} # host-only cooldowns, in this world's clock
+
+
+func _commander_source(peer: int) -> Target:
+	if not world or not is_instance_valid(world) or not roster.has(peer) or roster[peer]["class"] != "commander" or is_bot(peer):
+		return null
+	for target: Target in world.players:
+		if world.peer_of(target) == peer and not target.dead:
+			return target
+	return null
+
+
+func command_field(kind: String, at: Vector3, local_world: World = null) -> void:
+	if not active():
+		if local_world:
+			var field := CommandField.new()
+			local_world.add_child(field)
+			field.setup(local_world, 1, kind, at)
+			if kind == "gunner":
+				local_world.director.show_banner("The Commander has called in an artillery barrage", 5.0)
+	elif is_host():
+		_accept_command_field(my_id(), kind, at)
+	else:
+		_request_command_field.rpc_id(1, kind, at)
+
+
+@rpc("any_peer", "reliable")
+func _request_command_field(kind: String, at: Vector3) -> void:
+	if is_host():
+		_accept_command_field(multiplayer.get_remote_sender_id(), kind, at)
+
+
+func _accept_command_field(peer: int, kind: String, at: Vector3) -> void:
+	var source := _commander_source(peer)
+	if source == null or not kind in ["warlock", "gunner"] or not at.is_finite():
+		return
+	if absf(at.x) > world.half_size or absf(at.z) > world.half_size or world.now < float(_command_ready.get(peer, -1.0)):
+		return
+	_command_ready[peer] = world.now + CommanderKit.LAST_CD
+	if kind == "warlock":
+		at = source.global_position
+	else:
+		at.y = world.ground_at(at)
+	_spawn_command_field.rpc(peer, kind, at)
+
+
+@rpc("authority", "call_local", "reliable")
+func _spawn_command_field(peer: int, kind: String, at: Vector3) -> void:
+	if world == null or not is_instance_valid(world):
+		return
+	var field := CommandField.new()
+	world.add_child(field)
+	field.setup(world, peer, kind, at)
+	if kind == "gunner":
+		world.director.show_banner("The Commander has called in an artillery barrage", 5.0)
+
+
+func command_rally(peer: int, radius: float, last: bool, local_world: World = null) -> void:
+	if not active():
+		if local_world:
+			_apply_rally_player(local_world.player, last)
+			local_world.fx_ring(local_world.player.global_position, radius, ClassDefs.color("commander"))
+	elif is_host():
+		_accept_rally(peer, radius, last)
+	else:
+		_request_rally.rpc_id(1, radius, last)
+
+
+@rpc("any_peer", "reliable")
+func _request_rally(radius: float, last: bool) -> void:
+	if is_host():
+		_accept_rally(multiplayer.get_remote_sender_id(), radius, last)
+
+
+func _accept_rally(peer: int, radius: float, last: bool) -> void:
+	var source := _commander_source(peer)
+	if source == null or not is_finite(radius) or world.now < float(_command_ready.get(peer, -1.0)):
+		return
+	radius = clampf(radius, 0.0, 16.0)
+	# Remote talent selections are local to their player; enforce the shortest legal trained cooldown.
+	_command_ready[peer] = world.now + (CommanderKit.LAST_CD if last else CommanderKit.TRAINED_COMMAND_CD)
+	world.fx_ring(source.global_position, radius, ClassDefs.color("commander"))
+	blast_fx(source.global_position, radius, Color(0.85, 0.65, 0.25, 0.25))
+	for target: Target in world.players:
+		var other := world.peer_of(target)
+		if other <= 0 or bots_foes(peer, other) or target.global_position.distance_to(source.global_position) > radius:
+			continue
+		if target is Player:
+			_apply_rally_player(target, last)
+		else:
+			_receive_rally.rpc_id(other, last)
+
+
+@rpc("authority", "reliable")
+func _receive_rally(last: bool) -> void:
+	if world and is_instance_valid(world):
+		_apply_rally_player(world.player, last)
+
+
+func _apply_rally_player(p: Player, last: bool) -> void:
+	if p == null:
+		return
+	if last and p.dead:
+		if fog_rules() and lives_of(p.net_id()) <= 0:
+			return
+		p.respawn(p.global_position)
+		if p == world.player:
+			_respawn_left = -1.0
+			_stop_watching()
+	if p.dead:
+		return
+	var duration := 8.0 if last else 6.0
+	p._act({"do": "buff", "key": "command_speed", "stat": "speed", "val": 0.25, "secs": duration}, {})
+	if last:
+		p.heal(35.0)
+		p.guard_left = maxf(p.guard_left, 2.0)
+		p._act({"do": "buff", "key": "command_melee", "stat": "melee_damage", "val": 0.2, "secs": duration}, {})
+		p._act({"do": "buff", "key": "command_ranged", "stat": "ranged_damage", "val": 0.2, "secs": duration}, {})
+		p._act({"do": "buff", "key": "command_spell", "stat": "spell_damage", "val": 0.2, "secs": duration}, {})
+	p.say("Last Command!" if last else "Forward!")
+
+
+func command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
+	if is_host():
+		_command_impact_visual.rpc(at, radius, storm)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
+	if world and is_instance_valid(world):
+		CommandField.visual_impact(world, at, radius, storm)
+
+
+## The authority starts each warning; every phone applies the eventual hit to its own player only.
+func mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int) -> void:
+	if is_host():
+		_spawn_mist_seal.rpc(at, radius, eye, delay, damage, source)
+
+
+@rpc("authority", "call_local", "reliable")
+func _spawn_mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int) -> void:
+	if world and is_instance_valid(world):
+		MistSeal.create(world, at, radius, eye, delay, damage, source)
+
+
+@rpc("any_peer", "reliable")
+func _bot_ride_ask(carrier: int) -> void:
+	if is_host(): _accept_bot_ride(multiplayer.get_remote_sender_id(), carrier)
+
+func _accept_bot_ride(who: int, carrier: int) -> void:
+	var bot := local_player(carrier)
+	var rider: Target = world.player if who == my_id() else avatar(who)
+	var yes := bot != null and rider != null and not rider.dead and bot.is_riding() and bot.passenger == 0 and not bots_foes(who, carrier) and rider.global_position.distance_to(bot.global_position) < 3.5
+	if yes: bot.passenger = who
+	if who == my_id(): _bot_ride_answer(yes, carrier)
+	else: _bot_ride_answer.rpc_id(who, yes, carrier)
+
+@rpc("authority", "reliable")
+func _bot_ride_answer(yes: bool, carrier: int) -> void:
+	if yes and world and world.player: world.player.ride_behind = carrier
+
+@rpc("any_peer", "reliable")
+func _bot_ride_stop(carrier: int) -> void:
+	if is_host(): _clear_bot_seat(multiplayer.get_remote_sender_id(), carrier)
+
+func _clear_bot_seat(who: int, carrier: int) -> void:
+	var bot := local_player(carrier)
+	if bot and bot.passenger == who: bot.passenger = 0
+
+func start_mist_storm(island: int) -> void:
+	if is_host(): _mist_storm_start.rpc(island)
+
+@rpc("authority", "call_local", "reliable")
+func _mist_storm_start(island: int) -> void:
+	if world and is_instance_valid(world) and island >= -1 and island < 9:
+		MistStorm.create(world, maxi(0, island), island == -1)
+
+
+var _last_command_voice := -10.0
+
+func command_voice(peer: int) -> void:
+	if not active(): return
+	if is_host(): _relay_command_voice(peer)
+	else: _ask_command_voice.rpc_id(1)
+
+@rpc("any_peer", "reliable")
+func _ask_command_voice() -> void:
+	if is_host(): _relay_command_voice(multiplayer.get_remote_sender_id())
+
+func _relay_command_voice(peer: int) -> void:
+	var source := _commander_source(peer)
+	var now := Time.get_ticks_msec() / 1000.0
+	if source == null or now - _last_command_voice < 2.0: return
+	_last_command_voice = now
+	_command_voice.rpc(peer, source.global_position)
+
+@rpc("authority", "call_remote", "reliable")
+func _command_voice(peer: int, at: Vector3) -> void:
+	if peer != my_id() and world and world.player:
+		Sfx.play_at("command", at, world.player.global_position, -1.0, 0.1)
+
+
+func protect_peer(peer: int, seconds: float, healing: float) -> void:
+	if peer == my_id() or (is_host() and is_bot(peer)):
+		_protect_player(local_player(peer), seconds, healing)
+	elif is_bot(peer): _bot_protect.rpc_id(1, peer, seconds, healing)
+	else: _protect.rpc_id(peer, seconds, healing)
+
+@rpc("any_peer", "reliable")
+func _bot_protect(peer: int, seconds: float, healing: float) -> void:
+	if is_host() and is_bot(peer): _protect_player(local_player(peer), seconds, healing)
+
+@rpc("any_peer", "reliable")
+func _protect(seconds: float, healing: float) -> void:
+	if world and is_instance_valid(world): _protect_player(world.player, seconds, healing)
+
+func _protect_player(p: Player, seconds: float, healing: float) -> void:
+	if p == null or p.dead: return
+	p.dome_left = maxf(p.dome_left, clampf(seconds, 0, 6))
+	if healing > 0: p.heal(minf(healing, 30))

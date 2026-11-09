@@ -31,6 +31,7 @@ const HOP_GRAVITY := 18.0
 const HOP_THINK := 0.4
 const HOP_LOOK := 30.0
 
+var mist_mind: MistMind
 var world: World
 var model_id := ""
 var type_id := ""
@@ -66,7 +67,7 @@ var _shape: CollisionShape3D
 var _capsule: CapsuleShape3D
 var _shadow: MeshInstance3D
 var _parts: Array[MeshInstance3D] = []
-var _hand_mesh: MeshInstance3D
+var _hand_mesh: WeaponVisual
 var _eyes: MeshInstance3D
 var _claws: Array = []
 var _flames: CPUParticles3D
@@ -110,15 +111,16 @@ var _slow := 0.0
 var _flank := Vector3.ZERO
 var _predicted := false
 var _custom := false
-var _dot_time := 0.0
-var _dot_dps := 0.0
+var _dot_pending := 0.0
+var _dot_wait := 0.25
+var _poison_dps := 0.0
+var _bleed_dps := 0.0
 var poison_left := 0.0
 var bleed_left := 0.0
 var _debuff_fx: CPUParticles3D
 var _gate_wait := 0.0
 var _stun_fx: CPUParticles3D
 var shown_debuffs := 0 # on another phone: which of them the host last told us about
-var _dot_tick := 0.0
 var _mark_time := 0.0
 var _mark_mult := 1.0
 var _airborne := false
@@ -245,12 +247,13 @@ func _material_for(id: String, source: Material) -> ShaderMaterial:
 
 func _build_visual() -> void:
 	_setup_static()
-	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy", "harrier"]
+	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy", "harrier", "lantern_wisp", "mist_weaver", "veil_regent", "fallen_revenant"]
 	if _custom:
-		_visual = EnemyModels.build(model_id)
+		_visual = MistModels.build(model_id) if model_id in MistModels.KINDS else EnemyModels.build(model_id)
 		add_child(_visual)
 		for mi in _visual.find_children("*", "MeshInstance3D", false, false):
 			_parts.append(mi as MeshInstance3D)
+			(mi as MeshInstance3D).set_meta("mist_rest", (mi as MeshInstance3D).transform)
 		_fit[model_id] = 1.0
 		if model_id == "mimic":
 			_build_lure()
@@ -343,6 +346,10 @@ func _set_enabled(on: bool) -> void:
 
 func spawn(id: String, at: Vector3, minute := 0) -> void:
 	type_id = id
+	if model_id in MistModels.KINDS:
+		for part in _parts:
+			part.transform = part.get_meta("mist_rest", Transform3D.IDENTITY)
+	mist_mind = MistMind.new() if id in MistModels.KINDS else null
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
 	_dummy_log.clear()
@@ -391,6 +398,8 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		_damage *= harder
 		_armed_damage *= harder
 		_speed *= 1.0 + ZombieDefs.NIGHT_SPEED * minute
+	if def.get("mist_boss", false):
+		hp *= 1.0 + 0.55 * maxi(0, (Net.roster.size() if Net.active() else world.players.size()) - 1)
 	hp *= Game.enemy_health()
 	_damage *= Game.enemy_damage()
 	_armed_damage *= Game.enemy_damage()
@@ -410,7 +419,10 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_direct = false
 	_tick_every = 1
 	_tick_time = 0.0
-	_dot_time = 0.0
+	_dot_pending = 0.0
+	_dot_wait = 0.25
+	_poison_dps = 0.0
+	_bleed_dps = 0.0
 	poison_left = 0.0
 	bleed_left = 0.0
 	show_debuffs(false, false)
@@ -430,7 +442,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	# Each zombie approaches from its own side, so a group ends up surrounding you.
 	var a := randf() * TAU
 	_flank = Vector3.ZERO if id == "beast" else Vector3(cos(a), 0, sin(a))
-	height = HEIGHT * s
+	height = (2.2 if model_id == "lantern_wisp" else 2.35 if model_id in MistModels.KINDS else HEIGHT) * s
 	position = at
 	last_hitter = 0
 	next_hitter = 0
@@ -448,13 +460,15 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	state = State.ROAM
 	weapon_id = ""
 	if _hand_mesh:
-		_hand_mesh.mesh = null
+		_hand_mesh.equip("")
 	if def.has("weapon"):
 		weapon_id = def["weapon"]
 		_show_weapon(weapon_id)
 	for c: MeshInstance3D in _claws:
 		c.visible = def.get("claws", false)
 	_visual.position = Vector3.ZERO
+	if model_id == "veil_regent":
+		(_visual.get_node("RegentHealth") as Label3D).visible = true
 	_show_mount(def.get("rider", false))
 	_ride_pass = 0.0
 	_ride_turn = 1.0
@@ -608,12 +622,18 @@ func _show_weapon(id: String) -> void:
 	if _skeleton == null:
 		return
 	if _hand_mesh == null:
-		_hand_mesh = _attach("handslot.r", null, Vector3.ZERO)
+		var attachment := BoneAttachment3D.new()
+		attachment.bone_name = "handslot.r"
+		_skeleton.add_child(attachment)
+		_hand_mesh = WeaponVisual.new()
+		attachment.add_child(_hand_mesh)
 	var d: Dictionary = WeaponDefs.ALL[id]
-	_hand_mesh.mesh = WeaponDefs.mesh(id)
+	_hand_mesh.equip(id)
 	var hold := 0.55 if WeaponDefs.is_ranged(id) or id in ["lance", "spear", "pitchfork", "javelins"] else 1.0
 	_hand_mesh.scale = Vector3.ONE * float(d["scale"]) * hold * 2.2 / float(_fit[model_id])
 	_hand_mesh.rotation = WeaponDefs.hand_rotation(id)
+	if id in WeaponDefs.ALIGNED_HELD:
+		_hand_mesh.hold(self, true, WeaponDefs.held_size(id) * _scale)
 
 
 func _restore_materials() -> void:
@@ -656,6 +676,8 @@ func _play(anim_name: String, speed := 1.0, blend := 0.2) -> void:
 	if _current_anim == anim_name:
 		_anim.speed_scale = speed
 		return
+	if _hand_mesh and anim_name in ["Thrust", "Overhead", "Sweep", "BoSpin", "Throw", "1H_Melee_Attack_Chop", "2H_Ranged_Shoot"]:
+		_hand_mesh.attack()
 	_current_anim = anim_name
 	_anim.speed_scale = speed
 	_anim.play(anim_name, blend)
@@ -711,11 +733,13 @@ func add_dot(dps: float, seconds: float, bleeding := false) -> void:
 	if puppet:
 		Net.effect_zombie(self, Effect.BLEED if bleeding else Effect.DOT, dps, seconds)
 		return
-	_dot_dps = dps
-	_dot_time = maxf(_dot_time, seconds)
+	if not is_finite(dps) or not is_finite(seconds) or dps < 0.0 or seconds <= 0.0:
+		return
 	if bleeding:
+		_bleed_dps = maxf(_bleed_dps if bleed_left > 0.0 else 0.0, dps)
 		bleed_left = maxf(bleed_left, seconds)
 	else:
+		_poison_dps = maxf(_poison_dps if poison_left > 0.0 else 0.0, dps)
 		poison_left = maxf(poison_left, seconds)
 	show_debuffs(poison_left > 0.0, bleed_left > 0.0)
 
@@ -788,7 +812,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		bar_time = 2.5
 		_flash_on()
 		world.fx_gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
-		world.sfx_at("zombie_hurt", position, -8.0)
+		world.sfx_at("wraith" if type_id in MistModels.KINDS else "zombie_hurt", position, -8.0)
 		Net.hit_zombie(self, amount, from_dir, knock, hit_pos)
 		return
 	if next_hitter != 0:
@@ -829,7 +853,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		world.sfx_at("thunk", position, -8.0)
 		return
 	_check_dismount()
-	world.sfx_at("zombie_hurt", position, -8.0)
+	world.sfx_at("wraith" if type_id in MistModels.KINDS else "zombie_hurt", position, -8.0)
 	if type_id != "beast":
 		_hurt_stun = 0.1
 	var p := world.nearest_player(position)
@@ -838,6 +862,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 
 
 func _death_sound() -> String:
+	if type_id in MistModels.KINDS:
+		return "mist_burst"
 	match type_id:
 		"crow": return "crow"
 		"gargoyle": return "blast"
@@ -881,6 +907,8 @@ func stun(seconds: float) -> void:
 	if puppet:
 		Net.effect_zombie(self, Effect.STUN, seconds)
 		return
+	if def.get("mist_boss", false):
+		seconds = minf(seconds * 0.35, 0.6)
 	if dormant:
 		_wake()
 	_stun = maxf(_stun, seconds)
@@ -902,7 +930,7 @@ func freeze(seconds: float) -> void:
 		Net.effect_zombie(self, Effect.FREEZE, seconds)
 		return
 	stun(seconds)
-	_show_frozen(seconds)
+	_show_frozen(_stun if def.get("mist_boss", false) else seconds)
 
 
 func _show_frozen(seconds: float) -> void:
@@ -950,7 +978,10 @@ func _die() -> void:
 		world.drop_weapon(position + Vector3(0, 0, 0.5), weapon_id)
 		weapon_id = ""
 		if _hand_mesh:
-			_hand_mesh.mesh = null
+			_hand_mesh.equip("")
+	if def.get("mist_boss", false):
+		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
+		world.director.show_banner("The Veil Regent falls. The mist releases an Angel", 4.0)
 	world.on_zombie_killed(self)
 
 
@@ -959,10 +990,12 @@ func net_die() -> void:
 	_show_death()
 	weapon_id = ""
 	if _hand_mesh:
-		_hand_mesh.mesh = null
+		_hand_mesh.equip("")
 
 
 func _show_death() -> void:
+	if model_id == "veil_regent":
+		(_visual.get_node("RegentHealth") as Label3D).visible = false
 	_dying = 2.2
 	burn_time = 0.0
 	bar_time = 0.0
@@ -975,7 +1008,10 @@ func _show_death() -> void:
 	_knock = Vector3.ZERO
 	_current_anim = ""
 	_play("Death_A" if randf() < 0.5 else "Death_B", 1.2, 0.1)
-	if _anim == null:
+	if model_id in MistModels.KINDS:
+		_dying = 1.6
+		world.fx_mist(centre(), 2.0)
+	elif _anim == null:
 		_visual.rotation.x = -PI * 0.5
 		_visual.position.y = 0.2
 		_dying = 0.9
@@ -1037,6 +1073,7 @@ func net_weapon(id: String) -> void:
 
 
 func _puppet_tick(delta: float) -> void:
+	_update_ground_shadow()
 	var was := position
 	position = position.lerp(_net_pos, minf(1.0, delta * 10.0))
 	rotation.y = lerp_angle(rotation.y, _net_rot, minf(1.0, delta * 10.0))
@@ -1056,7 +1093,7 @@ func _puppet_tick(delta: float) -> void:
 		var d := position.distance_to(p.global_position) if p else 0.0
 		if _eyes:
 			_eyes.visible = d < FAR
-		_shadow.visible = d < FAR and position.y - world.ground_at(position) < 0.5
+		_shadow.visible = _shadow.visible and d < FAR
 
 
 # --- Senses ------------------------------------------------------------------
@@ -1164,7 +1201,7 @@ func _arrived() -> bool:
 func _random_spot(radius: float) -> Vector3:
 	for i in 6:
 		var p := position + Vector3(randf_range(-radius, radius), 0, randf_range(-radius, radius))
-		if absf(p.x) < World.HALF_SIZE - 1.0 and absf(p.z) < World.HALF_SIZE - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
+		if absf(p.x) < world.half_size - 1.0 and absf(p.z) < world.half_size - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
 			return p
 	return position
 
@@ -1182,7 +1219,7 @@ func _decide(target: Target, to: Vector3, dist: float, dt: float) -> void:
 	# Lost in the fog anyway, and each of these is one more draw call.
 	if _eyes:
 		_eyes.visible = dist < FAR
-	_shadow.visible = dist < FAR and position.y - world.ground_at(position) < 0.5 and not _airborne
+	_shadow.visible = _shadow.visible and dist < FAR
 	if dormant and _is_dormant_type:
 		# A mimic only reacts to something right next to it, so it needs no sight check.
 		if dist < 3.0:
@@ -1353,6 +1390,8 @@ func _take_weapon(p: Pickup) -> void:
 
 
 func _alert_sound() -> String:
+	if type_id in MistModels.KINDS:
+		return "wraith"
 	match type_id:
 		"leaper": return "leaper"
 		"wraith": return "wraith"
@@ -1414,6 +1453,13 @@ func _physics_process(delta: float) -> void:
 	if _dying > 0.0:
 		_dying -= delta
 		_tick_flash(delta)
+		if model_id in MistModels.KINDS:
+			var t := clampf(1.0 - _dying / 1.6, 0.0, 1.0)
+			for i in _parts.size():
+				var rest: Transform3D = _parts[i].get_meta("mist_rest", Transform3D.IDENTITY)
+				_parts[i].transform = rest
+				_parts[i].position += Vector3(sin(i * 2.4), 1.0, cos(i * 2.4)) * t
+				_parts[i].scale *= maxf(0.01, 1.0 - t)
 		var floor_y := world.ground_at(position)
 		if position.y > floor_y:
 			position.y = maxf(floor_y, position.y - 14.0 * delta) # flyers and leapers fall out of the air
@@ -1438,6 +1484,7 @@ func _physics_process(delta: float) -> void:
 	if _is_dummy:
 		_tick_dummy(delta)
 		return
+	_update_ground_shadow()
 	_tick_time += delta
 	_tick_count += 1
 	if _tick_every > 1 and _tick_count % _tick_every != 0:
@@ -1497,6 +1544,16 @@ func _physics_process(delta: float) -> void:
 		_groan_cd = randf_range(5.0, 12.0)
 		world.sfx_at(_idle_sound(), position, -14.0)
 
+	if world.mist_storm and world.mist_storm.contains(position) and not def.get("mist_boss", false) and not mist_mind:
+		var exit := world.mist_storm.escape(position)
+		if exit != Vector3.INF:
+			if not _has_goal or _goal.distance_squared_to(exit) > 1.0: _set_goal(exit)
+			state = State.INVESTIGATE
+			_move(target, exit - position, position.distance_to(exit), delta)
+			return
+	if mist_mind:
+		mist_mind.tick(self, target, delta)
+		return
 	if flies:
 		_fly(target, to, dist, delta)
 		return
@@ -1531,6 +1588,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _idle_sound() -> String:
+	if type_id in MistModels.KINDS:
+		return "wraith"
 	match type_id:
 		"crow": return "crow"
 		"wraith": return "wraith"
@@ -1538,19 +1597,25 @@ func _idle_sound() -> String:
 
 
 func _tick_dot(delta: float) -> void:
-	if poison_left > 0.0 or bleed_left > 0.0:
-		poison_left -= delta
-		bleed_left -= delta
-		if poison_left <= 0.0 or bleed_left <= 0.0:
-			show_debuffs(poison_left > 0.0, bleed_left > 0.0)
-	if _dot_time <= 0.0:
+	var had_poison := poison_left > 0.0
+	var had_bleed := bleed_left > 0.0
+	if not had_poison and not had_bleed:
 		return
-	_dot_time -= delta
-	_dot_tick -= delta
-	if _dot_tick <= 0.0:
-		_dot_tick = 0.5
+	# Integrate each channel over its remaining life; no extra half-second tick at expiry.
+	var amount := _poison_dps * minf(delta, maxf(poison_left, 0.0)) + _bleed_dps * minf(delta, maxf(bleed_left, 0.0))
+	_dot_pending += amount
+	_dot_wait -= delta
+	if _dot_pending > 0.0 and (_dot_wait <= 0.0 or maxf(poison_left, bleed_left) <= delta):
 		next_hitter = last_hitter
-		take_damage(_dot_dps * 0.5, Vector3.ZERO, 0.0, centre())
+		var previous_flinch := _hurt_stun
+		take_damage(_dot_pending, Vector3.ZERO, 0.0, centre())
+		_hurt_stun = previous_flinch
+		_dot_pending = 0.0
+		_dot_wait = 0.25
+	poison_left = maxf(0.0, poison_left - delta)
+	bleed_left = maxf(0.0, bleed_left - delta)
+	if had_poison != (poison_left > 0.0) or had_bleed != (bleed_left > 0.0):
+		show_debuffs(poison_left > 0.0, bleed_left > 0.0)
 
 
 ## A scarecrow only moves while you are not looking at it.
@@ -1907,8 +1972,8 @@ func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 	position += (velocity + _knock) * delta
 	_knock = _knock.lerp(Vector3.ZERO, min(1.0, delta * 6.0))
 	position.y = maxf(position.y, world.ground_at(position) + 0.6)
-	position.x = clampf(position.x, -World.HALF_SIZE + 1.0, World.HALF_SIZE - 1.0)
-	position.z = clampf(position.z, -World.HALF_SIZE + 1.0, World.HALF_SIZE - 1.0)
+	position.x = clampf(position.x, -world.half_size + 1.0, world.half_size - 1.0)
+	position.z = clampf(position.z, -world.half_size + 1.0, world.half_size - 1.0)
 	var flat := Vector3(velocity.x, 0, velocity.z)
 	if flat.length_squared() > 0.1:
 		rotation.y = lerp_angle(rotation.y, atan2(flat.x, flat.z), min(1.0, delta * 6.0))
@@ -1916,6 +1981,9 @@ func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 
 
 func _animate_custom(delta: float, moving: float) -> void:
+	if model_id in MistModels.KINDS:
+		MistModels.animate(_visual, world.now, hp / maxf(max_hp, 1.0))
+		return
 	_phase += delta * (9.0 if moving > 0.0 else 0.0)
 	match model_id:
 		"crow", "gargoyle", "harrier":
@@ -1956,6 +2024,9 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 			var out := world.portals.exit_from(position)
 			if out != Vector3.INF:
 				position = out
+				if world.mist_storm and not world.mist_storm.contains(out):
+					_clear_goal()
+					state = State.ROAM
 				_gate_wait = 2.0
 				_needs_path = true
 				_path = PackedVector3Array()
@@ -2020,7 +2091,8 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 		velocity = plain
 	else:
 		move_and_slide()
-	position.y = world.ground_at(position) + (0.25 if phases else 0.0)
+	var floor_y := world.ground_at(position)
+	position.y = floor_y + (0.25 if phases else 0.0)
 	if _sees or _hold or state == State.CHASE and dist < 4.0:
 		if dist > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
@@ -2157,3 +2229,11 @@ func _process(delta: float) -> void:
 	if _anim != null and (_frame + get_instance_id()) % every == 0:
 		_anim.advance(_anim_accum)
 		_anim_accum = 0.0
+
+
+func _update_ground_shadow() -> void:
+	var floor_y := world.ground_at(position)
+	var gap := maxf(0.0, position.y - floor_y)
+	_shadow.global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3(_scale, 1, _scale) / (1.0 + gap * 0.08)), Vector3(position.x, floor_y + 0.035, position.z))
+	_shadow.visible = is_alive() and world.terrain.is_walkable(position.x, position.z) and gap < 12.0
+	_shadow.transparency = clampf(gap / 12.0, 0.0, 1.0)

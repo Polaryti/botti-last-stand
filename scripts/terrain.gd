@@ -45,6 +45,10 @@ var _pools: Array[Vector3] = []
 var _streams: Array = []
 
 
+var half_extent := HALF
+var vertices_per_side := SIZE
+
+
 func _init() -> void:
 	_noise.seed = 71
 	_noise.frequency = 0.011
@@ -52,8 +56,8 @@ func _init() -> void:
 	_detail.seed = 13
 	_detail.frequency = 0.05
 	_detail.fractal_octaves = 1
-	walk.resize(SIZE * SIZE)
-	visual.resize(SIZE * SIZE)
+	walk.resize(vertices_per_side * vertices_per_side)
+	visual.resize(vertices_per_side * vertices_per_side)
 
 
 ## How big the land is, from the centre to its edge. Set before making a Terrain for a map.
@@ -152,11 +156,11 @@ func ford(centre: Vector2, half: Vector2, yaw: float) -> void:
 func bake() -> void:
 	for p: Dictionary in _auto_pads:
 		p["y"] = _natural(p["c"].x, p["c"].y)
-	for j in SIZE:
-		for i in SIZE:
-			var h := _shape(i * CELL - HALF, j * CELL - HALF)
-			visual[j * SIZE + i] = h
-			walk[j * SIZE + i] = h
+	for j in vertices_per_side:
+		for i in vertices_per_side:
+			var h := _shape(i * CELL - half_extent, j * CELL - half_extent)
+			visual[j * vertices_per_side + i] = h
+			walk[j * vertices_per_side + i] = h
 	for b: Dictionary in _bridges:
 		if not islands.is_empty():
 			var from: Vector2 = b["a"]
@@ -208,12 +212,14 @@ func _shape(x: float, z: float) -> float:
 	for c: Dictionary in _cuts:
 		h = _apply_cut(c, x, z, h)
 	if river.is_empty():
+		for pad: Dictionary in _auto_pads: h = _apply_pad(pad, x, z, h)
 		return h
 	# Hollows in the land stay above the water, or they would be pits with no water in them.
 	h = maxf(h, WATER_Y + 0.3)
 	var dist := river_distance(x, z)
 	if dist < river_width + BANK:
 		h = lerpf(BED_Y, minf(h, 2.2), smoothstep(river_width - 1.2, river_width + BANK, dist))
+	for pad: Dictionary in _auto_pads: h = _apply_pad(pad, x, z, h)
 	return h
 
 
@@ -323,9 +329,9 @@ func _lay_deck(b: Dictionary) -> void:
 	var e: Vector2 = b["b"]
 	var along := (e - a).normalized()
 	var length := a.distance_to(e)
-	for j in SIZE:
-		for i in SIZE:
-			var at := Vector2(i * CELL - HALF, j * CELL - HALF) - a
+	for j in vertices_per_side:
+		for i in vertices_per_side:
+			var at := Vector2(i * CELL - half_extent, j * CELL - half_extent) - a
 			var run := at.dot(along)
 			var side := absf(at.dot(along.orthogonal()))
 			if not islands.is_empty():
@@ -333,44 +339,44 @@ func _lay_deck(b: Dictionary) -> void:
 				# never read the bottom of the sky. The player stands on the deck itself.
 				if run < -CELL or run > length + CELL or side > float(b["half"]) + CELL * 1.5:
 					continue
-				walk[j * SIZE + i] = maxf(deck_y(b, clampf(run / length, 0.0, 1.0)), visual[j * SIZE + i])
+				walk[j * vertices_per_side + i] = maxf(deck_y(b, clampf(run / length, 0.0, 1.0)), visual[j * vertices_per_side + i])
 				continue
 			if run < 0.0 or run > length or side > 5.0:
 				continue
 			var y := deck_y(b, run / length)
 			# The very ends meet the road, whatever the land is doing there.
 			if run < 2.0 or length - run < 2.0:
-				y = maxf(y, walk[j * SIZE + i])
-			walk[j * SIZE + i] = y
+				y = maxf(y, walk[j * vertices_per_side + i])
+			walk[j * vertices_per_side + i] = y
 
 
 ## The stream runs over it, ankle deep, so you can wade across but feel the current as you do.
 func _lay_ford(f: Dictionary) -> void:
 	var c: Vector2 = f["c"]
 	var half: Vector2 = f["h"]
-	for j in SIZE:
-		for i in SIZE:
-			var dx := i * CELL - HALF - c.x
-			var dz := j * CELL - HALF - c.y
+	for j in vertices_per_side:
+		for i in vertices_per_side:
+			var dx := i * CELL - half_extent - c.x
+			var dz := j * CELL - half_extent - c.y
 			if dx * dx + dz * dz > float(f["reach2"]) * 1.2:
 				continue
 			var lx := absf(dx * float(f["cos"]) - dz * float(f["sin"]))
 			var lz := absf(dx * float(f["sin"]) + dz * float(f["cos"]))
 			var y := WATER_Y - 0.2
-			if lx < half.x + 1.0 and lz < half.y + 1.0 and visual[j * SIZE + i] < y:
-				visual[j * SIZE + i] = y
-				walk[j * SIZE + i] = y
+			if lx < half.x + 1.0 and lz < half.y + 1.0 and visual[j * vertices_per_side + i] < y:
+				visual[j * vertices_per_side + i] = y
+				walk[j * vertices_per_side + i] = y
 
 
 func _sample(a: PackedFloat32Array, x: float, z: float) -> float:
-	var fx := clampf((x + HALF) / CELL, 0.0, SIZE - 1.001)
-	var fz := clampf((z + HALF) / CELL, 0.0, SIZE - 1.001)
+	var fx := clampf((x + half_extent) / CELL, 0.0, vertices_per_side - 1.001)
+	var fz := clampf((z + half_extent) / CELL, 0.0, vertices_per_side - 1.001)
 	var i := int(fx)
 	var j := int(fz)
 	var u := fx - i
 	var v := fz - j
-	var k := j * SIZE + i
-	return lerpf(lerpf(a[k], a[k + 1], u), lerpf(a[k + SIZE], a[k + SIZE + 1], u), v)
+	var k := j * vertices_per_side + i
+	return lerpf(lerpf(a[k], a[k + 1], u), lerpf(a[k + vertices_per_side], a[k + vertices_per_side + 1], u), v)
 
 
 ## Standing height at a point. Called very often, so it is only a little arithmetic.
@@ -441,13 +447,13 @@ func is_walkable(x: float, z: float) -> bool:
 
 ## The physics ground, 1 m a sample, as big as the map.
 func collision_shape() -> HeightMapShape3D:
-	var side := HALF * 2 + 1
+	var side := half_extent * 2 + 1
 	var data := PackedFloat32Array()
 	data.resize(side * side)
 	for j in side:
 		for i in side:
 			# On the islands the bridges are separate solid things: there is nothing under them.
-			data[j * side + i] = ground_height(i - HALF, j - HALF) if not islands.is_empty() else height(i - HALF, j - HALF)
+			data[j * side + i] = ground_height(i - half_extent, j - half_extent) if not islands.is_empty() else height(i - half_extent, j - half_extent)
 	var shape := HeightMapShape3D.new()
 	shape.map_width = side
 	shape.map_depth = side
@@ -458,18 +464,18 @@ func collision_shape() -> HeightMapShape3D:
 ## Every metre that cannot be walked: runs of cells merged, so few boxes are needed.
 ## Returns rectangles in map coordinates.
 func blocked_rects() -> Array[Rect2i]:
-	var side := HALF * 2
+	var side := half_extent * 2
 	var open := {}
 	var out: Array[Rect2i] = []
 	for z in side:
 		var runs := {}
 		var x := 0
 		while x < side:
-			if is_walkable(x - HALF + 0.5, z - HALF + 0.5):
+			if is_walkable(x - half_extent + 0.5, z - half_extent + 0.5):
 				x += 1
 				continue
 			var start := x
-			while x < side and not is_walkable(x - HALF + 0.5, z - HALF + 0.5):
+			while x < side and not is_walkable(x - half_extent + 0.5, z - half_extent + 0.5):
 				x += 1
 			runs[Vector2i(start, x)] = true
 		for key: Vector2i in open.keys():
@@ -506,10 +512,10 @@ func _tint(x: float, z: float, h: float, steep: float, river_dist: float) -> Col
 
 
 func _vertex_steep(i: int, j: int) -> float:
-	var l := visual[j * SIZE + maxi(i - 1, 0)]
-	var r := visual[j * SIZE + mini(i + 1, SIZE - 1)]
-	var d := visual[maxi(j - 1, 0) * SIZE + i]
-	var u := visual[mini(j + 1, SIZE - 1) * SIZE + i]
+	var l := visual[j * vertices_per_side + maxi(i - 1, 0)]
+	var r := visual[j * vertices_per_side + mini(i + 1, vertices_per_side - 1)]
+	var d := visual[maxi(j - 1, 0) * vertices_per_side + i]
+	var u := visual[mini(j + 1, vertices_per_side - 1) * vertices_per_side + i]
 	return Vector2(r - l, u - d).length() / (2.0 * CELL)
 
 
@@ -517,21 +523,27 @@ func _vertex_steep(i: int, j: int) -> float:
 func patch_mesh(i0: int, j0: int, cells: int) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var w := mini(cells, SIZE - 1 - i0) + 1
-	var d := mini(cells, SIZE - 1 - j0) + 1
+	var w := mini(cells, vertices_per_side - 1 - i0) + 1
+	var d := mini(cells, vertices_per_side - 1 - j0) + 1
 	for j in range(j0, j0 + d):
 		for i in range(i0, i0 + w):
-			var x := i * CELL - HALF
-			var z := j * CELL - HALF
-			var h := visual[j * SIZE + i]
-			var l := visual[j * SIZE + maxi(i - 1, 0)]
-			var r := visual[j * SIZE + mini(i + 1, SIZE - 1)]
-			var b := visual[maxi(j - 1, 0) * SIZE + i]
-			var f := visual[mini(j + 1, SIZE - 1) * SIZE + i]
+			var x := i * CELL - half_extent
+			var z := j * CELL - half_extent
+			var h := visual[j * vertices_per_side + i]
+			var l := visual[j * vertices_per_side + maxi(i - 1, 0)]
+			var r := visual[j * vertices_per_side + mini(i + 1, vertices_per_side - 1)]
+			var b := visual[maxi(j - 1, 0) * vertices_per_side + i]
+			var f := visual[mini(j + 1, vertices_per_side - 1) * vertices_per_side + i]
 			st.set_normal(Vector3(l - r, 2.0 * CELL, b - f).normalized())
 			st.set_color(_tint(x, z, h, _vertex_steep(i, j), river_distance(x, z)))
 			st.set_uv(Vector2(x, z) / 4.0)
-			st.add_vertex(Vector3(x, h, z))
+			var covered := false
+			if has_islands():
+				var radius := Vector2(x, z).length()
+				covered = radius > 12.0 and radius < 58.0
+				for rotunda: Array in MapIslands.ROTUNDAS:
+					if Vector2(x, z).distance_to(rotunda[0]) < float(rotunda[1]) + 7.0: covered = true
+			st.add_vertex(Vector3(x, h - (0.24 if covered else 0.0), z))
 	for j in d - 1:
 		for i in w - 1:
 			var a := j * w + i
@@ -548,7 +560,7 @@ func patch_mesh(i0: int, j0: int, cells: int) -> ArrayMesh:
 
 func _all_void(i: int, j: int) -> bool:
 	var low := VOID_Y + 1.0
-	return visual[j * SIZE + i] < low and visual[j * SIZE + i + 1] < low and visual[(j + 1) * SIZE + i] < low and visual[(j + 1) * SIZE + i + 1] < low
+	return visual[j * vertices_per_side + i] < low and visual[j * vertices_per_side + i + 1] < low and visual[(j + 1) * vertices_per_side + i] < low and visual[(j + 1) * vertices_per_side + i + 1] < low
 
 
 ## Land beyond the edge of the map, rising away so the world seems to go on.
@@ -557,12 +569,12 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 	const RINGS := 16
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var along := int(float(HALF * 2 + RINGS * STEP * 2) / STEP)
+	var along := int(float(half_extent * 2 + RINGS * STEP * 2) / STEP)
 	var points := {}
 	for u in along + 1:
 		for v in RINGS + 1:
 			var p := _skirt_point(sector, u, v, STEP, along)
-			var near := Vector2(clampf(p.x, -HALF, HALF), clampf(p.y, -HALF, HALF))
+			var near := Vector2(clampf(p.x, -half_extent, half_extent), clampf(p.y, -half_extent, half_extent))
 			var out := p.distance_to(near)
 			var y := ground_height(near.x, near.y) + out * 0.16 + (_noise.get_noise_2d(p.x, p.y) + 0.5) * minf(out * 0.2, 14.0)
 			points[Vector2i(u, v)] = Vector3(p.x, y, p.y)
@@ -588,7 +600,7 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 
 func _skirt_point(sector: int, u: int, v: int, step: float, along: int) -> Vector2:
 	var s := -float(along) * step * 0.5 + u * step
-	var o := float(HALF) + v * step
+	var o := float(half_extent) + v * step
 	match sector:
 		0: return Vector2(s, -o)
 		1: return Vector2(s, o)

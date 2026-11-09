@@ -54,10 +54,16 @@ var _last_stand := false
 var _call_timer := 0.0
 var _far_timer := 4.0
 var _next_rider := FIRST_RIDER
+var _next_storm := MistStorm.EVERY
+var _storm_index := 0
+var _mist_boss_at := 510.0
+var _mist_boss_spawned := false
+var _mist_boss_defeated := false
 
 
 func _init(owner_world: World) -> void:
 	world = owner_world
+	_mist_boss_at = randf_range(505.0, 515.0)
 
 
 ## In a multiplayer game this waits for all phones to load. A joined phone only keeps the clock.
@@ -80,13 +86,13 @@ func begin_sandbox() -> void:
 func begin(with_zombies: bool) -> void:
 	_waiting = false
 	running = with_zombies
-	for i in 6:
+	for i in (10 if world.terrain.has_islands() else 6):
 		stock(Pickup.Kind.WEAPON)
-	for i in 4:
+	for i in (9 if world.terrain.has_islands() else 4):
 		stock(Pickup.Kind.FOOD)
-	for i in 3:
+	for i in (7 if world.terrain.has_islands() else 3):
 		stock(Pickup.Kind.ARROWS)
-	for i in 2:
+	for i in (4 if world.terrain.has_islands() else 2):
 		stock(Pickup.Kind.POWER)
 	_spawn_familiar()
 	if world.fort:
@@ -95,10 +101,12 @@ func begin(with_zombies: bool) -> void:
 	if running:
 		_spawn_timer = 0.0
 		for i in target_population():
-			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands()))
+			_spawn_roamer()
 		var opening := "Survive until dawn"
 		if world.fort:
 			opening = "Hold the fort until dawn"
+		elif requires_regent():
+			opening = "Survive ten minutes and defeat the Veil Regent"
 		elif Net.fog_rules():
 			opening = "Three lives. Last one standing"
 		show_banner(opening, 4.0)
@@ -124,13 +132,16 @@ func night_left() -> float:
 func dawn_amount() -> float:
 	if not running or Net.fog_rules():
 		return 0.0
-	return clampf(1.0 - night_left() / DAWN_GLOW, 0.0, 1.0)
+	var dawn := clampf(1.0 - night_left() / DAWN_GLOW, 0.0, 1.0)
+	return minf(dawn, 0.45) if requires_regent() and not _mist_boss_defeated else dawn
 
 
 ## The night starts calm and fills up to the phone's zombie limit.
 func target_population() -> int:
 	var cap := Game.max_live_zombies()
-	var start := mini(6, cap)
+	var mists := world.terrain.has_islands() and not Net.fog_rules()
+	if mists: cap += 4
+	var start := mini(12 if mists else 6, cap)
 	# A slow start while the player finds a weapon, then the crowd builds.
 	var t := pow(clampf(elapsed / (Game.NIGHT_LENGTH * 0.75), 0.0, 1.0), 1.3)
 	var crowd := lerpf(start, cap, t) * (1.0 + 0.35 * (world.players.size() - 1))
@@ -169,7 +180,7 @@ func _process(delta: float) -> void:
 			Net.bell(_bell_minute)
 	_stock_timer -= delta
 	if _stock_timer <= 0.0:
-		_stock_timer = 8.0
+		_stock_timer = 6.0 if world.terrain.has_islands() else 8.0
 		_restock()
 		if world.fort and world.count_pickups(Pickup.Kind.WOOD) < WOOD_ON_MAP:
 			world.stock_wood()
@@ -180,6 +191,12 @@ func _process(delta: float) -> void:
 	if not running:
 		return
 	elapsed += delta
+	if world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _next_storm:
+		_next_storm = elapsed + MistStorm.EVERY
+		var island := 0 if _storm_index == 0 else randi_range(1, 8)
+		_storm_index += 1
+		if Net.active(): Net.start_mist_storm(island)
+		else: MistStorm.create(world, island)
 	_tick_specials()
 	_tick_last_stand(delta)
 	_spawn_timer -= delta
@@ -187,7 +204,7 @@ func _process(delta: float) -> void:
 		_spawn_timer = 1.25 if _last_stand else 2.5
 		var living := world.count_living()
 		if living < target_population():
-			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands()))
+			_spawn_roamer()
 	if elapsed >= _next_beast:
 		_next_beast = elapsed + (LAST_STAND_BEAST_EVERY if _last_stand else BEAST_EVERY)
 		if world.count_type("beast") < (LAST_STAND_BEASTS if _last_stand else MAX_BEASTS) and world.spawn_zombie("beast"):
@@ -198,7 +215,7 @@ func _process(delta: float) -> void:
 		_far_timer = 4.0
 		if world.fort == null:
 			_clear_far_zombies()
-	if elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules():
+	if elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules() and (not requires_regent() or _mist_boss_defeated):
 		_won = true
 		_sound("rooster", 0.0)
 		if Net.is_host():
@@ -222,8 +239,9 @@ func _sound(sound: String, volume: float, pitch := 1.0) -> void:
 ## The map is big, and a zombie that wandered off into the distance is a zombie nobody will meet.
 ## It comes back around where the players are instead.
 func _clear_far_zombies() -> void:
+	if world.terrain.has_islands(): return # Keep the island garrisons rather than recycling them around the centre.
 	for z: Zombie in world.zombies.duplicate():
-		if not z.is_alive() or z.flies or z.dormant or z.hero or z.is_hunting():
+		if not z.is_alive() or z.flies or z.dormant or z.hero or z.def.get("mist_boss", false) or z.is_hunting():
 			continue
 		var near := INF
 		for p in world.players:
@@ -264,7 +282,27 @@ func minute() -> int:
 	return int(elapsed / 60.0)
 
 
+func _pick_roamer() -> String:
+	var kind := ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands())
+	# Leave two pooled bodies available for the Regent's second phase.
+	return "rift_stalker" if kind == "lantern_wisp" and world.count_type(kind) >= 3 else kind
+
+
+func _tick_mist_boss() -> void:
+	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
+		var throne := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3.ZERO)))
+		throne.y = world.ground_at(throne)
+		if world.spawn_zombie("veil_regent", throne):
+			_mist_boss_spawned = true
+			CommandField.visual_impact(world, throne, 12.0, true)
+			if Net.is_host(): Net.command_impact_visual(throne, 12.0, true)
+			if Net.active(): Net.start_mist_storm(-1)
+			else: MistStorm.create(world, 0, true)
+			_sound("mist_regent", 0.0)
+
+
 func _tick_specials() -> void:
+	_tick_mist_boss()
 	if elapsed >= _next_rider:
 		_next_rider = elapsed + RIDER_EVERY
 		if world.count_type("rider") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("rider"):
@@ -303,15 +341,46 @@ func _tick_specials() -> void:
 
 
 func _restock() -> void:
-	if world.count_pickups(Pickup.Kind.WEAPON) < 7:
+	if world.count_pickups(Pickup.Kind.WEAPON) < (10 if world.terrain.has_islands() else 7):
 		stock(Pickup.Kind.WEAPON)
-	if world.count_pickups(Pickup.Kind.FOOD) < 6:
+	if world.count_pickups(Pickup.Kind.FOOD) < (10 if world.terrain.has_islands() else 6):
 		stock(Pickup.Kind.FOOD)
-	if world.count_pickups(Pickup.Kind.ARROWS) < 4:
+	if world.count_pickups(Pickup.Kind.ARROWS) < (8 if world.terrain.has_islands() else 4):
 		stock(Pickup.Kind.ARROWS)
 	var potions := 0
 	for p in world.pickups:
 		if p.kind == Pickup.Kind.POWER and not PowerDefs.ALL[p.item_id]["familiar"]:
 			potions += 1
-	if potions < 3:
+	if potions < (5 if world.terrain.has_islands() else 3):
 		stock(Pickup.Kind.POWER)
+
+
+func _spawn_roamer() -> void:
+	if not world.terrain.has_islands():
+		world.spawn_zombie(_pick_roamer())
+		return
+	# Keep pressure near explorers and replenish the least populated outer island.
+	if (world.mist_storm and world.mist_storm.finale) or (world.count_living() >= 8 and randf() < 0.5):
+		world.spawn_zombie(_pick_roamer())
+		return
+	var counts := PackedInt32Array()
+	counts.resize(9)
+	for mob: Zombie in world.zombies:
+		if mob.is_alive():
+			var index := world.portals.island_of(mob.position)
+			if index >= 0 and index < 9: counts[index] += 1
+	var chosen := randi_range(1, 8)
+	for index in range(1, 9):
+		if counts[index] < counts[chosen]: chosen = index
+	var land := MapIslands.ISLANDS[chosen]
+	for attempt in 16:
+		var angle := randf() * TAU
+		var radius := randf_range(0.25, 0.7) * land.z
+		var at := Vector3(land.x + cos(angle) * radius, land.w, land.y + sin(angle) * radius)
+		if world.grid.is_free(world.grid.to_cell(at)) and world.terrain.is_walkable(at.x, at.z) and not world.terrain.in_pool(at.x, at.z):
+			world.spawn_zombie(_pick_roamer(), at)
+			return
+
+
+func requires_regent() -> bool:
+	return world.terrain.has_islands() and not sandbox and not Net.fog_rules()

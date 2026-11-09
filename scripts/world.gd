@@ -7,7 +7,8 @@ signal player_died
 signal dawn_reached
 signal fort_lost
 
-static var HALF_SIZE := 110.0
+static var HALF_SIZE := 110.0 # default for legacy callers; each world keeps its own extent
+var half_size := 110.0
 const PATHS_PER_FRAME := 1
 const SKY_EVERY := 0.15
 const BELL_GAP := 0.5
@@ -27,9 +28,12 @@ static var _axe_proj: Mesh
 static var _orb_meshes := {}
 static var _glow_material_cache := {}
 static var _flame_mesh: BoxMesh
+static var _mist_warmed_quality := -1
 static var _warmed_quality := -1
 static var _lands := {} # the land takes a moment to work out, and it never changes
 
+var mist_storm: MistStorm
+var mist_seals: Array[MistSeal] = []
 var stone_chains: Array = [] # each line of stones in the Mists, in order, by the middle of each top
 var mode: int = Game.Mode.MENU
 var grid: PathGrid
@@ -211,8 +215,9 @@ func setup(game_mode: int) -> void:
 	var file := _map_file()
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	Terrain.use_half(map.land_half)
-	HALF_SIZE = float(map.land_half)
-	grid = PathGrid.new(int(HALF_SIZE * 2.0))
+	half_size = float(map.land_half)
+	HALF_SIZE = half_size
+	grid = PathGrid.new(int(half_size * 2.0))
 	if not _lands.has(file):
 		var t := Terrain.new()
 		map.plan_land(t)
@@ -248,14 +253,21 @@ func setup(game_mode: int) -> void:
 	grid.build_far_grid()
 	if terrain.has_islands():
 		_mists_look()
+	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
+		var atmosphere := MistAtmosphere.new()
+		atmosphere.name = "VillageAura" if fort == null else "FortAura"
+		atmosphere.world = self
+		atmosphere.place = MistAtmosphere.Place.VILLAGE if fort == null else MistAtmosphere.Place.FORT
+		add_child(atmosphere)
 	_build_fx()
 	director = Director.new(self)
 	add_child(director)
 	if mode == Game.Mode.MENU:
 		menu_camera = Camera3D.new()
-		menu_camera.far = 130.0
+		menu_camera.far = 340.0
 		menu_camera.fov = 58.0
 		add_child(menu_camera)
+		_menu_view()
 		director.set_process(false)
 		_apply_sky(0.0)
 		return
@@ -321,11 +333,18 @@ func show_lightning(amount: float) -> void:
 		_moon.light_color = _moon_colour
 
 
+## A clear view of the arena sword, its moonlit terraces and the distant islands.
+func _menu_view() -> void:
+	menu_camera.position = Vector3(cos(_orbit) * 38.0, 24.0, sin(_orbit) * 38.0)
+	menu_camera.look_at(Vector3(0, 18.0, 0))
+
+
 ## Which map scene this game is on. Pressing F6 on a map in the editor overrides it.
 func _map_file() -> String:
 	if Game.test_map != "":
 		return Game.test_map
 	match mode:
+		Game.Mode.MENU: return "res://maps/mists.tscn"
 		Game.Mode.FORT: return "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
@@ -403,6 +422,21 @@ func grid_mark_crops(t: Transform3D, size: Vector2) -> void:
 
 
 func ground_at(at: Vector3) -> float:
+	if terrain.has_islands():
+		var radius := Vector2(at.x, at.z).length()
+		if maxf(absf(at.x), absf(at.z)) < 6.0:
+			return MapIslands.plinth_height(at, Vector3(0, 10, 0), 6.0, 1.8, 2.7) + 0.08
+		if maxf(absf(at.x - 8), absf(at.z - 124)) < 8.5:
+			var base := Vector3(8, terrain.ground_height(8, 124), 124)
+			return MapIslands.plinth_height(at, base, 8.5, 3.0, 2.4) + 0.08
+		if radius >= 54.0 and radius <= 57.0: return 18.1
+		if radius >= 13.0 and radius < 30.0: return 10.06
+		if radius >= 30.0 and radius < 54.0:
+			return lerpf(10.06, 18.1, (radius - 30.0) / 24.0)
+	if terrain.has_islands():
+		for shrine: Array in MapIslands.ROTUNDAS:
+			if Vector2(at.x, at.z).distance_to(shrine[0]) < float(shrine[1]) + 6.5:
+				return terrain.ground_height(at.x, at.z) + 0.1
 	var h := terrain.height(at.x, at.z)
 	if h < FALL_DEATH and terrain.has_islands():
 		return terrain.island_floor(at.x, at.z) # over the void, what flies stays level with the islands
@@ -523,14 +557,32 @@ func stone_near(p: Vector3) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-func add_stone(at: Vector3, radius: float) -> void:
-	var shape := CylinderShape3D.new()
-	shape.radius = radius
-	shape.height = 0.5
+func add_stone(at: Vector3, radius: float, depth := 0.5) -> void:
+	var shape: Shape3D
+	if depth > 0.5:
+		var hull := PackedVector3Array()
+		for n in 8:
+			var angle := TAU * n / 8.0
+			var edge := Vector3(cos(angle), 0, sin(angle))
+			hull.append(edge * radius)
+			hull.append(edge * radius * 1.05 + Vector3.DOWN * 0.26)
+		hull.append(Vector3(0.1, -depth, -0.1))
+		var convex := ConvexPolygonShape3D.new()
+		convex.points = hull
+		shape = convex
+	else:
+		var cylinder := CylinderShape3D.new()
+		cylinder.radius = radius
+		cylinder.height = 0.5
+		shape = cylinder
 	var cs := CollisionShape3D.new()
 	cs.shape = shape
-	cs.position = at + Vector3.DOWN * 0.25
+	cs.position = at if depth > 0.5 else at + Vector3.DOWN * 0.25
 	_ledges().add_child(cs)
+	# Low floating stones occupy headroom too. Ground-level AI must go around their footprint.
+	var floor_y := terrain.ground_height(at.x, at.z)
+	if terrain.has_islands() and floor_y > 0.0 and at.y - depth < floor_y + 1.9:
+		grid.block_box(at, Vector3(radius * 2.0, 1, radius * 2.0))
 
 
 func _ledges() -> StaticBody3D:
@@ -597,6 +649,7 @@ func _build_environment() -> void:
 	we.environment = _env
 	add_child(we)
 	_moon = DirectionalLight3D.new()
+	_moon.light_cull_mask = 7
 	_moon.rotation_degrees = Vector3(-48, -32, 0)
 	_moon.shadow_enabled = Game.quality == 2
 	_moon.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
@@ -607,17 +660,20 @@ func _build_environment() -> void:
 
 ## A violet night with nothing under it.
 func _mists_look() -> void:
-	night_bg = Color(0.3, 0.52, 0.58)
-	night_fog_colour = Color(0.4, 0.66, 0.7)
-	night_fog = 0.0062 if Game.quality > 0 else 0.011
+	night_bg = Color(0.012, 0.025, 0.055)
+	night_fog_colour = Color(0.055, 0.115, 0.16)
+	night_fog = 0.009 if Game.quality > 0 else 0.012
 	day_fog = 0.0035 if Game.quality > 0 else 0.008
-	night_ambient = Color(0.74, 0.8, 0.76)
-	night_sky_shows = false
+	night_ambient = Color(0.28, 0.39, 0.56)
+	night_sky_shows = true
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.world = self
+	add_child(atmosphere)
 	# The sky has to be further off than the furthest island, or it paints over them.
 	_sky_root.scale = Vector3.ONE * 4.6
-	night_moon_colour = Color(1.0, 0.94, 0.82)
-	night_moon = 0.62
-	_sky_material.set_shader_parameter("tint", Vector3(7.4, 8.0, 5.0))
+	night_moon_colour = Color(0.53, 0.73, 1.0)
+	night_moon = 0.3
+	_sky_material.set_shader_parameter("tint", Vector3(0.8, 1.05, 1.3))
 	_sky_value = -1.0
 	_apply_sky(_last_dawn)
 
@@ -736,8 +792,7 @@ func _process(delta: float) -> void:
 	_sky_root.position = _player_camera_position()
 	if mode == Game.Mode.MENU:
 		_orbit += delta * 0.05
-		menu_camera.position = Vector3(cos(_orbit) * 30.0, 11.0, sin(_orbit) * 30.0)
-		menu_camera.look_at(Vector3(0, 1.5, 0))
+		_menu_view()
 		return
 	if player and not player.dead:
 		player.poll_keyboard()
@@ -1180,8 +1235,8 @@ func spawn_axe(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: fl
 			Net.shot(1, at, vel, 0.0, max_range, false, Color.WHITE)
 
 
-func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: float, dmg: float, meteor: bool, element := "") -> void:
-	var col := Color(0.55, 0.75, 1.0)
+func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: float, dmg: float, meteor: bool, element := "", empowered := false) -> void:
+	var col := Color(0.7, 0.35, 1.0) if empowered else Color(0.55, 0.75, 1.0)
 	match element:
 		"fire": col = Color(1.0, 0.5, 0.12)
 		"frost": col = Color(0.65, 0.95, 1.0)
@@ -1194,6 +1249,10 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 		shot.set_owner_player(p)
 		shot.from_player = true
 		shot.frost = element == "frost"
+		if empowered:
+			shot.pierce = 2 if p.has_flag("war_shatter") else 1
+			shot.stagger = 0.8
+			shot.sparks = 2 if p.has_flag("war_echo") else 0
 		if meteor:
 			shot.blast_radius = 5.0
 			shot.scale = Vector3.ONE * 2.0
@@ -1421,9 +1480,9 @@ func _tick_sentries(delta: float) -> void:
 			node.queue_free()
 			_sentries.remove_at(i)
 			continue
-		var owner_player: Player = s["owner"]
-		if owner_player == null or not is_instance_valid(owner_player):
+		if not is_instance_valid(s["owner"]):
 			continue
+		var owner_player: Player = s["owner"]
 		s["timer"] = float(s["timer"]) - delta
 		if float(s["timer"]) > 0.0:
 			continue
@@ -1455,7 +1514,6 @@ func aim_point(from: Vector3, reach: float) -> Vector3:
 func _launch(kind: int, m: Mesh, at: Vector3, vel: Vector3, grav: float, max_range: float, dmg: float, knock := 0.0, fire := false, bounces := 0) -> Projectile:
 	for p in _projectiles:
 		if not p.active:
-			p.scale = Vector3.ONE
 			p.launch(kind, m, at, vel, grav, max_range, dmg, knock, fire, bounces)
 			return p
 	return null
@@ -1511,7 +1569,7 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	models.shuffle()
 	var pool: Array = []
 	for m: String in models:
-		if not (_pools[m] as Array).is_empty():
+		if _pools.has(m) and not (_pools[m] as Array).is_empty():
 			pool = _pools[m]
 			break
 	if pool.is_empty():
@@ -1722,13 +1780,13 @@ func _pick_spawn_point() -> Vector3:
 	for i in 16:
 		var p: Vector3
 		if players.is_empty():
-			p = Vector3(randf_range(-HALF_SIZE + 2, HALF_SIZE - 2), 0, randf_range(-HALF_SIZE + 2, HALF_SIZE - 2))
+			p = Vector3(randf_range(-half_size + 2, half_size - 2), 0, randf_range(-half_size + 2, half_size - 2))
 		else:
 			var a := randf() * TAU
 			p = random_player_position() + Vector3(cos(a), 0, sin(a)) * randf_range(28.0, 62.0)
 			if fort:
 				p = Vector3(cos(a), 0, sin(a)) * randf_range(44.0, 72.0)
-			if absf(p.x) > HALF_SIZE - 2.0 or absf(p.z) > HALF_SIZE - 2.0:
+			if absf(p.x) > half_size - 2.0 or absf(p.z) > half_size - 2.0:
 				continue
 		p.y = 0.0
 		if fog and not fog.contains(p, -4.0):
@@ -1761,10 +1819,11 @@ func recycle_zombie(z: Zombie) -> void:
 
 
 func on_zombie_killed(z: Zombie) -> void:
+	if z.def.get("mist_boss", false): director._mist_boss_defeated = true
 	make_noise(z.position, 6.0)
 	if Net.is_host():
 		Net.zombie_died(z, z.last_hitter)
-	elif player:
+	elif player and z.last_hitter >= 0:
 		player.on_kill(z)
 
 
@@ -1780,6 +1839,7 @@ func on_player_died(p: Player) -> void:
 
 ## Sunrise burns away everything still standing.
 func on_dawn() -> void:
+	if mist_storm: mist_storm.queue_free()
 	_dawn_done = true
 	_apply_sky(1.0)
 	for p: Player in local_players():
@@ -1810,7 +1870,7 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < HALF_SIZE - 2.0 and absf(at.z) < HALF_SIZE - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z):
+		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z):
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -1836,7 +1896,10 @@ func spawn_pickup_at(at: Vector3, kind: int, id: String, bonus := 0) -> Pickup:
 func spawn_pickup_random(kind: int, id: String) -> Pickup:
 	for i in 14:
 		var at: Vector3
-		if i < 6 and not loot_spots.is_empty():
+		if terrain.has_islands() and not loot_spots.is_empty():
+			at = loot_spots[randi() % loot_spots.size()]
+			if portals.island_of(at) == 0 and (kind in [Pickup.Kind.FOOD, Pickup.Kind.ARROWS] or randf() < 0.85): continue
+		elif i < 6 and not loot_spots.is_empty():
 			at = _loot_near_players()
 		else:
 			at = _open_ground_near_players()
@@ -1877,10 +1940,10 @@ func _loot_near_players() -> Vector3:
 
 func _open_ground_near_players() -> Vector3:
 	if players.is_empty():
-		return Vector3(randf_range(-HALF_SIZE + 3, HALF_SIZE - 3), 0, randf_range(-HALF_SIZE + 3, HALF_SIZE - 3))
+		return Vector3(randf_range(-half_size + 3, half_size - 3), 0, randf_range(-half_size + 3, half_size - 3))
 	var a := randf() * TAU
 	var at := players[randi() % players.size()].global_position + Vector3(cos(a), 0, sin(a)) * randf_range(8.0, 55.0)
-	return Vector3(clampf(at.x, -HALF_SIZE + 3, HALF_SIZE - 3), 0, clampf(at.z, -HALF_SIZE + 3, HALF_SIZE - 3))
+	return Vector3(clampf(at.x, -half_size + 3, half_size - 3), 0, clampf(at.z, -half_size + 3, half_size - 3))
 
 
 func drop_weapon(at: Vector3, id: String) -> void:
@@ -1913,6 +1976,8 @@ func count_pickups(kind: int) -> int:
 
 
 func collect_weapon(who: Player, p: Pickup) -> void:
+	if not who.can_use(p.weapon_id):
+		return
 	who.give_weapon(p.weapon_id)
 	who.add_arrows(p.bonus_arrows)
 	who.sfx("weapon_change")
@@ -2294,11 +2359,11 @@ func _tick_traps(_delta: float) -> void:
 	for i in range(_traps.size() - 1, -1, -1):
 		if i >= _traps.size():
 			continue
-		var owner_player: Player = _traps[i]["owner"]
-		if owner_player == null or not is_instance_valid(owner_player):
+		if not is_instance_valid(_traps[i]["owner"]):
 			(_traps[i]["node"] as Node).queue_free()
 			_traps.remove_at(i)
 			continue
+		var owner_player: Player = _traps[i]["owner"]
 		var at: Vector3 = _traps[i]["at"]
 		if now < float(_traps[i]["armed_at"]):
 			continue
@@ -2351,10 +2416,12 @@ func warm_up() -> void:
 		await get_tree().process_frame
 		return
 	_load_ahead()
-	if _warmed_quality == Game.quality:
+	if _warmed_quality == Game.quality and (not terrain.has_islands() or _mist_warmed_quality == Game.quality):
 		await get_tree().process_frame
 		return
 	_warmed_quality = Game.quality
+	if terrain.has_islands():
+		_mist_warmed_quality = Game.quality
 	_warming = true
 	var cam := Camera3D.new()
 	cam.far = 400.0
@@ -2365,13 +2432,22 @@ func warm_up() -> void:
 	var spot := Vector3(0, 0, 6.0)
 	var added: Array[Zombie] = []
 	var running_effects: Array[Node] = [_gore[_next_gore]]
+	for node: Node in get_children():
+		if node is MistAtmosphere:
+			running_effects.append(node)
 	var kinds := ["normal", "clever", "magic", "rider", "wraith", "banshee", "crow", "gargoyle", "mimic", "scarecrow", "hero_infantry", "hero_ranger"]
+	var mist_preview: MistSeal
+	if terrain.has_islands():
+		kinds.append_array(MistModels.KINDS)
+		mist_preview = MistSeal.create(self, Vector3(0, ground_at(spot), 6), 3.0, 0.0, 1.5, 0.0, -1)
+		mist_preview.set_physics_process(false)
+		cam.position.y += ground_at(spot)
 	for i in kinds.size():
 		var before := zombies.size()
 		if spawn_zombie(kinds[i], spot + Vector3(-5.5 + i, 0, 0)):
 			var z := zombies[before]
 			added.append(z)
-			z.position.y = 0.1
+			z.position.y = ground_at(spot) + 0.1 if terrain.has_islands() else 0.1
 			z.dormant = false
 			if z._lure:
 				z._visual.visible = true
@@ -2430,6 +2506,8 @@ func warm_up() -> void:
 	for i in _puddles.size():
 		_puddles[i].visible = false
 		_puddle_life[i] = 0.0
+	if mist_preview:
+		mist_preview.free()
 	cam.queue_free()
 	player.camera.current = true
 	await _warm_frame()
@@ -2731,7 +2809,7 @@ func _build_mist() -> void:
 		_mist_pool.append(p)
 
 
-## A Guardian's dome: everyone inside it is safe while it lasts.
+## A Guardian's dome marks its timed damage reduction.
 func fx_dome(at: Vector3, radius: float, seconds: float) -> void:
 	if _dome == null:
 		var s := SphereMesh.new()

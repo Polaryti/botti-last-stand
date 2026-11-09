@@ -1,0 +1,695 @@
+[
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "infantry",
+    "direct_dps": {
+      "max": 78.7,
+      "min": 75.9
+    },
+    "ehp": {
+      "max": 200.0,
+      "min": 85.0
+    },
+    "profession": "duelist",
+    "speed": {
+      "max": 1.2,
+      "min": 0.92
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "infantry",
+    "direct_dps": {
+      "max": 113.9,
+      "min": 75.9
+    },
+    "ehp": {
+      "max": 200.0,
+      "min": 70.8
+    },
+    "profession": "berserker",
+    "speed": {
+      "max": 1.2,
+      "min": 0.92
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "infantry",
+    "direct_dps": {
+      "max": 78.7,
+      "min": 75.9
+    },
+    "ehp": {
+      "max": 140.0,
+      "min": 85.0
+    },
+    "profession": "shadow",
+    "speed": {
+      "max": 1.4,
+      "min": 0.92
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "ranger",
+    "direct_dps": {
+      "max": 46.7,
+      "min": 46.7
+    },
+    "ehp": {
+      "max": 90.0,
+      "min": 90.0
+    },
+    "profession": "sharpshooter",
+    "speed": {
+      "max": 1.23,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "ranger",
+    "direct_dps": {
+      "max": 46.7,
+      "min": 46.7
+    },
+    "ehp": {
+      "max": 90.0,
+      "min": 90.0
+    },
+    "profession": "trapper",
+    "speed": {
+      "max": 1.23,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "ranger",
+    "direct_dps": {
+      "max": 46.7,
+      "min": 46.7
+    },
+    "ehp": {
+      "max": 90.0,
+      "min": 90.0
+    },
+    "profession": "beastmaster",
+    "speed": {
+      "max": 1.23,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 18.0,
+      "min": 18.0
+    },
+    "builds": 128,
+    "class": "heavy",
+    "direct_dps": {
+      "max": 59.1,
+      "min": 43.8
+    },
+    "ehp": {
+      "max": 313.3,
+      "min": 130.0
+    },
+    "profession": "guardian",
+    "speed": {
+      "max": 0.9,
+      "min": 0.85
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "heavy",
+    "direct_dps": {
+      "max": 76.8,
+      "min": 43.8
+    },
+    "ehp": {
+      "max": 175.0,
+      "min": 130.0
+    },
+    "profession": "warpriest",
+    "speed": {
+      "max": 0.9,
+      "min": 0.9
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "heavy",
+    "direct_dps": {
+      "max": 76.8,
+      "min": 56.9
+    },
+    "ehp": {
+      "max": 175.0,
+      "min": 130.0
+    },
+    "profession": "warlord",
+    "speed": {
+      "max": 0.9,
+      "min": 0.9
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "chivalry",
+    "direct_dps": {
+      "max": 65.0,
+      "min": 50.0
+    },
+    "ehp": {
+      "max": 110.0,
+      "min": 110.0
+    },
+    "profession": "lancer",
+    "speed": {
+      "max": 1.0,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "chivalry",
+    "direct_dps": {
+      "max": 65.0,
+      "min": 50.0
+    },
+    "ehp": {
+      "max": 129.4,
+      "min": 110.0
+    },
+    "profession": "paladin",
+    "speed": {
+      "max": 1.0,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "chivalry",
+    "direct_dps": {
+      "max": 62.5,
+      "min": 38.5
+    },
+    "ehp": {
+      "max": 110.0,
+      "min": 110.0
+    },
+    "profession": "horse_archer",
+    "speed": {
+      "max": 1.0,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "magician",
+    "direct_dps": {
+      "max": 72.2,
+      "min": 72.2
+    },
+    "ehp": {
+      "max": 90.0,
+      "min": 70.0
+    },
+    "profession": "necromancer",
+    "speed": {
+      "max": 1.18,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "magician",
+    "direct_dps": {
+      "max": 101.1,
+      "min": 72.2
+    },
+    "ehp": {
+      "max": 70.0,
+      "min": 70.0
+    },
+    "profession": "elementalist",
+    "speed": {
+      "max": 1.18,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 8.0,
+      "min": 5.2
+    },
+    "builds": 128,
+    "class": "magician",
+    "direct_dps": {
+      "max": 72.2,
+      "min": 72.2
+    },
+    "ehp": {
+      "max": 70.0,
+      "min": 70.0
+    },
+    "profession": "illusionist",
+    "speed": {
+      "max": 1.18,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 2.5,
+      "min": 0.9
+    },
+    "builds": 128,
+    "class": "revenant",
+    "direct_dps": {
+      "max": 74.4,
+      "min": 59.5
+    },
+    "ehp": {
+      "max": 125.0,
+      "min": 100.0
+    },
+    "profession": "leaper",
+    "speed": {
+      "max": 1.2,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 6.0,
+      "min": 3.6
+    },
+    "builds": 128,
+    "class": "revenant",
+    "direct_dps": {
+      "max": 74.4,
+      "min": 59.5
+    },
+    "ehp": {
+      "max": 100.0,
+      "min": 100.0
+    },
+    "profession": "rift",
+    "speed": {
+      "max": 1.2,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 18.0,
+      "min": 9.9
+    },
+    "builds": 128,
+    "class": "revenant",
+    "direct_dps": {
+      "max": 74.4,
+      "min": 59.5
+    },
+    "ehp": {
+      "max": 100.0,
+      "min": 100.0
+    },
+    "profession": "summoner",
+    "speed": {
+      "max": 1.2,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 4.0,
+      "min": 2.8
+    },
+    "builds": 128,
+    "class": "monk",
+    "direct_dps": {
+      "max": 92.0,
+      "min": 64.3
+    },
+    "ehp": {
+      "max": 192.3,
+      "min": 95.0
+    },
+    "profession": "bo_master",
+    "speed": {
+      "max": 1.22,
+      "min": 1.1
+    }
+  },
+  {
+    "art_cd": {
+      "max": 12.0,
+      "min": 12.0
+    },
+    "builds": 128,
+    "class": "monk",
+    "direct_dps": {
+      "max": 61.8,
+      "min": 51.5
+    },
+    "ehp": {
+      "max": 147.1,
+      "min": 95.0
+    },
+    "profession": "spirit_walker",
+    "speed": {
+      "max": 1.22,
+      "min": 1.1
+    }
+  },
+  {
+    "art_cd": {
+      "max": 6.0,
+      "min": 6.0
+    },
+    "builds": 128,
+    "class": "monk",
+    "direct_dps": {
+      "max": 61.8,
+      "min": 51.5
+    },
+    "ehp": {
+      "max": 194.1,
+      "min": 95.0
+    },
+    "profession": "iron_mountain",
+    "speed": {
+      "max": 1.22,
+      "min": 1.1
+    }
+  },
+  {
+    "art_cd": {
+      "max": 6.0,
+      "min": 3.6
+    },
+    "builds": 128,
+    "class": "adept",
+    "direct_dps": {
+      "max": 78.4,
+      "min": 47.7
+    },
+    "ehp": {
+      "max": 133.3,
+      "min": 100.0
+    },
+    "profession": "blade_dancer",
+    "speed": {
+      "max": 1.33,
+      "min": 1.25
+    }
+  },
+  {
+    "art_cd": {
+      "max": 6.0,
+      "min": 4.8
+    },
+    "builds": 128,
+    "class": "adept",
+    "direct_dps": {
+      "max": 58.0,
+      "min": 47.7
+    },
+    "ehp": {
+      "max": 200.0,
+      "min": 100.0
+    },
+    "profession": "mirror_step",
+    "speed": {
+      "max": 1.48,
+      "min": 1.25
+    }
+  },
+  {
+    "art_cd": {
+      "max": 6.0,
+      "min": 4.8
+    },
+    "builds": 128,
+    "class": "adept",
+    "direct_dps": {
+      "max": 58.0,
+      "min": 47.7
+    },
+    "ehp": {
+      "max": 133.3,
+      "min": 100.0
+    },
+    "profession": "void_walker",
+    "speed": {
+      "max": 1.48,
+      "min": 1.25
+    }
+  },
+  {
+    "art_cd": {
+      "max": 14.0,
+      "min": 9.8
+    },
+    "builds": 128,
+    "class": "plague_doctor",
+    "direct_dps": {
+      "max": 31.3,
+      "min": 25.0
+    },
+    "ehp": {
+      "max": 193.3,
+      "min": 116.7
+    },
+    "profession": "apothecary",
+    "speed": {
+      "max": 1.05,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "plague_doctor",
+    "direct_dps": {
+      "max": 38.8,
+      "min": 25.0
+    },
+    "ehp": {
+      "max": 140.0,
+      "min": 116.7
+    },
+    "profession": "pestilence",
+    "speed": {
+      "max": 1.05,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "plague_doctor",
+    "direct_dps": {
+      "max": 31.3,
+      "min": 25.0
+    },
+    "ehp": {
+      "max": 175.0,
+      "min": 116.7
+    },
+    "profession": "rat_king",
+    "speed": {
+      "max": 1.2,
+      "min": 1.05
+    }
+  },
+  {
+    "art_cd": {
+      "max": 7.0,
+      "min": 5.3
+    },
+    "builds": 128,
+    "class": "artificer",
+    "direct_dps": {
+      "max": 46.5,
+      "min": 27.5
+    },
+    "ehp": {
+      "max": 155.0,
+      "min": 130.0
+    },
+    "profession": "pyromaniac",
+    "speed": {
+      "max": 1.18,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 0.0,
+      "min": 0.0
+    },
+    "builds": 128,
+    "class": "artificer",
+    "direct_dps": {
+      "max": 46.5,
+      "min": 27.5
+    },
+    "ehp": {
+      "max": 155.0,
+      "min": 130.0
+    },
+    "profession": "mechanic",
+    "speed": {
+      "max": 1.18,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 6.0,
+      "min": 4.2
+    },
+    "builds": 128,
+    "class": "artificer",
+    "direct_dps": {
+      "max": 46.5,
+      "min": 27.5
+    },
+    "ehp": {
+      "max": 155.0,
+      "min": 130.0
+    },
+    "profession": "inventor",
+    "speed": {
+      "max": 1.18,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 60.0,
+      "min": 60.0
+    },
+    "builds": 128,
+    "class": "commander",
+    "direct_dps": {
+      "max": 77.0,
+      "min": 66.0
+    },
+    "ehp": {
+      "max": 119.3,
+      "min": 88.9
+    },
+    "profession": "warlock",
+    "speed": {
+      "max": 1.1,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 60.0,
+      "min": 60.0
+    },
+    "builds": 128,
+    "class": "commander",
+    "direct_dps": {
+      "max": 64.4,
+      "min": 48.0
+    },
+    "ehp": {
+      "max": 160.0,
+      "min": 122.2
+    },
+    "profession": "gunner",
+    "speed": {
+      "max": 1.1,
+      "min": 1.0
+    }
+  },
+  {
+    "art_cd": {
+      "max": 60.0,
+      "min": 60.0
+    },
+    "builds": 128,
+    "class": "commander",
+    "direct_dps": {
+      "max": 63.6,
+      "min": 45.5
+    },
+    "ehp": {
+      "max": 250.0,
+      "min": 175.0
+    },
+    "profession": "vanguard",
+    "speed": {
+      "max": 1.22,
+      "min": 1.0
+    }
+  }
+]

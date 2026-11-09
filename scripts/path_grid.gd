@@ -123,7 +123,7 @@ func nearest_free(c: Vector2i) -> Vector2i:
 ## Called when the map is finished. A coarse cell is open unless most of it is blocked, so walls
 ## do not close it, and only what really divides the map does: the river, the cliffs, the forest.
 func build_far_grid() -> void:
-	var n := size / FAR_CELL
+	var n := ceili(float(size) / FAR_CELL)
 	_far.region = Rect2i(0, 0, n, n)
 	_far.cell_size = Vector2.ONE
 	_far.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
@@ -134,9 +134,10 @@ func build_far_grid() -> void:
 			var open := 0
 			for dy in FAR_CELL:
 				for dx in FAR_CELL:
-					if not astar.is_point_solid(Vector2i(x * FAR_CELL + dx, y * FAR_CELL + dy)):
+					if is_free(Vector2i(x * FAR_CELL + dx, y * FAR_CELL + dy)):
 						open += 1
-			_far.set_point_solid(Vector2i(x, y), open < 6)
+			var cells := mini(FAR_CELL, size - x * FAR_CELL) * mini(FAR_CELL, size - y * FAR_CELL)
+			_far.set_point_solid(Vector2i(x, y), open * 16 < cells * 6)
 
 
 ## The way to somewhere. Far away, this only plans the next stretch: the walker asks again when it
@@ -163,7 +164,7 @@ func route(from: Vector3, to: Vector3) -> PackedVector3Array:
 
 
 func _far_nearest(p: Vector3) -> Vector2i:
-	var n := size / FAR_CELL
+	var n := _far.region.size.x
 	var c := Vector2i(clampi(int((p.x + half) / FAR_CELL), 0, n - 1), clampi(int((p.z + half) / FAR_CELL), 0, n - 1))
 	if not _far.is_point_solid(c):
 		return c
@@ -180,7 +181,7 @@ func path(from: Vector3, to: Vector3) -> PackedVector3Array:
 	var out := PackedVector3Array()
 	var a := nearest_free(to_cell(from))
 	var b := nearest_free(to_cell(to))
-	if a == b:
+	if a == b or not is_free(a) or not is_free(b):
 		return out
 	for c: Vector2i in astar.get_id_path(a, b, true):
 		out.append(to_world(c))
@@ -191,6 +192,8 @@ func path(from: Vector3, to: Vector3) -> PackedVector3Array:
 func flood(from: Vector3) -> Dictionary:
 	var seen := {}
 	var start := nearest_free(to_cell(from))
+	if not is_free(start):
+		return seen
 	var stack: Array[Vector2i] = [start]
 	seen[start] = true
 	while not stack.is_empty():

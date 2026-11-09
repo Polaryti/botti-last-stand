@@ -24,7 +24,7 @@ static func _blade(l: LowPoly, base: Vector3, tip: Vector3, wide: float, col: Co
 	if side.length_squared() < 0.0001:
 		side = Vector3.RIGHT
 	side = side.normalized() * wide * 0.5
-	l.gable(base - side, base + side, tip, col)
+	l.leaf(base - side, base + side, tip, col)
 
 
 static func wheat() -> Mesh:
@@ -181,11 +181,16 @@ static func plant(mesh: Mesh, xforms: Array[Transform3D], tints: PackedColorArra
 	mm.use_colors = true
 	mm.mesh = mesh
 	mm.instance_count = xforms.size()
+	var sway_scale := 0.0
 	for i in xforms.size():
 		mm.set_instance_transform(i, xforms[i])
 		mm.set_instance_color(i, tints[i] if i < tints.size() else Color.WHITE)
+		sway_scale = maxf(sway_scale, (xforms[i].basis * Vector3(1, 0, 0.5)).length())
 	var node := MultiMeshInstance3D.new()
 	node.multimesh = mm
 	node.material_override = material(soft)
+	# Shader displacement is invisible to CPU culling. Include the largest possible sway.
+	var height := maxf(absf(mesh.get_aabb().position.y), absf(mesh.get_aabb().end.y))
+	node.extra_cull_margin = 1.35 * (0.018 if soft else 0.09) * height * height * sway_scale
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return node

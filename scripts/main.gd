@@ -109,7 +109,7 @@ func show_menu(rebuild := false) -> void:
 	_clear_ui()
 	Game.mode = Game.Mode.MENU
 	_back = _quit
-	# Coming back from another menu screen, the village behind it can simply stay.
+	# Coming back from another menu screen, the Mists behind it can simply stay.
 	if rebuild or world == null or world.mode != Game.Mode.MENU:
 		_new_world(Game.Mode.MENU)
 	Sfx.ambient(true)
@@ -135,9 +135,13 @@ func show_menu(rebuild := false) -> void:
 	mark.texture = load("res://assets/ui/wordmark.png")
 	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	mark.custom_minimum_size = Vector2(752, 80)
+	mark.custom_minimum_size = Vector2(590, 80)
 	mark.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	top.add_child(mark)
+	var update_title := _label("The Mists Update", 27, UiTheme.EMBER)
+	update_title.name = "UpdateTitle"
+	update_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(update_title)
 	top.add_child(_expand())
 	top.add_child(_purse_button())
 	var gap := Control.new()
@@ -245,7 +249,7 @@ func _expand(tall := false) -> Control:
 ## One way to play: a large name and what it means, with nothing around it until you touch it.
 func _menu_row(title: String, line: String, action: Callable, first := false) -> Button:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(680, 92)
+	b.custom_minimum_size = Vector2(680, 80)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	var clear := UiTheme.flat(Color(0, 0, 0, 0), Color.TRANSPARENT, 8, 12.0)
 	b.add_theme_stylebox_override("normal", clear)
@@ -709,7 +713,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 					_fill_class_detail(detail, id, mode, in_store), Vector2(120, 48), Game.pet == pet))
 	detail.add_child(_expand(true))
 	if not owned and c.get("unavailable", false):
-		var how := _body("Not available at this time.", 26)
+		var how := _body(CodexPanel.acquisition(id), 26)
 		how.add_theme_color_override("font_color", UiTheme.ASH)
 		detail.add_child(how)
 	elif not owned and c.has("earned"):
@@ -1085,6 +1089,7 @@ func close_tree() -> void:
 
 
 func start_game(mode: int) -> void:
+	Game.begin_run()
 	Game.mode = mode
 	get_tree().paused = false
 	_run_over = false
@@ -1103,6 +1108,7 @@ func start_game(mode: int) -> void:
 	hud = Hud.new()
 	hud.theme = _theme
 	hud.player = world.player
+	world.player.command_target_requested.connect(show_command_map)
 	hud.director = world.director
 	hud.visible = false
 	ui_layer.add_child(hud)
@@ -1669,9 +1675,13 @@ func show_lobby() -> void:
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
 	box.custom_minimum_size.x = 900
+	var scroll := DragScroll.new()
+	scroll.custom_minimum_size = Vector2(900, 520)
+	box.add_child(scroll)
 	var body := VBoxContainer.new()
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 8)
-	box.add_child(body)
+	scroll.add_child(body)
 	var refresh := func() -> void: _fill_lobby(body)
 	Net.lobby_changed.connect(refresh)
 	root.tree_exiting.connect(func() -> void: Net.lobby_changed.disconnect(refresh))
@@ -1767,15 +1777,19 @@ func _fill_lobby(body: VBoxContainer) -> void:
 			var team := _body("Team %s" % ("Gold" if int(info["team"]) == 0 else "Blue"), 26)
 			team.add_theme_color_override("font_color", Net.team_colour(int(info["team"])))
 			row.add_child(team)
-	var classes := HBoxContainer.new()
-	classes.add_theme_constant_override("separation", 6)
+	var classes := GridContainer.new()
+	classes.columns = 6
+	classes.add_theme_constant_override("h_separation", 6)
+	classes.add_theme_constant_override("v_separation", 6)
 	body.add_child(classes)
 	var offered := ClassDefs.available()
 	for id: String in offered:
 		var pick := id
 		var mine := str(Net.roster[Net.my_id()]["class"]) == id
-		var b := _button(String(ClassDefs.ALL[id]["name"]).get_slice(" ", 0), func() -> void: Net.set_my_class(pick), Vector2(850.0 / offered.size(), 56), mine)
+		var b := _button(String(ClassDefs.ALL[id]["name"]).get_slice(" ", 0), func() -> void: Net.set_my_class(pick), Vector2(136, 56), mine)
 		b.add_theme_font_size_override("font_size", 22)
+		b.disabled = not Net.class_slot_available(id, Net.my_id())
+		b.tooltip_text = "Only one Commander per match" if b.disabled else ""
 		classes.add_child(b)
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 10)
@@ -1815,3 +1829,44 @@ func _notification(what: int) -> void:
 			show_pause()
 	elif what == NOTIFICATION_WM_GO_BACK_REQUEST and _back.is_valid():
 		_back.call()
+
+
+func show_command_map() -> void:
+	if world == null or world.player.dead or hud.menu_open:
+		return
+	hud.release_all()
+	hud.menu_open = true
+	world.player.input_fire = false
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	var root := _modal("Artillery target")
+	var box: VBoxContainer = root.get_meta("box")
+	box.add_child(_soft("Choose a circle: %d m radius. Impact in %d seconds; %d-second barrage, %d-second fires." % [int(CommanderKit.BARRAGE_RADIUS), int(CommanderKit.BARRAGE_DELAY), int(CommanderKit.BARRAGE_TIME), int(CommanderKit.FIRE_TIME)], 22))
+	var map := MapPanel.new()
+	map.world = world
+	map.targeting = true
+	map.selected_spot = world.player.global_position
+	map.custom_minimum_size = Vector2(440, 440)
+	map.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(map)
+	var row := HBoxContainer.new()
+	box.add_child(row)
+	var close := func() -> void:
+		root.queue_free()
+		if hud:
+			hud.menu_open = false
+		_back = show_pause
+		if not DisplayServer.is_touchscreen_available():
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	row.add_child(_button("Cancel", close, Vector2(210, 60)))
+	var confirm := _button("Call barrage", func() -> void:
+		if world == null or world.player.dead:
+			close.call()
+			return
+		world.player.command_target = map.selected_spot
+		world.player.command_target_ready = true
+		close.call()
+		world.player.use_art(), Vector2(230, 60), true)
+	confirm.disabled = true
+	map.selected.connect(func(_at: Vector3) -> void: confirm.disabled = false)
+	row.add_child(confirm)
+	_back = close

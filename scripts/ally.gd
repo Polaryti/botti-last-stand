@@ -6,8 +6,8 @@ extends Target
 
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
-const HEALTH := {"rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
-const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body"]
+const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
+const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry"]
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
 const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
 const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}
@@ -65,7 +65,7 @@ func _init(owner_world: World, ally_kind: String) -> void:
 	if BEASTS.has(ally_kind):
 		_build_beast(_visual_root())
 		return
-	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever"}.get(ally_kind, "skeleton")
+	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
 		_scenes[model] = load("res://assets/characters/%s.glb" % model)
 	_visual = (_scenes[model] as PackedScene).instantiate()
@@ -82,15 +82,19 @@ func _init(owner_world: World, ally_kind: String) -> void:
 		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		p.extra_cull_margin = 1.0
 		top = maxf(top, p.get_aabb().end.y)
-		if ally_kind != "skeleton" and ally_kind != "body":
+		if ally_kind not in ["skeleton", "body", "magician", "artificer", "infantry"]:
 			p.material_override = _ghost()
 	_visual.scale = Vector3.ONE * height / float(Zombie.BODY_TOP.get(model, maxf(top, 0.5)))
 	if ally_kind == "body":
 		ClassDefs.dress(_visual, "monk")
+	elif ally_kind in ["magician", "artificer", "infantry"]:
+		ClassDefs.dress(_visual, ally_kind)
+		_equip_retinue()
 
 
 ## Takes a resting body back into the fight.
 func activate(seconds: float) -> void:
+	guarded = 0.0
 	life = seconds
 	remote_owner = 0
 	master = null
@@ -240,7 +244,7 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 		Net.ally_hurt(remote_owner, net_index, amount)
 		return
 	if guarded > 0.0:
-		return
+		amount *= 1.0 - WorldLight.DOME_REDUCTION
 	# A Guardian shields its own summons too.
 	if me and me.m("cover") > 0.0 and global_position.distance_to(me.global_position) <= me.m("cover_radius"):
 		amount *= 1.0 - me.m("cover")
@@ -317,17 +321,17 @@ func _tick_own(delta: float) -> void:
 	if kind == "decoy" or kind == "body":
 		velocity = Vector3.ZERO
 		return
-	if kind == "mirror":
+	if kind == "mirror" or (kind == "magician" and (_foe != null or _rival != null)):
 		if _rival and not _rival.dead and _cooldown <= 0.0:
 			_cooldown = 1.2
-			world.mirror_bolt(position + Vector3.UP * 1.4, _rival.global_position + Vector3.UP)
+			_retinue_shot(position + Vector3.UP * 1.4, _rival.global_position + Vector3.UP)
 			_current = ""
 			_play("Spellcast_Shoot", 1.5)
 			return
 		if _foe and _foe.is_alive() and _cooldown <= 0.0:
 			_cooldown = 1.2
 			var from := position + Vector3.UP * 1.4
-			world.mirror_bolt(from, _foe.centre())
+			_retinue_shot(from, _foe.centre())
 			_current = ""
 			_play("Spellcast_Shoot", 1.5)
 		if _foe and _foe.is_alive():
@@ -361,6 +365,8 @@ func _tick_own(delta: float) -> void:
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
 			_foe.take_damage(WeaponDefs.DAMAGE * dmg_mult * float(BEAST_BITE.get(kind, 0.7 if kind == "revenant" else 0.8 if kind == "skeleton" else 1.0)), to, 2.0, _foe.centre())
+			if _foe.is_alive() and kind == "artificer":
+				_foe.ignite(ZombieDefs.BURN_SECONDS)
 			if not _foe.is_alive() and player:
 				player.on_ally_kill()
 			elif BEASTS.has(kind) and player and player.has_flag("wolf_stun"):
@@ -429,3 +435,34 @@ func _move_wolf(delta: float, moving: bool) -> void:
 		_head.rotation.x = sin(_idle_time * 1.3) * 0.06
 		_head.position.z = 0.45
 		_head.rotation.y = sin(_idle_time * 0.7) * (0.0 if moving else 0.28)
+
+
+func _retinue_shot(from: Vector3, at: Vector3) -> void:
+	var owner_player := _master()
+	if owner_player and kind == "magician":
+		world.spawn_bolt(owner_player, from, (at - from).normalized() * 30.0, 26.0, 1.0, 25.0 * owner_player.m("ally_damage"), false)
+	else:
+		world.mirror_bolt(from, at)
+
+
+func _equip_retinue() -> void:
+	var skeleton: Skeleton3D = _visual.find_children("*", "Skeleton3D", true, false)[0]
+	var bone := "handslot.r"
+	if skeleton.find_bone(bone) < 0:
+		return
+	var attachment := BoneAttachment3D.new()
+	attachment.bone_name = bone
+	skeleton.add_child(attachment)
+	var hand := MeshInstance3D.new()
+	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "sword"
+	hand.mesh = WeaponDefs.mesh(weapon)
+	hand.rotation = WeaponDefs.hand_rotation(weapon)
+	hand.scale = Vector3.ONE * 0.8 / _visual.scale.x
+	hand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	attachment.add_child(hand)
+	if weapon == "torch":
+		var flame := MeshInstance3D.new()
+		flame.mesh = WorldLight.flame_mesh()
+		flame.position.y = WeaponDefs.TORCH_FIRE
+		flame.scale = Vector3.ONE * 0.14
+		hand.add_child(flame)

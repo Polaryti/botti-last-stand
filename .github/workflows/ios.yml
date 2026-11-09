@@ -10,13 +10,23 @@ on:
 env:
   GODOT_VERSION: "4.7.2"
 
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   ios:
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 55
     runs-on: macos-latest
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v5
+
+      - name: Verify production identity
+        run: python3 tools/check_production_build.py
 
       - name: Fetch Godot and its export templates
         run: |
@@ -45,15 +55,15 @@ jobs:
           gh release download "$tag" --repo "$plugin" --pattern '*-all-56238973*' --output plugin.zip
           unzip -q plugin.zip -d "$RUNNER_TEMP/plugin"
           rm plugin.zip
-          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" ios
+          python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" ios,macos
 
       - name: Are the Epic keys there
         run: test -f scripts/epic_keys.gd
 
       - name: Export the Xcode project
         run: |
-          "$GODOT" --headless --path . --import 2>&1 | tail -5 || true
           mkdir -p build/ios
+          python3 tools/import_project.py --log build/import.log
           "$GODOT" --headless --path . --export-release iOS build/ios/botti.ipa 2>&1 | tee build/ios-export.log | tail -20
           test -d build/ios/botti.xcodeproj
 
@@ -76,12 +86,21 @@ jobs:
           retention-days: 30
 
       # The iPhone app goes on the version's release too, next to the Android one, so it is easy to find.
+      - name: Require full validation before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/wait_for_validation.py
+
       - name: Add it to the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           v=$(sed -n 's/^config\/version="\(.*\)"/\1/p' project.godot)
-          awk 'BEGIN{n=0} /^## /{n++} n==1' CHANGELOG.md > notes.md
-          gh release view "v$v" > /dev/null 2>&1 || gh release create "v$v" --target "$GITHUB_SHA" --title "Botti's Last Stand $v" --notes-file notes.md || true
+          # Android publishes the stable release only after its signed APK is ready.
+          for attempt in {1..100}; do
+            if gh release view "v$v" --json isDraft --jq '.isDraft' 2>/dev/null | grep -qx false; then break; fi
+            if [ "$attempt" = 100 ]; then echo "Android release is not published; stopping iOS upload."; exit 1; fi
+            sleep 10
+          done
           cp botti-last-stand-ios.ipa "botti-last-stand-$v-ios.ipa"
           gh release upload "v$v" "botti-last-stand-$v-ios.ipa" --clobber

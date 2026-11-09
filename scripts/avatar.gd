@@ -4,7 +4,7 @@ extends Target
 ## body that zombies can hunt and that shots can hit, and anything that hurts them is sent over.
 
 const LAYER_AVATAR := 64
-const MODELS := {"monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
+const MODELS := {"commander": "clever", "monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever"}
 
 var world: World
 var peer := 0
@@ -23,7 +23,7 @@ var _weapon := ""
 var _visual: Node3D
 var _anim: AnimationPlayer
 var _skeleton: Skeleton3D
-var _hand: MeshInstance3D
+var _hand: WeaponVisual
 var _label: Label3D
 var _current := ""
 var _fit := 1.0
@@ -46,6 +46,7 @@ var _flames: CPUParticles3D
 var _debuff_fx: CPUParticles3D
 var _stun_fx: CPUParticles3D
 var _statuses := 0
+var _banner: MeshInstance3D
 static var _ice_material: StandardMaterial3D
 static var _flash_material: StandardMaterial3D
 
@@ -101,7 +102,7 @@ func _build_body(model: String) -> void:
 	var a := BoneAttachment3D.new()
 	a.bone_name = "handslot.r"
 	_skeleton.add_child(a)
-	_hand = MeshInstance3D.new()
+	_hand = WeaponVisual.new()
 	_hand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	a.add_child(_hand)
 	_play("Idle")
@@ -143,10 +144,12 @@ func view_transform() -> Transform3D:
 
 
 func _play(anim_name: String, speed := 1.0) -> void:
-	if _current == anim_name or not _anim.has_animation(anim_name):
+	if _anim == null or not _anim.has_animation(anim_name):
+		return
+	_anim.speed_scale = speed
+	if _current == anim_name:
 		return
 	_current = anim_name
-	_anim.speed_scale = speed
 	_anim.play(anim_name, 0.15)
 
 
@@ -173,7 +176,8 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 		bar_time = 2.5
 	hp_fraction = hp_left
 	set_fallen(flags & 1 != 0)
-	if attacks != _attack_seen:
+	var attacked := attacks != _attack_seen
+	if attacked:
 		_attack_seen = attacks
 		if not dead:
 			_attack_left = 0.5
@@ -182,10 +186,15 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 			Sfx.play_at("swing", global_position, world.player.global_position if world.player else global_position, -4.0)
 	if weapon != _weapon:
 		_weapon = weapon
-		_hand.mesh = WeaponDefs.mesh(weapon) if weapon != "" and weapon != "fists" else null
+		_hand.equip(weapon)
 		if weapon != "":
-			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * (0.8 if WeaponDefs.hand_rotation(weapon) != Vector3.ZERO else 1.6) / _fit
+			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * (0.8 if WeaponDefs.ALL[weapon]["kind"] == WeaponDefs.Kind.RANGED or WeaponDefs.ALL[weapon].get("swing", "") == "thrust" else 1.6) / _fit
 			_hand.rotation = WeaponDefs.hand_rotation(weapon)
+			if weapon in WeaponDefs.ALIGNED_HELD:
+				_hand.hold(self, false, WeaponDefs.held_size(weapon))
+
+	if attacked:
+		_hand.attack()
 
 
 ## They used an ability: everyone can see them raise a hand.
@@ -251,6 +260,7 @@ func show_statuses(bits: int) -> void:
 	if bits == _statuses:
 		return
 	_statuses = bits
+	_show_banner(bits & 128 != 0)
 	if dead:
 		bits = 0
 	var burning := bits & 1 != 0
@@ -335,6 +345,9 @@ func _process(delta: float) -> void:
 		_chariot.roll(velocity.length() * delta)
 	if _horse and _horse.visible:
 		HorseModel.set_gait(_horse, clampf(velocity.length() / 8.0, 0.0, 1.0))
+	if _banner and _banner.visible:
+		var wave := sin(world.now * (10.0 if _attack_left > 0.0 else 2.0)) * (0.18 if _attack_left > 0.0 else 0.035)
+		_banner.global_transform = Transform3D(global_basis * Basis.from_euler(Vector3(0, PI - 0.4, wave)), (_banner.get_parent() as Node3D).global_position)
 	if not dead and _attack_left <= 0.0:
 		_play("Running_A" if velocity.length_squared() > 0.5 else "Idle", maxf(0.8, velocity.length() / 5.0))
 
@@ -391,3 +404,17 @@ func hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 func ignite(seconds: float) -> void:
 	if not dead:
 		Net.ignite_peer(peer, seconds)
+
+
+func _show_banner(on: bool) -> void:
+	if on and _banner == null:
+		var attach := BoneAttachment3D.new()
+		attach.bone_name = "handslot.l"
+		_skeleton.add_child(attach)
+		_banner = MeshInstance3D.new()
+		_banner.mesh = WeaponDefs.banner_mesh()
+		_banner.scale = Vector3.ONE / _fit
+		_banner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		attach.add_child(_banner)
+	if _banner:
+		_banner.visible = on and not dead

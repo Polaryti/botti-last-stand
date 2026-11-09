@@ -45,6 +45,7 @@ static func make() -> MeshInstance3D:
 	var n := MeshInstance3D.new()
 	n.mesh = mesh()
 	n.material_override = material().duplicate()
+	n.extra_cull_margin = 0.6 # galloping legs and swishing tail extend beyond the resting mesh
 	n.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	set_gait(n, 0.0)
 	return n
