@@ -341,7 +341,7 @@ func _add_lights(on: bool) -> void:
 	_light.omni_range = 11.0
 	_light.omni_attenuation = 1.2
 	_light.position = Vector3(0.2, -0.1, 0.1)
-	_light.light_cull_mask = 1 # the held weapon would look burnt out this close
+	_light.light_cull_mask = 5 # world and terrain; the held weapon would look burnt out this close
 	head.add_child(_light)
 	var hand_light := OmniLight3D.new()
 	hand_light.light_color = Color(1.0, 0.82, 0.6)
