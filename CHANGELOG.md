@@ -13,6 +13,7 @@ Newest first. The game shows this file on its Changelog screen, so keep the same
 ### Fixed
 - Artillery lasts until the final shell and fire have finished. Impact sounds are no longer doubled on remote players.
 - Supply chests cannot pay out twice through repeated opening calls.
+- Multiplayer fog and bot checks isolate their combat scenarios instead of depending on random waves or bot injuries.
 
 ## Development — Commander and stance rework
 ### New

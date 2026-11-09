@@ -327,16 +327,40 @@ func _with_bots() -> void:
 		ok(pl.dead, "the player fell")
 	await sync(54)
 	if rules == "bots":
-		# Bots fight the night, in co-op, and credit goes round.
+		# A scoring integration check, isolated from random waves, injuries and obstructed spawns.
+		await _clear_zombies_on_host()
 		if host:
 			var bot: BotPlayer = Net._bots[ids[1]]
-			w.spawn_zombie("normal", bot.at + Vector3(1.0, 0, 0))
+			for id: int in ids:
+				if id != ids[1]:
+					(Net._bots[id] as BotPlayer).set_physics_process(false)
+			for ally: Ally in w.allies.duplicate():
+				w.remove_ally(ally)
+			bot.pawn.respawn(Vector3(0, 0, 36))
+			bot.body.teleport(bot.pawn.global_position)
+			bot.body.set_fallen(false)
+			bot.pawn.guard_left = 15.0
+			bot.pawn.arrows = bot.pawn.max_arrows()
+			bot._respawn = -1.0
+			bot._target = null
+			bot._item = null
+			bot._path = PackedVector3Array()
+			bot._think = 0.0
+			var spawned := w.spawn_zombie("normal", bot.at + Vector3(1.5, 0, 0))
+			ok(spawned, "a controlled target is available to the bot")
+			if not spawned:
+				await sync(55)
+				return
+			var target: Zombie = w.zombies.back()
+			target.hp = 20.0
+			target.set_physics_process(false)
 			var scored := int(Net.roster[ids[1]]["score"])
 			var t := 0.0
-			while int(Net.roster[ids[1]]["score"]) == scored and t < 12.0:
-				await wait(0.2)
-				t += 0.2
-			ok(int(Net.roster[ids[1]]["score"]) > scored, "a bot kills zombies (%.1f s)" % t)
+			while int(Net.roster[ids[1]]["score"]) == scored and t < 8.0:
+				await wait(0.1)
+				t += 0.1
+			ok(int(Net.roster[ids[1]]["score"]) > scored, "real bot attacks kill and credit the bot (%.1f s, %s)" % [t, bot._class_id])
+
 	await sync(55)
 	await wait(0.3)
 	await snap("bots")
