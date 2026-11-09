@@ -953,8 +953,6 @@ func choose_ability(step: int, index: int) -> bool:
 	points -= 1
 	if step == CORE_STEPS:
 		spec_id = (tree_data()["specs"] as Array)[index]["id"]
-		if bot_peer == 0:
-			Game.run_profession = spec_id
 	_apply_ability(a)
 	if step == CORE_STEPS:
 		spec_chosen()

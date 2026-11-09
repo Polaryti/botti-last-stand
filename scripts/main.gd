@@ -135,28 +135,28 @@ func show_menu(rebuild := false) -> void:
 	mark.texture = load("res://assets/ui/wordmark.png")
 	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	mark.custom_minimum_size = Vector2(752, 64)
+	mark.custom_minimum_size = Vector2(752, 80)
 	mark.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	top.add_child(mark)
 	top.add_child(_expand())
 	top.add_child(_purse_button())
 	var gap := Control.new()
-	gap.custom_minimum_size.y = 4
+	gap.custom_minimum_size.y = 14
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
 	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
-	box.add_child(_menu_row("Leaderboard", "Lifetime points and favourite professions.", show_leaderboard))
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Sandbox", "Try any weapon, item or class you own.", func() -> void: show_class_picker(Game.Mode.SANDBOX)))
 	box.add_child(_expand(true))
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 12)
-	# Update status has its own row so it remains visible on a phone.
+	box.add_child(foot)
+	# Where a new version shows, when there is one.
 	_update_box = HBoxContainer.new()
 	_update_box.add_theme_constant_override("separation", 10)
 	_update_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(_update_box)
+	foot.add_child(_update_box)
 	if not updates.changed.is_connected(_fill_update_box):
 		updates.changed.connect(_fill_update_box)
 	_fill_update_box()
@@ -165,7 +165,6 @@ func show_menu(rebuild := false) -> void:
 	if not _checked_updates:
 		_checked_updates = true
 		updates.check()
-	box.add_child(foot)
 	foot.add_child(_button("Codex", show_codex, Vector2(132, 56)))
 	foot.add_child(_button("Changelog", show_changelog, Vector2(168, 56)))
 	foot.add_child(_button("Settings", show_settings, Vector2(146, 56)))
@@ -187,20 +186,6 @@ func _fill_update_box() -> void:
 	var action := ""
 	var press := Callable()
 	match updates.state:
-		Updates.State.IDLE:
-			line = "%s channel • installed v%s" % [Updates.channel_name(), Updates.current()]
-			action = "Check for updates"
-			press = updates.check
-		Updates.State.CHECKING:
-			line = "Checking %s updates…" % Updates.channel_name().to_lower()
-		Updates.State.NONE:
-			line = "%s channel is up to date • v%s" % [Updates.channel_name(), Updates.current()]
-			action = "Check again"
-			press = updates.check
-		Updates.State.CHECK_FAILED:
-			line = "%s updates: %s" % [Updates.channel_name(), updates.problem]
-			action = "Retry check"
-			press = updates.check
 		Updates.State.AVAILABLE:
 			if Updates.can_install():
 				line = "Version %s is out." % updates.latest
@@ -223,16 +208,14 @@ func _fill_update_box() -> void:
 			press = updates.download
 	if line == "":
 		return
-	var l := _body(line, 20)
+	var l := _body(line, 22)
 	l.add_theme_color_override("font_color", UiTheme.EMBER)
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_update_box.add_child(l)
 	if action != "":
-		_update_box.add_child(_button(action, press, Vector2(200, 56), true))
-	if updates.state in [Updates.State.CHECK_FAILED, Updates.State.FAILED]:
-		_update_box.add_child(_button("Open Releases", func() -> void: OS.shell_open(updates.page), Vector2(190, 56)))
+		_update_box.add_child(_button(action, press, Vector2(150, 56), true))
 
 
 ## A margin that also keeps clear of the camera cut-out, on whichever side it is.
@@ -1342,8 +1325,6 @@ func _earned_line(earned: int) -> String:
 	for id: String in Game.fresh_unlocks:
 		line += "\n%s unlocked!" % ClassDefs.ALL[id]["name"]
 	Game.fresh_unlocks.clear()
-	if EpicNet.available():
-		Scores.refresh.call_deferred(true)
 	return line
 
 
@@ -1900,7 +1881,7 @@ func show_name_prompt() -> void:
 	var root := _modal("Choose your name")
 	_name_prompt = root
 	var box: VBoxContainer = root.get_meta("box")
-	box.add_child(_soft("Shown to other players and on the leaderboard. Names may repeat.", 22))
+	box.add_child(_soft("Shown to other players. Names may repeat.", 22))
 	var edit := LineEdit.new()
 	edit.max_length = 16
 	edit.text = Game.player_name
@@ -1919,42 +1900,3 @@ func show_name_prompt() -> void:
 	box.add_child(button)
 	_back = Callable() # Android Back cannot silently accept a generated name.
 	edit.grab_focus()
-
-
-func show_leaderboard() -> void:
-	_clear_ui()
-	var root := _modal("Player leaderboard")
-	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 940
-	var header := HBoxContainer.new()
-	header.add_theme_constant_override("separation", 18)
-	box.add_child(header)
-	for field: Array in [["Name", 220], ["Points (total)", 180], ["Favourite Class–Profession", 490]]:
-		var label := _soft(field[0], 23)
-		label.custom_minimum_size.x = field[1]
-		header.add_child(label)
-	var status := _soft("Connecting…", 22)
-	box.add_child(status)
-	var scroll := DragScroll.new()
-	scroll.custom_minimum_size = Vector2(940, 360)
-	box.add_child(scroll)
-	var rows := VBoxContainer.new()
-	scroll.add_child(rows)
-	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(_soft("Your lifetime points: %d. Sandbox earns no points." % Game.total_points, 21))
-	box.add_child(_button("Back", show_menu, Vector2(240, 60)))
-	_back = show_menu
-	var results := await Scores.refresh()
-	if not is_instance_valid(root) or root.is_queued_for_deletion():
-		return
-	status.text = Scores.last_error if Scores.last_error != "" else "Top %d players" % results.size()
-	for entry: Dictionary in results:
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 18)
-		rows.add_child(row)
-		for field: Array in [[str(entry["name"]), 220], [str(entry["points"]), 180], [Scores.pair_label(str(entry["favourite"])), 490]]:
-			var label := _body(field[0], 24)
-			label.custom_minimum_size.x = field[1]
-			label.clip_text = true
-			label.tooltip_text = field[0]
-			row.add_child(label)

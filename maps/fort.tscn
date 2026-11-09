@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_hill.gd" id="1_hill"]
 [ext_resource type="Script" path="res://scripts/map/map_house.gd" id="2_house"]
@@ -11,8 +11,6 @@
 [ext_resource type="Script" path="res://scripts/map/map_spot.gd" id="9_spot"]
 [ext_resource type="Script" path="res://scripts/map/map_thing.gd" id="10_thing"]
 [ext_resource type="Script" path="res://scripts/map/map_tree.gd" id="11_tree"]
-
-[ext_resource type="Script" path="res://scripts/map/map_expedition.gd" id="expedition"]
 
 [sub_resource type="Curve3D" id="Curve_1"]
 _data = {
@@ -1705,35 +1703,3 @@ script = ExtResource("4_prop")
 kind = "rock"
 grow = 0.8754
 
-
-[node name="EastTimberDepot" type="Node3D" parent="."]
-position = Vector3(56, 0, -18)
-script = ExtResource("expedition")
-title = "East Timber Depot"
-trail = PackedVector2Array(40, 0, 46, -8, 50, -14, 56, -14, 64, -14, 70, 0)
-reward = "speed"
-timber = true
-
-[node name="WestTimberDepot" type="Node3D" parent="."]
-position = Vector3(-56, 0, 18)
-script = ExtResource("expedition")
-title = "West Timber Depot"
-trail = PackedVector2Array(-40, 0, -46, 12, -48, 22, -56, 22, -66, 22, -72, 8, -70, 0)
-reward = "speed"
-timber = true
-
-[node name="SouthSupplyPost" type="Node3D" parent="."]
-position = Vector3(32, 0, 54)
-script = ExtResource("expedition")
-title = "South Supply Post"
-trail = PackedVector2Array(0, 40, 16, 44, 24, 50, 24, 58, 32, 58, 42, 64, 36, 78, 0, 78)
-reward = "speed"
-timber = true
-
-[node name="NorthSupplyPost" type="Node3D" parent="."]
-position = Vector3(-18, 0, -56)
-script = ExtResource("expedition")
-title = "North Supply Post"
-trail = PackedVector2Array(0, -40, -10, -46, -12, -50, -18, -52, -26, -52, -28, -65, 0, -78)
-reward = "speed"
-timber = true

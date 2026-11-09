@@ -51,9 +51,9 @@ Redeem codes can also unlock supported classes. Codes are stored as hashes. Adep
 
 **Commander** is limited to one human per match; bots cannot choose it. Command becomes Last Command at level 10. Warlock keeps a War Staff whose fifth attack fires magic, summons a Magician, then commands an enemy-only storm. Gunner keeps a Musket with a melee bayonet, summons a torch-bearing Gunner, then selects an artillery circle on the map: everyone receives a warning, followed four seconds later by five seconds of shelling across an 18 m radius. Shells leave eight-second fire zones that damage enemies without stacking. Vanguard carries an off-hand banner, rallies nearby allies, then revives eligible allies, grants buffs and calls two Infantry. Exclusive weapons never appear as loot and cannot be dropped.
 
-On first launch after this update, choose or confirm a display name; duplicates are allowed. The new **Leaderboard** button uses Epic to show total lifetime points and the most-played class–profession pair. Match rewards add to lifetime points independently of currency spending, and Sandbox is excluded. Offline rewards are queued for sync. The existing Epic deployment needs the [leaderboard configuration](docs/EPIC_LEADERBOARD.md); the UI reports unavailable online data until that setup is active.
 
-Village, Mists and Fort include marked expedition stops, connecting trails and supply caches. Each player can claim a cache once per match for 15 doubloons, 60 XP, 30 healing and a temporary Speed or Sensor effect. Claiming near a living ally adds 15 XP and 10 healing; solo players can claim the same caches. Fort’s outer depots give supply runs a visible destination.
+
+Players choose a display name on first launch or after upgrading from older builds; duplicates are allowed.
 
 Store upgrades can add specialization abilities, and the Armory manages owned upgrades and selected familiars. The in-game Codex documents classes, enemies, weapons, items and familiars. The in-game Changelog reads [CHANGELOG.md](CHANGELOG.md).
 
@@ -66,7 +66,7 @@ Download APKs from [GitHub Releases](https://github.com/Polaryti/botti-last-stan
 | Production | `main`; stable `v…` releases | **Botti's Last Stand**, `com.botti.laststand` | Normal play; signed production updates are offered in the menu. |
 | Development | `dev`; `dev-…` prereleases | **Botti's Last Stand Dev**, `com.botti.laststand.dev` | Test changes before promotion to production. Installs alongside production with separate saves. |
 
-Every push to `dev` builds a uniquely versioned **Android-only** APK and publishes a prerelease with its checksum and source-commit metadata. It does not replace the latest stable release and does not build iOS. Development builds use a separate multiplayer compatibility namespace and do not offer production updates; everyone in a dev test session should install a compatible dev APK. The menu shows the installed channel and update status, with **Check again** even when no update is available. Newer dev APKs come from the dev prerelease feed and open Android’s installer after download verification. Failed checks show an error, **Retry check** and **Open Releases** instead of disappearing. Dev and production updates stay separate. Install dev build 7 or later manually once if upgrading from an older dev build with its updater disabled.
+Every push to `dev` builds a uniquely versioned **Android-only** APK and publishes a prerelease with its checksum and source-commit metadata. It does not replace the latest stable release and does not build iOS. Development builds use a separate multiplayer compatibility namespace and do not offer production updates; everyone in a dev test session should install a compatible dev APK. Dev checks run automatically at launch. A newer dev APK shows the same update prompt as production; no manual check controls are added. Dev and production channels stay separate.
 
 Both channels use the existing signing identity, but Android treats their different package IDs as different apps. The dev APK is an optimized release export, not a change to the production package. Online play is included when all Epic credentials are configured; otherwise its release notes identify it as solo/bots/LAN only.
 
@@ -80,7 +80,6 @@ Open the project in Godot 4.7.2 and press F5, or run `godot --path .`. Export te
 - [Development Android releases](docs/BUILDING.md#development-android-releases): dev package identity, versioning and release workflow.
 - [Editing maps](docs/EDITING_MAPS.md): edit map scenes in Godot and use F6 to walk around them.
 - [Balance review](docs/BALANCE_REVIEW.md): all class/profession screening, simulation results and limitations.
-- [Epic leaderboard setup](docs/EPIC_LEADERBOARD.md): exact stats, channel isolation and live verification.
 - [Mobile review](docs/MOBILE_REVIEW.md): maintenance fixes, mesh measurements, validation and remaining architecture/device work.
 
 `Validate game` checks pull requests and pushes to `main` and `dev`. It imports resources, runs gameplay and regression tests, exercises paired LAN scenarios, and captures weather/UI with the Compatibility renderer. The dev release workflow additionally verifies package identity and signing before publishing its APK. Engine tests and desktop captures do not substitute for real Android/iOS device profiling.

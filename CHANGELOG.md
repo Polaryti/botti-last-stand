@@ -2,25 +2,20 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
-## Development — Artillery and expeditions
+## Development — Artillery update
 ### New
 - Dev APKs offer newer dev builds in the menu, with verified downloads and Android installation. Install this dev APK manually once if your older dev build has no updater.
-- Explore new supply stops and connecting trails in Village, Mists and Fort. Everyone can claim each cache independently; a nearby living ally grants bonus XP and healing.
 ### Changed
 - Gunner Last Command gives a four-second warning over an 18 m radius, then fires twenty shells over five seconds. Each impact leaves an eight-second fire zone. Overlapping fire does not multiply damage, and allies remain safe.
 - Artillery has a ground-following warning, countdown, falling-shell whistles, deeper explosions, shockwaves, brief smoke, animated flames and distance-based camera shake.
-- Fort supply posts and timber depots, village camps and ruined island refuges add landmarks and optional exploration routes.
 ### Fixed
-- The menu always shows update status and a manual check. Failed checks show a reason, retry and release-page access; downloads avoid stale GitHub redirects.
 - Artillery lasts until the final shell and fire have finished. Impact sounds are no longer doubled on remote players.
-- Supply chests cannot pay out twice through repeated opening calls.
 - Multiplayer fog and bot checks isolate their combat scenarios instead of depending on random waves or bot injuries.
 
 ## Development — Commander and stance rework
 ### New
 - Commander: First prize in VRAIN tournaments, unlocked by code. Only one per match, and never a bot. Choose Warlock, Gunner or Vanguard; Command becomes Last Command at level 10.
 - Warlocks wield a War Staff, firing magic on every fifth attack. Gunners wield a Musket with a melee bayonet. Vanguards carry a banner. Summons, storm lightning, warned artillery and rallying revives complete their command skills.
-- Choose a display name the next time you start. Names may repeat. The new Epic leaderboard tracks lifetime match points and your favourite class and profession, with offline rewards queued for sync.
 ### Changed
 - Adept stances require commitment and a short visible transition. Three landed attacks build mastery; each stance has a persistent HUD card. Blade Dancer rewards prepared sweeps, Mirror Step gains a defensive counter window, and Void kill extensions have a limit.
 - Plague Doctor gains health, protection, movement, darts and stronger direct hits. Strong profession poison can no longer be overwritten by a weaker dart; bleeding and poison have independent damage timers.

@@ -39,8 +39,6 @@ var rng := RandomNumberGenerator.new() # for looks only: phones may disagree abo
 var _props := {}
 var _trees := {}
 var _indoors: Array[Rect2] = []
-var _supply_clearings: Array[Rect2] = []
-var _supply_trails: Array[PackedVector2Array] = []
 var _cells := {} # small things, merged by map area into one mesh each
 static var _cow_mesh: Mesh
 
@@ -53,7 +51,6 @@ func _init(world: Variant, p_terrain: Terrain) -> void:
 
 ## The whole map, for the game.
 func build(root: MapRoot) -> void:
-	configure_expeditions(root)
 	ground()
 	w.play_half = root.play_half
 	boundary(root.play_half)
@@ -64,37 +61,6 @@ func build(root: MapRoot) -> void:
 	_paint_roads()
 	flush()
 	w.indoors = _indoors
-
-
-## Reserve authored walking lanes before trees and movable clutter are scattered.
-## Structures remain in place; route checks catch trails that need to go around them.
-func configure_expeditions(root: MapRoot) -> void:
-	_supply_clearings.clear()
-	_supply_trails.clear()
-	_reserve_expeditions(root, Transform3D.IDENTITY)
-
-
-func _reserve_expeditions(root: Node, parent: Transform3D) -> void:
-	for node: Node in root.get_children():
-		if not node is Node3D:
-			continue
-		var at := parent * (node as Node3D).transform
-		if node is MapExpedition:
-			_supply_clearings.append(Rect2(Vector2(at.origin.x - 5, at.origin.z - 6), Vector2(10, 11)))
-			_supply_trails.append((node as MapExpedition).trail)
-		_reserve_expeditions(node, at)
-
-
-func expedition_lane(at: Vector3, margin := 2.2) -> bool:
-	var point := Vector2(at.x, at.z)
-	for area: Rect2 in _supply_clearings:
-		if area.has_point(point):
-			return true
-	for trail: PackedVector2Array in _supply_trails:
-		for i in trail.size() - 1:
-			if point.distance_squared_to(Geometry2D.get_closest_point_to_segment(point, trail[i], trail[i + 1])) < margin * margin:
-				return true
-	return false
 
 
 func _walk(node: Node, parent: Transform3D) -> void:
@@ -1078,8 +1044,6 @@ func prop(path: String, scale: float, solid_size: Vector3) -> void:
 
 
 func tree(path: String, scale: float, tall: float, is_solid: bool) -> void:
-	if expedition_lane(xf.origin, 2.8):
-		return
 	var at := xf.origin
 	var key := "%s|%d|%d" % [path, int(floor(at.x / 40.0)), int(floor(at.z / 40.0))]
 	if not _trees.has(key):

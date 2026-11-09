@@ -87,4 +87,4 @@ Test the dev APK on low- and mid-tier Android devices in four-player sessions, w
 
 ## Subsequent dev artillery tuning
 
-The artillery/expedition update changes Gunner Last Command to an 18 m radius, a 4 s warning and 20 shells over 5 s. Each impact leaves a 3.2 m radius fire zone for 8 s at 10 damage/s; overlaps do not stack and allies are excluded. The 60 s cooldown and 45 impact damage remain. The earlier simulation sample above predates these changes and the added expedition rewards; it is not evidence of the new build’s win rates.
+The artillery update changes Gunner Last Command to an 18 m radius, a 4 s warning and 20 shells over 5 s. Each impact leaves a 3.2 m radius fire zone for 8 s at 10 damage/s; overlaps do not stack and allies are excluded. The 60 s cooldown and 45 impact damage remain. The earlier simulation sample above predates these changes; it is not evidence of the new build’s win rates.

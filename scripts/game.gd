@@ -20,12 +20,6 @@ var force_weather := -1 # a test can ask for a certain weather
 var player_class := "infantry"
 const NAME_SCHEMA := 1
 var name_schema := 0
-var pending_points := 0
-var pending_plays := {}
-var sync_snapshot := {}
-var total_points := 0
-var class_plays := {}
-var run_profession := ""
 var _run_awarded := false
 var player_name := ""
 var unlocked := {} # classes bought, or opened with a code
@@ -217,11 +211,6 @@ func award_doubloons(seconds: float, kills: int, reached_dawn: bool, coop: bool)
 		return 0
 	_run_awarded = true
 	var earned := match_doubloons(seconds, kills, reached_dawn, coop)
-	total_points += earned
-	pending_points += earned
-	var pair := player_class + "|" + run_profession
-	class_plays[pair] = int(class_plays.get(pair, 0)) + 1
-	pending_plays[pair] = int(pending_plays.get(pair, 0)) + 1
 	doubloons += earned
 	save_settings()
 	return earned
@@ -303,17 +292,6 @@ func load_settings() -> void:
 	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
 	player_name = clean_name(str(_saved(c, "progress", "player_name", "")))
 	name_schema = maxi(0, _saved(c, "progress", "name_schema", 0))
-	total_points = maxi(0, _saved(c, "progress", "total_points", 0))
-	pending_points = clampi(_saved(c, "progress", "pending_points", 0), 0, total_points)
-	pending_plays = _saved(c, "progress", "pending_plays", {})
-	sync_snapshot = _saved(c, "progress", "sync_snapshot", {})
-	class_plays = _saved(c, "progress", "class_plays", {})
-	for counters: Dictionary in [class_plays, pending_plays]:
-		for pair: Variant in counters.keys():
-			if not pair is String or not counters[pair] is int or int(counters[pair]) < 0:
-				counters.erase(pair)
-	if not valid_sync_snapshot(sync_snapshot):
-		sync_snapshot.clear()
 	unlocked = _saved(c, "progress", "unlocked", {})
 	redeemed = _saved(c, "progress", "redeemed", {})
 	doubloons = maxi(0, _saved(c, "progress", "doubloons", 0))
@@ -349,11 +327,6 @@ func save_settings() -> void:
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
 	c.set_value("progress", "name_schema", name_schema)
-	c.set_value("progress", "total_points", total_points)
-	c.set_value("progress", "pending_points", pending_points)
-	c.set_value("progress", "pending_plays", pending_plays)
-	c.set_value("progress", "sync_snapshot", sync_snapshot)
-	c.set_value("progress", "class_plays", class_plays)
 	c.set_value("progress", "unlocked", unlocked)
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
@@ -417,19 +390,3 @@ func confirm_name(value: String) -> bool:
 
 func begin_run() -> void:
 	_run_awarded = false
-	run_profession = ""
-
-
-static func valid_sync_snapshot(value: Dictionary) -> bool:
-	if value.is_empty():
-		return true
-	for key: String in ["points", "covered_points"]:
-		if not value.get(key) is int or int(value[key]) < 0:
-			return false
-	for key: String in ["plays", "covered_plays"]:
-		if not value.get(key) is Dictionary:
-			return false
-		for pair: Variant in value[key]:
-			if not pair is String or not value[key][pair] is int or int(value[key][pair]) < 0:
-				return false
-	return true

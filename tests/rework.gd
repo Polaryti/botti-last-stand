@@ -1,5 +1,5 @@
 extends Node
-## Targeted behavior checks for the combat rework and persistent online score snapshots.
+## Targeted behavior checks for the combat rework and match rewards.
 
 var checks := 0
 var failures := 0
@@ -43,12 +43,9 @@ func _ready() -> void:
 	_statuses()
 	print("REWORK progress")
 	_progress()
-	print("REWORK online")
-	await _online()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
-	await _exploration()
 	Sfx.stop_all()
 	OS.delay_msec(120) # allow the audio mixing thread to release stopped playback
 	await get_tree().create_timer(0.1, true, false, true).timeout
@@ -255,11 +252,6 @@ func _statuses() -> void:
 
 
 func _progress() -> void:
-	check(not Game.valid_sync_snapshot({"points": "broken"}), "malformed pending score snapshots are rejected")
-	for cls: String in ClassDefs.ALL:
-		check(Scores.PAIRS.has(cls + "|"), "leaderboard tracks unspecialised " + cls)
-		for spec: Dictionary in AbilityData.tree(cls)["specs"]:
-			check(Scores.PAIRS.has(cls + "|" + str(spec["id"])), "leaderboard tracks " + str(spec["id"]))
 	Game.name_schema = 0
 	Game.player_name = "Old generated name"
 	check(Game.needs_name(), "existing installations get a one-time name prompt")
@@ -269,133 +261,9 @@ func _progress() -> void:
 	check(Game.clean_name("A\nB\tC") == "ABC", "network names strip control characters")
 	Game.mode = Game.Mode.NIGHT
 	Game.begin_run()
-	var before := Game.total_points
-	Game.run_profession = "pestilence"
-	check(Game.award_doubloons(600, 150, true, false) == 60 and Game.total_points == before + 60, "lifetime points use the match reward formula")
-	check(Game.award_doubloons(600, 150, true, false) == 0 and Game.total_points == before + 60, "duplicate match-end callbacks cannot duplicate points")
+	var before := Game.doubloons
+	check(Game.award_doubloons(600, 150, true, false) == 60 and Game.doubloons == before + 60, "match rewards still grant currency")
+	check(Game.award_doubloons(600, 150, true, false) == 0, "match rewards cannot be awarded twice")
 	Game.mode = Game.Mode.SANDBOX
 	Game.begin_run()
-	check(Game.award_doubloons(600, 150, true, false) == 0, "Sandbox awards no points")
-	check(Scores.favourite({"plague_doctor|pestilence": 3, "infantry|duelist": 1}) == "plague_doctor|pestilence", "favourite uses the most-played class-profession pair")
-	Game.total_points = 5
-	Game.pending_points = 5
-	Game.class_plays = {"infantry|duelist": 1}
-	Game.pending_plays = Game.class_plays.duplicate()
-	var snapshot := Scores.make_snapshot(100, {"infantry|duelist": 4})
-	check(snapshot["points"] == 105 and snapshot["plays"]["infantry|duelist"] == 5, "offline progress merges with an existing online identity")
-	Game.total_points += 2
-	Game.pending_points += 2
-	Scores.acknowledge(snapshot)
-	check(Game.total_points == 107 and Game.pending_points == 2, "sync acknowledgement preserves progress earned during the request")
-	Game.save_settings()
-	Game.total_points = 0
-	Game.load_settings()
-	check(Game.total_points == 107 and Game.pending_points == 2 and not Game.needs_name(), "points, pending progress and name migration survive restart")
-
-
-func _online() -> void:
-	# Full API contract checks live in FakeLeaderboard; no live account or network is needed in CI.
-	var fake := FakeLeaderboard.new()
-	add_child(fake)
-	var epic := Net._online_node()
-	epic._ieos = fake
-	epic._user = "self"
-	epic._display_name = Game.player_name
-	Scores._cache_time = -100000
-	fake.ingest_result = 3
-	await Scores.refresh(true)
-	check(not Game.sync_snapshot.is_empty() and Scores.last_error != "", "failed ingest retains its durable score snapshot")
-	var pending_snapshot := Game.sync_snapshot.duplicate(true)
-	fake.ingest_result = 0
-	var rows := await Scores.refresh(true)
-	check(fake.attempts.size() == 2 and fake.attempts[0] == fake.attempts[1], "lost or failed ingest retries the same MAX snapshot")
-	check(Game.sync_snapshot.is_empty() and Game.total_points == pending_snapshot["points"], "acknowledged retry cannot add the same points twice")
-	check(Scores.last_error == "" and rows.size() == 2, "Epic stats and ranks API contract completes")
-	check(rows[0]["points"] > rows[1]["points"], "leaderboard sorts by descending total points")
-	check(rows[0]["name"] == rows[1]["name"], "equal display names remain separate identities")
-	check(rows[0]["favourite"] == "plague_doctor|pestilence", "batched Epic stats resolve favourite profession")
-	check(fake.ingested.has(Scores.prefix() + "POINTS"), "score submission uses the selected release channel")
-	epic._ieos = null
-	epic._user = ""
-	fake.queue_free()
-
-
-func _exploration() -> void:
-	var map_was := Game.night_map
-	var coins_were := Game.doubloons
-	for map_id: String in ["village", "mists", "fort"]:
-		Game.night_map = map_id
-		var area := World.new()
-		add_child(area)
-		area.setup(Game.Mode.FORT if map_id == "fort" else Game.Mode.NIGHT)
-		area.director.running = false
-		area.player.set_physics_process(false)
-		var sites := area.caches.caches.filter(func(c: Dictionary) -> bool: return c["title"] != "Mist cache")
-		check(sites.size() == (4 if map_id == "fort" else 3), "%s has independent expedition stops" % map_id)
-		for c: Dictionary in sites:
-			var at: Vector3 = c["at"]
-			check(not area.terrain.in_water(at.x, at.z), "%s is on dry land" % c["title"])
-			check(area.grid.is_free(area.grid.to_cell(at)), "%s cache is on a walkable cell" % c["title"])
-			check(absf(at.y - area.ground_at(at)) < 0.1, "%s chest rests on the ground" % c["title"])
-			for side: float in [-1, 1]:
-				var from := at + Vector3(side * 5, 0, 3)
-				var route: Array[Vector2i] = area.grid.astar.get_id_path(area.grid.to_cell(from), area.grid.to_cell(at)) if area.grid.is_free(area.grid.to_cell(from)) else ([] as Array[Vector2i])
-				check(not route.is_empty(), "%s has a clear %s approach" % [c["title"], side])
-			area.player.hp = 40.0
-			var before := Game.doubloons
-			area.caches.open_cache(c, area.player)
-			area.caches.open_cache(c, area.player)
-			check(Game.doubloons == before + 15 and area.player.hp > 40, "%s rewards and heals exactly once" % c["title"])
-		var source: MapRoot = (load("res://maps/%s.tscn" % map_id) as PackedScene).instantiate()
-		for piece: Node in source.find_children("*", "Node3D", true, false):
-			if not piece is MapExpedition:
-				continue
-			var trail: PackedVector2Array = piece.trail
-			for segment in trail.size() - 1:
-				var steps := ceili(trail[segment].distance_to(trail[segment + 1]))
-				var blocked := Vector2.INF
-				for step in steps + 1:
-					var spot := trail[segment].lerp(trail[segment + 1], float(step) / steps)
-					if not area.grid.is_free(area.grid.to_cell(Vector3(spot.x, 0, spot.y))):
-						blocked = spot
-						for body: Node3D in [area._body, area._barriers, area._enemy_blocks]:
-							for collider: CollisionShape3D in body.get_children():
-								if collider.shape is BoxShape3D:
-									var local := collider.global_transform.affine_inverse() * Vector3(spot.x, collider.global_position.y, spot.y)
-									var size := (collider.shape as BoxShape3D).size * 0.5 + Vector3.ONE * 0.4
-									if absf(local.x) <= size.x and absf(local.z) <= size.z:
-										print("TRAIL_OBSTACLE ", piece.title, " ", collider.global_position, " size=", (collider.shape as BoxShape3D).size)
-						break
-				check(blocked == Vector2.INF, "%s trail segment %d is clear (blocked at %s)" % [piece.title, segment, blocked])
-		source.free()
-		if map_id != "fort":
-			var field := CommandField.new()
-			area.add_child(field)
-			field.set_physics_process(false)
-			field.world = area
-			var wet := Vector3(20, 0, 64) if map_id == "village" else Vector3(60, -100, 100)
-			wet.y = area.terrain.height(wet.x, wet.z)
-			field._add_fire(wet, 0.0)
-			check(field._fires.is_empty(), "%s artillery leaves no floating fire in water or void" % map_id)
-			field.queue_free()
-		var friend := Avatar.new(area, 42, {"name": "Companion", "class": "infantry"})
-		area.add_child(friend)
-		friend.set_process(false)
-		friend.set_physics_process(false)
-		area.players.append(friend)
-		var cache: Dictionary = sites[0]
-		area.player.global_position = cache["at"]
-		friend.global_position = area.player.global_position + Vector3.RIGHT * 3
-		check(area.caches.nearby_friend(area.player), "%s recognises a nearby travelling companion" % map_id)
-		friend.dead = true
-		check(not area.caches.nearby_friend(area.player), "fallen allies cannot trigger expedition bonuses")
-		friend.dead = false
-		cache["open"] = false
-		area.player.hp = 30.0
-		area.caches.open_cache(cache, area.player)
-		check(area.player.hp == 70.0, "%s group exploration grants ten extra healing" % map_id)
-		area.queue_free()
-		await frames(2)
-	Game.night_map = map_was
-	Game.doubloons = coins_were
-	Game.save_settings()
+	check(Game.award_doubloons(600, 150, true, false) == 0, "Sandbox grants no currency")
