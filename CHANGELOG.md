@@ -2,6 +2,13 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## Development — Projectile and animation fixes
+### Fixed
+- Reused arrows and bolts no longer inherit a thrown bomb’s size. Projectiles stop safely when their owner leaves instead of crediting the host.
+- Remote players’ animation speed adjusts while staying in the same animation, preserving its phase.
+### Changed
+- Shockwave and lightning-warning rims have smoother edges at distance.
+
 ## Development — Artillery update
 ### Fixed
 - Removed the mandatory name-selection prompt and its migration data; original multiplayer naming is restored.

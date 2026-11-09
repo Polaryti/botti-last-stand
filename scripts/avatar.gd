@@ -144,10 +144,12 @@ func view_transform() -> Transform3D:
 
 
 func _play(anim_name: String, speed := 1.0) -> void:
-	if _current == anim_name or not _anim.has_animation(anim_name):
+	if _anim == null or not _anim.has_animation(anim_name):
+		return
+	_anim.speed_scale = speed
+	if _current == anim_name:
 		return
 	_current = anim_name
-	_anim.speed_scale = speed
 	_anim.play(anim_name, 0.15)
 
 

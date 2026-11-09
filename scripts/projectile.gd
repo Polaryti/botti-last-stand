@@ -29,6 +29,7 @@ var sparks := 0 # darts: how many others the spark jumps to
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
+var _owner_assigned := false
 var _returning := false
 var _spin := 0.0
 var _vel := Vector3.ZERO
@@ -59,6 +60,10 @@ func _ready() -> void:
 
 func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range: float, dmg: float, knock_force := 0.0, on_fire := false, bounce_count := 0) -> void:
 	kind = k
+	scale = Vector3.ONE
+	rotation = Vector3.ZERO
+	_spin = 0.0
+	_owner_assigned = false
 	poison = Vector2.ZERO
 	stagger = 0.0
 	mesh = m
@@ -95,12 +100,15 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 ## A bot's shot never hits its own body, and can hit this phone's player if they are on the other side.
 func set_owner_player(p: Player) -> void:
 	owner_player = p
+	_owner_assigned = p != null
 	if p and p.is_bot() and p.bot and is_instance_valid(p.bot.body):
 		_exclude.append(p.bot.body.get_rid())
 
 
 func _owner() -> Player:
-	return owner_player if owner_player != null and is_instance_valid(owner_player) else world.player
+	if _owner_assigned:
+		return owner_player if is_instance_valid(owner_player) else null
+	return world.player
 
 
 func _orient() -> void:
@@ -109,7 +117,7 @@ func _orient() -> void:
 
 
 func stop() -> void:
-	if kind == Kind.AXE and active and _owner():
+	if kind == Kind.AXE and active and not visual and _owner():
 		_owner().axe_returned()
 	active = false
 	visible = false
@@ -121,6 +129,9 @@ func _is_friendly() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if _is_friendly() and not visual and _owner_assigned and not is_instance_valid(owner_player):
+		stop()
+		return
 	if _is_friendly() and not visual:
 		var was := world.begin_act(_owner())
 		_fly(delta)

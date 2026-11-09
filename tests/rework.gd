@@ -41,6 +41,8 @@ func _ready() -> void:
 	await _commander()
 	print("REWORK statuses")
 	_statuses()
+	_projectile_lifecycle()
+	_remote_animation()
 	print("REWORK progress")
 	_progress()
 	Net.leave()
@@ -260,3 +262,45 @@ func _progress() -> void:
 	Game.mode = Game.Mode.SANDBOX
 	Game.begin_run()
 	check(Game.award_doubloons(600, 150, true, false) == 0, "Sandbox grants no currency")
+
+
+func _projectile_lifecycle() -> void:
+	var shot := Projectile.new(w)
+	w.add_child(shot)
+	shot.scale = Vector3.ONE * 3.0
+	shot._spin = 8.0
+	shot.launch(Projectile.Kind.ARROW, null, p.eye_position(), Vector3.FORWARD * 20, 0, 10, 5)
+	check(shot.scale == Vector3.ONE and shot._spin == 0, "reused thrown shots cannot resize the next arrow or retain axe spin")
+	var owner := Player.new(w)
+	w.add_child(owner)
+	shot.set_owner_player(owner)
+	owner.free()
+	check(shot._owner() == null, "a departed projectile owner never falls back to the host")
+	shot._physics_process(0.016)
+	check(not shot.active, "a shot retires before damage or callbacks after its owner leaves")
+	shot.launch(Projectile.Kind.BOLT, null, p.eye_position(), Vector3.FORWARD, 0, 10, 0)
+	check(shot._owner() == p, "a recycled shot clears its previous owner assignment")
+	shot.stop()
+	var axe_was_out := p._axe_out
+	p._axe_out = true
+	shot.launch(Projectile.Kind.AXE, null, p.eye_position(), Vector3.FORWARD, 0, 10, 0)
+	shot.visual = true
+	shot.stop()
+	check(p._axe_out, "another player’s visual axe cannot return the local player’s weapon")
+	p._axe_out = axe_was_out
+	shot.queue_free()
+
+
+func _remote_animation() -> void:
+	var avatar := Avatar.new(w, 99, {"class": "infantry", "name": "Remote"})
+	w.add_child(avatar)
+	avatar.set_process(false)
+	var clips := avatar._anim.get_animation_list()
+	var clip: String = clips[0]
+	avatar._play(clip, 1.4)
+	avatar._anim.advance(0.1)
+	var position_was := avatar._anim.current_animation_position
+	avatar._play(clip, 0.6)
+	check(is_equal_approx(avatar._anim.speed_scale, 0.6), "remote movement updates playback speed without changing animation")
+	check(is_equal_approx(avatar._anim.current_animation_position, position_was), "speed changes preserve animation phase instead of restarting the clip")
+	avatar.queue_free()
