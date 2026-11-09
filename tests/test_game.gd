@@ -2747,7 +2747,10 @@ func test_version_9() -> void:
 	m.show_menu()
 	await frames(2)
 	var last_r := ClosingFog.radius_at(0.0)
-	ok(last_r >= Vector2(Terrain.HALF + 22.0, Terrain.HALF + 22.0).length(), "the fog starts outside the whole map")
+	var pvp_map := (load("res://maps/village.tscn") as PackedScene).instantiate() as MapRoot
+	var fog_reach := Vector2.ONE * (pvp_map.land_half + 22.0)
+	pvp_map.free()
+	ok(last_r >= fog_reach.length(), "the fog starts outside the whole PvP map, independently of the title backdrop")
 	var never_opens := true
 	for t in range(1, 430):
 		var r := ClosingFog.radius_at(float(t))
