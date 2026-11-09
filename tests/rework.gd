@@ -43,6 +43,7 @@ func _ready() -> void:
 	_statuses()
 	_projectile_lifecycle()
 	_remote_animation()
+	_equipment()
 	print("REWORK progress")
 	_progress()
 	Net.leave()
@@ -166,7 +167,7 @@ func _commander() -> void:
 	check(p._bayonet_pending and p._cooldown > 0.0, "Musket can thrust with its bayonet")
 	p.use_art()
 	await frames(32)
-	check(w.count_allies("gunner") == 1, "Gunner Command summons a torch-bearing Gunner")
+	check(w.count_allies("artificer") == 1, "Gunner Command summons an Artificer")
 	pawn("commander", 2)
 	check(p._banner != null and p.max_hp() >= 140.0, "Vanguard has a banner and defensive health")
 	p.use_art()
@@ -304,3 +305,108 @@ func _remote_animation() -> void:
 	check(is_equal_approx(avatar._anim.speed_scale, 0.6), "remote movement updates playback speed without changing animation")
 	check(is_equal_approx(avatar._anim.current_animation_position, position_was), "speed changes preserve animation phase instead of restarting the clip")
 	avatar.queue_free()
+
+
+func _equipment() -> void:
+	pawn("chivalry")
+	p.slots[1] = "sword"
+	check(not p.can_drop_weapon() and not WeaponDefs.lies_around("lance"), "Chivalry lance stays equipped and never enters the loot pool")
+	var pickup_count := w.pickups.size()
+	w.drop_weapon(p.global_position, "lance")
+	check(w.pickups.size() == pickup_count, "Fallen Knights cannot drop exclusive lances")
+	pawn("infantry")
+	check(not p.can_use("lance"), "other classes cannot equip a lance")
+	p.slots = ["sling", "dagger"]
+	p.current = 0
+	p._equip()
+	check(p.weapon_id() == "dagger" and p.slots[0] == null, "obsolete inventory weapons are discarded safely")
+	check(WeaponAnim.keys_for("reap", true) == WeaponAnim.keys_for("reap", false) and BodyAnim.attack_for("scythe", 1) == "Sweep", "scythe always reaps edge-first in both views")
+	pawn("ranger")
+	for id: String in ["bow", "longbow", "crossbow"]:
+		p.slots = [id, null]
+		p.current = 0
+		p.arrows = 3
+		p._equip()
+		p._switch_anim = 0.0
+		p._reload = 1.0
+		p.pose_weapon(p.weapon_def(), 1.0)
+		check(p._vm_arrow.visible, "%s starts nocked" % id)
+		p._cooldown = 0.0
+		p.input_fire = true
+		p._handle_fire()
+		p.input_fire = false
+		p._animate_view(0.001)
+		check(not p._vm_arrow.visible, "%s arrow leaves the hand immediately after firing" % id)
+		p._cooldown = 0.0
+		p._reload = 1.0
+		p.pose_weapon(p.weapon_def(), 1.0)
+		check(p._vm_arrow.visible, "%s is nocked again after reloading" % id)
+		p.arrows = 0
+		p.pose_weapon(p.weapon_def(), 1.0)
+		check(not p._vm_arrow.visible, "%s does not show an arrow without ammunition" % id)
+	var a := Avatar.new(w, 9993, {"class": "chivalry", "name": ""})
+	w.add_child(a)
+	a.apply_pose(p.global_position, 0.4, 0.0, Vector3.ZERO, 1.0, 0, 0, "lance", 1.0)
+	a._process(0.016)
+	a._hand._process(0.016)
+	check((-a._hand.global_basis.z.normalized()).dot(-a.global_basis.z.normalized()) > 0.99, "remote lance points forward independently of the sword wrist")
+	a.apply_pose(p.global_position, 0.4, 0.0, Vector3.ZERO, 1.0, 0, 1, "bow", 1.0)
+	check(a._hand.arrow != null and not a._hand.arrow.visible, "remote arrows disappear on the replicated firing packet")
+	a._hand._process(2.0)
+	check(a._hand.arrow.visible, "remote arrow returns after reload")
+	a.show_statuses(128)
+	check(a._banner != null and a._banner.visible, "Vanguard banner is visible on remote players")
+	a._hand.equip("flail")
+	a._hand._process(1.0)
+	var down := a._hand.chain.global_basis * Vector3.DOWN
+	check(down.normalized().dot(Vector3.DOWN) > 0.99, "idle flail chain hangs toward gravity despite the hand rotation")
+	a._hand.attack()
+	a._hand._process(0.2)
+	check((a._hand.chain.global_basis * Vector3.DOWN).normalized().dot(Vector3.DOWN) < 0.99, "flail chain moves through its attack arc")
+	a._hand.equip("")
+	check(a._hand.chain == null and a._hand.arrow == null, "unequip clears dynamic weapon parts")
+	a.queue_free()
+	pawn("commander", 0)
+	p.flags["quick_command"] = true
+	check(is_equal_approx(float(CommanderKit.art(p)["cd"]), 19.2), "Composure reduces Command cooldown before level ten")
+	p.flags["last_command"] = true
+	check(float(CommanderKit.art(p)["cd"]) == CommanderKit.LAST_CD, "Composure preserves Last Command cooldown")
+	p.flags.erase("last_command")
+	p.flags["war_echo"] = true
+	p.flags["war_shatter"] = true
+	p._war_attacks = 4
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	var bolts := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.owner_player == p)
+	check(bolts.size() == 1 and bolts[0].damage >= 45.0 and bolts[0].pierce == 2 and bolts[0].sparks == 2 and bolts[0].stagger == 0.8, "Warlock fifth hit applies empowered damage, stagger, piercing and chaining talents")
+	for q: Projectile in bolts:
+		q.stop()
+	w.spawn_bolt(p, p.eye_position(), Vector3.FORWARD * 30.0, 26.0, 1.0, 25.0, false)
+	var summon_bolts := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.owner_player == p)
+	check(summon_bolts.size() == 1 and summon_bolts[0].pierce == 0 and summon_bolts[0].sparks == 0 and summon_bolts[0].stagger == 0.0, "a Warlock's summoned Magician does not inherit fifth-hit bolt talents")
+	check("poison damage" in CodexPanel.acquisition("plague_doctor") and not "Store" in CodexPanel.acquisition("plague_doctor"), "Codex explains the Plague Doctor poison unlock")
+	check("VRAIN" in CodexPanel.acquisition("commander") and "code" in CodexPanel.acquisition("commander"), "Codex explains the tournament prize code")
+	for id: String in PowerDefs.ALL:
+		if PowerDefs.ALL[id]["familiar"]:
+			check(PowerDefs.ALL[id]["time"] == 20.0, "%s familiar uses the twenty-second lifetime" % id)
+
+	pawn("commander", 2)
+	p.flags["rally_recovery"] = true
+	p.hp = 60.0
+	w.spawn_ally("infantry", p.global_position + Vector3.RIGHT, 20.0)
+	var retainer: Ally = w.allies.back()
+	retainer.hp = 30.0
+	CommanderKit.cast(p)
+	check(p.hp == 80.0 and retainer.hp == 50.0, "Rally Recovery heals the Commander and its nearby living retinue")
+	pawn("commander", 1)
+	CommanderKit.cast(p)
+	var artificer: Ally = w.allies.back()
+	check(artificer.kind == "artificer" and is_equal_approx(artificer.life, 16.0), "Gunner summons the Artificer kind for sixteen seconds")
+	var victim := target(artificer.global_position + Vector3.FORWARD)
+	artificer._foe = victim
+	artificer._think = 1.0
+	artificer._cooldown = 0.0
+	artificer._tick_own(0.016)
+	check(victim.hp < victim.max_hp and victim.burn_time > 0.0, "summoned Artificer attacks in melee and its torch ignites the target")

@@ -2,6 +2,18 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## Development — Weapon presentation and Commander training
+### Changed
+- The Lance belongs to Chivalry: no map spawns or drops, including Fallen Knights. Other players, bots and knights carry it forward and thrust with it.
+- Scythes reap in one direction. Flails hang from a moving chain and swing forward. Bell Hammers have a reinforced warhammer frame, resonant bell and rear pick.
+- Bows and crossbows lose their nocked arrow when fired and load the next one during recovery. The Sling has been removed.
+- Gunner Musket reloads in 1.25 seconds instead of 1.5; Command summons a torch-wielding Artificer who burns enemies in melee.
+- Every fifth War Staff attack fires an empowered, piercing bolt that staggers enemies. Spellbreaker and Storm Conductor improve piercing or add chain lightning.
+- Commander training now includes spell damage, faster early Command, bayonet stagger, piercing musket shots, longer-lived summons and healing rallies. Vanguard banners have folded cloth, raised heraldry, wind movement and improved grips in both views.
+- Familiars last 20 seconds. Codex class entries explain earned and code unlocks without zero-price Store text; food and ammunition are no longer listed as Codex items.
+### Multiplayer
+- Updated the network protocol for the weapon and summon changes. Players must use the same dev build to play together.
+
 ## Development — Projectile and animation fixes
 ### Fixed
 - Projectiles stop safely when their owner leaves instead of crediting the host.

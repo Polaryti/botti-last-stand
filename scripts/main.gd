@@ -709,7 +709,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 					_fill_class_detail(detail, id, mode, in_store), Vector2(120, 48), Game.pet == pet))
 	detail.add_child(_expand(true))
 	if not owned and c.get("unavailable", false):
-		var how := _body("Not available at this time.", 26)
+		var how := _body(CodexPanel.acquisition(id), 26)
 		how.add_theme_color_override("font_color", UiTheme.ASH)
 		detail.add_child(how)
 	elif not owned and c.has("earned"):

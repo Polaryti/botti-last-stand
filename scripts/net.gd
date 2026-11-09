@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 28
+const PROTOCOL := 29
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -1988,7 +1988,8 @@ func _accept_rally(peer: int, radius: float, last: bool) -> void:
 	if source == null or not is_finite(radius) or world.now < float(_command_ready.get(peer, -1.0)):
 		return
 	radius = clampf(radius, 0.0, 16.0)
-	_command_ready[peer] = world.now + (CommanderKit.LAST_CD if last else CommanderKit.COMMAND_CD)
+	# Remote talent selections are local to their player; enforce the shortest legal trained cooldown.
+	_command_ready[peer] = world.now + (CommanderKit.LAST_CD if last else CommanderKit.TRAINED_COMMAND_CD)
 	world.fx_ring(source.global_position, radius, ClassDefs.color("commander"))
 	blast_fx(source.global_position, radius, Color(0.85, 0.65, 0.25, 0.25))
 	for target: Target in world.players:

@@ -66,7 +66,7 @@ var _shape: CollisionShape3D
 var _capsule: CapsuleShape3D
 var _shadow: MeshInstance3D
 var _parts: Array[MeshInstance3D] = []
-var _hand_mesh: MeshInstance3D
+var _hand_mesh: WeaponVisual
 var _eyes: MeshInstance3D
 var _claws: Array = []
 var _flames: CPUParticles3D
@@ -452,7 +452,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	state = State.ROAM
 	weapon_id = ""
 	if _hand_mesh:
-		_hand_mesh.mesh = null
+		_hand_mesh.equip("")
 	if def.has("weapon"):
 		weapon_id = def["weapon"]
 		_show_weapon(weapon_id)
@@ -612,12 +612,18 @@ func _show_weapon(id: String) -> void:
 	if _skeleton == null:
 		return
 	if _hand_mesh == null:
-		_hand_mesh = _attach("handslot.r", null, Vector3.ZERO)
+		var attachment := BoneAttachment3D.new()
+		attachment.bone_name = "handslot.r"
+		_skeleton.add_child(attachment)
+		_hand_mesh = WeaponVisual.new()
+		attachment.add_child(_hand_mesh)
 	var d: Dictionary = WeaponDefs.ALL[id]
-	_hand_mesh.mesh = WeaponDefs.mesh(id)
+	_hand_mesh.equip(id)
 	var hold := 0.55 if WeaponDefs.is_ranged(id) or id in ["lance", "spear", "pitchfork", "javelins"] else 1.0
 	_hand_mesh.scale = Vector3.ONE * float(d["scale"]) * hold * 2.2 / float(_fit[model_id])
 	_hand_mesh.rotation = WeaponDefs.hand_rotation(id)
+	if id in WeaponDefs.ALIGNED_HELD:
+		_hand_mesh.hold(self, true, WeaponDefs.held_size(id) * _scale)
 
 
 func _restore_materials() -> void:
@@ -660,6 +666,8 @@ func _play(anim_name: String, speed := 1.0, blend := 0.2) -> void:
 	if _current_anim == anim_name:
 		_anim.speed_scale = speed
 		return
+	if _hand_mesh and anim_name in ["Thrust", "Overhead", "Sweep", "BoSpin", "Throw", "1H_Melee_Attack_Chop", "2H_Ranged_Shoot"]:
+		_hand_mesh.attack()
 	_current_anim = anim_name
 	_anim.speed_scale = speed
 	_anim.play(anim_name, blend)
@@ -956,7 +964,7 @@ func _die() -> void:
 		world.drop_weapon(position + Vector3(0, 0, 0.5), weapon_id)
 		weapon_id = ""
 		if _hand_mesh:
-			_hand_mesh.mesh = null
+			_hand_mesh.equip("")
 	world.on_zombie_killed(self)
 
 
@@ -965,7 +973,7 @@ func net_die() -> void:
 	_show_death()
 	weapon_id = ""
 	if _hand_mesh:
-		_hand_mesh.mesh = null
+		_hand_mesh.equip("")
 
 
 func _show_death() -> void:

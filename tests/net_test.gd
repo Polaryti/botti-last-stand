@@ -1119,6 +1119,7 @@ func _commander() -> void:
 	ok(not pl.dead and pl._buffs.has("command_speed"), "host-authorized Last Command revives and buffs nearby players")
 	if host:
 		ok(Net.respawn_seconds() < 0.0, "Commander revival cancels the old respawn timer")
+		ok(_avatar()._banner != null and _avatar()._banner.visible, "remote Vanguard banner is replicated and visible")
 	else:
 		ok(w.count_allies("infantry") == 2, "Commander summons two Infantry")
 	# The host rejects a second Last Command within the cooldown, regardless of client state.
@@ -1154,6 +1155,15 @@ func _commander() -> void:
 	ok(field._fires.size() == 20 and field._spawned == 20, "all twenty shells and lingering zones appear on both peers")
 	ok(pl.hp == hp_before, "cooperative artillery and fire never hurt allies")
 	await sync(107)
+	if not host:
+		pl.flags.erase("last_command")
+		pl.spec_id = "gunner"
+		CommanderKit.equip(pl)
+		pl.art_cd_left = 0.0
+		pl.use_art()
+	await until(func() -> bool: return w.allies.any(func(a: Ally) -> bool: return a.kind == "artificer" and not a.dead), 4.0)
+	ok(w.allies.any(func(a: Ally) -> bool: return a.kind == "artificer" and not a.dead), "Gunner's summoned Artificer reaches both phones")
+	await sync(108)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.

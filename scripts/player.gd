@@ -223,7 +223,7 @@ var toast_time := 0.0
 var head: Node3D
 var camera: Camera3D
 var _vm_root: Node3D
-var _vm_mesh: MeshInstance3D
+var _vm_mesh: WeaponVisual
 var _shield_node: MeshInstance3D
 var _horse: Node3D
 var _horse_legs: Array[Node3D] = []
@@ -293,7 +293,7 @@ func _init(owner_world: World, as_bot := 0) -> void:
 	head.add_child(camera)
 	_vm_root = Node3D.new()
 	camera.add_child(_vm_root)
-	_vm_mesh = MeshInstance3D.new()
+	_vm_mesh = WeaponVisual.new()
 	_vm_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_vm_mesh.layers = 2
 	_vm_root.add_child(_vm_mesh)
@@ -603,6 +603,11 @@ func switch_weapon() -> void:
 
 
 func _equip() -> void:
+	for i in slots.size():
+		if slots[i] != null and not WeaponDefs.ALL.has(str(slots[i])):
+			slots[i] = null
+	if slots[current] == null and slots[1 - current] != null:
+		current = 1 - current
 	var d := weapon_def()
 	_melee_pending = -1.0
 	_bashing = false
@@ -619,9 +624,9 @@ func _equip() -> void:
 	_vm_arrow.visible = false
 	_vm_orb.visible = false
 	if d.is_empty():
-		_vm_mesh.mesh = null
+		_vm_mesh.equip("", true)
 		return
-	_vm_mesh.mesh = WeaponDefs.mesh(weapon_id())
+	_vm_mesh.equip(weapon_id(), true)
 	_vm_mesh.rotation.y = float(d.get("mesh_yaw", 0.0))
 	_vm_mesh.visible = not (d.get("returning", false) and _axe_out)
 	_vm_root.scale = Vector3.ONE * float(d["scale"])
@@ -3074,6 +3079,7 @@ func _handle_fire() -> void:
 		return
 	_cooldown = attack_interval(d)
 	attack_count += 1
+	_vm_mesh.attack()
 	match d["kind"]:
 		WeaponDefs.Kind.MELEE:
 			if weapon_id() == "war_staff":
@@ -3202,11 +3208,11 @@ func _cast_bolt(d: Dictionary) -> void:
 	var start := camera.global_position + dir * 0.6 + camera.global_basis.x * 0.12 + Vector3.DOWN * 0.02
 	_shot_count += 1
 	var meteor := has_flag("meteor") and _shot_count % 4 == 0
-	var dmg := WeaponDefs.DAMAGE * m("spell_damage") * damage_multiplier()
+	var dmg := WeaponDefs.DAMAGE * m("spell_damage") * damage_multiplier() * (1.8 if weapon_id() == "war_staff" else 1.0)
 	var element := ""
 	if has_flag("elements"):
 		element = ["fire", "frost", "storm"][_shot_count % 3]
-	world.spawn_bolt(self, start, dir * float(d["speed"]), float(d["range"]), float(d["knock"]), dmg, meteor, element)
+	world.spawn_bolt(self, start, dir * float(d["speed"]), float(d["range"]), float(d["knock"]), dmg, meteor, element, weapon_id() == "war_staff")
 	_swing_time = clampf(_cooldown * 0.85, 0.2, 0.6)
 	_swing = 0.0
 	_swing_keys = "cast"
@@ -3274,6 +3280,8 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		return
 	if has_flag("blood_frenzy") and hp < max_hp() * 0.5:
 		hp = minf(max_hp(), hp + 3.0)
+	if weapon_id() == "musket" and has_flag("bayonet_stagger"):
+		z.stun(0.6)
 	if d.get("burns", false):
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if d.has("stun"):
@@ -3433,7 +3441,7 @@ func _pose_shot(d: Dictionary, pos: Vector3, q: Quaternion) -> void:
 		aim = Quaternion(Vector3(0, 0, 1), -loosed * 0.14) * Quaternion(Vector3(1, 0, 0), loosed * 0.1)
 	_vm_root.position = pos
 	_vm_root.basis = Basis(q * aim).scaled(Vector3.ONE * float(d["scale"]))
-	_vm_arrow.visible = weapon_id() != "musket" and r >= 0.55 and (arrows > 0 or r < 1.0)
+	_vm_arrow.visible = weapon_id() in ["bow", "longbow", "crossbow"] and r >= 0.55 and arrows > 0
 	if _vm_arrow.visible:
 		var nock: Vector3 = d.get("nock", Vector3.ZERO)
 		var slide := 1.0 - smoothstep(0.55, 0.85, r)
@@ -3502,6 +3510,7 @@ func _refresh_banner() -> void:
 	_banner.mesh = WeaponDefs.banner_mesh()
 	_banner.layers = 2
 	_banner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_banner.position = Vector3(-0.58, -0.78, -0.95)
-	_banner.scale = Vector3.ONE * 0.42
+	_banner.position = Vector3(-0.4, -0.45, -0.8)
+	_banner.rotation.y = -0.65
+	_banner.scale = Vector3.ONE * 0.55
 	camera.add_child(_banner)

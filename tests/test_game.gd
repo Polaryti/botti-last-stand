@@ -2142,9 +2142,9 @@ func test_version_13() -> void:
 	var longbow: Dictionary = WeaponDefs.ALL["longbow"]
 	ok(WeaponDefs.DAMAGE * float(longbow["power"]) >= float(ZombieDefs.ALL["normal"]["hp"]), "one long bow arrow kills a plain zombie")
 	ok(int(longbow["pierce"]) == 2, "and goes on through two more")
-	for id: String in ["javelins", "sling", "blowgun"]:
+	for id: String in ["javelins", "blowgun"]:
 		ok(WeaponDefs.is_ranged(id) and WeaponDefs.mesh(id) != null, "%s is a new ranged weapon" % id)
-	ok(not WeaponDefs.uses_arrows(WeaponDefs.ALL["sling"]), "the sling needs no arrows")
+	ok(not WeaponDefs.ALL.has("sling"), "the sling has been removed")
 	# Debuffs, on a mob.
 	var z := spawn("normal", front(6.0), true)
 	z.hp = 1000.0
@@ -2974,7 +2974,7 @@ func test_version_8() -> void:
 	ok(not w.director.running and not Game.is_night(), "with no night running")
 	var weapon_count := 0
 	for id: String in WeaponDefs.ALL:
-		if not WeaponDefs.ALL[id].get("hidden", false) and id != "staff":
+		if WeaponDefs.lies_around(id):
 			weapon_count += 1
 	await seconds(2.2)
 	var items := {}
@@ -3618,7 +3618,7 @@ func test_powers() -> void:
 		w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
 		await seconds(0.25)
 		ok(pl.has_power(id), "%s activates" % id)
-		var want: float = 40.0 if PowerDefs.ALL[id]["familiar"] else 20.0
+		var want := 20.0
 		ok(absf(float(pl.powers[id]) - want) < 1.0, "%s lasts %d s" % [id, want])
 		pl.powers.erase(id)
 		if pl._familiars.has(id):
@@ -3636,7 +3636,7 @@ func test_powers() -> void:
 	ok(pl._familiars.has("angel"), "familiar appears")
 	pl.powers["angel"] = 1.0
 	pl.activate_power("angel")
-	ok(float(pl.powers["angel"]) > 39.0, "picking up the same power resets its timer")
+	ok(float(pl.powers["angel"]) > 19.0, "picking up the same power resets its timer")
 	pl.powers["angel"] = 0.1
 	await seconds(0.3)
 	ok(not pl._familiars.has("angel"), "familiar leaves when its time ends")

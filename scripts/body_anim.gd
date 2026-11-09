@@ -158,7 +158,9 @@ static func attack_for(weapon: String, count := 0) -> String:
 	match str(d.get("swing", "")):
 		"thrust", "stab": return "Thrust"
 		"overhead", "smash": return "Overhead"
-		"slash", "reap": return "Sweep" if count % 2 == 0 else "1H_Melee_Attack_Chop"
+		"reap": return "Sweep"
+		"flail": return "Overhead"
+		"slash": return "Sweep" if count % 2 == 0 else "1H_Melee_Attack_Chop"
 		"bo": return "BoSpin" if count % 3 == 0 else "Sweep"
 	return "Unarmed_Melee_Attack_Punch_A"
 

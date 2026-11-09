@@ -1182,8 +1182,8 @@ func spawn_axe(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: fl
 			Net.shot(1, at, vel, 0.0, max_range, false, Color.WHITE)
 
 
-func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: float, dmg: float, meteor: bool, element := "") -> void:
-	var col := Color(0.55, 0.75, 1.0)
+func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: float, dmg: float, meteor: bool, element := "", empowered := false) -> void:
+	var col := Color(0.7, 0.35, 1.0) if empowered else Color(0.55, 0.75, 1.0)
 	match element:
 		"fire": col = Color(1.0, 0.5, 0.12)
 		"frost": col = Color(0.65, 0.95, 1.0)
@@ -1196,6 +1196,10 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 		shot.set_owner_player(p)
 		shot.from_player = true
 		shot.frost = element == "frost"
+		if empowered:
+			shot.pierce = 2 if p.has_flag("war_shatter") else 1
+			shot.stagger = 0.8
+			shot.sparks = 2 if p.has_flag("war_echo") else 0
 		if meteor:
 			shot.blast_radius = 5.0
 			shot.scale = Vector3.ONE * 2.0

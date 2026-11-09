@@ -122,7 +122,7 @@ func _classes() -> void:
 			paths.append(spec["name"])
 		var note := "Health %d, speed %d%%. Paths: %s." % [int(d["hp"]), int(round(float(d["speed"]) * 100.0)), ", ".join(paths)]
 		if not Game.owns_class(id):
-			note += " In the Store for %d doubloons." % ClassDefs.price(id)
+			note += " " + acquisition(id)
 		_row(ClassDefs.icon(id), ClassDefs.color(id), d["name"], d["desc"], note)
 
 
@@ -148,10 +148,6 @@ func _items() -> void:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if not d["familiar"]:
 			_row(Icons.power(id), Color(d["color"]).darkened(0.35), "%s Potion" % d["name"], d["desc"], "%d seconds" % int(d["time"]))
-	for id: String in PowerDefs.FOODS:
-		var f: Dictionary = PowerDefs.FOODS[id]
-		_row("drop+heart", Color(0.3, 0.5, 0.25), f["name"], "Heals %d health." % int(f["heal"]))
-	_row("arrows", Color(0.5, 0.45, 0.35), "Arrows", "A bundle of 12, for bows and crossbows.")
 
 
 func _weapons() -> void:
@@ -168,3 +164,16 @@ func _weapons() -> void:
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
 		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
+
+
+static func acquisition(id: String) -> String:
+	var earned := Game.earn_text(id)
+	if earned != "":
+		return earned
+	if ClassDefs.price(id) > 0:
+		return "In the Store for %d doubloons." % ClassDefs.price(id)
+	if id == "commander":
+		return "First prize in VRAIN tournaments. Redeem the prize code to unlock."
+	if ClassDefs.ALL[id].get("unavailable", false):
+		return "Unlocked by redeeming a class code."
+	return "Available from the start."

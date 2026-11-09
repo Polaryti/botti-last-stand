@@ -23,7 +23,7 @@ Bots occupy player slots and support multiplayer rules, levelling, skill choices
 
 **The Mists** is a separate survival map of floating islands, ruins, bridges, stepping stones and timed portals. Falling into the void is fatal. Its hazards include jumping enemies, Rift Stalkers and airborne Mist Harriers.
 
-Fight with melee weapons, bows, crossbows, thrown weapons and class-specific attacks. Collect food, ammunition, potions, powers and familiars. Enemy types include ordinary zombies, beasts, spellcasters, ambushers, flying enemies, Dread Riders and Fallen Heroes. Most nights are clear; rain and thunderstorms alter visibility, and lightning warns with a glowing ground marker before it strikes.
+Fight with melee weapons, bows, crossbows, thrown weapons and class-specific attacks. Collect food, ammunition, potions, powers and familiars. Familiars last 20 seconds before duration upgrades. Chivalry’s Lance is class-exclusive and cannot be dropped or found as loot. Enemy types include ordinary zombies, beasts, spellcasters, ambushers, flying enemies, Dread Riders and Fallen Heroes. Most nights are clear; rain and thunderstorms alter visibility, and lightning warns with a glowing ground marker before it strikes.
 
 Each match build progresses to **level 10**: three early choices, one of three specializations, four branch choices and a final ability. Builds combine damage, movement, defence, status effects, summons and active skills.
 
@@ -49,7 +49,7 @@ Redeem codes can also unlock supported classes. Codes are stored as hashes. Adep
 
 **Adept** commits to Wind, Stone or Flame for six seconds, with a visible transition and a persistent stance card. Three connected melee attacks grant +15% damage until the next switch and empower that transition. Blade Dancer converts transitions into sweeps; Mirror Step combines timed damage recovery, protection and counters; Void Walker earns a temporary invisible stance through hits in different stances.
 
-**Commander** is limited to one human per match; bots cannot choose it. Command becomes Last Command at level 10. Warlock keeps a War Staff whose fifth attack fires magic, summons a Magician, then commands an enemy-only storm. Gunner keeps a Musket with a melee bayonet, summons a torch-bearing Gunner, then selects an artillery circle on the map: everyone receives a warning, followed four seconds later by five seconds of shelling across an 18 m radius. Shells leave eight-second fire zones that damage enemies without stacking. Vanguard carries an off-hand banner, rallies nearby allies, then revives eligible allies, grants buffs and calls two Infantry. Exclusive weapons never appear as loot and cannot be dropped.
+**Commander** is limited to one human per match; bots cannot choose it. Command becomes Last Command at level 10. Warlock keeps a War Staff whose fifth attack fires empowered, piercing magic that staggers enemies, summons a Magician, then commands an enemy-only storm. Gunner keeps a Musket with a melee bayonet, summons a torch-bearing Artificer, then selects an artillery circle on the map: everyone receives a warning, followed four seconds later by five seconds of shelling across an 18 m radius. Shells leave eight-second fire zones that damage enemies without stacking. Vanguard carries an off-hand banner, rallies nearby allies, then revives eligible allies, grants buffs and calls two Infantry. Exclusive weapons never appear as loot and cannot be dropped.
 
 
 

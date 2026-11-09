@@ -10,7 +10,8 @@ const HIT_MOMENT_START := 0.18 # a hit from another move joins the swing just be
 const REST_DIRS := {
 	"stab": Vector3(0.08, 0.5, -0.86),
 	"slash": Vector3(-0.22, 0.75, -0.62),
-	"reap": Vector3(-0.05, 0.88, -0.45),
+	"reap": Vector3(0.1, 0.94, -0.32),
+	"flail": Vector3(0.08, 0.96, -0.25),
 	"smash": Vector3(-0.28, 0.8, -0.3),
 	"claw": Vector3(-0.06, 0.82, -0.56),
 	"overhead": Vector3(-0.1, 0.94, -0.3),
@@ -92,17 +93,18 @@ const KEYS := {
 		[0.45, Vector3(0.12, 0.1, -0.06), Vector3(0.9, 0.42, -0.18), -0.8],
 		[1.0, Vector3.ZERO, Vector3(-0.22, 0.75, -0.62), 0.0]],
 	"reap_a": [
-		[0.0, Vector3.ZERO, Vector3(-0.05, 0.88, -0.45), 0.0],
-		[0.2, Vector3(0.16, 0.06, 0.1), Vector3(0.72, 0.62, -0.1), 0.0],
-		[0.3, Vector3(0.02, -0.04, -0.12), Vector3(0.12, 0.42, -0.9), 0.0],
-		[0.48, Vector3(-0.44, -0.1, -0.06), Vector3(-0.9, 0.3, -0.28), 0.0],
-		[1.0, Vector3.ZERO, Vector3(-0.05, 0.88, -0.45), 0.0]],
-	"reap_b": [
-		[0.0, Vector3.ZERO, Vector3(-0.05, 0.88, -0.45), 0.0],
-		[0.2, Vector3(-0.42, -0.04, 0.02), Vector3(-0.85, 0.45, -0.1), 0.0],
-		[0.3, Vector3(-0.1, -0.05, -0.14), Vector3(-0.1, 0.42, -0.9), 0.0],
-		[0.48, Vector3(0.2, 0.0, -0.06), Vector3(0.88, 0.4, -0.2), 0.0],
-		[1.0, Vector3.ZERO, Vector3(-0.05, 0.88, -0.45), 0.0]],
+		[0.0, Vector3.ZERO, Vector3(0.1, 0.94, -0.32), 0.0],
+		[0.2, Vector3(0.18, -0.06, 0.12), Vector3(0.72, 0.32, -0.61), -0.2],
+		[0.3, Vector3(-0.16, -0.12, -0.24), Vector3(-0.2, 0.3, -0.93), 0.0],
+		[0.5, Vector3(-0.65, -0.13, -0.06), Vector3(-0.93, 0.24, -0.27), 0.15],
+		[0.75, Vector3(-0.25, -0.22, 0.12), Vector3(-0.6, 0.6, -0.5), 0.05],
+		[1.0, Vector3.ZERO, Vector3(0.1, 0.94, -0.32), 0.0]],
+	"flail_a": [
+		[0.0, Vector3.ZERO, Vector3(0.08, 0.96, -0.25), 0.0],
+		[0.2, Vector3(0.12, 0.16, 0.1), Vector3(0.6, 0.5, 0.62), 0.0],
+		[0.3, Vector3(-0.08, -0.02, -0.2), Vector3(-0.15, 0.2, -0.97), 0.0],
+		[0.48, Vector3(-0.38, -0.18, -0.12), Vector3(-0.7, -0.1, -0.7), 0.0],
+		[1.0, Vector3.ZERO, Vector3(0.08, 0.96, -0.25), 0.0]],
 	"smash_a": [
 		[0.0, Vector3.ZERO, Vector3(-0.28, 0.8, -0.3), 0.0],
 		[0.2, Vector3(0.04, 0.16, 0.02), Vector3(0.1, 0.86, 0.5), 0.0],
@@ -168,7 +170,7 @@ static func both_hands(d: Dictionary) -> bool:
 static func keys_for(swing: String, side: bool) -> String:
 	if swing == "":
 		return ""
-	return swing + ("_a" if side else "_b")
+	return "reap_a" if swing == "reap" else "flail_a" if swing == "flail" else swing + ("_a" if side else "_b")
 
 
 ## The blade's +Y axis points along dir, and roll turns the edge to face the swing.
@@ -233,7 +235,7 @@ static func smear_roll(keys: String) -> float:
 		"slash_a", "bo_a": return 0.28
 		"slash_b", "bo_b": return -0.28
 		"reap_a": return 0.1
-		"reap_b": return -0.1
+		"flail_a": return 0.55
 		"smash_a": return 1.35
 		"smash_b": return 0.95
 	return NAN
@@ -243,8 +245,8 @@ static func smear_roll(keys: String) -> float:
 static func smear_turn(keys: String) -> float:
 	match keys:
 		"slash_a", "reap_a", "claw_a", "bo_a": return 0.9
-		"slash_b", "reap_b", "claw_b", "bo_b": return -0.9
-		"smash_a", "smash_b": return 0.6
+		"slash_b", "claw_b", "bo_b": return -0.9
+		"smash_a", "smash_b", "flail_a": return 0.6
 	return 0.0
 
 

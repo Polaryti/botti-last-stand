@@ -23,7 +23,7 @@ var _weapon := ""
 var _visual: Node3D
 var _anim: AnimationPlayer
 var _skeleton: Skeleton3D
-var _hand: MeshInstance3D
+var _hand: WeaponVisual
 var _label: Label3D
 var _current := ""
 var _fit := 1.0
@@ -102,7 +102,7 @@ func _build_body(model: String) -> void:
 	var a := BoneAttachment3D.new()
 	a.bone_name = "handslot.r"
 	_skeleton.add_child(a)
-	_hand = MeshInstance3D.new()
+	_hand = WeaponVisual.new()
 	_hand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	a.add_child(_hand)
 	_play("Idle")
@@ -176,7 +176,8 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 		bar_time = 2.5
 	hp_fraction = hp_left
 	set_fallen(flags & 1 != 0)
-	if attacks != _attack_seen:
+	var attacked := attacks != _attack_seen
+	if attacked:
 		_attack_seen = attacks
 		if not dead:
 			_attack_left = 0.5
@@ -185,10 +186,15 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 			Sfx.play_at("swing", global_position, world.player.global_position if world.player else global_position, -4.0)
 	if weapon != _weapon:
 		_weapon = weapon
-		_hand.mesh = WeaponDefs.mesh(weapon) if weapon != "" and weapon != "fists" else null
+		_hand.equip(weapon)
 		if weapon != "":
-			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * (0.8 if WeaponDefs.hand_rotation(weapon) != Vector3.ZERO else 1.6) / _fit
+			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * (0.8 if WeaponDefs.ALL[weapon]["kind"] == WeaponDefs.Kind.RANGED or WeaponDefs.ALL[weapon].get("swing", "") == "thrust" else 1.6) / _fit
 			_hand.rotation = WeaponDefs.hand_rotation(weapon)
+			if weapon in WeaponDefs.ALIGNED_HELD:
+				_hand.hold(self, false, WeaponDefs.held_size(weapon))
+
+	if attacked:
+		_hand.attack()
 
 
 ## They used an ability: everyone can see them raise a hand.
@@ -339,6 +345,9 @@ func _process(delta: float) -> void:
 		_chariot.roll(velocity.length() * delta)
 	if _horse and _horse.visible:
 		HorseModel.set_gait(_horse, clampf(velocity.length() / 8.0, 0.0, 1.0))
+	if _banner and _banner.visible:
+		var wave := sin(world.now * (10.0 if _attack_left > 0.0 else 2.0)) * (0.18 if _attack_left > 0.0 else 0.035)
+		_banner.global_transform = Transform3D(global_basis * Basis.from_euler(Vector3(0, -0.65, wave)), (_banner.get_parent() as Node3D).global_position)
 	if not dead and _attack_left <= 0.0:
 		_play("Running_A" if velocity.length_squared() > 0.5 else "Idle", maxf(0.8, velocity.length() / 5.0))
 

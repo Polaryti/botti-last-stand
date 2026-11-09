@@ -2,7 +2,7 @@ class_name PowerDefs
 ## Timed potions and familiars, plus food. Icons are built from simple shapes.
 
 const POTION_TIME := 20.0
-const FAMILIAR_TIME := 40.0
+const FAMILIAR_TIME := 20.0
 const SENSOR_RANGE := 20.0
 
 const ALL := {
