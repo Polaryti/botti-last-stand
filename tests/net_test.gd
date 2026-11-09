@@ -922,6 +922,9 @@ func _fog_match() -> void:
 	await sync(40)
 	ok(absf(w.fog.radius - ClosingFog.radius_at(w.director.elapsed)) < 4.0 and w.fog.radius < 100.0, "the fog has closed in on this phone (%.0f)" % w.fog.radius)
 	ok(not w.fog.contains(w.fog.centre3() + Vector3(120, 0, 0)), "far away is outside it")
+	# Isolate fog damage from the random wave restarted for the clock/shrink check above.
+	# The fog keeps processing when the director is stopped; its explicit enemy cull is checked below.
+	await _clear_zombies_on_host()
 	# Out there it hurts, and enemies do not stay.
 	var inside := w.fog.centre3() + Vector3(1.5 if host else -1.5, 0.05, 0)
 	var out := w.fog.centre3() + Vector3(0, 0.05, 92.0)
