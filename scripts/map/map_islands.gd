@@ -619,14 +619,14 @@ func _stairs(b: MapBuilder, l: LowPoly, from: Vector3, to: Vector3, width: float
 		var points: Array[Vector3] = []
 		for p: Vector2 in [a - side, a + side, z + side, z - side]:
 			var fraction := clampf((p - Vector2(from.x, from.z)).dot(along) / Vector2(to.x - from.x, to.z - from.z).length(), 0, 1)
-			points.append(Vector3(p.x, lerpf(from.y, to.y, fraction) + 0.1, p.y))
+			points.append(_at(b, p.x, p.y) + Vector3.UP * 0.025)
 		var under := (points[0] + points[2]) * 0.5 - Vector3.UP
 		var col := STONE.darkened(0.05 + (n % 2) * 0.08)
 		l._tri(points[0], points[1], points[2], under, col)
 		l._tri(points[0], points[2], points[3], under, col)
 		first_vertex._tri(points[0], points[1], points[2], under, col)
 		first_vertex._tri(points[0], points[2], points[3], under, col)
-	_surface_collision(b.w, first_vertex.commit(), "MistStairSurface")
+	# Ramp terrain owns collision, including the blend into the island.
 
 
 func _great_tree_small(b: MapBuilder, x: float, z: float) -> void:
@@ -1044,12 +1044,12 @@ func _ground_ring(b: MapBuilder, l: LowPoly, c: Vector3, inner: float, outer: fl
 			for v: Vector2 in [Vector2(ring, n), Vector2(ring, n + 1), Vector2(ring + 1, n + 1), Vector2(ring + 1, n)]:
 				var radius := lerpf(inner, outer, v.x / rings)
 				var angle := v.y / 64.0 * TAU
-				points.append(_at(b, c.x + cos(angle) * radius, c.z + sin(angle) * radius) + Vector3.UP * 0.1)
+				points.append(_at(b, c.x + cos(angle) * radius, c.z + sin(angle) * radius) + Vector3.UP * 0.025)
 			var under := (points[0] + points[2]) * 0.5 - Vector3.UP
 			for target: LowPoly in [l, floor_mesh]:
 				target._tri(points[0], points[1], points[2], under, col)
 				target._tri(points[0], points[2], points[3], under, col)
-	_surface_collision(b.w, floor_mesh.commit(), "RotundaWalkingSurface")
+	# The shared terrain heightfield is the walking surface; avoid overlapping triangle seams.
 
 
 func _gate_clear(b: MapBuilder, at: Vector2, island: int) -> bool:

@@ -131,16 +131,6 @@ func _physics_process(delta: float) -> void:
 			if target is Player and not target.dead and contains(target.global_position):
 				target.hurt(amount, global_position)
 		if not Net.active() or Net.is_host():
-			for mob: Zombie in world.zombies.duplicate():
-				if mob.is_alive() and contains(mob.position):
-					var flinch := mob._hurt_stun
-					var hitter := mob.last_hitter
-					mob.next_hitter = -1
-					mob.take_damage(amount, Vector3.ZERO, 0.0, mob.centre())
-					mob._hurt_stun = flinch
-					if mob.is_alive():
-						mob.last_hitter = hitter
-						mob.next_hitter = 0
 			for ally: Ally in world.allies:
 				if not ally.dead and contains(ally.global_position): ally.hurt(amount, global_position)
 	if world.player:

@@ -103,8 +103,10 @@ func _island_shape(x: float, z: float) -> float:
 		var b: Vector3 = ramp[1]
 		var ab := Vector2(b.x - a.x, b.z - a.z)
 		var t := clampf(Vector2(x - a.x, z - a.z).dot(ab) / ab.length_squared(), 0, 1)
-		if Vector2(x, z).distance_to(Vector2(a.x, a.z) + ab * t) <= 5.0:
-			best = lerpf(a.y, b.y, t)
+		var distance := Vector2(x, z).distance_to(Vector2(a.x, a.z) + ab * t)
+		if distance < 8.0:
+			var ramp_y := lerpf(a.y, b.y, t)
+			best = lerpf(ramp_y, best, smoothstep(4.0, 8.0, distance)) if best > 0 else ramp_y
 	return best
 
 
