@@ -4,10 +4,11 @@ Newest first. The game shows this file on its Changelog screen, so keep the same
 
 ## Development — Projectile and animation fixes
 ### Fixed
-- Reused arrows and bolts no longer inherit a thrown bomb’s size. Projectiles stop safely when their owner leaves instead of crediting the host.
+- Projectiles stop safely when their owner leaves instead of crediting the host.
 - Remote players’ animation speed adjusts while staying in the same animation, preserving its phase.
 ### Changed
 - Shockwave and lightning-warning rims have smoother edges at distance.
+- Projectile reuse resets transform and spin in one place; visual-only shots cannot trigger local weapon-return callbacks.
 
 ## Development — Artillery update
 ### Fixed

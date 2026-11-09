@@ -1457,7 +1457,6 @@ func aim_point(from: Vector3, reach: float) -> Vector3:
 func _launch(kind: int, m: Mesh, at: Vector3, vel: Vector3, grav: float, max_range: float, dmg: float, knock := 0.0, fire := false, bounces := 0) -> Projectile:
 	for p in _projectiles:
 		if not p.active:
-			p.scale = Vector3.ONE
 			p.launch(kind, m, at, vel, grav, max_range, dmg, knock, fire, bounces)
 			return p
 	return null
