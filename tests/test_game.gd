@@ -1105,6 +1105,16 @@ func test_version_20_1() -> void:
 	ok(texts.any(func(t: String) -> bool: return t.begins_with("Version 9.0.0 is out")), "the menu says a new version is out")
 	up.state = Updates.State.NONE
 	m._fill_update_box()
+	var update_buttons: Array = m._update_box.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	ok(update_buttons.has("Check again"), "an up-to-date game still has a manual update check")
+	up._check_failed("Could not connect to the update server. Retry or open Releases.")
+	update_buttons = m._update_box.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
+	ok(update_buttons.has("Retry check") and update_buttons.has("Open Releases"), "a failed update check offers both retry and release-page access")
+	ok(m._update_box.find_children("*", "Label", true, false).any(func(label: Label) -> bool: return "Could not connect" in label.text), "connection failures are shown instead of hiding the updater")
+	up.state = Updates.State.NONE
+	m._fill_update_box()
+	await frames(2)
+	ok(m._update_box.get_global_rect().end.y <= get_viewport().get_visible_rect().size.y - 20.0, "update controls fit within the phone menu safe area")
 	# The skill tree's words fit their cards, however long.
 	Game.player_class = "monk"
 	await start_clean()

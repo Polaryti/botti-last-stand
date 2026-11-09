@@ -135,13 +135,13 @@ func show_menu(rebuild := false) -> void:
 	mark.texture = load("res://assets/ui/wordmark.png")
 	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	mark.custom_minimum_size = Vector2(752, 80)
+	mark.custom_minimum_size = Vector2(752, 64)
 	mark.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	top.add_child(mark)
 	top.add_child(_expand())
 	top.add_child(_purse_button())
 	var gap := Control.new()
-	gap.custom_minimum_size.y = 14
+	gap.custom_minimum_size.y = 4
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
 	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
@@ -152,12 +152,11 @@ func show_menu(rebuild := false) -> void:
 	box.add_child(_expand(true))
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", 12)
-	box.add_child(foot)
-	# Where a new version shows, when there is one.
+	# Update status has its own row so it remains visible on a phone.
 	_update_box = HBoxContainer.new()
 	_update_box.add_theme_constant_override("separation", 10)
 	_update_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	foot.add_child(_update_box)
+	box.add_child(_update_box)
 	if not updates.changed.is_connected(_fill_update_box):
 		updates.changed.connect(_fill_update_box)
 	_fill_update_box()
@@ -166,6 +165,7 @@ func show_menu(rebuild := false) -> void:
 	if not _checked_updates:
 		_checked_updates = true
 		updates.check()
+	box.add_child(foot)
 	foot.add_child(_button("Codex", show_codex, Vector2(132, 56)))
 	foot.add_child(_button("Changelog", show_changelog, Vector2(168, 56)))
 	foot.add_child(_button("Settings", show_settings, Vector2(146, 56)))
@@ -187,6 +187,20 @@ func _fill_update_box() -> void:
 	var action := ""
 	var press := Callable()
 	match updates.state:
+		Updates.State.IDLE:
+			line = "%s channel • installed v%s" % [Updates.channel_name(), Updates.current()]
+			action = "Check for updates"
+			press = updates.check
+		Updates.State.CHECKING:
+			line = "Checking %s updates…" % Updates.channel_name().to_lower()
+		Updates.State.NONE:
+			line = "%s channel is up to date • v%s" % [Updates.channel_name(), Updates.current()]
+			action = "Check again"
+			press = updates.check
+		Updates.State.CHECK_FAILED:
+			line = "%s updates: %s" % [Updates.channel_name(), updates.problem]
+			action = "Retry check"
+			press = updates.check
 		Updates.State.AVAILABLE:
 			if Updates.can_install():
 				line = "Version %s is out." % updates.latest
@@ -209,14 +223,16 @@ func _fill_update_box() -> void:
 			press = updates.download
 	if line == "":
 		return
-	var l := _body(line, 22)
+	var l := _body(line, 20)
 	l.add_theme_color_override("font_color", UiTheme.EMBER)
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_update_box.add_child(l)
 	if action != "":
-		_update_box.add_child(_button(action, press, Vector2(150, 56), true))
+		_update_box.add_child(_button(action, press, Vector2(200, 56), true))
+	if updates.state in [Updates.State.CHECK_FAILED, Updates.State.FAILED]:
+		_update_box.add_child(_button("Open Releases", func() -> void: OS.shell_open(updates.page), Vector2(190, 56)))
 
 
 ## A margin that also keeps clear of the camera cut-out, on whichever side it is.

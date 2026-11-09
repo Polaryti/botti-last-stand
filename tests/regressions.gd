@@ -122,6 +122,16 @@ func _test_dev_channel() -> void:
 	updates.add_child(updates._http)
 	updates._on_downloaded(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), PackedByteArray())
 	check(updates.state == Updates.State.FAILED and not FileAccess.file_exists(Updates.FILE), "a corrupt download is deleted and never offered for installation")
+	ProjectSettings.set_setting(key, "dev")
+	for response: Array in [[HTTPRequest.RESULT_CANT_RESOLVE, 0, "", "connection"], [HTTPRequest.RESULT_TIMEOUT, 0, "", "timed out"], [HTTPRequest.RESULT_SUCCESS, 403, "{}", "limited"], [HTTPRequest.RESULT_SUCCESS, 503, "{}", "503"], [HTTPRequest.RESULT_SUCCESS, 200, "broken JSON", "invalid data"]]:
+		updates._http = HTTPRequest.new()
+		updates.add_child(updates._http)
+		updates._on_checked(response[0], response[1], PackedStringArray(), str(response[2]).to_utf8_buffer())
+		check(updates.state == Updates.State.CHECK_FAILED and response[3] in updates.problem, "failed update check is visible: %s" % response[3])
+	updates._http = HTTPRequest.new()
+	updates.add_child(updates._http)
+	updates._on_checked(HTTPRequest.RESULT_SUCCESS, 200, PackedStringArray(), "[]".to_utf8_buffer())
+	check(updates.state == Updates.State.NONE and updates.page == Updates.DEV_PAGE, "a successful dev check with no newer build keeps the correct release page")
 	updates.free()
 	ProjectSettings.set_setting(key, previous)
 

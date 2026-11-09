@@ -55,7 +55,7 @@ run number, independently of production’s stable `/latest` feed. Both Android 
 `REQUEST_INSTALL_PACKAGES`; Android asks the player before installation. The downloaded file’s
 size and GitHub SHA-256 digest (when supplied) are verified. Prereleases remain `latest=false`.
 Install dev build 7 or later manually once when upgrading from earlier builds, whose updater was
-disabled. Future dev updates appear in the menu. Production never offers a dev APK.
+disabled. Future dev updates appear in the menu. **Check again** repeats the check after startup; connection, timeout and rate-limit failures show **Retry check** and **Open Releases**. Downloads request a fresh GitHub asset redirect to avoid expired cached links. Production never offers a dev APK.
 
 The workflow uses Godot 4.7.2 and Epic plugin release 2.3.1. If all Epic secrets are available it
 includes online play; if any are missing it builds solo/bots/LAN and says so in the release notes.

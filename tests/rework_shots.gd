@@ -28,6 +28,23 @@ func _ready() -> void:
 	Game.confirm_name("Mara")
 	m.show_menu()
 	await snap("menu_leaderboard")
+	if m.updates._http:
+		m.updates._http.cancel_request()
+		m.updates._http.queue_free()
+		m.updates._http = null
+	var channel_was: Variant = ProjectSettings.get_setting("botti/release_channel")
+	var version_was: Variant = ProjectSettings.get_setting("application/config/version")
+	ProjectSettings.set_setting("botti/release_channel", "dev")
+	ProjectSettings.set_setting("application/config/version", "0.20.2-dev.10+b1286c7")
+	m.show_menu()
+	m.updates.apply_dev_releases([])
+	await snap("menu_update_current")
+	m.updates._check_failed("Could not find the update server. Check your connection and retry.")
+	await snap("menu_update_offline")
+	ProjectSettings.set_setting("botti/release_channel", channel_was)
+	ProjectSettings.set_setting("application/config/version", version_was)
+	m.updates.state = Updates.State.NONE
+	m._fill_update_box()
 	Scores.cached = [{"id": "fixture-a", "name": "Mara", "points": 625, "favourite": "commander|vanguard"}, {"id": "fixture-b", "name": "Mara", "points": 320, "favourite": "plague_doctor|pestilence"}]
 	Scores._cache_time = Time.get_ticks_msec()
 	m.show_leaderboard()

@@ -11,6 +11,7 @@ Newest first. The game shows this file on its Changelog screen, so keep the same
 - Artillery has a ground-following warning, countdown, falling-shell whistles, deeper explosions, shockwaves, brief smoke, animated flames and distance-based camera shake.
 - Fort supply posts and timber depots, village camps and ruined island refuges add landmarks and optional exploration routes.
 ### Fixed
+- The menu always shows update status and a manual check. Failed checks show a reason, retry and release-page access; downloads avoid stale GitHub redirects.
 - Artillery lasts until the final shell and fire have finished. Impact sounds are no longer doubled on remote players.
 - Supply chests cannot pay out twice through repeated opening calls.
 - Multiplayer fog and bot checks isolate their combat scenarios instead of depending on random waves or bot injuries.

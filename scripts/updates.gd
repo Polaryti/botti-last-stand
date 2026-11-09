@@ -1,9 +1,9 @@
 class_name Updates
 extends Node
-## Looks once per launch for a newer version on the game's GitHub page, where every version is
+## Checks at launch or on request for a newer version on the game's GitHub page, where every version is
 ## published with its Android app. On Android it can fetch the new app and hand it to Android's own
 ## installer, which asks before it changes anything. An iPhone app cannot install another, so there it
-## only says a new version is out and where to find it. With no connection it says nothing.
+## only says a new version is out and where to find it. Connection failures remain visible for retry.
 
 signal changed
 
@@ -11,10 +11,11 @@ const LATEST := "https://api.github.com/repos/Polaryti/botti-last-stand/releases
 const DEV_RELEASES := "https://api.github.com/repos/Polaryti/botti-last-stand/releases?per_page=100"
 const DOWNLOADS := "https://github.com/Polaryti/botti-last-stand/releases/download/"
 const PAGE := "https://github.com/Polaryti/botti-last-stand/releases/latest"
+const DEV_PAGE := "https://github.com/Polaryti/botti-last-stand/releases"
 const FOLDER := "user://update"
 const FILE := "user://update/botti-last-stand.apk"
 
-enum State { IDLE, CHECKING, NONE, AVAILABLE, DOWNLOADING, READY, FAILED }
+enum State { IDLE, CHECKING, NONE, AVAILABLE, DOWNLOADING, READY, FAILED, CHECK_FAILED }
 
 var state: int = State.IDLE
 var latest := "" # the newer version, as "0.20.2"
@@ -54,7 +55,7 @@ static func can_install() -> bool:
 
 
 func _headers() -> PackedStringArray:
-	return PackedStringArray(["User-Agent: BottisLastStand/%s" % current(), "Accept: application/vnd.github+json"])
+	return PackedStringArray(["User-Agent: BottisLastStand/%s" % current(), "Accept: application/vnd.github+json", "Cache-Control: no-cache"])
 
 
 func check() -> void:
@@ -63,29 +64,65 @@ func check() -> void:
 	# Whatever was fetched last time has been installed or given up on.
 	if FileAccess.file_exists(FILE):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(FILE))
+	_reset_offer()
+	problem = ""
 	state = State.CHECKING
+	changed.emit()
 	_http = HTTPRequest.new()
-	_http.timeout = 12.0
+	_http.timeout = 20.0
 	add_child(_http)
 	_http.request_completed.connect(_on_checked)
 	if _http.request(endpoint(), _headers()) != OK:
 		_http.queue_free()
-		state = State.NONE
-		changed.emit()
+		_http = null
+		_check_failed("Could not start the update check. Try again.")
 
 
 func _on_checked(result: int, code: int, _headers_got: PackedStringArray, body: PackedByteArray) -> void:
 	_http.queue_free()
 	_http = null
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		state = State.NONE
-		changed.emit()
+		_check_failed(check_problem(result, code))
 		return
-	var data: Variant = JSON.parse_string(body.get_string_from_utf8())
+	var parser := JSON.new()
+	if parser.parse(body.get_string_from_utf8()) != OK:
+		_check_failed("The update server returned invalid data. Try again.")
+		return
+	var data: Variant = parser.data
+	if (Game.is_dev_build() and typeof(data) != TYPE_ARRAY) or (not Game.is_dev_build() and typeof(data) != TYPE_DICTIONARY):
+		_check_failed("The update server returned invalid data. Try again.")
+		return
 	if Game.is_dev_build():
 		apply_dev_releases(data)
 	else:
 		apply_release(data)
+
+
+static func channel_name() -> String:
+	return "Dev" if Game.is_dev_build() else "Production"
+
+
+static func release_page() -> String:
+	return DEV_PAGE if Game.is_dev_build() else PAGE
+
+
+static func check_problem(result: int, code: int) -> String:
+	if code in [403, 429]:
+		return "GitHub limited update checks. Try again later or open Releases."
+	if result == HTTPRequest.RESULT_CANT_RESOLVE:
+		return "Could not find the update server. Check your connection and retry."
+	if result == HTTPRequest.RESULT_TIMEOUT:
+		return "The update check timed out. Retry or open Releases."
+	if code != 200 and code > 0:
+		return "The update server returned HTTP %d. Retry or open Releases." % code
+	return "Could not connect to the update server. Retry or open Releases."
+
+
+func _check_failed(why: String) -> void:
+	page = release_page()
+	problem = why
+	state = State.CHECK_FAILED
+	changed.emit()
 
 
 ## Production uses GitHub's stable release; dev scans prereleases because /latest excludes them.
@@ -118,12 +155,13 @@ static func installed_dev_build() -> int:
 
 
 func _reset_offer() -> void:
+	problem = ""
 	state = State.NONE
 	latest = ""
 	apk_url = ""
 	apk_size = 0
 	apk_digest = ""
-	page = PAGE
+	page = release_page()
 
 
 ## Ignore drafts, stable builds and incomplete uploads; compare Android's monotonic dev run number.
@@ -196,7 +234,9 @@ func download() -> void:
 	add_child(_http)
 	_http.request_completed.connect(_on_downloaded)
 	problem = ""
-	if _http.request(apk_url, _headers()) != OK:
+	# Avoid reusing an expired cached GitHub redirect to its signed asset URL.
+	var download_url := apk_url + ("&" if "?" in apk_url else "?") + "download=1&check=%d" % int(Time.get_unix_time_from_system())
+	if _http.request(download_url, _headers()) != OK:
 		_http.queue_free()
 		_http = null
 		_failed("Could not start the download.")
