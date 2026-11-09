@@ -443,7 +443,62 @@ func _mists() -> void:
 		var query := PhysicsRayQueryParameters3D.create(point + Vector3.UP * 25.0, point + Vector3.UP * 8.0, 1)
 		var hit := mw.get_world_3d().direct_space_state.intersect_ray(query)
 		treads_match = treads_match and not hit.is_empty() and absf((hit["position"] as Vector3).y - mw.ground_at(point)) < 0.03
-	check(treads_match, "all thirteen central treads have collision at the visible stair height")
+	check(treads_match, "all thirteen arena bands have continuous ramp collision at the visible surface")
+	var cache_top: Vector3 = mw.stone_chains[0].back()
+	var underside_query := PhysicsRayQueryParameters3D.create(cache_top - Vector3.UP * 6.0, cache_top + Vector3.UP, Terrain.LAYER)
+	var underside := mw.get_world_3d().direct_space_state.intersect_ray(underside_query)
+	check(not underside.is_empty() and (underside["position"] as Vector3).y < cache_top.y - 1.0, "floating stone undersides have collision rather than a thin top-only disc")
+	var clear_landings := true
+	var connected_landings := true
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.4
+	capsule.height = 1.7
+	for link: Dictionary in mw.portals.links:
+		for side: String in ["a", "b"]:
+			var at: Vector3 = link[side]
+			var island := int(link["ia" if side == "a" else "ib"])
+			var land := MapIslands.ISLANDS[island]
+			var anchor := mw.grid.nearest_free(mw.grid.to_cell(Vector3(land.x, land.w, land.y + 8)))
+			clear_landings = clear_landings and mw.grid.is_free(mw.grid.to_cell(at)) and absf(at.y - mw.ground_at(at)) < 0.2
+			connected_landings = connected_landings and not mw.grid.astar.get_id_path(mw.grid.to_cell(at), anchor).is_empty()
+			var query := PhysicsShapeQueryParameters3D.new()
+			query.shape = capsule
+			query.transform = Transform3D(Basis.IDENTITY, at + Vector3.UP * 0.95)
+			query.collision_mask = 1 | Terrain.LAYER
+			clear_landings = clear_landings and mw.get_world_3d().direct_space_state.intersect_shape(query).is_empty()
+	check(clear_landings, "all twenty portal landings have space for a capsule above the ground")
+	check(connected_landings, "every portal has a walkable route into its island")
+	var gate: Dictionary = mw.portals.links[0]
+	gate["open"] = true
+	var expected_exit := mw.portals._beyond(gate["b"], int(gate["ib"]))
+	mp.position = gate["a"]
+	mp.level_flash = 0.0
+	mp._gate_wait = 0.0
+	var old_level := mp.level
+	mp._tick_islands(0.016)
+	check(mp.level_flash == 0.0 and mp.level == old_level and mp.position.distance_to(expected_exit) < 0.01, "portal transit has its own effect without a level-up announcement")
+	mp.position = Vector3(28, 10.16, 0)
+	for direction: float in [1.0, -1.0]:
+		for tick in 480:
+			mp.velocity = Vector3(direction * 8.0, -3.0, 0)
+			mp.move_and_slide()
+			await frames(1)
+			if (direction > 0 and mp.position.x > 55.0) or (direction < 0 and mp.position.x < 29.0): break
+		check(mp.position.x > 54.0 if direction > 0 else mp.position.x < 30.0, "player walks %s the arena slope without jumping" % ("up" if direction > 0 else "down"))
+	mp.position = Vector3(0, 10.06, 16)
+	var shrines := mw.find_child("IslandSupplyShrines", false, false)
+	check(shrines != null and shrines.get_meta("islands").size() >= 6, "outer islands have several unobstructed supply shrines")
+	check(mw.director.target_population() >= 12, "Mists starts with enough enemies to populate the islands")
+
+	for shrine: Array in MapIslands.ROTUNDAS:
+		var centre: Vector2 = shrine[0]
+		var radius := float(shrine[1])
+		# Halfway between columns is the intended doorway, rather than through a pillar.
+		var angle := PI / (12.0 if radius > 9 else 10.0 if radius > 6 else 8.0)
+		var direction := Vector3(cos(angle), 0, sin(angle))
+		var outside := Vector3(centre.x, 0, centre.y) + direction * (radius + 7.0)
+		var inside := Vector3(centre.x, 0, centre.y) + direction * (radius - 2.0)
+		check(mw.grid.line_is_open(outside, inside), "shrine entry remains open between its columns")
 	check(mw.night_bg.get_luminance() < 0.06 and mw.night_moon <= 0.35 and mw.night_sky_shows, "Mists uses a moonlit night palette with stars")
 	check(mw.find_children("MistBridgeInlays*", "MeshInstance3D", false, false).size() == MapIslands.BRIDGES.size(), "every existing bridge has deck-following night inlays")
 	for kind: String in MistModels.KINDS:

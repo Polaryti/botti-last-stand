@@ -22,10 +22,15 @@ func _ready() -> void:
 	add_child(w)
 	w.setup(Game.Mode.NIGHT)
 	w.director.running = false
+	w.portals.set_process(false)
+	for link: Dictionary in w.portals.links:
+		link["open"] = true
+		w.portals._show(link)
 	w.player.set_physics_process(false)
 	w.player.set_process(false)
 	w.player._vm_root.visible = false
 	cam = w.player.camera
+	cam.cull_mask = 1
 	cam.current = true
 	for z: Zombie in w.zombies.duplicate():
 		z.release()
@@ -33,6 +38,16 @@ func _ready() -> void:
 	await snap("bridge_night", Vector3(-56, 20, 4), Vector3(-100, 17, 8))
 	await snap("rotunda_night", Vector3(18, 22, -55), Vector3(0, 45, -122))
 	await snap("stones_night", Vector3(-48, 21, -46), Vector3(-68, 24, -66))
+	await snap("arena_ramp_close", Vector3(26, 12, 4), Vector3(38, 14, 4))
+	await snap("rotunda_entry", Vector3(0, 42, -103), Vector3(0, 43, -122))
+	await snap("falls_pool", Vector3(90, 51, -110), Vector3(90, 46, -122))
+	for island in range(1, 9):
+		var ends := w.portals.ends_on(island)
+		if ends.is_empty(): continue
+		var gate := ends[0]
+		var land := MapIslands.ISLANDS[island]
+		var into := (Vector3(land.x, gate.y, land.y) - gate).normalized()
+		await snap("portal_island_%d" % island, gate + into * 8.0 + Vector3.UP * 2.0, gate + Vector3.UP * 1.8)
 	for i in MistModels.KINDS.size():
 		w.spawn_zombie(MistModels.KINDS[i], Vector3((i - 1) * 5, 10, 16))
 		var z: Zombie = w.zombies.back()

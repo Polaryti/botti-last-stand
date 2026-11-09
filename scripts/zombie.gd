@@ -574,7 +574,6 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		_ride_pass -= delta
 		velocity = _ride_dir * _speed * (0.5 if _slow > 0.0 else 1.0)
 		rotation.y = lerp_angle(rotation.y, atan2(_ride_dir.x, _ride_dir.z), min(1.0, delta * 10.0))
-		world.assist_arena_step(self, delta)
 		move_and_slide()
 		position.y = world.ground_at(position)
 		if not _ride_hit and dist < 2.7 and absf(target.global_position.y - position.y) < 2.6:
@@ -594,7 +593,6 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		_ride_turn -= delta
 		velocity = Vector3(sin(rotation.y), 0, cos(rotation.y)) * _speed * 0.45
 		rotation.y += delta * 2.6
-		world.assist_arena_step(self, delta)
 		move_and_slide()
 		position.y = world.ground_at(position)
 		return
@@ -2086,18 +2084,14 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 	if phases:
 		position += velocity * delta
 	elif _tick_every > 1:
-		world.assist_arena_step(self, delta)
 		# move_and_slide always uses one physics step, so a skipped tick needs a longer stride.
 		var plain := velocity
 		velocity *= float(_tick_every)
 		move_and_slide()
 		velocity = plain
 	else:
-		world.assist_arena_step(self, delta)
 		move_and_slide()
 	var floor_y := world.ground_at(position)
-	if world.terrain.has_islands() and not phases and Vector2(position.x, position.z).length() >= 29.5 and Vector2(position.x, position.z).length() <= 54.5:
-		floor_y = maxf(floor_y, world.ground_at(position + _move_dir * 0.36))
 	position.y = floor_y + (0.25 if phases else 0.0)
 	if _sees or _hold or state == State.CHASE and dist < 4.0:
 		if dist > 0.01:

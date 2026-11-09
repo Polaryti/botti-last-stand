@@ -85,13 +85,13 @@ func begin_sandbox() -> void:
 func begin(with_zombies: bool) -> void:
 	_waiting = false
 	running = with_zombies
-	for i in 6:
+	for i in (10 if world.terrain.has_islands() else 6):
 		stock(Pickup.Kind.WEAPON)
-	for i in 4:
+	for i in (9 if world.terrain.has_islands() else 4):
 		stock(Pickup.Kind.FOOD)
-	for i in 3:
+	for i in (7 if world.terrain.has_islands() else 3):
 		stock(Pickup.Kind.ARROWS)
-	for i in 2:
+	for i in (4 if world.terrain.has_islands() else 2):
 		stock(Pickup.Kind.POWER)
 	_spawn_familiar()
 	if world.fort:
@@ -135,7 +135,9 @@ func dawn_amount() -> float:
 ## The night starts calm and fills up to the phone's zombie limit.
 func target_population() -> int:
 	var cap := Game.max_live_zombies()
-	var start := mini(6, cap)
+	var mists := world.terrain.has_islands() and not Net.fog_rules()
+	if mists: cap += 4
+	var start := mini(12 if mists else 6, cap)
 	# A slow start while the player finds a weapon, then the crowd builds.
 	var t := pow(clampf(elapsed / (Game.NIGHT_LENGTH * 0.75), 0.0, 1.0), 1.3)
 	var crowd := lerpf(start, cap, t) * (1.0 + 0.35 * (world.players.size() - 1))
@@ -174,7 +176,7 @@ func _process(delta: float) -> void:
 			Net.bell(_bell_minute)
 	_stock_timer -= delta
 	if _stock_timer <= 0.0:
-		_stock_timer = 8.0
+		_stock_timer = 6.0 if world.terrain.has_islands() else 8.0
 		_restock()
 		if world.fort and world.count_pickups(Pickup.Kind.WOOD) < WOOD_ON_MAP:
 			world.stock_wood()
@@ -334,24 +336,42 @@ func _tick_specials() -> void:
 
 
 func _restock() -> void:
-	if world.count_pickups(Pickup.Kind.WEAPON) < 7:
+	if world.count_pickups(Pickup.Kind.WEAPON) < (10 if world.terrain.has_islands() else 7):
 		stock(Pickup.Kind.WEAPON)
-	if world.count_pickups(Pickup.Kind.FOOD) < 6:
+	if world.count_pickups(Pickup.Kind.FOOD) < (10 if world.terrain.has_islands() else 6):
 		stock(Pickup.Kind.FOOD)
-	if world.count_pickups(Pickup.Kind.ARROWS) < 4:
+	if world.count_pickups(Pickup.Kind.ARROWS) < (8 if world.terrain.has_islands() else 4):
 		stock(Pickup.Kind.ARROWS)
 	var potions := 0
 	for p in world.pickups:
 		if p.kind == Pickup.Kind.POWER and not PowerDefs.ALL[p.item_id]["familiar"]:
 			potions += 1
-	if potions < 3:
+	if potions < (5 if world.terrain.has_islands() else 3):
 		stock(Pickup.Kind.POWER)
 
 
 func _spawn_roamer() -> void:
-	if world.terrain.has_islands() and randf() < 0.75:
-		var land := MapIslands.ISLANDS[randi_range(1, 8)]
-		var at := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3(land.x + 8, land.w, land.y))))
-		world.spawn_zombie(_pick_roamer(), at)
-	else:
+	if not world.terrain.has_islands():
 		world.spawn_zombie(_pick_roamer())
+		return
+	# Keep pressure near explorers and replenish the least populated outer island.
+	if world.count_living() >= 8 and randf() < 0.5:
+		world.spawn_zombie(_pick_roamer())
+		return
+	var counts := PackedInt32Array()
+	counts.resize(9)
+	for mob: Zombie in world.zombies:
+		if mob.is_alive():
+			var index := world.portals.island_of(mob.position)
+			if index >= 0 and index < 9: counts[index] += 1
+	var chosen := randi_range(1, 8)
+	for index in range(1, 9):
+		if counts[index] < counts[chosen]: chosen = index
+	var land := MapIslands.ISLANDS[chosen]
+	for attempt in 16:
+		var angle := randf() * TAU
+		var radius := randf_range(0.25, 0.7) * land.z
+		var at := Vector3(land.x + cos(angle) * radius, land.w, land.y + sin(angle) * radius)
+		if world.grid.is_free(world.grid.to_cell(at)) and world.terrain.is_walkable(at.x, at.z) and not world.terrain.in_pool(at.x, at.z):
+			world.spawn_zombie(_pick_roamer(), at)
+			return

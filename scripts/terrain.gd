@@ -535,7 +535,13 @@ func patch_mesh(i0: int, j0: int, cells: int) -> ArrayMesh:
 			st.set_normal(Vector3(l - r, 2.0 * CELL, b - f).normalized())
 			st.set_color(_tint(x, z, h, _vertex_steep(i, j), river_distance(x, z)))
 			st.set_uv(Vector2(x, z) / 4.0)
-			st.add_vertex(Vector3(x, h, z))
+			var covered := false
+			if has_islands():
+				var radius := Vector2(x, z).length()
+				covered = radius > 12.0 and radius < 58.0
+				for rotunda: Array in MapIslands.ROTUNDAS:
+					if Vector2(x, z).distance_to(rotunda[0]) < float(rotunda[1]) + 7.0: covered = true
+			st.add_vertex(Vector3(x, h - (0.24 if covered else 0.0), z))
 	for j in d - 1:
 		for i in w - 1:
 			var a := j * w + i

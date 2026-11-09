@@ -442,22 +442,24 @@ static func banner_mesh() -> Mesh:
 	l.prism(Vector3(0, -0.5, 0), Vector3(0, 1.5, 0), 0.028, 0.025, 6, WOOD)
 	l.prism(Vector3(0, 1.5, 0), Vector3(0, 1.75, 0), 0.075, 0.0, 4, BRASS)
 	l.prism(Vector3(-0.04, 1.43, 0), Vector3(0.78, 1.43, 0), 0.018, 0.018, 6, BRASS)
-	for i in 8:
-		var x := 0.05 + i * 0.09
-		var z := sin(i * 1.15) * 0.055
-		var h := 0.62 + (0.09 if i < 3 or i > 4 else 0.0)
-		l.box(Vector3(x, 1.4 - h * 0.5, z), Vector3(0.088, h, 0.025), Color(0.37, 0.09, 0.48))
-		l.box(Vector3(x, 1.36, z), Vector3(0.088, 0.045, 0.04), BRASS)
-		l.box(Vector3(x, 1.4 - h, z), Vector3(0.088, 0.035, 0.04), BRASS)
-		if i in [3, 4]:
-			l.box(Vector3(x, 1.1, z), Vector3(0.06, 0.34, 0.045), BRASS)
-		if i in [2, 5]:
-			l.box(Vector3(x, 1.14, z), Vector3(0.095, 0.06, 0.04), BRASS)
 	_meshes["banner"] = l.commit()
+	var fabric := SurfaceTool.new()
+	fabric.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for x in 8:
+		for y in 4:
+			for corner: Vector2 in [Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(0, 0), Vector2(1, 1), Vector2(1, 0)]:
+				var uv := Vector2((x + corner.x) / 8.0, (y + corner.y) / 4.0)
+				var drop := 0.6 + 0.06 * absf(uv.x * 2.0 - 1.0)
+				fabric.set_normal(Vector3.FORWARD)
+				fabric.set_uv(uv)
+				fabric.add_vertex(Vector3(0.045 + uv.x * 0.62, 1.4 - uv.y * drop, sin(uv.x * TAU * 1.3) * 0.035 * uv.y))
+	var mesh := _meshes["banner"] as ArrayMesh
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, fabric.commit_to_arrays())
 	var cloth := ShaderMaterial.new()
 	cloth.shader = preload("res://assets/shaders/banner.gdshader")
-	(_meshes["banner"] as ArrayMesh).surface_set_material(0, cloth)
-	return _meshes["banner"]
+	mesh.surface_set_material(1, cloth)
+	return mesh
+
 
 
 static func _crossbow() -> Mesh:

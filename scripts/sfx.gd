@@ -186,15 +186,30 @@ func play_at(sound: String, pos: Vector3, listener: Vector3, volume_db := 0.0, m
 
 ## A short voiced rally, generated once at startup; no extra audio file or streaming cost.
 func _command_cry() -> AudioStreamWAV:
-	var data := PackedByteArray()
 	const RATE := 16000
-	data.resize(RATE * 2)
-	for i in RATE:
+	const LENGTH := 1.15
+	var count := int(RATE * LENGTH)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 712
+	var phase := 0.0
+	var breath := 0.0
+	for i in count:
 		var t := float(i) / RATE
-		var envelope := minf(t * 18.0, 1.0) * pow(1.0 - t, 1.5)
-		var phase := TAU * (130.0 * t - 12.0 * t * t)
-		var voice := (sin(phase) + 0.45 * sin(phase * 2.0) + 0.25 * sin(phase * 3.0)) * envelope * 0.35
-		data.encode_s16(i * 2, int(voice * 32767.0))
+		var x := t / LENGTH
+		var envelope := smoothstep(0.0, 0.07, x) * (1.0 - smoothstep(0.55, 1.0, x))
+		# A rough glottal source through the resonant formants of an open 'ah', with breath and pitch fall.
+		var fundamental := 155.0 - x * 35.0 + sin(t * 47.0) * 2.8 + rng.randf_range(-1.2, 1.2)
+		phase += TAU * fundamental / RATE
+		var voiced := 0.0
+		for harmonic in range(1, 33):
+			var f := harmonic * fundamental
+			var vowel := exp(-pow((f - 820.0) / 180.0, 2.0)) + exp(-pow((f - 1230.0) / 240.0, 2.0)) * 0.7 + exp(-pow((f - 2700.0) / 420.0, 2.0)) * 0.25
+			voiced += sin(phase * harmonic) * (0.07 / harmonic + vowel * 0.14)
+		breath = lerpf(breath, rng.randf_range(-1, 1), 0.6)
+		var voice := tanh((voiced + breath * 0.035) * 1.8) * envelope * 0.8
+		data.encode_s16(i * 2, int(clampf(voice, -1.0, 1.0) * 32767.0))
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = RATE

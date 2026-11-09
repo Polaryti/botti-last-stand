@@ -95,6 +95,19 @@ func _ready() -> void:
 	knight._play(BodyAnim.attack_for("lance"), 1.2)
 	await get_tree().create_timer(0.2).timeout
 	await snap("fallen_knight_strike")
+	knight.visible = false
+	cam.current = false
+	p.camera.current = true
+	p.class_id = "commander"
+	p.spec_id = "vanguard"
+	p.slots = ["sword", null]
+	p._equip()
+	p._vm_root.visible = true
+	p._refresh_banner()
+	p._banner.rotation.z = 0.0
+	await snap("vanguard_first_person")
+	p._banner.rotation.z = 0.18
+	await snap("vanguard_first_person_command")
 	a.queue_free()
 	w.queue_free()
 	await get_tree().process_frame

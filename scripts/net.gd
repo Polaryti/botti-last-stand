@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 31
+const PROTOCOL := 32
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -2097,3 +2097,27 @@ func start_mist_storm(island: int) -> void:
 func _mist_storm_start(island: int) -> void:
 	if world and is_instance_valid(world) and island >= 0 and island < 9:
 		MistStorm.create(world, island)
+
+
+var _last_command_voice := -10.0
+
+func command_voice(peer: int) -> void:
+	if not active(): return
+	if is_host(): _relay_command_voice(peer)
+	else: _ask_command_voice.rpc_id(1)
+
+@rpc("any_peer", "reliable")
+func _ask_command_voice() -> void:
+	if is_host(): _relay_command_voice(multiplayer.get_remote_sender_id())
+
+func _relay_command_voice(peer: int) -> void:
+	var source := _commander_source(peer)
+	var now := Time.get_ticks_msec() / 1000.0
+	if source == null or now - _last_command_voice < 2.0: return
+	_last_command_voice = now
+	_command_voice.rpc(peer, source.global_position)
+
+@rpc("authority", "call_remote", "reliable")
+func _command_voice(peer: int, at: Vector3) -> void:
+	if peer != my_id() and world and world.player:
+		Sfx.play_at("command", at, world.player.global_position, -1.0, 0.1)

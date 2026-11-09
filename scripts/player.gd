@@ -1618,7 +1618,7 @@ func _familiar_mark(reach: float, need_sight: bool) -> Node3D:
 
 func _tick_ability_timers(delta: float) -> void:
 	if _banner != null:
-		_banner.rotation.z = sin(world.now * (12.0 if _cast_kind == "command" else 2.0)) * (0.45 if _cast_kind == "command" else 0.035)
+		_banner.rotation.z = sin(world.now * (12.0 if _cast_kind == "command" else 2.0)) * (0.18 if _cast_kind == "command" else 0.025)
 	for key: String in _buffs.keys():
 		_buffs[key]["left"] = float(_buffs[key]["left"]) - delta
 		if float(_buffs[key]["left"]) <= 0.0:
@@ -2854,7 +2854,6 @@ func _physics_step(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta
 	input_jump = false
-	world.assist_arena_step(self, delta)
 	move_and_slide()
 	if world.portals:
 		_tick_islands(delta)
@@ -2901,7 +2900,6 @@ func _tick_islands(delta: float) -> void:
 		_gate_wait = 1.5
 		sfx("spell", -4.0, 1.5)
 		hurt_flash = 0.0
-		level_flash = 0.5
 		world.fx_ring(out, 3.0, Color(0.45, 0.98, 0.92))
 
 
@@ -3514,7 +3512,7 @@ func _refresh_banner() -> void:
 	_banner.mesh = WeaponDefs.banner_mesh()
 	_banner.layers = 2
 	_banner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_banner.position = Vector3(-0.4, -0.45, -0.8)
-	_banner.rotation.y = -0.65
-	_banner.scale = Vector3.ONE * 0.55
+	_banner.position = Vector3(-0.52, -0.68, -0.72)
+	_banner.rotation.y = PI - 0.2
+	_banner.scale = Vector3.ONE * 0.4
 	camera.add_child(_banner)

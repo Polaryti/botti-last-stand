@@ -169,6 +169,7 @@ jobs:
           import json
           from pathlib import Path
           info = json.loads(Path('build/dev/build-info.json').read_text())
+          changes = Path('CHANGELOG.md').read_text().split('\n## ', 2)[1].rstrip()
           Path('build/dev/notes.md').write_text(
               f"Android development test build **{info['version']}**.\n\n"
               f"Source: `{info['commit']}` on `dev`.\n\n"
@@ -176,8 +177,8 @@ jobs:
               "Its saves and multiplayer compatibility are separate. Its menu offers future dev APK updates through Android’s installer.\n\n"
               f"Online play included: **{'yes' if info['online_play'] else 'no; solo, bots and LAN are available'}**.\n\n"
               "This prerelease does not replace the latest production release. No iOS build is included. "
-              "Includes dev in-game updates, four-second artillery with eight-second fires, and exploration supply routes. "
-              "full gameplay/LAN/render CI results are available in the separate Validate game workflow.\n"
+              "Full gameplay/LAN/render CI results are available in the separate Validate game workflow.\n\n"
+              f"## {changes}\n"
           )
           PY
           if gh release view "$TAG" > /dev/null 2>&1; then

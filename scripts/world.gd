@@ -253,6 +253,12 @@ func setup(game_mode: int) -> void:
 	grid.build_far_grid()
 	if terrain.has_islands():
 		_mists_look()
+	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
+		var atmosphere := MistAtmosphere.new()
+		atmosphere.name = "VillageAura" if fort == null else "FortAura"
+		atmosphere.world = self
+		atmosphere.place = MistAtmosphere.Place.VILLAGE if fort == null else MistAtmosphere.Place.FORT
+		add_child(atmosphere)
 	_build_fx()
 	director = Director.new(self)
 	add_child(director)
@@ -413,7 +419,11 @@ func ground_at(at: Vector3) -> float:
 		if radius >= 54.0 and radius <= 57.0: return 18.1
 		if radius >= 13.0 and radius < 30.0: return 10.06
 		if radius >= 30.0 and radius < 54.0:
-			return 10.08 + (floorf((radius - 30.0) / 24.0 * 13.0) + 1.0) * 8.0 / 13.0
+			return lerpf(10.06, 18.1, (radius - 30.0) / 24.0)
+	if terrain.has_islands():
+		for shrine: Array in MapIslands.ROTUNDAS:
+			if Vector2(at.x, at.z).distance_to(shrine[0]) < float(shrine[1]) + 6.5:
+				return terrain.ground_height(at.x, at.z) + 0.1
 	var h := terrain.height(at.x, at.z)
 	if h < FALL_DEATH and terrain.has_islands():
 		return terrain.island_floor(at.x, at.z) # over the void, what flies stays level with the islands
@@ -534,14 +544,32 @@ func stone_near(p: Vector3) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
-func add_stone(at: Vector3, radius: float) -> void:
-	var shape := CylinderShape3D.new()
-	shape.radius = radius
-	shape.height = 0.5
+func add_stone(at: Vector3, radius: float, depth := 0.5) -> void:
+	var shape: Shape3D
+	if depth > 0.5:
+		var hull := PackedVector3Array()
+		for n in 8:
+			var angle := TAU * n / 8.0
+			var edge := Vector3(cos(angle), 0, sin(angle))
+			hull.append(edge * radius)
+			hull.append(edge * radius * 1.05 + Vector3.DOWN * 0.26)
+		hull.append(Vector3(0.1, -depth, -0.1))
+		var convex := ConvexPolygonShape3D.new()
+		convex.points = hull
+		shape = convex
+	else:
+		var cylinder := CylinderShape3D.new()
+		cylinder.radius = radius
+		cylinder.height = 0.5
+		shape = cylinder
 	var cs := CollisionShape3D.new()
 	cs.shape = shape
-	cs.position = at + Vector3.DOWN * 0.25
+	cs.position = at if depth > 0.5 else at + Vector3.DOWN * 0.25
 	_ledges().add_child(cs)
+	# Low floating stones occupy headroom too. Ground-level AI must go around their footprint.
+	var floor_y := terrain.ground_height(at.x, at.z)
+	if terrain.has_islands() and floor_y > 0.0 and at.y - depth < floor_y + 1.9:
+		grid.block_box(at, Vector3(radius * 2.0, 1, radius * 2.0))
 
 
 func _ledges() -> StaticBody3D:
@@ -2906,17 +2934,3 @@ func fx_gore(at: Vector3, col: Color) -> void:
 	g.global_position = at
 	g.color = col.darkened(0.25)
 	g.restart()
-
-
-## Step over the arena's 0.615 m risers before sweeping the capsule against their front edges.
-func assist_arena_step(actor: CharacterBody3D, delta: float) -> void:
-	if not terrain.has_islands() or actor.velocity.y > 0.1: return
-	var at := actor.global_position
-	var radius := Vector2(at.x, at.z).length()
-	if radius < 29.5 or radius > 54.5 or absf(at.y - ground_at(at)) > 0.2: return
-	var motion := Vector3(actor.velocity.x, 0, actor.velocity.z)
-	if motion.length_squared() < 0.01: return
-	var ahead := at + motion.normalized() * (0.5 + motion.length() * delta)
-	var rise := ground_at(ahead) - at.y
-	if rise > 0.02 and rise < 0.72:
-		actor.global_position.y += rise + 0.01

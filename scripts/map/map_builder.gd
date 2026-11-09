@@ -1466,9 +1466,10 @@ func grass(h: float) -> void:
 		if terrain.has_islands() and Vector2(p.x, p.z).length() < 57.1: continue
 		if not w.grid.is_free(w.grid.to_cell(p)) or _is_indoors(p):
 			continue
-		# No grass on the arena's paving and seats.
-		if terrain.has_islands() and Vector2(p.x, p.z).length() < 57.0 and Vector2(p.x, p.z).length() > 12.0:
-			continue
+		if terrain.on_deck(p.x, p.z) or terrain.in_pool(p.x, p.z): continue
+		if terrain.has_islands():
+			if MapIslands.on_masonry(Vector2(p.x, p.z)): continue
+			if not is_preview and MapIslands._near_gate(w, p, 4.0): continue
 		p.y = terrain.height(p.x, p.z)
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.z / 24.0)))
 		if not patches.has(key):

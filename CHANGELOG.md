@@ -2,6 +2,21 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## Development — Mists traversal and night atmosphere
+### Fixed
+- Portals no longer flash a level-up announcement. Gates stand on clear, level landings, face their island's approach and leave space for trees, players and mobs.
+- The central arena has continuous ramp collision and sloped stone tiers. Shrine floors and their approach paths follow the terrain; paving covers the grass beneath it.
+- Trees and grass leave gates, masonry, access ramps and bridge decks clear. The northern shrine's reward spiral stays outside its entrances. Floating stones have solid undersides; mobs route around low stones, and rooftop reward landings have visible platforms.
+- Vanguard banners sit lower and farther left in first person. The cloth carries its own woven border and emblem, without overlapping trim meshes; other players still see the full banner.
+### Changed
+- The Mists has darker, gently rippling pools, continuous stream surfaces, softer waterfalls and swirling gate veils.
+- More enemies populate the opening night, with replenishment both near explorers and on less populated islands. More supplies replenish across the islands; food and arrows remain outside the centre.
+- Small outer-island supply shrines add seats, an urn, firelight and loot anchors while leaving their approach open.
+- Command has a rough voiced battle cry, heard by nearby multiplayer allies.
+- The Village has drifting ground haze and warm fireflies. Defend the Fort has smoke-toned wisps and ember motes. Emission pauses indoors and fades toward dawn, with fixed mobile particle budgets.
+### Validation
+- Traversal checks cover every portal landing, island routes, shrine entrances and walking both directions on the arena ramp. Render CI now captures the Mists, first-person banner and both night atmosphere profiles.
+
 ## Development — Island storms and combat fixes
 ### Fixed
 - Ghost Knights picked up by bots appear beside and follow their bot owner.

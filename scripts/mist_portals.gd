@@ -63,10 +63,8 @@ func _make_end(at: Vector3) -> Node3D:
 	disc.height = 0.04
 	disc.radial_segments = 16
 	disc.rings = 1
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(0.5, 1.0, 0.95, 0.72)
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://assets/shaders/mist_gate.gdshader")
 	disc.material = mat
 	veil.mesh = disc
 	veil.rotation.x = PI * 0.5
@@ -207,9 +205,9 @@ func exit_from(at: Vector3) -> Vector3:
 			continue
 		var a: Vector3 = link["a"]
 		var b: Vector3 = link["b"]
-		if Vector2(at.x - a.x, at.z - a.z).length() < REACH:
+		if absf(at.y - a.y) < 3.0 and Vector2(at.x - a.x, at.z - a.z).length() < REACH:
 			return _beyond(b, int(link["ib"]))
-		if Vector2(at.x - b.x, at.z - b.z).length() < REACH:
+		if absf(at.y - b.y) < 3.0 and Vector2(at.x - b.x, at.z - b.z).length() < REACH:
 			return _beyond(a, int(link["ia"]))
 	return Vector3.INF
 

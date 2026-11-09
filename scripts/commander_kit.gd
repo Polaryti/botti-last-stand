@@ -72,4 +72,5 @@ static func cast(p: Player) -> void:
 			for friend: Target in p.world.friends_near(p.global_position, radius):
 				Net.guard_peer(p.world.peer_of(friend), 0.0, 20.0)
 	p.command_target_ready = false
-	p.sfx("command", -3.0, 0.85)
+	p.sfx("command", -1.0)
+	Net.command_voice(p.net_id())
