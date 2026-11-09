@@ -81,6 +81,7 @@ jobs:
           python3 tools/check_production_build.py
           python3 -m unittest discover -s tests -p "test_*.py"
           python3 tools/run_checks.py rework
+          python3 tools/run_checks.py features
       - name: Compile shaders and capture UI and weather
         if: matrix.suite == 'render'
         shell: bash
@@ -91,7 +92,7 @@ jobs:
           export XDG_DATA_HOME="$RUNNER_TEMP/visual-profile"
           export LIBGL_ALWAYS_SOFTWARE=1
           mkdir -p build/checks/screens
-          for scene in weather_shots ui_shots rework_shots mist_review weapon_shots atmosphere_review village_review; do
+          for scene in weather_shots ui_shots rework_shots mist_review weapon_shots atmosphere_review village_review dev_feature_shots; do
             timeout 180s xvfb-run -a -s '-screen 0 1280x720x24' "$GODOT" --path . \
               --rendering-driver opengl3 --audio-driver Dummy "res://tests/$scene.tscn" \
               -- "$PWD/build/checks/screens" 2>&1 | tee "build/checks/$scene.log"
@@ -109,6 +110,9 @@ jobs:
           test -f build/checks/screens/interior_Barn.png
           test -f build/checks/screens/watermill_repaired.png
           test -f build/checks/screens/finale_outer_storms.png
+          test -f build/checks/screens/gate_cost_outside.png
+          test -f build/checks/screens/snake_bite.png
+          test -f build/checks/screens/warlord_faultline.png
       - uses: actions/upload-artifact@v6
         if: always()
         with:

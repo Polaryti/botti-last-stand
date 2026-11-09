@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 33
+const PROTOCOL := 34
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -854,7 +854,7 @@ func _send_allies() -> void:
 	var at := 0
 	for a in mine:
 		b.encode_u8(at, a.net_index)
-		b.encode_u8(at + 1, Ally.KINDS.find(a.kind))
+		b.encode_u8(at + 1, Ally.KINDS.find(a.kind) | (128 if a._attack_left > 0.0 else 0))
 		b.encode_s16(at + 2, int(a.position.x * 100.0))
 		b.encode_s16(at + 4, int(a.position.y * 100.0))
 		b.encode_s16(at + 6, int(a.position.z * 100.0))
@@ -2145,3 +2145,22 @@ func _protect_player(p: Player, seconds: float, healing: float) -> void:
 	if p == null or p.dead: return
 	p.dome_left = maxf(p.dome_left, clampf(seconds, 0, 6))
 	if healing > 0: p.heal(minf(healing, 30))
+
+
+func heavy_visual(kind: int, at: Vector3, direction: Vector3, radius: float) -> void:
+	_heavy_visual.rpc(kind, at, direction, radius)
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _heavy_visual(kind: int, at: Vector3, direction: Vector3, radius: float) -> void:
+	if world and is_instance_valid(world) and kind >= 0 and kind <= 2 and at.is_finite() and direction.is_finite() and is_finite(radius):
+		HeavyWave.spawn_visual(world, kind, at, direction, clampf(radius, 0.1, 12.0))
+
+func heavy_mend(at: Vector3, radius: float, healing: float, owner: int) -> void:
+	_heavy_mend.rpc(at, radius, healing, owner)
+
+@rpc("any_peer", "reliable", "call_remote")
+func _heavy_mend(at: Vector3, radius: float, healing: float, owner: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if owner != sender and not (sender == 1 and is_bot(owner)): return
+	if world and is_instance_valid(world) and at.is_finite() and is_finite(radius) and is_finite(healing):
+		HeavyArts.mend_summons(world, owner, at, clampf(radius, 0.0, 10.0), clampf(healing, 0.0, 50.0))

@@ -1032,7 +1032,8 @@ func portcullis() -> void:
 
 ## A log lying in the wood. Spare wood turns up beside these.
 func fallen_log() -> void:
-	cell().prism(Vector3(-1.6, 0.25, 0), Vector3(1.6, 0.25, 0.4), 0.24, 0.22, 6, Color(0.32, 0.22, 0.14))
+	var inv := xf.affine_inverse()
+	cell().prism(inv * on_ground(Vector3(-1.6, 0.25, 0)), inv * on_ground(Vector3(1.6, 0.25, 0.4)), 0.24, 0.22, 6, Color(0.32, 0.22, 0.14))
 	w.wood_spots.append(on_ground(Vector3(0, 0, 1.4)))
 
 
@@ -1061,7 +1062,9 @@ func prop(path: String, scale: float, solid_size: Vector3) -> void:
 
 
 func tree(path: String, scale: float, tall: float, is_solid: bool) -> void:
+	if not _plant_allowed(xf.origin, maxf(0.5, scale * 0.18)): return
 	var at := xf.origin
+	if not is_preview: w.tree_spots.append(at)
 	var key := "%s|%d|%d" % [path, int(floor(at.x / 40.0)), int(floor(at.z / 40.0))]
 	if not _trees.has(key):
 		_trees[key] = []
@@ -1071,6 +1074,7 @@ func tree(path: String, scale: float, tall: float, is_solid: bool) -> void:
 
 
 func dead_tree() -> void:
+	if not _plant_allowed(xf.origin, 0.7): return
 	var l := mesh()
 	var bark := Color(0.14, 0.12, 0.11)
 	l.prism(Vector3.ZERO, Vector3(0.2, 3.0, 0.1), 0.26, 0.1, 5, bark)
@@ -1157,16 +1161,22 @@ func fence(l: LowPoly, a: Vector2, b: Vector2, gaps: Array) -> void:
 		var length := s.y - s.x
 		if length < 0.2:
 			continue
-		var m := (s.x + s.y) * 0.5
-		var centre := Vector3(m, 0, other) if along_x else Vector3(other, 0, m)
-		for rail_y: float in [0.5, 0.88]:
-			l.box(centre + Vector3.UP * rail_y, Vector3(length, 0.09, 0.05) if along_x else Vector3(0.05, 0.09, length), BEAM.lightened(0.28))
-		var n := int(length / 2.0)
-		for i in n + 1:
-			var p := s.x + length * i / maxf(1.0, n)
-			var post := Vector3(p, 0.5, other) if along_x else Vector3(other, 0.5, p)
-			l.box(post, Vector3(0.12, 1.0, 0.12), BEAM.lightened(0.15))
-		solid(centre + Vector3.UP * 0.5, Vector3(length, 1.0, 0.14) if along_x else Vector3(0.14, 1.0, length))
+		var inv := xf.affine_inverse()
+		var segments := maxi(1, ceili(length / 1.6))
+		for i in segments:
+			var first := lerpf(s.x, s.y, float(i) / segments)
+			var last := lerpf(s.x, s.y, float(i + 1) / segments)
+			var left := inv * on_ground(Vector3(first, 0, other) if along_x else Vector3(other, 0, first))
+			var right := inv * on_ground(Vector3(last, 0, other) if along_x else Vector3(other, 0, last))
+			for rail_y: float in [0.5, 0.88]:
+				l.prism(left + Vector3.UP * rail_y, right + Vector3.UP * rail_y, 0.045, 0.045, 4, BEAM.lightened(0.28))
+			var mid := (left + right) * 0.5 + Vector3.UP * 0.5
+			var thick := 1.0 + absf(left.y - right.y)
+			solid(mid, Vector3(last - first, thick, 0.14) if along_x else Vector3(0.14, thick, last - first))
+		for i in segments + 1:
+			var at := lerpf(s.x, s.y, float(i) / segments)
+			var foot := inv * on_ground(Vector3(at, 0, other) if along_x else Vector3(other, 0, at))
+			l.box(foot + Vector3.UP * 0.5, Vector3(0.12, 1.0, 0.12), BEAM.lightened(0.15))
 
 
 ## Rows of different vegetables. They hide nothing, but they are a pleasure to walk through.
@@ -1573,3 +1583,19 @@ func _warm_ground() -> void:
 		var material := _ground_material.duplicate() as ShaderMaterial
 		material.set_shader_parameter("hearths", hearths)
 		patch.material_override = material
+
+
+## Rest boulders on the actual slope rather than floating their downhill edge above it.
+func terrain_rock(grow: float) -> void:
+	if not _plant_allowed(xf.origin, 0.65 * grow): return
+	var saved := xf
+	var at := xf.origin
+	var step := maxf(0.5, grow * 0.6)
+	var dx := (terrain.height(at.x + step, at.z) - terrain.height(at.x - step, at.z)) / (step * 2.0)
+	var dz := (terrain.height(at.x, at.z + step) - terrain.height(at.x, at.z - step)) / (step * 2.0)
+	var normal := Vector3(-dx, 1.0, -dz).normalized()
+	var right := (xf.basis.x - normal * xf.basis.x.dot(normal)).normalized()
+	at.y -= 0.1 * grow
+	xf = Transform3D(Basis(right, normal, right.cross(normal)), at)
+	prop("nature/rock_single_C", 5.0 * grow, Vector3(1.2, 0.7, 1.2) * grow)
+	xf = saved

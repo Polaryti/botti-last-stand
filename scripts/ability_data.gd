@@ -380,12 +380,12 @@ static func _heavy() -> Dictionary:
 			[a("challenge", "Challenge", "Raising the dome draws every enemy around to you", "shout+shield", {}, [], "dome_taunt"),
 			a("hold_line", "Hold the Line", "Take 25% less damage, but 5% slower", "banner+helm", {"damage_taken": -0.25, "speed": -0.05})],
 			[a("block_stuns", "Crushing Block", "Blocking stuns the attacker for 0.8 s", "shield+star", {}, [t("block", "stun_attacker", {"secs": 0.8})]),
-			a("block_heals", "Faith in Iron", "Blocking heals 4", "shield+heart", {}, [t("block", "heal", {"n": 4.0})])]],
+			a("oathkeeper", "Oathkeeper", "Blocks store 4 healing, up to 20. Shield Dome spends the reserve to heal nearby allies and summons", "shield+heart", {}, [], "oathkeeper")]],
 			a("aegis", "Aegis", "The dome also heals everyone inside by 30, and comes back 25% sooner", "helm+crown", {"art_cd": -0.25}, [], "aegis")),
 		_spec("warpriest", "Warpriest", "Holy fire and endless faith", Color(0.76, 0.6, 0.2),
 			a("warpriest", "Warpriest", "Heal 1 health per second", "cross+heart", {"regen": 1.0}),
 			[[a("blessing", "Blessing", "Heal 1 more per second", "sun+heart", {"regen": 1.0}),
-			a("healing_hands", "Healing Hands", "Heal 3 per kill", "hand+heart", {}, [t("kill", "heal", {"n": 3.0})])],
+			a("last_rites", "Last Rites", "Every third kill releases a funeral flame: heal allies within 6 m of the fallen by 10 and ignite enemies within 4 m. 4 s cooldown", "cross+flame", {}, [t("kill", "last_rites", {"nth": 3, "cd": 4.0})])],
 			[a("holy_fire", "Holy Fire", "Melee sets enemies on fire", "flame+cross", {}, [t("hit", "ignite")]),
 			a("smite", "Smite", "Every 5th hit calls lightning", "bolt+cross", {}, [t("hit", "thunder", {"nth": 5})])],
 			[a("consecrate", "Consecrate", "Every 6 s, burn enemies within 4.5 m", "sun+flame", {}, [t("every", "burn_around", {"secs_every": 6.0, "r": 4.5})]),
@@ -395,7 +395,7 @@ static func _heavy() -> Dictionary:
 			a("divine_wrath", "Divine Wrath", "Every 15 s, lightning strikes all enemies within 12 m", "bolt+crown", {}, [t("every", "thunder_all", {"secs_every": 15.0, "r": 12.0})])),
 		_spec("warlord", "Warlord", "Break whole crowds at once", Color(0.56, 0.24, 0.14),
 			a("warlord", "Warlord", "Swings are much wider and hit 2 more", "mace+spiral", {"melee_cone": 40.0, "melee_hits": 2, "knock": 0.5}),
-			[[a("great_swing", "Great Swing", "+35% melee damage", "hammer+up", {"melee_damage": 0.35}),
+			[[a("faultline", "Faultline", "Every third connecting swing splits a 12 m line: 40 damage, knockback and 2 s slow. Stops at walls; 6 s cooldown", "quake+axe", {}, [t("melee_swing", "faultline", {"nth": 3, "cd": 6.0})]),
 			a("swift_arm", "Swift Arm", "+30% melee speed", "hammer+clock", {"melee_rate": 0.3})],
 			[a("aftershock", "Aftershock", "Every 3rd hit makes a shockwave", "quake+plus", {}, [t("hit", "blast", {"nth": 3, "r": 3.2, "dmg": 35.0})]),
 			a("stomp", "Stomp", "Every 10 s, slow all around you for 3 s", "boot+quake", {}, [t("every", "slow_around", {"secs_every": 10.0, "r": 6.0, "secs": 3.0})])],
@@ -403,7 +403,7 @@ static func _heavy() -> Dictionary:
 			a("crush", "Crush", "30% chance to stun on hit", "hammer+star", {}, [t("hit", "stun", {"chance": 0.3, "secs": 1.0})])],
 			[a("war_banner", "War Banner", "Every 30 s, a spirit soldier fights with you for 15 s", "banner+ghost", {}, [t("every", "summon", {"secs_every": 30.0, "kind": "ghost", "n": 1, "secs": 15.0})]),
 			a("sunder", "Sunder", "Hits mark enemies: +30% damage for 4 s", "axe+target", {}, [t("hit", "mark", {"mult": 1.3, "secs": 4.0})])]],
-			a("earthbreaker", "Earthbreaker", "Every 5th attack shakes the ground: 60 damage and stun in 7 m", "quake+crown", {}, [t("hit", "quake", {"nth": 5, "r": 7.0, "dmg": 60.0})])),
+			a("earthbreaker", "Earthbreaker", "Every fifth connecting swing shakes the ground: 60 damage and stun in 7 m", "quake+crown", {}, [t("melee_swing", "quake", {"nth": 5, "r": 7.0, "dmg": 60.0})])),
 	]}
 
 

@@ -1,5 +1,19 @@
 # Changelog
 
+## Development — Iron vows and woodland expeditions
+### Classes and skills
+- Monk now costs 920 Doubloons and Artificer costs 598. Adept is available in the Store for 1,150; existing owners keep their unlocks, and its class code still works.
+- Guardian gains Oathkeeper: blocks store up to 20 healing, spent when raising Shield Dome to mend nearby allies and summons.
+- Warpriest gains Last Rites: every third kill sends out a funeral flame, healing allies near the fallen and igniting surrounding enemies.
+- Warlord gains Faultline: every third connecting swing splits a narrow line through the crowd, damaging, pushing and slowing enemies. Walls stop the fissure. Earthbreaker now counts connecting swings rather than each enemy struck.
+### The world
+- Mist Storms gather every 70 seconds. Their warning, damage duration and final-boss retreat rules remain the same.
+- Snakes slither, breathe and lunge when biting, including other players' snakes. Their Store preview moves too.
+- Fort firewood replenishes in reachable woodland locations, well away from the gates. Each damaged gate shows the wood needed on both faces; the HUD only lists what you carry.
+- Bots use the Fort’s side doors when fetching woodland supplies instead of walking into the walls.
+- Repaired gates wait for players and summons as well as enemies to leave the doorway before closing. Summons appear on their correct ground height immediately.
+- Fences and fallen logs follow uneven terrain. Rocks settle onto slopes, and trees and boulders leave house footprints clear.
+
 ## 0.21.0 — The Mists Update (9 November 2026)
 ### Enter The Mists
 - The Mists takes over the title screen. Explore its floating islands beneath a blue moon, with drifting mist, glowing portals, rippling pools and waterfalls disappearing into the dark.

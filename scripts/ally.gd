@@ -31,6 +31,8 @@ var master: Player # whose summon it is, on this phone: its player, or one of th
 var net_index := 0
 var net_target := Vector3.ZERO
 var net_yaw := 0.0
+var net_biting := false
+var _snake: SnakeBody
 var guarded := 0.0
 
 var _visual: Node3D
@@ -95,6 +97,8 @@ func _init(owner_world: World, ally_kind: String) -> void:
 ## Takes a resting body back into the fight.
 func activate(seconds: float) -> void:
 	guarded = 0.0
+	net_biting = false
+	if _snake: _snake.reset_pose()
 	life = seconds
 	remote_owner = 0
 	master = null
@@ -132,6 +136,7 @@ func _build_beast(root: Node3D) -> void:
 	_head = made["head"]
 	_tail = made["tail"]
 	_legs.assign(made["legs"])
+	_snake = made.get("snake")
 
 
 static func _part(root: Node3D, mesh: Mesh, at: Vector3) -> MeshInstance3D:
@@ -193,21 +198,9 @@ static func _raven_model(root: Node3D) -> Dictionary:
 
 
 static func _snake_model(root: Node3D) -> Dictionary:
-	var scale_col := Color(0.24, 0.42, 0.18)
-	if not _beast_parts.has("snake"):
-		var b := LowPoly.new()
-		var last := Vector3(0, 0.08, 0.3)
-		for i in range(1, 8):
-			var next := Vector3(sin(i * 1.1) * 0.16, 0.08, 0.3 - i * 0.24)
-			b.prism(last, next, 0.09 - i * 0.008, 0.09 - (i + 1) * 0.008, 6, scale_col.lightened(0.1 if i % 2 == 0 else 0.0))
-			last = next
-		var head := LowPoly.new().box(Vector3(0, 0, 0.05), Vector3(0.2, 0.11, 0.26), scale_col.darkened(0.15))
-		head.box(Vector3(0.07, 0.05, 0.1), Vector3(0.04, 0.03, 0.04), Color(1, 0.85, 0.1))
-		head.box(Vector3(-0.07, 0.05, 0.1), Vector3(0.04, 0.03, 0.04), Color(1, 0.85, 0.1))
-		_beast_parts["snake"] = {"body": b.commit(), "head": head.commit(), "tail": LowPoly.new().prism(Vector3.ZERO, Vector3(0, 0, -0.2), 0.03, 0.0, 5, scale_col).commit()}
-	var parts: Dictionary = _beast_parts["snake"]
-	_part(root, parts["body"], Vector3.ZERO)
-	return {"head": _part(root, parts["head"], Vector3(0, 0.1, 0.4)), "tail": _part(root, parts["tail"], Vector3(0.15, 0.08, -1.4)), "legs": [] as Array[Node3D]}
+	var body := SnakeBody.new()
+	root.add_child(body)
+	return {"head": body, "tail": body, "legs": [] as Array[Node3D], "snake": body}
 
 
 static func _ghost() -> StandardMaterial3D:
@@ -284,9 +277,11 @@ func _physics_process(delta: float) -> void:
 		var was := global_position
 		global_position = global_position.lerp(net_target, minf(1.0, delta * 9.0))
 		rotation.y = lerp_angle(rotation.y, net_yaw, minf(1.0, delta * 9.0))
+		var moving := was.distance_squared_to(global_position) > 0.000004
+		_attack_left = 0.25 if net_biting else 0.0
 		if kind != "body":
-			_play("Running_A" if was.distance_squared_to(net_target) > 0.05 else "Idle")
-		_move_wolf(delta, was.distance_squared_to(net_target) > 0.05)
+			_play("Running_A" if moving else "Idle")
+		_move_wolf(delta, moving)
 		return
 	var was := world.begin_act(_master())
 	_tick_own(delta)
@@ -418,6 +413,10 @@ func _forage() -> void:
 
 ## Legs, a bounce in its stride, a tail that never quite stops, and a lunge when it bites.
 func _move_wolf(delta: float, moving: bool) -> void:
+	if _snake:
+		_snake.moving = moving
+		_snake.biting = _attack_left > 0.0
+		return
 	if _legs.is_empty():
 		return
 	_idle_time += delta

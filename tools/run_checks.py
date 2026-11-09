@@ -29,7 +29,7 @@ def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", cas
                 env = dict(os.environ, XDG_DATA_HOME=str(profile))
                 # Linux/CI profiles must not share progress or settings.
                 command = [godot, "--headless", "--path", str(ROOT)]
-                scene = "net_test" if suite == "network" else "test_game" if suite == "gameplay" else "rework" if suite == "rework" else "regressions"
+                scene = "net_test" if suite == "network" else "test_game" if suite == "gameplay" else "rework" if suite == "rework" else "dev_features" if suite == "features" else "regressions"
                 if suite != "network":
                     command.extend(["--fixed-fps", "240"])
                 command.append(f"res://tests/{scene}.tscn")
@@ -84,7 +84,7 @@ def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", cas
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=["regressions", "gameplay", "network", "rework"])
+    parser.add_argument("suite", choices=["regressions", "gameplay", "network", "rework", "features"])
     parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"))
     parser.add_argument("--mode", default="coop", choices=["coop", "ffa", "teams", "fort", "mists", "bots", "botsffa", "ride", "chariot", "room", "commander"])
     parser.add_argument("--case", default="", help="Run one named gameplay method")

@@ -1,7 +1,7 @@
 class_name MistStorm
 extends Node3D
 ## One scheduled island storm. Local players own their damage; the host owns mobs and summons.
-const EVERY := 90.0
+const EVERY := 70.0
 const WARNING := 8.0
 const DURATION := 20.0
 const DPS := 6.0

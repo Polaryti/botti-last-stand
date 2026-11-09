@@ -710,7 +710,7 @@ func test_version_18() -> void:
 	Game.unlocked.erase("adept")
 	Game.redeemed.erase(_code_of("adept"))
 	ok(not Game.owns_class("adept"), "the Adept is locked")
-	ok(ClassDefs.price("adept") == 0, "and cannot be bought")
+	ok(ClassDefs.price("adept") == 1150, "and can be bought for 1150")
 	ok(Game.redeem_key(_code_of("adept"))["class"] == "adept" and Game.owns_class("adept"), "its code opens it")
 	Game.unlocked["monk"] = true
 	# The Bo and the hands are nobody's item.
@@ -1064,7 +1064,7 @@ func test_version_20_1() -> void:
 			if not fort_world.fort.inside(p.global_position):
 				outside += 1
 			fort_world.remove_pickup(p)
-	ok(outside >= samples * 0.6 and outside <= samples * 0.9, "wood sampling stays near its 75%% outside policy (%d/%d)" % [outside, samples])
+	ok(outside == samples, "wood sampling stays entirely in the woodland (%d/%d)" % [outside, samples])
 	ok(Fort.WOOD_PER_PICKUP == 2 and Director.WOOD_ON_MAP == 4, "and there is less of it")
 	fort_world.queue_free()
 	# The menu, the Armory and the Store.
@@ -1437,7 +1437,7 @@ func test_version_19_1() -> void:
 	ok(pl.weapon_id() == "bo" and not pl.can_drop_weapon(), "the Bo can't be dropped")
 	# Who can be had, and how.
 	ok(ClassDefs.for_sale().has("monk") and ClassDefs.price("monk") > ClassDefs.price("artificer"), "the Monk is in the Store, above the Artificer")
-	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and not ClassDefs.for_sale().has("adept"), "and nothing that is earned")
+	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and ClassDefs.for_sale().has("adept"), "and nothing that is earned")
 	var saved_mode := Game.mode
 	var saved_unlocks := Game.unlocked.duplicate()
 	var saved_poison := Game.poison_dealt
@@ -1554,7 +1554,7 @@ func test_version_19_1() -> void:
 	var far_wood := 0.0
 	for p: Pickup in wood_world.pickups:
 		far_wood = maxf(far_wood, p.global_position.distance_to(worn["at"]))
-	ok(wood_world.pickups.size() >= 3 and far_wood < 10.0, "wood lies at the damaged gate (%d, furthest %.1f m)" % [wood_world.pickups.size(), far_wood])
+	ok(wood_world.pickups.size() >= 3 and far_wood >= World.WOOD_GATE_CLEARANCE, "wood requires an expedition away from the damaged gate (%d, furthest %.1f m)" % [wood_world.pickups.size(), far_wood])
 	wood_world.queue_free()
 	await frames(3)
 	Game.player_class = "infantry"
@@ -2116,7 +2116,7 @@ func test_version_14() -> void:
 	for kind: String in ["raven", "snake", "fox"]:
 		var body := Ally.new(w, kind)
 		w.add_child(body)
-		ok(body._visual != null and body._visual.get_child_count() > 1, "the %s has a body" % kind)
+		ok(body._visual != null and body._visual.get_child_count() > 0, "the %s has a body" % kind)
 		body.queue_free()
 	Game.choose_pet("raven")
 	pl.spec_id = "beastmaster"
@@ -2799,13 +2799,13 @@ func test_version_8() -> void:
 	ok(Game.owns_class("artificer"), "and the class is yours")
 	ok(Game.redeem_key(_code_of("artificer"))["result"] == "used", "the same code cannot be used twice")
 	Game.unlocked.clear()
-	ok(ClassDefs.price("monk") == 800 and ClassDefs.price("artificer") == 520, "the prices are set")
+	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598, "the prices are set")
 	ok(ClassDefs.price("infantry") == 0, "the others are free")
 	var sale := ClassDefs.for_sale()
-	ok(sale.size() == 2 and sale.has("monk") and sale.has("artificer"), "the Store sells the two")
-	Game.doubloons = 519
-	ok(not Game.buy_class("artificer") and Game.doubloons == 519, "you cannot buy what you cannot pay for")
-	Game.doubloons = 521
+	ok(sale.size() == 3 and sale.has("monk") and sale.has("artificer") and sale.has("adept"), "the Store sells Monk, Artificer and Adept")
+	Game.doubloons = 597
+	ok(not Game.buy_class("artificer") and Game.doubloons == 597, "you cannot buy what you cannot pay for")
+	Game.doubloons = 599
 	ok(Game.buy_class("artificer") and Game.doubloons == 1 and Game.owns_class("artificer"), "buying takes the price and opens the class")
 	ok(not Game.buy_class("artificer"), "and it cannot be bought twice")
 	Game.save_settings()
@@ -2836,7 +2836,7 @@ func test_version_8() -> void:
 	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
-	ok(m.panel.get_meta("list").get_child_count() == 3, "the Store opens, with its tabs and two classes")
+	ok(m.panel.get_meta("list").get_child_count() == 4, "the Store opens, with its tabs and three classes")
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await frames(2)
 	ok(m.panel.get_meta("list").get_child_count() == ClassDefs.available().size(), "the Sandbox only offers what you own")
@@ -3339,8 +3339,14 @@ func place(at: Vector3, yaw := 0.0) -> void:
 
 
 func spawn(id: String, at: Vector3, frozen := false) -> Zombie:
-	var model: String = ZombieDefs.ALL[id]["models"][0]
-	var z: Zombie = w._pools[model].pop_back()
+	# Initial roamers may use every body of the first model; use any compatible pool.
+	var pool: Array = []
+	for model: String in ZombieDefs.ALL[id]["models"]:
+		if w._pools.has(model) and not w._pools[model].is_empty():
+			pool = w._pools[model]
+			break
+	assert(not pool.is_empty(), "No pooled body available for test enemy " + id)
+	var z: Zombie = pool.pop_back()
 	w.zombies.append(z)
 	z.spawn(id, at)
 	if frozen:

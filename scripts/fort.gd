@@ -70,6 +70,23 @@ func add_gate(i: int, node: Node3D, rows: Array[Node3D]) -> void:
 	sign_board.modulate = Color(0.95, 0.8, 0.5)
 	sign_board.position = at + Vector3.UP * (WALL_H + 1.2)
 	world.add_child(sign_board)
+	var requirement := Label3D.new()
+	requirement.name = "GateWood%d" % i
+	requirement.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	requirement.font_size = 48
+	requirement.outline_size = 10
+	requirement.pixel_size = 0.008
+	requirement.position = at + dir.cross(Vector3.UP) * (GATE_W * 0.5 + 1.1) + dir * (WALL_T * 0.5 + 0.2) + Vector3.UP * 2.3
+	requirement.modulate = Color(1.0, 0.8, 0.45)
+	requirement.no_depth_test = false
+	world.add_child(requirement)
+	var inner := requirement.duplicate() as Label3D
+	inner.name = "GateWoodInner%d" % i
+	inner.position = at + dir.cross(Vector3.UP) * (GATE_W * 0.5 + 1.1) - dir * (WALL_T * 0.5 + 0.2) + Vector3.UP * 2.3
+	world.add_child(inner)
+	gates.back()["requirement"] = requirement
+	gates.back()["inner_requirement"] = inner
+	_show_gate(gates.back())
 
 
 ## How much wood it would take to mend this gate completely.
@@ -162,6 +179,10 @@ func repair(i: int, amount: float) -> void:
 
 
 func _doorway_busy(g: Dictionary) -> bool:
+	for target: Target in world.players:
+		if not target.dead and target.global_position.distance_to(g["at"]) < GATE_W * 0.7: return true
+	for ally: Ally in world.allies:
+		if not ally.dead and ally.global_position.distance_to(g["at"]) < GATE_W * 0.7: return true
 	for z in world.zombies:
 		if z.is_alive() and not z.flies and z.position.distance_to(g["at"]) < GATE_W * 0.7:
 			return true
@@ -178,6 +199,15 @@ func _set_closed(g: Dictionary, closed: bool) -> void:
 
 ## A gate loses its planks from the top down as it takes damage.
 func _show_gate(g: Dictionary) -> void:
+	var requirement: Label3D = g.get("requirement")
+	if requirement:
+		var needed := wood_needed(g)
+		requirement.text = "%d FIREWOOD\nto repair" % needed
+		requirement.visible = needed > 0
+		var inner: Label3D = g.get("inner_requirement")
+		if inner:
+			inner.text = requirement.text
+			inner.visible = requirement.visible
 	var f := float(g["hp"]) / GATE_HP
 	var rows: Array[Node3D] = g["rows"]
 	for r in rows.size():
