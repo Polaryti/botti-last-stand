@@ -244,6 +244,9 @@ func zombie_pool_plan() -> Dictionary:
 		plan["dummy"] = 6
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
+		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent
+		plan["mist_weaver"] = 2
+		plan["veil_regent"] = 1
 	return plan
 
 

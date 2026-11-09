@@ -28,9 +28,11 @@ static var _axe_proj: Mesh
 static var _orb_meshes := {}
 static var _glow_material_cache := {}
 static var _flame_mesh: BoxMesh
+static var _mist_warmed_quality := -1
 static var _warmed_quality := -1
 static var _lands := {} # the land takes a moment to work out, and it never changes
 
+var mist_seals: Array[MistSeal] = []
 var stone_chains: Array = [] # each line of stones in the Mists, in order, by the middle of each top
 var mode: int = Game.Mode.MENU
 var grid: PathGrid
@@ -609,17 +611,20 @@ func _build_environment() -> void:
 
 ## A violet night with nothing under it.
 func _mists_look() -> void:
-	night_bg = Color(0.3, 0.52, 0.58)
-	night_fog_colour = Color(0.4, 0.66, 0.7)
-	night_fog = 0.0062 if Game.quality > 0 else 0.011
+	night_bg = Color(0.012, 0.025, 0.055)
+	night_fog_colour = Color(0.055, 0.115, 0.16)
+	night_fog = 0.009 if Game.quality > 0 else 0.012
 	day_fog = 0.0035 if Game.quality > 0 else 0.008
-	night_ambient = Color(0.74, 0.8, 0.76)
-	night_sky_shows = false
+	night_ambient = Color(0.28, 0.39, 0.56)
+	night_sky_shows = true
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.world = self
+	add_child(atmosphere)
 	# The sky has to be further off than the furthest island, or it paints over them.
 	_sky_root.scale = Vector3.ONE * 4.6
-	night_moon_colour = Color(1.0, 0.94, 0.82)
-	night_moon = 0.62
-	_sky_material.set_shader_parameter("tint", Vector3(7.4, 8.0, 5.0))
+	night_moon_colour = Color(0.53, 0.73, 1.0)
+	night_moon = 0.3
+	_sky_material.set_shader_parameter("tint", Vector3(0.8, 1.05, 1.3))
 	_sky_value = -1.0
 	_apply_sky(_last_dawn)
 
@@ -1516,7 +1521,7 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	models.shuffle()
 	var pool: Array = []
 	for m: String in models:
-		if not (_pools[m] as Array).is_empty():
+		if _pools.has(m) and not (_pools[m] as Array).is_empty():
 			pool = _pools[m]
 			break
 	if pool.is_empty():
@@ -2358,10 +2363,12 @@ func warm_up() -> void:
 		await get_tree().process_frame
 		return
 	_load_ahead()
-	if _warmed_quality == Game.quality:
+	if _warmed_quality == Game.quality and (not terrain.has_islands() or _mist_warmed_quality == Game.quality):
 		await get_tree().process_frame
 		return
 	_warmed_quality = Game.quality
+	if terrain.has_islands():
+		_mist_warmed_quality = Game.quality
 	_warming = true
 	var cam := Camera3D.new()
 	cam.far = 400.0
@@ -2372,13 +2379,22 @@ func warm_up() -> void:
 	var spot := Vector3(0, 0, 6.0)
 	var added: Array[Zombie] = []
 	var running_effects: Array[Node] = [_gore[_next_gore]]
+	for node: Node in get_children():
+		if node is MistAtmosphere:
+			running_effects.append(node)
 	var kinds := ["normal", "clever", "magic", "rider", "wraith", "banshee", "crow", "gargoyle", "mimic", "scarecrow", "hero_infantry", "hero_ranger"]
+	var mist_preview: MistSeal
+	if terrain.has_islands():
+		kinds.append_array(MistModels.KINDS)
+		mist_preview = MistSeal.create(self, Vector3(0, ground_at(spot), 6), 3.0, 0.0, 1.5, 0.0, -1)
+		mist_preview.set_physics_process(false)
+		cam.position.y += ground_at(spot)
 	for i in kinds.size():
 		var before := zombies.size()
 		if spawn_zombie(kinds[i], spot + Vector3(-5.5 + i, 0, 0)):
 			var z := zombies[before]
 			added.append(z)
-			z.position.y = 0.1
+			z.position.y = ground_at(spot) + 0.1 if terrain.has_islands() else 0.1
 			z.dormant = false
 			if z._lure:
 				z._visual.visible = true
@@ -2437,6 +2453,8 @@ func warm_up() -> void:
 	for i in _puddles.size():
 		_puddles[i].visible = false
 		_puddle_life[i] = 0.0
+	if mist_preview:
+		mist_preview.free()
 	cam.queue_free()
 	player.camera.current = true
 	await _warm_frame()

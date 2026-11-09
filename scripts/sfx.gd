@@ -35,6 +35,8 @@ func _ready() -> void:
 		for n: String in VARIANTS[group]:
 			_streams[n] = load("res://assets/sounds/%s.ogg" % n)
 	_streams["command"] = _command_cry()
+	for kind in ["warning", "burst", "regent"]:
+		_streams["mist_" + kind] = _mist_sound(kind)
 	for sound in ["warning", "fall", "impact"]:
 		_streams["artillery_" + sound] = _artillery_sound(sound)
 	_music = [_stem("night"), _stem("hunted"), _stem("dawn")]
@@ -221,6 +223,35 @@ func _artillery_sound(kind: String) -> AudioStreamWAV:
 		else:
 			value = (sin(TAU * 195 * t) + 0.3 * sin(TAU * 390 * t)) * sin(PI * x) * (0.35 + 0.15 * sin(TAU * 5 * t))
 		data.encode_s16(i * 2, int(clampf(value, -0.95, 0.95) * 32767))
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = RATE
+	stream.data = data
+	return stream
+
+
+## Original mist cues: a rising glass note, a hollow impact and the Regent's low chord.
+func _mist_sound(kind: String) -> AudioStreamWAV:
+	const RATE := 16000
+	var duration := 1.8 if kind == "regent" else 1.2 if kind == "warning" else 0.65
+	var count := int(duration * RATE)
+	var data := PackedByteArray()
+	data.resize(count * 2)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8931
+	var air := 0.0
+	for i in count:
+		var t := float(i) / RATE
+		var x := t / duration
+		var envelope := sin(PI * x) * minf(t * 25.0, 1.0)
+		air = lerpf(air, rng.randf_range(-1.0, 1.0), 0.06)
+		var phase := TAU * (420.0 * t + 90.0 * t * t)
+		var tone := sin(phase) * 0.2 + sin(phase * 1.502) * 0.11
+		if kind == "burst":
+			tone = sin(TAU * (115.0 * t - 55.0 * t * t)) * 0.34 + air * 0.55
+		elif kind == "regent":
+			tone = sin(TAU * 73.4 * t) * 0.22 + sin(TAU * 110.0 * t) * 0.15 + sin(TAU * 155.6 * t) * 0.12 + air * 0.1
+		data.encode_s16(i * 2, int(clampf(tone * envelope, -0.8, 0.8) * 32767.0))
 	var stream := AudioStreamWAV.new()
 	stream.format = AudioStreamWAV.FORMAT_16_BITS
 	stream.mix_rate = RATE

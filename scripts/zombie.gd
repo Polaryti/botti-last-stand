@@ -31,6 +31,7 @@ const HOP_GRAVITY := 18.0
 const HOP_THINK := 0.4
 const HOP_LOOK := 30.0
 
+var mist_mind: MistMind
 var world: World
 var model_id := ""
 var type_id := ""
@@ -246,9 +247,9 @@ func _material_for(id: String, source: Material) -> ShaderMaterial:
 
 func _build_visual() -> void:
 	_setup_static()
-	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy", "harrier"]
+	_custom = model_id in ["crow", "gargoyle", "mimic", "scarecrow", "dummy", "harrier", "lantern_wisp", "mist_weaver", "veil_regent"]
 	if _custom:
-		_visual = EnemyModels.build(model_id)
+		_visual = MistModels.build(model_id) if model_id in MistModels.KINDS else EnemyModels.build(model_id)
 		add_child(_visual)
 		for mi in _visual.find_children("*", "MeshInstance3D", false, false):
 			_parts.append(mi as MeshInstance3D)
@@ -344,6 +345,7 @@ func _set_enabled(on: bool) -> void:
 
 func spawn(id: String, at: Vector3, minute := 0) -> void:
 	type_id = id
+	mist_mind = MistMind.new() if id in MistModels.KINDS else null
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
 	_dummy_log.clear()
@@ -392,6 +394,8 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		_damage *= harder
 		_armed_damage *= harder
 		_speed *= 1.0 + ZombieDefs.NIGHT_SPEED * minute
+	if def.get("mist_boss", false):
+		hp *= 1.0 + 0.55 * maxi(0, (Net.roster.size() if Net.active() else world.players.size()) - 1)
 	hp *= Game.enemy_health()
 	_damage *= Game.enemy_damage()
 	_armed_damage *= Game.enemy_damage()
@@ -434,7 +438,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	# Each zombie approaches from its own side, so a group ends up surrounding you.
 	var a := randf() * TAU
 	_flank = Vector3.ZERO if id == "beast" else Vector3(cos(a), 0, sin(a))
-	height = HEIGHT * s
+	height = (2.2 if model_id == "lantern_wisp" else 2.35 if model_id in MistModels.KINDS else HEIGHT) * s
 	position = at
 	last_hitter = 0
 	next_hitter = 0
@@ -459,6 +463,8 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	for c: MeshInstance3D in _claws:
 		c.visible = def.get("claws", false)
 	_visual.position = Vector3.ZERO
+	if model_id == "veil_regent":
+		(_visual.get_node("RegentHealth") as Label3D).visible = true
 	_show_mount(def.get("rider", false))
 	_ride_pass = 0.0
 	_ride_turn = 1.0
@@ -802,7 +808,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		bar_time = 2.5
 		_flash_on()
 		world.fx_gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
-		world.sfx_at("zombie_hurt", position, -8.0)
+		world.sfx_at("wraith" if type_id in MistModels.KINDS else "zombie_hurt", position, -8.0)
 		Net.hit_zombie(self, amount, from_dir, knock, hit_pos)
 		return
 	if next_hitter != 0:
@@ -843,7 +849,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		world.sfx_at("thunk", position, -8.0)
 		return
 	_check_dismount()
-	world.sfx_at("zombie_hurt", position, -8.0)
+	world.sfx_at("wraith" if type_id in MistModels.KINDS else "zombie_hurt", position, -8.0)
 	if type_id != "beast":
 		_hurt_stun = 0.1
 	var p := world.nearest_player(position)
@@ -852,6 +858,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 
 
 func _death_sound() -> String:
+	if type_id in MistModels.KINDS:
+		return "mist_burst"
 	match type_id:
 		"crow": return "crow"
 		"gargoyle": return "blast"
@@ -895,6 +903,8 @@ func stun(seconds: float) -> void:
 	if puppet:
 		Net.effect_zombie(self, Effect.STUN, seconds)
 		return
+	if def.get("mist_boss", false):
+		seconds = minf(seconds * 0.35, 0.6)
 	if dormant:
 		_wake()
 	_stun = maxf(_stun, seconds)
@@ -916,7 +926,7 @@ func freeze(seconds: float) -> void:
 		Net.effect_zombie(self, Effect.FREEZE, seconds)
 		return
 	stun(seconds)
-	_show_frozen(seconds)
+	_show_frozen(_stun if def.get("mist_boss", false) else seconds)
 
 
 func _show_frozen(seconds: float) -> void:
@@ -965,6 +975,9 @@ func _die() -> void:
 		weapon_id = ""
 		if _hand_mesh:
 			_hand_mesh.equip("")
+	if def.get("mist_boss", false):
+		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
+		world.director.show_banner("The Veil Regent falls. The mist releases an Angel", 4.0)
 	world.on_zombie_killed(self)
 
 
@@ -977,6 +990,8 @@ func net_die() -> void:
 
 
 func _show_death() -> void:
+	if model_id == "veil_regent":
+		(_visual.get_node("RegentHealth") as Label3D).visible = false
 	_dying = 2.2
 	burn_time = 0.0
 	bar_time = 0.0
@@ -1367,6 +1382,8 @@ func _take_weapon(p: Pickup) -> void:
 
 
 func _alert_sound() -> String:
+	if type_id in MistModels.KINDS:
+		return "wraith"
 	match type_id:
 		"leaper": return "leaper"
 		"wraith": return "wraith"
@@ -1511,6 +1528,9 @@ func _physics_process(delta: float) -> void:
 		_groan_cd = randf_range(5.0, 12.0)
 		world.sfx_at(_idle_sound(), position, -14.0)
 
+	if mist_mind:
+		mist_mind.tick(self, target, delta)
+		return
 	if flies:
 		_fly(target, to, dist, delta)
 		return
@@ -1545,6 +1565,8 @@ func _physics_process(delta: float) -> void:
 
 
 func _idle_sound() -> String:
+	if type_id in MistModels.KINDS:
+		return "wraith"
 	match type_id:
 		"crow": return "crow"
 		"wraith": return "wraith"
@@ -1934,6 +1956,9 @@ func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 
 
 func _animate_custom(delta: float, moving: float) -> void:
+	if model_id in MistModels.KINDS:
+		MistModels.animate(_visual, world.now, hp / maxf(max_hp, 1.0))
+		return
 	_phase += delta * (9.0 if moving > 0.0 else 0.0)
 	match model_id:
 		"crow", "gargoyle", "harrier":

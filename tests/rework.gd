@@ -44,6 +44,7 @@ func _ready() -> void:
 	_projectile_lifecycle()
 	_remote_animation()
 	_equipment()
+	await _mists()
 	print("REWORK progress")
 	_progress()
 	Net.leave()
@@ -410,3 +411,116 @@ func _equipment() -> void:
 	artificer._cooldown = 0.0
 	artificer._tick_own(0.016)
 	check(victim.hp < victim.max_hp and victim.burn_time > 0.0, "summoned Artificer attacks in melee and its torch ignites the target")
+
+
+func _mists() -> void:
+	var old_map := Game.night_map
+	var old_class := Game.player_class
+	w.process_mode = Node.PROCESS_MODE_DISABLED
+	Game.night_map = "mists"
+	Game.player_class = "infantry"
+	var mw := World.new()
+	add_child(mw)
+	mw.setup(Game.Mode.NIGHT)
+	mw.director.running = false
+	for z: Zombie in mw.zombies.duplicate():
+		z.release()
+	var mp := mw.player
+	mp.set_physics_process(false)
+	mp.guard_left = 0.0
+	mp.position = Vector3(0, mw.ground_at(Vector3(0, 0, 16)), 16)
+	await frames(2)
+	check(mw.night_bg.get_luminance() < 0.06 and mw.night_moon <= 0.35 and mw.night_sky_shows, "Mists uses a moonlit night palette with stars")
+	check(mw.find_children("MistBridgeInlays*", "MeshInstance3D", false, false).size() == MapIslands.BRIDGES.size(), "every existing bridge has deck-following night inlays")
+	for kind: String in MistModels.KINDS:
+		check(Icons.exists(kind) and Game.zombie_pool_plan().has(kind), "%s has its own icon and pooled model in the Mists" % kind)
+		check(mw.spawn_zombie(kind, Vector3(8, 10, 8)), "%s can spawn" % kind)
+		var enemy: Zombie = mw.zombies.back()
+		enemy.set_physics_process(false)
+		check(enemy.mist_mind != null and enemy._custom and enemy._parts.size() > 0, "%s uses its original model and mist AI" % kind)
+		enemy._animate_custom(0.1, 0.0)
+		await frames(2)
+		var eye := enemy._visual.to_global(Vector3(0, 1.35 if kind == "lantern_wisp" else 1.78, 0.3 if kind == "lantern_wisp" else 0.2))
+		var ray := PhysicsRayQueryParameters3D.create(eye + Vector3.BACK * 5.0, eye, Zombie.LAYER)
+		var hit := mw.get_world_3d().direct_space_state.intersect_ray(ray)
+		check(hit.get("collider") == enemy, "%s visible face is inside its hittable collider" % kind)
+		enemy.release()
+	var village_only := true
+	for i in 400:
+		village_only = village_only and not ZombieDefs.ALL[ZombieDefs.pick_roamer(550.0)].get("only_islands", false)
+	check(village_only, "Village roster excludes mist-only enemies")
+	var seen := {}
+	for i in 400:
+		seen[ZombieDefs.pick_roamer(550.0, true)] = true
+	check(seen.has("lantern_wisp") and seen.has("mist_weaver") and not seen.has("veil_regent"), "Mists roaming waves include both spirits and exclude the scheduled boss")
+	mw.spawn_zombie("lantern_wisp", mp.position + Vector3.RIGHT * 12)
+	var spirit: Zombie = mw.zombies.back()
+	spirit.set_physics_process(false)
+	spirit._sees = false
+	spirit._has_goal = false
+	spirit.mist_mind.cooldown = 0.0
+	var before := mw.mist_seals.size()
+	spirit.mist_mind.tick(spirit, mp, 0.016)
+	check(mw.mist_seals.size() == before and spirit.velocity == Vector3.ZERO, "unaware spirits do not track or cast at unseen players")
+	spirit._sees = true
+	spirit.mist_mind.tick(spirit, mp, 0.016)
+	check(mw.mist_seals.size() == before + 1, "a spirit that sees its target casts a warning")
+	for seal: MistSeal in mw.mist_seals.duplicate():
+		seal.free()
+	for i in MistSeal.LIMIT:
+		MistSeal.create(mw, mp.position, 3.0, 0.0, 1.5, 0.0, -1)
+	MistSeal.cast(spirit, mp.position, 3.0, 1.5, 10.0)
+	check(mw.mist_seals.size() == MistSeal.LIMIT, "active mist effects respect their fixed mobile budget")
+	for seal: MistSeal in mw.mist_seals.duplicate():
+		seal.free()
+	spirit.release()
+	var at := mp.position
+	mp.hp = 100.0
+	var seal := MistSeal.create(mw, at, 3.0, 0.0, 1.5, 10.0, -1)
+	seal._physics_process(1.0)
+	check(mp.hp == 100.0, "mist seal does not damage during its warning")
+	seal._physics_process(0.5)
+	check(mp.hp == 90.0 and mp.slowed_left > 0.0, "mist seal lands once and slows a player caught inside")
+	seal._physics_process(0.1)
+	check(mp.hp == 90.0, "mist seal cannot damage repeatedly after detonation")
+	seal.free()
+	var crown := MistSeal.create(mw, at, 9.0, 3.0, 1.8, 20.0, -1)
+	check(not crown.contains(at) and crown.contains(at + Vector3.RIGHT * 5.0), "Regent crown has a genuinely safe centre and dangerous annulus")
+	check(not crown.contains(at + Vector3.RIGHT * 10.0) and not crown.contains(at + Vector3(5, 10, 0)), "seal cannot hit outside its radius or on a different height")
+	crown.strike()
+	check(mp.hp == 90.0, "standing in the safe eye avoids the crown attack")
+	crown.free()
+	mw.director._mist_boss_spawned = false
+	check(mw.director._mist_boss_at >= 525.0 and mw.director._mist_boss_at <= 540.0, "boss scheduling is inside 8:45-9:00")
+	mw.director.elapsed = mw.director._mist_boss_at - 0.01
+	mw.director._tick_mist_boss()
+	check(mw.count_type("veil_regent") == 0, "Regent does not arrive early")
+	mw.director.elapsed += 0.02
+	mw.director._tick_mist_boss()
+	mw.director._tick_mist_boss()
+	check(mw.count_type("veil_regent") == 1, "Regent arrives exactly once at its scheduled time")
+	var boss: Zombie = mw.zombies.back()
+	boss.set_physics_process(false)
+	boss.freeze(10.0)
+	check(boss._stun <= 0.6 and boss._frozen <= 0.6, "Regent resists long disables without an incorrect lingering ice effect")
+	boss._stun = 0.0
+	boss._show_frozen(0.0)
+	for i in 3:
+		mw.spawn_zombie("lantern_wisp", Vector3(8 + i * 2, 10, 16))
+	var reserves_kept := true
+	for i in 100:
+		reserves_kept = reserves_kept and mw.director._pick_roamer() != "lantern_wisp"
+	check(reserves_kept, "roaming waves reserve two wisp bodies for the boss encounter")
+	boss.hp = boss.max_hp * 0.49
+	boss.mist_mind.tick(boss, mp, 0.016)
+	check(boss.mist_mind.enraged and mw.count_type("lantern_wisp") == 5, "Regent enters its second phase and calls two wisps")
+	boss.mist_mind.tick(boss, mp, 0.016)
+	check(mw.count_type("lantern_wisp") == 5, "second-phase reinforcement happens only once")
+	var angels := mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size()
+	boss._die()
+	check(mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size() == angels + 1, "defeating the Regent drops an Angel familiar")
+	Game.night_map = old_map
+	Game.player_class = old_class
+	mw.queue_free()
+	await frames(2)
+	w.process_mode = Node.PROCESS_MODE_INHERIT

@@ -282,6 +282,42 @@ func _mists() -> void:
 		var other: Avatar = Net.avatar(1)
 		ok(other and w.portals.island_of(other.global_position) == int(link["ib"]), "and the other phone sees it arrive")
 
+	# Mist-only bodies and warnings must replicate without applying damage twice.
+	await _clear_zombies_on_host()
+	pl.set_physics_process(false)
+	pl.global_position = Vector3(0 if host else 1, 10.05, 16)
+	pl.hp = 100.0
+	pl.guard_left = 0.0
+	await wait(0.5)
+	await sync(15)
+	if host:
+		w.spawn_zombie("lantern_wisp", Vector3(0, 10, 27))
+		(w.zombies.back() as Zombie).set_physics_process(false)
+	await until(func() -> bool: return w.count_type("lantern_wisp") == 1, 4.0)
+	ok(w.count_type("lantern_wisp") == 1, "original Lantern Wisp model replicates to both phones")
+	await sync(16)
+	if host:
+		MistSeal.cast(w.zombies.back(), Vector3(0, 10.05, 16), 3.0, 1.5, 10.0)
+	await until(func() -> bool: return not w.mist_seals.is_empty(), 3.0)
+	ok(not w.mist_seals.is_empty() and pl.hp == 100.0, "mist warning appears before damage on both phones")
+	await sync(17)
+	await until(func() -> bool: return pl.hp < 100.0, 3.0)
+	ok(pl.hp == 90.0 and pl.slowed_left > 0.0, "each phone receives exactly one mist hit and slow")
+	await until(func() -> bool: return w.mist_seals.is_empty(), 3.0)
+	await sync(18)
+	if not host:
+		Net.mist_seal(pl.global_position, 3.0, 0.0, 1.5, 10.0, -1)
+	await wait(0.2)
+	ok(w.mist_seals.is_empty(), "client cannot create an enemy warning through the authority API")
+	if host:
+		w.director.elapsed = w.director._mist_boss_at
+		w.director._tick_mist_boss()
+		w.director._tick_mist_boss()
+		(w.zombies.back() as Zombie).set_physics_process(false)
+	await until(func() -> bool: return w.count_type("veil_regent") == 1, 4.0)
+	ok(w.count_type("veil_regent") == 1, "one scheduled Veil Regent appears on both phones")
+	await sync(19)
+
 
 func _with_bots() -> void:
 	pl.guard_left = 99999.0

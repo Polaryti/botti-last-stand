@@ -2,6 +2,19 @@
 
 Newest first. The game shows this file on its Changelog screen, so keep the same layout: `## ` for a version, `### ` for a part of it, and `- ` for a line. Write for the player: what is new to do, see or earn, in a sentence or two.
 
+## Development — The Mists awaken
+### Changed
+- Removed the old bell inside the War Bell Hammer, retaining its armoured frame and rear pick.
+- The Mists now has a blue moonlit night, stars, a darker flowing mist sea, drifting ground wisps and spectral motes. The Village keeps its lighting.
+- Bridge deck inlays, illuminated entry posts and stepping-stone runes make existing routes easier to read at night.
+### New
+- Lantern Wisps mark your position with a delayed mist seal. Mist Weavers place three seals across your route. Escape the marked area before it bursts and slows you.
+- The Veil Regent awakens once in the arena between 8:45 and 9:00. Its crown attack leaves a safe central eye. Below half health it alternates crown waves with three targeted seals and summons two Lantern Wisps.
+- The Regent scales with party size, sees through concealment and resists long disables. Defeating it releases an Angel familiar; surviving to dawn still wins the night.
+- All three mist-born enemies have original low-poly models, animated veils, Codex icons and distinct magical warning and impact sounds. Their warnings and damage work in multiplayer.
+### Performance
+- Mist particles, enemy bodies and active seals have fixed mobile budgets. New enemy and seal shaders warm behind the loading screen. Multiplayer requires matching updated builds.
+
 ## Development — Weapon presentation and Commander training
 ### Changed
 - The Lance belongs to Chivalry: no map spawns or drops, including Fallen Knights. Other players, bots and knights carry it forward and thrust with it.

@@ -271,17 +271,15 @@ static func flail_chain() -> Mesh:
 	return _meshes["chain"]
 
 
-## Reinforced resonant bell inside a steel warhammer frame, with a striking face and rear pick.
+## Armoured war hammer with a solid striking face and rear pick.
 static func _bell_hammer() -> Mesh:
 	var l := LowPoly.new()
 	l.prism(Vector3(0, -0.5, 0), Vector3(0, 0.85, 0), 0.035, 0.03, 8, WOOD)
 	for y: float in [-0.35, -0.12, 0.6]:
 		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.13, 0), 0.043, 0.043, 8, DARK)
 	l.box(Vector3(0, 0.8, 0), Vector3(0.3, 0.32, 0.22), DARK)
-	l.prism(Vector3(0, 0.8, 0.04), Vector3(0, 0.8, 0.3), 0.11, 0.2, 10, BRASS)
-	l.prism(Vector3(0, 0.8, 0.3), Vector3(0, 0.8, 0.35), 0.22, 0.22, 10, STEEL)
-	l.prism(Vector3(0, 0.8, 0.352), Vector3(0, 0.8, 0.36), 0.14, 0.14, 10, DARK)
-	l.prism(Vector3(0, 0.8, 0.35), Vector3(0, 0.8, 0.38), 0.055, 0.055, 6, BRASS)
+	# Solid striking face. The old bell, mouth and clapper are gone.
+	l.box(Vector3(0, 0.8, 0.3), Vector3(0.38, 0.34, 0.1), STEEL)
 	l.prism(Vector3(0, 0.8, -0.1), Vector3(0, 0.85, -0.45), 0.09, 0.0, 4, STEEL)
 	for x: float in [-0.17, 0.17]:
 		l.box(Vector3(x, 0.8, 0.17), Vector3(0.04, 0.34, 0.3), DARK)

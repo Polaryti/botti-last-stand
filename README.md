@@ -21,7 +21,7 @@ Bots occupy player slots and support multiplayer rules, levelling, skill choices
 
 **The Village** has enterable buildings, farmland, hills, a castle and a river crossed by bridges and fords. Crops hide you, firelight makes you easier to see, and sound attracts enemies. The church bell marks elapsed minutes and draws attention.
 
-**The Mists** is a separate survival map of floating islands, ruins, bridges, stepping stones and timed portals. Falling into the void is fatal. Its hazards include jumping enemies, Rift Stalkers and airborne Mist Harriers.
+**The Mists** is a separate survival map of floating islands, ruins, bridges, stepping stones and timed portals. Falling into the void is fatal. Its hazards include jumping enemies, Rift Stalkers and airborne Mist Harriers. Night lighting, drifting wisps and glowing route inlays accompany its own Lantern Wisps and Mist Weavers. Once between 8:45 and 9:00, the Veil Regent awakens in the arena: dodge its marked seals, use the safe eye of its crown attack, and defeat it for an Angel familiar. Its second phase calls reinforcements; its health scales for multiplayer. Dawn remains the survival objective.
 
 Fight with melee weapons, bows, crossbows, thrown weapons and class-specific attacks. Collect food, ammunition, potions, powers and familiars. Familiars last 20 seconds before duration upgrades. Chivalry’s Lance is class-exclusive and cannot be dropped or found as loot. Enemy types include ordinary zombies, beasts, spellcasters, ambushers, flying enemies, Dread Riders and Fallen Heroes. Most nights are clear; rain and thunderstorms alter visibility, and lightning warns with a glowing ground marker before it strikes.
 

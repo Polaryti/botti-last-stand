@@ -54,10 +54,13 @@ var _last_stand := false
 var _call_timer := 0.0
 var _far_timer := 4.0
 var _next_rider := FIRST_RIDER
+var _mist_boss_at := 532.5
+var _mist_boss_spawned := false
 
 
 func _init(owner_world: World) -> void:
 	world = owner_world
+	_mist_boss_at = randf_range(525.0, 540.0)
 
 
 ## In a multiplayer game this waits for all phones to load. A joined phone only keeps the clock.
@@ -95,7 +98,7 @@ func begin(with_zombies: bool) -> void:
 	if running:
 		_spawn_timer = 0.0
 		for i in target_population():
-			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands()))
+			world.spawn_zombie(_pick_roamer())
 		var opening := "Survive until dawn"
 		if world.fort:
 			opening = "Hold the fort until dawn"
@@ -187,7 +190,7 @@ func _process(delta: float) -> void:
 		_spawn_timer = 1.25 if _last_stand else 2.5
 		var living := world.count_living()
 		if living < target_population():
-			world.spawn_zombie(ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands()))
+			world.spawn_zombie(_pick_roamer())
 	if elapsed >= _next_beast:
 		_next_beast = elapsed + (LAST_STAND_BEAST_EVERY if _last_stand else BEAST_EVERY)
 		if world.count_type("beast") < (LAST_STAND_BEASTS if _last_stand else MAX_BEASTS) and world.spawn_zombie("beast"):
@@ -223,7 +226,7 @@ func _sound(sound: String, volume: float, pitch := 1.0) -> void:
 ## It comes back around where the players are instead.
 func _clear_far_zombies() -> void:
 	for z: Zombie in world.zombies.duplicate():
-		if not z.is_alive() or z.flies or z.dormant or z.hero or z.is_hunting():
+		if not z.is_alive() or z.flies or z.dormant or z.hero or z.def.get("mist_boss", false) or z.is_hunting():
 			continue
 		var near := INF
 		for p in world.players:
@@ -264,7 +267,24 @@ func minute() -> int:
 	return int(elapsed / 60.0)
 
 
+func _pick_roamer() -> String:
+	var kind := ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands())
+	# Leave two pooled bodies available for the Regent's second phase.
+	return "rift_stalker" if kind == "lantern_wisp" and world.count_type(kind) >= 3 else kind
+
+
+func _tick_mist_boss() -> void:
+	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
+		var throne := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3.ZERO)))
+		throne.y = world.ground_at(throne)
+		if world.spawn_zombie("veil_regent", throne):
+			_mist_boss_spawned = true
+			show_banner("The Veil Regent awakens in the arena", 5.0)
+			_sound("mist_regent", 0.0)
+
+
 func _tick_specials() -> void:
+	_tick_mist_boss()
 	if elapsed >= _next_rider:
 		_next_rider = elapsed + RIDER_EVERY
 		if world.count_type("rider") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("rider"):

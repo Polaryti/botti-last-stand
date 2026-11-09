@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 29
+const PROTOCOL := 30
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -2040,3 +2040,15 @@ func command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
 func _command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
 	if world and is_instance_valid(world):
 		CommandField.visual_impact(world, at, radius, storm)
+
+
+## The authority starts each warning; every phone applies the eventual hit to its own player only.
+func mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int) -> void:
+	if is_host():
+		_spawn_mist_seal.rpc(at, radius, eye, delay, damage, source)
+
+
+@rpc("authority", "call_local", "reliable")
+func _spawn_mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int) -> void:
+	if world and is_instance_valid(world):
+		MistSeal.create(world, at, radius, eye, delay, damage, source)

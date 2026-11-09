@@ -856,6 +856,7 @@ func _bridge(b: MapBuilder, br: Array) -> void:
 	const STEP := 1.6
 	var parts := int(length / STEP)
 	var last := Vector3.ZERO
+	var inlays := LowPoly.new()
 	for n in parts + 1:
 		var s := float(n) / parts
 		var p := from.lerp(to, s)
@@ -874,7 +875,16 @@ func _bridge(b: MapBuilder, br: Array) -> void:
 					l.box(pp + Vector3.DOWN * 0.08, Vector3(half * 2.0, 0.12, 0.48), WOOD.lightened((n + q) % 3 * 0.06), Vector3(rad_to_deg(basis.get_euler().x), rad_to_deg(basis.get_euler().y), 0))
 				l.prism(last + side * half + Vector3.DOWN * 0.1, at + side * half + Vector3.DOWN * 0.1, 0.07, 0.07, 4, ROPE)
 				l.prism(last - side * half + Vector3.DOWN * 0.1, at - side * half + Vector3.DOWN * 0.1, 0.07, 0.07, 4, ROPE)
+		# Inset markers follow the existing deck, so the night route has readable edges.
+		for edge: float in [-1.0, 1.0]:
+			inlays.box(at + side * edge * (half - 0.2) + Vector3.UP * 0.045, Vector3(0.13, 0.035, 0.38), Color(0.14, 0.46, 0.5), Vector3(0, rad_to_deg(yaw), 0))
 		last = at
+	var edge_mesh := b.add(inlays)
+	edge_mesh.name = "MistBridgeInlays"
+	var shine := StandardMaterial3D.new()
+	shine.vertex_color_use_as_albedo = true
+	shine.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	edge_mesh.material_override = shine
 	# A flat step at each end, reaching a little onto the land, so that there is no lip to trip over.
 	for s: float in [0.0, 1.0]:
 		var p := from.lerp(to, s)
@@ -886,6 +896,7 @@ func _bridge(b: MapBuilder, br: Array) -> void:
 		var p := from.lerp(to, s)
 		var at := Vector3(p.x, t.deck_y(data, s), p.y)
 		for g: float in [-1.0, 1.0]:
+			b.w.add_glow(at + side * g * (half + 0.2) + Vector3.UP * 1.45, Color(0.2, 0.65, 0.7), 0.45)
 			if stone:
 				l.box(at + side * g * (half + 0.2) + Vector3.UP * 0.6, Vector3(0.7, 1.6, 0.7), STONE, Vector3(0, rad_to_deg(yaw), 0))
 			else:
@@ -900,6 +911,7 @@ func _bridge(b: MapBuilder, br: Array) -> void:
 
 func _stone_line(b: MapBuilder, line: Dictionary, caches: MistCaches) -> void:
 	var l := LowPoly.new()
+	var rings := LowPoly.new()
 	var w: World = b.w
 	var stones := stones_of(line)
 	var chain: Array = []
@@ -907,10 +919,18 @@ func _stone_line(b: MapBuilder, line: Dictionary, caches: MistCaches) -> void:
 	for s: Vector4 in stones:
 		var top := Vector3(s.x, s.y, s.z)
 		chain.append(top)
+		if chain.size() % 3 == 1 or chain.size() == stones.size():
+			_annulus(rings, top, s.w * 0.72, s.w * 0.79, top.y + 0.025, top.y + 0.025, Color(0.12, 0.4, 0.43), 12)
 		l.prism(top + Vector3.DOWN * 0.26, top, s.w * 1.05, s.w, 8, MOSS.lightened(0.12))
 		l.prism(top + Vector3.DOWN * 0.26, top + Vector3(0.1, -s.w * 0.9 - 0.3, -0.1), s.w * 1.05, 0.25, 7, STONE.darkened(0.25))
 		w.add_stone(top, s.w * 0.96)
 	b.add(l)
+	var rune_mesh := b.add(rings)
+	rune_mesh.name = "MistStoneWaymarks"
+	var glow := StandardMaterial3D.new()
+	glow.vertex_color_use_as_albedo = true
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rune_mesh.material_override = glow
 	if line.has("coins"):
 		var spot: Vector3 = line.get("landing", Vector3(stones[stones.size() - 1].x, stones[stones.size() - 1].y, stones[stones.size() - 1].z))
 		if line.has("landing"):

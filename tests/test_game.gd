@@ -5412,7 +5412,8 @@ func soak() -> void:
 	print("soak: night time reached ", Game.clock(w.director.elapsed), " kills=", pl.kills, " peak alive=", peak_alive, " types=", seen.keys())
 	print("soak: physics ms avg=%.2f peak=%.2f, hunted %d%% of the time" % [total / maxi(n, 1), peak, 100 * hunted_frames / maxi(frames_total, 1)])
 	# Rare ones depend on how many zombies die and get replaced, which varies from night to night.
-	ok(seen.size() >= ZombieDefs.ALL.size() - 5, "nearly all zombie types appear in a real night (%d of %d)" % [seen.size(), ZombieDefs.ALL.size()])
+	var eligible := ZombieDefs.ALL.values().filter(func(d: Dictionary) -> bool: return not d.get("only_islands", false)).size()
+	ok(seen.size() >= eligible - 3, "nearly all eligible Village types appear in a real night (%d of %d)" % [seen.size(), eligible])
 	var late := {}
 	for i in 600:
 		late[ZombieDefs.pick_roamer(420.0)] = true
