@@ -8,7 +8,7 @@ static var _images := {}
 signal selected(at: Vector3)
 var targeting := false
 var selected_spot := Vector3.ZERO
-var target_radius := 12.0
+var target_radius := CommanderKit.BARRAGE_RADIUS
 
 var world: World
 
