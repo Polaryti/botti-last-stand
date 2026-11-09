@@ -199,9 +199,6 @@ func _walk_surface(pawn: Player, from: Vector3, toward: Vector3, label: String) 
 		pawn.velocity = direction * 6 + Vector3.DOWN * 4
 		pawn.move_and_slide()
 		await frames(1)
-	if pawn.get_slide_collision_count() > 0:
-		var contact := pawn.get_slide_collision(0)
-		print(label, " collider=", contact.get_collider(), " normal=", contact.get_normal(), " at=", contact.get_position())
 	check(Vector2(pawn.position.x - toward.x, pawn.position.z - toward.z).length() < 1.0 and pawn.position.y > toward.y - 1.0, label + " ended " + str(pawn.position))
 
 func _traversal() -> void:
@@ -227,6 +224,12 @@ func _traversal() -> void:
 			var at := centre + dir * (float(shrine[1]) + 4)
 			var from := Vector3(at.x, mist.ground_at(Vector3(at.x, 0, at.y)), at.y)
 			await _walk_surface(pawn, from, Vector3(centre.x, float(shrine[3]) + MapIslands.ROTUNDA_RISE, centre.y), "open shrine approach")
+	for pair: Array in MapIslands.JOINED:
+		var from: Vector4 = MapIslands.ISLANDS[pair[0]]
+		var to: Vector4 = MapIslands.ISLANDS[pair[1]]
+		var start := mist.grid.to_world(mist.grid.nearest_free(mist.grid.to_cell(Vector3(from.x, 0, from.y))))
+		var end := mist.grid.nearest_free(mist.grid.to_cell(Vector3(to.x, 0, to.y)))
+		check(mist.grid.flood(start).has(end), "bots and mobs can traverse joined islands %s" % str(pair))
 	check(mist.map_marks.size() >= MapIslands.ISLANDS.size(), "every Mists zone has a map label")
 	viewport.queue_free()
 	await frames(2)

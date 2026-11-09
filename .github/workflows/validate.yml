@@ -26,6 +26,19 @@ jobs:
         include:
           - suite: gameplay
             mode: coop
+            group: core
+          - suite: gameplay
+            mode: coop
+            group: recent
+          - suite: gameplay
+            mode: coop
+            group: legacy
+          - suite: gameplay
+            mode: coop
+            group: classes
+          - suite: gameplay
+            mode: coop
+            group: world
           - suite: regressions
             mode: coop
           - suite: render
@@ -74,7 +87,7 @@ jobs:
           python3 tools/import_project.py --log build/checks/import.log
       - name: Run checks with isolated saves
         if: matrix.suite != 'render'
-        run: python3 tools/run_checks.py ${{ matrix.suite }} --mode ${{ matrix.mode }}
+        run: python3 tools/run_checks.py ${{ matrix.suite }} --mode ${{ matrix.mode }} --group "${{ matrix.group || 'all' }}"
       - name: Check development packaging
         if: matrix.suite == 'regressions'
         run: |
@@ -116,6 +129,6 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: checks-${{ matrix.suite }}-${{ matrix.mode }}
+          name: checks-${{ matrix.suite }}-${{ matrix.mode }}-${{ matrix.group || 'all' }}
           path: build/checks
           retention-days: 14

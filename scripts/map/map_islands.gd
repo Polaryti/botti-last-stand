@@ -120,7 +120,7 @@ static func stone_lines() -> Array[Dictionary]:
 	# Off the arena's rim, out over the void, to a rock with a cache on it.
 	out.append({"points": [Vector3(-46.5, 18.5, -46.5), Vector3(-62, 20.2, -38), Vector3(-76, 22, -50), Vector3(-68, 23.5, -66)], "coins": 25, "reward": "angel"})
 	# Round and round the great tree of the forest. A fall only lands you on the grass.
-	out.append({"points": _spiral(Vector2(-124, 8), 15.0, 14.5, 28.0, 0.4, 1.55), "coins": 30, "reward": "ghost"})
+	out.append({"points": _spiral(Vector2(-124, 8), 15.0, 14.5, 28.0, 4.5, 1.55), "coins": 30, "reward": "ghost"})
 	# Up around the tall tower of the battlements, to its top.
 	var tower := _spiral(Vector2(128, -20), 11.0, 26.5, 39.8, 2.2, 2.1)
 	tower.append(Vector3(128, 40.2, -20) + _outward(tower, Vector2(128, -20)) * 7.2)
@@ -476,6 +476,7 @@ func _tower(b: MapBuilder, l: LowPoly, c: Vector3, r: float, h: float, walkable_
 
 ## A big old tree with a twisted trunk and heavy crowns.
 func _great_tree(b: MapBuilder, l: LowPoly, at: Vector3, size: float, leaf: Color) -> void:
+	if on_masonry(Vector2(at.x, at.z)): return
 	if _near_gate(b.w, at, 7.0 * size): return
 	_foliage.append(Vector4(at.x, at.z, 5.0 * size, at.y))
 	var p := at

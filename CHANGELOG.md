@@ -12,6 +12,7 @@
 - The map names every island and shelf, and highlights the islands affected by Mist Storms, including the final retreat.
 - Shelf stairs have matching continuous walking surfaces and solid ramp connections across island rims. Shrines have wider, clearly open approaches.
 - The northern parkour shortcut reaches its shelf. Floating stones have matching upper and lower facets; the southern monument has a smaller, centred base and a clearer staircase landing.
+- The forest parkour spiral leaves headroom above the western shelf ramp, keeping the route open for mobs and bots.
 - Everyone in a multiplayer room needs this version.
 
 ## Development — Iron vows and woodland expeditions
