@@ -1,0 +1,13 @@
+{
+  "name": "botti-board",
+  "private": true,
+  "description": "Public leaderboard for Botti's Last Stand: names, match scores, all-time and weekly boards.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/board.test.js",
+    "dev": "wrangler dev --env dev --local"
+  },
+  "devDependencies": {
+    "wrangler": "4.153.0"
+  }
+}

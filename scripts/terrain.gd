@@ -97,6 +97,16 @@ func _island_shape(x: float, z: float) -> float:
 		for c: Dictionary in _cuts:
 			top = _apply_cut(c, x, z, top)
 		best = maxf(best, lerpf(top, VOID_Y, smoothstep(-0.5, ISLAND_RIM, past)))
+	# A shelf ramp remains solid even where it crosses the gap between island rims.
+	for ramp: Array in MapIslands.RAMPS:
+		var a: Vector3 = ramp[0]
+		var b: Vector3 = ramp[1]
+		var ab := Vector2(b.x - a.x, b.z - a.z)
+		var t := clampf(Vector2(x - a.x, z - a.z).dot(ab) / ab.length_squared(), 0, 1)
+		var distance := Vector2(x, z).distance_to(Vector2(a.x, a.z) + ab * t)
+		if distance < 8.0:
+			var ramp_y := lerpf(a.y, b.y, t)
+			best = lerpf(ramp_y, best, smoothstep(4.0, 8.0, distance)) if best > 0 else ramp_y
 	return best
 
 

@@ -19,6 +19,10 @@ extends MapPiece
 		refresh()
 
 
+func land(t: Terrain, at: Transform3D) -> void:
+	if kind == "bonfire" and on_ground:
+		t.level_auto(Vector2(at.origin.x, at.origin.z), Vector2.ONE * 1.5, 0, 2.0)
+
 func build(b: MapBuilder) -> void:
 	match kind:
 		"bed": b.bed()

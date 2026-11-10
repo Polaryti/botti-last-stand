@@ -125,6 +125,13 @@ jobs:
           python3 tools/setup_epic.py "$(dirname "$(find "$RUNNER_TEMP/plugin" -name eosg.gdextension | head -1)")" android,linux
           test -f scripts/epic_keys.gd
 
+      - name: Point it at the production leaderboard
+        if: steps.version.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python3 tools/set_leaderboard_url.py production
+
       - name: Build and check the signature
         if: steps.version.outputs.go == 'true'
         run: |

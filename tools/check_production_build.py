@@ -24,6 +24,8 @@ def verify(root=ROOT, badging=None):
         raise ValueError('Production app name changed')
     if value(project, 'botti', 'release_channel') != 'production':
         raise ValueError('Production cannot use the dev updater')
+    if project.has_option('botti', 'leaderboard_url') and 'botti-board-dev' in project.get('botti', 'leaderboard_url'):
+        raise ValueError('Production cannot use the dev leaderboard')
     if '"dev"' in project.get('application', 'config/features'):
         raise ValueError('Production cannot advertise the dev feature')
     for index in (0, 1):

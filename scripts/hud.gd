@@ -320,21 +320,7 @@ func _draw_fort(s: Vector2, centre: Vector2) -> void:
 		_bar(r, float(g["hp"]) / Fort.GATE_HP, Color(0.72, 0.5, 0.26) if g["closed"] else Color(0.8, 0.2, 0.15))
 		_centered(["N", "E", "S", "W"][i], r.get_center() + Vector2(0, 16), 15, UiTheme.BONE)
 	const WOOD_COL := Color(0.92, 0.72, 0.42)
-	var needs: Array[String] = []
-	for g: Dictionary in fort.gates:
-		if fort.wood_needed(g) > 0:
-			needs.append("%s %d" % [["N", "E", "S", "W"][g["i"]], fort.wood_needed(g)])
-	var wood_line := "Wood %d of %d" % [player.wood, Fort.WOOD_MAX]
-	if not needs.is_empty():
-		wood_line += "   Gates need: %s" % ", ".join(needs)
-	_centered(wood_line, Vector2(centre.x, top + 60), 20, WOOD_COL)
-	var near := fort.damaged_gate_near(player.global_position)
-	if near >= 0:
-		var missing := fort.wood_needed(fort.gates[near])
-		var note := "Mending the %s gate: %d more wood" % [Fort.NAMES[near], missing]
-		if player.wood <= 0:
-			note = "The %s gate needs %d wood, and you have none" % [Fort.NAMES[near], missing]
-		_centered(note, Vector2(centre.x, s.y * 0.62), 26, WOOD_COL)
+	_centered("Wood %d of %d" % [player.wood, Fort.WOOD_MAX], Vector2(centre.x, top + 60), 20, WOOD_COL)
 	_draw_gate_compass(fort, Vector2(centre.x + w * 0.5 + 66.0, top + 26.0))
 
 

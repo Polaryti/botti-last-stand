@@ -1,0 +1,83 @@
+{
+  "about": "Examples of the scoring rule. The server's tests and the game's tests both check them, so the points the game shows are the points the board counts.",
+  "points": [
+    {
+      "seconds": 600,
+      "kills": 150,
+      "outcome": "won",
+      "difficulty": 1,
+      "points": 250
+    },
+    {
+      "seconds": 600,
+      "kills": 150,
+      "outcome": "won",
+      "difficulty": 2,
+      "points": 313
+    },
+    {
+      "seconds": 600,
+      "kills": 150,
+      "outcome": "won",
+      "difficulty": 0,
+      "points": 188
+    },
+    {
+      "seconds": 59,
+      "kills": 3,
+      "outcome": "lost",
+      "difficulty": 1,
+      "points": 3
+    },
+    {
+      "seconds": 245,
+      "kills": 40,
+      "outcome": "lost",
+      "difficulty": 1,
+      "points": 60
+    },
+    {
+      "seconds": 720,
+      "kills": 210,
+      "outcome": "won",
+      "difficulty": 1,
+      "points": 320
+    },
+    {
+      "seconds": 3600,
+      "kills": 0,
+      "outcome": "lost",
+      "difficulty": 1,
+      "points": 300
+    },
+    {
+      "seconds": 130,
+      "kills": 9,
+      "outcome": "won",
+      "difficulty": 1,
+      "points": 69
+    }
+  ],
+  "weeks": [
+    {
+      "unix": 0,
+      "week": -1
+    },
+    {
+      "unix": 345600,
+      "week": 0
+    },
+    {
+      "unix": 1794182400,
+      "week": 2966
+    },
+    {
+      "unix": 1794787199,
+      "week": 2966
+    },
+    {
+      "unix": 1794787200,
+      "week": 2967
+    }
+  ]
+}

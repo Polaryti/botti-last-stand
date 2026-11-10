@@ -92,9 +92,27 @@ func _draw() -> void:
 		var p := _to_map(at.x, at.y)
 		var text: String = mark["name"]
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-		var label_at := Vector2(clampf(p.x - w * 0.5, 4.0, maxf(4.0, size.x - w - 4.0)), clampf(p.y, 20.0, size.y - 4.0))
+		var label_at := Vector2(clampf(p.x - w * 0.5, 4.0, maxf(4.0, size.x - w - 4.0)), clampf(p.y + float(mark.get("label_offset", 0.0)), 20.0, size.y - 4.0))
 		draw_string_outline(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
 		draw_string(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
+	if world.mist_storm:
+		var storm := world.mist_storm
+		var affected: Array[int] = []
+		if storm.finale:
+			for index in range(1, MapIslands.ISLANDS.size()): affected.append(index)
+		else: affected.append(storm.island)
+		for index in affected:
+			var land := MapIslands.ISLANDS[index]
+			var centre := _to_map(land.x, land.y)
+			var radius := land.z / (world.terrain.half_extent * 2.0) * size.x
+			draw_circle(centre, radius, Color(0.65, 0.3, 0.9, 0.3))
+			draw_arc(centre, radius, 0, TAU, 48, Color(0.85, 0.55, 1), 3)
+			if not storm.finale:
+				var text_width := font.get_string_size("MIST STORM", HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x
+				var label_at := Vector2(clampf(centre.x - text_width * 0.5, 4, maxf(4, size.x - text_width - 4)), clampf(centre.y + 24, 20, size.y - 4))
+				draw_string(font, label_at, "MIST STORM", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.95, 0.7, 1))
+		if storm.finale:
+			draw_string(font, Vector2(12, 24), "MIST STORMS: ALL OUTER ISLANDS", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.95, 0.7, 1))
 	if world.portals:
 		for link: Dictionary in world.portals.links:
 			if link["open"]:

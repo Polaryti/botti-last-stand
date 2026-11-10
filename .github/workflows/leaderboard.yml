@@ -1,0 +1,129 @@
+name: Leaderboard
+
+# Tests the leaderboard server, and deploys it to Cloudflare: a push to dev updates the dev board
+# (Worker "botti-board-dev", database "botti-board-dev"), a push to main the production board
+# (Worker "botti-board", database "botti-board"). They never share players or scores.
+#
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Without them the
+# tests still run, and nothing is deployed. See docs/LEADERBOARD.md.
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - "server/leaderboard/**"
+      - ".github/workflows/leaderboard.yml"
+      - "tools/set_leaderboard_url.py"
+  pull_request:
+    paths:
+      - "server/leaderboard/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leaderboard-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  board:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: server/leaderboard
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Install and test against a local copy of the board
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+
+      - name: Which board
+        id: board
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::No Cloudflare secrets, so the leaderboard was tested but not deployed. See docs/LEADERBOARD.md."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "env=production" >> "$GITHUB_OUTPUT"
+            echo "database=botti-board" >> "$GITHUB_OUTPUT"
+          else
+            echo "env=dev" >> "$GITHUB_OUTPUT"
+            echo "database=botti-board-dev" >> "$GITHUB_OUTPUT"
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"
+
+      - name: Make sure its database exists
+        if: steps.board.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE: ${{ steps.board.outputs.database }}
+          BOARD_ENV: ${{ steps.board.outputs.env }}
+        run: |
+          find_id() {
+            npx wrangler d1 list --json | python3 -c '
+          import json, os, sys
+          for db in json.load(sys.stdin):
+              if db.get("name") == os.environ["DATABASE"]:
+                  print(db.get("uuid") or db.get("database_id") or "")
+          '
+          }
+          id=$(find_id)
+          if [ -z "$id" ]; then
+            npx wrangler d1 create "$DATABASE"
+            id=$(find_id)
+          fi
+          test -n "$id"
+          # The committed config has placeholder ids; this copy has the real one for this board.
+          python3 - "$id" <<'PY'
+          import os, re, sys
+          text = open("wrangler.toml").read()
+          section = "[env." + os.environ["BOARD_ENV"] + "]"
+          start = text.index(section)
+          end = text.find("\n[env.", start + 1)
+          end = len(text) if end < 0 else end
+          part = re.sub(r'database_id = "[^"]*"', 'database_id = "' + sys.argv[1] + '"', text[start:end])
+          open("wrangler.deploy.toml", "w").write(text[:start] + part + text[end:])
+          PY
+          grep -c "$id" wrangler.deploy.toml
+
+      - name: Update its tables and deploy
+        if: steps.board.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BOARD_ENV: ${{ steps.board.outputs.env }}
+        run: |
+          npx wrangler d1 migrations apply DB --env "$BOARD_ENV" --remote -c wrangler.deploy.toml
+          npx wrangler deploy --env "$BOARD_ENV" -c wrangler.deploy.toml
+
+      - name: Ask the deployed board
+        if: steps.board.outputs.go == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BOARD_ENV: ${{ steps.board.outputs.env }}
+        run: |
+          url=$(python3 ../../tools/set_leaderboard_url.py "$BOARD_ENV" --print-only | tail -1)
+          case "$url" in https://*) ;; *) echo "::error::No address for the board: $url"; exit 1;; esac
+          # A new workers.dev address can take a little while to answer.
+          for i in $(seq 1 20); do
+            if curl -fsS "$url/v1/health" -o health.json; then break; fi
+            sleep 6
+          done
+          cat health.json
+          python3 -c 'import json, os; d = json.load(open("health.json")); assert d["env"] == os.environ["BOARD_ENV"] and d["ok"], d'
+          echo "### Leaderboard ($BOARD_ENV): $url" >> "$GITHUB_STEP_SUMMARY"

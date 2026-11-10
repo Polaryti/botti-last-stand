@@ -446,8 +446,10 @@ func _room() -> void:
 		ok(names.has("Back to the room"), "the host can take everyone back to the room")
 	else:
 		ok(not names.has("Back to the room") and names.has("Menu"), "the others wait for the host, or leave")
-	await sync(81)
+	# Remember the night before meeting up: the host may press Back to the room as soon as both
+	# phones arrive, and its message can reach this phone before the meeting returns here.
 	var first_world := m.world
+	await sync(81)
 	if host:
 		_press("Back to the room")
 	t = 0.0
@@ -456,7 +458,7 @@ func _room() -> void:
 		t += 0.1
 	await wait(0.4)
 	ok(not Net.in_game and Net.active(), "back in the room, still together")
-	ok(m.world != null and m.world.mode == Game.Mode.MENU and not is_instance_valid(first_world), "the night is cleared away")
+	ok(m.world != null and m.world.mode == Game.Mode.MENU and not is_instance_valid(first_world), "the night is cleared away (world %s, mode %s, old night still there %s, waited %.1f s)" % [m.world != null, m.world.mode if m.world else -1, is_instance_valid(first_world), t])
 	var labels: Array = m.ui_layer.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 	ok(labels.has("Infantry") and labels.has("Ranger"), "the room shows again, with the classes to pick")
 	ok(Net.roster.size() == 3 and _human_other() != 0 and Net.roster.keys().filter(Net.is_bot).size() == 1, "the other phone and the bot are still in the room (%d)" % Net.roster.size())
@@ -570,6 +572,8 @@ func _fort() -> void:
 	await sync(3)
 	ok(not g["closed"], "a gate falling reaches both phones")
 	ok(f.any_open(), "and it is open on both")
+	for label: Label3D in [g["requirement"], g["inner_requirement"]]:
+		ok(label.visible and label.text.contains("FIREWOOD"), "the damaged gate replicates its in-world repair requirement")
 	await snap("gate_down")
 	# The client mends it with its own wood, and the host agrees.
 	if not host:
@@ -920,6 +924,32 @@ func _coop() -> void:
 	else:
 		ok(not _avatar().dead, "and the host sees that")
 	await wait(0.4)
+	# Profession healing and the snake's attack flag cross the real connection.
+	var grove := Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
+	pl.position = grove + Vector3.RIGHT * (1 if host else -1)
+	pl.hp = pl.max_hp() - 30
+	var snake: Ally
+	if not host:
+		w.spawn_ally("snake", grove, 20)
+		snake = w.allies.back()
+		snake.set_physics_process(false)
+		snake.hp = 50
+		snake._attack_left = 1.0
+	await wait(0.6)
+	await sync(45)
+	if host:
+		var remote_snake: Ally
+		for ally: Ally in w.allies:
+			if ally.kind == "snake" and ally.remote_owner != 0: remote_snake = ally
+		ok(remote_snake != null and remote_snake.net_biting and remote_snake._snake != null, "a remote snake keeps its kind and receives its bite animation")
+		HeavyArts.heal_party(pl, grove, 6, 10)
+	await wait(0.5)
+	await sync(46)
+	if not host:
+		ok(is_equal_approx(pl.hp, pl.max_hp() - 20), "profession healing reaches the nearby player once")
+		ok(snake.hp == 60, "profession healing reaches the other phone's summon once")
+		w.remove_ally(snake)
+	await sync(47)
 	# Everyone down ends the night for everyone.
 	if host:
 		print("  check at ", Time.get_ticks_msec(), " fps=", Engine.get_frames_per_second())

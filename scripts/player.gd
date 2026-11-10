@@ -120,6 +120,7 @@ var _triggers := {} # event -> list of effect dictionaries with runtime counters
 var invis_left := 0.0
 var guard_left := 0.0
 var dome_left := 0.0
+var oath_reserve := 0.0
 var _riposte_cd := 0.0
 var _kill_shot_cd := 0.0
 var _sacred_cd := 0.0
@@ -205,6 +206,7 @@ var wood := 0
 var hurt_from := Vector3.ZERO
 var hurt_dir_time := 0.0
 var level_flash := 0.0
+const LEVEL_GOLD := Color(1.0, 0.8, 0.36)
 var _shake := 0.0
 var _buzz_at := -10.0
 var _dawn_bright := 0.0
@@ -698,6 +700,8 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if _shield_blocks(from):
 		dmg *= 1.0 - minf(0.88, SHIELD_BASE + m("shield"))
 		sfx("block", -6.0, 1.0, 0.1)
+		if has_item("oathkeeper") and amount > 0.0:
+			oath_reserve = minf(20.0, oath_reserve + 4.0)
 		fire("block", {"attacker": attacker})
 	if has_flag("mana_shield") and mana > 0.0:
 		var drained := minf(mana, dmg * 0.5)
@@ -902,6 +906,9 @@ func add_xp(n: int) -> void:
 		level_flash = 1.0
 		guard_left = maxf(guard_left, LEVEL_UP_GUARD)
 		sfx("level", -2.0)
+		# Everyone sees someone grow stronger: a golden ring, and motes rising around them.
+		world.fx_ring(global_position, 3.4, LEVEL_GOLD)
+		world.fx_rise(global_position, LEVEL_GOLD)
 		say("Level %d! Choose an ability" % level)
 	if level >= ClassDefs.MAX_LEVEL:
 		xp = 0
@@ -962,6 +969,9 @@ func choose_ability(step: int, index: int) -> bool:
 	_apply_ability(a)
 	if step == CORE_STEPS:
 		spec_chosen()
+		for item: String in ShopDefs.for_class(class_id):
+			if has_item(item) and ShopDefs.ITEMS[item].has("effect"):
+				_apply_ability({"on": [ShopDefs.ITEMS[item]["effect"].duplicate(true)]})
 	sfx("ui_choose", -3.0)
 	return true
 
@@ -1105,6 +1115,10 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 		"blast":
 			var at: Vector3 = z.centre() if z else here
 			world.blast(at, float(e["r"]), float(e["dmg"]))
+		"last_rites":
+			if z: HeavyArts.last_rites(self, z.position)
+		"faultline":
+			HeavyArts.faultline(self)
 		"quake":
 			world.blast(here + Vector3.UP * 0.2, float(e["r"]), float(e["dmg"]) * damage_multiplier())
 			world.stun_around(here, float(e["r"]), 1.2)
@@ -1771,6 +1785,8 @@ func art_glyph() -> String:
 
 
 func art_label() -> String:
+	if spec_id == "guardian" and has_item("oathkeeper"):
+		return "Oath %d / 20" % int(oath_reserve)
 	if class_id == "commander":
 		return "Last Command" if has_flag("last_command") else "Command"
 	if class_id == "adept":
@@ -1853,6 +1869,8 @@ func use_art() -> void:
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
+	# The class's colour flares at the caster's feet, so friends and foes can read what happened.
+	world.fx_ring(global_position, 2.2, ClassDefs.color(class_id).lightened(0.4))
 
 
 # --- The Monk ----------------------------------------------------------------
@@ -2274,16 +2292,17 @@ func raise_dome() -> void:
 	world.fx_dome(global_position + Vector3.UP * 0.5, r, secs)
 	sfx("block", 0.0, 0.7, 0.1)
 	dome_left = maxf(dome_left, secs)
-	var healing := has_flag("aegis")
-	if healing:
-		heal(30.0)
+	var healing := (30.0 if has_flag("aegis") else 0.0) + oath_reserve
+	oath_reserve = 0.0
+	if healing > 0.0:
+		HeavyArts.heal_party(self, global_position, r, healing)
 	for a in world.allies:
 		if a.remote_owner == 0 and not a.dead and a.global_position.distance_to(global_position) <= r:
 			a.guarded = maxf(a.guarded, secs)
 	if Net.active():
 		Net.dome(global_position + Vector3.UP * 0.5, r, secs)
 		for t: Target in world.friends_near(global_position, r):
-			Net.protect_peer(world.peer_of(t), secs, 30.0 if healing else 0.0)
+			Net.protect_peer(world.peer_of(t), secs, 0.0)
 	if has_flag("dome_taunt"):
 		for z: Zombie in world.zombies:
 			if z.is_alive() and z.position.distance_to(global_position) < 22.0:
@@ -3252,6 +3271,8 @@ func _do_melee_hit() -> void:
 	if d.is_empty() or d["kind"] != WeaponDefs.Kind.MELEE:
 		return
 	var hits := world.melee_hit(self, d, melee_stats(d))
+	if hits > 0 and d != BASH:
+		fire("melee_swing", {})
 	_next_hit_mult = 1.0
 	if d != BASH:
 		_show_smear(d)

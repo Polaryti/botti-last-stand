@@ -1,7 +1,7 @@
 class_name MistStorm
 extends Node3D
 ## One scheduled island storm. Local players own their damage; the host owns mobs and summons.
-const EVERY := 90.0
+const EVERY := 70.0
 const WARNING := 8.0
 const DURATION := 20.0
 const DPS := 6.0
@@ -110,7 +110,7 @@ static func create(w: World, index: int, final_storm := false) -> MistStorm:
 		w.director.show_banner("Mist Storm gathering on %s — evacuate in 8 seconds" % NAMES[index], 8.0)
 	return storm
 
-const NAMES := ["the Arena", "the Rotunda", "the Battlements", "the Old Forest", "the Monument", "the Falls", "the Hollow", "the Terrace", "the Harbour", "the Northern Shelf", "the Eastern Shelf", "the Southern Shelf", "the Western Shelf"]
+const NAMES := MapIslands.ZONE_NAMES
 
 func contains(at: Vector3) -> bool:
 	if finale: return Vector2(at.x, at.z).length() > MapIslands.ISLANDS[0].z
@@ -131,16 +131,6 @@ func _physics_process(delta: float) -> void:
 			if target is Player and not target.dead and contains(target.global_position):
 				target.hurt(amount, global_position)
 		if not Net.active() or Net.is_host():
-			for mob: Zombie in world.zombies.duplicate():
-				if mob.is_alive() and contains(mob.position):
-					var flinch := mob._hurt_stun
-					var hitter := mob.last_hitter
-					mob.next_hitter = -1
-					mob.take_damage(amount, Vector3.ZERO, 0.0, mob.centre())
-					mob._hurt_stun = flinch
-					if mob.is_alive():
-						mob.last_hitter = hitter
-						mob.next_hitter = 0
 			for ally: Ally in world.allies:
 				if not ally.dead and contains(ally.global_position): ally.hurt(amount, global_position)
 	if world.player:

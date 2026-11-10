@@ -8,10 +8,44 @@ import re
 import subprocess
 import tempfile
 import time
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 ERROR = re.compile(r"(?:SCRIPT ERROR:|SHADER ERROR:|^ERROR:|\bFAIL:)", re.MULTILINE)
 RESULT = re.compile(r"RESULT: (\d+) checks, (\d+) failures")
+
+
+BOARD = ROOT / "server" / "leaderboard"
+
+
+def start_boards(temporary: str, logs: Path) -> tuple[list, list[str]]:
+    """Local copies of the production and dev boards, each with its own empty database."""
+    wrangler = BOARD / "node_modules" / ".bin" / "wrangler"
+    if not wrangler.exists():
+        raise RuntimeError("Run `npm ci` in server/leaderboard first")
+    processes, urls = [], []
+    for env, port in [("production", 8971), ("dev", 8972)]:
+        state = Path(temporary) / f"board-{env}"
+        subprocess.run([str(wrangler), "d1", "migrations", "apply", "DB", "--env", env, "--local", "--persist-to", str(state)],
+                       cwd=BOARD, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, env=dict(os.environ, CI="1"))
+        log = (logs / f"board-{env}.log").open("w", encoding="utf-8")
+        processes.append((subprocess.Popen([str(wrangler), "dev", "--env", env, "--local", "--ip", "127.0.0.1", "--port", str(port),
+                                            "--persist-to", str(state), "--show-interactive-dev-session=false"],
+                                           cwd=BOARD, stdout=log, stderr=subprocess.STDOUT), log))
+        urls.append(f"http://127.0.0.1:{port}")
+    deadline = time.monotonic() + 90
+    for url in urls:
+        while True:
+            try:
+                with urllib.request.urlopen(url + "/v1/health", timeout=2) as answer:
+                    if answer.status == 200:
+                        break
+            except OSError:
+                pass
+            if time.monotonic() > deadline:
+                raise RuntimeError("A local board did not start; see " + str(logs))
+            time.sleep(0.3)
+    return processes, urls
 
 
 def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", case: str = "") -> bool:
@@ -21,22 +55,29 @@ def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", cas
     processes = []
     deadline = time.monotonic() + timeout
     problem = ""
+    boards = []
     with tempfile.TemporaryDirectory(prefix="botti-checks-") as temporary:
         try:
+            if suite == "board":
+                boards, board_urls = start_boards(temporary, logs)
             for role in roles:
                 profile = Path(temporary) / role
                 profile.mkdir()
                 env = dict(os.environ, XDG_DATA_HOME=str(profile))
                 # Linux/CI profiles must not share progress or settings.
                 command = [godot, "--headless", "--path", str(ROOT)]
-                scene = "net_test" if suite == "network" else "test_game" if suite == "gameplay" else "rework" if suite == "rework" else "regressions"
-                if suite != "network":
+                scene = {"network": "net_test", "gameplay": "test_game", "rework": "rework", "features": "dev_features", "board": "board_test"}.get(suite, "regressions")
+                # Fixed steps make the game's clock outrun the real one; the board answers in real time.
+                if suite not in ("network", "board"):
                     command.extend(["--fixed-fps", "240"])
                 command.append(f"res://tests/{scene}.tscn")
                 if suite == "network":
                     command.extend(["--", role, mode])
                 elif suite == "gameplay":
                     command.extend(["--", "case=" + case] if case else ["--", "group=" + group])
+                elif suite == "board":
+                    # A production game against the production board, and the dev board as the wrong one.
+                    command.extend(["--", "url=" + board_urls[0], "other=" + board_urls[1]])
                 log = (logs / f"{role}.log").open("w", encoding="utf-8")
                 process = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
                 processes.append((role, process, log))
@@ -61,6 +102,13 @@ def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", cas
             problem = str(error)
             print(problem)
         finally:
+            for process, log in boards:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                log.close()
             for _, process, log in processes:
                 if process.poll() is None:
                     process.terminate()
@@ -84,7 +132,7 @@ def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", cas
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=["regressions", "gameplay", "network", "rework"])
+    parser.add_argument("suite", choices=["regressions", "gameplay", "network", "rework", "features", "board"])
     parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"))
     parser.add_argument("--mode", default="coop", choices=["coop", "ffa", "teams", "fort", "mists", "bots", "botsffa", "ride", "chariot", "room", "commander"])
     parser.add_argument("--case", default="", help="Run one named gameplay method")

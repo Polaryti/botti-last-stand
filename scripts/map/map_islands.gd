@@ -13,13 +13,14 @@ const ISLANDS: Array[Vector4] = [
 	Vector4(106, 104, 30, 12),
 	Vector4(-46, -104, 24, 28), Vector4(150, 38, 20, 18), Vector4(-30, 146, 18, 14), Vector4(-146, -24, 20, 25),
 ]
+const ZONE_NAMES := ["Arena", "Moonlit Rotunda", "Ruined Battlements", "Ancient Forest", "Southern Obelisk", "Starfall Pools", "Whispering Hollow", "Twilight Shrine", "Eastern Sanctuary", "Rotunda Approach", "Eastern Shelf", "Obelisk Approach", "Forest Heights"]
 const ROUGH: Array[float] = [0.0, 0.3, 0.5, 2.2, 0.4, 0.5, 0.6, 0.8, 0.7, 0.5, 0.5, 0.5, 1.4]
 const WOBBLE: Array[float] = [0.02, 0.05, 0.06, 0.07, 0.05, 0.05, 0.07, 0.07, 0.06, 0.05, 0.05, 0.05, 0.05]
 ## From a shelf up to its island: x, y, z at each end.
 const RAMPS := [
 	[Vector3(-56, 28, -104), Vector3(-12, 40, -120)],
 	[Vector3(152, 18, 38), Vector3(126, 26, 2)],
-	[Vector3(-36, 14, 146), Vector3(4, 24, 118)],
+	[Vector3(-36, 14, 146), Vector3(-4, 24, 116)],
 	[Vector3(-130, 14, 2), Vector3(-148, 25, -22)],
 ]
 ## Bridges: from, to, how they curve, half their width, and whether they are stone.
@@ -77,7 +78,7 @@ func land(t: Terrain, _at: Transform3D) -> void:
 	# The rotundas stand on low mounds you can walk straight up.
 	for r: Array in ROTUNDAS:
 		var at: Vector2 = r[0]
-		t.terrace(at, float(r[1]) + 1.6, float(r[1]) + 6.0, float(r[3]) + ROTUNDA_RISE, float(r[3]))
+		t.terrace(at, float(r[1]) + 1.6, float(r[1]) + 9.0, float(r[3]) + ROTUNDA_RISE, float(r[3]))
 	for w: Array in WATERS:
 		var pool: Vector2 = w[0]
 		var bed: float = float(w[2]) - 0.7
@@ -119,7 +120,7 @@ static func stone_lines() -> Array[Dictionary]:
 	# Off the arena's rim, out over the void, to a rock with a cache on it.
 	out.append({"points": [Vector3(-46.5, 18.5, -46.5), Vector3(-62, 20.2, -38), Vector3(-76, 22, -50), Vector3(-68, 23.5, -66)], "coins": 25, "reward": "angel"})
 	# Round and round the great tree of the forest. A fall only lands you on the grass.
-	out.append({"points": _spiral(Vector2(-124, 8), 15.0, 14.5, 28.0, 0.4, 1.55), "coins": 30, "reward": "ghost"})
+	out.append({"points": _spiral(Vector2(-124, 8), 15.0, 14.5, 28.0, 4.5, 1.55), "coins": 30, "reward": "ghost"})
 	# Up around the tall tower of the battlements, to its top.
 	var tower := _spiral(Vector2(128, -20), 11.0, 26.5, 39.8, 2.2, 2.1)
 	tower.append(Vector3(128, 40.2, -20) + _outward(tower, Vector2(128, -20)) * 7.2)
@@ -134,7 +135,7 @@ static func stone_lines() -> Array[Dictionary]:
 	out.append({"points": [Vector3(-73, 8.5, 77), Vector3(-58, 11, 56), Vector3(-66, 14, 40)], "coins": 25, "weapon": "longbow"})
 	# Short cuts that need no gate: the arena's south rim to the monument, and its north rim to the rotunda's shelf.
 	out.append({"points": [Vector3(12, 18.5, 67), Vector3(38, 19.8, 72), Vector3(44, 21.6, 92), Vector3(26, 24.5, 108)]})
-	out.append({"points": [Vector3(-19.5, 18.5, -63), Vector3(-6, 20, -74), Vector3(14, 22, -70), Vector3(16, 24.5, -86), Vector3(-6, 26.5, -88), Vector3(-30, 28.5, -98)]})
+	out.append({"points": [Vector3(-19.5, 18.5, -63), Vector3(-6, 20, -74), Vector3(14, 22, -70), Vector3(16, 24.5, -86), Vector3(-6, 26.5, -88), Vector3(-46, 28.5, -104)]})
 	return out
 
 
@@ -190,6 +191,9 @@ func build(b: MapBuilder) -> void:
 	var gates := MistPortals.new(w, ISLANDS, regions())
 	w.add_child(gates)
 	w.portals = gates
+	for index in ISLANDS.size():
+		var island := ISLANDS[index]
+		w.map_marks.append({"at": Vector2(island.x, island.y), "name": ZONE_NAMES[index], "label_offset": 20.0 if index == 7 else 0.0})
 	var used := {}
 	for pair: Array in LINKS:
 		var ia: int = pair[0]
@@ -350,6 +354,8 @@ func _rotunda(b: MapBuilder, c: Vector3, r: float, h: float, ribs := 12) -> void
 	var floor_y := c.y + 0.1
 	for n in ribs:
 		var a := TAU * n / ribs
+		# Four broad entrances stay clear of column bases and their collision.
+		if absf(sin(a)) < 0.22 or absf(cos(a)) < 0.22: continue
 		var foot := _at(b, c.x + cos(a) * r, c.z + sin(a) * r) + Vector3.UP * 0.08
 		_column(l, foot, h, r * 0.075 + 0.1, MARBLE)
 		w.add_solid(foot + Vector3.UP * h * 0.5, Vector3(1.1, h, 1.1))
@@ -470,6 +476,7 @@ func _tower(b: MapBuilder, l: LowPoly, c: Vector3, r: float, h: float, walkable_
 
 ## A big old tree with a twisted trunk and heavy crowns.
 func _great_tree(b: MapBuilder, l: LowPoly, at: Vector3, size: float, leaf: Color) -> void:
+	if on_masonry(Vector2(at.x, at.z)): return
 	if _near_gate(b.w, at, 7.0 * size): return
 	_foliage.append(Vector4(at.x, at.z, 5.0 * size, at.y))
 	var p := at
@@ -602,6 +609,7 @@ func _rotunda_island(b: MapBuilder) -> void:
 
 
 func _stairs(b: MapBuilder, l: LowPoly, from: Vector3, to: Vector3, width: float) -> void:
+	var first_vertex := LowPoly.new()
 	var along := Vector2(to.x - from.x, to.z - from.z).normalized()
 	var side := along.orthogonal() * width * 0.5
 	var steps := ceili(from.distance_to(to) / 1.2)
@@ -610,11 +618,15 @@ func _stairs(b: MapBuilder, l: LowPoly, from: Vector3, to: Vector3, width: float
 		var z := Vector2(from.x, from.z).lerp(Vector2(to.x, to.z), float(n + 1) / steps)
 		var points: Array[Vector3] = []
 		for p: Vector2 in [a - side, a + side, z + side, z - side]:
-			points.append(_at(b, p.x, p.y) + Vector3.UP * 0.08)
+			var fraction := clampf((p - Vector2(from.x, from.z)).dot(along) / Vector2(to.x - from.x, to.z - from.z).length(), 0, 1)
+			points.append(_at(b, p.x, p.y) + Vector3.UP * 0.025)
 		var under := (points[0] + points[2]) * 0.5 - Vector3.UP
 		var col := STONE.darkened(0.05 + (n % 2) * 0.08)
 		l._tri(points[0], points[1], points[2], under, col)
 		l._tri(points[0], points[2], points[3], under, col)
+		first_vertex._tri(points[0], points[1], points[2], under, col)
+		first_vertex._tri(points[0], points[2], points[3], under, col)
+	# Ramp terrain owns collision, including the blend into the island.
 
 
 func _great_tree_small(b: MapBuilder, x: float, z: float) -> void:
@@ -682,7 +694,7 @@ func _forest(b: MapBuilder) -> void:
 func _monument(b: MapBuilder) -> void:
 	var l := LowPoly.new()
 	var c := _at(b, 8, 124)
-	_plinth(b, l, c, 8.5, 3.0, 2.4, 4)
+	_plinth(b, l, c, 7.0, 3.0, 2.4, 4)
 	b.w.add_solid(c + Vector3(0, 10.7, 0), Vector3(3.0, 16.6, 3.0))
 	l.prism(c + Vector3(0, 2.4, 0), c + Vector3(0, 19.0, 0), 1.9, 0.9, 4, MARBLE)
 	l.prism(c + Vector3(0, 19.0, 0), c + Vector3(0, 21.0, 0), 0.9, 0.0, 4, GOLD)
@@ -943,7 +955,7 @@ func _stone_line(b: MapBuilder, line: Dictionary, caches: MistCaches) -> void:
 		if chain.size() % 3 == 1 or chain.size() == stones.size():
 			_annulus(rings, top, s.w * 0.72, s.w * 0.79, top.y + 0.025, top.y + 0.025, Color(0.12, 0.4, 0.43), 12)
 		l.prism(top + Vector3.DOWN * 0.26, top, s.w * 1.05, s.w, 8, MOSS.lightened(0.12))
-		l.prism(top + Vector3.DOWN * 0.26, top + Vector3(0.1, -s.w * 0.9 - 0.3, -0.1), s.w * 1.05, 0.25, 7, STONE.darkened(0.25))
+		l.prism(top + Vector3.DOWN * 0.26, top + Vector3(0.1, -s.w * 0.9 - 0.3, -0.1), s.w * 1.05, 0.25, 8, STONE.darkened(0.25))
 		w.add_stone(top, s.w * 0.96, s.w * 0.9 + 0.3)
 	b.add(l)
 	var rune_mesh := b.add(rings)
@@ -1032,12 +1044,12 @@ func _ground_ring(b: MapBuilder, l: LowPoly, c: Vector3, inner: float, outer: fl
 			for v: Vector2 in [Vector2(ring, n), Vector2(ring, n + 1), Vector2(ring + 1, n + 1), Vector2(ring + 1, n)]:
 				var radius := lerpf(inner, outer, v.x / rings)
 				var angle := v.y / 64.0 * TAU
-				points.append(_at(b, c.x + cos(angle) * radius, c.z + sin(angle) * radius) + Vector3.UP * 0.1)
+				points.append(_at(b, c.x + cos(angle) * radius, c.z + sin(angle) * radius) + Vector3.UP * 0.025)
 			var under := (points[0] + points[2]) * 0.5 - Vector3.UP
 			for target: LowPoly in [l, floor_mesh]:
 				target._tri(points[0], points[1], points[2], under, col)
 				target._tri(points[0], points[2], points[3], under, col)
-	_surface_collision(b.w, floor_mesh.commit(), "RotundaWalkingSurface")
+	# The shared terrain heightfield is the walking surface; avoid overlapping triangle seams.
 
 
 func _gate_clear(b: MapBuilder, at: Vector2, island: int) -> bool:

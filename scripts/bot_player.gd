@@ -36,6 +36,7 @@ var _has_goal := false
 var _path := PackedVector3Array()
 var _path_at := 0
 var _repath := 0.0
+var _fort_cross := Vector3.INF
 var _clear_way := false # nothing between here and the goal
 var _no_shortcut := 0.0 # that straight line turned out to be blocked at foot level
 var _think := 0.0
@@ -309,7 +310,8 @@ func _wanted_item() -> Pickup:
 	var best_score := 0.0
 	for p: Pickup in world.pickups:
 		var d := p.global_position.distance_to(pawn.global_position)
-		if d > float(_smart["items"]):
+		var woodland_errand := p.kind == Pickup.Kind.WOOD and world.fort != null and pawn.wood < 6 and _gate_to_mend() != Vector3.INF
+		if d > float(_smart["items"]) and not woodland_errand:
 			continue
 		var worth := _worth(p)
 		if worth <= 0.0 or (busy and not (hurt_badly and p.kind == Pickup.Kind.FOOD)):
@@ -498,7 +500,33 @@ func _walk_dir(delta: float) -> Vector3:
 	var aim := _goal
 	if world.portals:
 		aim = world.portals.waypoint(here, _goal)
-	var direct := _clear_way and _no_shortcut <= 0.0 and aim == _goal
+	var crossing := false
+	if world.fort:
+		if _fort_cross != Vector3.INF and Vector2(_fort_cross.x - here.x, _fort_cross.z - here.z).length() > 0.8:
+			aim = _fort_cross
+			crossing = true
+		else:
+			_fort_cross = Vector3.INF
+			if world.fort.inside(here) != world.fort.inside(_goal):
+				var best := INF
+				var door := Vector3.ZERO
+				var outward := Vector3.ZERO
+				for side in 4:
+					var dir: Vector3 = Fort.DIRS[side]
+					var point: Vector3 = dir * Fort.HALF + Vector3(dir.z, 0, -dir.x) * Fort.DOORS[side]
+					var cost := here.distance_to(point) + _goal.distance_to(point)
+					if cost < best:
+						best = cost
+						door = point
+						outward = dir
+				var from_side := -1.0 if world.fort.inside(here) else 1.0
+				var approach := door + outward * from_side * 4.0
+				aim = approach
+				if Vector2(approach.x - here.x, approach.z - here.z).length() < 1.3:
+					_fort_cross = door - outward * from_side * 4.0
+					aim = _fort_cross
+					crossing = true
+	var direct := crossing or (_clear_way and _no_shortcut <= 0.0 and aim == _goal)
 	if not direct and _repath <= 0.0:
 		_repath = REPATH_EVERY
 		_path = world.grid.route(here, aim)

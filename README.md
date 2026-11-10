@@ -23,7 +23,7 @@ Bots occupy player slots and support multiplayer rules, levelling, skill choices
 
 **The Village** has enterable buildings, farmland, hills, a castle and a river crossed by bridges and fords. Crops hide you, firelight makes you easier to see, and sound attracts enemies. The church bell marks elapsed minutes and draws attention. Local ground haze and warm fireflies give the night its atmosphere; Defend the Fort uses smoke-toned wisps and ember motes.
 
-**The Mists** is a separate survival map of floating islands, ruins, bridges, stepping stones and timed portals. Falling into the void is fatal. Its hazards include jumping enemies, Rift Stalkers and airborne Mist Harriers. Night lighting, drifting wisps and glowing route inlays accompany its own Lantern Wisps, Mist Weavers and Fallen Revenants. Once around 8:30, the Veil Regent awakens in the arena: dodge its marked seals, use the safe eye of its crown attack, and defeat it for an Angel familiar. Its second phase calls reinforcements; its health scales for multiplayer. Island Mist Storms arrive every 90 seconds: an 8-second evacuation warning, then 20 seconds at 6 HP/s. Smooth amphitheatre ramps, terrain-following shrine floors, rippling pools and animated portals keep routes readable. Supplies and small supply shrines favour the outer islands, while encounters replenish near explorers and on quieter islands. Bots explore and flee storms. Winning requires both surviving ten minutes and defeating the Regent. When it awakens, all outer islands and shelves gather permanent Mist Storms: a 20-second warning gives the party time to return through open gates to the safe central arena. The match continues beyond ten minutes if the boss is still alive.
+**The Mists** is a separate survival map of floating islands, ruins, bridges, stepping stones and timed portals. Falling into the void is fatal. Its hazards include jumping enemies, Rift Stalkers and airborne Mist Harriers. Night lighting, drifting wisps and glowing route inlays accompany its own Lantern Wisps, Mist Weavers and Fallen Revenants. Once around 8:30, the Veil Regent awakens in the arena: dodge its marked seals, use the safe eye of its crown attack, and defeat it for an Angel familiar. Its second phase calls reinforcements; its health scales for multiplayer. Island Mist Storms arrive every 70 seconds: an 8-second evacuation warning, then 20 seconds at 6 HP/s. Smooth amphitheatre ramps, terrain-following shrine floors, rippling pools and animated portals keep routes readable. Supplies and small supply shrines favour the outer islands, while encounters replenish near explorers and on quieter islands. Bots explore and flee storms. Winning requires both surviving ten minutes and defeating the Regent. When it awakens, all outer islands and shelves gather permanent Mist Storms: a 20-second warning gives the party time to return through open gates to the safe central arena. The match continues beyond ten minutes if the boss is still alive.
 
 Fight with melee weapons, bows, crossbows, thrown weapons and class-specific attacks. Collect food, ammunition, potions, powers and familiars. Familiars last 20 seconds before duration upgrades. Chivalry’s Lance is class-exclusive and cannot be dropped or found as loot. Enemy types include ordinary zombies, beasts, spellcasters, ambushers, flying enemies, Dread Riders and Fallen Heroes. Most nights are clear; rain and thunderstorms alter visibility, and lightning warns with a glowing ground marker before it strikes.
 
@@ -31,7 +31,7 @@ Each match build progresses to **level 10**: three early choices, one of three s
 
 ## Classes and permanent progression
 
-The standard progression includes nine classes, plus two code-only classes. Unlocks and purchases are saved on the device; Botti Doubloons are earned in matches and spent in the in-game Store. They are not a real-money checkout implemented by this repository.
+The standard progression includes ten classes available through play or the Store, plus the code-only Commander. Unlocks and purchases are saved on the device; Botti Doubloons are earned in matches and spent in the in-game Store. They are not a real-money checkout implemented by this repository.
 
 | Class | Normal availability | Specializations |
 | --- | --- | --- |
@@ -42,12 +42,12 @@ The standard progression includes nine classes, plus two code-only classes. Unlo
 | Magician | Finish five games outside Sandbox | Necromancer, Elementalist, Illusionist |
 | Revenant | Survive until dawn in the Mists five times | Mist Leaper, Rift Traveller, Summoner |
 | Plague Doctor | Deal 3,000 cumulative poison damage outside Sandbox | Apothecary, Pestilence, Rat King |
-| Monk | 800 Botti Doubloons in the Store | Bo Master, Spirit Walker, Iron Mountain |
-| Artificer | 520 Botti Doubloons in the Store | Pyromaniac, Mechanic, Inventor |
-| Adept | Redeem code | Blade Dancer, Mirror Step, Void Walker |
+| Monk | 920 Botti Doubloons in the Store | Bo Master, Spirit Walker, Iron Mountain |
+| Artificer | 598 Botti Doubloons in the Store | Pyromaniac, Mechanic, Inventor |
+| Adept | 1,150 Botti Doubloons in the Store, or redeem code | Blade Dancer, Mirror Step, Void Walker |
 | Commander | Tournament prize code: “First prize in VRAIN tournaments” | Warlock, Gunner, Vanguard |
 
-Redeem codes can also unlock supported classes. Codes are stored as hashes. Adept and Commander cannot be bought or earned through normal match progression.
+Redeem codes can also unlock supported classes. Codes are stored as hashes. Adept can now be purchased; Commander remains a tournament-prize code unlock.
 
 **Adept** commits to Wind, Stone or Flame for six seconds, with a visible transition and a persistent stance card. Three connected melee attacks grant +15% damage until the next switch and empower that transition. Blade Dancer converts transitions into sweeps; Mirror Step combines timed damage recovery, protection and counters; Void Walker earns a temporary invisible stance through hits in different stances.
 
@@ -55,7 +55,7 @@ Redeem codes can also unlock supported classes. Codes are stored as hashes. Adep
 
 
 
-Multiplayer uses the original generated names, with the existing optional name field in Play Together. There is no first-launch or upgrade name prompt.
+Players choose a display name the first time they start the game (and players from earlier versions on their next start). Names are unique and appear in games together and on the **Leaderboard**, which lists the top 50 players of all time and of the current week by match points, with each player's most-played class and profession. Points come from finished matches outside the Sandbox: 1 per kill, 5 per full minute, 50 for winning, scaled by difficulty. The board is a small Cloudflare Worker in `server/leaderboard`, with separate dev and production boards; see [Leaderboard](docs/LEADERBOARD.md).
 
 Store upgrades can add specialization abilities, and the Armory manages owned upgrades and selected familiars. The in-game Codex documents classes, enemies, weapons, items and familiars. The in-game Changelog reads [CHANGELOG.md](CHANGELOG.md).
 
@@ -82,9 +82,10 @@ Open the project in Godot 4.7.2 and press F5, or run `godot --path .`. Export te
 - [Development Android releases](docs/BUILDING.md#development-android-releases): dev package identity, versioning and release workflow.
 - [Editing maps](docs/EDITING_MAPS.md): edit map scenes in Godot and use F6 to walk around them.
 - [Balance review](docs/BALANCE_REVIEW.md): all class/profession screening, simulation results and limitations.
+- [Leaderboard](docs/LEADERBOARD.md): setting up the free Cloudflare boards, how points are counted and checked, and maintenance.
 - [Mobile review](docs/MOBILE_REVIEW.md): maintenance fixes, mesh measurements, validation and remaining architecture/device work.
 
-`Validate game` checks pull requests and pushes to `main` and `dev`. It imports resources, runs gameplay and regression tests, exercises paired LAN scenarios, and captures weather/UI with the Compatibility renderer. The dev release workflow additionally verifies package identity and signing before publishing its APK. Engine tests and desktop captures do not substitute for real Android/iOS device profiling.
+`Validate game` checks pull requests and pushes to `main` and `dev`. It imports resources, runs gameplay and regression tests, exercises paired LAN scenarios, runs the game against local copies of both leaderboards, and captures weather/UI with the Compatibility renderer. The dev release workflow additionally verifies package identity and signing before publishing its APK, and keeps only the newest five dev builds. `Leaderboard` tests the board server and deploys it: `dev` to the dev board, `main` to the production board. Engine tests and desktop captures do not substitute for real Android/iOS device profiling.
 
 ## Licence and credits
 

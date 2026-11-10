@@ -403,7 +403,7 @@ static func _heavy() -> Dictionary:
 			a("crush", "Crush", "30% chance to stun on hit", "hammer+star", {}, [t("hit", "stun", {"chance": 0.3, "secs": 1.0})])],
 			[a("war_banner", "War Banner", "Every 30 s, a spirit soldier fights with you for 15 s", "banner+ghost", {}, [t("every", "summon", {"secs_every": 30.0, "kind": "ghost", "n": 1, "secs": 15.0})]),
 			a("sunder", "Sunder", "Hits mark enemies: +30% damage for 4 s", "axe+target", {}, [t("hit", "mark", {"mult": 1.3, "secs": 4.0})])]],
-			a("earthbreaker", "Earthbreaker", "Every 5th attack shakes the ground: 60 damage and stun in 7 m", "quake+crown", {}, [t("hit", "quake", {"nth": 5, "r": 7.0, "dmg": 60.0})])),
+			a("earthbreaker", "Earthbreaker", "Every fifth connecting swing shakes the ground: 60 damage and stun in 7 m", "quake+crown", {}, [t("melee_swing", "quake", {"nth": 5, "r": 7.0, "dmg": 60.0})])),
 	]}
 
 

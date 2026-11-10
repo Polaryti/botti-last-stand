@@ -1,0 +1,17 @@
+# Two Workers, two databases: dev and production never share players or scores.
+# The deploy workflow (.github/workflows/leaderboard.yml) fills in the real database ids in a
+# copy of this file; the ids below are only for local testing.
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+preview_urls = false
+
+[env.dev]
+name = "botti-board-dev"
+vars = { BOARD_ENV = "dev" }
+d1_databases = [{ binding = "DB", database_name = "botti-board-dev", database_id = "00000000-0000-0000-0000-000000000001", migrations_dir = "migrations" }]
+
+[env.production]
+name = "botti-board"
+vars = { BOARD_ENV = "production" }
+d1_databases = [{ binding = "DB", database_name = "botti-board", database_id = "00000000-0000-0000-0000-000000000002", migrations_dir = "migrations" }]

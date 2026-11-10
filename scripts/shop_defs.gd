@@ -7,6 +7,10 @@ const SECTIONS := {"classes": "Classes", "upgrades": "Class upgrades"}
 const PETS := ["wolf", "raven", "snake", "fox"]
 
 const ITEMS := {
+	"oathkeeper": {"name": "Oathkeeper", "section": "upgrades", "class": "heavy", "spec": "guardian", "price": 240, "icon": "shield", "model": "mace", "desc": "Blocked attacks store 4 healing, up to 20. Shield Dome spends it to mend nearby allies and summons."},
+	"last_rites": {"name": "Last Rites", "section": "upgrades", "class": "heavy", "spec": "warpriest", "price": 260, "icon": "cross", "model": "bell_hammer", "desc": "Every third kill releases a funeral flame: heal allies within 6 m by 10 and ignite enemies within 4 m. 4 s cooldown.", "effect": {"when": "kill", "do": "last_rites", "nth": 3, "cd": 4.0}},
+	"faultline": {"name": "Faultline", "section": "upgrades", "class": "heavy", "spec": "warlord", "price": 280, "icon": "quake", "model": "mace", "desc": "Every third connecting swing splits a 12 m fissure: 40 damage, knockback and 2 s slow. Walls stop it. 6 s cooldown.", "effect": {"when": "melee_swing", "do": "faultline", "nth": 3, "cd": 6.0}},
+
 	"rain_of_arrows": {"name": "Rain of Arrows", "section": "upgrades", "class": "ranger", "spec": "sharpshooter", "price": 260, "icon": "rain", "model": "longbow",
 		"desc": "Hold the ability button to place a circle on the ground. Let go, stand still for 2 s, and a volley of arrows falls on it. Costs 8 arrows.",
 		"art": {"name": "Rain of Arrows", "cost": 0.0, "cast": 2.0, "cd": 18.0, "icon": "arrows", "hold": true}},

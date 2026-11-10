@@ -90,33 +90,22 @@ func show_class(id: String) -> void:
 
 
 func show_pet(id: String) -> void:
-	var root := _begin(1.3 if id == "raven" else 1.5)
-	var holder := Node3D.new()
-	holder.position.y = 0.6 if id == "raven" else 0.0
-	root.add_child(holder)
-	Ally.build_beast_model(id, holder)
+	var root := _begin(1.5)
+	var demonstration := UpgradePreview.new()
+	root.add_child(demonstration)
+	demonstration.configure(id)
 
 
-## An upgrade: the thing it is about, standing on end.
 func show_item(id: String) -> void:
 	var d: Dictionary = ShopDefs.ITEMS[id]
 	if d.get("pet", false):
 		show_pet(id)
 		return
-	var root := _begin(1.3)
-	var piece := MeshInstance3D.new()
-	var model: String = d.get("model", "sword")
-	if model == "trap":
-		piece.mesh = World.trap_mesh()
-		piece.position.y = 0.35
-		piece.scale = Vector3.ONE * 1.3
-	else:
-		piece.mesh = WeaponDefs.mesh(model)
-		var box := piece.mesh.get_aabb()
-		var longest := maxf(box.size.x, maxf(box.size.y, box.size.z))
-		piece.scale = Vector3.ONE * 1.0 / maxf(longest, 0.01)
-		piece.position = Vector3(0, 0.6, 0) - box.get_center() * piece.scale
-		if box.size.z > box.size.y:
-			piece.rotation.x = PI * 0.5
-			piece.position = Vector3(0, 0.6, 0) - piece.basis * box.get_center()
-	root.add_child(piece)
+	show_class(d["class"])
+	_camera.position *= 1.16
+	var body := _spin.get_child(0) as Node3D
+	var demonstration := UpgradePreview.new()
+	_spin.add_child(demonstration)
+	demonstration.configure(id, body)
+	if id == "rain_of_arrows":
+		_camera.position *= 1.35

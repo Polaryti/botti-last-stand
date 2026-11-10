@@ -23,7 +23,9 @@ BARS = 32
 LENGTH = int(round(BARS * 4 * BEAT * SR))
 OUT = "assets/music/"
 # How loud each stem ends up, as the average level in dB. The hunted stem is the loudest.
-TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5}
+TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5, "menu": -16.0,
+    "mists_night": -16.0, "mists_hunted": -13.5, "mists_dawn": -14.5,
+    "fort_night": -15.0, "fort_hunted": -13.5, "fort_dawn": -14.5}
 
 NAMES = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
 SAMPLES = ""
@@ -85,7 +87,7 @@ class Instrument:
         assert files, "no samples in " + self.folder
         for f in files:
             name = os.path.basename(f)
-            m = re.search(r"_([A-G]#?)(\d)_", name)
+            m = re.search(r"_([A-G]#?)(\d)(?:_|\.wav)", name)
             if not m:
                 continue
             # The library calls middle C "C3", apart from the harp.
@@ -221,7 +223,9 @@ def parse_line(text, bar, shift=0):
 
 # --- Chords -------------------------------------------------------------------------------------
 
-CHORDS = {"Dm": (2, 5, 9), "Bb": (10, 2, 5), "F": (5, 9, 0), "C": (0, 4, 7), "Gm": (7, 10, 2), "A": (9, 1, 4), "Asus": (9, 2, 4), "Am": (9, 0, 4)}
+CHORDS = {"Dm": (2, 5, 9), "Bb": (10, 2, 5), "F": (5, 9, 0), "C": (0, 4, 7), "Gm": (7, 10, 2), "A": (9, 1, 4), "Asus": (9, 2, 4), "Am": (9, 0, 4),
+    "Em": (4, 7, 11), "G": (7, 11, 2), "D": (2, 6, 9), "B": (11, 3, 6), "Bsus": (11, 4, 6),
+    "Cm": (0, 3, 7), "Ab": (8, 0, 3), "Eb": (3, 7, 10), "Fm": (5, 8, 0), "Gsus": (7, 0, 2), "GM": (7, 11, 2)}
 
 NIGHT_CHORDS = ["Dm", "Bb", "F", "C", "Dm", "Bb", "Gm", "A",
     "Bb", "F", "C", "Dm", "Bb", "F", "Gm", "A",
@@ -464,6 +468,52 @@ class Drums:
         y = y[:peak + int(SR * 2.5)]
         score._add(self.metal_bus, y.astype(np.float32), into_beat * BEAT - peak / SR)
 
+    def _one(self, pattern, vel, score, layers):
+        """One file of a drum hit, from the layer nearest the strength asked for."""
+        wanted = 1 + vel * (max(layers) - 1)
+        layer = min(layers, key=lambda l: abs(l - wanted))
+        files = sorted(glob.glob(os.path.join(SAMPLES, "Percussion", pattern % layer)))
+        return self._read(files[score.rng.integers(0, len(files))])
+
+    def snare(self, score, beat, vel):
+        """A field drum, snares on: the Fort's march."""
+        if not hasattr(self, "snare_bus"):
+            self.snare_bus = Instrument("Percussion/Snare2", 0.78, -0.08, 0.3, lead=0.0)
+        v = float(np.clip(vel * score.level(beat // 4 + 1), 0.04, 1.0))
+        x = self._one("Snare2-HitSN_v%d_*.wav", v, score, [1, 3, 5, 7])[:int(SR * 1.2)]
+        y = x / max(1e-5, np.abs(x).max()) * 0.62 * v ** 1.3
+        score._add(self.snare_bus, y.astype(np.float32), beat * BEAT + score.rng.normal(0, 0.004))
+
+    def snare_roll(self, score, beat, beats, v0, v1):
+        """A roll that grows into the next downbeat."""
+        if not hasattr(self, "snare_bus"):
+            self.snare_bus = Instrument("Percussion/Snare2", 0.78, -0.08, 0.3, lead=0.0)
+        x = self._read(sorted(glob.glob(os.path.join(SAMPLES, "Percussion/Snare2-rollSN_v5_*.wav")))[0])
+        n = int(beats * BEAT * SR)
+        body = x[int(0.3 * SR):max(int(0.3 * SR) + 4096, len(x) - int(0.5 * SR))]
+        pos = np.arange(n) % len(body)
+        y = body[pos] / max(1e-5, np.sqrt((body ** 2).mean())) * 0.07
+        level = score.level(beat // 4 + 1)
+        y = y * np.linspace(v0 * level, v1 * level, n, dtype=np.float32)[:, None] ** 1.3
+        y[-200:] *= np.linspace(1.0, 0.0, 200, dtype=np.float32)[:, None]
+        score._add(self.snare_bus, y.astype(np.float32), beat * BEAT)
+
+    def bowed(self, score, beat, vel):
+        """A cymbal played with a bow: a long shimmer, like wind through the mist."""
+        if not hasattr(self, "air_bus"):
+            self.air_bus = Instrument("Percussion/susCymb1-bow", 0.8, -0.3, 0.6, lead=0.0)
+        files = sorted(glob.glob(os.path.join(SAMPLES, "Percussion/susCymb1-bow-*.wav")))
+        x = self._read(files[score.rng.integers(0, len(files))])[:int(SR * 7.0)]
+        y = x / max(1e-5, np.abs(x).max()) * 0.32 * vel * score.level(beat // 4 + 1)
+        y[-int(SR * 0.5):] *= np.linspace(1.0, 0.0, int(SR * 0.5), dtype=np.float32)[:, None]
+        score._add(self.air_bus, y.astype(np.float32), beat * BEAT)
+
+    def triangle(self, score, beat, vel):
+        if not hasattr(self, "bright_bus"):
+            self.bright_bus = Instrument("Percussion/Triangle3", 0.6, 0.3, 0.5, lead=0.0)
+        x = self._one("Triangle3-Hit_v%d_*.wav", float(np.clip(vel, 0.05, 1.0)), score, [1, 2])[:int(SR * 3.0)]
+        score._add(self.bright_bus, (x / max(1e-5, np.abs(x).max()) * 0.3 * vel).astype(np.float32), beat * BEAT)
+
     def gong(self, score, beat, vel):
         names = ["p", "mf", "f", "fff"]
         v = float(np.clip(vel, 0.05, 1.0))
@@ -495,6 +545,15 @@ class Orchestra:
         self.tpt_short = Instrument(B + "Trumpet/stac", 0.78, 0.14, 0.4, lead=0.0, release=0.25, short=True)
         self.choir = Choir()
         self.drums = Drums()
+        # Colours for the Mists, the Fort and the menu.
+        self.solo_violin = Instrument(S + "Solo Violin/Arco Vib", 0.9, -0.22, 0.48, lead=0.05, release=0.5, scientific=True)
+        self.vln_trem = Instrument(S + "Violin Section/Trem", 0.62, -0.36, 0.4, lead=0.04, release=0.5)
+        self.cel_trem = Instrument(S + "Cello Section/trem", 0.6, 0.34, 0.34, lead=0.04, release=0.5)
+        self.vln_pizz = Instrument(S + "Violin Section/Pizz", 0.8, -0.36, 0.3, lead=0.0, release=0.3, short=True)
+        self.cel_pizz = Instrument(S + "Cello Section/pizzT", 0.95, 0.34, 0.26, lead=0.0, release=0.3, short=True)
+        self.oboe = Instrument(W + "Oboe/Vib", 0.85, 0.08, 0.5, lead=0.04, release=0.45)
+        self.bassoon = Instrument(W + "Bassoon/vib", 0.8, 0.22, 0.4, lead=0.04, release=0.4)
+        self.glock = Instrument("Percussion/Glock", 0.42, 0.24, 0.55, lead=0.0, release=1.2, short=True, keep=4.0)
 
 
 def low_strings(s, o, chords, first_bar, vel, basses=True):
@@ -712,6 +771,335 @@ def compose_dawn(o):
     return s
 
 
+# --- The menu -----------------------------------------------------------------------------------
+# The game's theme as a title theme: remembered by a single violin, answered by the oboe, turned
+# to the major by the whole orchestra, then back into the night it came from, and round again.
+
+MENU_CHORDS = NIGHT_CHORDS[:16] + DAWN_CHORDS[:8] + NIGHT_CHORDS[24:]
+
+
+def sparkle(s, inst, chords, first_bar, every, vel, lo=84, hi=96):
+    """A bell-like note at the top of the chord, now and then."""
+    for i in range(0, len(chords), every):
+        top = tones(chords[i], lo, hi)
+        s.note(inst, top[len(top) // 2], (first_bar + i - 1) * 4.0, 2.0, vel * (0.85 + 0.15 * s.rng.random()))
+
+
+def compose_menu(o):
+    s = Score("menu", 44)
+    d = o.drums
+    s.dynamics = [(1, 0.5), (8, 0.55), (9, 0.6), (16, 0.7), (17, 0.86), (24, 0.95), (25, 0.7), (32, 0.5), (33, 0.5)]
+    ch = MENU_CHORDS
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.68 if i < 16 else 0.74, up_only=i % 2 == 1)
+    low_strings(s, o, ch, 1, 0.5, basses=False)
+    # I. Remembered by one violin.
+    play_pad(s, o.violas, ch[:8], 1, 2, 57, 69, 0.34)
+    s.play_line(o.solo_violin, THEME_A, 1, vel=0.72)
+    sparkle(s, o.glock, ch[:8], 1, 2, 0.5)
+    # II. The oboe answers, with voices far away.
+    s.play_line(o.oboe, THEME_B, 9, shift=-12, vel=0.7)
+    play_pad(s, o.violins, ch[8:16], 9, 3, 65, 77, 0.36)
+    choir_chords(s, o.choir, ch[8:16], 9, 0.4)
+    play_pad(s, o.horns, ch[12:16], 13, 2, 53, 65, 0.4)
+    harp_run(s, o.harp, 62.0, 2.0, 57, 88, 0.55, OVER_A)
+    d.swell(s, 64.0, 0.5, "Median")
+    # III. Morning: the theme in the major, the whole string section and the horns.
+    s.play_line(o.violins, DAWN_A, 17, shift=12, vel=0.86, players=3)
+    s.play_line(o.horns, DAWN_A, 17, vel=0.6, players=2)
+    for m, b, l in harmony_below(DAWN_A, 17, [None] * 16 + ch[16:24]):
+        s.note(o.violas, m, b, l * 1.03, 0.5, legato=True)
+    play_pad(s, o.trombones, ch[16:24], 17, 2, 46, 58, 0.44)
+    choir_chords(s, o.choir, ch[16:24], 17, 0.7, lo=62, hi=79)
+    pulse_low(s, o, ch[16:24], 17, 0.52)
+    d.crash(s, 64.0, 0.32)
+    for bar in (17, 19, 21, 23):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.55)
+    sparkle(s, o.glock, ch[16:24], 17, 2, 0.45)
+    # IV. Back into the night, the flute closing it, and round again.
+    s.play_line(o.flute, THEME_B_SHORT, 25, vel=0.6, swell=True)
+    play_pad(s, o.violas, ch[24:32], 25, 2, 57, 69, 0.36)
+    choir_chords(s, o.choir, ch[24:32], 25, 0.34)
+    s.play_line(o.solo_violin, CLOSING, 29, vel=0.62)
+    d.roll(s, 33 + 12, 124.0, 8.0, 0.25, 0.1)
+    return s
+
+
+# --- The Mists ----------------------------------------------------------------------------------
+# E minor, high and far away: trembling strings, harp rising like mist, a glockenspiel for the
+# floating stones, and a solo violin. Its own theme, not the Village's.
+
+MISTS_CHORDS = ["Em", "C", "G", "D", "Em", "C", "Am", "B",
+    "C", "G", "D", "Em", "C", "G", "Am", "B",
+    "Em", "C", "G", "D", "Em", "C", "Am", "B",
+    "C", "G", "Am", "Em", "Am", "C", "Bsus", "B"]
+MISTS_DAWN_CHORDS = ["G", "Em", "C", "Am", "G", "C", "Am", "D",
+    "Em", "D", "C", "G", "Am", "C", "G", "D",
+    "G", "Em", "C", "Am", "G", "C", "Am", "D",
+    "Em", "D", "C", "G", "Am", "C", "D", "G"]
+MISTS_A = "E4:2 B4:1.5 A4:.5 | G4:2 E4:1 G4:1 | D5:2 B4:1 G4:1 | A4:3 F#4:1 | E4:2 B4:1.5 C5:.5 | E5:2 D5:1 B4:1 | C5:1.5 B4:.5 A4:2 | B4:4"
+MISTS_B = "G5:3 E5:1 | D5:2 B4:1 D5:1 | F#5:3 D5:1 | E5:2 B4:2 | G5:3 A5:1 | B5:2 A5:1 G5:1 | A5:2 G5:1 E5:1 | F#5:2 D#5:1 F#5:1"
+MISTS_B_SHORT = "G5:3 E5:1 | D5:2 B4:1 D5:1 | F#5:3 D5:1 | E5:2 B4:2"
+# The answer again near the end, bent to the last part's chords (A minor where it had D).
+MISTS_B_LATE = "G5:3 E5:1 | D5:2 B4:1 D5:1 | E5:3 C5:1 | E5:2 B4:2"
+MISTS_CLOSING = "E5:2 C5:2 | E5:1 D5:1 C5:1 B4:1 | B4:4"
+MISTS_DAWN_A = "G4:2 D5:1.5 C5:.5 | B4:2 A4:1 B4:1 | G4:2 B4:1 E5:1 | E5:3 D5:1 | G4:2 D5:1.5 E5:.5 | G5:2 F#5:1 E5:1 | E5:1.5 D5:.5 C5:2 | D5:4"
+MISTS_DAWN_B = "B5:3 G5:1 | A5:2 F#5:1 A5:1 | G5:3 E5:1 | D5:2 B4:2 | C5:3 D5:1 | E5:2 D5:1 C5:1 | D5:2 B4:1 G4:1 | A4:2 F#4:1 A4:1"
+MISTS_DAWN_C = "B5:2 D6:2 | A5:3 F#5:1 | G5:2 E5:1 G5:1 | B5:3 G5:1 | C6:2 A5:1 E5:1 | E6:2 C6:2 | D6:2 A5:1 F#5:1 | G5:4"
+OVER_B = (4, 6, 7, 9, 11, 0, 3)  # E harmonic minor, for sweeps over B
+
+
+def compose_mists_night(o):
+    s = Score("mists_night", 55)
+    d = o.drums
+    s.dynamics = [(1, 0.46), (8, 0.5), (9, 0.58), (16, 0.68), (17, 0.86), (24, 0.9), (25, 0.7), (29, 0.55), (32, 0.46), (33, 0.46)]
+    ch = MISTS_CHORDS
+    play_pad(s, o.vln_trem, ch, 1, 3, 64, 79, 0.3)
+    low_strings(s, o, ch, 1, 0.44)
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.6, up_only=True)
+    sparkle(s, o.glock, ch, 1, 2, 0.46)
+    for at in (0.0, 32.0, 96.0, 112.0):
+        d.bowed(s, at, 0.42)
+    # I. A lone violin.
+    s.play_line(o.solo_violin, MISTS_A, 1, vel=0.72)
+    # II. Flute and oboe share the answer; voices from somewhere below.
+    s.play_line(o.flute, MISTS_B_SHORT, 9, vel=0.64, swell=True)
+    s.play_line(o.oboe, "G5:3 A5:1 | B5:2 A5:1 G5:1 | A5:2 G5:1 E5:1 | F#5:2 D#5:1 F#5:1", 13, shift=-12, vel=0.66)
+    choir_chords(s, o.choir, ch[8:16], 9, 0.45, lo=64, hi=79)
+    harp_run(s, o.harp, 62.0, 2.0, 59, 90, 0.5, OVER_B)
+    d.swell(s, 64.0, 0.5, "Median")
+    # III. The theme in the violins and voices together, the horns far below.
+    s.play_line(o.violins, MISTS_A, 17, shift=12, vel=0.84, players=3)
+    s.play_line(o.horns, MISTS_A, 17, vel=0.54, players=2)
+    choir_chords(s, o.choir, ch[16:24], 17, 0.8, lo=64, hi=79)
+    pulse_low(s, o, ch[16:24], 17, 0.58)
+    for bar in (17, 19, 21, 23):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.58)
+    d.gong(s, 64.0, 0.32)
+    # IV. Back into the mist.
+    s.play_line(o.solo_violin, MISTS_B_LATE, 25, vel=0.6)
+    s.play_line(o.flute, MISTS_CLOSING, 30, vel=0.56, swell=False)
+    choir_chords(s, o.choir, ch[24:32], 25, 0.36, lo=64, hi=79)
+    return s
+
+
+def compose_mists_hunted(o):
+    s = Score("mists_hunted", 66)
+    d = o.drums
+    s.dynamics = [(1, 0.82), (8, 0.86), (9, 0.86), (16, 0.92), (17, 1.0), (24, 1.0), (25, 0.9), (32, 0.96), (33, 0.82)]
+    ch = MISTS_CHORDS
+    drive_strings(s, o, ch[:8], 1, 0.78)
+    drive_strings(s, o, ch[8:], 9, 0.84, violins=True)
+    for i, c in enumerate(ch):
+        drum_bar(s, d, c, i + 1, 0.86)
+    for bar in (8, 16, 24, 32):
+        drum_fill(s, d, ch[bar - 1], bar, 0.84)
+    for bar in (9, 17, 25, 33):
+        d.crash(s, (bar - 1) * 4.0, 0.68)
+    # The voices never stop.
+    choir_chords(s, o.choir, ch, 1, 0.72, lo=60, hi=76)
+    play_pad(s, o.vln_trem, ch[:8], 1, 2, 64, 76, 0.5)
+    s.play_line(o.horns, MISTS_A, 1, vel=0.8, players=3)
+    s.play_line(o.trombones, MISTS_A, 1, shift=-12, vel=0.82, players=2)
+    s.play_line(o.violins, MISTS_B, 9, vel=0.9, players=3)
+    s.play_line(o.trumpets, MISTS_B, 9, shift=-12, vel=0.86, players=2)
+    s.play_line(o.violins, MISTS_A, 17, shift=12, vel=1.0, players=3)
+    s.play_line(o.trumpets, MISTS_A, 17, vel=0.9, players=2)
+    s.play_line(o.trombones, MISTS_A, 17, shift=-12, vel=0.88, players=2)
+    for i in range(24, 32):
+        brass_stabs(s, o, ch[i], i + 1, 0.88)
+    s.play_line(o.violins, MISTS_B_LATE, 25, vel=0.9, players=3)
+    s.play_line(o.violins, MISTS_CLOSING, 30, vel=0.86, players=3)
+    s.play_line(o.horns, MISTS_CLOSING, 30, shift=-12, vel=0.88, players=3)
+    d.gong(s, 64.0, 0.5)
+    return s
+
+
+def compose_mists_dawn(o):
+    s = Score("mists_dawn", 77)
+    d = o.drums
+    s.dynamics = [(1, 0.9), (16, 0.95), (17, 0.7), (24, 0.8), (25, 1.0), (33, 0.9)]
+    ch = MISTS_DAWN_CHORDS
+    low_strings(s, o, ch, 1, 0.78)
+    play_pad(s, o.violas, ch, 1, 3, 57, 72, 0.64, players=2)
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.72, up_only=True)
+    sparkle(s, o.glock, ch, 1, 1, 0.5)
+    for bar in (1, 9, 25):
+        harp_run(s, o.harp, (bar - 1) * 4.0 - 2.0, 2.0, 59, 91, 0.6, (7, 9, 11, 0, 2, 4, 6))
+        d.crash(s, (bar - 1) * 4.0, 0.58)
+        d.triangle(s, (bar - 1) * 4.0, 0.6)
+    choir_chords(s, o.choir, ch[:16], 1, 0.8, lo=62, hi=79)
+    s.play_line(o.violins, MISTS_DAWN_A, 1, shift=12, vel=0.9, players=3)
+    s.play_line(o.horns, MISTS_DAWN_A, 1, vel=0.68, players=2)
+    s.play_line(o.trumpets, MISTS_DAWN_A, 1, vel=0.72, players=1)
+    s.play_line(o.violins, MISTS_DAWN_B, 9, vel=0.92, players=3)
+    s.play_line(o.horns, MISTS_DAWN_B, 9, shift=-12, vel=0.68, players=2)
+    play_pad(s, o.trombones, ch[:16], 1, 2, 46, 58, 0.58)
+    for bar in list(range(1, 17)) + list(range(25, 33)):
+        c = ch[bar - 1]
+        d.timp(s, root_in(c, 38), (bar - 1) * 4.0, 0.66)
+        d.timp(s, root_in(c, 38), (bar - 1) * 4.0 + 2.0, 0.42)
+    # A breath of morning: the solo violin above the voices.
+    s.play_line(o.solo_violin, MISTS_DAWN_A, 17, shift=12, vel=0.66)
+    play_pad(s, o.vln_trem, ch[16:24], 17, 3, 69, 84, 0.34)
+    choir_chords(s, o.choir, ch[16:24], 17, 0.44, lo=62, hi=79)
+    d.roll(s, 36 + 12, 92.0, 4.0, 0.3, 0.9)
+    d.swell(s, 96.0, 0.66, "Median")
+    # And the last climb.
+    s.play_line(o.violins, MISTS_DAWN_C, 25, vel=0.95, players=3)
+    s.play_line(o.trumpets, MISTS_DAWN_C, 25, shift=-12, vel=0.9, players=2)
+    s.play_line(o.horns, MISTS_DAWN_C, 25, shift=-24, vel=0.72, players=2)
+    play_pad(s, o.trombones, ch[24:32], 25, 2, 46, 58, 0.7)
+    choir_chords(s, o.choir, ch[24:32], 25, 0.9, lo=62, hi=79)
+    pulse_low(s, o, ch[24:32], 25, 0.72)
+    return s
+
+
+# --- The Fort -----------------------------------------------------------------------------------
+# C minor, and a march: field drum, low brass and bassoons, a dotted call for the horns.
+
+FORT_CHORDS = ["Cm", "Ab", "Eb", "Bb", "Cm", "Ab", "Fm", "G",
+    "Ab", "Eb", "Bb", "Cm", "Ab", "Eb", "Fm", "G",
+    "Cm", "Ab", "Eb", "Bb", "Cm", "Ab", "Fm", "G",
+    "Ab", "Eb", "Fm", "Cm", "Fm", "Ab", "Gsus", "G"]
+FORT_DAWN_CHORDS = ["Eb", "Bb", "Cm", "Ab", "Eb", "Ab", "Bb", "Bb",
+    "Ab", "Eb", "Bb", "Cm", "Ab", "Eb", "Bb", "Eb",
+    "Eb", "Bb", "Cm", "Ab", "Eb", "Ab", "Bb", "Bb",
+    "Ab", "Eb", "Bb", "Cm", "Ab", "Eb", "Bb", "Eb"]
+FORT_A = "C4:1.5 C4:.5 G4:2 | Ab4:1 G4:1 F4:1 Eb4:1 | G4:1.5 G4:.5 Bb4:2 | F4:3 D4:1 | C4:1.5 C4:.5 G4:1 C5:1 | C5:2 Bb4:1 Ab4:1 | Ab4:1 G4:1 F4:1 D4:1 | G4:4"
+FORT_B = "Eb5:3 C5:1 | Bb4:2 G4:1 Bb4:1 | D5:3 Bb4:1 | C5:2 G4:2 | Eb5:3 F5:1 | G5:2 F5:1 Eb5:1 | F5:2 Eb5:1 C5:1 | D5:2 B4:1 D5:1"
+FORT_B_LATE = "Eb5:3 C5:1 | Bb4:2 G4:1 Bb4:1 | C5:3 Ab4:1 | C5:2 G4:2"
+FORT_CLOSING = "C5:2 Ab4:2 | C5:1 Bb4:1 Ab4:1 G4:1 | G4:4"
+FORT_DAWN_A = "Eb4:1.5 Eb4:.5 Bb4:2 | Bb4:1 F4:1 D4:1 F4:1 | G4:1.5 G4:.5 C5:2 | Ab4:3 C5:1 | Eb4:1.5 Eb4:.5 Bb4:1 Eb5:1 | Eb5:2 D5:1 C5:1 | D5:1 C5:1 Bb4:1 F4:1 | Bb4:4"
+FORT_DAWN_B = "Ab5:3 Eb5:1 | G5:2 Eb5:1 G5:1 | F5:3 D5:1 | Eb5:2 C5:2 | C5:3 Eb5:1 | G5:2 F5:1 Eb5:1 | F5:2 D5:1 Bb4:1 | Eb5:4"
+FORT_DAWN_C = "C6:2 Ab5:2 | Bb5:3 G5:1 | F5:2 D5:1 F5:1 | G5:3 Eb5:1 | Ab5:2 C6:1 Ab5:1 | G5:2 Bb5:2 | Bb5:2 F5:1 D5:1 | Eb5:4"
+OVER_G = (0, 2, 3, 5, 7, 8, 11)  # C harmonic minor, for sweeps over G
+
+
+def march_bar(s, d, bar, vel, busy=False):
+    """The field drum: on the beat, with lighter strokes between, and more of them when it matters."""
+    beat = (bar - 1) * 4.0
+    hits = {0: 1.0, 4: 0.7, 6: 0.45, 8: 0.85, 12: 0.7, 14: 0.5}
+    if busy:
+        hits.update({2: 0.4, 3: 0.45, 10: 0.42, 11: 0.48, 13: 0.4, 15: 0.55})
+    for k, a in hits.items():
+        d.snare(s, beat + k * 0.25, vel * a)
+
+
+def compose_fort_night(o):
+    s = Score("fort_night", 88)
+    d = o.drums
+    s.dynamics = [(1, 0.56), (8, 0.6), (9, 0.64), (16, 0.74), (17, 0.92), (24, 0.96), (25, 0.8), (29, 0.66), (32, 0.56), (33, 0.56)]
+    ch = FORT_CHORDS
+    low_strings(s, o, ch, 1, 0.58)
+    pulse_low(s, o, ch, 1, 0.5)
+    for i in range(32):
+        march_bar(s, d, i + 1, 0.42 if i < 16 else 0.6, busy=i >= 16 and i < 24)
+    # I. The call, on a horn.
+    s.play_line(o.horns, FORT_A, 1, vel=0.8, players=1)
+    s.play_line(o.bassoon, FORT_A, 1, shift=-12, vel=0.55)
+    play_pad(s, o.violas, ch[:8], 1, 2, 55, 67, 0.36)
+    d.timp(s, root_in("Cm", 38), 0.0, 0.6)
+    d.timp(s, root_in("Cm", 38), 16.0, 0.5)
+    # II. The answer, on oboe and violins, the brass holding the chords.
+    s.play_line(o.oboe, FORT_B, 9, shift=-12, vel=0.72)
+    s.play_line(o.violins, FORT_B, 9, vel=0.56, players=2)
+    play_pad(s, o.horns, ch[8:16], 9, 2, 53, 65, 0.44)
+    d.snare_roll(s, 60.0, 4.0, 0.2, 0.8)
+    harp_run(s, o.harp, 62.0, 2.0, 55, 86, 0.5, OVER_G)
+    # III. Everyone on the walls: trumpets and horns on the call.
+    s.play_line(o.trumpets, FORT_A, 17, shift=12, vel=0.9, players=2)
+    s.play_line(o.horns, FORT_A, 17, vel=0.74, players=3)
+    s.play_line(o.trombones, FORT_A, 17, shift=-12, vel=0.7, players=2)
+    play_pad(s, o.violins, ch[16:24], 17, 3, 67, 79, 0.5, players=2)
+    choir_chords(s, o.choir, ch[16:24], 17, 0.7, lo=55, hi=72)
+    d.crash(s, 64.0, 0.5)
+    for bar in range(17, 25):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.68)
+        d.boom(s, (bar - 1) * 4.0, 0.58)
+    # IV. The watch goes on.
+    s.play_line(o.violins, FORT_B_LATE, 25, vel=0.62, players=2)
+    s.play_line(o.bassoon, FORT_B_LATE, 25, shift=-24, vel=0.5)
+    s.play_line(o.horns, FORT_CLOSING, 30, shift=-12, vel=0.66, players=2)
+    d.snare_roll(s, 124.0, 4.0, 0.15, 0.6)
+    return s
+
+
+def compose_fort_hunted(o):
+    s = Score("fort_hunted", 99)
+    d = o.drums
+    s.dynamics = [(1, 0.84), (8, 0.88), (9, 0.88), (16, 0.94), (17, 1.0), (24, 1.0), (25, 0.9), (32, 0.96), (33, 0.84)]
+    ch = FORT_CHORDS
+    drive_strings(s, o, ch[:8], 1, 0.8)
+    drive_strings(s, o, ch[8:], 9, 0.86, violins=True)
+    for i, c in enumerate(ch):
+        drum_bar(s, d, c, i + 1, 0.86)
+        march_bar(s, d, i + 1, 0.7, busy=True)
+    for bar in (8, 16, 24, 32):
+        drum_fill(s, d, ch[bar - 1], bar, 0.86)
+        d.snare_roll(s, (bar - 1) * 4.0 + 2.0, 2.0, 0.3, 0.95)
+    for bar in (9, 17, 25, 33):
+        d.crash(s, (bar - 1) * 4.0, 0.72)
+    s.play_line(o.trombones, FORT_A, 1, vel=0.88, players=2)
+    s.play_line(o.horns, FORT_A, 1, shift=12, vel=0.78, players=3)
+    s.play_line(o.trumpets, FORT_B, 9, shift=-12, vel=0.94, players=2)
+    s.play_line(o.violins, FORT_B, 9, vel=0.9, players=3)
+    play_pad(s, o.trombones, ch[8:16], 9, 2, 46, 58, 0.72)
+    s.play_line(o.trumpets, FORT_A, 17, shift=12, vel=0.94, players=2)
+    s.play_line(o.violins, FORT_A, 17, shift=12, vel=1.0, players=3)
+    s.play_line(o.trombones, FORT_A, 17, vel=0.9, players=2)
+    choir_chords(s, o.choir, ch[16:24], 17, 0.86, lo=55, hi=72)
+    for i in range(24, 32):
+        brass_stabs(s, o, ch[i], i + 1, 0.9)
+    s.play_line(o.violins, FORT_B_LATE, 25, vel=0.9, players=3)
+    s.play_line(o.horns, FORT_CLOSING, 30, vel=0.9, players=3)
+    return s
+
+
+def compose_fort_dawn(o):
+    s = Score("fort_dawn", 111)
+    d = o.drums
+    s.dynamics = [(1, 0.9), (16, 0.95), (17, 0.72), (24, 0.82), (25, 1.0), (33, 0.9)]
+    ch = FORT_DAWN_CHORDS
+    low_strings(s, o, ch, 1, 0.8)
+    play_pad(s, o.violas, ch, 1, 3, 55, 70, 0.62, players=2)
+    for i in range(32):
+        if i < 16 or i >= 24:
+            march_bar(s, d, i + 1, 0.55, busy=i % 4 == 3)
+    for bar in (1, 9, 25):
+        d.crash(s, (bar - 1) * 4.0, 0.62)
+        d.gong(s, (bar - 1) * 4.0, 0.4)
+    # Victory: the call in the major, trumpets on top.
+    s.play_line(o.trumpets, FORT_DAWN_A, 1, shift=12, vel=0.92, players=2)
+    s.play_line(o.horns, FORT_DAWN_A, 1, vel=0.72, players=3)
+    s.play_line(o.violins, FORT_DAWN_A, 1, shift=12, vel=0.86, players=3)
+    play_pad(s, o.trombones, ch[:16], 1, 2, 46, 58, 0.62)
+    s.play_line(o.trumpets, FORT_DAWN_B, 9, shift=-12, vel=0.9, players=2)
+    s.play_line(o.violins, FORT_DAWN_B, 9, vel=0.94, players=3)
+    choir_chords(s, o.choir, ch[:16], 1, 0.78, lo=58, hi=75)
+    for bar in list(range(1, 17)) + list(range(25, 33)):
+        c = ch[bar - 1]
+        d.timp(s, root_in(c, 38), (bar - 1) * 4.0, 0.7)
+        d.boom(s, (bar - 1) * 4.0, 0.5)
+        d.timp(s, root_in(c, 38), (bar - 1) * 4.0 + 3.0, 0.42)
+    # The walls quiet down for a moment: a bassoon and the oboe in the light.
+    s.play_line(o.oboe, FORT_DAWN_A, 17, vel=0.66)
+    s.play_line(o.bassoon, FORT_DAWN_A, 17, shift=-12, vel=0.5)
+    play_pad(s, o.violins, ch[16:24], 17, 3, 67, 82, 0.4)
+    pulse_low(s, o, ch[20:24], 21, 0.5)
+    d.snare_roll(s, 92.0, 4.0, 0.2, 0.9)
+    # And the last salute.
+    s.play_line(o.violins, FORT_DAWN_C, 25, vel=0.95, players=3)
+    s.play_line(o.trumpets, FORT_DAWN_C, 25, shift=-12, vel=0.92, players=2)
+    s.play_line(o.horns, FORT_DAWN_C, 25, shift=-24, vel=0.74, players=2)
+    play_pad(s, o.trombones, ch[24:32], 25, 2, 46, 58, 0.72)
+    choir_chords(s, o.choir, ch[24:32], 25, 0.9, lo=58, hi=75)
+    pulse_low(s, o, ch[24:32], 25, 0.72)
+    return s
+
+
 # --- Mixing -------------------------------------------------------------------------------------
 
 def hall(seconds=2.9, seed=5):
@@ -817,7 +1205,9 @@ def write(name, x):
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", path, "-c:a", "libvorbis", "-q:a", "2.6", "-map_metadata", "-1", OUT + name + ".ogg"], check=True)
 
 
-COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_dawn}
+COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_dawn, "menu": compose_menu,
+    "mists_night": compose_mists_night, "mists_hunted": compose_mists_hunted, "mists_dawn": compose_mists_dawn,
+    "fort_night": compose_fort_night, "fort_hunted": compose_fort_hunted, "fort_dawn": compose_fort_dawn}
 
 
 def main():

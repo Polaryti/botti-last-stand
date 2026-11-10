@@ -30,6 +30,9 @@ const KINDS := {
 
 
 func build(b: MapBuilder) -> void:
+	if kind == "rock":
+		b.terrain_rock(grow)
+		return
 	var k: Array = KINDS[kind]
 	var solid_size: Vector3 = k[2]
 	b.prop(k[0], float(k[1]) * grow, solid_size if kind != "rock" else solid_size * grow / 1.0)

@@ -76,7 +76,9 @@ var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
 const PICKUP_APART := 6.0
-const WOOD_OUTSIDE := 0.75 # how much of the wood lies outside the gate that needs it
+const WOOD_GATE_CLEARANCE := 18.0
+var tree_spots: Array[Vector3] = []
+var forest_wood_spots: Array[Vector3] = []
 var perches: Array[Vector3] = []
 var crop_spots: Array[Vector3] = []
 var pois: Array[Vector3] = []
@@ -213,6 +215,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	Terrain.use_half(map.land_half)
 	half_size = float(map.land_half)
@@ -251,6 +254,7 @@ func setup(game_mode: int) -> void:
 	map.free()
 	grid.astar.update()
 	grid.build_far_grid()
+	prepare_forest_wood()
 	if terrain.has_islands():
 		_mists_look()
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
@@ -363,6 +367,7 @@ func start_fort() -> void:
 
 ## True when a transform is turned by some number of quarter turns, so a plain box will do.
 func _square_on(t: Transform3D) -> int:
+	if not t.basis.y.normalized().is_equal_approx(Vector3.UP): return -1
 	var yaw := t.basis.get_euler().y
 	var quarter := yaw / (PI * 0.5)
 	if absf(quarter - round(quarter)) < 0.01:
@@ -1649,29 +1654,37 @@ func player_start(peer: int) -> Vector3:
 	return Vector3(s.x, ground_at(s) + 0.05, s.z)
 
 
-## Wood turns up just inside a gate, where it is needed: the most damaged gate first.
+## Gather wood in the forest, never beside a gate or inside its approach.
+func wood_site_clear(at: Vector3) -> bool:
+	if fort == null or fort.inside(at) or not grid.is_free(grid.to_cell(at)) or not terrain.is_walkable(at.x, at.z): return false
+	for gate: Dictionary in fort.gates:
+		if Vector2(at.x - gate["at"].x, at.z - gate["at"].z).length() < WOOD_GATE_CLEARANCE: return false
+	for item: Pickup in pickups:
+		if item.position.distance_to(at) < 2.5: return false
+	return true
+
+func prepare_forest_wood() -> void:
+	forest_wood_spots.clear()
+	if fort == null: return
+	var reachable := grid.flood(Fort.DIRS[0] * (Fort.HALF + 8.0))
+	for anchor: Vector3 in wood_spots:
+		for offset: Vector3 in [Vector3.ZERO, Vector3(2, 0, 1), Vector3(-2, 0, -1), Vector3(0, 0, 3)]:
+			var at := anchor + offset
+			at.y = ground_at(at)
+			if wood_site_clear(at) and reachable.has(grid.to_cell(at)): forest_wood_spots.append(at)
+	# Use the tree line too, so one side of the fort cannot exhaust all reachable supplies.
+	for tree: Vector3 in tree_spots:
+		for angle: float in [0.6, 2.7, 4.8]:
+			var at := tree + Vector3(cos(angle), 0, sin(angle)) * 2.4
+			at.y = ground_at(at)
+			if wood_site_clear(at) and reachable.has(grid.to_cell(at)): forest_wood_spots.append(at)
+
 func stock_wood() -> void:
-	if fort == null or fort.gates.is_empty():
-		return
-	var g: Dictionary = fort.gates[randi() % fort.gates.size()]
-	for other: Dictionary in fort.gates:
-		if float(other["hp"]) < float(g["hp"]):
-			g = other
-	var dir: Vector3 = g["dir"]
-	var along := Vector3(dir.z, 0, -dir.x)
-	# Mostly outside the gate, where you have to step out to fetch it. Now and then just inside.
-	var outside := randf() < WOOD_OUTSIDE
-	for attempt in 8:
-		var out := randf_range(4.0, 8.0) if outside else -randf_range(3.0, 5.0)
-		var at: Vector3 = (g["at"] as Vector3) + dir * out + along * randf_range(-Fort.GATE_W, Fort.GATE_W) * 0.8
-		if not grid.is_free(grid.to_cell(at)):
-			at = grid.to_world(grid.nearest_free(grid.to_cell(at)))
-		var clash := false
-		for other in pickups:
-			if other.global_position.distance_to(at) < 1.0:
-				clash = true
-				break
-		if not clash:
+	if fort == null or forest_wood_spots.is_empty(): return
+	var start := randi() % forest_wood_spots.size()
+	for offset in forest_wood_spots.size():
+		var at := forest_wood_spots[(start + offset) % forest_wood_spots.size()]
+		if wood_site_clear(at):
 			spawn_pickup_at(at, Pickup.Kind.WOOD, "wood")
 			return
 
@@ -2079,7 +2092,9 @@ func spawn_ally(kind: String, at: Vector3, seconds: float) -> void:
 	a.net_index = _ally_seq
 	if master:
 		a.hp *= master.m("ally_hp")
-	a.global_position = grid.to_world(grid.nearest_free(grid.to_cell(at)))
+	var placed := grid.to_world(grid.nearest_free(grid.to_cell(at)))
+	placed.y = ground_at(placed) + (Ally.RAVEN_HEIGHT if kind == "raven" else 0.0)
+	a.global_position = placed
 	allies.append(a)
 
 
@@ -2093,7 +2108,7 @@ func net_remote_allies(peer: int, b: PackedByteArray) -> void:
 		var a: Ally = _remote_allies.get(key)
 		var pos := Vector3(b.decode_s16(at + 2), b.decode_s16(at + 4), b.decode_s16(at + 6)) * 0.01
 		if a == null:
-			var kind: String = Ally.KINDS[clampi(b.decode_u8(at + 1), 0, Ally.KINDS.size() - 1)]
+			var kind: String = Ally.KINDS[clampi(b.decode_u8(at + 1) & 127, 0, Ally.KINDS.size() - 1)]
 			var spare: Array = _spare_allies.get(kind, [])
 			if spare.is_empty():
 				a = Ally.new(self, kind)
@@ -2106,6 +2121,7 @@ func net_remote_allies(peer: int, b: PackedByteArray) -> void:
 			a.global_position = pos
 			allies.append(a)
 			_remote_allies[key] = a
+		a.net_biting = (b.decode_u8(at + 1) & 128) != 0
 		a.net_target = pos
 		a.net_yaw = b.decode_u8(at + 8) / 255.0 * TAU
 		at += 9
@@ -2473,6 +2489,8 @@ func warm_up() -> void:
 			_launch(Projectile.Kind.BOLT, _orb_mesh(Color(0.55, 0.75, 1.0)), spot + Vector3(1, 1.6, 2), Vector3.FORWARD, 0.0, 9.0, 0.0)]:
 		if s:
 			shots.append(s)
+	var heavy_preview := HeavyWave.spawn_visual(self, 0, spot, Vector3.FORWARD, 3.0)
+	running_effects.append(heavy_preview)
 	# The world is frozen during this, but particles only appear when they run.
 	for n in running_effects:
 		n.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -2506,6 +2524,7 @@ func warm_up() -> void:
 	for i in _puddles.size():
 		_puddles[i].visible = false
 		_puddle_life[i] = 0.0
+	heavy_preview.queue_free()
 	if mist_preview:
 		mist_preview.free()
 	cam.queue_free()
@@ -2925,6 +2944,54 @@ func _tick_rings(delta: float) -> void:
 			node.visible = false
 		else:
 			(node.material_override as ShaderMaterial).set_shader_parameter("progress", 1.0 - float(ring["left"]) / RING_TIME)
+
+
+var _rise: CPUParticles3D
+
+
+## Motes rising around someone, for a level gained. One burst at a time is plenty, so it is reused.
+func fx_rise(at: Vector3, col: Color) -> void:
+	if _rise == null:
+		_rise = CPUParticles3D.new()
+		_rise.one_shot = true
+		_rise.emitting = false
+		_rise.amount = 28
+		_rise.lifetime = 1.4
+		_rise.explosiveness = 0.7
+		_rise.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+		_rise.emission_ring_axis = Vector3.UP
+		_rise.emission_ring_radius = 1.4
+		_rise.emission_ring_inner_radius = 0.9
+		_rise.emission_ring_height = 0.1
+		_rise.direction = Vector3.UP
+		_rise.spread = 10.0
+		_rise.initial_velocity_min = 1.4
+		_rise.initial_velocity_max = 3.0
+		_rise.gravity = Vector3(0, 0.5, 0)
+		_rise.scale_amount_min = 0.07
+		_rise.scale_amount_max = 0.13
+		var fade := Gradient.new()
+		fade.set_color(0, Color(1, 1, 1, 1))
+		fade.set_color(1, Color(1, 1, 1, 0))
+		_rise.color_ramp = fade
+		# Small round motes: a low sphere looks round from every side, with no billboard to set up.
+		var mote := SphereMesh.new()
+		mote.radius = 0.5
+		mote.height = 1.0
+		mote.radial_segments = 6
+		mote.rings = 3
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		look.vertex_color_use_as_albedo = true
+		mote.material = look
+		_rise.mesh = mote
+		_rise.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_rise)
+	_rise.global_position = at + Vector3.UP * 0.15
+	_rise.color = col
+	_rise.restart()
 
 
 func fx_blast(at: Vector3, radius: float, col: Color) -> void:
