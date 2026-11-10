@@ -138,7 +138,7 @@ static func fit_safe_area(margin: MarginContainer, horizontal := 24, vertical :=
 	viewport.size_changed.connect(apply)
 	margin.tree_exiting.connect(func() -> void:
 		if viewport.size_changed.is_connected(apply): viewport.size_changed.disconnect(apply), CONNECT_ONE_SHOT)
-	apply.call_deferred()
+	apply.call()
 
 static func safe_insets(window: Vector2i, safe: Rect2i, viewport: Vector2, horizontal: int, vertical: int) -> Array:
 	var scale := viewport / Vector2(window)

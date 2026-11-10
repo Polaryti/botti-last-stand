@@ -1148,6 +1148,7 @@ func test_version_20_1() -> void:
 		var inner: Control = card.get_child(0)
 		var needed := inner.get_combined_minimum_size().y
 		if needed > card.size.y + 1.0:
+			print("CARD_OVERFLOW: ", labels[0].text if not labels.is_empty() else "", " needed=", needed, " available=", card.size.y)
 			fits = false
 		for l: Label in labels:
 			if l.get_theme_font_size("font_size") < 22:

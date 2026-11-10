@@ -234,15 +234,6 @@ func _screen_margin(side: int, top_bottom: int) -> MarginContainer:
 	var margin := MarginContainer.new()
 	UiTheme.fit_safe_area(margin, side, top_bottom)
 	_fill(margin)
-	var cut := 0
-	var win := DisplayServer.window_get_size()
-	var safe := DisplayServer.get_display_safe_area()
-	if win.x > 0 and safe.size.x > 0:
-		cut = int(float(maxi(safe.position.x, win.x - safe.end.x)) * get_viewport().get_visible_rect().size.x / float(win.x))
-	for edge: String in ["left", "right"]:
-		margin.add_theme_constant_override("margin_" + edge, maxi(side, cut + 20))
-	margin.add_theme_constant_override("margin_top", top_bottom)
-	margin.add_theme_constant_override("margin_bottom", top_bottom)
 	return margin
 
 

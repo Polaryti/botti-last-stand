@@ -22,10 +22,6 @@ func build() -> void:
 	UiTheme.fit_safe_area(margin, 40, 16)
 	add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right"]:
-		margin.add_theme_constant_override("margin_" + side, 40)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_bottom", 10)
 	var panel := PanelContainer.new()
 	margin.add_child(panel)
 	var box := VBoxContainer.new()
