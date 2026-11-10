@@ -467,7 +467,7 @@ func status_effects() -> Array[Dictionary]:
 	for entry: Dictionary in StatusCatalog.TIMED:
 		var remaining := float(get(entry["field"]))
 		if remaining > 0 and remaining < 900:
-			out.append({"icon": ("drop+shield" if is_iced else "star") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
+			out.append({"icon": ("status_frozen" if is_iced else "status_stunned") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
 		if key == "command_ranged" or key == "command_spell":
@@ -535,6 +535,8 @@ func can_use(id: String) -> bool:
 	var exclusive: String = WeaponDefs.ALL[id].get("only", "")
 	if exclusive != "" and exclusive != class_id:
 		return false
+	if class_id == "magician":
+		return id == "staff"
 	if class_id == "commander" and spec_id in ["warlock", "gunner"]:
 		return id == ("war_staff" if spec_id == "warlock" else "musket")
 	if class_def().get("no_weapons", false):
@@ -3141,6 +3143,7 @@ func _handle_fire() -> void:
 		mana -= float(d["cost"])
 	if d.get("returning", false) and _axe_out:
 		return
+	invis_left = 0.0
 	_cooldown = attack_interval(d)
 	attack_count += 1
 	_vm_mesh.attack()
@@ -3170,6 +3173,7 @@ func _handle_fire() -> void:
 
 ## With nothing left to shoot you can still hit with what you hold: weak, but never helpless.
 func _bash(reason: String) -> void:
+	invis_left = 0.0
 	say(reason)
 	sfx("empty", -6.0, 1.0, 0.3)
 	sfx("swing", -5.0, 0.8)
@@ -3562,6 +3566,7 @@ func use_bayonet() -> void:
 	if weapon_id() != "musket" or dead or _cooldown > 0.0 or _cast_kind != "" or frozen_left > 0.0:
 		return
 	var d := musket_bayonet()
+	invis_left = 0.0
 	_cooldown = attack_interval(d)
 	_bayonet_pending = true
 	attack_count += 1

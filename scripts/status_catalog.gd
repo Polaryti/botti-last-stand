@@ -18,7 +18,7 @@ const TIMED := [
 		"field": "invis_left",
 		"name": "Invisible",
 		"icon": "eye_closed",
-		"desc": "Hides you from ordinary enemies. Some foes can see through it."
+		"desc": "Hides you from ordinary enemies until the timer ends or you attack. Some foes can see through it."
 	},
 	{
 		"field": "void_left",
@@ -65,19 +65,19 @@ const TIMED := [
 	{
 		"field": "burn_time",
 		"name": "Burning",
-		"icon": "flame",
+		"icon": "status_burning",
 		"desc": "Fire deals damage over time."
 	},
 	{
 		"field": "poison_left",
 		"name": "Poisoned",
-		"icon": "drop",
+		"icon": "status_poisoned",
 		"desc": "Poison deals damage over time."
 	},
 	{
 		"field": "bleed_left",
 		"name": "Bleeding",
-		"icon": "drop+skull",
+		"icon": "status_bleeding",
 		"desc": "Bleeding deals damage over time."
 	},
 	{
@@ -89,7 +89,7 @@ const TIMED := [
 	{
 		"field": "slowed_left",
 		"name": "Slowed",
-		"icon": "boot",
+		"icon": "status_slowed",
 		"desc": "Movement speed is reduced."
 	}
 ]

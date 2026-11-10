@@ -26,6 +26,7 @@ func _ready() -> void:
 	p.position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
 	p.guard_left = 0
 	await _ui_initialization()
+	_codex_and_concealment()
 	_prices()
 	_store_upgrades()
 	_heavy()
@@ -208,7 +209,7 @@ func _wood_and_gates() -> void:
 	var gate: Dictionary = fw.fort.gates[0]
 	gate["hp"] = 770.0
 	fw.fort._show_gate(gate)
-	check((gate["requirement"] as Label3D).text == "3 FIREWOOD\nto repair" and (gate["inner_requirement"] as Label3D).visible, "both gate faces show the correct repair cost")
+	check((gate["requirement"] as Label3D).text == "3 WOOD\nto repair" and (gate["inner_requirement"] as Label3D).visible, "both gate faces show the correct repair cost")
 	gate["hp"] = Fort.GATE_HP
 	fw.fort._show_gate(gate)
 	check(not (gate["requirement"] as Label3D).visible, "a fully repaired gate hides its requirement")
@@ -438,3 +439,28 @@ func _ui_initialization() -> void:
 	for gore: CPUParticles3D in w._gore:
 		if gore.visible or gore.emitting: clear = false
 	check(clear, "warm-up leaves no visible puddles or phantom blood")
+
+func _codex_and_concealment() -> void:
+	var was := p.class_id
+	p.class_id = "magician"
+	for id: String in WeaponDefs.ALL:
+		check(p.can_use(id) == (id == "staff"), "Magician only accepts the wand: " + id)
+	p.class_id = was
+	p.invis_left = 4.0
+	p.input_fire = false
+	p._handle_fire()
+	check(p.invis_left == 4.0, "not attacking preserves invisibility")
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	check(p.invis_left == 0.0, "an actual attack breaks invisibility")
+	p.input_fire = false
+	check(CodexPanel.enemy_group("normal") < CodexPanel.enemy_group("hero_infantry") and CodexPanel.enemy_group("hero_infantry") < CodexPanel.enemy_group("veil_regent"), "Codex separates common enemies, fallen heroes and bosses")
+	check(not "doubloons" in CodexPanel.acquisition("monk"), "Codex acquisition omits store prices")
+	var shot := Projectile.new(w)
+	w.add_child(shot)
+	shot.launch(Projectile.Kind.ARROW, w._arrow_mesh, Vector3(0, 5, 0), Vector3.FORWARD, 0, 20, 1, 0, true)
+	check(not shot._flame.visible and shot._arrow_aura.visible, "fire arrows use a narrow 3D tip, never the fireball sprite")
+	shot.launch(Projectile.Kind.FIREBALL, w._fireball_mesh, Vector3(0, 5, 0), Vector3.FORWARD, 0, 20, 1)
+	check(shot._flame.visible and not shot._arrow_aura.visible, "pooled fireballs reset the arrow effect")
+	shot.queue_free()

@@ -234,7 +234,7 @@ func _show_gate(g: Dictionary) -> void:
 	var requirement: Label3D = g.get("requirement")
 	if requirement:
 		var needed := wood_needed(g)
-		requirement.text = "%d FIREWOOD\nto repair" % needed
+		requirement.text = "%d WOOD\nto repair" % needed
 		requirement.visible = needed > 0
 		var inner: Label3D = g.get("inner_requirement")
 		if inner:

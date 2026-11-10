@@ -579,7 +579,7 @@ func _fort() -> void:
 	ok(not g["closed"], "a gate falling reaches both phones")
 	ok(f.any_open(), "and it is open on both")
 	for label: Label3D in [g["requirement"], g["inner_requirement"]]:
-		ok(label.visible and label.text.contains("FIREWOOD"), "the damaged gate replicates its in-world repair requirement")
+		ok(label.visible and label.text.contains("WOOD"), "the damaged gate replicates its in-world repair requirement")
 	await snap("gate_down")
 	# The client mends it with its own wood, and the host agrees.
 	if not host:

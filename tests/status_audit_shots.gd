@@ -16,6 +16,10 @@ func _ready() -> void:
 	await snap("codex_status_effects")
 	(menu.panel as CodexPanel).show_tab(6)
 	await snap("codex_maps")
+	(menu.panel as CodexPanel).show_tab(4)
+	await snap("codex_enemy_families")
+	(menu.panel as CodexPanel)._scroll.scroll_vertical = 100000
+	await snap("codex_map_exclusive_badge")
 	menu.show_store()
 	await snap("safe_store")
 	Game.player_class = "adept"

@@ -1,6 +1,13 @@
 # Changelog
 
-## Development — A portal worth defending
+## Development — Clearer field notes and elemental arrows
+- Magicians fight with their wand alone. Attacking breaks invisibility.
+- Fire arrows have a visible shaft and a narrow burning tip; poison arrows trail green venom. Fireballs keep their separate blazing orb.
+- The Codex groups enemies into families, highlights map-exclusive creatures, and gives each map its own emblem.
+- Status Effects explains general conditions with dedicated icons. Profession skills remain in their trees, and class prices remain in the Store.
+- Gate repair requirements now say Wood.
+
+## Previous development — A portal worth defending
 - The Fort now protects a glowing portal to The Mists. Its objective health, gate repairs and multiplayer rules stay familiar.
 - Clearer combat messages, an invisibility tint and timed status icons make temporary effects easier to follow.
 - Elemental arrows keep their arrow silhouette, with smaller fire trails and green poison trails.

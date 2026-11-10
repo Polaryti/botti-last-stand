@@ -285,7 +285,7 @@ func _draw() -> void:
 	if player.hurt_dir_time > 0.0:
 		_draw_hurt_direction(centre)
 	_draw_dive_warning(centre)
-	if player.is_unseen() or player.void_left > 0.0:
+	if player.is_unseen():
 		draw_rect(Rect2(Vector2.ZERO, s), Color(0.2, 0.12, 0.5, 0.16))
 	_draw_status(s)
 	if player.class_id == "adept":

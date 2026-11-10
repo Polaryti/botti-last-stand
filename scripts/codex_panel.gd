@@ -125,20 +125,58 @@ func _classes() -> void:
 		_row(ClassDefs.icon(id), ClassDefs.color(id), d["name"], d["desc"], note)
 
 
+## Families are kept together; alphabetical order is only used within a family.
+static func enemy_group(id: String) -> int:
+	var d: Dictionary = ZombieDefs.ALL[id]
+	if d.get("mist_boss", false): return 4
+	if not d.get("maps", []).is_empty(): return 3
+	if d.get("hero", false) or d.get("rider", false): return 2
+	if id in ["normal", "clever", "magic", "beast", "leaper"]: return 0
+	return 1
+
 func _enemies() -> void:
 	var order: Array = ZombieDefs.ALL.keys()
-	order.sort_custom(func(a: String, b: String) -> bool: return float(ZombieDefs.ALL[a].get("from", 0)) < float(ZombieDefs.ALL[b].get("from", 0)))
+	order.sort_custom(func(a: String, b: String) -> bool:
+		var ga := enemy_group(a)
+		var gb := enemy_group(b)
+		if ga != gb: return ga < gb
+		if ga == 0: return ["normal", "clever", "leaper", "magic", "beast"].find(a) < ["normal", "clever", "leaper", "magic", "beast"].find(b)
+		return str(ZombieDefs.ALL[a]["name"]).naturalnocasecmp_to(str(ZombieDefs.ALL[b]["name"])) < 0)
+	var previous := -1
 	for id: String in order:
+		var group := enemy_group(id)
+		if group != previous:
+			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Bosses"][group])
+			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
 		var locations := PackedStringArray()
 		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort"}.get(map_id, map_id.capitalize()))
-		var note := ("Maps: %s. " % ", ".join(locations) if not locations.is_empty() else "") + "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
+		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
 		if d.get("mist_boss", false):
 			note += ". Boss encounter around 8:30"
 		elif from > 0.0:
 			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], d["desc"], note)
+		if not locations.is_empty():
+			var badge := PanelContainer.new()
+			badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			badge.add_theme_stylebox_override("panel", UiTheme.flat(Color("193e4b"), UiTheme.MIST, 6, 7.0))
+			var label := Label.new()
+			label.text = "MAP EXCLUSIVE · " + " / ".join(locations).to_upper()
+			label.add_theme_font_override("font", UiTheme.bold_font())
+			label.add_theme_font_size_override("font_size", 19)
+			label.add_theme_color_override("font_color", Color("a5f0ec"))
+			badge.add_child(label)
+			_list.get_child(-1).get_child(1).add_child(badge)
+
+func _section(title: String) -> void:
+	var label := Label.new()
+	label.text = title.to_upper()
+	label.add_theme_font_override("font", UiTheme.bold_font())
+	label.add_theme_font_size_override("font_size", 24)
+	label.add_theme_color_override("font_color", UiTheme.EMBER)
+	_list.add_child(label)
 
 
 func _familiars() -> void:
@@ -178,30 +216,22 @@ static func acquisition(id: String) -> String:
 	if earned != "":
 		return earned
 	if ClassDefs.price(id) > 0:
-		return "In the Store for %d doubloons." % ClassDefs.price(id)
+		return "Available in the Store."
 	if id == "commander":
 		return "First prize in VRAIN tournaments. Redeem the prize code to unlock."
 	if ClassDefs.ALL[id].get("unavailable", false):
 		return "Unlocked by redeeming a class code."
 	return "Available from the start."
 
+## General conditions only. Profession skills remain in their class trees.
 func _statuses() -> void:
-	_row("mist+clock", UiTheme.MIST, "Mist Storm", "After a warning, the affected island deals %d damage per second for %d seconds. Final storms persist until the match ends." % [int(MistStorm.DPS), int(MistStorm.DURATION)])
 	for entry: Dictionary in StatusCatalog.TIMED:
-		if entry["field"] == "frozen_left":
-			_row("drop+shield", UiTheme.MIST, "Frozen", "Ice prevents movement until its timer ends. You can still look around.")
-			_row("star", UiTheme.EMBER, "Stunned", "An impact briefly interrupts movement until its timer ends.")
-		else:
-			_row(entry["icon"], UiTheme.MIST, entry["name"], entry["desc"])
-	for id: String in PowerDefs.ALL:
-		var effect: Dictionary = PowerDefs.ALL[id]
-		if not effect["familiar"]:
-			_row(Icons.power(id), effect["color"], effect["name"], effect["desc"], "%d seconds" % int(effect["time"]))
-
-	for stat: String in Player._BUFF_ICONS:
-		_row(Player._BUFF_ICONS[stat], UiTheme.MOSS, stat.replace("_", " ").capitalize() + " bonus", "A temporary ability bonus. Strength and duration depend on the skill that grants it; repeated applications may stack.")
+		if entry["field"] not in ["burn_time", "bleed_left", "poison_left", "slowed_left", "invis_left", "guard_left"]: continue
+		_row(entry["icon"], UiTheme.BLOOD if entry["field"] in ["burn_time", "bleed_left", "poison_left"] else UiTheme.MIST, entry["name"], entry["desc"])
+	_row("status_frozen", UiTheme.MIST, "Frozen", "Ice prevents movement until its timer ends. You can still look around.")
+	_row("status_stunned", UiTheme.EMBER, "Stunned", "An impact briefly interrupts movement until its timer ends.")
 
 func _maps() -> void:
-	_row("helm", UiTheme.BONE, "The Village", "The first village to be overrun and razed by the zombie hordes.")
-	_row("shield", UiTheme.BONE, "The Fort", "The last bastion protecting the portal to The Mists.")
-	_row("ghost", UiTheme.MIST, "The Mists", "The heart of mysterious worlds lying beyond our own.")
+	_row("map_village", UiTheme.BONE, "The Village", "The first village to be overrun and razed by the zombie hordes.")
+	_row("map_fort", UiTheme.BONE, "The Fort", "The last bastion protecting the portal to The Mists.")
+	_row("map_mists", UiTheme.MIST, "The Mists", "The heart of mysterious worlds lying beyond our own.")

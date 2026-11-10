@@ -38,6 +38,9 @@ var _gravity := 0.0
 var _left := 0.0
 var _speed := 0.0
 var _exclude: Array[RID] = []
+var _arrow_aura: MeshInstance3D
+static var _fire_tip: Mesh
+static var _poison_tip: Mesh
 var _flame: Sprite3D
 
 
@@ -53,6 +56,18 @@ func _init(owner_world: World) -> void:
 	_flame.modulate = Color(1.0, 0.6, 0.15)
 	_flame.visible = false
 	add_child(_flame)
+	# Arrows carry a narrow flame or venom trail, never the fireball sprite.
+	if _fire_tip == null:
+		_fire_tip = LowPoly.new().prism(Vector3(0, 0, -0.40), Vector3(0, 0, -0.08), 0.055, 0.0, 5, Color("ff9e32")).prism(Vector3(0.025, 0, -0.30), Vector3(0.05, 0, 0.15), 0.025, 0.0, 4, Color("ffe6a0")).commit()
+		_poison_tip = LowPoly.new().prism(Vector3(0, 0, -0.38), Vector3(0, 0, 0.05), 0.035, 0.0, 5, Color("80e349")).commit()
+	_arrow_aura = MeshInstance3D.new()
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.vertex_color_use_as_albedo = true
+	_arrow_aura.material_override = glow
+	_arrow_aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_arrow_aura.visible = false
+	add_child(_arrow_aura)
 
 
 func _ready() -> void:
@@ -94,7 +109,8 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	owner_player = null
 	_returning = false
 	_flame.scale = Vector3.ONE * (0.3 if k in [Kind.ARROW, Kind.ENEMY_ARROW] else 1.0)
-	_flame.visible = on_fire or k == Kind.FIREBALL
+	_flame.visible = k == Kind.FIREBALL or (on_fire and k not in [Kind.ARROW, Kind.ENEMY_ARROW])
+	_update_arrow_aura()
 	_flame.modulate = Color(1.0, 0.6, 0.15)
 	_orient()
 	set_physics_process(true)
@@ -131,10 +147,15 @@ func _is_friendly() -> bool:
 	return kind == Kind.ARROW or kind == Kind.BOLT or kind == Kind.AXE
 
 
+func _update_arrow_aura() -> void:
+	var arrow := kind in [Kind.ARROW, Kind.ENEMY_ARROW]
+	_arrow_aura.visible = arrow and (fire or poison.y > 0.0 or poison_trail)
+	_arrow_aura.mesh = _fire_tip if fire else _poison_tip
+	if arrow: _flame.visible = false
+
+
 func _physics_process(delta: float) -> void:
-	if kind == Kind.ARROW:
-		_flame.visible = fire or poison.y > 0.0 or poison_trail
-		_flame.modulate = Color(0.35, 0.95, 0.15) if (poison.y > 0 or poison_trail) and not fire else Color(1, 0.5, 0.1)
+	_update_arrow_aura()
 	if _is_friendly() and not visual and _owner_assigned and not is_instance_valid(owner_player):
 		stop()
 		return
