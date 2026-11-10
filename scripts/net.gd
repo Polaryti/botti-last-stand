@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 38
+const PROTOCOL := 39
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -894,8 +894,18 @@ func _ally_hurt(index: int, amount: float) -> void:
 
 
 ## Things other players should see, but that only one phone works out.
+## Sparks are many and a lost one doesn't matter; a sentry or a burning patch is placed once and
+## lasts, so those go reliably and every phone gets them.
 func world_fx(kind: int, a: Vector3, b := Vector3.ZERO, by := 0) -> void:
-	_world_fx.rpc(kind, a, b, by if by != 0 else my_id())
+	if kind == Fx.SPARK:
+		_world_fx.rpc(kind, a, b, by if by != 0 else my_id())
+	else:
+		_world_fx_sure.rpc(kind, a, b, by if by != 0 else my_id())
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _world_fx_sure(kind: int, a: Vector3, b: Vector3, by: int) -> void:
+	_world_fx(kind, a, b, by)
 
 
 @rpc("any_peer", "unreliable", "call_remote")

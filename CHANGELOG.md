@@ -4,6 +4,7 @@
 
 ### Online games
 - A player whose connection was slower than the others no longer falls further and further behind. Through the online relay, positions, poses and the clock used to queue up for a slow phone; now a late update is skipped and the newest one is used, so that phone stays in step and its timer agrees with the host's.
+- Inventor sentries and burning or poisoned ground placed by another player now always appear on every phone; they could go missing before.
 - Phones on 0.21.3 only play with other phones on 0.21.3: update every phone before playing together.
 
 ### Playing together
