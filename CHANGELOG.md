@@ -1,6 +1,6 @@
 # Changelog
 
-## Development — Prizes, boards for every mode and fairer trees
+## 0.21.2 — Leaderboard Prizes and Fairer Trees (10 November 2026)
 
 ### Leaderboard
 - Each kind of match has its own board as well as the overall one: Night, Mists, Fort, Co-op and Versus (All vs All and Teams), each with all-time and weekly tabs.
@@ -19,6 +19,9 @@
 - Warpriest: Blessing heals 0.5 more per second instead of 1, and Shield of Faith comes every 50 s instead of 35.
 - Paladin heals 0.5 per second on foot as well as while riding (1 per second riding). Horse Archer gets +20% ranged damage at all times and 2 arrows back per kill. The Mechanic's War Chariot mends 2 health a second.
 - Blade Dancer sweeps heal 2 per enemy hit, up to 10. Opening Void stance heals 15. Mist Leap landings deal 20 damage around you and heal 5.
+
+### Playing together
+- Phones on 0.21.2 only play with other phones on 0.21.2: update every phone before playing together.
 
 ## 0.21.1 — Names and the Leaderboard (10 November 2026)
 

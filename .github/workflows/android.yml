@@ -161,8 +161,11 @@ jobs:
           tag="${{ steps.version.outputs.tag }}"
           # The notes are the newest entry of the changelog, the same words the game shows.
           awk 'BEGIN{n=0} /^## /{n++} n==1' CHANGELOG.md > notes.md
+          # The release is named like that entry: "## 0.21.2 — Some Name (10 November 2026)" gives "Some Name".
+          name=$(head -1 notes.md | sed -E 's/^## [^ ]+ — //; s/ \([^)]*\)$//')
+          case "$name" in "" | "## "*) echo "::error::The newest CHANGELOG entry has no name: $(head -1 notes.md)"; exit 1;; esac
           cp build/botti-last-stand.apk "botti-last-stand-$v.apk"
-          gh release view "$tag" > /dev/null 2>&1 || gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Botti's Last Stand $v — The Mists Update" --notes-file notes.md
+          gh release view "$tag" > /dev/null 2>&1 || gh release create "$tag" --draft --target "$GITHUB_SHA" --title "Botti's Last Stand $v — $name" --notes-file notes.md
           sha256sum "botti-last-stand-$v.apk" > "botti-last-stand-$v.apk.sha256"
           gh release upload "$tag" "botti-last-stand-$v.apk" "botti-last-stand-$v.apk.sha256" --clobber
           gh release edit "$tag" --draft=false --latest
