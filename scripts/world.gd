@@ -948,7 +948,8 @@ func nearest_zombie_excluding(from: Vector3, radius: float, excluded: Array[RID]
 
 
 func nearest_weapon_pickup(from: Vector3, radius: float) -> Pickup:
-	var regions: Array[int] = MapIslands.regions() if portals else []
+	var regions: Array[int] = []
+	if portals: regions = MapIslands.regions()
 	var source_island := portals.island_of(from) if portals else -1
 	var best: Pickup = null
 	var best_d := radius * radius

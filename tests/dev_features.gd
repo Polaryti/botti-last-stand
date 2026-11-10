@@ -383,6 +383,12 @@ func _after_0212() -> void:
 	await frames(1)
 
 func _ui_initialization() -> void:
+	for item: Pickup in w.pickups.duplicate():
+		if item.kind == Pickup.Kind.WEAPON: w.remove_pickup(item)
+	w.spawn_pickup_at(p.position + Vector3.RIGHT, Pickup.Kind.WEAPON, "sword")
+	var loose_weapon: Pickup = w.pickups.back()
+	check(w.nearest_weapon_pickup(p.position, 100.0) == loose_weapon, "Clever search finds a nearby reachable weapon on maps without portals")
+	w.remove_pickup(loose_weapon)
 	var insets := UiTheme.safe_insets(Vector2i(1920, 1080), Rect2i(160, 20, 1680, 1020), Vector2(1280, 720), 24, 16)
 	check(insets[0] >= 127 and insets[1] >= 74 and insets[2] >= 30 and insets[3] >= 43, "safe-area conversion protects all four edges in viewport units")
 	var flipped := UiTheme.safe_insets(Vector2i(1920, 1080), Rect2i(80, 20, 1680, 1020), Vector2(1280, 720), 24, 16)
