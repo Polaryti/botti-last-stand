@@ -70,7 +70,7 @@ func show_tab(index: int) -> void:
 		UiTheme.plain(_tabs[i])
 		if i == index:
 			UiTheme.selected(_tabs[i])
-	_scroll.scroll_vertical = 0
+	_scroll.scroll_to(0)
 	match index:
 		0: _classes()
 		1: _weapons()
