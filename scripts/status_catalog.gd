@@ -48,7 +48,7 @@ const TIMED := [
 		"field": "spirit_left",
 		"name": "Spirit Walk",
 		"icon": "ghost",
-		"desc": "Your spirit leaves its body."
+		"desc": "Walk unseen while your body remains behind."
 	},
 	{
 		"field": "mirror_guard_left",
