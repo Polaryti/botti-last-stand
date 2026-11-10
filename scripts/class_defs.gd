@@ -21,7 +21,7 @@ const ALL := {
 		"desc": "Dead, and not done. No weapons, only claws of Mist, which it spends with every blow."},
 	"monk": {"name": "Monk", "weapon": "fists", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "mana": true, "ki": true, "mana_regen": 0.0, "hidden": true, "price": 920, "one_weapon": true,
 		"desc": "Master of Ki. Every hit fills the Ki bar, and Ki pays for the Monk's ability. Carries one weapon at a time and punches when it has none. Only a Monk can use the Bo."},
-	"adept": {"name": "Adept", "weapon": "sword", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": false, "hidden": true, "price": 1150,
+	"adept": {"name": "Adept", "weapon": "sword", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": false, "hidden": true, "price": 1150, "disabled": true,
 		"desc": "Master of stances. Commit to each stance for 6 seconds; changing takes a moment. Land three blows for +15% melee damage until you switch, and an empowered transition. Wind: 25% faster, and each blow strikes twice for less. Stone: 30% less damage, and blows throw enemies back. Flame: blows burn, and you take 15% more. Starts with a Sword. No ranged weapons."},
 	"plague_doctor": {"name": "Plague Doctor", "weapon": "blowgun", "arrows": 32, "hp": 105.0, "speed": 1.05, "damage_taken": 0.9, "ranged": true, "kill_arrows": 2, "hidden": true, "earned": "poison",
 		"desc": "The beaked mask has seen it all. Starts with a Blowgun and 32 darts. Takes 10% less damage. Cures friends, spreads sickness, or commands the rats."},
@@ -45,11 +45,17 @@ static func dress(body: Node3D, id: String) -> void:
 	ClassGear.wear(body, id)
 
 
+## Switched off for now: nobody can play, buy or be given it. Phones that own it keep it, so it
+## comes back to them when the flag goes.
+static func disabled(id: String) -> bool:
+	return bool(ALL.get(id, {}).get("disabled", false))
+
+
 ## The classes this phone can play. Some have to be bought or earned first.
 static func available() -> Array[String]:
 	var out: Array[String] = []
 	for id: String in ALL:
-		if Game.owns_class(id):
+		if Game.owns_class(id) and not disabled(id):
 			out.append(id)
 	return out
 
@@ -57,7 +63,7 @@ static func available() -> Array[String]:
 static func for_sale() -> Array[String]:
 	var out: Array[String] = []
 	for id: String in ALL:
-		if price(id) > 0:
+		if price(id) > 0 and not disabled(id):
 			out.append(id)
 	return out
 

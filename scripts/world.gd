@@ -76,9 +76,14 @@ var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
 const PICKUP_APART := 6.0
-const WOOD_GATE_CLEARANCE := 18.0
+const WOOD_GATE_CLEARANCE := 18.0 # forest wood: out of the gates' approaches
+const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itself
+## Where new Fort wood lies: by the walls (6 to 15 m out), in the field (15 to 30 m) or in the woods.
+const WOOD_BANDS := {"near": 0.45, "field": 0.3, "forest": 0.25}
 var tree_spots: Array[Vector3] = []
 var forest_wood_spots: Array[Vector3] = []
+var near_wood_spots: Array[Vector3] = []
+var field_wood_spots: Array[Vector3] = []
 var perches: Array[Vector3] = []
 var crop_spots: Array[Vector3] = []
 var pois: Array[Vector3] = []
@@ -1579,14 +1584,20 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 			break
 	if pool.is_empty():
 		return false
+	# Defend the Fort: each new zombie goes against the gate with the fewest, and rises on its side.
+	var gate := fort.least_pressed_gate(zombies) if fort and fort.gates.size() == 4 else -1
 	if at == Vector3.INF:
-		at = _pick_spawn_point()
+		at = _pick_spawn_point(gate)
+		if at == Vector3.INF and gate >= 0:
+			at = _pick_spawn_point() # nowhere free on that side right now: rise anywhere, and keep the gate
 	if at == Vector3.INF:
 		return false
 	var z: Zombie = pool.pop_back()
 	zombies.append(z)
 	var minute := director.minute() if director else 0
 	z.spawn(id, at, minute)
+	z.fort_gate = gate
+	z.fort_shortcut = randf() < 0.25
 	if Net.is_host() and not _warming:
 		Net.zombie_spawned(z, id, z.position, minute)
 	return true
@@ -1655,18 +1666,34 @@ func player_start(peer: int) -> Vector3:
 
 
 ## Gather wood in the forest, never beside a gate or inside its approach.
-func wood_site_clear(at: Vector3) -> bool:
+func wood_site_clear(at: Vector3, gate_clearance := WOOD_GATE_CLEARANCE) -> bool:
 	if fort == null or fort.inside(at) or not grid.is_free(grid.to_cell(at)) or not terrain.is_walkable(at.x, at.z): return false
 	for gate: Dictionary in fort.gates:
-		if Vector2(at.x - gate["at"].x, at.z - gate["at"].z).length() < WOOD_GATE_CLEARANCE: return false
+		if Vector2(at.x - gate["at"].x, at.z - gate["at"].z).length() < gate_clearance: return false
 	for item: Pickup in pickups:
 		if item.position.distance_to(at) < 2.5: return false
 	return true
 
 func prepare_forest_wood() -> void:
 	forest_wood_spots.clear()
+	near_wood_spots.clear()
+	field_wood_spots.clear()
 	if fort == null: return
 	var reachable := grid.flood(Fort.DIRS[0] * (Fort.HALF + 8.0))
+	# The open ground round the walls, every 3 m: how far out decides near or field.
+	var reach := Fort.HALF + 30.0
+	var x := -reach
+	while x <= reach:
+		var z := -reach
+		while z <= reach:
+			var out := maxf(absf(x), absf(z)) - Fort.HALF - Fort.WALL_T * 0.5
+			if out >= 6.0 and out <= 30.0:
+				var at := Vector3(x, 0, z)
+				at.y = ground_at(at)
+				if absf(x) < half_size - 3.0 and absf(z) < half_size - 3.0 and wood_site_clear(at, WOOD_NEAR_GATE_CLEARANCE) and reachable.has(grid.to_cell(at)):
+					(near_wood_spots if out <= 15.0 else field_wood_spots).append(at)
+			z += 3.0
+		x += 3.0
 	for anchor: Vector3 in wood_spots:
 		for offset: Vector3 in [Vector3.ZERO, Vector3(2, 0, 1), Vector3(-2, 0, -1), Vector3(0, 0, 3)]:
 			var at := anchor + offset
@@ -1679,14 +1706,39 @@ func prepare_forest_wood() -> void:
 			at.y = ground_at(at)
 			if wood_site_clear(at) and reachable.has(grid.to_cell(at)): forest_wood_spots.append(at)
 
+## How much wood the Fort keeps lying about: 5, and 2 more for each other player.
+func wood_target() -> int:
+	return 5 + 2 * maxi(0, (Net.roster.size() if Net.active() else 1) - 1)
+
+
+## One more piece of Fort wood, by the walls, out in the field or in the woods (see WOOD_BANDS).
+## Wherever there is room, never two pieces close together.
 func stock_wood() -> void:
-	if fort == null or forest_wood_spots.is_empty(): return
-	var start := randi() % forest_wood_spots.size()
-	for offset in forest_wood_spots.size():
-		var at := forest_wood_spots[(start + offset) % forest_wood_spots.size()]
-		if wood_site_clear(at):
-			spawn_pickup_at(at, Pickup.Kind.WOOD, "wood")
-			return
+	if fort == null: return
+	var roll := randf()
+	var order: Array[String] = []
+	for band: String in WOOD_BANDS:
+		roll -= float(WOOD_BANDS[band])
+		if roll < 0.0 and order.is_empty():
+			order.append(band)
+	for band: String in WOOD_BANDS:
+		if not order.has(band): order.append(band)
+	for band in order:
+		var spots: Array[Vector3] = {"near": near_wood_spots, "field": field_wood_spots, "forest": forest_wood_spots}[band]
+		if spots.is_empty(): continue
+		var clearance := WOOD_GATE_CLEARANCE if band == "forest" else WOOD_NEAR_GATE_CLEARANCE
+		var start := randi() % spots.size()
+		for offset in mini(spots.size(), 40):
+			var at := spots[(start + offset * 7) % spots.size()]
+			if wood_site_clear(at, clearance) and _wood_apart(at):
+				spawn_pickup_at(at, Pickup.Kind.WOOD, "wood")
+				return
+
+
+func _wood_apart(at: Vector3) -> bool:
+	for item: Pickup in pickups:
+		if item.kind == Pickup.Kind.WOOD and item.position.distance_to(at) < 7.0: return false
+	return true
 
 
 ## Somewhere to come back: as far as can be managed from everyone else. A bot asks from its own side.
@@ -1787,7 +1839,7 @@ func banner(text: String, seconds: float) -> void:
 
 ## Out of sight and far from every player, at the edge of what they can hear. The map is big,
 ## so the search stays around the players: a zombie across the river would never find them.
-func _pick_spawn_point() -> Vector3:
+func _pick_spawn_point(fort_gate := -1) -> Vector3:
 	var best := Vector3.INF
 	var best_score := -INF
 	for i in 16:
@@ -1798,6 +1850,9 @@ func _pick_spawn_point() -> Vector3:
 			var a := randf() * TAU
 			p = random_player_position() + Vector3(cos(a), 0, sin(a)) * randf_range(28.0, 62.0)
 			if fort:
+				if fort_gate >= 0:
+					var d: Vector3 = Fort.DIRS[fort_gate]
+					a = atan2(d.z, d.x) + randf_range(-0.7, 0.7)
 				p = Vector3(cos(a), 0, sin(a)) * randf_range(44.0, 72.0)
 			if absf(p.x) > half_size - 2.0 or absf(p.z) > half_size - 2.0:
 				continue

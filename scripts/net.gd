@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 37
+const PROTOCOL := 38
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -31,6 +31,9 @@ const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
 const SNAPSHOT_EVERY := 0.08
 const POSE_EVERY := 0.066
+## Zombies per snapshot packet. 12 bytes each, so a packet stays under Epic's 1170-byte limit with room
+## for the RPC's own header.
+const SNAPSHOT_CHUNK := 80
 const BEACON_EVERY := 1.0
 const RESPAWN_TIME := 20.0
 # A phone's Wi-Fi can go quiet for seconds at a time, so give it longer than ENet's usual 5 seconds.
@@ -93,6 +96,11 @@ var _dawn_ending := false
 var _ally_goodbyes := 0
 var _ally_timer := 0.0
 var _bots := {} # on the host: peer id -> BotPlayer
+# Positions, poses and the clock go out unreliable and unordered: a late one is worth nothing, and
+# Epic would turn "unreliable ordered" into reliable, queueing a slow phone further and further behind.
+# Each stream carries a 16-bit count so a packet older than one already used is ignored.
+var _out_seq := {} # stream -> last count sent
+var _in_seq := {} # [stream, sender] -> newest count used
 
 
 func _ready() -> void:
@@ -202,7 +210,7 @@ func set_bots(count: int) -> void:
 		if roster.has(id):
 			continue
 		mine.append(id)
-		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("no_bots", false) and (not ClassDefs.ALL[c].get("hidden", false) or ClassDefs.ALL[c].has("earned")))
+		var offered: Array = ClassDefs.ALL.keys().filter(func(c: String) -> bool: return not ClassDefs.ALL[c].get("no_bots", false) and not ClassDefs.disabled(c) and (not ClassDefs.ALL[c].get("hidden", false) or ClassDefs.ALL[c].has("earned")))
 		# Each bot something different, as long as there are enough to go round.
 		for other: int in mine:
 			if roster.has(other):
@@ -394,6 +402,8 @@ func _online_node() -> EpicNet:
 
 
 func leave(reason := "") -> void:
+	_out_seq.clear()
+	_in_seq.clear()
 	var was_active := active()
 	if online:
 		online.close_room()
@@ -807,6 +817,7 @@ func _check_loaded() -> void:
 @rpc("authority", "reliable")
 func _go() -> void:
 	started_loading = false
+	_in_seq.clear() # a new night: whatever was counted before belongs to the last one
 	set_physics_process(true)
 	all_ready.emit()
 
@@ -832,7 +843,7 @@ func _physics_process(delta: float) -> void:
 		_clock_timer -= delta
 		if _clock_timer <= 0.0:
 			_clock_timer = 1.0
-			_clock.rpc(world.director.elapsed)
+			_clock.rpc(next_seq("clock"), world.director.elapsed)
 			_check_everyone_down()
 
 
@@ -860,12 +871,12 @@ func _send_allies() -> void:
 		b.encode_s16(at + 6, int(a.position.z * 100.0))
 		b.encode_u8(at + 8, int(wrapf(a.rotation.y, 0.0, TAU) / TAU * 255.0))
 		at += 9
-	_allies_pose.rpc(b)
+	_allies_pose.rpc(next_seq("allies"), b)
 
 
-@rpc("any_peer", "unreliable_ordered", "call_remote", 4)
-func _allies_pose(b: PackedByteArray) -> void:
-	if world and is_instance_valid(world):
+@rpc("any_peer", "unreliable", "call_remote", 4)
+func _allies_pose(seq: int, b: PackedByteArray) -> void:
+	if world and is_instance_valid(world) and fresh(["allies", multiplayer.get_remote_sender_id()], seq):
 		world.net_remote_allies(multiplayer.get_remote_sender_id(), b)
 
 
@@ -948,14 +959,38 @@ func _blast_fx(at: Vector3, radius: float, col: Color) -> void:
 
 
 func _send_pose() -> void:
-	_pose.rpc(pose_bytes(world.player))
+	_pose.rpc(next_seq("pose"), pose_bytes(world.player))
 
 
-@rpc("any_peer", "unreliable_ordered", "call_remote", 1)
-func _pose(b: PackedByteArray) -> void:
-	var a: Avatar = _avatars.get(multiplayer.get_remote_sender_id())
+@rpc("any_peer", "unreliable", "call_remote", 1)
+func _pose(seq: int, b: PackedByteArray) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if not fresh(["pose", sender], seq):
+		return
+	var a: Avatar = _avatars.get(sender)
 	if a:
 		_apply_pose(a, b)
+
+
+## The next count for one of this phone's streams.
+func next_seq(stream: Variant) -> int:
+	var n := (int(_out_seq.get(stream, -1)) + 1) & 0xFFFF
+	_out_seq[stream] = n
+	return n
+
+
+## True when a packet is newer than the last one used from the same stream (or, with same_ok, part
+## of that same one), and remembers it. Counts wrap at 65536.
+func fresh(key: Array, seq: int, same_ok := false) -> bool:
+	var last: int = _in_seq.get(key, -1)
+	if last >= 0:
+		var ahead := (seq - last) & 0xFFFF
+		if ahead == 0:
+			return same_ok
+		if ahead >= 0x8000:
+			return false
+	_in_seq[key] = seq & 0xFFFF
+	return true
 
 
 ## What every zombie looks like right now: 12 bytes each. Losing a packet does not matter.
@@ -982,13 +1017,20 @@ func _send_snapshot() -> void:
 		b.encode_u8(at + 11, clampi(int(z.anim_speed() * 40.0), 0, 255))
 		at += 12
 	b.resize(at)
-	if at > 0:
-		_snapshot.rpc(b)
+	if at == 0:
+		return
+	# A night with many zombies would not fit one packet: send it in parts that share one count.
+	var seq := next_seq("snapshot")
+	var step := SNAPSHOT_CHUNK * 12
+	for from in range(0, at, step):
+		_snapshot.rpc(seq, b.slice(from, mini(from + step, at)))
 
 
-@rpc("authority", "unreliable_ordered", "call_remote", 2)
-func _snapshot(b: PackedByteArray) -> void:
+@rpc("authority", "unreliable", "call_remote", 2)
+func _snapshot(seq: int, b: PackedByteArray) -> void:
 	if world == null or not is_instance_valid(world):
+		return
+	if not fresh(["snapshot"], seq, true):
 		return
 	var at := 0
 	while at + 12 <= b.size():
@@ -1004,9 +1046,9 @@ func _snapshot(b: PackedByteArray) -> void:
 		at += 12
 
 
-@rpc("authority", "unreliable_ordered", "call_remote", 3)
-func _clock(elapsed: float) -> void:
-	if world and is_instance_valid(world):
+@rpc("authority", "unreliable", "call_remote", 3)
+func _clock(seq: int, elapsed: float) -> void:
+	if world and is_instance_valid(world) and fresh(["clock"], seq):
 		world.director.elapsed = elapsed
 
 
@@ -1235,11 +1277,13 @@ func valid_pose(b: PackedByteArray) -> bool:
 func bot_pose(bot: BotPlayer) -> void:
 	var b := pose_bytes(bot.pawn)
 	_apply_pose(bot.body, b)
-	_bot_pose.rpc(bot.peer, b)
+	_bot_pose.rpc(next_seq(["bot", bot.peer]), bot.peer, b)
 
 
-@rpc("authority", "unreliable_ordered", "call_remote", 1)
-func _bot_pose(peer: int, b: PackedByteArray) -> void:
+@rpc("authority", "unreliable", "call_remote", 1)
+func _bot_pose(seq: int, peer: int, b: PackedByteArray) -> void:
+	if not fresh(["bot", peer], seq):
+		return
 	var a: Avatar = _avatars.get(peer)
 	if a:
 		_apply_pose(a, b)
@@ -1866,6 +1910,24 @@ func respawn_seconds() -> float:
 	return _respawn_left
 
 
+## For the list of players: how one of them is doing. {hp (0..1), down, out, back_in (seconds,
+## or -1 when unknown)}. Another phone's countdown is worked out from when its player fell here.
+func player_state(peer: int) -> Dictionary:
+	var out := fog_rules() and lives_of(peer) <= 0
+	if peer == my_id():
+		var me := world.player if world else null
+		if me == null:
+			return {"hp": 1.0, "down": false, "out": out, "back_in": -1.0}
+		return {"hp": clampf(me.hp / me.max_hp(), 0.0, 1.0), "down": me.dead, "out": out, "back_in": _respawn_left}
+	var a: Avatar = _avatars.get(peer)
+	if a == null:
+		return {"hp": 1.0, "down": false, "out": out, "back_in": -1.0}
+	var back := -1.0
+	if a.dead and not out and a.world:
+		back = maxf(0.0, (FOG_RESPAWN if fog_rules() else RESPAWN_TIME) - (a.world.now - a.down_since))
+	return {"hp": a.hp_fraction, "down": a.dead, "out": out, "back_in": back}
+
+
 ## The results, as the host sees them.
 func on_dawn_reached() -> void:
 	if not is_host():
@@ -1914,7 +1976,7 @@ func team_colour(team: int) -> Color:
 
 ## The host serializes reservations, including simultaneous join/choice requests.
 func class_slot_available(cls: String, peer: int) -> bool:
-	if not ClassDefs.ALL.has(cls):
+	if not ClassDefs.ALL.has(cls) or ClassDefs.disabled(cls):
 		return false
 	if is_bot(peer) and ClassDefs.ALL[cls].get("no_bots", false):
 		return false

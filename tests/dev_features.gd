@@ -32,6 +32,7 @@ func _ready() -> void:
 	await _wood_and_gates()
 	await _traversal()
 	_music_and_polish()
+	await _after_0212()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -42,13 +43,23 @@ func _ready() -> void:
 	get_tree().quit(1 if failures else 0)
 func _prices() -> void:
 	check(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598, "both original Store classes cost exactly 15% more")
-	check(ClassDefs.price("adept") == 1150 and ClassDefs.for_sale().has("adept"), "Adept is sold for 25% above the updated most expensive class")
+	# Adept is switched off: not sold, not offered, not bought, and its code waits.
+	var had_adept := Game.unlocked.has("adept")
 	Game.unlocked.erase("adept")
-	Game.doubloons = 1149
-	check(not Game.buy_class("adept") and Game.doubloons == 1149, "an unaffordable Adept purchase cannot alter the balance")
-	Game.doubloons = 1150
-	check(Game.buy_class("adept") and Game.doubloons == 0 and Game.owns_class("adept"), "buying Adept unlocks it at the exact price")
-	check(CodexPanel.acquisition("adept").contains("1150"), "Codex shows Adept's current Store acquisition")
+	check(ClassDefs.disabled("adept") and not ClassDefs.for_sale().has("adept"), "Adept is not in the Store")
+	Game.doubloons = 5000
+	check(not Game.buy_class("adept") and Game.doubloons == 5000 and not Game.owns_class("adept"), "and cannot be bought")
+	check(CodexPanel.acquisition("adept") == "Not available at this time.", "the Codex says it is not available")
+	Game.unlocked["adept"] = true
+	check(not ClassDefs.available().has("adept"), "a phone that owns it cannot pick it")
+	Game.player_class = "adept"
+	Game.save_settings()
+	Game.load_settings()
+	check(Game.player_class == "infantry" and Game.unlocked.has("adept"), "a saved Adept choice becomes Infantry, and ownership is kept")
+	check(not Net.class_slot_available("adept", 1), "nobody can take it in a game together")
+	if not had_adept:
+		Game.unlocked.erase("adept")
+		Game.save_settings()
 	check(MistStorm.EVERY == 70.0, "scheduled Mist Storms use the new seventy-second cadence")
 func _heavy() -> void:
 	Game.owned_items["oathkeeper"] = true
@@ -148,10 +159,51 @@ func _wood_and_gates() -> void:
 		check(fw.pickups.size() == 1, "one firewood bundle spawns per stock operation")
 		for item: Pickup in fw.pickups.duplicate():
 			for gate: Dictionary in fw.fort.gates:
-				check(Vector2(item.position.x - gate["at"].x, item.position.z - gate["at"].z).length() >= World.WOOD_GATE_CLEARANCE, "firewood remains far from every gate")
+				check(Vector2(item.position.x - gate["at"].x, item.position.z - gate["at"].z).length() >= World.WOOD_NEAR_GATE_CLEARANCE, "firewood stays out of every gateway")
 			check(not fw.fort.inside(item.position) and fw.grid.is_free(fw.grid.to_cell(item.position)), "firewood stands on traversable ground outside the fort")
 			fw.remove_pickup(item)
-	check(failures == failures_before, "the woodland policy holds across repeated replenishment")
+	check(failures == failures_before, "the wood policy holds across repeated replenishment")
+	check(fw.near_wood_spots.size() > 40 and fw.field_wood_spots.size() > 40, "there is room for wood by the walls (%d) and out in the field (%d)" % [fw.near_wood_spots.size(), fw.field_wood_spots.size()])
+	# The labels lie flat on the wall above each gateway, reading outwards and inwards.
+	for g: Dictionary in fw.fort.gates:
+		var outer: Label3D = g["requirement"]
+		var inner: Label3D = g["inner_requirement"]
+		var dir: Vector3 = g["dir"]
+		check(outer.billboard == BaseMaterial3D.BILLBOARD_DISABLED and outer.global_basis.z.dot(dir) > 0.99 and inner.global_basis.z.dot(-dir) > 0.99, "gate %d's wood labels face out and in" % g["i"])
+		var off: float = (outer.global_position - (g["at"] as Vector3)).dot(dir)
+		check(off > Fort.WALL_T * 0.5 and off < Fort.WALL_T * 0.5 + 0.2 and outer.global_position.y > Fort.GATE_H and outer.global_position.y < Fort.WALL_H, "gate %d's label sits on the wall face above the gateway" % g["i"])
+	# Zombies are sent evenly against the four gates, and rise on their gate's side.
+	fw.director.running = false
+	var per_gate := [0, 0, 0, 0]
+	var on_side := 0
+	var risen := 0
+	for k in 40:
+		if not fw.spawn_zombie("normal"):
+			continue
+		var z: Zombie = fw.zombies.back()
+		risen += 1
+		per_gate[z.fort_gate] += 1
+		var d: Vector3 = Fort.DIRS[z.fort_gate]
+		if Vector2(z.position.x, z.position.z).normalized().dot(Vector2(d.x, d.z)) > 0.6:
+			on_side += 1
+	check(risen >= 8 and per_gate.max() - per_gate.min() <= 1, "zombies are split evenly across the gates: %s" % str(per_gate))
+	check(on_side >= risen - 1, "and rise on their own gate's side (%d of %d)" % [on_side, risen])
+	# A breach at one gate draws only the zombies sent there, and about a quarter of the rest.
+	var west: Dictionary = fw.fort.gates[3]
+	west["hp"] = 0.0
+	fw.fort._set_closed(west, false)
+	var diverted := 0
+	var others := 0
+	for z: Zombie in fw.zombies:
+		if z.fort_gate == 3:
+			continue
+		others += 1
+		if fw.fort.gate_for(z)["i"] == 3:
+			diverted += 1
+	check(diverted <= others * 0.5, "an open gate does not pull the whole horde (%d of %d)" % [diverted, others])
+	for z: Zombie in fw.zombies.duplicate(): z.release()
+	west["hp"] = Fort.GATE_HP
+	fw.fort._set_closed(west, true)
 	var gate: Dictionary = fw.fort.gates[0]
 	gate["hp"] = 770.0
 	fw.fort._show_gate(gate)
@@ -278,3 +330,53 @@ func _music_and_polish() -> void:
 	p.add_xp(p.xp_needed())
 	check(w._rise != null and w._rise.emitting and w._rings.filter(func(r: Dictionary) -> bool: return float(r["left"]) > 0.0).size() > rings_before, "a level gained sends a ring and rising motes")
 
+
+
+func _after_0212() -> void:
+	# Late packets are dropped, not queued: each stream counts, and only newer counts are used.
+	Net.leave()
+	check(Net.fresh(["pose", 7], 10) and not Net.fresh(["pose", 7], 9) and not Net.fresh(["pose", 7], 10), "an older or repeated pose is ignored")
+	check(Net.fresh(["pose", 7], 11) and Net.fresh(["pose", 8], 0), "a newer one, or another sender's, is used")
+	check(Net.fresh(["snapshot"], 65535) and Net.fresh(["snapshot"], 65535, true) and Net.fresh(["snapshot"], 2), "parts of one snapshot all count, and counts wrap past 65535")
+	check(not Net.fresh(["snapshot"], 65000, true), "a snapshot from before the wrap is still old")
+	check(Net.next_seq("clock") == 0 and Net.next_seq("clock") == 1, "each stream counts on its own")
+	Net.leave()
+	check(Net.next_seq("clock") == 0, "and starts again with a new game")
+	check(Net.SNAPSHOT_CHUNK * 12 + 64 < 1170, "a snapshot part fits one Epic packet with room for its header")
+	# The drop button: up top, away from the fighting thumb, and it needs a held press.
+	var hud := Hud.new()
+	add_child(hud)
+	hud.player = p
+	hud.size = Vector2(1280, 720)
+	hud._layout()
+	var drop: Vector2 = hud._buttons["drop"]["pos"]
+	check(drop.y < 100.0 and drop.distance_to(hud._buttons["fire"]["pos"]) > 300.0 and drop.distance_to(hud._buttons["switch"]["pos"]) > 250.0, "the drop button sits in the top row, far from Attack and Switch")
+	p.set_physics_process(false)
+	p.slots = ["mace", "sword"]
+	p.current = 1
+	p._equip()
+	var can_drop := p.can_drop_weapon()
+	hud._touch_down(5, drop)
+	hud._process(0.2)
+	check(p.slots[1] == "sword", "a short press does not drop the weapon")
+	hud._process(0.4)
+	check(not can_drop or p.slots[1] == null, "holding it half a second does")
+	hud._touch_up(5)
+	hud.queue_free()
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	# Each player's health and countdown, for the list in a game together.
+	var state := Net.player_state(Net.my_id())
+	check(state.has("hp") and state.has("down") and state.has("back_in"), "the player list knows your health and state")
+	var info := {"name": "Ally", "class": "ranger", "team": 0}
+	var other := Avatar.new(w, 4242, info)
+	w.add_child(other)
+	Net._avatars[4242] = other
+	other.hp_fraction = 0.4
+	check(is_equal_approx(float(Net.player_state(4242)["hp"]), 0.4) and not Net.player_state(4242)["down"], "and another player's health")
+	other.set_fallen(true)
+	other.down_since = w.now - 5.0
+	var back: float = Net.player_state(4242)["back_in"]
+	check(Net.player_state(4242)["down"] and back > 14.0 and back <= 15.0, "and when they are down, how long until they are back (%.1f)" % back)
+	Net._avatars.erase(4242)
+	other.queue_free()
+	await frames(1)

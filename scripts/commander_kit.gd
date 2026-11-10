@@ -52,6 +52,8 @@ static func cast(p: Player) -> void:
 			if ally.master == p and ally.remote_owner == 0 and ally.kind == old_kind:
 				p.world.remove_ally(ally)
 		Net.command_field(p.spec_id, p.command_target if p.spec_id == "gunner" else p.global_position, p.world)
+		# ...and calls a fresh one with it.
+		p.world.spawn_ally(old_kind, p.global_position + Vector3(2, 0, 0), 16.0 * p.m("ally_time"))
 	elif p.spec_id == "warlock":
 		p.world.spawn_ally("magician", p.global_position + Vector3(2, 0, 0), 16.0 * p.m("ally_time"))
 	elif p.spec_id == "gunner":
@@ -60,8 +62,12 @@ static func cast(p: Player) -> void:
 		var radius := 16.0 if p.has_flag("banner_reach") else RALLY_RADIUS
 		Net.command_rally(p.net_id(), radius, last, p.world)
 		if last:
+			# Two Infantry and a Ranger.
 			for i in 2:
 				p.world.spawn_ally("infantry", p.global_position + Vector3((i * 2 - 1) * 2, 0, 0), 20.0 * p.m("ally_time"))
+			p.world.spawn_ally("ranger", p.global_position + Vector3(0, 0, -2), 20.0 * p.m("ally_time"))
+		else:
+			p.world.spawn_ally("infantry", p.global_position + Vector3(2, 0, 0), 16.0 * p.m("ally_time"))
 	if p.has_flag("rally_recovery"):
 		var radius := 16.0 if p.has_flag("banner_reach") else RALLY_RADIUS
 		p.heal(20.0)

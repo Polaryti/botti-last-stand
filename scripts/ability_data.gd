@@ -516,7 +516,7 @@ static func _commander() -> Dictionary:
 			a("arcane_reach", "Spellbreaker", "+0.7 m staff reach; fifth-hit bolts pierce two enemies", "staff+plus", {"melee_reach": 0.7}, [], "war_shatter")],
 			[a("storm_training", "Storm Conductor", "Fifth-hit bolts chain to two nearby enemies for 70% damage", "bolt+up", {}, [], "war_echo"),
 			a("arcane_recovery", "Arcane Recovery", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
-			a("last_command_warlock", "Last Command", "Replaces Command: an 8 s storm follows you within 11 m, slowing enemies and striking them with AoE lightning. 60 s cooldown", "", {}, [], "last_command")),
+			a("last_command_warlock", "Last Command", "Replaces Command: an 8 s storm follows you within 11 m, slowing enemies and striking them with AoE lightning, and a Magician joins you for 16 s. 60 s cooldown", "", {}, [], "last_command")),
 		_spec("gunner", "Gunner", "A musket officer with a bayonet for close quarters", Color(0.64, 0.46, 0.23),
 			a("gunner", "Gunner", "Your only weapon becomes a Musket. Fire shoots; the melee button thrusts its bayonet. Command summons a torch-wielding Artificer for 16 s", "crossbow", {}, [], "gunner"),
 			[[a("powder_charge", "Powder Charge", "+25% musket damage", "crossbow+up", {"ranged_damage": 0.25}),
@@ -527,9 +527,9 @@ static func _commander() -> Dictionary:
 			a("steady_barrel", "Steady Barrel", "+20% range and shot speed", "target+up", {"ranged_power": 0.2})],
 			[a("powder_reserve", "Piercing Powder", "+10% shooting rate; musket shots pierce one extra enemy", "arrows+clock", {"ranged_rate": 0.1, "pierce": 1.0}),
 			a("field_rations", "Field Rations", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
-			a("last_command_gunner", "Last Command", "Replaces Command: choose an 18 m radius. Warns everyone for 4 s, bombards enemies for 5 s, leaving 8 s fire zones (10 damage/s; no stacking). 60 s cooldown", "", {}, [], "last_command")),
+			a("last_command_gunner", "Last Command", "Replaces Command: choose an 18 m radius. Warns everyone for 4 s, bombards enemies for 5 s, leaving 8 s fire zones (10 damage/s; no stacking), and an Artificer joins you for 16 s. 60 s cooldown", "", {}, [], "last_command")),
 		_spec("vanguard", "Vanguard", "A resilient banner bearer who rallies the line", Color(0.78, 0.57, 0.18),
-			a("vanguard", "Vanguard", "+30 max health, take 10% less damage. Carry an off-hand banner. Command gives nearby allies +25% speed for 6 s", "banner", {"max_hp": 30.0, "damage_taken": -0.1}, [], "vanguard"),
+			a("vanguard", "Vanguard", "+30 max health, take 10% less damage. Carry an off-hand banner. Command gives nearby allies +25% speed for 6 s and calls an Infantry for 16 s", "banner", {"max_hp": 30.0, "damage_taken": -0.1}, [], "vanguard"),
 			[[a("hold_line", "Hold the Line", "Take 12% less damage", "shield+banner", {"damage_taken": -0.12}),
 			a("forward", "Forward", "+12% speed", "boot+banner", {"speed": 0.12})],
 			[a("banner_reach", "Close Ranks", "Rally reaches 16 m instead of 12 m", "banner+plus", {}, [], "banner_reach"),
@@ -538,5 +538,5 @@ static func _commander() -> Dictionary:
 			a("vanguard_vigor", "Vanguard Vigor", "+30 max health", "heart+up", {"max_hp": 30.0})],
 			[a("rally_recovery", "Rally Recovery", "Command and Last Command also heal living allies within rally range by 20", "heart+clock", {}, [], "rally_recovery"),
 			a("infantry_drill", "Infantry Drill", "Summons deal 30% more damage", "ghost+sword", {"ally_damage": 0.3})]],
-			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry for 20 s. 60 s cooldown", "", {}, [], "last_command"))
+			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry and a Ranger for 20 s. 60 s cooldown", "", {}, [], "last_command"))
 	]}

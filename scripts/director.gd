@@ -24,7 +24,7 @@ const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0
-const WOOD_ON_MAP := 4
+const WOOD_EVERY := 4.0 # Defend the Fort: seconds between new pieces of wood, while short of World.wood_target()
 const FIRST_RIDER := 300.0
 const RIDER_EVERY := 75.0
 const MAX_RIDERS := 2
@@ -36,6 +36,7 @@ var banner := ""
 var banner_time := 0.0
 var _spawn_timer := 0.0
 var _stock_timer := 0.0
+var _wood_timer := 0.0
 var _familiar_timer := FAMILIAR_EVERY
 var _next_hero := FIRST_HERO
 var _next_crows := FIRST_CROWS
@@ -96,7 +97,7 @@ func begin(with_zombies: bool) -> void:
 		stock(Pickup.Kind.POWER)
 	_spawn_familiar()
 	if world.fort:
-		for i in WOOD_ON_MAP:
+		for i in world.wood_target():
 			world.stock_wood()
 	if running:
 		_spawn_timer = 0.0
@@ -182,7 +183,10 @@ func _process(delta: float) -> void:
 	if _stock_timer <= 0.0:
 		_stock_timer = 6.0 if world.terrain.has_islands() else 8.0
 		_restock()
-		if world.fort and world.count_pickups(Pickup.Kind.WOOD) < WOOD_ON_MAP:
+	_wood_timer -= delta
+	if _wood_timer <= 0.0:
+		_wood_timer = WOOD_EVERY
+		if world.fort and world.count_pickups(Pickup.Kind.WOOD) < world.wood_target():
 			world.stock_wood()
 	_familiar_timer -= delta
 	if _familiar_timer <= 0.0:

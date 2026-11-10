@@ -391,10 +391,13 @@ func _equipment() -> void:
 	var summon_bolts := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.owner_player == p)
 	check(summon_bolts.size() == 1 and summon_bolts[0].pierce == 0 and summon_bolts[0].sparks == 0 and summon_bolts[0].stagger == 0.0, "a Warlock's summoned Magician does not inherit fifth-hit bolt talents")
 	w.spawn_ally("magician", p.position + Vector3.RIGHT, 16.0)
+	var old_magician: Ally = w.allies.back()
+	old_magician.life = 3.0
 	p.flags["last_command"] = true
 	p.level = 9
 	CommanderKit.cast(p)
-	check(w.count_allies("magician") == 0, "Last Command never falls back to the Warlock summon")
+	var magicians := w.allies.filter(func(x: Ally) -> bool: return x.kind == "magician" and not x.dead and x.master == p)
+	check(magicians.size() == 1 and is_equal_approx((magicians[0] as Ally).life, 16.0), "Warlock's Last Command also calls one fresh Magician for 16 s")
 	check("poison damage" in CodexPanel.acquisition("plague_doctor") and not "Store" in CodexPanel.acquisition("plague_doctor"), "Codex explains the Plague Doctor poison unlock")
 	check("VRAIN" in CodexPanel.acquisition("commander") and "code" in CodexPanel.acquisition("commander"), "Codex explains the tournament prize code")
 	for id: String in PowerDefs.ALL:
@@ -407,11 +410,37 @@ func _equipment() -> void:
 	w.spawn_ally("infantry", p.global_position + Vector3.RIGHT, 20.0)
 	var retainer: Ally = w.allies.back()
 	retainer.hp = 30.0
+	var infantry_before := w.count_allies("infantry")
 	CommanderKit.cast(p)
 	check(p.hp == 80.0 and retainer.hp == 50.0, "Rally Recovery heals the Commander and its nearby living retinue")
+	check(w.count_allies("infantry") == infantry_before + 1, "Vanguard's Command calls an Infantry")
+	check(p.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "boot+up" and float(e["left"]) > 5.0), "the rally's speed shows in the effects row")
+	for x: Ally in w.allies.duplicate():
+		if x.master == p: w.remove_ally(x)
+	p.flags["last_command"] = true
+	CommanderKit.cast(p)
+	check(w.count_allies("infantry") == 2 and w.count_allies("ranger") == 1, "Vanguard's Last Command calls two Infantry and a Ranger")
+	var effects := p.status_effects()
+	check(effects.any(func(e: Dictionary) -> bool: return e["icon"] == "sword+up") and not effects.any(func(e: Dictionary) -> bool: return e["icon"] == "arrow+up"), "Last Command's damage shows once in the effects row")
+	var ranger: Ally = w.allies.filter(func(x: Ally) -> bool: return x.kind == "ranger").back()
+	var mark := target(ranger.global_position + Vector3.FORWARD * 8.0)
+	ranger._foe = mark
+	ranger._think = 1.0
+	ranger._cooldown = 0.0
+	ranger._tick_own(0.016)
+	check(w._projectiles.any(func(q: Projectile) -> bool: return q.active and q.owner_player == p and q.kind == Projectile.Kind.ARROW), "the summoned Ranger shoots arrows")
+	p.flags.erase("last_command")
 	pawn("commander", 1)
 	CommanderKit.cast(p)
 	var artificer: Ally = w.allies.back()
+	p.flags["last_command"] = true
+	p.command_target_ready = true
+	p.command_target = p.global_position + Vector3(0, 0, -20)
+	var before_last := w.count_allies("artificer")
+	CommanderKit.cast(p)
+	check(w.count_allies("artificer") == maxi(1, before_last), "Gunner's Last Command also calls an Artificer")
+	p.flags.erase("last_command")
+	artificer = w.allies.filter(func(x: Ally) -> bool: return x.kind == "artificer" and not x.dead).back()
 	check(artificer.kind == "artificer" and is_equal_approx(artificer.life, 16.0), "Gunner summons the Artificer kind for sixteen seconds")
 	var victim := target(artificer.global_position + Vector3.FORWARD)
 	artificer._foe = victim

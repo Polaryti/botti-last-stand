@@ -68,25 +68,30 @@ func add_gate(i: int, node: Node3D, rows: Array[Node3D]) -> void:
 	sign_board.outline_size = 24
 	sign_board.pixel_size = 0.012
 	sign_board.modulate = Color(0.95, 0.8, 0.5)
-	sign_board.position = at + Vector3.UP * (WALL_H + 1.2)
+	# Above the wall and a little outside it, so the battlements never stand in front of it.
+	sign_board.position = at + dir * (WALL_T * 0.5 + 0.6) + Vector3.UP * (WALL_H + 1.5)
 	world.add_child(sign_board)
-	var requirement := Label3D.new()
-	requirement.name = "GateWood%d" % i
-	requirement.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	requirement.font_size = 48
-	requirement.outline_size = 10
-	requirement.pixel_size = 0.008
-	requirement.position = at + dir.cross(Vector3.UP) * (GATE_W * 0.5 + 1.1) + dir * (WALL_T * 0.5 + 0.2) + Vector3.UP * 2.3
-	requirement.modulate = Color(1.0, 0.8, 0.45)
-	requirement.no_depth_test = false
-	world.add_child(requirement)
-	var inner := requirement.duplicate() as Label3D
-	inner.name = "GateWoodInner%d" % i
-	inner.position = at + dir.cross(Vector3.UP) * (GATE_W * 0.5 + 1.1) - dir * (WALL_T * 0.5 + 0.2) + Vector3.UP * 2.3
-	world.add_child(inner)
+	# How much wood the gate needs, painted flat on the wall above the gateway on both sides. A label
+	# that turns to face the camera would swing into the wall when seen from the side.
+	var requirement := _wall_label("GateWood%d" % i, at + dir * (WALL_T * 0.5 + 0.06), dir)
+	var inner := _wall_label("GateWoodInner%d" % i, at - dir * (WALL_T * 0.5 + 0.06), -dir)
 	gates.back()["requirement"] = requirement
 	gates.back()["inner_requirement"] = inner
 	_show_gate(gates.back())
+
+
+func _wall_label(label_name: String, at: Vector3, facing: Vector3) -> Label3D:
+	var l := Label3D.new()
+	l.name = label_name
+	l.font_size = 64
+	l.outline_size = 14
+	l.pixel_size = 0.01
+	l.modulate = Color(1.0, 0.8, 0.45)
+	l.double_sided = false
+	l.position = at + Vector3.UP * (GATE_H + (WALL_H - GATE_H) * 0.5)
+	l.basis = Basis.looking_at(-facing, Vector3.UP) # the text reads from the side it faces
+	world.add_child(l)
+	return l
 
 
 ## How much wood it would take to mend this gate completely.
@@ -113,6 +118,33 @@ func any_open() -> bool:
 		if not g["closed"]:
 			return true
 	return false
+
+
+## The gate a zombie attacks: the one it was given. When the gate nearest it is already open, about a
+## quarter of zombies (decided once each, so they don't waver) take that breach instead.
+func gate_for(z: Zombie) -> Dictionary:
+	if z.fort_gate < 0 or z.fort_gate >= gates.size():
+		z.fort_gate = gate_nearest(z.position)["i"]
+	var g: Dictionary = gates[z.fort_gate]
+	if g["closed"] and z.fort_shortcut and any_open():
+		var near := gate_nearest(z.position)
+		if not near["closed"]:
+			return near
+	return g
+
+
+## The gate with the fewest zombies sent against it right now; ties are broken at random.
+func least_pressed_gate(zombies: Array[Zombie]) -> int:
+	var counts := [0, 0, 0, 0]
+	for z in zombies:
+		if z.is_alive() and z.fort_gate >= 0 and z.fort_gate < counts.size():
+			counts[z.fort_gate] += 1
+	var low: int = counts.min()
+	var options: Array[int] = []
+	for i in gates.size():
+		if counts[i] == low:
+			options.append(i)
+	return options[randi() % options.size()] if not options.is_empty() else randi() % 4
 
 
 func gate_nearest(p: Vector3) -> Dictionary:

@@ -14,6 +14,8 @@ const COL_BG := Color(0.05, 0.05, 0.07, 0.72)
 const COL_LINE := Color(1, 1, 1, 0.7)
 const COL_FIRE := Color(0.62, 0.13, 0.09, 0.8)
 const COL_ACCENT := Color(1.0, 0.78, 0.3)
+## Dropping a weapon takes a held press, so a thumb passing over the button never throws one away.
+const DROP_HOLD := 0.5
 
 var player: Player
 var director: Director
@@ -35,6 +37,7 @@ var _track := UiTheme.flat(Color(UiTheme.NIGHT, 0.72), Color.TRANSPARENT, 5, 0.0
 var _fill := UiTheme.flat(Color.WHITE, Color.TRANSPARENT, 5, 0.0)
 var _capsule := UiTheme.flat(Color(UiTheme.NIGHT, 0.6), Color.TRANSPARENT, 10, 0.0)
 var _was_dead := false
+var _drop_held := 0.0 # how long the drop button has been held, or -1 once it has dropped
 
 
 func _init() -> void:
@@ -72,7 +75,8 @@ func _layout() -> void:
 		"bayonet": {"pos": Vector2(right - 248, bottom - 92), "r": 52.0},
 		"switch": {"pos": Vector2(right - 248, bottom - 92), "r": 52.0},
 		"zoom": {"pos": Vector2(right - 208, bottom - 260), "r": 50.0},
-		"drop": {"pos": Vector2(right - 250, bottom - 184), "r": 38.0},
+		# Up with the menu buttons, away from the thumb's fighting buttons.
+		"drop": {"pos": Vector2(right - (316 if Game.mode == Game.Mode.SANDBOX else 228), 46), "r": 38.0},
 		"take": {"pos": Vector2(s.x * 0.5, s.y * 0.68), "r": 62.0},
 		"pause": {"pos": Vector2(right - 28, 46), "r": 32.0},
 		"tree": {"pos": Vector2(right - 124, 52), "r": 46.0},
@@ -149,7 +153,7 @@ func _touch_down(index: int, at: Vector2) -> void:
 			"fire": player.input_fire = true
 			"jump": player.input_jump = true
 			"switch": player.switch_weapon()
-			"drop": player.drop_current_weapon()
+			"drop": _drop_held = 0.0
 			"bayonet": player.use_bayonet()
 			"zoom": player.toggle_zoom()
 			"take": player.take_nearby_weapon()
@@ -218,10 +222,16 @@ func release_all() -> void:
 		player.input_fire = false
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if player and player.dead != _was_dead:
 		_was_dead = player.dead
 		release_all()
+	if player and _fingers.values().has("drop") and _drop_held >= 0.0:
+		_drop_held += delta
+		if _drop_held >= DROP_HOLD:
+			_drop_held = -1.0
+			if player.can_drop_weapon():
+				player.drop_current_weapon()
 	queue_redraw()
 
 
@@ -356,11 +366,13 @@ func _draw_fog(s: Vector2, centre: Vector2) -> void:
 	_sensor_arrow(centre, (Vector3(fog.centre.x, 0.0, fog.centre.y) - player.global_position).normalized() * 5.0, UiTheme.MOSS)
 
 
-## Who else is out there. In a fight, the score. If you are down, how long until you are back.
+## Who else is out there: each player's name, health and, when they are down, how long until they
+## are back. In a fight, the score. If you are down, your own countdown in the middle.
 func _draw_together(s: Vector2, centre: Vector2) -> float:
 	var y := _status_bottom + 18.0
 	var ids: Array = Net.roster.keys()
 	ids.sort_custom(func(a: int, b: int) -> bool: return int(Net.roster[a]["score"]) > int(Net.roster[b]["score"]))
+	const BAR_W := 150.0
 	for peer: int in ids:
 		var info: Dictionary = Net.roster[peer]
 		var col := UiTheme.BONE
@@ -369,13 +381,27 @@ func _draw_together(s: Vector2, centre: Vector2) -> float:
 		var line := str(info["name"])
 		if Net.rules != Net.Rules.COOP:
 			line += "  %d" % int(info["score"])
-		var out := Net.fog_rules() and Net.lives_of(peer) <= 0
-		_text(line, Vector2(_pad, y), 19, Color(col, 0.4 if out else (1.0 if peer == Net.my_id() else 0.8)))
+		var state := Net.player_state(peer)
+		var out: bool = state["out"]
+		var down: bool = state["down"]
+		_text(line, Vector2(_pad, y), 19, Color(col, 0.4 if out or down else (1.0 if peer == Net.my_id() else 0.85)))
 		if Net.fog_rules():
 			var x := _pad + font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 10.0
 			for i in Net.lives_of(peer):
 				draw_texture_rect(Icons.glyph("heart"), Rect2(x + i * 19.0, y - 16.0, 18.0, 18.0), false, UiTheme.BLOOD.lightened(0.2))
-		y += 22.0
+		y += 7.0
+		var bar := Rect2(_pad, y, BAR_W, 8)
+		if out:
+			_bar(bar, 0.0, UiTheme.ASH)
+			_text("Out", Vector2(_pad + BAR_W + 8, y + 9), 16, UiTheme.ASH)
+		elif down:
+			_bar(bar, 0.0, UiTheme.ASH)
+			var back: float = state["back_in"]
+			_text("Down, back in %d s" % ceili(back) if back >= 0.0 else "Down", Vector2(_pad + BAR_W + 8, y + 9), 16, UiTheme.BLOOD.lightened(0.3))
+		else:
+			var f: float = state["hp"]
+			_bar(bar, f, UiTheme.MOSS.darkened(0.15) if f > 0.35 else UiTheme.BLOOD)
+		y += 30.0
 	if player.dead:
 		var wait := Net.respawn_seconds()
 		if Net.is_out():
@@ -460,6 +486,20 @@ func _draw_powers(top: float) -> void:
 		var t := "%d" % ceil(left)
 		var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		_text(t, Vector2(x + 23 - w * 0.5, y + 60), fs, UiTheme.BONE)
+		x += 52.0
+		if x > _pad + 260.0:
+			x = _pad
+			y += 66.0
+	# Buffs, from your own skills or from another player, in the same row.
+	for e: Dictionary in player.status_effects():
+		Icons.draw(self, Rect2(x, y, 46, 46), e["icon"], e["color"])
+		var left: float = e["left"]
+		if left >= 0.0:
+			var t := "%d" % ceil(left)
+			var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
+			_text(t, Vector2(x + 23 - w * 0.5, y + 60), 18, UiTheme.BONE)
+		if int(e["stacks"]) > 1:
+			_text("x%d" % int(e["stacks"]), Vector2(x + 30, y + 14), 15, UiTheme.EMBER)
 		x += 52.0
 		if x > _pad + 260.0:
 			x = _pad
@@ -688,6 +728,10 @@ func _draw_controls() -> void:
 		var inset := r * 0.42
 		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color.WHITE)
 		draw_texture_rect(_ring, rect, false, Color(1, 1, 1, 0.6) if not held else UiTheme.EMBER)
+		if id == "drop" and held and _drop_held >= 0.0:
+			draw_arc(pos, r - 4.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(_drop_held / DROP_HOLD, 0.0, 1.0), 32, UiTheme.EMBER, 7.0)
+		if id == "drop":
+			_centered("Hold to drop", pos + Vector2(0, r + 14), 17, UiTheme.BONE)
 		if id == "take" and player.nearby_weapon:
 			_centered(player.nearby_weapon.display_name(), pos + Vector2(0, -r - 18), 26, UiTheme.BONE)
 		if id == "art" and player.art_label() != "":

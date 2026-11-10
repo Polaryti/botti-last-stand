@@ -167,6 +167,8 @@ func _weapons() -> void:
 
 
 static func acquisition(id: String) -> String:
+	if ClassDefs.disabled(id):
+		return "Not available at this time."
 	var earned := Game.earn_text(id)
 	if earned != "":
 		return earned

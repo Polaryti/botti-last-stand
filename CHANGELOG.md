@@ -1,5 +1,27 @@
 # Changelog
 
+## Development — Steadier online games, a clearer team and a fairer Fort
+
+### Online games
+- A player whose connection was slower than the others no longer falls further and further behind. Through the online relay, positions, poses and the clock used to queue up for a slow phone; now a late update is skipped and the newest one is used, so that phone stays in step and its timer agrees with the host's.
+- Phones on this version only play with phones on this version.
+
+### Playing together
+- The list of players shows everyone's health. A player who is down is greyed out with "Down, back in 14 s", and "Out" when they have no lives left.
+- Buffs from another player, like a Commander's rally, appear in the row of effects with their time left, as do your own skills' buffs, a Shield Dome over you and a Guardian's cover while you stand near one.
+
+### Controls
+- The drop-weapon button has moved to the top row, beside the skill tree, and needs to be held for half a second ("Hold to drop"), so a passing thumb no longer throws a weapon away.
+
+### Defend the Fort
+- Enemies are sent evenly against all four gates and come from that gate's side. When a gate breaks, only its own attackers and about a quarter of the others go for it, so the other gates stay under pressure.
+- Much more wood: 5 pieces for one player and 2 more per extra player, a new piece every 4 seconds while short. Almost half lies 6 to 15 m outside the walls, the rest out in the field or in the woods, never in a gateway.
+- The wood a gate needs is painted on the wall above the gateway, inside and out, so it can be read from any angle. Gate names stand clear of the battlements.
+
+### Classes
+- The Adept is switched off for now. It can't be picked, bought or used by bots. Phones that own it keep it for when it returns, and its code is not used up.
+- Commander: Warlock's Last Command also calls a Magician, and Gunner's Last Command an Artificer. Vanguard's Command calls an Infantry, and Last Command two Infantry and a Ranger, a new ally that shoots arrows.
+
 ## 0.21.2 — Leaderboard Prizes and Fairer Trees (10 November 2026)
 
 ### Leaderboard

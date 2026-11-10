@@ -11,6 +11,7 @@ var peer := 0
 var team := 0
 var display := ""
 var hp_fraction := 1.0
+var down_since := -1.0 # world.now when this player fell, for the countdown beside their name
 var _target := Vector3.ZERO
 var _yaw := 0.0
 var _pitch := 0.0
@@ -211,6 +212,7 @@ func set_fallen(on: bool) -> void:
 	if on == dead:
 		return
 	dead = on
+	down_since = world.now if dead and world else -1.0
 	collision_layer = 0 if dead else LAYER_AVATAR
 	if dead:
 		bar_time = 0.0

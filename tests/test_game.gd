@@ -710,8 +710,8 @@ func test_version_18() -> void:
 	Game.unlocked.erase("adept")
 	Game.redeemed.erase(_code_of("adept"))
 	ok(not Game.owns_class("adept"), "the Adept is locked")
-	ok(ClassDefs.price("adept") == 1150, "and can be bought for 1150")
-	ok(Game.redeem_key(_code_of("adept"))["class"] == "adept" and Game.owns_class("adept"), "its code opens it")
+	ok(ClassDefs.price("adept") == 1150 and not ClassDefs.for_sale().has("adept"), "it keeps its price, but is not sold while switched off")
+	ok(Game.redeem_key(_code_of("adept"))["result"] == "disabled" and not Game.owns_class("adept") and not Game.redeemed.has(_code_of("adept")), "its code is kept for when it returns")
 	Game.unlocked["monk"] = true
 	# The Bo and the hands are nobody's item.
 	ok(WeaponDefs.ALL["bo"].get("hidden", false) and WeaponDefs.ALL["fists"].get("hidden", false), "neither the Bo nor empty hands are offered anywhere")
@@ -1056,16 +1056,39 @@ func test_version_20_1() -> void:
 	for p: Pickup in fort_world.pickups.duplicate():
 		fort_world.remove_pickup(p)
 	var outside := 0
-	var samples := 128
+	var by_wall := 0
+	var far := 0
+	var off_gateway := true
+	var samples := 200
 	for i in samples:
 		fort_world.stock_wood()
 		ok(fort_world.pickups.size() == 1, "wood sample %d produces one reachable pickup" % i)
 		for p: Pickup in fort_world.pickups.duplicate():
-			if not fort_world.fort.inside(p.global_position):
+			var at := p.global_position
+			var out := maxf(absf(at.x), absf(at.z)) - Fort.HALF - Fort.WALL_T * 0.5
+			if not fort_world.fort.inside(at):
 				outside += 1
+			if out <= 15.0:
+				by_wall += 1
+			elif out > 30.0:
+				far += 1
+			for g: Dictionary in fort_world.fort.gates:
+				if Vector2(at.x - g["at"].x, at.z - g["at"].z).length() < World.WOOD_NEAR_GATE_CLEARANCE:
+					off_gateway = false
 			fort_world.remove_pickup(p)
-	ok(outside == samples, "wood sampling stays entirely in the woodland (%d/%d)" % [outside, samples])
-	ok(Fort.WOOD_PER_PICKUP == 2 and Director.WOOD_ON_MAP == 4, "and there is less of it")
+	ok(outside == samples, "wood always lies outside the walls (%d/%d)" % [outside, samples])
+	ok(by_wall > samples * 0.3 and by_wall < samples * 0.6, "about half of it within 15 m of the walls (%d/%d)" % [by_wall, samples])
+	ok(far > samples * 0.1 and far < samples * 0.4, "and some out in the woods (%d/%d)" % [far, samples])
+	ok(off_gateway, "never in a gateway")
+	ok(fort_world.wood_target() == 5 and Fort.WOOD_PER_PICKUP == 2, "5 pieces lie about for one player")
+	for i in 8:
+		fort_world.stock_wood()
+	var apart := true
+	for a: Pickup in fort_world.pickups:
+		for b: Pickup in fort_world.pickups:
+			if a != b and a.position.distance_to(b.position) < 7.0:
+				apart = false
+	ok(fort_world.pickups.size() == 8 and apart, "several pieces at once lie apart (%d)" % fort_world.pickups.size())
 	fort_world.queue_free()
 	# The menu, the Armory and the Store.
 	m.show_menu()
@@ -1437,7 +1460,7 @@ func test_version_19_1() -> void:
 	ok(pl.weapon_id() == "bo" and not pl.can_drop_weapon(), "the Bo can't be dropped")
 	# Who can be had, and how.
 	ok(ClassDefs.for_sale().has("monk") and ClassDefs.price("monk") > ClassDefs.price("artificer"), "the Monk is in the Store, above the Artificer")
-	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and ClassDefs.for_sale().has("adept"), "and nothing that is earned")
+	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and not ClassDefs.for_sale().has("adept"), "and nothing that is earned, nor the switched-off Adept")
 	var saved_mode := Game.mode
 	var saved_unlocks := Game.unlocked.duplicate()
 	var saved_poison := Game.poison_dealt
@@ -2803,7 +2826,7 @@ func test_version_8() -> void:
 	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598, "the prices are set")
 	ok(ClassDefs.price("infantry") == 0, "the others are free")
 	var sale := ClassDefs.for_sale()
-	ok(sale.size() == 3 and sale.has("monk") and sale.has("artificer") and sale.has("adept"), "the Store sells Monk, Artificer and Adept")
+	ok(sale.size() == 2 and sale.has("monk") and sale.has("artificer") and not sale.has("adept"), "the Store sells Monk and Artificer, and not the switched-off Adept")
 	Game.doubloons = 597
 	ok(not Game.buy_class("artificer") and Game.doubloons == 597, "you cannot buy what you cannot pay for")
 	Game.doubloons = 599
@@ -2837,7 +2860,7 @@ func test_version_8() -> void:
 	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
-	ok(m.panel.get_meta("list").get_child_count() == 4, "the Store opens, with its tabs and three classes")
+	ok(m.panel.get_meta("list").get_child_count() == 3, "the Store opens, with its tabs and two classes")
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await frames(2)
 	ok(m.panel.get_meta("list").get_child_count() == ClassDefs.available().size(), "the Sandbox only offers what you own")
@@ -5294,7 +5317,7 @@ func test_review() -> void:
 	m.show_class_picker(Game.Mode.NIGHT)
 	await frames(2)
 	var rows: Node = m.panel.get_meta("list")
-	ok(rows.get_child_count() == ClassDefs.ALL.size(), "every class is listed")
+	ok(rows.get_child_count() == ClassDefs.ALL.size() - 1, "every class but the switched-off Adept is listed")
 	(rows.get_child(2) as Button).pressed.emit()
 	await frames(1)
 	await _press("Play as Heavy Infantry")

@@ -901,11 +901,15 @@ func _coop() -> void:
 	await sync(17)
 	if host:
 		ok(_avatar().dead, "the host sees me fallen")
+		var listed := Net.player_state(_other())
+		ok(listed["down"] and float(listed["back_in"]) > 15.0 and float(listed["back_in"]) <= 20.0, "the player list shows me down, back in about 20 s (%.1f)" % float(listed["back_in"]))
 		ok(not m._run_over, "and the night goes on for the one still standing")
 		w.ring_bell(1)
 		Net.bell(1)
 	else:
 		ok(Net.respawn_seconds() > 15.0, "I wait about 20 seconds (%.0f)" % Net.respawn_seconds())
+		var host_state := Net.player_state(_other())
+		ok(not host_state["down"] and float(host_state["hp"]) > 0.0 and is_equal_approx(float(host_state["hp"]), _avatar().hp_fraction), "the player list shows the host standing, with their health")
 		ok(Net.watching_name() == "H", "watching the other player")
 		ok(get_viewport().get_camera_3d() == Net.spectate_cam, "through their eyes")
 		ok(Net.spectate_cam.global_position.distance_to(_avatar().eye_position()) < 2.5, "from where they stand")
