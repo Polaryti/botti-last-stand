@@ -55,7 +55,7 @@ Redeem codes can also unlock supported classes. Codes are stored as hashes. Adep
 
 
 
-Players choose a display name the first time they start the game (and players from earlier versions on their next start). Names are unique and appear in games together and on the **Leaderboard**, which lists the top 50 players of all time and of the current week by match points, with each player's most-played class and profession. Points come from finished matches outside the Sandbox: 1 per kill, 5 per full minute, 50 for winning, scaled by difficulty. The board is a small Cloudflare Worker in `server/leaderboard`, with separate dev and production boards; see [Leaderboard](docs/LEADERBOARD.md).
+Players choose a display name the first time they start the game (and players from earlier versions on their next start). Names are unique and appear in games together and on the **Leaderboard**, which lists the top 50 players of all time and of the current week by match points, with each player's most-played class and profession. Each kind of match (Night, Mists, Fort, Co-op, Versus) also has its own board, the **Your matches** tab lists your last 30 counted matches, and the top three of each week win Doubloons. Points come from finished matches outside the Sandbox: 1 per kill, 5 per full minute, 50 for winning, scaled by difficulty. The board is a small Cloudflare Worker in `server/leaderboard`, with separate dev and production boards; see [Leaderboard](docs/LEADERBOARD.md).
 
 Store upgrades can add specialization abilities, and the Armory manages owned upgrades and selected familiars. The in-game Codex documents classes, enemies, weapons, items and familiars. The in-game Changelog reads [CHANGELOG.md](CHANGELOG.md).
 

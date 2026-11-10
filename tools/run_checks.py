@@ -16,6 +16,8 @@ RESULT = re.compile(r"RESULT: (\d+) checks, (\d+) failures")
 
 
 BOARD = ROOT / "server" / "leaderboard"
+# Only for the local boards these checks start; tests/board_test.gd uses the same one.
+TEST_ADMIN_KEY = "local-checks-admin-key-not-a-secret"
 
 
 def start_boards(temporary: str, logs: Path) -> tuple[list, list[str]]:
@@ -30,7 +32,8 @@ def start_boards(temporary: str, logs: Path) -> tuple[list, list[str]]:
                        cwd=BOARD, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, env=dict(os.environ, CI="1"))
         log = (logs / f"board-{env}.log").open("w", encoding="utf-8")
         processes.append((subprocess.Popen([str(wrangler), "dev", "--env", env, "--local", "--ip", "127.0.0.1", "--port", str(port),
-                                            "--persist-to", str(state), "--show-interactive-dev-session=false"],
+                                            "--persist-to", str(state), "--show-interactive-dev-session=false",
+                                            "--var", "ADMIN_KEY:" + TEST_ADMIN_KEY],
                                            cwd=BOARD, stdout=log, stderr=subprocess.STDOUT), log))
         urls.append(f"http://127.0.0.1:{port}")
     deadline = time.monotonic() + 90

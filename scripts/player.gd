@@ -1263,6 +1263,8 @@ func _on_kill(z: Zombie) -> void:
 			say("Chivalry unlocked!")
 	add_xp(z.xp_value)
 	mana = minf(max_mana(), mana + float(class_def().get("kill_mist", 0.0)))
+	if class_def().has("kill_heal") and hp < max_hp():
+		heal(float(class_def()["kill_heal"]))
 	if void_left > 0.0:
 		if has_flag("hungry_void"):
 			heal(12.0)
@@ -2099,6 +2101,7 @@ func _change_stance() -> void:
 		_void_extensions = 0
 		void_left = VOID_TIME + (2.0 if has_flag("deeper_void") else 0.0)
 		invis_left = maxf(invis_left, void_left)
+		heal(15.0)
 		_fog_at(global_position + Vector3.UP, 1.5)
 		sfx("wraith", -4.0, 0.8)
 	elif void_left > 0.0:
@@ -2123,6 +2126,8 @@ func _dance_sweep() -> void:
 	var hits := _sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), (1.5 if has_flag("whirl") else 1.0) * _transition_power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
 	if hits <= 0:
 		return
+	if hp < max_hp():
+		heal(minf(10.0, 2.0 * hits))
 	if has_flag("stance_echo"):
 		for z: Zombie in world.zombies_near(global_position, SWEEP_REACH + 1.5, 16):
 			if stance == "wind":
@@ -2704,6 +2709,10 @@ func _tick_leap(delta: float) -> void:
 			return
 		_fog_at(global_position + Vector3.UP * 0.4, 1.9)
 		fog_flash = 1.0
+		if has_flag("art_leaper") and hp < max_hp():
+			heal(15.0 if has_flag("leap_mend") else 5.0)
+		if has_flag("leap_mend"):
+			mana = minf(max_mana(), mana + 8.0)
 		var hit := m("leap_damage")
 		var stuns := has_flag("leap_stun")
 		var freezes := has_flag("leap_freeze")
@@ -2788,6 +2797,8 @@ func _tick_rift(delta: float) -> void:
 	on_hit(false)
 	if has_flag("rift_mist"):
 		mana = minf(max_mana(), mana + 6.0)
+	if has_flag("rift_feast") and hp < max_hp():
+		heal(5.0)
 	_swing_side = not _swing_side
 	_swing_keys = WeaponAnim.keys_for("claw", _swing_side)
 	_swing_time = 0.2

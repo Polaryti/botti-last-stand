@@ -177,6 +177,8 @@ func _night() -> void:
 		"alive_avg": snappedf(_alive_sum / maxf(1.0, _alive_n), 0.1),
 		"physics_ms": snappedf(_phys_sum / maxf(1.0, _perf_n), 0.01), "process_ms": snappedf(_proc_sum / maxf(1.0, _perf_n), 0.01),
 		"flags": (pl.get("flags") as Dictionary).keys() if pl.get("flags") != null else [],
+		# Every pick, in order, so each choice can be weighed against how the night went.
+		"chosen": (pl.get("chosen") as Dictionary).values() if pl.get("chosen") != null else [],
 	}
 	print("SIM ", JSON.stringify(result))
 	w.queue_free()
