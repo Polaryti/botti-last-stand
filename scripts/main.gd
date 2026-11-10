@@ -63,6 +63,9 @@ func _ready() -> void:
 	Net.game_over.connect(_on_net_over)
 	Net.all_ready.connect(func() -> void: _net_go = true)
 	Net.back_in_room.connect(_return_to_room)
+	Board.counted.connect(func(result: Dictionary) -> void:
+		_counted = result
+		_apply_board_note())
 	updates = Updates.new()
 	add_child(updates)
 	if Game.test_map != "":
@@ -178,6 +181,8 @@ func show_menu(rebuild := false) -> void:
 	panel = root
 	if Board.needs_name() and _asks_for_name():
 		show_name_prompt(true)
+	elif _asks_for_name():
+		_collect_prizes()
 
 
 ## A new version on the game's page: on Android, one tap fetches it and Android asks to install it.
@@ -1820,6 +1825,8 @@ func _end_screen(title: String, line: String) -> void:
 	var l := _body(line, 26)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(l)
+	_end_label = l
+	_apply_board_note()
 	box.add_child(_button("Play again", func() -> void: start_game(Game.mode), Vector2(480, 72), true))
 	box.add_child(_button("Change class", func() -> void: show_class_picker(Game.mode), Vector2(480, 72)))
 	box.add_child(_button("Menu", show_menu, Vector2(480, 72)))
@@ -1911,7 +1918,7 @@ func show_name_prompt(required: bool, after := Callable()) -> void:
 		_back = close
 	var line := "Other players see this name in games together and on the leaderboard. Each name belongs to one player."
 	if Board.name_state == Board.NameState.TAKEN:
-		line = "Someone else took \"%s\" while you were offline. Choose another name." % Board.taken_name
+		line = ("\"%s\" isn't allowed on the leaderboard. Choose another name." if Board.taken_blocked else "Someone else took \"%s\" while you were offline. Choose another name.") % Board.taken_name
 	var about := _soft(line, 23)
 	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(about)
@@ -1966,17 +1973,77 @@ func _board_line(seconds: float, kills: int, won: bool) -> String:
 		mode = {Net.Rules.COOP: "coop", Net.Rules.FFA: "ffa", Net.Rules.TEAMS: "teams", Net.Rules.FORT: "fort"}.get(Net.rules, "coop")
 	var map := "fort" if Game.mode == Game.Mode.FORT else Game.current_map()
 	var difficulty: int = Net.difficulty if Net.active() else Game.difficulty
+	_counted = {}
 	var points := Board.record_match(seconds, kills, won, mode, map, world.player.class_id, world.player.spec_id, difficulty)
-	return "\n+%d leaderboard points" % points
+	_board_note = "+%d leaderboard points" % points
+	return "\n" + _board_note
 
 
-var _board_period := "all"
+var _board_note := "" # "+250 leaderboard points" on the current end screen
+var _end_label: Label
+var _counted := {} # what the board said about the last match
+var _prizes_checked := -1e9
 
 
-## The top 50 players, of all time or of this week, by points.
-func show_leaderboard(period := "") -> void:
+## Once the board has counted the match, the end screen also says where it moved you.
+func _apply_board_note() -> void:
+	if _counted.is_empty() or _board_note == "" or not is_instance_valid(_end_label) or not _end_label.text.contains(_board_note):
+		return
+	var moves: Array = []
+	for period: String in ["week", "all"]:
+		var now: Dictionary = _counted.get(period, {})
+		var was: Dictionary = (_counted.get("before", {}) as Dictionary).get(period, {})
+		if now.get("rank") == null:
+			continue
+		var where := "this week" if period == "week" else "of all time"
+		var rank := int(now["rank"])
+		if was.get("rank") == null:
+			moves.append("#%d %s" % [rank, where])
+		elif int(was["rank"]) > rank:
+			moves.append("#%d %s (up %d)" % [rank, where, int(was["rank"]) - rank])
+		else:
+			moves.append("#%d %s" % [rank, where])
+	if moves.is_empty():
+		return
+	var line := _board_note + ": " + " and ".join(moves)
+	_end_label.text = _end_label.text.replace(_board_note, line)
+	_board_note = line
+
+
+## Weekly prizes: collected quietly when the menu opens, and announced when there is one.
+func _collect_prizes() -> void:
+	if not Board.configured() or Board.registered == "" or Time.get_ticks_msec() - _prizes_checked < 5 * 60 * 1000.0:
+		return
+	_prizes_checked = Time.get_ticks_msec()
+	var won: Array = await Board.collect_prizes()
+	if won.is_empty() or not is_instance_valid(panel) or Game.mode != Game.Mode.MENU:
+		return
+	var root := _modal("A leaderboard prize")
+	var box: VBoxContainer = root.get_meta("box")
+	for reward: Dictionary in won:
+		var place: String = ["first", "second", "third"][clampi(int(reward.get("rank", 1)) - 1, 0, 2)]
+		var start := Time.get_datetime_dict_from_unix_time(int(reward.get("week", 0)) * 7 * 86400 + 4 * 86400)
+		var l := _body("You finished %s in the week of %d %s. +%d doubloons." % [place, start["day"], ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][int(start["month"]) - 1], int(reward.get("doubloons", 0))], 26)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size.x = 560
+		box.add_child(l)
+	var close := func() -> void:
+		root.queue_free()
+		show_menu()
+	box.add_child(_button("Close", close, Vector2(480, 72), true))
+
+
+var _board_period := "all" # "all", "week" or "mine"
+var _board_kind := "all"
+
+
+## The leaderboard: the top 50 of all time or of this week, on every match or one kind of match,
+## and your own last matches.
+func show_leaderboard(period := "", kind := "") -> void:
 	if period != "":
 		_board_period = period
+	if kind != "":
+		_board_kind = kind
 	_clear_ui()
 	_back = show_menu
 	var root := Control.new()
@@ -1992,7 +2059,7 @@ func show_leaderboard(period := "") -> void:
 	box.add_theme_constant_override("separation", 10)
 	margin.add_child(box)
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 14)
+	top.add_theme_constant_override("separation", 12)
 	box.add_child(top)
 	top.add_child(_button("Back", show_menu, Vector2(116, 56)))
 	var head := _label("Leaderboard", 40, UiTheme.BONE)
@@ -2000,10 +2067,21 @@ func show_leaderboard(period := "") -> void:
 	head.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(head)
 	top.add_child(_expand())
-	for tab: Array in [["all", "All time"], ["week", "This week"]]:
+	for tab: Array in [["all", "All time"], ["week", "This week"], ["mine", "Your matches"]]:
 		var which: String = tab[0]
-		top.add_child(_button(tab[1], func() -> void: show_leaderboard(which), Vector2(176, 56), _board_period == which))
+		top.add_child(_button(tab[1], func() -> void: show_leaderboard(which), Vector2(168, 56), _board_period == which))
+	# Which matches count: every one, or one kind.
+	if _board_period != "mine":
+		var kinds := HBoxContainer.new()
+		kinds.add_theme_constant_override("separation", 8)
+		box.add_child(kinds)
+		for id: String in Board.BOARDS:
+			var b := _button(Board.BOARDS[id], func() -> void: show_leaderboard("", id), Vector2(0, 46), _board_kind == id)
+			b.add_theme_font_size_override("font_size", 21)
+			b.custom_minimum_size.x = maxf(96.0, _text_width(Board.BOARDS[id], 21) + 36.0)
+			kinds.add_child(b)
 	var note := _soft("", 21)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(note)
 	var page := PanelContainer.new()
 	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -2011,7 +2089,10 @@ func show_leaderboard(period := "") -> void:
 	var inside := VBoxContainer.new()
 	inside.add_theme_constant_override("separation", 4)
 	page.add_child(inside)
-	inside.add_child(_board_row("#", "Player", "Points", "Most played", UiTheme.ASH, true))
+	if _board_period == "mine":
+		inside.add_child(_history_row("When", "Match", "Played as", "Kills", "Result", "Points", true))
+	else:
+		inside.add_child(_board_row("#", "Player", "Points", "Most played", UiTheme.ASH, true))
 	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inside.add_child(scroll)
@@ -2025,6 +2106,7 @@ func show_leaderboard(period := "") -> void:
 	var mine := _body("", 23)
 	mine.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mine.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mine.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	foot.add_child(mine)
 	foot.add_child(_button("Refresh", func() -> void: _fill_leaderboard(list, note, mine, true), Vector2(150, 56)))
 	panel = root
@@ -2035,29 +2117,43 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 	for c in list.get_children():
 		c.queue_free()
 	var period := _board_period
-	note.text = "All matches since the leaderboard began." if period == "all" else "Matches since Monday 00:00 UTC."
+	var kind := _board_kind
+	mine.text = ""
+	note.text = ""
 	if not Board.configured():
 		list.add_child(_soft("This version of the game has no leaderboard.", 24))
-		mine.text = ""
 		return
 	var asking := _soft("Asking the leaderboard…", 24)
 	list.add_child(asking)
-	mine.text = ""
-	var result: Dictionary = await Board.fetch(period, fresh)
-	if not is_instance_valid(list) or _board_period != period:
+	if period == "mine":
+		note.text = "Your last 30 matches on the leaderboard, newest first."
+		var got: Dictionary = await Board.history()
+		if not is_instance_valid(list) or _board_period != period:
+			return
+		asking.queue_free()
+		if not got["ok"]:
+			list.add_child(_board_problem(got["error"]))
+		elif got["matches"].is_empty():
+			list.add_child(_soft("No matches yet. Finish a match outside the Sandbox and it shows here.", 24))
+		for m: Dictionary in got.get("matches", []):
+			var played := _match_word(str(m.get("mode", "")), str(m.get("map", "")))
+			var as_class := Board.class_label(str(m.get("class", "")), str(m.get("spec", "")))
+			var result := ("Won" if m.get("outcome", "") == "won" else "Lost") + ", " + Game.clock(float(m.get("seconds", 0)))
+			list.add_child(_history_row(_ago(int(m.get("at", 0))), played, as_class, str(int(m.get("kills", 0))), result, str(int(m.get("points", 0))), false))
+		_note_pending(mine)
+		return
+	var result: Dictionary = await Board.fetch(period, fresh, kind)
+	if not is_instance_valid(list) or _board_period != period or _board_kind != kind:
 		return
 	asking.queue_free()
+	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort", "coop": "Co-op nights in the Village", "versus": "All vs All and Teams"}[kind]
+	note.text = ("Points from %s, since the leaderboard began." if period == "all" else "Points from %s since Monday 00:00 UTC.") % what
 	if not result["ok"]:
-		var why := "Can't reach the leaderboard. Check your connection and try again."
-		if result["error"] == "wrong_board":
-			why = "The leaderboard answered for another version of the game, so it was ignored."
-		var l := _soft(why, 24)
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		list.add_child(l)
+		list.add_child(_board_problem(result["error"]))
 	else:
 		var entries: Array = result["entries"]
 		if entries.is_empty():
-			list.add_child(_soft("No one has scored yet this week. Finish a match to be the first." if period == "week" else "No one has scored yet. Finish a match to be the first.", 24))
+			list.add_child(_soft("No one has scored here yet%s. Finish a match to be the first." % (" this week" if period == "week" else ""), 24))
 		for e: Dictionary in entries:
 			var me_row := str(e.get("name", "")) == Game.player_name and Board.registered != ""
 			var rank := int(e.get("rank", 0))
@@ -2070,14 +2166,82 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 		var me: Dictionary = result.get("me", {})
 		if not me.is_empty():
 			if me.get("rank") == null:
-				mine.text = "You (%s) haven't scored yet%s." % [Game.player_name, " this week" if period == "week" else ""]
+				mine.text = "You (%s) haven't scored here yet%s." % [Game.player_name, " this week" if period == "week" else ""]
 			else:
 				mine.text = "You: #%d with %d points." % [int(me["rank"]), int(me["points"])]
 		if period == "week" and int(result.get("week_end", 0)) > 0:
 			var left := int(result["week_end"]) - int(Time.get_unix_time_from_system())
-			note.text = "Matches since Monday 00:00 UTC. A new week starts in %s." % _span(left)
+			note.text += " A new week starts in %s." % _span(left)
+			var prizes: Array = result.get("prizes", [])
+			if prizes.size() == 3 and kind == "all":
+				note.text += " The top three of the week win %d, %d and %d doubloons." % [int(prizes[0]), int(prizes[1]), int(prizes[2])]
+	_note_pending(mine)
+
+
+func _board_problem(error: String) -> Label:
+	var why := "Can't reach the leaderboard. Check your connection and try again."
+	if error == "wrong_board":
+		why = "The leaderboard answered for another version of the game, so it was ignored."
+	var l := _soft(why, 24)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
+
+func _note_pending(mine: Label) -> void:
 	if not Board.pending.is_empty():
 		mine.text += ("  " if mine.text != "" else "") + ("%d of your matches haven't been sent yet." % Board.pending.size() if Board.pending.size() > 1 else "One of your matches hasn't been sent yet.")
+
+
+static func _map_word(map: String) -> String:
+	return {"village": "Village", "mists": "Mists", "fort": "Fort"}.get(map, map.capitalize())
+
+
+## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort".
+static func _match_word(mode: String, map: String) -> String:
+	var word: String = {"night": "Night", "coop": "Co-op", "fort": "Fort", "ffa": "All vs All", "teams": "Teams"}.get(mode, mode.capitalize())
+	return word if map == "fort" or map == "" else word + " · " + _map_word(map)
+
+
+## "Just now", "12 min ago", "3 h ago", "2 days ago", then the date.
+static func _ago(unix: int) -> String:
+	var s := int(Time.get_unix_time_from_system()) - unix
+	if s < 90:
+		return "Just now"
+	if s < 3600:
+		return "%d min ago" % (s / 60)
+	if s < 86400:
+		return "%d h ago" % (s / 3600)
+	if s < 7 * 86400:
+		return "%d day%s ago" % [s / 86400, "" if s / 86400 == 1 else "s"]
+	var d := Time.get_datetime_dict_from_unix_time(unix)
+	return "%d %s" % [d["day"], ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][int(d["month"]) - 1]]
+
+
+func _history_row(when: String, played: String, as_class: String, kills: String, result: String, points: String, header: bool) -> PanelContainer:
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", UiTheme.flat(Color(0, 0, 0, 0), Color.TRANSPARENT, 6, 4.0))
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 14)
+	row.add_child(line)
+	var size := 21 if header else 23
+	var cells: Array = [[when, 150.0, HORIZONTAL_ALIGNMENT_LEFT], [played, 200.0, HORIZONTAL_ALIGNMENT_LEFT], [as_class, 0.0, HORIZONTAL_ALIGNMENT_LEFT],
+		[kills, 80.0, HORIZONTAL_ALIGNMENT_RIGHT], [result, 170.0, HORIZONTAL_ALIGNMENT_LEFT], [points, 90.0, HORIZONTAL_ALIGNMENT_RIGHT]]
+	for i in cells.size():
+		var cell: Array = cells[i]
+		var l := _body(str(cell[0]), size)
+		l.horizontal_alignment = cell[2]
+		l.clip_text = true
+		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		l.add_theme_color_override("font_color", UiTheme.ASH if header or i == 0 else UiTheme.BONE)
+		if i == 2:
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		else:
+			l.custom_minimum_size.x = cell[1]
+		if not header and i == 5:
+			l.add_theme_font_override("font", UiTheme.bold_font())
+			l.add_theme_color_override("font_color", UiTheme.EMBER)
+		line.add_child(l)
+	return row
 
 
 ## "2 days 5 hours", "3 hours 10 minutes", "12 minutes".

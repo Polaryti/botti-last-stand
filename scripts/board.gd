@@ -10,6 +10,10 @@ extends Node
 ## wait here, saved, until the board can be reached; each has its own id, so none counts twice.
 
 signal changed
+## A match reached the board: {"points", "board", "before": {"all", "week"}, "all", "week"}.
+signal counted(result: Dictionary)
+## A week's prize was added to your doubloons: {"week", "rank", "doubloons"}.
+signal prize(reward: Dictionary)
 
 const SAVE_PATH := "user://board.cfg"
 const API := 1
@@ -20,6 +24,8 @@ const DIFFICULTY := [0.75, 1.0, 1.25]
 const MAX_PENDING := 300
 const TIMEOUT := 12.0
 const MAPS := ["village", "mists", "fort"]
+## Every board, by what it counts. "all" holds every match.
+const BOARDS := {"all": "All", "night": "Night", "mists": "Mists", "fort": "Fort", "coop": "Co-op", "versus": "Versus"}
 
 enum NameState { NONE, CHOSEN, TAKEN }
 
@@ -27,7 +33,8 @@ var url := ""
 var token := "" # this phone's secret: only its fingerprint is kept on the board
 var registered := "" # the name the board knows us by, once it does
 var name_state: int = NameState.NONE
-var taken_name := "" # a name chosen offline that someone else had already
+var taken_name := "" # a name chosen offline that someone else had already, or the board refused
+var taken_blocked := false # true when the board refused it as rude rather than taken
 var pending: Array[Dictionary] = []
 var syncing := false
 var last_error := ""
@@ -114,6 +121,8 @@ func choose_name(raw: String) -> String:
 			409:
 				return "Someone already has that name."
 			400:
+				if answer["data"].get("error", "") == "name_blocked":
+					return "That name isn't allowed. Choose another."
 				return name_problem(raw) if name_problem(raw) != "" else "That name can't be used."
 			429:
 				return "You changed your name a moment ago. Try again in a few minutes."
@@ -130,6 +139,7 @@ func choose_name(raw: String) -> String:
 	Game.save_settings()
 	name_state = NameState.CHOSEN
 	taken_name = ""
+	taken_blocked = false
 	_save()
 	changed.emit()
 	if configured() and registered != "":
@@ -176,6 +186,8 @@ func sync() -> void:
 					standing[period] = answer["data"][period]
 			_cache.clear()
 			_save()
+			if not answer["data"].get("duplicate", false):
+				counted.emit(answer["data"])
 		elif code == 400:
 			# The board will never take this one, so it can't wait here for ever.
 			push_warning("Leaderboard refused a match: %s" % answer["data"].get("error", ""))
@@ -206,8 +218,10 @@ func _join() -> void:
 				Game.save_settings()
 			_save()
 		409, 400:
-			# Someone else took the name while we were offline: the player picks another.
+			# Someone else took the name while we were offline, or the board won't have it: the
+			# player picks another.
 			taken_name = Game.player_name
+			taken_blocked = answer["data"].get("error", "") == "name_blocked"
 			name_state = NameState.TAKEN
 			_save()
 			changed.emit()
@@ -215,23 +229,75 @@ func _join() -> void:
 
 # --- The boards ----------------------------------------------------------------------------------
 
-## The top players: period "all" or "week". Returns {"ok", "entries", "me", "week_end", "error"}.
-func fetch(period: String, fresh := false) -> Dictionary:
+## The top players: period "all" or "week", on one of BOARDS.
+## Returns {"ok", "entries", "me", "week_end", "prizes", "error"}.
+func fetch(period: String, fresh := false, board := "all") -> Dictionary:
 	if not configured():
 		return {"ok": false, "error": "not_configured"}
-	var cached: Array = _cache.get(period, [])
+	var key := period + "/" + board
+	var cached: Array = _cache.get(key, [])
 	if not fresh and not cached.is_empty() and Time.get_ticks_msec() - int(cached[0]) < 30000:
 		return cached[1]
 	if not pending.is_empty() or (registered == "" and name_state == NameState.CHOSEN):
 		await sync()
-	var answer := await _call(HTTPClient.METHOD_GET, "/v1/board?period=" + period, null, registered != "")
+	var answer := await _call(HTTPClient.METHOD_GET, "/v1/board?period=%s&board=%s" % [period, board], null, registered != "")
 	var code := int(answer["code"])
 	if code != 200:
 		return {"ok": false, "error": str(answer["data"].get("error", "offline"))}
 	var data: Dictionary = answer["data"]
-	var result := {"ok": true, "entries": data.get("entries", []), "me": data.get("me", {}), "week_end": int(data.get("week_end", 0))}
-	_cache[period] = [Time.get_ticks_msec(), result]
+	var result := {"ok": true, "entries": data.get("entries", []), "me": data.get("me", {}), "week_end": int(data.get("week_end", 0)), "prizes": data.get("prizes", [])}
+	_cache[key] = [Time.get_ticks_msec(), result]
 	return result
+
+
+## Your own last matches, newest first. Returns {"ok", "matches", "error"}.
+func history() -> Dictionary:
+	if not configured():
+		return {"ok": false, "error": "not_configured"}
+	if not pending.is_empty() or (registered == "" and name_state == NameState.CHOSEN):
+		await sync()
+	if registered == "":
+		return {"ok": true, "matches": []}
+	var answer := await _call(HTTPClient.METHOD_GET, "/v1/players/me/matches", null, true)
+	if int(answer["code"]) != 200:
+		return {"ok": false, "error": str(answer["data"].get("error", "offline"))}
+	return {"ok": true, "matches": answer["data"].get("matches", [])}
+
+
+## Collects the doubloons of any week you finished in the top three. Each prize is added once:
+## the save remembers which weeks were paid, and the board is told afterwards. Returns the prizes
+## newly added, for the menu to announce.
+func collect_prizes() -> Array:
+	var won: Array = []
+	if not configured() or registered == "":
+		return won
+	var answer := await _call(HTTPClient.METHOD_GET, "/v1/players/me", null, true)
+	if int(answer["code"]) != 200:
+		return won
+	_adopt_name(str(answer["data"].get("name", "")))
+	for reward: Variant in answer["data"].get("rewards", []):
+		if typeof(reward) != TYPE_DICTIONARY:
+			continue
+		var week := int(reward.get("week", -1))
+		if week < 0:
+			continue
+		if Game.pay_board_prize(week, int(reward.get("doubloons", 0))):
+			won.append(reward)
+			prize.emit(reward)
+		# Paid here, now or before: the board can stop offering it.
+		await _call(HTTPClient.METHOD_POST, "/v1/rewards/claim", {"week": week}, true)
+	return won
+
+
+## The board renamed this player (from its admin page): the phone uses that name from now on.
+func _adopt_name(on_board: String) -> void:
+	if on_board == "" or on_board == registered or name_state != NameState.CHOSEN:
+		return
+	registered = on_board
+	Game.player_name = on_board
+	Game.save_settings()
+	_save()
+	changed.emit()
 
 
 ## "Ranger · Trapper", or just the class when no profession was reached.
@@ -292,6 +358,7 @@ func _load() -> void:
 	registered = str(c.get_value("board", "registered", ""))
 	name_state = int(c.get_value("board", "name_state", NameState.NONE))
 	taken_name = str(c.get_value("board", "taken_name", ""))
+	taken_blocked = bool(c.get_value("board", "taken_blocked", false))
 	var saved: Variant = c.get_value("board", "pending", [])
 	pending.clear()
 	if typeof(saved) == TYPE_ARRAY:
@@ -306,6 +373,7 @@ func _save() -> void:
 	c.set_value("board", "registered", registered)
 	c.set_value("board", "name_state", name_state)
 	c.set_value("board", "taken_name", taken_name)
+	c.set_value("board", "taken_blocked", taken_blocked)
 	c.set_value("board", "pending", pending)
 	# Written beside the old file, then swapped in, so a crash can't lose the queue.
 	var tmp := SAVE_PATH + ".tmp"

@@ -88,3 +88,96 @@ Test the dev APK on low- and mid-tier Android devices in four-player sessions, w
 ## Subsequent dev artillery tuning
 
 The artillery update changes Gunner Last Command to an 18 m radius, a 4 s warning and 20 shells over 5 s. Each impact leaves a 3.2 m radius fire zone for 8 s at 10 damage/s; overlaps do not stack and allies are excluded. The 60 s cooldown and 45 impact damage remain. The earlier simulation sample above predates these changes; it is not evidence of the new build’s win rates.
+
+## November 2026: picks that did nothing, and a progression screening
+
+### Picks replaced
+
+Eight picks only made zombies see or hear you less. Zombies that are already chasing you, which is most of a
+night, ignore both, so the picks did nothing in practice. Each is replaced by something that changes a fight:
+
+| Class | Where | Was | Now |
+| --- | --- | --- | --- |
+| Monk | Spirit Walker, tier 1 | Quiet Mind: seen 35% less far | Still Mind: every 10 s, slow enemies within 5 m for 3 s |
+| Adept | Void Walker, tier 2 | Silent Step: seen 30% less far | Void Appetite: kills give +15% melee damage for 5 s, up to 3 times |
+| Plague Doctor | Core, tier 2 | Bird Mask: seen 25% less far | Bird Mask: heal 1 health per second |
+| Revenant | Core, tier 2 | Thick Mist: +40 Mist and quieter steps | Thick Mist: +40 Mist, and Mist refills 15% faster |
+| Revenant | Mist Leaper, tier 4 | After Image: seen 30% less far | Mist Landing: each landing heals 10 more and gives back 8 Mist |
+| Revenant | Rift Traveller, tier 2 | Gone Again: seen 30% less far | Rift Feast: each hop heals 5 |
+| Infantry | Shadow Blade, tier 1 | Soft Steps (50% less noise) / Cloak (seen 40% less far) | Cutthroat: each backstab heals 6 / Shadowstep: each backstab gives +35% speed for 2 s |
+| Ranger | Trapper, tier 4 | Ghillie Suit: seen 40% less far | Fletcher: every kill gives an arrow back |
+
+Shadow Blade's own "30% less noise" is replaced too (see below). Illusionist's Fade and Dazzle and the Trapper's
+Lure stay: they act on enemies that are already hunting you.
+
+### Method
+
+The earlier screening started every night at level 10 with the left choice at every tier. This one plays each
+night from level 1, the way a player does: the bot levels up during the night and takes a random side at each
+tier, so a profession is judged across its builds and its early game. Village, Normal, the `good` bot, quality
+Low, ten nights per profession (seeds 5000–5005 and 7000–7003). A full night is 600 seconds.
+
+Ten nights is still a screening sample. A profession's result moves by about 50 seconds between samples of this
+size, and the bot can't play some professions as a person would: it doesn't stand still for Iron Mountain's Stone
+Skin, and it swaps a Horse Archer's bow for any melee weapon it finds. The swap of the eight picks above was made
+while the first batch of nights was running, so most "before" nights already had the new picks; the "before"
+column is "before the numbers below were tuned", not exactly 0.21.1. Raw nights are in
+[progression.csv](balance/progression.csv).
+
+### Changes and reasons
+
+| Profession | Change | Reason |
+| --- | --- | --- |
+| Warpriest | Blessing heals 0.5 more per second (was 1); Shield of Faith every 50 s (was 35) | Won 8 of 10 nights and healed about twice what the other Heavy Infantry professions did. Now 5 of 10, still among the strongest. |
+| Infantry (all three) | 110 health (was 100), and every kill heals 2 | The starting class. All three professions were the three weakest, dying around level 6 with about 55 kills: the Dagger hits one enemy at a time, and nothing healed it before a profession. At level 10 they were strong, so the help is early sustain rather than damage. |
+| Shadow Blade | +20% melee damage, and 15% chance to avoid any hit, in place of 30% less noise | Backstabs rarely happen in a crowd that is already facing you; the profession had no other edge. |
+| Paladin | Heals 0.5 per second always, twice that while riding (was 0.5 only while riding) | Weakest Chivalry path on foot, which is most of a night before the horse comes. |
+| Horse Archer | +20% ranged damage at all times, and 2 arrows back per kill (was 1) | Weakest in both screenings. |
+| Mechanic | The War Chariot mends 2 health a second | Died before or between chariots with almost no healing. |
+| Blade Dancer | Each sweep heals 2 per enemy it hits, up to 10; Flowing Health now adds 6 to that | Sweeps only come with stance changes, and the path had no healing unless Flowing Health was picked. |
+| Void Walker | Opening Void stance heals 15 | Low sustain outside the five seconds of Void. |
+| Mist Leaper | Landing deals 20 damage around you and heals 5 | The leap was only movement until tier 3. |
+
+Iron Mountain is unchanged: its weakness in the screening comes from the bot never standing still, and tuning it
+to the bot would make it too strong for a player who does. Mechanic and Horse Archer stay below the middle; they
+need human testing before another pass.
+
+### Results
+
+"After" is only shown for professions whose numbers changed.
+
+| Class | Profession | Before: survival (s) | Before: wins / 10 | Before: kills | After: survival (s) | After: wins / 10 | After: kills |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| adept | blade_dancer | 327 | 0 | 69 | 368 | 0 | 82 |
+| adept | mirror_step | 471 | 0 | 109 | — | — | — |
+| adept | void_walker | 370 | 0 | 80 | 377 | 1 | 84 |
+| artificer | inventor | 344 | 3 | 91 | — | — | — |
+| artificer | mechanic | 286 | 0 | 51 | 300 | 3 | 71 |
+| artificer | pyromaniac | 322 | 4 | 89 | — | — | — |
+| chivalry | horse_archer | 276 | 0 | 65 | 326 | 0 | 86 |
+| chivalry | lancer | 420 | 2 | 116 | — | — | — |
+| chivalry | paladin | 318 | 1 | 83 | 364 | 0 | 90 |
+| commander | gunner | 526 | 5 | 177 | — | — | — |
+| commander | vanguard | 415 | 2 | 91 | — | — | — |
+| commander | warlock | 441 | 0 | 112 | — | — | — |
+| heavy | guardian | 506 | 3 | 116 | — | — | — |
+| heavy | warlord | 471 | 2 | 111 | — | — | — |
+| heavy | warpriest | 591 | 8 | 161 | 550 | 5 | 144 |
+| infantry | berserker | 272 | 0 | 56 | 409 | 1 | 96 |
+| infantry | duelist | 292 | 0 | 54 | 410 | 2 | 97 |
+| infantry | shadow | 308 | 0 | 57 | 366 | 1 | 79 |
+| magician | elementalist | 538 | 2 | 162 | — | — | — |
+| magician | illusionist | 545 | 4 | 163 | — | — | — |
+| magician | necromancer | 430 | 0 | 118 | — | — | — |
+| monk | bo_master | 477 | 2 | 118 | — | — | — |
+| monk | iron_mountain | 366 | 0 | 74 | — | — | — |
+| monk | spirit_walker | 523 | 2 | 100 | — | — | — |
+| plague_doctor | apothecary | 502 | 4 | 121 | — | — | — |
+| plague_doctor | pestilence | 444 | 0 | 110 | — | — | — |
+| plague_doctor | rat_king | 518 | 1 | 128 | — | — | — |
+| ranger | beastmaster | 474 | 5 | 154 | — | — | — |
+| ranger | sharpshooter | 453 | 1 | 128 | — | — | — |
+| ranger | trapper | 424 | 2 | 126 | — | — | — |
+| revenant | leaper | 338 | 0 | 77 | 482 | 3 | 123 |
+| revenant | rift | 483 | 3 | 135 | — | — | — |
+| revenant | summoner | 414 | 0 | 115 | — | — | — |

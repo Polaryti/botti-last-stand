@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.21.2 — Leaderboard Prizes and Fairer Trees (10 November 2026)
+
+### Leaderboard
+- Each kind of match has its own board as well as the overall one: Night, Mists, Fort, Co-op and Versus (All vs All and Teams), each with all-time and weekly tabs.
+- A new **Your matches** tab lists your last 30 counted matches: result, length, mode and map, class and profession, and points.
+- The end screen says where a match left you, for example "+60 leaderboard points: #2 this week and #3 of all time (up 2)".
+- Weekly prizes: when a week ends, the top three of that week's board win 120, 80 and 50 Doubloons (equal points share a place). The game hands them out the next time you open the menu online, once.
+- Rude names are refused with "That name isn't allowed". Accents, numbers standing in for letters and stretched letters don't get round it; ordinary names that happen to contain a rude word stay allowed.
+- Defend the Fort matches now reach the leaderboard. The 0.21.1 board turned them away.
+- An admin page for the board (behind a private key) can rename or hide a player, reset their scores, remove them, or take back a single match. A renamed player's phone takes the new name.
+
+### Skill trees
+- Eight picks that only made zombies see or hear you less are gone; zombies already chasing you ignored them. In their place: Still Mind (Spirit Walker) slows enemies around you every 10 s; Void Appetite (Void Walker) stacks melee damage on kills; Bird Mask (Plague Doctor) heals 1 per second; Thick Mist (Revenant) also refills Mist 15% faster; Mist Landing (Mist Leaper) heals and returns Mist on landing; Rift Feast (Rift Traveller) heals on each hop; Cutthroat and Shadowstep (Shadow Blade) heal or speed you up on backstabs; Fletcher (Trapper) returns an arrow per kill.
+
+### Balance
+- Infantry has 110 health and heals 2 from every kill. Shadow Blade gains +20% melee damage and a 15% chance to avoid hits instead of quieter steps.
+- Warpriest: Blessing heals 0.5 more per second instead of 1, and Shield of Faith comes every 50 s instead of 35.
+- Paladin heals 0.5 per second on foot as well as while riding (1 per second riding). Horse Archer gets +20% ranged damage at all times and 2 arrows back per kill. The Mechanic's War Chariot mends 2 health a second.
+- Blade Dancer sweeps heal 2 per enemy hit, up to 10. Opening Void stance heals 15. Mist Leap landings deal 20 damage around you and heal 5.
+
+### Playing together
+- Phones on 0.21.2 only play with other phones on 0.21.2: update every phone before playing together.
+
 ## 0.21.1 — Names and the Leaderboard (10 November 2026)
 
 ### Your name

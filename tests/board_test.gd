@@ -7,6 +7,8 @@ var checks := 0
 var failures := 0
 var url := ""
 var other := ""
+## tools/run_checks.py gives the local boards this admin key.
+const ADMIN_KEY := "local-checks-admin-key-not-a-secret"
 
 
 func check(ok: bool, message: String) -> void:
@@ -29,6 +31,7 @@ func _ready() -> void:
 		await _online()
 		await _strict_channels()
 		await _screens()
+		await _renamed_by_admin()
 	else:
 		print("No local boards given: online checks skipped.")
 	Board.url = ""
@@ -146,6 +149,42 @@ func _online() -> void:
 	check(await Board.choose_name("Olaf the Bold") == "" and Board.registered == "Olaf the Bold", "renaming keeps the same player")
 	all = await Board.fetch("all", true)
 	check(all["entries"][0]["name"] == "Olaf the Bold" and int(all["entries"][0]["points"]) == 220, "with the same points")
+	await _kinds_history_and_prizes()
+
+
+## Boards per kind of match, your own matches, the rank a match moves you to, rude names and prizes.
+func _kinds_history_and_prizes() -> void:
+	# Olaf's night in the Village is on the Night board; Sam's co-op nights in the Mists on the Mists board.
+	var night := await Board.fetch("all", true, "night")
+	check(night["ok"] and night["entries"].map(func(e: Dictionary) -> String: return e["name"]) == ["Olaf the Bold"], "the Night board: %s" % str(night.get("entries", [])))
+	var mists := await Board.fetch("week", true, "mists")
+	check(mists["ok"] and mists["entries"].size() == 1 and mists["entries"][0]["name"] == "Second Sam", "the Mists board, this week")
+	var forts := await Board.fetch("all", true, "fort")
+	check(forts["ok"] and forts["entries"].is_empty() and forts["me"].get("rank") == null, "an empty Fort board, and no place on it yet")
+	# A Fort match counts, on the Fort board, and says where it moved you.
+	var told: Array = []
+	var listen := func(result: Dictionary) -> void: told.append(result)
+	Board.counted.connect(listen)
+	Board.record_match(605.0, 120, true, "fort", "fort", "heavy", "guardian", 1)
+	while Board.syncing or not Board.pending.is_empty():
+		await get_tree().process_frame
+		if not Board.syncing and not Board.pending.is_empty():
+			Board.sync()
+	Board.counted.disconnect(listen)
+	check(told.size() == 1 and told[0].get("board", "") == "fort" and int(told[0]["points"]) == 220, "a Fort match counts on the Fort board: %s" % str(told))
+	check(told.size() == 1 and int(told[0]["before"]["all"]["rank"]) == 1 and int(told[0]["all"]["rank"]) == 1, "and says where you stood before and after")
+	forts = await Board.fetch("all", true, "fort")
+	check(forts["entries"].size() == 1 and forts["entries"][0]["class"] == "heavy" and forts["entries"][0]["spec"] == "guardian", "with what you played there")
+	var mine := await Board.history()
+	check(mine["ok"] and mine["matches"].size() == 2 and mine["matches"][0]["board"] == "fort" and mine["matches"][1]["board"] == "night", "your matches, newest first: %s" % str(mine.get("matches", [])).left(200))
+	# A rude name is refused, with its own words.
+	check(await Board.choose_name("Puta Madre") == "That name isn't allowed. Choose another.", "rude names are refused")
+	# A prize is paid once, however often the board offers it.
+	var had := Game.doubloons
+	check(Game.pay_board_prize(2966, 120) and Game.doubloons == had + 120, "a weekly prize is added to your doubloons")
+	check(not Game.pay_board_prize(2966, 120) and Game.doubloons == had + 120, "and only once")
+	Game.load_settings()
+	check(Game.board_prizes.has("2966") and Game.doubloons == had + 120, "the paid week is saved with the doubloons")
 
 
 ## A dev build never trusts the production board, nor the other way round.
@@ -165,6 +204,40 @@ func _strict_channels() -> void:
 	Board.pending.clear()
 	Board._save()
 	Board.url = url
+
+
+## A name changed on the admin page reaches the phone the next time it asks the board.
+func _renamed_by_admin() -> void:
+	var found: Dictionary = await _admin(HTTPClient.METHOD_GET, "/v1/admin/players?q=Olaf", "")
+	var players: Array = found.get("players", []) if found else []
+	check(players.size() == 1, "the admin page finds Olaf: %s" % str(found))
+	if players.size() != 1:
+		return
+	var id := str(int(players[0]["id"]))
+	var done: Variant = await _admin(HTTPClient.METHOD_POST, "/v1/admin/players/" + id, JSON.stringify({"action": "rename", "name": "Olaf Renamed"}))
+	check(done is Dictionary and done.get("ok", false), "and renames him")
+	await Board.collect_prizes()
+	check(Game.player_name == "Olaf Renamed" and Board.registered == "Olaf Renamed", "the phone takes the new name: %s" % Game.player_name)
+	Game.load_settings()
+	check(Game.player_name == "Olaf Renamed", "and keeps it")
+	var wrong := HTTPRequest.new()
+	add_child(wrong)
+	wrong.request(url + "/v1/admin/players", ["Authorization: Admin not-the-key-at-all-not-the-key"], HTTPClient.METHOD_GET)
+	var answer: Array = await wrong.request_completed
+	wrong.queue_free()
+	check(int(answer[1]) == 401, "a wrong admin key is refused: %d" % int(answer[1]))
+
+
+func _admin(method: int, path: String, body: String) -> Variant:
+	var http := HTTPRequest.new()
+	add_child(http)
+	http.request(url + path, ["Authorization: Admin " + ADMIN_KEY, "Content-Type: application/json"], method, body)
+	var answer: Array = await http.request_completed
+	http.queue_free()
+	if int(answer[1]) != 200:
+		print("admin answer ", int(answer[1]), " ", (answer[3] as PackedByteArray).get_string_from_utf8())
+		return null
+	return JSON.parse_string((answer[3] as PackedByteArray).get_string_from_utf8())
 
 
 ## The screens: the prompt, the board and the end-of-match line.
@@ -191,8 +264,34 @@ func _screens() -> void:
 		said = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
 		if said.has("Olaf the Bold"):
 			break
-	check(said.has("Olaf the Bold") and said.has("220") and said.has("Ranger · Trapper"), "the leaderboard lists players, points and most played: %s" % str(said))
-	check(said.any(func(t: String) -> bool: return t.begins_with("You: #1 with 220 points")), "and where you are")
+	# Olaf played one night as a Trapper and then one Fort as a Guardian: the latest wins a tie.
+	check(said.has("Olaf the Bold") and said.has("440") and said.has("Heavy Infantry · Guardian"), "the leaderboard lists players, points and most played: %s" % str(said))
+	check(said.any(func(t: String) -> bool: return t.begins_with("You: #1 with 440 points")), "and where you are")
+	m.show_leaderboard("", "fort")
+	deadline = Time.get_ticks_msec() + 8000
+	while Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+		said = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		if said.has("Heavy Infantry · Guardian"):
+			break
+	check(said.has("Heavy Infantry · Guardian") and said.any(func(t: String) -> bool: return t.contains("Defend the Fort")), "the Fort board on screen: %s" % str(said).left(300))
+	m.show_leaderboard("mine")
+	deadline = Time.get_ticks_msec() + 8000
+	while Time.get_ticks_msec() < deadline:
+		await get_tree().process_frame
+		said = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		if said.has("Won, 10:05"):
+			break
+	check(said.has("Won, 10:05") and said.has("Fort") and said.has("Night · Village") and said.has("Just now"), "your matches on screen: %s" % str(said).left(300))
+	m._board_kind = "all"
+	# The end screen adds where the match moved you, once the board has counted it.
+	m._board_note = "+60 leaderboard points"
+	m._counted = {}
+	m._end_screen("The night is over", "You lasted 4:05.\n+60 leaderboard points")
+	m._counted = {"before": {"all": {"rank": 5}, "week": {"rank": null}}, "all": {"rank": 3}, "week": {"rank": 2}}
+	m._apply_board_note()
+	said = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(said.any(func(t: String) -> bool: return t.ends_with("+60 leaderboard points: #2 this week and #3 of all time (up 2)")), "the end screen says where the match moved you: %s" % str(said).left(300))
 	m._clear_ui()
 	m._clear_world()
 	m.queue_free()

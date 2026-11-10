@@ -6,8 +6,8 @@ const MAX_LEVEL := 10
 const XP_TO_NEXT := [45, 65, 80, 110, 160, 220, 270, 330, 420]
 
 const ALL := {
-	"infantry": {"name": "Infantry", "weapon": "dagger", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true,
-		"desc": "Fast close fighter. Starts with a Dagger. Uses melee and ranged weapons."},
+	"infantry": {"name": "Infantry", "weapon": "dagger", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": true, "kill_heal": 2.0,
+		"desc": "Fast close fighter. Starts with a Dagger, and heals 2 from each kill. Uses melee and ranged weapons."},
 	"ranger": {"name": "Ranger", "weapon": "bow", "arrows": 30, "hp": 90.0, "speed": 1.05, "ranged": true, "kill_arrows": 2,
 		"desc": "Precise archer. Starts with a Short Bow and 30 arrows, and takes 2 back from each kill. Uses melee and ranged weapons."},
 	"heavy": {"name": "Heavy Infantry", "weapon": "mace", "arrows": 0, "hp": 130.0, "speed": 0.9, "ranged": false, "shield": true,

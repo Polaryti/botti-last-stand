@@ -23,6 +23,7 @@ var player_name := ""
 var unlocked := {} # classes bought, or opened with a code
 var redeemed := {} # the hashes of codes already used on this phone
 var doubloons := 0
+var board_prizes := {} # week -> doubloons, for leaderboard prizes already paid
 var finished_games := 0
 var mists_wins := 0
 var poison_dealt := 0.0
@@ -206,6 +207,18 @@ func match_doubloons(seconds: float, kills: int, reached_dawn: bool, coop: bool)
 	return ceili(base * 1.5) if coop else base
 
 
+## A week's leaderboard prize, paid once: the weeks already paid are kept in the same save as the
+## doubloons, so a prize can never be counted twice. Returns whether it was paid now.
+func pay_board_prize(week: int, amount: int) -> bool:
+	var key := str(week)
+	if board_prizes.has(key) or amount <= 0:
+		return false
+	board_prizes[key] = amount
+	doubloons += amount
+	save_settings()
+	return true
+
+
 func award_doubloons(seconds: float, kills: int, reached_dawn: bool, coop: bool) -> int:
 	if mode == Mode.SANDBOX or _run_awarded:
 		return 0
@@ -298,6 +311,7 @@ func load_settings() -> void:
 	unlocked = _saved(c, "progress", "unlocked", {})
 	redeemed = _saved(c, "progress", "redeemed", {})
 	doubloons = maxi(0, _saved(c, "progress", "doubloons", 0))
+	board_prizes = _saved(c, "progress", "board_prizes", {})
 	finished_games = maxi(0, _saved(c, "progress", "finished_games", 0))
 	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
 	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
@@ -332,6 +346,7 @@ func save_settings() -> void:
 	c.set_value("progress", "unlocked", unlocked)
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
+	c.set_value("progress", "board_prizes", board_prizes)
 	c.set_value("progress", "finished_games", finished_games)
 	c.set_value("progress", "mists_wins", mists_wins)
 	c.set_value("progress", "poison_dealt", poison_dealt)

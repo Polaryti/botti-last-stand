@@ -3615,7 +3615,7 @@ func test_items() -> void:
 		w.spawn_pickup_at(pl.global_position, Pickup.Kind.FOOD, food)
 		await seconds(0.3)
 		ok(is_equal_approx(pl.hp, 50.0 + heal), "%s heals %d" % [food, heal])
-	pl.hp = 100.0
+	pl.hp = pl.max_hp()
 	var apple := w.spawn_pickup_at(pl.global_position, Pickup.Kind.FOOD, "apple")
 	await seconds(0.3)
 	ok(is_instance_valid(apple) and w.pickups.has(apple), "food stays on the ground at full health")
