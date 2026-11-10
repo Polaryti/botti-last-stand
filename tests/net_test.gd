@@ -829,7 +829,10 @@ func _coop() -> void:
 	for it: Pickup in w.pickups:
 		print("  still here: ", it.display_name(), " id ", it.net_id, " at ", it.global_position)
 	ok(w.pickups.is_empty(), "and it is gone from both")
-	# Dropping a weapon goes through the host.
+	# Dropping a weapon goes through the host. The host can leave the meeting point a moment after the
+	# client, so the client waits before dropping: the host must not see the sword before it looks.
+	# (A plain wait: meeting points only count upwards, so a new one here would skip later ones.)
+	await wait(0.5)
 	if not host:
 		w.drop_weapon(Vector3(6, 0, 12), "sword")
 	await wait(0.5)
