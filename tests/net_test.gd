@@ -446,8 +446,10 @@ func _room() -> void:
 		ok(names.has("Back to the room"), "the host can take everyone back to the room")
 	else:
 		ok(not names.has("Back to the room") and names.has("Menu"), "the others wait for the host, or leave")
-	await sync(81)
+	# Remember the night before meeting up: the host may press Back to the room as soon as both
+	# phones arrive, and its message can reach this phone before the meeting returns here.
 	var first_world := m.world
+	await sync(81)
 	if host:
 		_press("Back to the room")
 	t = 0.0
@@ -456,7 +458,7 @@ func _room() -> void:
 		t += 0.1
 	await wait(0.4)
 	ok(not Net.in_game and Net.active(), "back in the room, still together")
-	ok(m.world != null and m.world.mode == Game.Mode.MENU and not is_instance_valid(first_world), "the night is cleared away")
+	ok(m.world != null and m.world.mode == Game.Mode.MENU and not is_instance_valid(first_world), "the night is cleared away (world %s, mode %s, old night still there %s, waited %.1f s)" % [m.world != null, m.world.mode if m.world else -1, is_instance_valid(first_world), t])
 	var labels: Array = m.ui_layer.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 	ok(labels.has("Infantry") and labels.has("Ranger"), "the room shows again, with the classes to pick")
 	ok(Net.roster.size() == 3 and _human_other() != 0 and Net.roster.keys().filter(Net.is_bot).size() == 1, "the other phone and the bot are still in the room (%d)" % Net.roster.size())
