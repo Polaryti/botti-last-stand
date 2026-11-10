@@ -1,0 +1,13 @@
+{
+  "adept": ["blade_dancer", "mirror_step", "void_walker"],
+  "artificer": ["pyromaniac", "mechanic", "inventor"],
+  "chivalry": ["lancer", "paladin", "horse_archer"],
+  "commander": ["warlock", "gunner", "vanguard"],
+  "heavy": ["guardian", "warpriest", "warlord"],
+  "infantry": ["duelist", "berserker", "shadow"],
+  "magician": ["necromancer", "elementalist", "illusionist"],
+  "monk": ["bo_master", "spirit_walker", "iron_mountain"],
+  "plague_doctor": ["apothecary", "pestilence", "rat_king"],
+  "ranger": ["sharpshooter", "trapper", "beastmaster"],
+  "revenant": ["leaper", "rift", "summoner"]
+}

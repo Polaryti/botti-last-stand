@@ -206,6 +206,7 @@ var wood := 0
 var hurt_from := Vector3.ZERO
 var hurt_dir_time := 0.0
 var level_flash := 0.0
+const LEVEL_GOLD := Color(1.0, 0.8, 0.36)
 var _shake := 0.0
 var _buzz_at := -10.0
 var _dawn_bright := 0.0
@@ -905,6 +906,9 @@ func add_xp(n: int) -> void:
 		level_flash = 1.0
 		guard_left = maxf(guard_left, LEVEL_UP_GUARD)
 		sfx("level", -2.0)
+		# Everyone sees someone grow stronger: a golden ring, and motes rising around them.
+		world.fx_ring(global_position, 3.4, LEVEL_GOLD)
+		world.fx_rise(global_position, LEVEL_GOLD)
 		say("Level %d! Choose an ability" % level)
 	if level >= ClassDefs.MAX_LEVEL:
 		xp = 0
@@ -1865,6 +1869,8 @@ func use_art() -> void:
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
+	# The class's colour flares at the caster's feet, so friends and foes can read what happened.
+	world.fx_ring(global_position, 2.2, ClassDefs.color(class_id).lightened(0.4))
 
 
 # --- The Monk ----------------------------------------------------------------

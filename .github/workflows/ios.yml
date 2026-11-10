@@ -60,6 +60,12 @@ jobs:
       - name: Are the Epic keys there
         run: test -f scripts/epic_keys.gd
 
+      - name: Point it at the production leaderboard
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python3 tools/set_leaderboard_url.py production
+
       - name: Export the Xcode project
         run: |
           mkdir -p build/ios

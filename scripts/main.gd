@@ -143,6 +143,7 @@ func show_menu(rebuild := false) -> void:
 	update_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(update_title)
 	top.add_child(_expand())
+	top.add_child(_name_button())
 	top.add_child(_purse_button())
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 14
@@ -151,6 +152,7 @@ func show_menu(rebuild := false) -> void:
 	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
+	box.add_child(_menu_row("Leaderboard", "The top players of all time, and of this week.", func() -> void: show_leaderboard()))
 	box.add_child(_menu_row("Sandbox", "Try any weapon, item or class you own.", func() -> void: show_class_picker(Game.Mode.SANDBOX)))
 	box.add_child(_expand(true))
 	var foot := HBoxContainer.new()
@@ -174,6 +176,8 @@ func show_menu(rebuild := false) -> void:
 	version.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	foot.add_child(version)
 	panel = root
+	if Board.needs_name() and _asks_for_name():
+		show_name_prompt(true)
 
 
 ## A new version on the game's page: on Android, one tap fetches it and Android asks to install it.
@@ -1265,6 +1269,7 @@ func _on_player_died() -> void:
 	var kills := world.player.kills
 	var is_best := Game.mode == Game.Mode.NIGHT and Game.record_run(seconds, kills, false)
 	var earned := Game.award_doubloons(seconds, kills, false, false) if Game.is_night() else 0
+	var points_line := _board_line(seconds, kills, false) if Game.is_night() else ""
 	var current := world
 	await get_tree().create_timer(1.2).timeout
 	if world != current or not is_inside_tree():
@@ -1275,7 +1280,7 @@ func _on_player_died() -> void:
 		cause = "Burned alive."
 	elif pl.hit_by == "lightning":
 		cause = "Struck by lightning."
-	_end_screen("You fell", "%s\nSurvived %s as %s: %d kills, level %d.%s" % [cause, Game.clock(seconds), _character_name(pl), kills, pl.level, (" New best!" if is_best else "") + _earned_line(earned)])
+	_end_screen("You fell", "%s\nSurvived %s as %s: %d kills, level %d.%s" % [cause, Game.clock(seconds), _character_name(pl), kills, pl.level, (" New best!" if is_best else "") + _earned_line(earned) + points_line])
 
 
 func _on_dawn() -> void:
@@ -1300,6 +1305,8 @@ func _on_dawn() -> void:
 	var earned := Game.award_doubloons(Game.NIGHT_LENGTH, kills, true, false)
 	var current := world
 	var line := "%s survived the night: %d kills, level %d.%s" % [_character_name(world.player), kills, world.player.level, _earned_line(earned)]
+	# The Mists can run past ten minutes, until the Regent falls.
+	line += _board_line(maxf(Game.NIGHT_LENGTH, world.director.elapsed), kills, true)
 	# Let the sunrise and the burning zombies play first.
 	await get_tree().create_timer(3.5).timeout
 	if world != current or not is_inside_tree():
@@ -1318,7 +1325,7 @@ func _on_fort_lost() -> void:
 	var seconds := world.director.elapsed
 	var kills := world.player.kills
 	var earned := Game.award_doubloons(seconds, kills, false, false)
-	_end_screen("The heart has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned)])
+	_end_screen("The heart has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
 
 
 func _earned_line(earned: int) -> String:
@@ -1338,6 +1345,7 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 	if reached_dawn:
 		Game.note_mists_win()
 	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp() and Net.humans() > 1))
+	line += _board_line(world.director.elapsed, world.player.kills, won)
 	close_tree()
 	if hud:
 		hud.release_all()
@@ -1460,16 +1468,10 @@ func show_together(tab := -1) -> void:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 10)
 	box.add_child(top)
-	top.add_child(_body("Your name", 26))
-	var name_edit := LineEdit.new()
-	name_edit.text = Game.player_name
-	name_edit.max_length = 16
-	name_edit.custom_minimum_size = Vector2(290, 58)
-	name_edit.add_theme_font_size_override("font_size", 26)
-	name_edit.text_changed.connect(func(t: String) -> void:
-		Game.player_name = t.strip_edges() if t.strip_edges() != "" else Game.player_name
-		Game.save_settings())
-	top.add_child(name_edit)
+	top.add_child(_soft("Playing as", 24))
+	var who := _button(Game.player_name, func() -> void: show_name_prompt(false, func() -> void: show_together()), Vector2(250, 58))
+	who.tooltip_text = "Change your name"
+	top.add_child(who)
 	if _together_tab == ONLINE_TAB:
 		if EpicNet.available():
 			top.add_child(_button("Start a game", _start_online, Vector2(300, 66), true))
@@ -1870,3 +1872,250 @@ func show_command_map() -> void:
 	map.selected.connect(func(_at: Vector3) -> void: confirm.disabled = false)
 	row.add_child(confirm)
 	_back = close
+
+
+# --- Your name and the leaderboard -------------------------------------------
+
+## The game itself asks for a name. Tests and capture scenes that host this menu ask for one only
+## when they mean to.
+func _asks_for_name() -> bool:
+	var scene := get_tree().current_scene
+	return scene == null or scene == self
+
+
+## Who you are, at the top of the menu. Tapping it changes your name.
+func _name_button() -> Button:
+	var b := _button(Game.player_name, func() -> void: show_name_prompt(false), Vector2(0, 64))
+	b.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	b.add_theme_font_size_override("font_size", 26)
+	b.custom_minimum_size.x = maxf(150.0, _text_width(Game.player_name, 26) + 48.0)
+	b.tooltip_text = "Change your name"
+	return b
+
+
+## Your display name: shown to others in games together and on the leaderboard. Names are unique.
+## When `required`, there is no way out but choosing one.
+func show_name_prompt(required: bool, after := Callable()) -> void:
+	var root := _modal("Choose your name" if required else "Your name")
+	var box: VBoxContainer = root.get_meta("box")
+	box.custom_minimum_size.x = 640
+	var was_back := _back
+	var close := func() -> void:
+		root.queue_free()
+		_back = was_back
+		if after.is_valid():
+			after.call()
+		elif Game.mode == Game.Mode.MENU:
+			show_menu()
+	if not required:
+		_back = close
+	var line := "Other players see this name in games together and on the leaderboard. Each name belongs to one player."
+	if Board.name_state == Board.NameState.TAKEN:
+		line = "Someone else took \"%s\" while you were offline. Choose another name." % Board.taken_name
+	var about := _soft(line, 23)
+	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(about)
+	var edit := LineEdit.new()
+	edit.text = Game.player_name if Board.name_state != Board.NameState.TAKEN else ""
+	edit.placeholder_text = "3 to 16 letters"
+	edit.max_length = Board.NAME_MAX
+	edit.custom_minimum_size = Vector2(640, 64)
+	edit.add_theme_font_size_override("font_size", 30)
+	edit.select_all_on_focus = true
+	box.add_child(edit)
+	var problem := _body("", 22)
+	problem.add_theme_color_override("font_color", UiTheme.EMBER)
+	problem.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(problem)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	var save := _button("Save", func() -> void: pass, Vector2(0, 66), true)
+	save.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var choose := func() -> void:
+		if save.disabled:
+			return
+		save.disabled = true
+		save.text = "Checking…"
+		problem.text = ""
+		var answer: String = await Board.choose_name(edit.text)
+		if not is_instance_valid(root):
+			return
+		save.disabled = false
+		save.text = "Save"
+		if answer == "":
+			close.call()
+		else:
+			problem.text = answer
+			edit.grab_focus()
+	save.pressed.connect(choose)
+	edit.text_submitted.connect(func(_t: String) -> void: choose.call())
+	edit.text_changed.connect(func(t: String) -> void: problem.text = Board.name_problem(t) if t.strip_edges() != "" else "")
+	if not required:
+		row.add_child(_button("Cancel", close, Vector2(180, 66)))
+	row.add_child(save)
+	edit.grab_focus.call_deferred()
+
+
+## This match's points for the leaderboard, as a line for the end screen.
+func _board_line(seconds: float, kills: int, won: bool) -> String:
+	if Game.mode == Game.Mode.SANDBOX or world == null or world.player == null:
+		return ""
+	var mode := "fort" if Game.mode == Game.Mode.FORT else "night"
+	if Net.active():
+		mode = {Net.Rules.COOP: "coop", Net.Rules.FFA: "ffa", Net.Rules.TEAMS: "teams", Net.Rules.FORT: "fort"}.get(Net.rules, "coop")
+	var map := "fort" if Game.mode == Game.Mode.FORT else Game.current_map()
+	var difficulty: int = Net.difficulty if Net.active() else Game.difficulty
+	var points := Board.record_match(seconds, kills, won, mode, map, world.player.class_id, world.player.spec_id, difficulty)
+	return "\n+%d leaderboard points" % points
+
+
+var _board_period := "all"
+
+
+## The top 50 players, of all time or of this week, by points.
+func show_leaderboard(period := "") -> void:
+	if period != "":
+		_board_period = period
+	_clear_ui()
+	_back = show_menu
+	var root := Control.new()
+	root.theme = _theme
+	ui_layer.add_child(root)
+	_fill(root)
+	var shade := _vignette()
+	root.add_child(shade)
+	_fill(shade)
+	var margin := _screen_margin(44, 18)
+	root.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	margin.add_child(box)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 14)
+	box.add_child(top)
+	top.add_child(_button("Back", show_menu, Vector2(116, 56)))
+	var head := _label("Leaderboard", 40, UiTheme.BONE)
+	head.add_theme_font_override("font", UiTheme.title_font())
+	head.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(head)
+	top.add_child(_expand())
+	for tab: Array in [["all", "All time"], ["week", "This week"]]:
+		var which: String = tab[0]
+		top.add_child(_button(tab[1], func() -> void: show_leaderboard(which), Vector2(176, 56), _board_period == which))
+	var note := _soft("", 21)
+	box.add_child(note)
+	var page := PanelContainer.new()
+	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(page)
+	var inside := VBoxContainer.new()
+	inside.add_theme_constant_override("separation", 4)
+	page.add_child(inside)
+	inside.add_child(_board_row("#", "Player", "Points", "Most played", UiTheme.ASH, true))
+	var scroll := DragScroll.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	inside.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 2)
+	scroll.add_child(list)
+	var foot := HBoxContainer.new()
+	foot.add_theme_constant_override("separation", 12)
+	box.add_child(foot)
+	var mine := _body("", 23)
+	mine.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mine.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	foot.add_child(mine)
+	foot.add_child(_button("Refresh", func() -> void: _fill_leaderboard(list, note, mine, true), Vector2(150, 56)))
+	panel = root
+	_fill_leaderboard(list, note, mine, false)
+
+
+func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: bool) -> void:
+	for c in list.get_children():
+		c.queue_free()
+	var period := _board_period
+	note.text = "All matches since the leaderboard began." if period == "all" else "Matches since Monday 00:00 UTC."
+	if not Board.configured():
+		list.add_child(_soft("This version of the game has no leaderboard.", 24))
+		mine.text = ""
+		return
+	var asking := _soft("Asking the leaderboard…", 24)
+	list.add_child(asking)
+	mine.text = ""
+	var result: Dictionary = await Board.fetch(period, fresh)
+	if not is_instance_valid(list) or _board_period != period:
+		return
+	asking.queue_free()
+	if not result["ok"]:
+		var why := "Can't reach the leaderboard. Check your connection and try again."
+		if result["error"] == "wrong_board":
+			why = "The leaderboard answered for another version of the game, so it was ignored."
+		var l := _soft(why, 24)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		list.add_child(l)
+	else:
+		var entries: Array = result["entries"]
+		if entries.is_empty():
+			list.add_child(_soft("No one has scored yet this week. Finish a match to be the first." if period == "week" else "No one has scored yet. Finish a match to be the first.", 24))
+		for e: Dictionary in entries:
+			var me_row := str(e.get("name", "")) == Game.player_name and Board.registered != ""
+			var rank := int(e.get("rank", 0))
+			var col: Color = [UiTheme.EMBER, Color(0.66, 0.76, 0.92), Color(0.8, 0.55, 0.35)][rank - 1] if rank >= 1 and rank <= 3 else UiTheme.BONE
+			var row := _board_row(str(rank), str(e.get("name", "")), str(int(e.get("points", 0))), Board.class_label(str(e.get("class", "")), str(e.get("spec", ""))), col, false)
+			if me_row:
+				var mark := UiTheme.flat(Color(UiTheme.EMBER, 0.18), Color(UiTheme.EMBER, 0.6), 6, 4.0)
+				row.add_theme_stylebox_override("panel", mark)
+			list.add_child(row)
+		var me: Dictionary = result.get("me", {})
+		if not me.is_empty():
+			if me.get("rank") == null:
+				mine.text = "You (%s) haven't scored yet%s." % [Game.player_name, " this week" if period == "week" else ""]
+			else:
+				mine.text = "You: #%d with %d points." % [int(me["rank"]), int(me["points"])]
+		if period == "week" and int(result.get("week_end", 0)) > 0:
+			var left := int(result["week_end"]) - int(Time.get_unix_time_from_system())
+			note.text = "Matches since Monday 00:00 UTC. A new week starts in %s." % _span(left)
+	if not Board.pending.is_empty():
+		mine.text += ("  " if mine.text != "" else "") + ("%d of your matches haven't been sent yet." % Board.pending.size() if Board.pending.size() > 1 else "One of your matches hasn't been sent yet.")
+
+
+## "2 days 5 hours", "3 hours 10 minutes", "12 minutes".
+static func _span(seconds: int) -> String:
+	seconds = maxi(seconds, 60)
+	var days := seconds / 86400
+	var hours := (seconds % 86400) / 3600
+	var minutes := (seconds % 3600) / 60
+	var plural := func(n: int, word: String) -> String: return "%d %s%s" % [n, word, "" if n == 1 else "s"]
+	if days > 0:
+		return "%s %s" % [plural.call(days, "day"), plural.call(hours, "hour")]
+	if hours > 0:
+		return "%s %s" % [plural.call(hours, "hour"), plural.call(minutes, "minute")]
+	return plural.call(minutes, "minute")
+
+
+func _board_row(rank: String, who: String, points: String, played: String, col: Color, header: bool) -> PanelContainer:
+	var row := PanelContainer.new()
+	row.add_theme_stylebox_override("panel", UiTheme.flat(Color(0, 0, 0, 0), Color.TRANSPARENT, 6, 4.0))
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 16)
+	row.add_child(line)
+	var size := 21 if header else 25
+	var cells: Array = [[rank, 64.0, HORIZONTAL_ALIGNMENT_RIGHT], [who, 300.0, HORIZONTAL_ALIGNMENT_LEFT], [points, 140.0, HORIZONTAL_ALIGNMENT_RIGHT], [played, 0.0, HORIZONTAL_ALIGNMENT_LEFT]]
+	for i in cells.size():
+		var cell: Array = cells[i]
+		var l := _body(str(cell[0]), size)
+		l.horizontal_alignment = cell[2]
+		l.clip_text = true
+		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		l.add_theme_color_override("font_color", UiTheme.ASH if header else (col if i < 2 else UiTheme.BONE))
+		if i == 3:
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			if not header:
+				l.add_theme_color_override("font_color", UiTheme.ASH)
+		else:
+			l.custom_minimum_size.x = cell[1]
+		if not header and i == 1:
+			l.add_theme_font_override("font", UiTheme.bold_font())
+		line.add_child(l)
+	return row

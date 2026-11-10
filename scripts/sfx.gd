@@ -11,6 +11,14 @@ const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attac
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],
 	"clang": ["clang", "clang_b"], "step": ["step_a", "step_b", "step_c"]}
 const POOL := 14
+## Each place has its own music, in three stems that stay in step: calm, hunted and dawn.
+## The menu has one theme of its own.
+const MUSIC_SETS := {
+	"village": ["night", "hunted", "dawn"],
+	"mists": ["mists_night", "mists_hunted", "mists_dawn"],
+	"fort": ["fort_night", "fort_hunted", "fort_dawn"],
+	"menu": ["menu", "", ""],
+}
 const MUSIC_BUS := "Music"
 const SOUND_BUS := "Sounds"
 
@@ -22,6 +30,8 @@ var _ambient: AudioStreamPlayer
 var _music: Array[AudioStreamPlayer] = []
 var _targets := [-2.0, -60.0, -60.0] # calm, hunted, dawn
 var _music_on := false
+var music_set := "village"
+var _music_cache := {} # set -> its three streams, loaded once
 var _rain: AudioStreamPlayer
 var _rain_target := -60.0
 
@@ -40,6 +50,7 @@ func _ready() -> void:
 	for sound in ["warning", "fall", "impact"]:
 		_streams["artillery_" + sound] = _artillery_sound(sound)
 	_music = [_stem("night"), _stem("hunted"), _stem("dawn")]
+	_music_cache["village"] = _music.map(func(p: AudioStreamPlayer) -> AudioStream: return p.stream)
 	for i in POOL:
 		var p := AudioStreamPlayer.new()
 		p.bus = SOUND_BUS
@@ -103,7 +114,37 @@ func _stem(stem: String) -> AudioStreamPlayer:
 
 
 func music_is_playing() -> bool:
-	return _music_on and _music[0].playing and _music[1].playing and _music[2].playing
+	return _music_on and _music.all(func(p: AudioStreamPlayer) -> bool: return p.playing or p.stream == null)
+
+
+## Changes to another place's music. Its stems start together, from the top.
+func use_music(which: String) -> void:
+	if which == music_set or not MUSIC_SETS.has(which):
+		return
+	if not _music_cache.has(which):
+		var streams: Array = []
+		for stem: String in MUSIC_SETS[which]:
+			var path := "res://assets/music/%s.ogg" % stem
+			if stem != "" and ResourceLoader.exists(path):
+				var loop: AudioStreamOggVorbis = load(path)
+				loop.loop = true
+				streams.append(loop)
+			else:
+				streams.append(null)
+		if streams[0] == null:
+			return # not made yet: keep what is playing
+		_music_cache[which] = streams
+	music_set = which
+	var streams: Array = _music_cache[which]
+	for i in _music.size():
+		_music[i].stop()
+		_music[i].stream = streams[i]
+		# Only the calm stem may start loud: the others fade in when the night asks for them.
+		_music[i].volume_db = _music[i].volume_db if i == 0 else -60.0
+	if _music_on:
+		for p in _music:
+			if p.stream:
+				p.play()
 
 
 func ambient(on: bool) -> void:
@@ -114,7 +155,8 @@ func ambient(on: bool) -> void:
 	if on and not _music_on:
 		_music_on = true
 		for p in _music:
-			p.play()
+			if p.stream:
+				p.play()
 
 
 ## A steady loop while it rains. The volume changes smoothly, so walking indoors sounds right.

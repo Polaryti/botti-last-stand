@@ -1,5 +1,19 @@
 # Changelog
 
+## Development — Names, the leaderboard and new music
+### Your name
+- Choose a display name when you start the game. Other players see it in games together and on the leaderboard, and each name belongs to one player. Tap your name at the top of the menu, or in Play Together, to change it.
+- Choose a name offline and it waits for the next connection. If someone takes it in the meantime, the game asks you for another.
+### Leaderboard
+- A new Leaderboard on the menu lists the top 50 players of all time and of this week (from Monday 00:00 UTC), with their points and their most-played class and profession. Your own place shows even when you're not in the top 50.
+- Every finished match outside the Sandbox earns points: 1 per kill, 5 per full minute, 50 for winning. Easy scores 0.75 times as much and Hard 1.25 times. The end screen shows what the match was worth.
+- Matches played offline are kept and sent later, and each counts once. The dev app and the released game have separate leaderboards.
+### Music and sound
+- The menu has a theme of its own. The Mists and Defend the Fort each have new music: one for the quiet, one for when you're hunted, and one for dawn.
+### The world
+- Homes have rugs, shelves of crockery and herbs drying from the beams. Barns, sheds and halls get shelves.
+- Gaining a level sends a golden ring and rising sparks around you, and every ability flares in its class's colour at your feet. Other players see both.
+
 ## Development — Living upgrades and safer paths
 ### Store and Armory
 - Heavy Infantry upgrades are now permanent Store purchases: Oathkeeper (240 Doubloons), Last Rites (260) and Faultline (280). Equip or disable them in the Armory; they work on their matching professions. The original free skill-tree choices return.

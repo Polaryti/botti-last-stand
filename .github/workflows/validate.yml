@@ -41,6 +41,8 @@ jobs:
             group: world
           - suite: regressions
             mode: coop
+          - suite: board
+            mode: coop
           - suite: render
             mode: coop
           - suite: network
@@ -79,6 +81,13 @@ jobs:
           unzip -q "$archive" -d "$RUNNER_TEMP/godot"
           echo "GODOT=$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "$GITHUB_ENV"
           rm "$archive" SHA512-SUMS.txt
+      - uses: actions/setup-node@v5
+        if: matrix.suite == 'board'
+        with:
+          node-version: "22"
+      - name: Local copies of the leaderboard
+        if: matrix.suite == 'board'
+        run: npm ci --prefix server/leaderboard --no-audit --no-fund
       - name: Import all resources
         shell: bash
         run: |

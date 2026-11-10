@@ -506,10 +506,111 @@ func house(width: float, depth: float, h: float, ridge: String, style: Dictionar
 	for corner: Vector2 in [Vector2(x0, z0), Vector2(x1, z0), Vector2(x0, z1), Vector2(x1, z1)]:
 		l.box(Vector3(corner.x, h * 0.5, corner.y), Vector3(0.4, h, 0.4), BEAM)
 	_roof(l, width, depth, h, rise, ridge, style["roof"], plaster)
+	_dress(l, width, depth, h, walls, plaster.is_equal_approx(PLASTER) or plaster.is_equal_approx(PLASTER_B))
 	add(l)
 	# A ceiling: flyers cannot reach you through it, and nothing can be shot through it.
 	collider(Vector3(0, h + 0.1, 0), Vector3(width, 0.2, depth))
 	w.perches.append(xf * Vector3(0, h + 2.25, 0))
+
+
+const RUGS := [Color(0.42, 0.14, 0.12), Color(0.18, 0.24, 0.4), Color(0.48, 0.36, 0.14), Color(0.22, 0.3, 0.18)]
+const CROCKERY := [Color(0.62, 0.36, 0.22), Color(0.72, 0.68, 0.58), Color(0.32, 0.36, 0.42), Color(0.5, 0.42, 0.3)]
+
+
+## Rooms that look lived in: shelves of crockery against bare stretches of wall, and in homes a
+## woven rug and tie beams overhead with herbs drying on them. Nothing collides: the rug is flat,
+## the shelves stand 28 cm from the wall and the beams hang above head height, so the furniture
+## placed in the room and the way through it stay exactly as they were.
+func _dress(l: LowPoly, width: float, depth: float, h: float, walls: Dictionary, home: bool) -> void:
+	if width < 4.0 or depth < 4.0:
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(roundi(xf.origin.x * 10.0), roundi(xf.origin.z * 10.0), roundi(width * 10.0 + depth)))
+	_shelves(l, width, depth, h, walls, rng)
+	# Barns, sheds and stone halls keep their bare floors; homes get a rug and drying herbs.
+	if not home:
+		return
+	# A rug, with a border, just above the floor.
+	var rug: Color = RUGS[rng.randi() % RUGS.size()]
+	var rug_size := Vector2(minf(width * 0.45, 3.6), minf(depth * 0.4, 2.6))
+	l.box(Vector3(0, 0.086, 0), Vector3(rug_size.x, 0.012, rug_size.y), rug)
+	l.box(Vector3(0, 0.094, 0), Vector3(rug_size.x - 0.36, 0.012, rug_size.y - 0.36), rug.lightened(0.18))
+	l.box(Vector3(0, 0.1, 0), Vector3(rug_size.x - 0.9, 0.012, rug_size.y - 0.9), rug)
+	# Tie beams across the room, with bundles of herbs hanging from them.
+	if h >= 2.8:
+		var across_x := width <= depth
+		var span_len := width if across_x else depth
+		var run := depth if across_x else width
+		var count := maxi(1, int(run / 3.2))
+		for i in count:
+			var at := -run * 0.5 + run * (i + 1) / (count + 1)
+			var beam_at := Vector3(0, h - 0.32, at) if across_x else Vector3(at, h - 0.32, 0)
+			l.box(beam_at, Vector3(span_len, 0.18, 0.18) if across_x else Vector3(0.18, 0.18, span_len), BEAM)
+			for j in 3:
+				if rng.randf() < 0.5:
+					continue
+				var off := rng.randf_range(-span_len * 0.35, span_len * 0.35)
+				var hang := beam_at + (Vector3(off, -0.09, 0) if across_x else Vector3(0, -0.09, off))
+				var green := Color(0.3, 0.38, 0.18).lerp(Color(0.5, 0.42, 0.22), rng.randf())
+				l.prism(hang, hang + Vector3.DOWN * rng.randf_range(0.3, 0.45), 0.02, 0.09, 5, green)
+
+
+## Shelves of crockery on the two longest bare stretches of wall, from shoulder height up.
+func _shelves(l: LowPoly, width: float, depth: float, h: float, walls: Dictionary, rng: RandomNumberGenerator) -> void:
+	# Shelves on the two longest bare stretches of wall.
+	var spans: Array = []
+	for side: String in ["n", "s", "w", "e"]:
+		var along_x := side == "n" or side == "s"
+		var length := width if along_x else depth
+		var span := _longest_gap(length, walls.get(side, []))
+		if span.y - span.x >= 1.6:
+			spans.append([side, span])
+	spans.sort_custom(func(p: Array, q: Array) -> bool: return (p[1] as Vector2).y - (p[1] as Vector2).x > (q[1] as Vector2).y - (q[1] as Vector2).x)
+	for k in mini(2, spans.size()):
+		var side: String = spans[k][0]
+		var span: Vector2 = spans[k][1]
+		var length := minf(span.y - span.x - 0.3, 2.2)
+		var centre := (span.x + span.y) * 0.5
+		var inward := 0.15 + 0.14
+		var pos := Vector3.ZERO
+		var along := Vector3.ZERO
+		match side:
+			"n": pos = Vector3(centre, 0, -depth * 0.5 + inward); along = Vector3.RIGHT
+			"s": pos = Vector3(centre, 0, depth * 0.5 - inward); along = Vector3.RIGHT
+			"w": pos = Vector3(-width * 0.5 + inward, 0, centre); along = Vector3.BACK
+			"e": pos = Vector3(width * 0.5 - inward, 0, centre); along = Vector3.BACK
+		var deep := Vector3(0.28, 0.05, 0.28) - along * 0.28 + along * length
+		for shelf_y: float in ([1.62, 2.12] if h >= 2.9 else [1.62]):
+			l.box(pos + Vector3.UP * shelf_y, deep, BEAM.lightened(0.12))
+			for end: float in [-0.5, 0.5]:
+				l.box(pos + along * (end * (length - 0.2)) + Vector3.UP * (shelf_y - 0.12), Vector3(0.05, 0.2, 0.05) + (Vector3(0.0, 0.0, 0.18) if along == Vector3.RIGHT else Vector3(0.18, 0.0, 0.0)), BEAM)
+			# Jars, jugs and bowls along it.
+			var x := -length * 0.5 + 0.2
+			while x < length * 0.5 - 0.15:
+				var col: Color = CROCKERY[rng.randi() % CROCKERY.size()]
+				var tall := rng.randf_range(0.12, 0.3)
+				var wide := rng.randf_range(0.06, 0.11)
+				var base := pos + along * x + Vector3.UP * (shelf_y + 0.025)
+				l.prism(base, base + Vector3.UP * tall, wide, wide * rng.randf_range(0.55, 0.95), 6, col)
+				x += wide * 2.0 + rng.randf_range(0.12, 0.32)
+
+
+## The longest stretch of a wall with no door or window in it, measured from its centre, kept a
+## little clear of the corners and of every opening.
+static func _longest_gap(length: float, openings: Array) -> Vector2:
+	var cuts: Array = []
+	for o: Dictionary in openings:
+		cuts.append(Vector2(float(o["at"]) - float(o["width"]) * 0.5 - 0.35, float(o["at"]) + float(o["width"]) * 0.5 + 0.35))
+	cuts.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	var best := Vector2.ZERO
+	var cursor := -length * 0.5 + 0.55
+	for c: Vector2 in cuts:
+		if c.x - cursor > best.y - best.x:
+			best = Vector2(cursor, c.x)
+		cursor = maxf(cursor, c.y)
+	if length * 0.5 - 0.55 - cursor > best.y - best.x:
+		best = Vector2(cursor, length * 0.5 - 0.55)
+	return best
 
 
 ## The space a building takes on the map, for the map screen and for keeping grass out.

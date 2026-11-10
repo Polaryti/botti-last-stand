@@ -85,6 +85,12 @@ jobs:
         id: dev
         run: python3 tools/prepare_dev_build.py --build-number "$GITHUB_RUN_NUMBER" --commit "$GITHUB_SHA"
 
+      - name: Point it at the dev leaderboard
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python3 tools/set_leaderboard_url.py dev
+
       - name: Install Android Gradle template
         run: |
           # Template installation requires an export invocation; its first export may fail
@@ -188,6 +194,20 @@ jobs:
               --prerelease --latest=false --notes-file build/dev/notes.md
           fi
           gh release upload "$TAG" "build/dev/$APK_NAME" "build/dev/$APK_NAME.sha256" build/dev/build-info.json --clobber
+
+      # Every push to dev publishes a build, so old ones pile up. The game only ever offers the
+      # newest, and testers need at most a few to compare against.
+      - name: Keep only the newest five dev builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.prerelease and (.tag_name | test("^dev-[0-9]+-[0-9a-f]+$"))) | .tag_name' \
+            | sort -t- -k2,2nr | tail -n +6 > old-dev-builds.txt
+          while read -r tag; do
+            echo "Removing $tag"
+            gh release delete "$tag" --cleanup-tag --yes
+          done < old-dev-builds.txt
 
       - name: Remove the temporary signing key
         if: always()

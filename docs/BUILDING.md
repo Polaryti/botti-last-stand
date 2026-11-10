@@ -133,7 +133,8 @@ one machine because the gameplay suite also exercises hosting and discovery on t
     python3 tools/run_checks.py gameplay                           # full ordered suite
     python3 tools/run_checks.py gameplay --group classes           # one isolated group
     python3 tools/run_checks.py gameplay --case test_version_18     # one named scenario
-    python3 tools/run_checks.py rework                             # Commander, Adept and Epic score contracts
+    python3 tools/run_checks.py rework                             # Commander and Adept rules
+    python3 tools/run_checks.py board                              # names and leaderboard, against local boards
     python3 -m unittest discover -s tests -p 'test_*.py'             # runner and packaging checks
     godot --headless --path . res://tests/test_game.tscn -- soakonly # optional long soak
 
@@ -141,6 +142,10 @@ Gameplay uses fixed 1/60 game-second physics steps and uncapped headless renderi
 seed per scenario. Groups are `core`, `recent`, `legacy`, `classes` and `world`. Each scenario prints
 its check count and elapsed time; add `verbose` to the direct Godot invocation for individual successes.
 The former overlapping `new`, `quick` and `v201` plans have been replaced by named groups/cases.
+
+The `board` suite needs `npm ci` in `server/leaderboard` first. It starts local copies of the
+production and dev boards (wrangler with local databases), runs the game against the production one
+and checks the dev one is refused. `npm test` there tests the board server alone. See [Leaderboard](LEADERBOARD.md).
 
 Multiplayer has its own test, which runs two copies of the game talking to each other. Start the host and the client in two terminals. The third word can be `bots`, `botsffa`, `coop`, `ffa`, `teams`, `fort`, `ride`, `chariot`, `commander`, `room` or `soak`:
 
@@ -177,7 +182,7 @@ Everything generated is made by the scripts in `tools/`. They need Python 3 with
 | Script | Makes |
 |---|---|
 | `tools/make_audio.py` | All sound effects |
-| `tools/make_music.py` | All the music. The score is written in this file, and it plays it with the VSCO 2 Community Edition samples. They are 3 GB and not kept here, so clone https://github.com/sgossner/VSCO-2-CE and pass its folder: `python3 tools/make_music.py path/to/VSCO-2-CE` |
+| `tools/make_music.py` | All the music: the Village's three stems (`night`, `hunted`, `dawn`), the Mists' and the Fort's (`mists_*`, `fort_*`) and the menu theme (`menu`). The score is written in this file, and it plays it with the VSCO 2 Community Edition samples. They are 3 GB and not kept here, so clone https://github.com/sgossner/VSCO-2-CE and pass its folder: `python3 tools/make_music.py path/to/VSCO-2-CE [stem ...]`. A sparse checkout of `Strings Brass Woodwinds Percussion` is enough |
 | `tools/make_icons.py` | Every icon |
 | `tools/make_ui.py` | Discs, slider knob, menu shade, the Botti Doubloon and the wordmark |
 | `tools/make_launcher.py` | Launcher icon and splash |

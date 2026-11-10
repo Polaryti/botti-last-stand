@@ -215,6 +215,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	Terrain.use_half(map.land_half)
 	half_size = float(map.land_half)
@@ -2943,6 +2944,54 @@ func _tick_rings(delta: float) -> void:
 			node.visible = false
 		else:
 			(node.material_override as ShaderMaterial).set_shader_parameter("progress", 1.0 - float(ring["left"]) / RING_TIME)
+
+
+var _rise: CPUParticles3D
+
+
+## Motes rising around someone, for a level gained. One burst at a time is plenty, so it is reused.
+func fx_rise(at: Vector3, col: Color) -> void:
+	if _rise == null:
+		_rise = CPUParticles3D.new()
+		_rise.one_shot = true
+		_rise.emitting = false
+		_rise.amount = 28
+		_rise.lifetime = 1.4
+		_rise.explosiveness = 0.7
+		_rise.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+		_rise.emission_ring_axis = Vector3.UP
+		_rise.emission_ring_radius = 1.4
+		_rise.emission_ring_inner_radius = 0.9
+		_rise.emission_ring_height = 0.1
+		_rise.direction = Vector3.UP
+		_rise.spread = 10.0
+		_rise.initial_velocity_min = 1.4
+		_rise.initial_velocity_max = 3.0
+		_rise.gravity = Vector3(0, 0.5, 0)
+		_rise.scale_amount_min = 0.07
+		_rise.scale_amount_max = 0.13
+		var fade := Gradient.new()
+		fade.set_color(0, Color(1, 1, 1, 1))
+		fade.set_color(1, Color(1, 1, 1, 0))
+		_rise.color_ramp = fade
+		# Small round motes: a low sphere looks round from every side, with no billboard to set up.
+		var mote := SphereMesh.new()
+		mote.radius = 0.5
+		mote.height = 1.0
+		mote.radial_segments = 6
+		mote.rings = 3
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		look.vertex_color_use_as_albedo = true
+		mote.material = look
+		_rise.mesh = mote
+		_rise.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_rise)
+	_rise.global_position = at + Vector3.UP * 0.15
+	_rise.color = col
+	_rise.restart()
 
 
 func fx_blast(at: Vector3, radius: float, col: Color) -> void:

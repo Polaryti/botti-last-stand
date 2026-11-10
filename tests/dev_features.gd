@@ -31,6 +31,7 @@ func _ready() -> void:
 	await _snakes()
 	await _wood_and_gates()
 	await _traversal()
+	_music_and_polish()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -247,3 +248,33 @@ func _store_upgrades() -> void:
 		check(not Game.item_active(id), "Armory can disable " + id)
 		Game.set_item_on(id, true)
 		check(Game.item_active(id), "Armory can equip " + id)
+
+
+## Each place has its own music, the menu its own theme, and homes are dressed without changing the way through.
+func _music_and_polish() -> void:
+	for set_name: String in Sfx.MUSIC_SETS:
+		for stem: String in Sfx.MUSIC_SETS[set_name]:
+			check(stem == "" or ResourceLoader.exists("res://assets/music/%s.ogg" % stem), "the %s music has its %s stem" % [set_name, stem])
+	var was := Sfx.music_set
+	Sfx.ambient(true)
+	Sfx.use_music("fort")
+	check(Sfx.music_set == "fort" and Sfx.music_is_playing() and (Sfx._music[0].stream as AudioStreamOggVorbis).resource_path.ends_with("fort_night.ogg"), "the Fort plays its own three stems")
+	check(Sfx._music.all(func(p: AudioStreamPlayer) -> bool: return p.stream and (p.stream as AudioStreamOggVorbis).loop), "and all of them loop")
+	Sfx.use_music("menu")
+	check(Sfx._music[0].stream != null and Sfx._music[1].stream == null and Sfx._music[2].stream == null and Sfx.music_is_playing(), "the menu has one theme of its own")
+	Sfx.use_music("nowhere")
+	check(Sfx.music_set == "menu", "an unknown place keeps what is playing")
+	var lengths: Array = []
+	for stem: String in ["mists_night", "mists_hunted", "mists_dawn"]:
+		lengths.append(snappedf((load("res://assets/music/%s.ogg" % stem) as AudioStream).get_length(), 0.01))
+	check(lengths[0] == lengths[1] and lengths[1] == lengths[2], "the Mists stems are the same length, so they stay in step: %s" % str(lengths))
+	Sfx.use_music(was)
+	# Shelves keep clear of doors and windows, and of the corners.
+	var gap := MapBuilder._longest_gap(8.0, [{"at": -1.0, "width": 2.2}, {"at": 2.6, "width": 1.1}])
+	check(is_equal_approx(gap.x, 0.45) and is_equal_approx(gap.y, 1.7), "the longest bare stretch of an 8 m wall with a door and a window: %s" % str(gap))
+	check(MapBuilder._longest_gap(6.0, []).is_equal_approx(Vector2(-2.45, 2.45)), "a bare wall keeps 55 cm from each corner")
+	# A level gained shows a ring and motes, and an ability its class's colour.
+	var rings_before := w._rings.filter(func(r: Dictionary) -> bool: return float(r["left"]) > 0.0).size()
+	p.add_xp(p.xp_needed())
+	check(w._rise != null and w._rise.emitting and w._rings.filter(func(r: Dictionary) -> bool: return float(r["left"]) > 0.0).size() > rings_before, "a level gained sends a ring and rising motes")
+

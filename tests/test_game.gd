@@ -2435,7 +2435,8 @@ func test_version_11() -> void:
 	m.show_together(Main.ONLINE_TAB)
 	await frames(2)
 	if EpicNet.available():
-		ok(m.panel.find_children("*", "LineEdit", true, false).size() == 2, "Online asks for a room code")
+		# The name is a button now (it opens the name prompt), so the room code is the only box.
+		ok(m.panel.find_children("*", "LineEdit", true, false).size() == 1, "Online asks for a room code")
 	# What is behind Online is nobody's business.
 	var words: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
 	ok(not " ".join(words).contains("Epic"), "and does not say what it runs on")
