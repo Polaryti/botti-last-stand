@@ -1,10 +1,10 @@
 # Changelog
 
-## Development — Steadier online games, a clearer team and a fairer Fort
+## 0.21.3 — Steadier Online Games and a Fairer Fort (10 November 2026)
 
 ### Online games
 - A player whose connection was slower than the others no longer falls further and further behind. Through the online relay, positions, poses and the clock used to queue up for a slow phone; now a late update is skipped and the newest one is used, so that phone stays in step and its timer agrees with the host's.
-- Phones on this version only play with phones on this version.
+- Phones on 0.21.3 only play with other phones on 0.21.3: update every phone before playing together.
 
 ### Playing together
 - The list of players shows everyone's health. A player who is down is greyed out with "Down, back in 14 s", and "Out" when they have no lives left.
