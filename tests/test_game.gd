@@ -4398,14 +4398,14 @@ func test_classes() -> void:
 	ok(pl.toast == "No mana", "no mana, no bolt")
 	mz.set_physics_process(true)
 	await kill_all()
-	pl.slots = ["staff", "dagger"]
+	pl.slots = ["staff", null]
 	pl.current = 0
 	pl._equip()
 	w.spawn_pickup_at(front(1.0), Pickup.Kind.WEAPON, "sword")
 	await seconds(0.3)
 	pl.take_nearby_weapon()
 	await frames(2)
-	ok(pl.slots.has("staff") and pl.slots.has("sword"), "the Magician keeps the staff when swapping")
+	ok(pl.weapon_id() == "staff" and not pl.slots.has("sword") and not pl.can_use("sword"), "the Magician refuses a ground weapon and keeps only the staff")
 	clear_pickups()
 
 	# Chivalry and the horse.
