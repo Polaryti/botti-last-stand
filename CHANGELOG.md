@@ -1,47 +1,52 @@
 # Changelog
 
-## Development — Names, the leaderboard and new music
+## 0.21.1 — Names and the Leaderboard (10 November 2026)
+
 ### Your name
 - Choose a display name when you start the game. Other players see it in games together and on the leaderboard, and each name belongs to one player. Tap your name at the top of the menu, or in Play Together, to change it.
 - Choose a name offline and it waits for the next connection. If someone takes it in the meantime, the game asks you for another.
+
 ### Leaderboard
 - A new Leaderboard on the menu lists the top 50 players of all time and of this week (from Monday 00:00 UTC), with their points and their most-played class and profession. Your own place shows even when you're not in the top 50.
 - Every finished match outside the Sandbox earns points: 1 per kill, 5 per full minute, 50 for winning. Easy scores 0.75 times as much and Hard 1.25 times. The end screen shows what the match was worth.
 - Matches played offline are kept and sent later, and each counts once. The dev app and the released game have separate leaderboards.
-### Music and sound
-- The menu has a theme of its own. The Mists and Defend the Fort each have new music: one for the quiet, one for when you're hunted, and one for dawn.
-### The world
-- Homes have rugs, shelves of crockery and herbs drying from the beams. Barns, sheds and halls get shelves.
-- Gaining a level sends a golden ring and rising sparks around you, and every ability flares in its class's colour at your feet. Other players see both.
 
-## Development — Living upgrades and safer paths
-### Store and Armory
-- Heavy Infantry upgrades are now permanent Store purchases: Oathkeeper (240 Doubloons), Last Rites (260) and Faultline (280). Equip or disable them in the Armory; they work on their matching professions. The original free skill-tree choices return.
-- Upgrade displays demonstrate their effects: a shower of arrows, a Berserker rising through flames, moving pets, flurries, shrouds, funeral flames, healing motes and ground fissures.
-### The Village
-- Dry hillside navigation restrictions no longer form invisible walls for players. Deep-water and map-boundary barriers remain.
-- The Windmill has collision matching its tapered tower. Bonfires have level ground beneath their full footprints, and the fires near Windmill Hill and Castle Road have clearer positions.
-- Ground continues behind the boundary forest, covering the visible seam. A small memorial resting place fills the clearing north of the Church.
-### The Mists
-- The map names every island and shelf, and highlights the islands affected by Mist Storms, including the final retreat.
-- Shelf stairs have matching continuous walking surfaces and solid ramp connections across island rims. Shrines have wider, clearly open approaches.
-- The northern parkour shortcut reaches its shelf. Floating stones have matching upper and lower facets; the southern monument has a smaller, centred base and a clearer staircase landing.
-- The forest parkour spiral leaves headroom above the western shelf ramp, keeping the route open for mobs and bots.
-- Everyone in a multiplayer room needs this version.
-
-## Development — Iron vows and woodland expeditions
 ### Classes and skills
 - Monk now costs 920 Doubloons and Artificer costs 598. Adept is available in the Store for 1,150; existing owners keep their unlocks, and its class code still works.
 - Guardian gains Oathkeeper: blocks store up to 20 healing, spent when raising Shield Dome to mend nearby allies and summons.
 - Warpriest gains Last Rites: every third kill sends out a funeral flame, healing allies near the fallen and igniting surrounding enemies.
 - Warlord gains Faultline: every third connecting swing splits a narrow line through the crowd, damaging, pushing and slowing enemies. Walls stop the fissure. Earthbreaker now counts connecting swings rather than each enemy struck.
+
+### Store and Armory
+- Heavy Infantry upgrades are now permanent Store purchases: Oathkeeper (240 Doubloons), Last Rites (260) and Faultline (280). Equip or disable them in the Armory; they work on their matching professions. The original free skill-tree choices return.
+- Upgrade displays demonstrate their effects: a shower of arrows, a Berserker rising through flames, moving pets, flurries, shrouds, funeral flames, healing motes and ground fissures.
+
+### Music
+- The menu has a theme of its own. The Mists and Defend the Fort each have new music: one for the quiet, one for when you're hunted, and one for dawn.
+
+### The Village
+- Dry hillside navigation restrictions no longer form invisible walls for players. Deep-water and map-boundary barriers remain.
+- The Windmill has collision matching its tapered tower. Bonfires have level ground beneath their full footprints, and the fires near Windmill Hill and Castle Road have clearer positions.
+- Ground continues behind the boundary forest, covering the visible seam. A small memorial resting place fills the clearing north of the Church.
+
+### The Mists
+- The map names every island and shelf, and highlights the islands affected by Mist Storms, including the final retreat.
+- Shelf stairs have matching continuous walking surfaces and solid ramp connections across island rims. Shrines have wider, clearly open approaches.
+- The northern parkour shortcut reaches its shelf. Floating stones have matching upper and lower facets; the southern monument has a smaller, centred base and a clearer staircase landing.
+- The forest parkour spiral leaves headroom above the western shelf ramp, keeping the route open for mobs and bots.
+
 ### The world
+- Homes have rugs, shelves of crockery and herbs drying from the beams. Barns, sheds and halls get shelves.
+- Gaining a level sends a golden ring and rising sparks around you, and every ability flares in its class's colour at your feet. Other players see both.
 - Mist Storms gather every 70 seconds. Their warning, damage duration and final-boss retreat rules remain the same.
 - Snakes slither, breathe and lunge when biting, including other players' snakes. Their Store preview moves too.
 - Fort firewood replenishes in reachable woodland locations, well away from the gates. Each damaged gate shows the wood needed on both faces; the HUD only lists what you carry.
 - Bots use the Fort’s side doors when fetching woodland supplies instead of walking into the walls.
 - Repaired gates wait for players and summons as well as enemies to leave the doorway before closing. Summons appear on their correct ground height immediately.
 - Fences and fallen logs follow uneven terrain. Rocks settle onto slopes, and trees and boulders leave house footprints clear.
+
+### Playing together
+- Everyone in a multiplayer room needs this version.
 
 ## 0.21.0 — The Mists Update (9 November 2026)
 ### Enter The Mists
