@@ -28,7 +28,7 @@ const ALL := {
 	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 598,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
 	"commander": {"name": "Commander", "weapon": "sword", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": true, "hidden": true, "unavailable": true, "unique": true, "no_bots": true,
-		"desc": "First prize in VRAIN tournaments. Only one Commander per match; never a bot. Command rallies allies, then becomes Last Command at level 10. Warlock, Gunner or Vanguard."},
+		"desc": "First prize in VRAIN tournaments. Only one Commander per match; never a bot. Command rallies allies, then becomes Last Command at level 10."},
 }
 
 static func icon(id: String) -> String:

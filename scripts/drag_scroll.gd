@@ -2,8 +2,7 @@ class_name DragScroll
 extends ScrollContainer
 ## A list that scrolls the way a phone's lists do. Drag anywhere on it, tiles and buttons included, and
 ## it follows the finger exactly; let go while moving and it glides on and slows down; pull past the
-## end and it gives a little, then settles back. A thin bar on the right shows where you are while you
-## scroll, and can itself be grabbed and dragged. A mouse wheel scrolls smoothly too.
+## end and it gives a little, then settles back. The scroll indicator stays hidden. A mouse wheel scrolls smoothly too.
 ## A touch that stays still is a tap on whatever is under it. One that moves is a drag, and then the
 ## button it began on forgets it was pressed.
 
@@ -129,7 +128,7 @@ func _press(at: Vector2, finger: int) -> void:
 	_samples.clear()
 	_samples.append(Vector2(Time.get_ticks_msec(), at.y))
 	# The bar can be taken hold of while it is showing.
-	_on_bar = _bar_left > 0.0 and _longest() > 0.0 and at.x > get_global_rect().end.x - BAR_GRAB
+	_on_bar = false
 	if _on_bar:
 		_dragging = true
 		_forget_press()
@@ -241,13 +240,7 @@ func _thumb_length() -> float:
 
 
 func _draw_bar() -> void:
-	if _longest() <= 0.0 or _bar_left <= 0.0:
-		return
-	var alpha := clampf(_bar_left / 0.3, 0.0, 1.0) * (0.75 if _on_bar else 0.5)
-	var length := _thumb_length()
-	var at := clampf(_pos / _longest(), 0.0, 1.0) * (size.y - length)
-	var w := BAR_WIDTH * (1.6 if _on_bar else 1.0)
-	_bar.draw_rect(Rect2(size.x - w - 3.0, at, w, length), Color(1.0, 0.92, 0.78, alpha))
+	pass # Lists scroll by touch or mouse wheel; no visible thumb.
 
 
 func _forget_press() -> void:

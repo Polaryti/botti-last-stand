@@ -1,5 +1,14 @@
 # Changelog
 
+## Development — A portal worth defending
+- The Fort now protects a glowing portal to The Mists. Its objective health, gate repairs and multiplayer rules stay familiar.
+- Clearer combat messages, an invisibility tint and timed status icons make temporary effects easier to follow.
+- Elemental arrows keep their arrow silhouette, with smaller fire trails and green poison trails.
+- The Codex adds Status Effects and Maps, map-specific enemy tags and updated descriptions. Duplicate Commander and Store text is removed.
+- Menus respect all four mobile safe-area edges; touch lists hide scrollbar indicators. The Adept and Fort panels have separate space.
+- Fixed loading-screen hazard previews escaping into multiplayer, first-packet phantom attacks, lingering warm-up blood, and temporary material restoration on death.
+- Idle Clever enemies search farther for loose weapons.
+
 ## 0.21.3 — Steadier Online Games and a Fairer Fort (10 November 2026)
 
 ### Online games

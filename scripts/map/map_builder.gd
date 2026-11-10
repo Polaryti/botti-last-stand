@@ -1567,27 +1567,33 @@ func fort_keep() -> void:
 	l.prism(Vector3.UP * 0.5, Vector3.UP * 0.9, 0.7, 0.45, 8, CASTLE_STONE)
 	add(l)
 	solid(Vector3.UP * 0.5, Vector3(2.2, 1.0, 2.2))
-	var heart := LowPoly.new()
-	heart.prism(Vector3(0, -0.5, 0), Vector3(0, 0, 0), 0.08, 0.45, 8, Color(1.0, 0.36, 0.28))
-	heart.prism(Vector3(0, 0, 0), Vector3(0, 0.5, 0), 0.45, 0.08, 8, Color(1.0, 0.52, 0.36))
+	var ring := TorusMesh.new()
+	ring.inner_radius = 1.05
+	ring.outer_radius = 1.35
 	var mi := MeshInstance3D.new()
-	mi.mesh = heart.commit()
-	var m := LowPoly.material().duplicate() as StandardMaterial3D
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.disable_fog = true
-	mi.material_override = m
-	mi.position = xf.origin + Vector3.UP * 1.6
+	mi.name = "MistsPortalObjective"
+	mi.mesh = ring
+	mi.rotation.x = PI * 0.5
+	mi.position = xf.origin + Vector3.UP * 2.0
+	var stone_material := StandardMaterial3D.new()
+	stone_material.albedo_color = Color(0.22, 0.26, 0.3)
+	stone_material.emission_enabled = true
+	stone_material.emission = Color(0.1, 0.45, 0.5)
+	mi.material_override = stone_material
 	w.add_child(mi)
-	w.add_spinner(mi, Vector3.UP, 0.8)
-	w.add_glow(xf.origin + Vector3.UP * 1.6, Color(1.0, 0.36, 0.26), 4.0)
-	if quality > 0:
-		var light := OmniLight3D.new()
-		light.position = xf.origin + Vector3.UP * 2.2
-		light.light_color = Color(1.0, 0.42, 0.3)
-		light.light_energy = 2.2
-		light.omni_range = 9.0
-		w.add_child(light)
-		w.add_lantern_light(light)
+	var veil := MeshInstance3D.new()
+	var disc := SphereMesh.new()
+	disc.radius = 1.05
+	disc.height = 2.1
+	veil.mesh = disc
+	veil.scale = Vector3(1, 0.08, 1)
+	var glow := StandardMaterial3D.new()
+	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	glow.albedo_color = Color(0.2, 0.85, 0.85, 0.65)
+	veil.material_override = glow
+	mi.add_child(veil)
+	w.add_glow(mi.position, Color(0.3, 0.9, 0.9), 4.0)
 	w.fort.set_heart(xf.origin, mi)
 
 

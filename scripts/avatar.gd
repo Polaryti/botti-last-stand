@@ -155,6 +155,8 @@ func _play(anim_name: String, speed := 1.0) -> void:
 
 
 func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: float, flags: int, attacks: int, weapon: String, hp_left: float) -> void:
+	var first_pose := not _got_pose
+	if first_pose: _attack_seen = attacks
 	# Far in one step: a gate. No gliding across the sky.
 	if not _got_pose or at.distance_to(_target) > 12.0:
 		global_position = at
@@ -177,7 +179,7 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 		bar_time = 2.5
 	hp_fraction = hp_left
 	set_fallen(flags & 1 != 0)
-	var attacked := attacks != _attack_seen
+	var attacked := not first_pose and attacks != _attack_seen
 	if attacked:
 		_attack_seen = attacks
 		if not dead:
@@ -211,6 +213,10 @@ func play_cast(anim_name := "") -> void:
 func set_fallen(on: bool) -> void:
 	if on == dead:
 		return
+	_flash = 0.0
+	_ice_left = 0.0
+	_set_flash(false)
+	_show_ice(false)
 	dead = on
 	down_since = world.now if dead and world else -1.0
 	collision_layer = 0 if dead else LAYER_AVATAR
@@ -248,12 +254,11 @@ func _set_flash(on: bool) -> void:
 	for mi in _visual.find_children("*", "MeshInstance3D", true, false):
 		var part := mi as MeshInstance3D
 		if on:
-			if not part.has_meta("before_flash"):
-				part.set_meta("before_flash", part.material_override)
+			if not part.has_meta("status_base"):
+				part.set_meta("status_base", part.material_override)
 			part.material_override = _flash_material
-		elif part.has_meta("before_flash"):
-			part.material_override = part.get_meta("before_flash")
-			part.remove_meta("before_flash")
+		elif part.has_meta("status_base"):
+			part.material_override = _ice_look() if _ice_left > 0.0 else part.get_meta("status_base")
 
 
 ## What is happening to this player, as their own phone or the host says: flames when burning,
@@ -370,12 +375,11 @@ func _show_ice(on: bool) -> void:
 	for mi in _visual.find_children("*", "MeshInstance3D", true, false):
 		var part := mi as MeshInstance3D
 		if on:
-			if not part.has_meta("before_ice"):
-				part.set_meta("before_ice", part.material_override)
-			part.material_override = _ice_look()
-		elif part.has_meta("before_ice"):
-			part.material_override = part.get_meta("before_ice")
-			part.remove_meta("before_ice")
+			if not part.has_meta("status_base"):
+				part.set_meta("status_base", part.material_override)
+			part.material_override = _flash_material if _flash > 0.0 else _ice_look()
+		elif part.has_meta("status_base"):
+			part.material_override = _flash_material if _flash > 0.0 else part.get_meta("status_base")
 
 
 static func _ice_look() -> StandardMaterial3D:

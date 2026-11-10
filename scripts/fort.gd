@@ -183,7 +183,7 @@ func hit_heart(damage: float) -> void:
 	_dirty = true
 	if _banner_left <= 0.0:
 		_banner_left = 12.0
-		world.banner("They are at the heart!", 3.0)
+		world.banner("They are at the portal!", 3.0)
 		world.sfx_at("banshee", heart_at, -6.0)
 	if heart_hp <= 0.0:
 		_over = true

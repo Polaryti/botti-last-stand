@@ -1260,11 +1260,14 @@ func _decide(target: Target, to: Vector3, dist: float, dt: float) -> void:
 					_search_left = 12.0
 					_clear_goal()
 		State.INVESTIGATE:
-			if _arrived():
+			if type_id == "clever" and weapon_id == "":
+				_roam(dt)
+			elif _arrived():
 				state = State.SEARCH
 				_search_left = 8.0
 				_clear_goal()
 		State.SEARCH:
+			if type_id == "clever" and weapon_id == "": _roam(dt)
 			_search_left -= dt
 			if _search_left <= 0.0:
 				state = State.ROAM
@@ -1352,7 +1355,7 @@ func _fort_strike(gate: int, at: Vector3) -> void:
 
 func _roam(dt: float) -> void:
 	if type_id == "clever" and weapon_id == "":
-		var p := world.nearest_weapon_pickup(position, 34.0)
+		var p := world.nearest_weapon_pickup(position, world.half_size * 2.0)
 		if p:
 			if p.global_position.distance_to(position) < 1.6:
 				_take_weapon(p)

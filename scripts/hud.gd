@@ -285,6 +285,8 @@ func _draw() -> void:
 	if player.hurt_dir_time > 0.0:
 		_draw_hurt_direction(centre)
 	_draw_dive_warning(centre)
+	if player.invis_left > 0.0 or player.void_left > 0.0:
+		draw_rect(Rect2(Vector2.ZERO, s), Color(0.2, 0.12, 0.5, 0.16))
 	_draw_status(s)
 	if player.class_id == "adept":
 		_draw_stance(s)
@@ -303,9 +305,9 @@ func _draw() -> void:
 	_draw_weapon(s)
 	_draw_controls()
 	if player.toast_time > 0.0:
-		_centered(player.toast, Vector2(centre.x, s.y * 0.38), 30, Color(UiTheme.BONE, minf(1.0, player.toast_time * 2.0)))
+		_centered(player.toast, Vector2(centre.x, s.y * 0.38), 30, Color(UiTheme.MOSS if "DODGE" in player.toast else (UiTheme.EMBER if "Backstab" in player.toast or "Riposte" in player.toast else UiTheme.BONE), minf(1.0, player.toast_time * 2.0)))
 	if director and director.banner_time > 0.0:
-		_banner_text(director.banner, Vector2(centre.x, s.y * 0.32), minf(1.0, director.banner_time))
+		_banner_text(director.banner, Vector2(centre.x, 328.0 if player.class_id == "adept" and player.world.fort else s.y * 0.32), minf(1.0, director.banner_time))
 
 
 func _bar(r: Rect2, f: float, col: Color) -> void:
@@ -316,13 +318,13 @@ func _bar(r: Rect2, f: float, col: Color) -> void:
 		draw_style_box(_fill, Rect2(r.position, Vector2(maxf(r.size.x * part, minf(r.size.y, r.size.x)), r.size.y)))
 
 
-## The heart, the four gates, and how much wood you carry.
+## The portal, the four gates, and how much wood you carry.
 func _draw_fort(s: Vector2, centre: Vector2) -> void:
 	var fort := player.world.fort
 	var w := 260.0
-	var top := 122.0
+	var top := 194.0 if player.class_id == "adept" else 122.0
 	_bar(Rect2(centre.x - w * 0.5, top, w, 12), fort.heart_hp / Fort.HEART_HP, Color(0.9, 0.3, 0.24))
-	_centered("Heart", Vector2(centre.x - w * 0.5 - 36, top + 6), 18, UiTheme.BONE)
+	_centered("Portal", Vector2(centre.x - w * 0.5 - 36, top + 6), 18, UiTheme.BONE)
 	var gate_w := (w - 18.0) / 4.0
 	for i in fort.gates.size():
 		var g: Dictionary = fort.gates[i]
@@ -450,15 +452,6 @@ func _draw_status(s: Vector2) -> void:
 	elif Game.mode == Game.Mode.SANDBOX:
 		_clock(s, "Sandbox")
 	_draw_way_of_fighting(s)
-	var ailments: Array[String] = []
-	if player.poison_left > 0.0:
-		ailments.append("Poisoned")
-	if player.bleed_left > 0.0:
-		ailments.append("Bleeding")
-	if not ailments.is_empty():
-		_centered(", ".join(ailments), Vector2(s.x * 0.5, 124), 18, UiTheme.EMBER)
-	if player.guard_left > 0.0 and player.guard_left < 100.0 and player.spirit_left <= 0.0:
-		_centered("Invincible %d" % ceili(player.guard_left), Vector2(s.x * 0.5, s.y * 0.2), 24, UiTheme.EMBER)
 	if player.is_riding():
 		_text("%s %d" % [player.mount_name(), ceil(player.riding_left)], Vector2(_pad, y + 18), 20, UiTheme.EMBER)
 		y += 26.0

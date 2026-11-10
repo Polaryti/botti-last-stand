@@ -152,7 +152,7 @@ func show_menu(rebuild := false) -> void:
 	gap.custom_minimum_size.y = 14
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
-	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
+	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal to The Mists.", func() -> void: show_class_picker(Game.Mode.FORT)))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Leaderboard", "The top players of all time, and of this week.", func() -> void: show_leaderboard()))
@@ -232,6 +232,7 @@ func _fill_update_box() -> void:
 ## A margin that also keeps clear of the camera cut-out, on whichever side it is.
 func _screen_margin(side: int, top_bottom: int) -> MarginContainer:
 	var margin := MarginContainer.new()
+	UiTheme.fit_safe_area(margin, side, top_bottom)
 	_fill(margin)
 	var cut := 0
 	var win := DisplayServer.window_get_size()
@@ -761,7 +762,7 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 	cost.add_theme_font_override("font", UiTheme.bold_font())
 	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(cost)
-	var left := _soft("You have %d." % Game.doubloons, 24)
+	var left := Control.new()
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left)
@@ -919,7 +920,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	cost.add_theme_font_override("font", UiTheme.bold_font())
 	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(cost)
-	var left := _soft("You have %d." % Game.doubloons, 24)
+	var left := Control.new()
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left)
@@ -1333,7 +1334,7 @@ func _on_fort_lost() -> void:
 	var seconds := world.director.elapsed
 	var kills := world.player.kills
 	var earned := Game.award_doubloons(seconds, kills, false, false)
-	_end_screen("The heart has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
+	_end_screen("The portal has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
 
 
 func _earned_line(earned: int) -> String:

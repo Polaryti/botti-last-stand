@@ -26,6 +26,7 @@ var visual := false # someone else's shot: it flies here too, but only their pho
 var on_burst := Callable() # thrown things: what happens where it lands
 var chaos_left := 0 # bomblets: how many more times it bounces off and goes on
 var sparks := 0 # darts: how many others the spark jumps to
+var poison_trail := false
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
@@ -65,6 +66,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	_spin = 0.0
 	_owner_assigned = false
 	poison = Vector2.ZERO
+	poison_trail = false
 	stagger = 0.0
 	mesh = m
 	position = pos
@@ -91,6 +93,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	source = ""
 	owner_player = null
 	_returning = false
+	_flame.scale = Vector3.ONE * (0.3 if k in [Kind.ARROW, Kind.ENEMY_ARROW] else 1.0)
 	_flame.visible = on_fire or k == Kind.FIREBALL
 	_flame.modulate = Color(1.0, 0.6, 0.15)
 	_orient()
@@ -129,6 +132,9 @@ func _is_friendly() -> bool:
 
 
 func _physics_process(delta: float) -> void:
+	if kind == Kind.ARROW:
+		_flame.visible = fire or poison.y > 0.0 or poison_trail
+		_flame.modulate = Color(0.35, 0.95, 0.15) if (poison.y > 0 or poison_trail) and not fire else Color(1, 0.5, 0.1)
 	if _is_friendly() and not visual and _owner_assigned and not is_instance_valid(owner_player):
 		stop()
 		return

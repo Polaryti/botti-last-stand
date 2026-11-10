@@ -227,6 +227,12 @@ func _play() -> void:
 	await wait(0.6)
 	await sync(1)
 	ok(_avatar() != null and w.players.has(_avatar()), "the other player has a body here")
+	if rules == "coop":
+		var phantom := false
+		for puddle: MeshInstance3D in w._puddles:
+			if puddle.visible: phantom = true
+		ok(not phantom, "loading-screen hazards do not escape into the live multiplayer world")
+		ok(_avatar()._attack_left <= 0.0, "the initial remote pose does not replay an attack")
 	ok(w.zombies.size() > 0, "zombies are out (%d)" % w.zombies.size())
 	ok(w.pickups.size() > 3, "items are out (%d)" % w.pickups.size())
 	ok(w.director.running, "the clock is running")

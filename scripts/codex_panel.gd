@@ -4,7 +4,7 @@ extends Control
 
 signal closed
 
-const TABS := ["Classes", "Enemies", "Familiars", "Items", "Weapons"]
+const TABS := ["Classes", "Weapons", "Items", "Familiars", "Enemies", "Status Effects", "Maps"]
 
 var _list: VBoxContainer
 var _scroll: DragScroll
@@ -19,6 +19,7 @@ func build() -> void:
 	add_child(shade)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var margin := MarginContainer.new()
+	UiTheme.fit_safe_area(margin, 40, 16)
 	add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right"]:
@@ -30,15 +31,15 @@ func build() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
-	var top := HBoxContainer.new()
+	var top := HFlowContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	box.add_child(top)
 	for i in TABS.size():
 		var tab := Button.new()
 		tab.text = TABS[i]
 		tab.toggle_mode = false
-		tab.custom_minimum_size = Vector2(150, 52)
-		tab.add_theme_font_size_override("font_size", 24)
+		tab.custom_minimum_size = Vector2(110, 52)
+		tab.add_theme_font_size_override("font_size", 20)
 		var index := i
 		tab.pressed.connect(func() -> void:
 			Sfx.play("ui_click", -5.0)
@@ -51,7 +52,7 @@ func build() -> void:
 	var close := Button.new()
 	close.text = "Close"
 	close.custom_minimum_size = Vector2(120, 52)
-	close.add_theme_font_size_override("font_size", 24)
+	close.add_theme_font_size_override("font_size", 20)
 	close.pressed.connect(func() -> void:
 		Sfx.play("ui_click", -4.0)
 		closed.emit())
@@ -76,10 +77,12 @@ func show_tab(index: int) -> void:
 	_scroll.scroll_vertical = 0
 	match index:
 		0: _classes()
-		1: _enemies()
-		2: _familiars()
-		3: _items()
-		4: _weapons()
+		1: _weapons()
+		2: _items()
+		3: _familiars()
+		4: _enemies()
+		5: _statuses()
+		6: _maps()
 
 
 func _row(icon: String, color: Color, title: String, text: String, note := "") -> void:
@@ -120,19 +123,25 @@ func _classes() -> void:
 		var paths := PackedStringArray()
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:
 			paths.append(spec["name"])
-		var note := "Health %d, speed %d%%. Paths: %s." % [int(d["hp"]), int(round(float(d["speed"]) * 100.0)), ", ".join(paths)]
+		var note := "Base health %d, speed %d%%. Paths: %s." % [int(d["hp"]), int(round(float(d["speed"]) * 100.0)), ", ".join(paths)]
 		if not Game.owns_class(id):
 			note += " " + acquisition(id)
 		_row(ClassDefs.icon(id), ClassDefs.color(id), d["name"], d["desc"], note)
 
 
 func _enemies() -> void:
-	for id: String in ZombieDefs.ALL:
+	var order: Array = ZombieDefs.ALL.keys()
+	order.sort_custom(func(a: String, b: String) -> bool: return float(ZombieDefs.ALL[a].get("from", 0)) < float(ZombieDefs.ALL[b].get("from", 0)))
+	for id: String in order:
 		var d: Dictionary = ZombieDefs.ALL[id]
-		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
+		var locations := PackedStringArray()
+		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort"}.get(map_id, map_id.capitalize()))
+		var note := ("Maps: %s. " % ", ".join(locations) if not locations.is_empty() else "") + "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
-		if from > 0.0:
-			note += ". From minute %d" % ceili(from / 60.0)
+		if d.get("mist_boss", false):
+			note += ". Boss encounter around 8:30"
+		elif from > 0.0:
+			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], d["desc"], note)
 
 
@@ -140,14 +149,14 @@ func _familiars() -> void:
 	for id: String in PowerDefs.ALL:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if d["familiar"]:
-			_row(Icons.power(id), Color(d["color"]).darkened(0.35), d["name"], d["desc"], "%d seconds" % int(d["time"]))
+			_row(Icons.power(id), Color(d["color"]).darkened(0.35), d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
 
 
 func _items() -> void:
 	for id: String in PowerDefs.ALL:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if not d["familiar"]:
-			_row(Icons.power(id), Color(d["color"]).darkened(0.35), "%s Potion" % d["name"], d["desc"], "%d seconds" % int(d["time"]))
+			_row(Icons.power(id), Color(d["color"]).darkened(0.35), "%s Potion" % d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
 
 
 func _weapons() -> void:
@@ -179,3 +188,24 @@ static func acquisition(id: String) -> String:
 	if ClassDefs.ALL[id].get("unavailable", false):
 		return "Unlocked by redeeming a class code."
 	return "Available from the start."
+
+func _statuses() -> void:
+	_row("mist+clock", UiTheme.MIST, "Mist Storm", "After a warning, the affected island deals %d damage per second for %d seconds. Final storms persist until the match ends." % [int(MistStorm.DPS), int(MistStorm.DURATION)])
+	for entry: Dictionary in StatusCatalog.TIMED:
+		if entry["field"] == "frozen_left":
+			_row("drop+shield", UiTheme.MIST, "Frozen", "Ice prevents movement until its timer ends. You can still look around.")
+			_row("star", UiTheme.EMBER, "Stunned", "An impact briefly interrupts movement until its timer ends.")
+		else:
+			_row(entry["icon"], UiTheme.MIST, entry["name"], entry["desc"])
+	for id: String in PowerDefs.ALL:
+		var effect: Dictionary = PowerDefs.ALL[id]
+		if not effect["familiar"]:
+			_row(Icons.power(id), effect["color"], effect["name"], effect["desc"], "%d seconds" % int(effect["time"]))
+
+	for stat: String in Player._BUFF_ICONS:
+		_row(Player._BUFF_ICONS[stat], UiTheme.MOSS, stat.replace("_", " ").capitalize() + " bonus", "A temporary ability bonus. Strength and duration depend on the skill that grants it; repeated applications may stack.")
+
+func _maps() -> void:
+	_row("helm", UiTheme.BONE, "The Village", "The first village to be overrun and razed by the zombie hordes.")
+	_row("shield", UiTheme.BONE, "The Fort", "The last bastion protecting the portal to The Mists.")
+	_row("ghost", UiTheme.MIST, "The Mists", "The heart of mysterious worlds lying beyond our own.")

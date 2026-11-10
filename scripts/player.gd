@@ -464,6 +464,10 @@ const _BUFF_ICONS := {"speed": "boot+up", "melee_damage": "sword+up", "ranged_da
 
 func status_effects() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	for entry: Dictionary in StatusCatalog.TIMED:
+		var remaining := float(get(entry["field"]))
+		if remaining > 0 and remaining < 900:
+			out.append({"icon": ("drop+shield" if is_iced else "star") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
 		if key == "command_ranged" or key == "command_spell":
@@ -472,8 +476,10 @@ func status_effects() -> Array[Dictionary]:
 		var from_command := key.begins_with("command_")
 		out.append({"icon": _BUFF_ICONS.get(b["stat"], "star+up"), "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
 			"left": float(b["left"]), "stacks": int(b["stacks"])})
-	if dome_left > 0.0:
-		out.append({"icon": "shield_rect+up", "color": ClassDefs.color("heavy"), "left": dome_left, "stacks": 1})
+	if world and world.mist_storm and world.mist_storm.contains(global_position):
+		var storm := world.mist_storm
+		var remaining := storm.warning - storm.elapsed if storm.elapsed < storm.warning else (-1.0 if storm.finale else maxf(0, storm.warning + storm.duration - storm.elapsed))
+		out.append({"icon": "mist+clock", "color": Color(0.7, 0.4, 0.95), "left": remaining, "stacks": 1})
 	if world and not is_bot() and world.best_cover(global_position) != null:
 		out.append({"icon": "shield_rect+heart", "color": ClassDefs.color("heavy"), "left": -1.0, "stacks": 1})
 	return out
@@ -699,7 +705,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if dead or guard_left > 0.0 or (is_riding() and has_flag("unstoppable")):
 		return
 	if m("dodge") > 0.0 and randf() < m("dodge"):
-		say("Dodged")
+		say("◆ DODGE")
 		return
 	if has_flag("perfect_riposte") and _riposte_cd <= 0.0:
 		_riposte_cd = 8.0
@@ -1331,6 +1337,7 @@ func modify_damage(z: Zombie, base: float) -> float:
 	if m("backstab") > 0.0 and (unaware or z.is_behind(global_position)):
 		dmg *= 1.0 + m("backstab")
 		fire("backstab", {"z": z})
+		say("✦ Backstab")
 	if has_flag("pack_tactics") and world.ally_near(z.position, 5.0):
 		dmg *= 1.3
 	return dmg
