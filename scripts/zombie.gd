@@ -52,6 +52,8 @@ var dormant := false
 var flies := false
 var phases := false
 var hero := false
+var fort_gate := -1 # Defend the Fort: the gate this one was sent against
+var fort_shortcut := false # and whether it would rather take a breach somewhere else
 var bar_time := 0.0 # seconds left of the health bar shown after a hit
 var puppet := false # on a joined phone: the host decides, and this body only shows it
 var net_id := -1
@@ -1296,8 +1298,9 @@ func _decide(target: Target, to: Vector3, dist: float, dt: float) -> void:
 		_separation *= 0.25
 
 
-## In the fort: a zombie goes for the players only if it can actually get to them. Otherwise
-## it goes through the nearest open gate to the heart, or if every gate is shut, it breaks one.
+## In the fort: a zombie goes for the players only if it can actually get to them. Otherwise it
+## goes for its own gate (handed out evenly when it rose), and once that gate is open, through it to
+## the heart. A breach elsewhere draws only a few, so every gate keeps being pressed.
 func _fort_plan(target: Target, dist: float) -> bool:
 	var fort := world.fort
 	var me_inside := fort.inside(position)
@@ -1310,13 +1313,13 @@ func _fort_plan(target: Target, dist: float) -> bool:
 	state = State.INVESTIGATE
 	_direct = false
 	_hold = false
-	if me_inside or fort.any_open() or phases:
+	var g := fort.gate_for(self)
+	if me_inside or phases or not g["closed"]:
 		_fort_goal(fort.heart_at + (position - fort.heart_at).normalized() * 2.2)
 		if Vector2(position.x - fort.heart_at.x, position.z - fort.heart_at.z).length() < 3.8:
 			_hold = true
 			_fort_strike(-1, fort.heart_at)
 		return true
-	var g := fort.gate_nearest(position)
 	var front := fort.gate_front(g, position)
 	_fort_goal(front)
 	if Vector2(position.x - front.x, position.z - front.z).length() < 1.6:

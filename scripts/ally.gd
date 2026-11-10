@@ -6,8 +6,8 @@ extends Target
 
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
-const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0}
-const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry"]
+const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0}
+const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger"] # new kinds go at the end: their index travels between phones
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
 const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
 const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}
@@ -67,7 +67,7 @@ func _init(owner_world: World, ally_kind: String) -> void:
 	if BEASTS.has(ally_kind):
 		_build_beast(_visual_root())
 		return
-	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever"}.get(ally_kind, "skeleton")
+	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever", "ranger": "clever"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
 		_scenes[model] = load("res://assets/characters/%s.glb" % model)
 	_visual = (_scenes[model] as PackedScene).instantiate()
@@ -84,12 +84,12 @@ func _init(owner_world: World, ally_kind: String) -> void:
 		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		p.extra_cull_margin = 1.0
 		top = maxf(top, p.get_aabb().end.y)
-		if ally_kind not in ["skeleton", "body", "magician", "artificer", "infantry"]:
+		if ally_kind not in ["skeleton", "body", "magician", "artificer", "infantry", "ranger"]:
 			p.material_override = _ghost()
 	_visual.scale = Vector3.ONE * height / float(Zombie.BODY_TOP.get(model, maxf(top, 0.5)))
 	if ally_kind == "body":
 		ClassDefs.dress(_visual, "monk")
-	elif ally_kind in ["magician", "artificer", "infantry"]:
+	elif ally_kind in ["magician", "artificer", "infantry", "ranger"]:
 		ClassDefs.dress(_visual, ally_kind)
 		_equip_retinue()
 
@@ -316,19 +316,19 @@ func _tick_own(delta: float) -> void:
 	if kind == "decoy" or kind == "body":
 		velocity = Vector3.ZERO
 		return
-	if kind == "mirror" or (kind == "magician" and (_foe != null or _rival != null)):
+	if kind == "mirror" or (kind in ["magician", "ranger"] and (_foe != null or _rival != null)):
 		if _rival and not _rival.dead and _cooldown <= 0.0:
 			_cooldown = 1.2
 			_retinue_shot(position + Vector3.UP * 1.4, _rival.global_position + Vector3.UP)
 			_current = ""
-			_play("Spellcast_Shoot", 1.5)
+			_play(_shoot_anim(), 1.5)
 			return
 		if _foe and _foe.is_alive() and _cooldown <= 0.0:
 			_cooldown = 1.2
 			var from := position + Vector3.UP * 1.4
 			_retinue_shot(from, _foe.centre())
 			_current = ""
-			_play("Spellcast_Shoot", 1.5)
+			_play(_shoot_anim(), 1.5)
 		if _foe and _foe.is_alive():
 			var look := _foe.position - position
 			rotation.y = lerp_angle(rotation.y, atan2(look.x, look.z), min(1.0, delta * 9.0))
@@ -436,9 +436,16 @@ func _move_wolf(delta: float, moving: bool) -> void:
 		_head.rotation.y = sin(_idle_time * 0.7) * (0.0 if moving else 0.28)
 
 
+func _shoot_anim() -> String:
+	return "2H_Ranged_Shoot" if kind == "ranger" else "Spellcast_Shoot"
+
+
 func _retinue_shot(from: Vector3, at: Vector3) -> void:
 	var owner_player := _master()
-	if owner_player and kind == "magician":
+	if owner_player and kind == "ranger":
+		world.spawn_player_arrow(owner_player, from, (at - from).normalized() * 40.0, 0.0, 30.0, 1.0, WeaponDefs.DAMAGE * owner_player.m("ally_damage"), false)
+		world.sfx_at("bow", from, -9.0)
+	elif owner_player and kind == "magician":
 		world.spawn_bolt(owner_player, from, (at - from).normalized() * 30.0, 26.0, 1.0, 25.0 * owner_player.m("ally_damage"), false)
 	else:
 		world.mirror_bolt(from, at)
@@ -453,7 +460,7 @@ func _equip_retinue() -> void:
 	attachment.bone_name = bone
 	skeleton.add_child(attachment)
 	var hand := MeshInstance3D.new()
-	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "sword"
+	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind == "ranger" else "sword"
 	hand.mesh = WeaponDefs.mesh(weapon)
 	hand.rotation = WeaponDefs.hand_rotation(weapon)
 	hand.scale = Vector3.ONE * 0.8 / _visual.scale.x

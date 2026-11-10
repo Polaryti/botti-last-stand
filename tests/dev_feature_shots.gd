@@ -69,8 +69,38 @@ func _ready() -> void:
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
 	canvas.add_child(hud)
+	hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	await snap("gate_cost_outside", Vector3(0, 1.65, -36), Vector3(0.7, 1.8, -26))
 	await snap("gate_cost_inside", Vector3(0, 1.65, -16), Vector3(0.7, 1.8, -26))
+	# From the side, where a label that turned to face the camera used to sink into the wall.
+	await snap("gate_cost_angle", Vector3(11, 1.65, -33), Vector3(0, 4.5, -27.2))
+	# A game together: the list of players with health, one of them down, the effects row with a
+	# Commander's rally, and the drop button up top.
+	var p := w.player
+	p.slots = ["mace", "sword"]
+	p._equip()
+	p._act({"do": "buff", "key": "command_speed", "stat": "speed", "val": 0.25, "secs": 8.0}, {})
+	p._act({"do": "buff", "key": "command_melee", "stat": "melee_damage", "val": 0.2, "secs": 8.0}, {})
+	Net.roster = {1: {"name": "Mario", "class": "heavy", "team": 0, "score": 0, "deaths": 0, "lives": 3},
+		2: {"name": "Lucia", "class": "ranger", "team": 0, "score": 0, "deaths": 0, "lives": 3},
+		3: {"name": "Pepe", "class": "monk", "team": 0, "score": 0, "deaths": 1, "lives": 3}}
+	var friends: Array[Avatar] = []
+	for peer: int in [2, 3]:
+		var a := Avatar.new(w, peer, Net.roster[peer])
+		w.add_child(a)
+		a.position = Vector3(peer * 2.0, 0, -12)
+		Net._avatars[peer] = a
+		friends.append(a)
+	friends[0].hp_fraction = 0.55
+	friends[1].set_fallen(true)
+	friends[1].down_since = w.now - 6.0
+	Net.in_game = true
+	await snap("together_hud", Vector3(0, 1.65, -14), Vector3(0, 1.6, -26))
+	Net.in_game = false
+	for a in friends:
+		Net._avatars.erase(a.peer)
+		a.queue_free()
+	Net.roster = {}
 	hud.visible = false
 	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
 	w.stock_wood()

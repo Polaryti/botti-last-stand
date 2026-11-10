@@ -456,6 +456,29 @@ func has_flag(f: String) -> bool:
 	return flags.has(f)
 
 
+## What helps you right now, for the HUD's row of effects, besides powers and familiars: timed buffs
+## from your own skills or from someone else (a Commander's rally), a Shield Dome over you, and a
+## Guardian's cover while you stand near one. Each is {icon, color, left (-1 if it has no end), stacks}.
+const _BUFF_ICONS := {"speed": "boot+up", "melee_damage": "sword+up", "ranged_damage": "arrow+up", "spell_damage": "staff+up",
+	"melee_rate": "hand+clock", "ranged_rate": "arrow+clock", "damage_taken": "shield+up", "horse_speed": "horse+up"}
+
+func status_effects() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for key: String in _buffs:
+		# Last Command raises melee, ranged and spell damage together: one icon says it.
+		if key == "command_ranged" or key == "command_spell":
+			continue
+		var b: Dictionary = _buffs[key]
+		var from_command := key.begins_with("command_")
+		out.append({"icon": _BUFF_ICONS.get(b["stat"], "star+up"), "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
+			"left": float(b["left"]), "stacks": int(b["stacks"])})
+	if dome_left > 0.0:
+		out.append({"icon": "shield_rect+up", "color": ClassDefs.color("heavy"), "left": dome_left, "stacks": 1})
+	if world and not is_bot() and world.best_cover(global_position) != null:
+		out.append({"icon": "shield_rect+heart", "color": ClassDefs.color("heavy"), "left": -1.0, "stacks": 1})
+	return out
+
+
 ## A stat including temporary buffs.
 func m(stat: String) -> float:
 	var v: float = mods[stat]

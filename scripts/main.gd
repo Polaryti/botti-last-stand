@@ -406,6 +406,9 @@ func _try_code(code: LineEdit, answer: Label) -> void:
 			answer.add_theme_color_override("font_color", UiTheme.MOSS)
 			code.text = ""
 			Sfx.play("level", -3.0)
+		"disabled":
+			answer.text = "%s is not available at this time. Keep the code for later." % ClassDefs.ALL[said["class"]]["name"]
+			answer.add_theme_color_override("font_color", UiTheme.ASH)
 		"used":
 			answer.text = "This code has already been redeemed."
 			answer.add_theme_color_override("font_color", UiTheme.ASH)
@@ -562,7 +565,7 @@ func show_class_picker(mode: int) -> void:
 	var root := _two_panes("Choose your class")
 	var list: VBoxContainer = root.get_meta("list")
 	var detail: VBoxContainer = root.get_meta("detail")
-	var ids := ClassDefs.ALL.keys()
+	var ids := ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id))
 	if mode == Game.Mode.SANDBOX:
 		ids = ClassDefs.available()
 	var rows := {}

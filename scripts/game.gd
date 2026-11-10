@@ -81,6 +81,8 @@ func redeem_key(key: String) -> Dictionary:
 	if redeemed.has(key):
 		return {"result": "used"}
 	var opened: String = CODES[key]
+	if ClassDefs.disabled(opened):
+		return {"result": "disabled", "class": opened} # kept for when the class returns: not used up
 	redeemed[key] = true
 	unlocked[opened] = true
 	save_settings()
@@ -189,7 +191,7 @@ func _earn(id: String) -> void:
 
 func buy_class(id: String) -> bool:
 	var price := ClassDefs.price(id)
-	if owns_class(id) or price <= 0 or doubloons < price:
+	if owns_class(id) or price <= 0 or doubloons < price or ClassDefs.disabled(id):
 		return false
 	doubloons -= price
 	unlocked[id] = true
@@ -323,7 +325,7 @@ func load_settings() -> void:
 		night_map = "village"
 	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
 		pet = "wolf"
-	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class):
+	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class) or ClassDefs.disabled(player_class):
 		player_class = "infantry"
 	best_time = maxf(0.0, _saved(c, "progress", "best_time", 0.0))
 	best_kills = maxi(0, _saved(c, "progress", "best_kills", 0))
