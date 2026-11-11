@@ -19,7 +19,7 @@ func _init() -> void:
 
 func equip(id: String, view_model := false) -> void:
 	weapon = id
-	mesh = WeaponDefs.mesh(id) if id != "" and id != "fists" else null
+	mesh = WeaponDefs.mesh(id) if id != "" and (id != "fists" or view_model) else null
 	reload_left = 0.0
 	swing_left = 0.0
 	body_owner = null

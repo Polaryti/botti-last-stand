@@ -1036,9 +1036,14 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 			line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, 50)))
 			continue
 		var on := Game.item_active(item)
-		line.add_child(_button("Equipped" if on else "Not equipped", func() -> void:
-			Game.set_item_on(item, not on)
-			show_armory(class_id), Vector2(190, 50), on))
+		var toggle := _button("Equipped" if on else "Not equipped", func() -> void: pass, Vector2(190, 50), on)
+		line.add_child(toggle)
+		toggle.pressed.connect(func() -> void:
+			Game.set_item_on(item, not Game.item_active(item))
+			var active := Game.item_active(item)
+			toggle.text = "Equipped" if active else "Not equipped"
+			if active: UiTheme.selected(toggle)
+			else: UiTheme.plain(toggle))
 	return row
 
 

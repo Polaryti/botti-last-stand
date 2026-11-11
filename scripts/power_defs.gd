@@ -17,8 +17,8 @@ const ALL := {
 	"raven": {"name": "Raven", "desc": "Marks every enemy within 32 metres, even through walls.", "time": FAMILIAR_TIME, "color": Color(0.55, 0.45, 0.8), "familiar": true, "weight": 1.0},
 	"ghost": {"name": "Ghost Knight", "desc": "A spirit fights at your side and draws attacks away from you.", "time": FAMILIAR_TIME, "color": Color(0.55, 0.9, 1.0), "familiar": true, "weight": 1.0},
 	"imp": {"name": "Thief Imp", "desc": "Brings you the nearest item on the map, every 4 seconds.", "time": FAMILIAR_TIME, "color": Color(0.9, 0.65, 0.2), "familiar": true, "weight": 1.0},
-	"bell_spirit": {"name": "Bell Spirit", "desc": "Rings every 6 seconds, stunning all within 10 metres.", "time": FAMILIAR_TIME, "color": Color(1.0, 0.85, 0.45), "familiar": true, "weight": 1.0},
-	"rat": {"name": "Plague Rat", "desc": "Leaves a trail of poison behind you.", "time": FAMILIAR_TIME, "color": Color(0.5, 0.85, 0.3), "familiar": true, "weight": 1.0},
+	"bell_spirit": {"maps": ["village", "fort"], "name": "Bell Spirit", "desc": "Rings every 6 seconds, stunning all within 10 metres.", "time": FAMILIAR_TIME, "color": Color(1.0, 0.85, 0.45), "familiar": true, "weight": 1.0},
+	"rat": {"maps": ["village", "fort"], "name": "Plague Rat", "desc": "Leaves a trail of poison behind you.", "time": FAMILIAR_TIME, "color": Color(0.5, 0.85, 0.3), "familiar": true, "weight": 1.0},
 }
 
 const FOODS := {
@@ -72,10 +72,10 @@ static func pick_potion() -> String:
 	return pick_weighted(t)
 
 
-static func pick_familiar() -> String:
+static func pick_familiar(map_id := "") -> String:
 	var t := {}
 	for id: String in ALL:
-		if ALL[id]["familiar"]:
+		if ALL[id]["familiar"] and SpawnRules.allows(ALL[id], map_id):
 			t[id] = ALL[id]
 	return pick_weighted(t)
 

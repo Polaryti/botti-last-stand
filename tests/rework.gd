@@ -255,7 +255,7 @@ func _statuses() -> void:
 	hp = z.hp
 	z._tick_dot(1.0)
 	check(z.hp == hp, "expired statuses deal no extra tick")
-	check(p.max_hp() >= 105.0 and p.m("damage_taken") < 1.0, "Plague Doctor has improved baseline durability")
+	check(p.max_hp() == 100.0 and p.m("damage_taken") < 1.0, "Plague Doctor has improved baseline durability")
 
 
 func _progress() -> void:

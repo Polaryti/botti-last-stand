@@ -129,7 +129,7 @@ func _classes() -> void:
 static func enemy_group(id: String) -> int:
 	var d: Dictionary = ZombieDefs.ALL[id]
 	if d.get("mist_boss", false): return 4
-	if not d.get("maps", []).is_empty(): return 3
+	if d.get("maps", []).has("mists"): return 3
 	if d.get("hero", false) or d.get("rider", false): return 2
 	if id in ["normal", "clever", "magic", "beast", "leaper"]: return 0
 	return 1
@@ -158,17 +158,20 @@ func _enemies() -> void:
 		elif from > 0.0:
 			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], d["desc"], note)
-		if not locations.is_empty():
-			var badge := PanelContainer.new()
-			badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-			badge.add_theme_stylebox_override("panel", UiTheme.flat(Color("193e4b"), UiTheme.MIST, 6, 7.0))
-			var label := Label.new()
-			label.text = "MAP EXCLUSIVE · " + " / ".join(locations).to_upper()
-			label.add_theme_font_override("font", UiTheme.bold_font())
-			label.add_theme_font_size_override("font_size", 19)
-			label.add_theme_color_override("font_color", Color("a5f0ec"))
-			badge.add_child(label)
-			_list.get_child(-1).get_child(1).add_child(badge)
+		_map_badge(d, d.get("maps", []).has("village"))
+
+func _map_badge(data: Dictionary, green := true) -> void:
+	if not data.has("maps"): return
+	var badge := PanelContainer.new()
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	badge.add_theme_stylebox_override("panel", UiTheme.flat(Color("1d3c2c") if green else Color("193e4b"), UiTheme.MOSS if green else UiTheme.MIST, 6, 7.0))
+	var label := Label.new()
+	label.text = "Map Exclusive · " + SpawnRules.names(data)
+	label.add_theme_font_override("font", UiTheme.bold_font())
+	label.add_theme_font_size_override("font_size", 19)
+	label.add_theme_color_override("font_color", Color("b2e8b5") if green else Color("a5f0ec"))
+	badge.add_child(label)
+	_list.get_child(-1).get_child(1).add_child(badge)
 
 func _section(title: String) -> void:
 	var label := Label.new()
@@ -184,6 +187,7 @@ func _familiars() -> void:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if d["familiar"]:
 			_row(Icons.power(id), Color(d["color"]).darkened(0.35), d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
+			_map_badge(d)
 
 
 func _items() -> void:
@@ -207,6 +211,7 @@ func _weapons() -> void:
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
 		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
+		_map_badge(d)
 
 
 static func acquisition(id: String) -> String:

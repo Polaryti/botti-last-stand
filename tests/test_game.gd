@@ -4339,7 +4339,7 @@ func test_finals() -> void:
 
 
 func test_classes() -> void:
-	var starts := {"infantry": "dagger", "ranger": "bow", "heavy": "mace", "chivalry": "lance", "magician": "staff"}
+	var starts := {"infantry": "dagger", "ranger": "bow", "heavy": "flail", "chivalry": "lance", "magician": "staff"}
 	for id: String in starts:
 		Game.player_class = id
 		await start_clean()

@@ -1,6 +1,13 @@
 # Changelog
 
-## Development — Know your path
+## Development — Hands, equipment and local finds
+- Monk fists are visible again and punches animate correctly.
+- Equipping Class Upgrades preserves your Armory scroll positions, preview and class selection.
+- Plague Doctor has 100 base health and 100% speed; Commander moves at 105%; Artificer has 100 base health. Heavy Infantry starts with a Flail.
+- Scythes, Pitchforks, Throwing Axes and Torches are found in The Village and The Fort; Bell Hammers are found in The Mists. Artificer still starts with a Torch everywhere.
+- Plague Rat, Bell Spirit, Carrion Crows and Dread Riders are found in The Village and The Fort. Green Codex badges identify restricted weapons and familiars.
+
+## Previous development — Know your path
 - The Armory now includes class lore, starting stats, three profession summaries, Class Upgrade descriptions and controls, and a separate appearance section.
 - Class and profession selection uses consistent introductions and concise mechanic summaries.
 - Commander wears a distinctive officer helmet, with new Commander, Gunner and Vanguard emblems.

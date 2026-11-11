@@ -19,15 +19,15 @@ const ALL := {
 		"knock": 4.0, "swing": "smash", "weight": 1.6, "pos": Vector3(0.28, -0.3, -0.46), "scale": 0.72},
 	"lance": {"only": "chivalry", "power": 1.5, "name": "Lance", "charge": true, "desc": "Chivalry only. Cannot be dropped or found as loot. The longest reach, through up to two enemies. Half as strong again while you run or ride.", "kind": Kind.MELEE, "rate": 0.75, "range": 5.2, "cone": 16.0, "max_hits": 2,
 		"knock": 3.0, "swing": "thrust", "weight": 0.7, "pos": Vector3(0.24, -0.22, 0.35), "scale": 1.0},
-	"scythe": {"power": 0.8, "name": "Scythe", "bleed": true, "desc": "Slow, and sweeps a huge arc through a whole crowd. Leaves them bleeding.", "kind": Kind.MELEE, "rate": 0.95, "range": 3.3, "cone": 210.0, "max_hits": 8,
+	"scythe": {"maps": ["village", "fort"], "power": 0.8, "name": "Scythe", "bleed": true, "desc": "Slow, and sweeps a huge arc through a whole crowd. Leaves them bleeding.", "kind": Kind.MELEE, "rate": 0.95, "range": 3.3, "cone": 210.0, "max_hits": 8,
 		"knock": 2.0, "swing": "reap", "arc": 1.2, "weight": 1.2, "pos": Vector3(0.4, -0.4, -0.65), "scale": 0.72},
 	"flail": {"power": 0.95, "name": "Flail", "desc": "Gets faster the longer you keep swinging.", "kind": Kind.MELEE, "rate": 0.85, "range": 2.5, "cone": 100.0, "max_hits": 3,
 		"knock": 2.0, "swing": "flail", "momentum": true, "weight": 1.2, "pos": Vector3(0.28, -0.1, -0.7), "scale": 0.72},
-	"bell_hammer": {"power": 1.3, "name": "Bell Hammer", "desc": "Stuns all it hits, and everyone can hear it.", "kind": Kind.MELEE, "rate": 1.05, "range": 2.5, "cone": 130.0, "max_hits": 6,
+	"bell_hammer": {"maps": ["mists"], "power": 1.3, "name": "Bell Hammer", "desc": "Stuns all it hits, and everyone can hear it.", "kind": Kind.MELEE, "rate": 1.05, "range": 2.5, "cone": 130.0, "max_hits": 6,
 		"knock": 4.0, "swing": "overhead", "stun": 1.3, "loud": 22.0, "weight": 1.0, "pos": Vector3(0.22, -0.4, -0.5), "scale": 0.5},
-	"pitchfork": {"power": 0.8, "name": "Pitchfork", "desc": "Stabs straight through up to three in a row.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.8, "cone": 16.0, "max_hits": 3,
+	"pitchfork": {"maps": ["village", "fort"], "power": 0.8, "name": "Pitchfork", "desc": "Stabs straight through up to three in a row.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.8, "cone": 16.0, "max_hits": 3,
 		"knock": 1.5, "swing": "thrust", "weight": 1.3, "pos": Vector3(0.22, -0.24, 0.0), "scale": 1.0},
-	"torch": {"power": 0.55, "name": "Torch", "desc": "Sets enemies on fire and lights your way.", "kind": Kind.MELEE, "rate": 0.5, "range": 2.0, "cone": 80.0, "max_hits": 2,
+	"torch": {"maps": ["village", "fort"], "power": 0.55, "name": "Torch", "desc": "Sets enemies on fire and lights your way.", "kind": Kind.MELEE, "rate": 0.5, "range": 2.0, "cone": 80.0, "max_hits": 2,
 		"knock": 1.0, "swing": "slash", "burns": true, "weight": 1.2, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.72},
 	"bow": {"nock": Vector3(-0.01, 0.0, -0.02), "name": "Short Bow", "desc": "Medium range and steady.", "kind": Kind.RANGED, "rate": 0.65, "range": 36.0, "speed": 38.0, "gravity": 3.5,
 		"knock": 1.5, "weight": 1.6, "pos": Vector3(0.17, -0.1, -0.45), "scale": 0.5, "tilt": -0.42},
@@ -35,7 +35,7 @@ const ALL := {
 		"knock": 1.0, "weight": 1.3, "pos": Vector3(0.17, -0.2, -0.3), "scale": 0.2},
 	"longbow": {"power": 3.2, "nock": Vector3(-0.01, 0.0, -0.02), "name": "Long Bow", "pierce": 2, "desc": "Slow, but one arrow kills a zombie and goes on through two more. Reaches across the map. Zoom in to aim.", "kind": Kind.RANGED, "rate": 1.25, "range": 75.0, "speed": 64.0, "gravity": 1.5,
 		"knock": 2.5, "zoom_fov": 38.0, "weight": 1.0, "pos": Vector3(0.17, -0.1, -0.5), "scale": 0.7, "tilt": -0.42},
-	"axes": {"power": 0.9, "name": "Throwing Axes", "desc": "They come back to you, cutting on the way out and back. No arrows needed.", "kind": Kind.RANGED, "rate": 0.5, "range": 15.0, "speed": 24.0, "gravity": 0.0,
+	"axes": {"maps": ["village", "fort"], "power": 0.9, "name": "Throwing Axes", "desc": "They come back to you, cutting on the way out and back. No arrows needed.", "kind": Kind.RANGED, "rate": 0.5, "range": 15.0, "speed": 24.0, "gravity": 0.0,
 		"knock": 2.0, "returning": true, "weight": 1.1, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
 	"javelins": {"power": 2.2, "pierce": 1, "shot": "javelin", "name": "Javelins", "desc": "Heavy, with a falling arc. Passes through the first enemy. Uses arrows.", "kind": Kind.RANGED, "rate": 1.0, "range": 30.0, "speed": 27.0, "gravity": 8.0,
 		"knock": 3.5, "weight": 1.0, "pos": Vector3(0.22, -0.22, -0.1), "scale": 1.0},
@@ -71,14 +71,14 @@ static func lies_around(id: String) -> bool:
 	return not d.is_empty() and not d.get("hidden", false) and not d.has("only") and float(d.get("weight", 0.0)) > 0.0
 
 
-static func pick_random() -> String:
+static func pick_random(map_id := "") -> String:
 	var total := 0.0
 	for id: String in ALL:
-		if lies_around(id):
+		if lies_around(id) and SpawnRules.allows(ALL[id], map_id):
 			total += float(ALL[id]["weight"])
 	var r := randf() * total
 	for id: String in ALL:
-		if not lies_around(id):
+		if not lies_around(id) or not SpawnRules.allows(ALL[id], map_id):
 			continue
 		r -= float(ALL[id]["weight"])
 		if r <= 0.0:

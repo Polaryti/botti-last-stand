@@ -1584,6 +1584,12 @@ func _build_zombie_pools() -> void:
 			(_pools[model] as Array).append(z)
 
 
+func spawn_map() -> String:
+	if mode == Game.Mode.SANDBOX: return ""
+	if mode == Game.Mode.FORT: return "fort"
+	return "mists" if terrain.has_islands() else "village"
+
+
 func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	var models: Array = ZombieDefs.def_of(id)["models"].duplicate()
 	models.shuffle()
