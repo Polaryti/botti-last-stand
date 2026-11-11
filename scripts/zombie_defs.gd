@@ -25,15 +25,15 @@ const ALL := {
 		"sight": 30.0, "tint": Color(0.74, 0.72, 0.22), "models": ["normal_b"], "from": 100.0, "weight": 3.5, "leaps": true},
 	# Only in the Mists.
 	"rift_stalker": {"name": "Rift Stalker", "icon": "stalker", "desc": "Hunts only in the Mists. Bounds over gaps a Zombie could never clear, and a stone line is no escape from it.", "hp": 65.0, "roam_speed": 2.0, "speed": 3.6, "damage": 12.0, "scale": 0.95, "xp": 16,
-		"sight": 36.0, "tint": Color(0.3, 0.82, 0.76), "models": ["normal_b"], "from": 45.0, "weight": 3.0, "leaps": true, "only_islands": true, "hop_reach": 20.0, "hop_up": 10.0},
+		"sight": 36.0, "tint": Color(0.3, 0.82, 0.76), "models": ["normal_b"], "from": 45.0, "weight": 3.0, "leaps": true, "only_islands": true, "maps": ["mists"], "hop_reach": 20.0, "hop_up": 10.0},
 	"mist_harrier": {"name": "Mist Harrier", "icon": "harrier", "desc": "Hunts only in the Mists. Glides over the void and dives. Its blow throws you back, so keep away from the edge.", "hp": 70.0, "roam_speed": 4.0, "speed": 5.4, "damage": 11.0, "scale": 1.0, "xp": 18,
-		"sight": 40.0, "models": ["harrier"], "from": 150.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 6.0, "only_islands": true, "shoves": true},
-	"lantern_wisp": {"name": "Lantern Wisp", "icon": "lantern_wisp", "desc": "A lost lantern carried by living mist. Marks your last position with a cyan seal, then bursts it. Step outside the ring before it closes.", "hp": 60.0, "roam_speed": 2.0, "speed": 3.8, "damage": 9.0, "scale": 1.0, "xp": 20, "sight": 32.0, "models": ["lantern_wisp"], "from": 50.0, "weight": 3.0, "custom": true, "phases": true, "only_islands": true},
-	"mist_weaver": {"name": "Mist Weaver", "icon": "mist_weaver", "desc": "An antlered moth woven from funeral veils. Lays three mist seals around your last position. The seals slow as well as wound; move through a gap instead of retreating along the line.", "hp": 115.0, "roam_speed": 2.0, "speed": 2.9, "damage": 13.0, "scale": 1.1, "xp": 32, "sight": 36.0, "models": ["mist_weaver"], "from": 180.0, "weight": 1.8, "custom": true, "phases": true, "only_islands": true},
-	"veil_regent": {"name": "Veil Regent", "icon": "veil_regent", "desc": "Sovereign of the Mists. Sees through concealment and resists stun and freezing. Awakens once around 8:30. Its expanding crown leaves a safe eye at the centre. Below half health it weaves three distant seals and calls two Lantern Wisps. Killing it leaves an Angel familiar. Surviving until dawn still wins the night.", "hp": 850.0, "roam_speed": 2.5, "speed": 3.2, "damage": 22.0, "scale": 1.6, "xp": 180, "sight": 100.0, "models": ["veil_regent"], "from": 525.0, "weight": 0.0, "custom": true, "phases": true, "only_islands": true, "mist_boss": true},
+		"sight": 40.0, "models": ["harrier"], "from": 150.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 6.0, "only_islands": true, "maps": ["mists"], "shoves": true},
+	"lantern_wisp": {"name": "Lantern Wisp", "icon": "lantern_wisp", "desc": "A lost lantern carried by living mist. Marks your last position with a cyan seal, then bursts it. Step outside the ring before it closes.", "hp": 60.0, "roam_speed": 2.0, "speed": 3.8, "damage": 9.0, "scale": 1.0, "xp": 20, "sight": 32.0, "models": ["lantern_wisp"], "from": 50.0, "weight": 3.0, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"]},
+	"mist_weaver": {"name": "Mist Weaver", "icon": "mist_weaver", "desc": "An antlered moth woven from funeral veils. Lays three mist seals around your last position. The seals slow as well as wound; move through a gap instead of retreating along the line.", "hp": 115.0, "roam_speed": 2.0, "speed": 2.9, "damage": 13.0, "scale": 1.1, "xp": 32, "sight": 36.0, "models": ["mist_weaver"], "from": 180.0, "weight": 1.8, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"]},
+	"veil_regent": {"name": "Veil Regent", "icon": "veil_regent", "desc": "Sovereign of the Mists. Sees through concealment and resists stun and freezing. Awakens once around 8:30. Its expanding crown leaves a safe eye at the centre. Below half health it weaves three distant seals and calls two Lantern Wisps. Killing it leaves an Angel familiar. Survive ten minutes and defeat the Regent to win.", "hp": 850.0, "roam_speed": 2.5, "speed": 3.2, "damage": 22.0, "scale": 1.6, "xp": 180, "sight": 100.0, "models": ["veil_regent"], "from": 525.0, "weight": 0.0, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"], "mist_boss": true},
 
-	"fallen_revenant": {"name": "Fallen Revenant", "icon": "fallen_revenant", "desc": "A fallen wielder of Mist. Spectral claws drain life. Its marked mist leap bursts after a warning; move out of the seal before it arrives.", "hp": 160.0, "roam_speed": 2.0, "speed": 3.5, "damage": 16.0, "scale": 1.1, "xp": 45, "sight": 36.0, "models": ["fallen_revenant"], "from": 240.0, "weight": 1.5, "custom": true, "phases": true, "only_islands": true},
-	"crow": {"name": "Carrion Crow", "icon": "feather", "desc": "Comes in flocks that circle and dive. A roof stops them.", "hp": 25.0, "roam_speed": 5.0, "speed": 6.0, "damage": 5.0, "scale": 1.0, "xp": 6,
+	"fallen_revenant": {"name": "Fallen Revenant", "icon": "fallen_revenant", "desc": "A fallen wielder of Mist. Spectral claws drain life. Its marked mist leap bursts after a warning; move out of the seal before it arrives.", "hp": 160.0, "roam_speed": 2.0, "speed": 3.5, "damage": 16.0, "scale": 1.1, "xp": 45, "sight": 36.0, "models": ["fallen_revenant"], "from": 240.0, "weight": 1.5, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"]},
+	"crow": {"maps": ["village", "fort"], "name": "Carrion Crow", "icon": "feather", "desc": "Comes in flocks that circle and dive. A roof stops them.", "hp": 25.0, "roam_speed": 5.0, "speed": 6.0, "damage": 5.0, "scale": 1.0, "xp": 6,
 		"sight": 32.0, "models": ["crow"], "from": 120.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 4.5},
 	"gargoyle": {"name": "Gargoyle", "icon": "wings", "desc": "A statue on a rooftop, until you walk too close. Then it hunts from the air.", "hp": 120.0, "roam_speed": 4.0, "speed": 7.5, "damage": 18.0, "scale": 1.0, "xp": 28,
 		"sight": 14.0, "models": ["gargoyle"], "from": 240.0, "weight": 0.0, "flies": true, "custom": true, "statue": true, "fly_height": 6.0},
@@ -54,7 +54,7 @@ const ALL := {
 		"tint": Color(0.42, 0.42, 0.52), "models": ["beast"], "hero": true, "weapon": "mace", "shielded": true},
 	"hero_chivalry": {"name": "Fallen Knight", "icon": "lance", "desc": "Charges in a straight line with its lance. Charges more often at minute 6.", "hp": 150.0, "roam_speed": 1.8, "speed": 3.4, "damage": 16.0, "scale": 1.18, "xp": 34, "sight": 34.0,
 		"tint": Color(0.56, 0.42, 0.24), "models": ["beast"], "hero": true, "weapon": "lance", "charges": true},
-	"rider": {"name": "Dread Rider", "icon": "horse", "desc": "Gallops through you with a lance and turns wide to come again. Hit it while it turns. Bring down its horse and it fights on foot.", "hp": 260.0, "roam_speed": 3.5, "speed": 8.2, "damage": 20.0, "scale": 1.3, "xp": 45,
+	"rider": {"maps": ["village", "fort"], "name": "Dread Rider", "icon": "horse", "desc": "Gallops through you with a lance and turns wide to come again. Hit it while it turns. Bring down its horse and it fights on foot.", "hp": 260.0, "roam_speed": 3.5, "speed": 8.2, "damage": 20.0, "scale": 1.3, "xp": 45,
 		"sight": 42.0, "tint": Color(0.5, 0.3, 0.26), "models": ["beast"], "from": 300.0, "weight": 0.0, "weapon": "lance", "rider": true},
 	"hero_magician": {"name": "Fallen Mage", "icon": "staff", "desc": "Two fireballs at minute 4. Raises zombies around itself at minute 7.", "hp": 90.0, "roam_speed": 1.4, "speed": 2.5, "damage": 11.0, "scale": 1.12, "xp": 32, "sight": 38.0,
 		"tint": Color(0.5, 0.26, 0.54), "models": ["magic"], "hero": true, "caster": true},
@@ -74,11 +74,11 @@ static func def_of(id: String) -> Dictionary:
 static func pick_roamer(elapsed: float, islands := false) -> String:
 	var total := 0.0
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)):
+		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)) and SpawnRules.allows(ALL[id], "mists" if islands else "village"):
 			total += float(ALL[id].get("weight", 0.0))
 	var r := randf() * total
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)):
+		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)) and SpawnRules.allows(ALL[id], "mists" if islands else "village"):
 			var w: float = ALL[id].get("weight", 0.0)
 			if w <= 0.0:
 				continue

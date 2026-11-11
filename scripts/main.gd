@@ -152,7 +152,7 @@ func show_menu(rebuild := false) -> void:
 	gap.custom_minimum_size.y = 14
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
-	box.add_child(_menu_row("Defend the Fort", "Four gates, and one heart to keep safe.", func() -> void: show_class_picker(Game.Mode.FORT)))
+	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal to The Mists.", func() -> void: show_class_picker(Game.Mode.FORT)))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Leaderboard", "The top players of all time, and of this week.", func() -> void: show_leaderboard()))
@@ -232,16 +232,8 @@ func _fill_update_box() -> void:
 ## A margin that also keeps clear of the camera cut-out, on whichever side it is.
 func _screen_margin(side: int, top_bottom: int) -> MarginContainer:
 	var margin := MarginContainer.new()
+	UiTheme.fit_safe_area(margin, side, top_bottom)
 	_fill(margin)
-	var cut := 0
-	var win := DisplayServer.window_get_size()
-	var safe := DisplayServer.get_display_safe_area()
-	if win.x > 0 and safe.size.x > 0:
-		cut = int(float(maxi(safe.position.x, win.x - safe.end.x)) * get_viewport().get_visible_rect().size.x / float(win.x))
-	for edge: String in ["left", "right"]:
-		margin.add_theme_constant_override("margin_" + edge, maxi(side, cut + 20))
-	margin.add_theme_constant_override("margin_top", top_bottom)
-	margin.add_theme_constant_override("margin_bottom", top_bottom)
 	return margin
 
 
@@ -693,7 +685,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
 	words.add_child(_soft("Health %d. Speed %d%%." % [int(c["hp"]), int(round(float(c["speed"]) * 100.0))], 24))
-	var desc := _body(c["desc"], 25)
+	var desc := _body(ClassPresentation.description(id), 25)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail.add_child(desc)
 	for spec: Dictionary in AbilityData.tree(id)["specs"]:
@@ -708,7 +700,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 		spec_name.custom_minimum_size.x = 190
 		spec_name.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		line.add_child(spec_name)
-		var spec_desc := _soft(spec["desc"], 23)
+		var spec_desc := _soft(ClassPresentation.profession(spec), 23)
 		spec_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		spec_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		line.add_child(spec_desc)
@@ -761,7 +753,7 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 	cost.add_theme_font_override("font", UiTheme.bold_font())
 	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(cost)
-	var left := _soft("You have %d." % Game.doubloons, 24)
+	var left := Control.new()
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left)
@@ -882,7 +874,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	var d: Dictionary = ShopDefs.ITEMS[id]
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 18)
-	head.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	head.size_flags_vertical = Control.SIZE_FILL
 	detail.add_child(head)
 	var view := ModelView.new(Vector2(250, 270))
 	view.show_item(id)
@@ -919,7 +911,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	cost.add_theme_font_override("font", UiTheme.bold_font())
 	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(cost)
-	var left := _soft("You have %d." % Game.doubloons, 24)
+	var left := Control.new()
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left)
@@ -953,7 +945,7 @@ func show_armory(focus := "") -> void:
 			(rows[other] as Button).remove_theme_stylebox_override("hover")
 		UiTheme.selected(rows[id])
 		_fill_armory(detail, id)
-	var classes := ClassDefs.available()
+	var classes: Array = ClassDefs.ALL.keys().filter(func(key: String) -> bool: return not ClassDefs.disabled(key))
 	for id: String in classes:
 		var row := _class_row(id)
 		rows[id] = row
@@ -972,9 +964,9 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 		child.queue_free()
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 18)
-	head.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	head.size_flags_vertical = Control.SIZE_FILL
 	detail.add_child(head)
-	var view := ModelView.new(Vector2(230, 300))
+	var view := ModelView.new(Vector2(170, 180))
 	view.show_class(id)
 	head.add_child(view)
 	var words := VBoxContainer.new()
@@ -984,16 +976,34 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	var title := _body(ClassDefs.ALL[id]["name"], 36)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
+	words.add_child(_body(ClassPresentation.COPY[id][0], 23))
+	var d: Dictionary = ClassDefs.ALL[id]
+	words.add_child(_soft("Base health %d · Speed %d%%\nStarting weapon: %s · Starting arrows: %d" % [int(d["hp"]), roundi(float(d["speed"]) * 100), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], 21))
+	words.add_child(_body(ClassPresentation.COPY[id][1], 22))
+	var scroll := DragScroll.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 14)
+	scroll.add_child(content)
+	var tree := AbilityData.tree(id)
 	var items := ShopDefs.for_class(id)
-	if items.is_empty():
-		words.add_child(_soft("Nothing for this class yet.", 24))
-	var shown_specs := {}
-	for item: String in items:
-		var spec := str(ShopDefs.ITEMS[item]["spec"])
-		if shown_specs.has(spec):
-			continue
-		shown_specs[spec] = true
-		words.add_child(_armory_spec_row(id, spec, items.filter(func(other: String) -> bool: return ShopDefs.ITEMS[other]["spec"] == spec)))
+	for spec: Dictionary in tree["specs"]:
+		content.add_child(_body(spec["name"], 29))
+		content.add_child(_body(ClassPresentation.profession(spec), 22))
+		var upgrades := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["spec"] == spec["id"])
+		if not upgrades.is_empty():
+			content.add_child(_armory_spec_row(id, spec["id"], upgrades))
+		else:
+			content.add_child(_soft("No Class Upgrades available for this profession.", 20))
+	var cosmetics := VBoxContainer.new()
+	cosmetics.name = "CosmeticsSection"
+	content.add_child(cosmetics)
+	cosmetics.add_child(_body("Appearance", 25))
+	cosmetics.add_child(_soft("Default appearance. No additional skins available yet.", 21))
+	for label: Label in detail.find_children("*", "Label", true, false):
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 
 ## One specialization: its emblem and name, and what you have for it.
@@ -1007,7 +1017,7 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_theme_constant_override("separation", 4)
 	row.add_child(column)
-	column.add_child(_body(_spec_name(class_id, spec), 23))
+	column.add_child(_body("Class Upgrades", 23))
 	if ShopDefs.ITEMS[items[0]].get("pet", false):
 		column.add_child(_pet_row())
 		return row
@@ -1016,6 +1026,9 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 12)
 		column.add_child(line)
+		var description := _soft(d["desc"], 21)
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(description)
 		var name_label := _soft(d["name"], 22)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		line.add_child(name_label)
@@ -1023,9 +1036,14 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 			line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, 50)))
 			continue
 		var on := Game.item_active(item)
-		line.add_child(_button("Equipped" if on else "Not equipped", func() -> void:
-			Game.set_item_on(item, not on)
-			show_armory(class_id), Vector2(190, 50), on))
+		var toggle := _button("Equipped" if on else "Not equipped", func() -> void: pass, Vector2(190, 50), on)
+		line.add_child(toggle)
+		toggle.pressed.connect(func() -> void:
+			Game.set_item_on(item, not Game.item_active(item))
+			var active := Game.item_active(item)
+			toggle.text = "Equipped" if active else "Not equipped"
+			if active: UiTheme.selected(toggle)
+			else: UiTheme.plain(toggle))
 	return row
 
 
@@ -1333,7 +1351,7 @@ func _on_fort_lost() -> void:
 	var seconds := world.director.elapsed
 	var kills := world.player.kills
 	var earned := Game.award_doubloons(seconds, kills, false, false)
-	_end_screen("The heart has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
+	_end_screen("The portal has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
 
 
 func _earned_line(earned: int) -> String:

@@ -14,6 +14,7 @@ const PANEL_PAD := 12.0
 const CARD_PAD := 12.0
 
 var player: Player
+var _safe_margin: MarginContainer
 var _class_name: Label
 var _level: Label
 var _points: Label
@@ -34,12 +35,10 @@ func build() -> void:
 	add_child(shade)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var margin := MarginContainer.new()
+	_safe_margin = margin
+	UiTheme.fit_safe_area(margin, 40, 16)
 	add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side: String in ["left", "right"]:
-		margin.add_theme_constant_override("margin_" + side, 18)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
 	var panel := PanelContainer.new()
 	panel.add_theme_stylebox_override("panel", UiTheme.flat(Color(UiTheme.NIGHT, 0.97), UiTheme.STEEL, 12, 12.0))
 	margin.add_child(panel)
@@ -56,6 +55,7 @@ func build() -> void:
 	_map.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	box.add_child(_map)
 	refresh(true)
+	get_viewport().size_changed.connect(_fill_zone, CONNECT_DEFERRED)
 
 
 func _build_header() -> Control:
@@ -136,7 +136,8 @@ func refresh(rebuild := false) -> void:
 
 ## How wide the top half is, from the screen, before anything is laid out.
 func _zone_width() -> float:
-	return get_viewport_rect().size.x - 36.0 - PANEL_PAD * 2.0
+	var pads := _safe_margin.get_theme_constant("margin_left") + _safe_margin.get_theme_constant("margin_right")
+	return maxf(1.0, get_viewport_rect().size.x - pads - PANEL_PAD * 2.0)
 
 
 ## How tall these words stand in a Label this wide, wrapped by word, with the gap between lines.
@@ -160,7 +161,7 @@ static func fit_size(font: Font, text: String, width: float, height: float, size
 ## up to most of the panel, and the map below gives way.
 func _fit_pair(name_label: Label, desc: Label, width: float, height: float, name_sizes: Array, desc_sizes: Array) -> void:
 	var bold := UiTheme.bold_font()
-	var plain := get_theme_default_font()
+	var plain := get_theme_font("font", "Label")
 	var spacing := get_theme_constant("line_spacing", "Label")
 	var name_size: int = name_sizes[0]
 	var desc_size: int = desc_sizes[0]
@@ -221,7 +222,7 @@ func _show_cards(step: int, options: Array) -> void:
 	_zone.add_child(row)
 	var specs: Array = player.tree_data()["specs"]
 	var count := options.size()
-	var card_w := (_zone_width() - 10.0 * (count - 1)) / count
+	var card_w := floorf((_zone_width() - 10.0 * (count - 1)) / count)
 	var text_w := card_w - CARD_PAD * 2.0 - (96.0 if count < 3 else 80.0) - 14.0
 	var text_h := ZONE_HIGH - 42.0 - CARD_PAD * 2.0
 	for i in count:
@@ -358,7 +359,10 @@ func _state_words(n: TreeNodeButton) -> String:
 
 
 func read(n: TreeNodeButton) -> void:
+	var previous := _reading
 	_reading = n
+	if is_instance_valid(previous): previous.queue_redraw()
+	if is_instance_valid(n): n.queue_redraw()
 	Sfx.play("ui_click", -8.0)
 	_map.queue_redraw()
 	_fill_zone()

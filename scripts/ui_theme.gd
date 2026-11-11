@@ -114,3 +114,32 @@ static func plain(b: Button) -> void:
 		b.remove_theme_stylebox_override(state)
 	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color", "font_disabled_color"]:
 		b.remove_theme_color_override(state)
+
+static func fit_safe_area(margin: MarginContainer, horizontal := 24, vertical := 16) -> void:
+	if not margin.is_inside_tree():
+		margin.tree_entered.connect(func() -> void: fit_safe_area(margin, horizontal, vertical), CONNECT_ONE_SHOT)
+		return
+	var apply := func() -> void:
+		if not is_instance_valid(margin) or not margin.is_inside_tree(): return
+		var pads := [horizontal, horizontal, vertical, vertical]
+		if OS.has_feature("android") or OS.has_feature("ios"):
+			var window := DisplayServer.window_get_size()
+			var safe := DisplayServer.get_display_safe_area()
+			var viewport := margin.get_viewport_rect().size
+			if window.x > 0 and window.y > 0 and safe.has_area():
+				pads = safe_insets(window, safe, viewport, horizontal, vertical)
+				# A 180-degree rotation can move the notch without resizing the viewport.
+				pads[0] = maxi(pads[0], pads[1])
+				pads[1] = pads[0]
+				pads[2] = maxi(pads[2], pads[3])
+				pads[3] = pads[2]
+		for i in 4: margin.add_theme_constant_override("margin_" + ["left", "right", "top", "bottom"][i], pads[i])
+	var viewport := margin.get_viewport()
+	viewport.size_changed.connect(apply)
+	margin.tree_exiting.connect(func() -> void:
+		if viewport.size_changed.is_connected(apply): viewport.size_changed.disconnect(apply), CONNECT_ONE_SHOT)
+	apply.call()
+
+static func safe_insets(window: Vector2i, safe: Rect2i, viewport: Vector2, horizontal: int, vertical: int) -> Array:
+	var scale := viewport / Vector2(window)
+	return [maxi(horizontal, ceili(safe.position.x * scale.x) + 20), maxi(horizontal, ceili((window.x - safe.end.x) * scale.x) + 20), maxi(vertical, ceili(safe.position.y * scale.y) + 16), maxi(vertical, ceili((window.y - safe.end.y) * scale.y) + 16)]

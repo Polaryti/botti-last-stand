@@ -1148,6 +1148,7 @@ func test_version_20_1() -> void:
 		var inner: Control = card.get_child(0)
 		var needed := inner.get_combined_minimum_size().y
 		if needed > card.size.y + 1.0:
+			print("CARD_OVERFLOW: ", labels[0].text if not labels.is_empty() else "", " needed=", needed, " available=", card.size.y)
 			fits = false
 		for l: Label in labels:
 			if l.get_theme_font_size("font_size") < 22:
@@ -4338,7 +4339,7 @@ func test_finals() -> void:
 
 
 func test_classes() -> void:
-	var starts := {"infantry": "dagger", "ranger": "bow", "heavy": "mace", "chivalry": "lance", "magician": "staff"}
+	var starts := {"infantry": "dagger", "ranger": "bow", "heavy": "flail", "chivalry": "lance", "magician": "staff"}
 	for id: String in starts:
 		Game.player_class = id
 		await start_clean()
@@ -4397,14 +4398,14 @@ func test_classes() -> void:
 	ok(pl.toast == "No mana", "no mana, no bolt")
 	mz.set_physics_process(true)
 	await kill_all()
-	pl.slots = ["staff", "dagger"]
+	pl.slots = ["staff", null]
 	pl.current = 0
 	pl._equip()
 	w.spawn_pickup_at(front(1.0), Pickup.Kind.WEAPON, "sword")
 	await seconds(0.3)
 	pl.take_nearby_weapon()
 	await frames(2)
-	ok(pl.slots.has("staff") and pl.slots.has("sword"), "the Magician keeps the staff when swapping")
+	ok(pl.weapon_id() == "staff" and not pl.slots.has("sword") and not pl.can_use("sword"), "the Magician refuses a ground weapon and keeps only the staff")
 	clear_pickups()
 
 	# Chivalry and the horse.

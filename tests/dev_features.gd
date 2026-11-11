@@ -25,6 +25,8 @@ func _ready() -> void:
 	p.set_physics_process(false)
 	p.position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
 	p.guard_left = 0
+	await _ui_initialization()
+	_codex_and_concealment()
 	_prices()
 	_store_upgrades()
 	_heavy()
@@ -207,7 +209,7 @@ func _wood_and_gates() -> void:
 	var gate: Dictionary = fw.fort.gates[0]
 	gate["hp"] = 770.0
 	fw.fort._show_gate(gate)
-	check((gate["requirement"] as Label3D).text == "3 FIREWOOD\nto repair" and (gate["inner_requirement"] as Label3D).visible, "both gate faces show the correct repair cost")
+	check((gate["requirement"] as Label3D).text == "3 WOOD\nto repair" and (gate["inner_requirement"] as Label3D).visible, "both gate faces show the correct repair cost")
 	gate["hp"] = Fort.GATE_HP
 	fw.fort._show_gate(gate)
 	check(not (gate["requirement"] as Label3D).visible, "a fully repaired gate hides its requirement")
@@ -380,3 +382,85 @@ func _after_0212() -> void:
 	Net._avatars.erase(4242)
 	other.queue_free()
 	await frames(1)
+
+func _ui_initialization() -> void:
+	for item: Pickup in w.pickups.duplicate():
+		if item.kind == Pickup.Kind.WEAPON: w.remove_pickup(item)
+	w.spawn_pickup_at(p.position + Vector3.RIGHT, Pickup.Kind.WEAPON, "sword")
+	var loose_weapon: Pickup = w.pickups.back()
+	check(w.nearest_weapon_pickup(p.position, 100.0) == loose_weapon, "Clever search finds a nearby reachable weapon on maps without portals")
+	w.remove_pickup(loose_weapon)
+	var insets := UiTheme.safe_insets(Vector2i(1920, 1080), Rect2i(160, 20, 1680, 1020), Vector2(1280, 720), 24, 16)
+	check(insets[0] >= 127 and insets[1] >= 74 and insets[2] >= 30 and insets[3] >= 43, "safe-area conversion protects all four edges in viewport units")
+	var flipped := UiTheme.safe_insets(Vector2i(1920, 1080), Rect2i(80, 20, 1680, 1020), Vector2(1280, 720), 24, 16)
+	check(flipped[1] > flipped[0], "rotating the notch to the opposite side swaps the protected horizontal inset")
+	var margin := MarginContainer.new()
+	UiTheme.fit_safe_area(margin, 32, 18)
+	add_child(margin)
+	await frames(2)
+	check(margin.get_theme_constant("margin_left") >= 32 and margin.get_theme_constant("margin_top") >= 18, "safe-area margins bind after entering the tree")
+	margin.queue_free()
+	var avatar := Avatar.new(w, 7654, {"class": "infantry", "name": "Test"})
+	w.add_child(avatar)
+	avatar.apply_pose(p.position, 0, 0, Vector3.ZERO, 1, 0, 17, "sword", 1)
+	check(avatar._attack_left <= 0, "first pose seeds the attack counter without playing a phantom swing")
+	avatar.apply_pose(p.position, 0, 0, Vector3.ZERO, 1, 0, 18, "sword", 1)
+	check(avatar._attack_left > 0, "subsequent attack counter changes still animate")
+	avatar._flash = 0.1
+	avatar._set_flash(true)
+	avatar._ice_left = 1.0
+	avatar._show_ice(true)
+	avatar._flash = 0.0
+	avatar._set_flash(false)
+	var ice_preserved := true
+	for part: MeshInstance3D in avatar._visual.find_children("*", "MeshInstance3D", true, false):
+		if part.material_override != Avatar._ice_look(): ice_preserved = false
+	check(ice_preserved, "ending a hit flash preserves a still-active freeze visual")
+	avatar.set_fallen(true)
+	avatar.set_fallen(false)
+	var restored := true
+	for part: MeshInstance3D in avatar._visual.find_children("*", "MeshInstance3D", true, false):
+		if part.has_meta("status_base") and part.material_override != part.get_meta("status_base"): restored = false
+	check(restored, "death and respawn restore base materials after overlapping status visuals")
+	avatar.queue_free()
+	for entry: Dictionary in StatusCatalog.TIMED:
+		for glyph: String in entry["icon"].split("+"): check(Icons.exists(glyph), "status glyph exists: " + glyph)
+		p.set(entry["field"], 2.5)
+		var found := false
+		for effect: Dictionary in p.status_effects():
+			if is_equal_approx(float(effect["left"]), 2.5): found = true
+		check(found, "temporary status exposes a duration: " + entry["name"])
+		p.set(entry["field"], 0.0)
+	w._warmed_quality = -1
+	await w.warm_up()
+	var clear := true
+	for puddle: MeshInstance3D in w._puddles:
+		if puddle.visible: clear = false
+	for gore: CPUParticles3D in w._gore:
+		if gore.visible or gore.emitting: clear = false
+	check(clear, "warm-up leaves no visible puddles or phantom blood")
+
+func _codex_and_concealment() -> void:
+	var was := p.class_id
+	p.class_id = "magician"
+	for id: String in WeaponDefs.ALL:
+		check(p.can_use(id) == (id == "staff"), "Magician only accepts the wand: " + id)
+	p.class_id = was
+	p.invis_left = 4.0
+	p.input_fire = false
+	p._handle_fire()
+	check(p.invis_left == 4.0, "not attacking preserves invisibility")
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	check(p.invis_left == 0.0, "an actual attack breaks invisibility")
+	p.input_fire = false
+	check(CodexPanel.enemy_group("normal") < CodexPanel.enemy_group("hero_infantry") and CodexPanel.enemy_group("hero_infantry") < CodexPanel.enemy_group("veil_regent"), "Codex separates common enemies, fallen heroes and bosses")
+	check(not "doubloons" in CodexPanel.acquisition("monk"), "Codex acquisition omits store prices")
+	var shot := Projectile.new(w)
+	w.add_child(shot)
+	shot.launch(Projectile.Kind.ARROW, w._arrow_mesh, Vector3(0, 5, 0), Vector3.FORWARD, 0, 20, 1, 0, true)
+	check(not shot._flame.visible and shot._arrow_aura.visible, "fire arrows use a narrow 3D tip, never the fireball sprite")
+	shot.launch(Projectile.Kind.FIREBALL, w._fireball_mesh, Vector3(0, 5, 0), Vector3.FORWARD, 0, 20, 1)
+	check(shot._flame.visible and not shot._arrow_aura.visible, "pooled fireballs reset the arrow effect")
+	shot.queue_free()

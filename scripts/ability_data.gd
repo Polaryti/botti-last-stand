@@ -349,16 +349,16 @@ static func _ranger() -> Dictionary:
 			a("fletcher", "Fletcher", "Every kill gives an arrow back", "arrows+trap", {}, [t("kill", "arrows", {"n": 1})])]],
 			a("field_snares", "Field of Snares", "Up to 8 traps on the ground and 8 in the Trap Satchel, and each trap kill drops a new one", "net+crown", {"trap_cap": 5, "trap_carry": 3}, [], "field_snares")),
 		_spec("beastmaster", "Beastmaster", "You never hunt alone", Color(0.34, 0.5, 0.2),
-			a("beastmaster", "Beastmaster", "Your beast fights beside you, and returns 15 s after falling. Choose it in the Armory", "wolf+plus", {"wolves": 1}),
+			a("beastmaster", "Beastmaster", "Your pet fights beside you and returns 15 s after falling. Choose it in the Armory.", "wolf+plus", {"wolves": 1}),
 			[[a("alpha", "Alpha", "Allies do 30% more damage", "wolf+up", {"ally_damage": 0.3}),
 			a("thick_fur", "Thick Fur", "Allies have 75% more health", "wolf+heart", {"ally_hp": 0.75})],
-			[a("savage_bite", "Savage Bite", "Your beast's bites stun for 0.7 s", "tooth+star", {}, [], "wolf_stun"),
+			[a("savage_bite", "Savage Bite", "Your pet's attacks stun for 0.7 s.", "tooth+star", {}, [], "wolf_stun"),
 			a("scent", "Scent", "Enemies within 15 m are always marked", "wolf+eye", {}, [], "scent")],
-			[a("second_wolf", "Second Beast", "One more beast at your side", "wolf+star", {"wolves": 1}),
+			[a("second_wolf", "Second Beast", "One more pet at your side.", "wolf+star", {"wolves": 1}),
 			a("hawk", "Hunting Hawk", "Every 2.5 s a hawk strikes a nearby enemy", "feather+arrow", {}, [t("every", "hawk", {"secs_every": 2.5})])],
 			[a("pack_tactics", "Pack Tactics", "+30% damage to enemies near your allies", "claw+plus", {}, [], "pack_tactics"),
 			a("bond", "Blood Bond", "Heal 5 whenever one of your allies kills", "heart+wolf", {}, [], "bond")]],
-			a("wolf_pack", "The Pack", "One more beast, and every 20 s the pack acts: wolves stun all around you, ravens mark every enemy near you, snakes poison them, foxes bring food or arrows", "moon+crown", {"wolves": 1}, [t("every", "pack_call", {"secs_every": 20.0})])),
+			a("wolf_pack", "The Pack", "One more pet joins you. Every 20 s, your pets use their ability.", "moon+crown", {"wolves": 1}, [t("every", "pack_call", {"secs_every": 20.0})])),
 	]}
 
 

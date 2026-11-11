@@ -183,7 +183,7 @@ func hit_heart(damage: float) -> void:
 	_dirty = true
 	if _banner_left <= 0.0:
 		_banner_left = 12.0
-		world.banner("They are at the heart!", 3.0)
+		world.banner("They are at the portal!", 3.0)
 		world.sfx_at("banshee", heart_at, -6.0)
 	if heart_hp <= 0.0:
 		_over = true
@@ -234,7 +234,7 @@ func _show_gate(g: Dictionary) -> void:
 	var requirement: Label3D = g.get("requirement")
 	if requirement:
 		var needed := wood_needed(g)
-		requirement.text = "%d FIREWOOD\nto repair" % needed
+		requirement.text = "%d WOOD\nto repair" % needed
 		requirement.visible = needed > 0
 		var inner: Label3D = g.get("inner_requirement")
 		if inner:

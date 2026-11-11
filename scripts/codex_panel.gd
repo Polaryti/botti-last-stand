@@ -4,7 +4,7 @@ extends Control
 
 signal closed
 
-const TABS := ["Classes", "Enemies", "Familiars", "Items", "Weapons"]
+const TABS := ["Classes", "Weapons", "Items", "Familiars", "Enemies", "Status Effects", "Maps"]
 
 var _list: VBoxContainer
 var _scroll: DragScroll
@@ -19,26 +19,23 @@ func build() -> void:
 	add_child(shade)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var margin := MarginContainer.new()
+	UiTheme.fit_safe_area(margin, 40, 16)
 	add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right"]:
-		margin.add_theme_constant_override("margin_" + side, 40)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_bottom", 10)
 	var panel := PanelContainer.new()
 	margin.add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
-	var top := HBoxContainer.new()
+	var top := HFlowContainer.new()
 	top.add_theme_constant_override("separation", 8)
 	box.add_child(top)
 	for i in TABS.size():
 		var tab := Button.new()
 		tab.text = TABS[i]
 		tab.toggle_mode = false
-		tab.custom_minimum_size = Vector2(150, 52)
-		tab.add_theme_font_size_override("font_size", 24)
+		tab.custom_minimum_size = Vector2(110, 52)
+		tab.add_theme_font_size_override("font_size", 20)
 		var index := i
 		tab.pressed.connect(func() -> void:
 			Sfx.play("ui_click", -5.0)
@@ -51,7 +48,7 @@ func build() -> void:
 	var close := Button.new()
 	close.text = "Close"
 	close.custom_minimum_size = Vector2(120, 52)
-	close.add_theme_font_size_override("font_size", 24)
+	close.add_theme_font_size_override("font_size", 20)
 	close.pressed.connect(func() -> void:
 		Sfx.play("ui_click", -4.0)
 		closed.emit())
@@ -73,13 +70,15 @@ func show_tab(index: int) -> void:
 		UiTheme.plain(_tabs[i])
 		if i == index:
 			UiTheme.selected(_tabs[i])
-	_scroll.scroll_vertical = 0
+	_scroll.scroll_to(0)
 	match index:
 		0: _classes()
-		1: _enemies()
-		2: _familiars()
-		3: _items()
-		4: _weapons()
+		1: _weapons()
+		2: _items()
+		3: _familiars()
+		4: _enemies()
+		5: _statuses()
+		6: _maps()
 
 
 func _row(icon: String, color: Color, title: String, text: String, note := "") -> void:
@@ -120,34 +119,82 @@ func _classes() -> void:
 		var paths := PackedStringArray()
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:
 			paths.append(spec["name"])
-		var note := "Health %d, speed %d%%. Paths: %s." % [int(d["hp"]), int(round(float(d["speed"]) * 100.0)), ", ".join(paths)]
+		var note := "Base health %d, speed %d%%. Paths: %s." % [int(d["hp"]), int(round(float(d["speed"]) * 100.0)), ", ".join(paths)]
 		if not Game.owns_class(id):
 			note += " " + acquisition(id)
 		_row(ClassDefs.icon(id), ClassDefs.color(id), d["name"], d["desc"], note)
 
 
+## Families are kept together; alphabetical order is only used within a family.
+static func enemy_group(id: String) -> int:
+	var d: Dictionary = ZombieDefs.ALL[id]
+	if d.get("mist_boss", false): return 4
+	if d.get("maps", []).has("mists"): return 3
+	if d.get("hero", false) or d.get("rider", false): return 2
+	if id in ["normal", "clever", "magic", "beast", "leaper"]: return 0
+	return 1
+
 func _enemies() -> void:
-	for id: String in ZombieDefs.ALL:
+	var order: Array = ZombieDefs.ALL.keys()
+	order.sort_custom(func(a: String, b: String) -> bool:
+		var ga := enemy_group(a)
+		var gb := enemy_group(b)
+		if ga != gb: return ga < gb
+		if ga == 0: return ["normal", "clever", "leaper", "magic", "beast"].find(a) < ["normal", "clever", "leaper", "magic", "beast"].find(b)
+		return str(ZombieDefs.ALL[a]["name"]).naturalnocasecmp_to(str(ZombieDefs.ALL[b]["name"])) < 0)
+	var previous := -1
+	for id: String in order:
+		var group := enemy_group(id)
+		if group != previous:
+			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Bosses"][group])
+			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
+		var locations := PackedStringArray()
+		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort"}.get(map_id, map_id.capitalize()))
 		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
-		if from > 0.0:
-			note += ". From minute %d" % ceili(from / 60.0)
+		if d.get("mist_boss", false):
+			note += ". Boss encounter around 8:30"
+		elif from > 0.0:
+			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], d["desc"], note)
+		_map_badge(d, d.get("maps", []).has("village"))
+
+func _map_badge(data: Dictionary, green := true) -> void:
+	if not data.has("maps"): return
+	var badge := PanelContainer.new()
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	badge.add_theme_stylebox_override("panel", UiTheme.flat(Color("1d3c2c") if green else Color("193e4b"), UiTheme.MOSS if green else UiTheme.MIST, 6, 7.0))
+	var label := Label.new()
+	label.text = "Map Exclusive · " + SpawnRules.names(data)
+	label.add_theme_font_override("font", UiTheme.bold_font())
+	label.add_theme_font_size_override("font_size", 19)
+	label.add_theme_color_override("font_color", Color("b2e8b5") if green else Color("a5f0ec"))
+	badge.add_child(label)
+	_list.get_child(-1).get_child(1).add_child(badge)
+
+func _section(title: String) -> void:
+	var label := Label.new()
+	label.text = title.to_upper()
+	label.add_theme_font_override("font", UiTheme.bold_font())
+	label.add_theme_font_size_override("font_size", 24)
+	label.add_theme_color_override("font_color", UiTheme.EMBER)
+	_list.add_child(label)
 
 
 func _familiars() -> void:
 	for id: String in PowerDefs.ALL:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if d["familiar"]:
-			_row(Icons.power(id), Color(d["color"]).darkened(0.35), d["name"], d["desc"], "%d seconds" % int(d["time"]))
+			_row(Icons.power(id), Color(d["color"]).darkened(0.35), d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
+			_map_badge(d)
 
 
 func _items() -> void:
 	for id: String in PowerDefs.ALL:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if not d["familiar"]:
-			_row(Icons.power(id), Color(d["color"]).darkened(0.35), "%s Potion" % d["name"], d["desc"], "%d seconds" % int(d["time"]))
+			_row(Icons.power(id), Color(d["color"]).darkened(0.35), "%s Potion" % d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
 
 
 func _weapons() -> void:
@@ -164,6 +211,7 @@ func _weapons() -> void:
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
 		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
+		_map_badge(d, not d.get("maps", []).has("mists"))
 
 
 static func acquisition(id: String) -> String:
@@ -173,9 +221,22 @@ static func acquisition(id: String) -> String:
 	if earned != "":
 		return earned
 	if ClassDefs.price(id) > 0:
-		return "In the Store for %d doubloons." % ClassDefs.price(id)
+		return "Available in the Store."
 	if id == "commander":
 		return "First prize in VRAIN tournaments. Redeem the prize code to unlock."
 	if ClassDefs.ALL[id].get("unavailable", false):
 		return "Unlocked by redeeming a class code."
 	return "Available from the start."
+
+## General conditions only. Profession skills remain in their class trees.
+func _statuses() -> void:
+	for entry: Dictionary in StatusCatalog.TIMED:
+		if entry["field"] not in ["burn_time", "bleed_left", "poison_left", "slowed_left", "invis_left", "guard_left"]: continue
+		_row(entry["icon"], UiTheme.BLOOD if entry["field"] in ["burn_time", "bleed_left", "poison_left"] else UiTheme.MIST, entry["name"], entry["desc"])
+	_row("status_frozen", UiTheme.MIST, "Frozen", "Ice prevents movement until its timer ends. You can still look around.")
+	_row("status_stunned", UiTheme.EMBER, "Stunned", "An impact briefly interrupts movement until its timer ends.")
+
+func _maps() -> void:
+	_row("map_village", UiTheme.BONE, "The Village", "The first village to be overrun and razed by the zombie hordes.")
+	_row("map_fort", UiTheme.BONE, "The Fort", "The last bastion protecting the portal to The Mists.")
+	_row("map_mists", UiTheme.MIST, "The Mists", "The heart of mysterious worlds lying beyond our own.")

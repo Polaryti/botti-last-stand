@@ -155,7 +155,7 @@ func target_population() -> int:
 
 func stock(kind: int) -> void:
 	match kind:
-		Pickup.Kind.WEAPON: world.spawn_pickup_random(kind, WeaponDefs.pick_random())
+		Pickup.Kind.WEAPON: world.spawn_pickup_random(kind, WeaponDefs.pick_random(world.spawn_map()))
 		Pickup.Kind.FOOD: world.spawn_pickup_random(kind, PowerDefs.pick_weighted(PowerDefs.FOODS))
 		Pickup.Kind.ARROWS: world.spawn_pickup_random(kind, "arrows")
 		Pickup.Kind.POWER: world.spawn_pickup_random(kind, PowerDefs.pick_potion())
@@ -257,7 +257,7 @@ func _clear_far_zombies() -> void:
 ## A familiar always appears within reach. The sound says one is out there; finding it is up to you.
 func _spawn_familiar() -> void:
 	var who: Target = world.players[randi() % world.players.size()] if not world.players.is_empty() else null
-	var p := world.spawn_pickup_near_player(Pickup.Kind.POWER, PowerDefs.pick_familiar(), 10.0, 26.0, who)
+	var p := world.spawn_pickup_near_player(Pickup.Kind.POWER, PowerDefs.pick_familiar(world.spawn_map()), 10.0, 26.0, who)
 	if p and who:
 		if who is Avatar:
 			Net.familiar_near((who as Avatar).peer)
@@ -307,12 +307,12 @@ func _tick_mist_boss() -> void:
 
 func _tick_specials() -> void:
 	_tick_mist_boss()
-	if elapsed >= _next_rider:
+	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
 		_next_rider = elapsed + RIDER_EVERY
 		if world.count_type("rider") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("rider"):
 			_sound("gallop", 2.0)
 			show_banner("Hooves in the dark...", 3.0)
-	if elapsed >= _next_crows:
+	if elapsed >= _next_crows and SpawnRules.allows(ZombieDefs.ALL["crow"], world.spawn_map()):
 		_next_crows = elapsed + CROWS_EVERY
 		for i in 3:
 			world.spawn_zombie("crow")

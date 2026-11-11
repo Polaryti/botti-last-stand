@@ -106,7 +106,7 @@ static func _disc(l: LowPoly, centre: Vector3, normal: Vector3, r: float, thick:
 ## Infantry: an iron kettle hat with a wide brim, and a round shield on the back.
 static func _infantry() -> Dictionary:
 	var head := LowPoly.new()
-	head.prism(Vector3(0, 0.74, 0), Vector3(0, 1.1, 0), 0.68, 0.34, 8, STEEL)
+	head.prism(Vector3(0, 0.74, 0), Vector3(0, 1.1, 0), 0.68, 0.34, 8, Color(0.40, 0.47, 0.55))
 	head.prism(Vector3(0, 1.1, 0), Vector3(0, 1.22, 0), 0.34, 0.0, 8, DARK_STEEL)
 	head.prism(Vector3(0, 0.7, 0), Vector3(0, 0.8, 0), 0.9, 0.72, 10, DARK_STEEL)
 	var chest := LowPoly.new()
@@ -138,7 +138,7 @@ static func _ranger() -> Dictionary:
 static func _heavy() -> Dictionary:
 	var head := LowPoly.new()
 	head.prism(Vector3(0, 0.02, 0), Vector3(0, 0.98, 0), 0.68, 0.7, 8, DARK_STEEL)
-	head.prism(Vector3(0, 0.98, 0), Vector3(0, 1.14, 0), 0.7, 0.42, 8, STEEL)
+	head.prism(Vector3(0, 0.98, 0), Vector3(0, 1.14, 0), 0.7, 0.42, 8, Color(0.40, 0.47, 0.55))
 	head.box(Vector3(0, 0.56, 0.66), Vector3(0.88, 0.1, 0.08), BLACK)
 	head.box(Vector3(0, 0.42, 0.67), Vector3(0.14, 0.74, 0.07), GOLD)
 	head.box(Vector3(0, 0.58, 0.68), Vector3(0.92, 0.04, 0.05), STEEL)
@@ -146,7 +146,7 @@ static func _heavy() -> Dictionary:
 	head.prism(Vector3(0, 1.72, -0.26), Vector3(0, 1.72, -0.86), 0.09, 0.0, 6, RED)
 	var chest := LowPoly.new()
 	for side: float in [-1.0, 1.0]:
-		chest.prism(Vector3(side * 0.34, 0.14, 0), Vector3(side * 0.8, 0.14, 0), 0.24, 0.34, 8, STEEL)
+		chest.prism(Vector3(side * 0.34, 0.14, 0), Vector3(side * 0.8, 0.14, 0), 0.24, 0.34, 8, Color(0.40, 0.47, 0.55))
 		chest.prism(Vector3(side * 0.8, 0.14, 0), Vector3(side * 0.9, 0.14, 0), 0.34, 0.16, 8, DARK_STEEL)
 		chest.prism(Vector3(side * 0.58, 0.44, 0), Vector3(side * 0.58, 0.76, 0), 0.08, 0.0, 5, DARK_STEEL)
 	chest.box(Vector3(0, -0.26, 0.36), Vector3(0.6, 0.8, 0.04), Color(0.14, 0.17, 0.3))
@@ -306,11 +306,13 @@ static func _artificer() -> Dictionary:
 
 static func _commander() -> Dictionary:
 	var helm := LowPoly.new()
-	helm.prism(Vector3(0, 0.72, 0), Vector3(0, 1.02, 0), 0.64, 0.58, 8, GOLD)
-	for i in 5:
-		var angle := i * TAU / 5.0
-		var at := Vector3(cos(angle) * 0.58, 1.0, sin(angle) * 0.58)
-		helm.prism(at, at + Vector3.UP * 0.38, 0.14, 0.0, 4, GOLD)
+	# Enclosed officer's sallet with a swept crest and split cheek guards.
+	helm.prism(Vector3(0, 0.64, 0), Vector3(0, 1.16, 0.06), 0.63, 0.43, 8, Color(0.40, 0.47, 0.55))
+	helm.box(Vector3(0, 0.80, -0.57), Vector3(0.85, 0.07, 0.08), Color(0.06, 0.07, 0.10))
+	for side: float in [-1.0, 1.0]:
+		helm.box(Vector3(side * 0.43, 0.52, -0.32), Vector3(0.16, 0.38, 0.32), Color(0.40, 0.47, 0.55))
+	helm.prism(Vector3(0, 1.06, -0.3), Vector3(0, 1.40, 0.48), 0.12, 0.035, 4, Color(0.46, 0.16, 0.58))
+	helm.box(Vector3(0, 0.68, -0.62), Vector3(0.08, 0.23, 0.06), GOLD)
 	var chest := LowPoly.new()
 	chest.box(Vector3(0, -0.3, -0.38), Vector3(1.1, 1.1, 0.06), Color(0.38, 0.12, 0.55))
 	for side: float in [-1.0, 1.0]:

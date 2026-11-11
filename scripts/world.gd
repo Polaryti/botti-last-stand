@@ -948,11 +948,19 @@ func nearest_zombie_excluding(from: Vector3, radius: float, excluded: Array[RID]
 
 
 func nearest_weapon_pickup(from: Vector3, radius: float) -> Pickup:
+	var regions: Array[int] = []
+	if portals: regions = MapIslands.regions()
+	var source_island := portals.island_of(from) if portals else -1
 	var best: Pickup = null
 	var best_d := radius * radius
 	for p in pickups:
-		if p.kind != Pickup.Kind.WEAPON:
+		if p.kind != Pickup.Kind.WEAPON or WeaponDefs.ALL.get(p.weapon_id, {}).get("hidden", false):
 			continue
+		if not grid.is_free(grid.to_cell(p.global_position)) or absf(p.global_position.y - ground_at(p.global_position)) > 2.5:
+			continue
+		if portals:
+			var target_island := portals.island_of(p.global_position)
+			if source_island < 0 or target_island < 0 or regions[source_island] != regions[target_island]: continue
 		var d := p.global_position.distance_squared_to(from)
 		if d < best_d:
 			best_d = d
@@ -1219,11 +1227,13 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
+		for effect: Dictionary in p._triggers.get("shot", []):
+			if effect.get("do", "") == "dot" and not effect.get("bleed", false): shot.poison_trail = true
 		shot.stagger = float(d.get("stagger", 0.0))
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(0, at, vel, grav, max_range, burning, Color.WHITE)
+			Net.shot(0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
 
 
 func familiar_arrow(p: Player, target: Node3D) -> void:
@@ -1574,6 +1584,12 @@ func _build_zombie_pools() -> void:
 			(_pools[model] as Array).append(z)
 
 
+func spawn_map() -> String:
+	if mode == Game.Mode.SANDBOX: return ""
+	if mode == Game.Mode.FORT: return "fort"
+	return "mists" if terrain.has_islands() else "village"
+
+
 func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	var models: Array = ZombieDefs.def_of(id)["models"].duplicate()
 	models.shuffle()
@@ -1651,6 +1667,8 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
+		if mesh == 0 and col.g > col.r + 0.3:
+			shot.poison_trail = true
 
 
 ## Where each player starts. In a fight they start apart.
@@ -2308,7 +2326,7 @@ func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, sho
 	_next_puddle = (_next_puddle + 1) % _puddles.size()
 	m.global_position = Vector3(at.x, ground_at(at) + 0.07, at.z)
 	m.visible = true
-	if not shown_only and Net.active():
+	if not shown_only and not _warming and Net.active():
 		Net.world_fx(Net.Fx.FIRE_PATCH if burning else Net.Fx.POISON_PATCH, at, Vector3(life, size, 0), owner_peer)
 
 
@@ -2565,6 +2583,9 @@ func warm_up() -> void:
 		z._stop_flames()
 		z.release()
 	_burning.clear()
+	for gore: CPUParticles3D in _gore:
+		gore.emitting = false
+		gore.visible = false
 	for s in shots:
 		s.stop()
 	while allies.size() > allies_from:
@@ -2579,6 +2600,9 @@ func warm_up() -> void:
 	for i in _puddles.size():
 		_puddles[i].visible = false
 		_puddle_life[i] = 0.0
+		for effect: Node3D in _puddles[i].get_children():
+			effect.visible = false
+			if effect is CPUParticles3D: effect.emitting = false
 	heavy_preview.queue_free()
 	if mist_preview:
 		mist_preview.free()
@@ -3068,6 +3092,7 @@ func fx_impact(at: Vector3) -> void:
 func fx_gore(at: Vector3, col: Color) -> void:
 	var g := _gore[_next_gore]
 	_next_gore = (_next_gore + 1) % _gore.size()
+	g.visible = true
 	g.global_position = at
 	g.color = col.darkened(0.25)
 	g.restart()

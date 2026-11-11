@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.21.4 — A Portal Worth Defending (11 November 2026)
+
+### The Fort
+- The last bastion now protects a glowing portal to The Mists instead of the Heart. Defend the portal and keep the gates standing until dawn.
+- Gate repair signs now say Wood. The Fort objective and Adept stance display no longer overlap.
+
+### Your class and equipment
+- The Armory introduces each class and its base stats, explains its three professions, and shows its Class Upgrades and equipment controls. Toggling an upgrade keeps your place in the list and your model preview.
+- Class and profession introductions are more consistent. Beastmaster skill descriptions now refer to your pet and its ability.
+- Commander has a new officer helmet and redesigned class and profession emblems, with matching frames.
+- Monk's hands are visible again, with working punch animations. Magician can wield only the Staff. Attacking breaks invisibility.
+- Plague Doctor now has 100 base health and 100% movement speed. Commander moves at 105% speed, and Artificer has 100 base health. Heavy Infantry starts with a Flail.
+
+### Finds worth travelling for
+- Scythes, Pitchforks, Throwing Axes and Torches are found in The Village and The Fort. Artificer still starts with a Torch on every map.
+- Bell Hammers are found in The Mists. Their Codex badge uses the same blue as the Mists creatures.
+- Plague Rat and Bell Spirit familiars, Carrion Crows and Dread Riders appear only in The Village and The Fort.
+- Idle Clever enemies search farther for weapons they can reach.
+
+### Clearer battles and field notes
+- Fire and poison arrows have distinct effects that preserve their arrow shape, separate from fireballs.
+- Invisibility adds a screen tint. Timed status icons and more distinctive combat messages make effects, backstabs and dodges easier to read.
+- The Codex groups enemies into families, highlights map-exclusive entries, explains general status conditions, and introduces the three maps with their own emblems and lore.
+- Removed duplicate descriptions and class prices from the Codex. The Armory explains professions and Class Upgrades without listing the entire skill tree.
+- Menus respect mobile screen cutouts and safe edges. Touch lists no longer display scrollbars. Inspecting another skill clears the previous inspection ring.
+
+### Fixes and playing together
+- Fixed phantom fire, poison, blood and attack effects when starting a match.
+- Temporary hit and freeze appearances now restore correctly when effects end or a player falls and respawns.
+- Online matches require everyone to update to 0.21.4 so class balance and map rules agree.
+
 ## 0.21.3 — Steadier Online Games and a Fairer Fort (10 November 2026)
 
 ### Online games

@@ -25,6 +25,7 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v5
 
@@ -163,6 +164,11 @@ jobs:
             build/dev/badging.txt
             build/checks
           retention-days: 14
+
+      - name: Require full validation before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/wait_for_validation.py
 
       - name: Publish an Android-only prerelease
         env:
