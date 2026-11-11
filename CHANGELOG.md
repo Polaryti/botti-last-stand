@@ -1,5 +1,11 @@
 # Changelog
 
+## Development — Steadier Light
+- Firelight follows the burning enemies nearest your view, using the same number of lights.
+- River highlights receive pixel-width filtering to soften distant shimmer.
+- Ground and pool shaders use simpler lighting calculations while retaining their falloff and highlights.
+- Pickup scanning and icon loading do less repeated work, without changing reach or artwork.
+
 ## 0.21.4 — A Portal Worth Defending (11 November 2026)
 
 ### The Fort

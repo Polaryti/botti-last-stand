@@ -1709,7 +1709,7 @@ func _warm_ground() -> void:
 			var fire: Dictionary = nearby[i]
 			var at: Vector3 = fire["at"]
 			var radius := 8.0 if fire["heals"] else 5.0
-			hearths[i] = Vector4(at.x, at.y + 1.2, at.z, radius)
+			hearths[i] = Vector4(at.x, at.y + 1.2, at.z, 1.0 / (radius * radius))
 		var material := _ground_material.duplicate() as ShaderMaterial
 		material.set_shader_parameter("hearths", hearths)
 		patch.material_override = material

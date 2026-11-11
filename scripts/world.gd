@@ -127,6 +127,8 @@ var _night_dome: MeshInstance3D
 var _star_material: StandardMaterial3D
 var _burn_lights: Array[OmniLight3D] = []
 var _burning: Array[Zombie] = []
+var _lit_burning: Array[Zombie] = []
+var _lit_burning_distances := PackedFloat64Array()
 var _bell_swing := 0.0
 var _bell_strokes := 0
 var _bell_wait := 0.0
@@ -1566,14 +1568,34 @@ func _tick_burn_lights() -> void:
 	for i in range(_burning.size() - 1, -1, -1):
 		if _burning[i].burn_time <= 0.0 or not _burning[i].is_alive():
 			_burning.remove_at(i)
-	for i in _burn_lights.size():
-		var l := _burn_lights[i]
-		if i < _burning.size():
-			l.visible = true
-			l.global_position = _burning[i].centre() + Vector3.UP * 0.3
-			l.light_energy = 2.2 + sin(Time.get_ticks_msec() * 0.02 + i) * 0.5
-		else:
-			l.visible = false
+	var count := _burn_lights.size()
+	if count == 0: return
+	if _lit_burning.size() != count:
+		_lit_burning.resize(count)
+		_lit_burning_distances.resize(count)
+	for i in count:
+		_lit_burning[i] = null
+		_lit_burning_distances[i] = INF
+	var camera_at := _player_camera_position()
+	# Only the small fixed light budget is ranked; no sorting or per-frame candidate arrays.
+	for z in _burning:
+		var distance_squared := camera_at.distance_squared_to(z.centre())
+		for slot in count:
+			if distance_squared < _lit_burning_distances[slot]:
+				for shift in range(count - 1, slot, -1):
+					_lit_burning[shift] = _lit_burning[shift - 1]
+					_lit_burning_distances[shift] = _lit_burning_distances[shift - 1]
+				_lit_burning[slot] = z
+				_lit_burning_distances[slot] = distance_squared
+				break
+	var now := Time.get_ticks_msec() * 0.02
+	for i in count:
+		var light := _burn_lights[i]
+		var z := _lit_burning[i]
+		light.visible = z != null
+		if z:
+			light.global_position = z.centre() + Vector3.UP * 0.3
+			light.light_energy = 2.2 + sin(now + i) * 0.5
 
 
 # --- Spawning ----------------------------------------------------------------
