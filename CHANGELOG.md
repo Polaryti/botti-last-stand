@@ -1,9 +1,10 @@
 # Changelog
 
 ## Development — Know your path
-- The Armory now includes class lore, starting stats, shared training, every profession tier and final ability, equipment controls and a separate appearance section.
+- The Armory now includes class lore, starting stats, three profession summaries, Class Upgrade descriptions and controls, and a separate appearance section.
 - Class and profession selection uses consistent introductions and concise mechanic summaries.
 - Commander wears a distinctive officer helmet, with new Commander, Gunner and Vanguard emblems.
+- Warlock now uses the same gold-edged shield frame as the other Commander emblems.
 - Inspecting a different skill clears the previous selection ring. Beastmaster descriptions refer to your pet and its ability.
 
 ## Previous development — Clearer field notes and elemental arrows

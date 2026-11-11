@@ -13,8 +13,12 @@ func _ready() -> void:
 		var labels := m.panel.find_children("*", "Label", true, false)
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:
 			assert(ClassPresentation.profession(spec).ends_with("."))
-			assert(labels.any(func(l: Label) -> bool: return l.text.contains(spec["final"]["name"])))
-			checks += 2
+			assert(labels.any(func(l: Label) -> bool: return l.text == spec["name"]))
+			assert(not labels.any(func(l: Label) -> bool: return l.text.begins_with(spec["final"]["name"] + " —")))
+			for item: String in ShopDefs.for_class(id):
+				if not ShopDefs.ITEMS[item].get("pet", false):
+					assert(labels.any(func(l: Label) -> bool: return l.text == ShopDefs.ITEMS[item]["desc"]))
+			checks += 3
 		checks += 2
 	print("ARMORY ESSENTIALS: ", checks, " checks passed")
 	if not OS.get_cmdline_user_args().is_empty():

@@ -987,20 +987,16 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 14)
 	scroll.add_child(content)
-	content.add_child(_body("Shared training · Levels 2–4", 25))
 	var tree := AbilityData.tree(id)
-	for tier in tree["core"].size():
-		_armory_tier(content, "Level %d · Choose one" % (tier + 2), tree["core"][tier])
 	var items := ShopDefs.for_class(id)
 	for spec: Dictionary in tree["specs"]:
 		content.add_child(_body(spec["name"], 29))
 		content.add_child(_body(ClassPresentation.profession(spec), 22))
-		_armory_tier(content, "Level 5 · Profession", [spec["entry"]])
-		for tier in spec["path"].size():
-			_armory_tier(content, "Level %d · Choose one" % (tier + 6), spec["path"][tier])
-		_armory_tier(content, "Level 10 · Final ability", [spec["final"]])
 		var upgrades := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["spec"] == spec["id"])
-		if not upgrades.is_empty(): content.add_child(_armory_spec_row(id, spec["id"], upgrades))
+		if not upgrades.is_empty():
+			content.add_child(_armory_spec_row(id, spec["id"], upgrades))
+		else:
+			content.add_child(_soft("No Class Upgrades available for this profession.", 20))
 	var cosmetics := VBoxContainer.new()
 	cosmetics.name = "CosmeticsSection"
 	content.add_child(cosmetics)
@@ -1008,13 +1004,6 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	cosmetics.add_child(_soft("Default appearance. No additional skins available yet.", 21))
 	for label: Label in detail.find_children("*", "Label", true, false):
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-
-func _armory_tier(parent: VBoxContainer, title: String, abilities: Array) -> void:
-	parent.add_child(_soft(title, 20))
-	for ability: Dictionary in abilities:
-		var label := _body("%s — %s" % [ability["name"], ability["desc"]], 21)
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		parent.add_child(label)
 
 
 ## One specialization: its emblem and name, and what you have for it.
@@ -1028,7 +1017,7 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_theme_constant_override("separation", 4)
 	row.add_child(column)
-	column.add_child(_body(_spec_name(class_id, spec), 23))
+	column.add_child(_body("Class Upgrades", 23))
 	if ShopDefs.ITEMS[items[0]].get("pet", false):
 		column.add_child(_pet_row())
 		return row
@@ -1037,6 +1026,9 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 12)
 		column.add_child(line)
+		var description := _soft(d["desc"], 21)
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(description)
 		var name_label := _soft(d["name"], 22)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		line.add_child(name_label)
