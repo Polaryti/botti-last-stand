@@ -359,7 +359,10 @@ func _state_words(n: TreeNodeButton) -> String:
 
 
 func read(n: TreeNodeButton) -> void:
+	var previous := _reading
 	_reading = n
+	if is_instance_valid(previous): previous.queue_redraw()
+	if is_instance_valid(n): n.queue_redraw()
 	Sfx.play("ui_click", -8.0)
 	_map.queue_redraw()
 	_fill_zone()

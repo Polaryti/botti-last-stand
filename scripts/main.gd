@@ -685,7 +685,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
 	words.add_child(_soft("Health %d. Speed %d%%." % [int(c["hp"]), int(round(float(c["speed"]) * 100.0))], 24))
-	var desc := _body(c["desc"], 25)
+	var desc := _body(ClassPresentation.description(id), 25)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail.add_child(desc)
 	for spec: Dictionary in AbilityData.tree(id)["specs"]:
@@ -700,7 +700,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 		spec_name.custom_minimum_size.x = 190
 		spec_name.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		line.add_child(spec_name)
-		var spec_desc := _soft(spec["desc"], 23)
+		var spec_desc := _soft(ClassPresentation.profession(spec), 23)
 		spec_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		spec_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		line.add_child(spec_desc)
@@ -874,7 +874,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	var d: Dictionary = ShopDefs.ITEMS[id]
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 18)
-	head.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	head.size_flags_vertical = Control.SIZE_FILL
 	detail.add_child(head)
 	var view := ModelView.new(Vector2(250, 270))
 	view.show_item(id)
@@ -945,7 +945,7 @@ func show_armory(focus := "") -> void:
 			(rows[other] as Button).remove_theme_stylebox_override("hover")
 		UiTheme.selected(rows[id])
 		_fill_armory(detail, id)
-	var classes := ClassDefs.available()
+	var classes: Array = ClassDefs.ALL.keys().filter(func(key: String) -> bool: return not ClassDefs.disabled(key))
 	for id: String in classes:
 		var row := _class_row(id)
 		rows[id] = row
@@ -964,9 +964,9 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 		child.queue_free()
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 18)
-	head.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	head.size_flags_vertical = Control.SIZE_FILL
 	detail.add_child(head)
-	var view := ModelView.new(Vector2(230, 300))
+	var view := ModelView.new(Vector2(170, 180))
 	view.show_class(id)
 	head.add_child(view)
 	var words := VBoxContainer.new()
@@ -976,16 +976,45 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	var title := _body(ClassDefs.ALL[id]["name"], 36)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
+	words.add_child(_body(ClassPresentation.COPY[id][0], 23))
+	var d: Dictionary = ClassDefs.ALL[id]
+	words.add_child(_soft("Base health %d · Speed %d%%\nStarting weapon: %s · Starting arrows: %d" % [int(d["hp"]), roundi(float(d["speed"]) * 100), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], 21))
+	words.add_child(_body(ClassPresentation.COPY[id][1], 22))
+	var scroll := DragScroll.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 14)
+	scroll.add_child(content)
+	content.add_child(_body("Shared training · Levels 2–4", 25))
+	var tree := AbilityData.tree(id)
+	for tier in tree["core"].size():
+		_armory_tier(content, "Level %d · Choose one" % (tier + 2), tree["core"][tier])
 	var items := ShopDefs.for_class(id)
-	if items.is_empty():
-		words.add_child(_soft("Nothing for this class yet.", 24))
-	var shown_specs := {}
-	for item: String in items:
-		var spec := str(ShopDefs.ITEMS[item]["spec"])
-		if shown_specs.has(spec):
-			continue
-		shown_specs[spec] = true
-		words.add_child(_armory_spec_row(id, spec, items.filter(func(other: String) -> bool: return ShopDefs.ITEMS[other]["spec"] == spec)))
+	for spec: Dictionary in tree["specs"]:
+		content.add_child(_body(spec["name"], 29))
+		content.add_child(_body(ClassPresentation.profession(spec), 22))
+		_armory_tier(content, "Level 5 · Profession", [spec["entry"]])
+		for tier in spec["path"].size():
+			_armory_tier(content, "Level %d · Choose one" % (tier + 6), spec["path"][tier])
+		_armory_tier(content, "Level 10 · Final ability", [spec["final"]])
+		var upgrades := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["spec"] == spec["id"])
+		if not upgrades.is_empty(): content.add_child(_armory_spec_row(id, spec["id"], upgrades))
+	var cosmetics := VBoxContainer.new()
+	cosmetics.name = "CosmeticsSection"
+	content.add_child(cosmetics)
+	cosmetics.add_child(_body("Appearance", 25))
+	cosmetics.add_child(_soft("Default appearance. No additional skins available yet.", 21))
+	for label: Label in detail.find_children("*", "Label", true, false):
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+func _armory_tier(parent: VBoxContainer, title: String, abilities: Array) -> void:
+	parent.add_child(_soft(title, 20))
+	for ability: Dictionary in abilities:
+		var label := _body("%s — %s" % [ability["name"], ability["desc"]], 21)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		parent.add_child(label)
 
 
 ## One specialization: its emblem and name, and what you have for it.

@@ -1,6 +1,12 @@
 # Changelog
 
-## Development — Clearer field notes and elemental arrows
+## Development — Know your path
+- The Armory now includes class lore, starting stats, shared training, every profession tier and final ability, equipment controls and a separate appearance section.
+- Class and profession selection uses consistent introductions and concise mechanic summaries.
+- Commander wears a distinctive officer helmet, with new Commander, Gunner and Vanguard emblems.
+- Inspecting a different skill clears the previous selection ring. Beastmaster descriptions refer to your pet and its ability.
+
+## Previous development — Clearer field notes and elemental arrows
 - Magicians fight with their wand alone. Attacking breaks invisibility.
 - Fire arrows have a visible shaft and a narrow burning tip; poison arrows trail green venom. Fireballs keep their separate blazing orb.
 - The Codex groups enemies into families, highlights map-exclusive creatures, and gives each map its own emblem.
