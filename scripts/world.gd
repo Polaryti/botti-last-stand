@@ -947,24 +947,26 @@ func nearest_zombie_excluding(from: Vector3, radius: float, excluded: Array[RID]
 	return best
 
 
+var _weapon_regions: Array[int] = []
+
+
 func nearest_weapon_pickup(from: Vector3, radius: float) -> Pickup:
-	var regions: Array[int] = []
-	if portals: regions = MapIslands.regions()
+	if portals and _weapon_regions.is_empty(): _weapon_regions = MapIslands.regions()
 	var source_island := portals.island_of(from) if portals else -1
 	var best: Pickup = null
 	var best_d := radius * radius
 	for p in pickups:
 		if p.kind != Pickup.Kind.WEAPON or WeaponDefs.ALL.get(p.weapon_id, {}).get("hidden", false):
 			continue
+		var d := p.global_position.distance_squared_to(from)
+		if d >= best_d: continue
 		if not grid.is_free(grid.to_cell(p.global_position)) or absf(p.global_position.y - ground_at(p.global_position)) > 2.5:
 			continue
 		if portals:
 			var target_island := portals.island_of(p.global_position)
-			if source_island < 0 or target_island < 0 or regions[source_island] != regions[target_island]: continue
-		var d := p.global_position.distance_squared_to(from)
-		if d < best_d:
-			best_d = d
-			best = p
+			if source_island < 0 or target_island < 0 or _weapon_regions[source_island] != _weapon_regions[target_island]: continue
+		best_d = d
+		best = p
 	return best
 
 
@@ -1070,8 +1072,10 @@ func forget_around(at: Vector3, radius: float) -> int:
 
 func zombies_near(at: Vector3, radius: float, limit: int) -> Array[Zombie]:
 	var out: Array[Zombie] = []
+	if radius < 0.0: return out
+	var radius_squared := radius * radius
 	for z in zombies:
-		if z.is_alive() and not z.dormant and z.position.distance_to(at) <= radius:
+		if z.is_alive() and not z.dormant and z.position.distance_squared_to(at) <= radius_squared:
 			out.append(z)
 			if out.size() >= limit:
 				break
@@ -1079,9 +1083,11 @@ func zombies_near(at: Vector3, radius: float, limit: int) -> Array[Zombie]:
 
 
 func ally_near(at: Vector3, radius: float) -> bool:
+	if radius < 0.0: return false
+	var radius_squared := radius * radius
 	var owner_player := acting()
 	for a in allies:
-		if not a.dead and a.remote_owner == 0 and a.master == owner_player and a.position.distance_to(at) <= radius:
+		if not a.dead and a.remote_owner == 0 and a.master == owner_player and a.position.distance_squared_to(at) <= radius_squared:
 			return true
 	return false
 
