@@ -2086,23 +2086,24 @@ func _scan_pickups_for(who: Player) -> void:
 	if who.dead:
 		return
 	var near: Pickup = null
-	var near_d := 2.0
+	var near_distance_squared := 4.0
 	var here := who.global_position
 	var named: Pickup = null
-	var named_d := 3.5
+	var named_distance_squared := 12.25
 	# A weapon just put down stays down until you have walked away from where it fell.
-	if who.shun_weapon != "" and Vector2(here.x - who.shun_at.x, here.z - who.shun_at.z).length() > Pickup.SHUN_REACH:
+	if who.shun_weapon != "" and Vector2(here.x - who.shun_at.x, here.z - who.shun_at.z).length_squared() > Pickup.SHUN_REACH * Pickup.SHUN_REACH:
 		who.shun_weapon = ""
 	for p: Pickup in pickups.duplicate():
 		if not is_instance_valid(p):
 			continue
-		var d := p.global_position.distance_to(here)
-		if p.kind == Pickup.Kind.WEAPON and p.weapon_id == who.shun_weapon and p.global_position.distance_to(who.shun_at) < 2.5:
+		var distance_squared := p.global_position.distance_squared_to(here)
+		if distance_squared >= 12.25: continue
+		if p.kind == Pickup.Kind.WEAPON and p.weapon_id == who.shun_weapon and p.global_position.distance_squared_to(who.shun_at) < 6.25:
 			continue
-		if d < named_d:
+		if distance_squared < named_distance_squared:
 			named = p
-			named_d = d
-		if d > 2.0:
+			named_distance_squared = distance_squared
+		if distance_squared > 4.0:
 			continue
 		match p.kind:
 			Pickup.Kind.WEAPON:
@@ -2116,27 +2117,27 @@ func _scan_pickups_for(who: Player) -> void:
 						remove_pickup(p)
 				elif who.has_empty_slot():
 					collect_weapon(who, p)
-				elif d < near_d:
+				elif distance_squared < near_distance_squared:
 					near = p
-					near_d = d
+					near_distance_squared = distance_squared
 			Pickup.Kind.FOOD:
-				if d < 1.6 and who.hp < who.max_hp():
+				if distance_squared < 1.6 * 1.6 and who.hp < who.max_hp():
 					who.heal(float(PowerDefs.FOODS[p.item_id]["heal"]))
 					who.say("+%d %s" % [int(PowerDefs.FOODS[p.item_id]["heal"]), p.display_name()])
 					who.sfx("eat", -2.0)
 					remove_pickup(p)
 			Pickup.Kind.ARROWS:
-				if d < 1.6 and who.arrows < who.max_arrows() and not who.class_def().get("no_weapons", false):
+				if distance_squared < 1.6 * 1.6 and who.arrows < who.max_arrows() and not who.class_def().get("no_weapons", false):
 					who.add_arrows(12)
 					who.say("+12 Arrows")
 					who.sfx("pickup", -5.0)
 					remove_pickup(p)
 			Pickup.Kind.POWER:
-				if d < 1.6:
+				if distance_squared < 1.6 * 1.6:
 					who.activate_power(p.item_id)
 					remove_pickup(p)
 			Pickup.Kind.WOOD:
-				if d < 1.8 and who.wood < Fort.WOOD_MAX:
+				if distance_squared < 1.8 * 1.8 and who.wood < Fort.WOOD_MAX:
 					who.wood = mini(Fort.WOOD_MAX, who.wood + Fort.WOOD_PER_PICKUP)
 					who.say("Wood: %d" % who.wood)
 					who.sfx("pickup", -5.0, 0.7)

@@ -3,6 +3,7 @@ class_name Icons
 ## Icon strings look like "sword" or "sword+flame".
 
 static var _tex := {}
+static var _glyphs := {}
 
 
 static func tex(path: String) -> Texture2D:
@@ -12,8 +13,12 @@ static func tex(path: String) -> Texture2D:
 
 
 static func glyph(name: String) -> Texture2D:
+	# Assets do not change during a match: resolve SVG/PNG once per glyph.
+	if _glyphs.has(name): return _glyphs[name]
 	var vector := "res://assets/icons/%s.svg" % name
-	return tex(vector if ResourceLoader.exists(vector) else "res://assets/icons/%s.png" % name)
+	var texture := tex(vector if ResourceLoader.exists(vector) else "res://assets/icons/%s.png" % name)
+	_glyphs[name] = texture
+	return texture
 
 
 static func exists(name: String) -> bool:
