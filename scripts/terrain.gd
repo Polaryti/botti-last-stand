@@ -38,6 +38,7 @@ var _pads: Array[Dictionary] = [] # levelled at a height given by the map
 var _auto_pads: Array[Dictionary] = [] # levelled at whatever height the land has there
 var _cuts: Array[Dictionary] = []
 var _bridges: Array[Dictionary] = []
+var bake_revision := 0
 var _fords: Array[Dictionary] = []
 
 
@@ -156,7 +157,9 @@ func cut(points: Array[Vector3], half_width: float, margin := 3.0) -> void:
 
 
 func bridge(a: Vector2, b: Vector2, hump: float, half := 5.0) -> void:
-	_bridges.append({"a": a, "b": b, "hump": hump, "ya": 0.0, "yb": 0.0, "half": half})
+	var deck := {"a": a, "b": b, "hump": hump, "ya": 0.0, "yb": 0.0, "half": half}
+	_cache_deck(deck)
+	_bridges.append(deck)
 
 
 func ford(centre: Vector2, half: Vector2, yaw: float) -> void:
@@ -177,11 +180,13 @@ func bake() -> void:
 			var to: Vector2 = b["b"]
 			b["a"] = _rim_towards(from, to)
 			b["b"] = _rim_towards(to, from)
+		_cache_deck(b)
 		b["ya"] = _sample(visual, b["a"].x, b["a"].y)
 		b["yb"] = _sample(visual, b["b"].x, b["b"].y)
 		_lay_deck(b)
 	for f: Dictionary in _fords:
 		_lay_ford(f)
+	bake_revision += 1
 
 
 ## The land before anything is set down on it: hills, roughness, and the map's own platforms.
@@ -308,7 +313,7 @@ func deck_y(b: Dictionary, s: float) -> float:
 	if not islands.is_empty():
 		# Dead level for the first and last few metres, right over the land's edge, so that the
 		# slope only starts once you are clear of it and there is no lip to walk into.
-		var length := Vector2(b["a"]).distance_to(b["b"])
+		var length: float = b["length"]
 		var flat := minf(DECK_FLAT / maxf(length, 0.01), 0.3)
 		var r := clampf((s - flat) / (1.0 - flat * 2.0), 0.0, 1.0)
 		var bulge := sin(r * PI)
@@ -404,19 +409,30 @@ func slope(x: float, z: float) -> float:
 	return Vector2(dx, dz).length()
 
 
+## Static bridge geometry; refreshed after baking adjusts island rim endpoints.
+func _cache_deck(b: Dictionary) -> void:
+	var span: Vector2 = b["b"] - b["a"]
+	b["length"] = span.length()
+	b["along"] = span.normalized()
+	b["across"] = Vector2(b["along"]).orthogonal()
+	# Conservative bounds include every approach margin used by the deck queries.
+	var a: Vector2 = b["a"]
+	var end: Vector2 = b["b"]
+	b["bounds"] = Rect2(a.min(end), (end - a).abs()).grow(float(b["half"]) + 10.0)
+
+
 ## How far along a bridge, and how far to its side, a point is.
 func _deck_place(b: Dictionary, x: float, z: float) -> Vector2:
-	var a: Vector2 = b["a"]
-	var e: Vector2 = b["b"]
-	var along := (e - a).normalized()
-	var at := Vector2(x, z) - a
-	return Vector2(at.dot(along), absf(at.dot(along.orthogonal())))
+	var at := Vector2(x, z) - Vector2(b["a"])
+	return Vector2(at.dot(b["along"]), absf(at.dot(b["across"])))
 
 
 func on_deck(x: float, z: float) -> bool:
+	var point := Vector2(x, z)
 	for b: Dictionary in _bridges:
+		if not Rect2(b["bounds"]).has_point(point): continue
 		var q := _deck_place(b, x, z)
-		var length := (b["a"] as Vector2).distance_to(b["b"])
+		var length: float = b["length"]
 		if not islands.is_empty():
 			if q.x > 0.0 and q.x < length and q.y < float(b["half"]) + 0.2:
 				return true
@@ -428,17 +444,21 @@ func on_deck(x: float, z: float) -> bool:
 
 ## On a bridge or just coming up to one.
 func near_deck(x: float, z: float) -> bool:
+	var point := Vector2(x, z)
 	for b: Dictionary in _bridges:
+		if not Rect2(b["bounds"]).has_point(point): continue
 		var q := _deck_place(b, x, z)
-		if q.x > -6.0 and q.x < (b["a"] as Vector2).distance_to(b["b"]) + 6.0 and q.y < float(b["half"]) + 3.0:
+		if q.x > -6.0 and q.x < float(b["length"]) + 6.0 and q.y < float(b["half"]) + 3.0:
 			return true
 	return false
 
 
 func over_water_on_deck(x: float, z: float) -> bool:
+	var point := Vector2(x, z)
 	for b: Dictionary in _bridges:
+		if not Rect2(b["bounds"]).has_point(point): continue
 		var q := _deck_place(b, x, z)
-		if q.x > 0.0 and q.x < (b["a"] as Vector2).distance_to(b["b"]) and q.y < 3.0:
+		if q.x > 0.0 and q.x < float(b["length"]) and q.y < 3.0:
 			return true
 	return false
 

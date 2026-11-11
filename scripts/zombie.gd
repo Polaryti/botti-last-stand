@@ -68,6 +68,11 @@ var _skeleton: Skeleton3D
 var _shape: CollisionShape3D
 var _capsule: CapsuleShape3D
 var _shadow: MeshInstance3D
+var _shadow_at := Vector2(INF, INF)
+var _shadow_floor := 0.0
+var _shadow_walkable := false
+var _shadow_terrain: Terrain
+var _shadow_revision := -1
 var _parts: Array[MeshInstance3D] = []
 var _hand_mesh: WeaponVisual
 var _eyes: MeshInstance3D
@@ -2220,14 +2225,14 @@ func _process(delta: float) -> void:
 	var every := 1
 	if p:
 		var to := position - p.global_position
-		var d := to.length()
-		if d > 45.0:
+		var distance_squared := to.length_squared()
+		if distance_squared > 45.0 * 45.0:
 			every = 12
-		elif d > 22.0:
+		elif distance_squared > 22.0 * 22.0:
 			every = 4
-		elif d > 10.0:
+		elif distance_squared > 10.0 * 10.0:
 			every = 2
-		if d > 4.0 and to.dot(-p.camera.global_basis.z) < 0.0:
+		if distance_squared > 4.0 * 4.0 and to.dot(-p.camera.global_basis.z) < 0.0:
 			every = maxi(every, 6)
 	if _frozen > 0.0:
 		_anim_accum = 0.0
@@ -2238,8 +2243,17 @@ func _process(delta: float) -> void:
 
 
 func _update_ground_shadow() -> void:
-	var floor_y := world.ground_at(position)
-	var gap := maxf(0.0, position.y - floor_y)
-	_shadow.global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3(_scale, 1, _scale) / (1.0 + gap * 0.08)), Vector3(position.x, floor_y + 0.035, position.z))
-	_shadow.visible = is_alive() and world.terrain.is_walkable(position.x, position.z) and gap < 12.0
-	_shadow.transparency = clampf(gap / 12.0, 0.0, 1.0)
+	var at := Vector2(position.x, position.z)
+	if at != _shadow_at or _shadow_terrain != world.terrain or _shadow_revision != world.terrain.bake_revision:
+		_shadow_at = at
+		_shadow_terrain = world.terrain
+		_shadow_revision = world.terrain.bake_revision
+		_shadow_floor = world.ground_at(position)
+		_shadow_walkable = world.terrain.is_walkable(position.x, position.z)
+	var gap := maxf(0.0, position.y - _shadow_floor)
+	var transform := Transform3D(Basis.IDENTITY.scaled(Vector3(_scale, 1, _scale) / (1.0 + gap * 0.08)), Vector3(position.x, _shadow_floor + 0.035, position.z))
+	if _shadow.global_transform != transform: _shadow.global_transform = transform
+	var show := is_alive() and _shadow_walkable and gap < 12.0
+	if _shadow.visible != show: _shadow.visible = show
+	var alpha := clampf(gap / 12.0, 0.0, 1.0)
+	if _shadow.transparency != alpha: _shadow.transparency = alpha

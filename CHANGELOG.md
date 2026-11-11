@@ -1,6 +1,12 @@
 # Changelog
 
-## Development — Steadier Light
+## Development — Smoother Crowds
+- Terrain and bridge checks do less repeated work in busy areas, with the same walking surfaces and approach margins.
+- Stationary enemies reuse their ground-shadow placement; moving or airborne enemies still update correctly. Terrain rebuilds refresh cached shadow results.
+- Animation distance checks retain the same detail and update rates with simpler calculations.
+- Mists portals gain finer moving filaments and smoother edges, while fully transparent corners skip unnecessary shading.
+
+## Previous development — Steadier Light
 - Firelight follows the burning enemies nearest your view, using the same number of lights.
 - River highlights receive pixel-width filtering to soften distant shimmer.
 - Ground and pool shaders use simpler lighting calculations while retaining their falloff and highlights.
