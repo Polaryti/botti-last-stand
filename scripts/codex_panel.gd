@@ -211,7 +211,7 @@ func _weapons() -> void:
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
 		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
-		_map_badge(d)
+		_map_badge(d, not d.get("maps", []).has("mists"))
 
 
 static func acquisition(id: String) -> String:

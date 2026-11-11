@@ -1,34 +1,35 @@
 # Changelog
 
-## Development — Hands, equipment and local finds
-- Monk fists are visible again and punches animate correctly.
-- Equipping Class Upgrades preserves your Armory scroll positions, preview and class selection.
-- Plague Doctor has 100 base health and 100% speed; Commander moves at 105%; Artificer has 100 base health. Heavy Infantry starts with a Flail.
-- Scythes, Pitchforks, Throwing Axes and Torches are found in The Village and The Fort; Bell Hammers are found in The Mists. Artificer still starts with a Torch everywhere.
-- Plague Rat, Bell Spirit, Carrion Crows and Dread Riders are found in The Village and The Fort. Green Codex badges identify restricted weapons and familiars.
+## 0.21.4 — A Portal Worth Defending (11 November 2026)
 
-## Previous development — Know your path
-- The Armory now includes class lore, starting stats, three profession summaries, Class Upgrade descriptions and controls, and a separate appearance section.
-- Class and profession selection uses consistent introductions and concise mechanic summaries.
-- Commander wears a distinctive officer helmet, with new Commander, Gunner and Vanguard emblems.
-- Warlock now uses the same gold-edged shield frame as the other Commander emblems.
-- Inspecting a different skill clears the previous selection ring. Beastmaster descriptions refer to your pet and its ability.
+### The Fort
+- The last bastion now protects a glowing portal to The Mists instead of the Heart. Defend the portal and keep the gates standing until dawn.
+- Gate repair signs now say Wood. The Fort objective and Adept stance display no longer overlap.
 
-## Previous development — Clearer field notes and elemental arrows
-- Magicians fight with their wand alone. Attacking breaks invisibility.
-- Fire arrows have a visible shaft and a narrow burning tip; poison arrows trail green venom. Fireballs keep their separate blazing orb.
-- The Codex groups enemies into families, highlights map-exclusive creatures, and gives each map its own emblem.
-- Status Effects explains general conditions with dedicated icons. Profession skills remain in their trees, and class prices remain in the Store.
-- Gate repair requirements now say Wood.
+### Your class and equipment
+- The Armory introduces each class and its base stats, explains its three professions, and shows its Class Upgrades and equipment controls. Toggling an upgrade keeps your place in the list and your model preview.
+- Class and profession introductions are more consistent. Beastmaster skill descriptions now refer to your pet and its ability.
+- Commander has a new officer helmet and redesigned class and profession emblems, with matching frames.
+- Monk's hands are visible again, with working punch animations. Magician can wield only the Staff. Attacking breaks invisibility.
+- Plague Doctor now has 100 base health and 100% movement speed. Commander moves at 105% speed, and Artificer has 100 base health. Heavy Infantry starts with a Flail.
 
-## Previous development — A portal worth defending
-- The Fort now protects a glowing portal to The Mists. Its objective health, gate repairs and multiplayer rules stay familiar.
-- Clearer combat messages, an invisibility tint and timed status icons make temporary effects easier to follow.
-- Elemental arrows keep their arrow silhouette, with smaller fire trails and green poison trails.
-- The Codex adds Status Effects and Maps, map-specific enemy tags and updated descriptions. Duplicate Commander and Store text is removed.
-- Menus respect all four mobile safe-area edges; touch lists hide scrollbar indicators. The Adept and Fort panels have separate space.
-- Fixed loading-screen hazard previews escaping into multiplayer, first-packet phantom attacks, lingering warm-up blood, and temporary material restoration on death.
-- Idle Clever enemies search farther for loose weapons.
+### Finds worth travelling for
+- Scythes, Pitchforks, Throwing Axes and Torches are found in The Village and The Fort. Artificer still starts with a Torch on every map.
+- Bell Hammers are found in The Mists. Their Codex badge uses the same blue as the Mists creatures.
+- Plague Rat and Bell Spirit familiars, Carrion Crows and Dread Riders appear only in The Village and The Fort.
+- Idle Clever enemies search farther for weapons they can reach.
+
+### Clearer battles and field notes
+- Fire and poison arrows have distinct effects that preserve their arrow shape, separate from fireballs.
+- Invisibility adds a screen tint. Timed status icons and more distinctive combat messages make effects, backstabs and dodges easier to read.
+- The Codex groups enemies into families, highlights map-exclusive entries, explains general status conditions, and introduces the three maps with their own emblems and lore.
+- Removed duplicate descriptions and class prices from the Codex. The Armory explains professions and Class Upgrades without listing the entire skill tree.
+- Menus respect mobile screen cutouts and safe edges. Touch lists no longer display scrollbars. Inspecting another skill clears the previous inspection ring.
+
+### Fixes and playing together
+- Fixed phantom fire, poison, blood and attack effects when starting a match.
+- Temporary hit and freeze appearances now restore correctly when effects end or a player falls and respawns.
+- Online matches require everyone to update to 0.21.4 so class balance and map rules agree.
 
 ## 0.21.3 — Steadier Online Games and a Fairer Fort (10 November 2026)
 
