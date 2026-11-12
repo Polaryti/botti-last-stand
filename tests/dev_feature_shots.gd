@@ -138,5 +138,14 @@ func _ready() -> void:
 	w.plant_beacon(203, road + Vector3(10, 0, -8), gates, 0.6)
 	await get_tree().create_timer(0.3).timeout
 	await snap("survey_waygates", road + Vector3(-2, w.ground_at(road) + 2.4, 7), road + Vector3(3, w.ground_at(road) + 1.2, -4))
+	# The rings that warn of what the creatures of Mesenlla are about to bring down: mist, quake, storm, fire, boulder.
+	var rings := Vector3(0, 0, 74)
+	for i in 5:
+		var ring_at := rings + Vector3(-12 + i * 6, 0, 0)
+		ring_at.y = w.ground_at(ring_at)
+		var seal := MistSeal.create(w, ring_at, 2.4, 0.0, 30.0, 0.0, -1, i)
+		seal.elapsed = 12.0
+	await get_tree().create_timer(0.3).timeout
+	await snap("mesenlla_rings", rings + Vector3(0, w.ground_at(rings) + 9.0, 11), rings + Vector3(0, w.ground_at(rings), -1))
 	canvas.queue_free()
 	await preload("res://tests/scene_cleanup.gd").finish(w)

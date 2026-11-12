@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 43
+const PROTOCOL := 44
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -45,9 +45,13 @@ const KILL_POINTS := 5
 const RULE_NAMES := ["Co-op Night", "All vs All", "Teams", "Defend the Fort"]
 const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "crow", "gargoyle", "leaper", "wraith", "banshee", "mimic", "creak",
 	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf", "chakram_hit", "cleave", "vanish", "steal", "nightfall", "dagger_fan",
-	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_wrap"]
+	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_wrap",
+	"bear_roar", "bear_maul", "eagle_cry", "shapeshift", "quake_warning", "earth_slam", "mist_blink", "storm_call", "fire_warning",
+	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
-	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep"]
+	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
+	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
+	"m_swipe", "m_rear", "m_charge", "m_slam", "m_cast", "m_breath", "m_throw", "m_blink", "m_stag", "m_beast", "m_shift"]
 
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
@@ -2202,15 +2206,15 @@ func _command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
 
 
 ## The authority starts each warning; every phone applies the eventual hit to its own player only.
-func mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int) -> void:
+func mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int, style := 0) -> void:
 	if is_host():
-		_spawn_mist_seal.rpc(at, radius, eye, delay, damage, source)
+		_spawn_mist_seal.rpc(at, radius, eye, delay, damage, source, style)
 
 
 @rpc("authority", "call_local", "reliable")
-func _spawn_mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int) -> void:
+func _spawn_mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int, style: int) -> void:
 	if world and is_instance_valid(world):
-		MistSeal.create(world, at, radius, eye, delay, damage, source)
+		MistSeal.create(world, at, radius, eye, delay, damage, source, style)
 
 
 @rpc("any_peer", "reliable")

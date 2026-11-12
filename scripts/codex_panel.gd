@@ -129,7 +129,8 @@ func _classes() -> void:
 ## Families are kept together; alphabetical order is only used within a family.
 static func enemy_group(id: String) -> int:
 	var d: Dictionary = ZombieDefs.ALL[id]
-	if d.get("mist_boss", false): return 4
+	if d.get("mist_boss", false) or d.get("mesenlla_boss", false): return 5
+	if SpawnRules.is_mesenlla(d): return 4
 	if d.get("maps", []).has("mists"): return 3
 	if d.get("hero", false) or d.get("rider", false): return 2
 	if id in ["normal", "clever", "magic", "beast", "leaper"]: return 0
@@ -147,15 +148,15 @@ func _enemies() -> void:
 	for id: String in order:
 		var group := enemy_group(id)
 		if group != previous:
-			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Bosses"][group])
+			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Creatures of Mesenlla", "Bosses"][group])
 			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
 		var locations := PackedStringArray()
 		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort"}.get(map_id, map_id.capitalize()))
 		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
-		if d.get("mist_boss", false):
-			note += ". Boss encounter around 8:30"
+		if d.get("mist_boss", false) or d.get("mesenlla_boss", false):
+			note += ". Boss encounter"
 		elif from > 0.0:
 			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], d["desc"], note)

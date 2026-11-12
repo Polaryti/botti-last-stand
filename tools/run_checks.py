@@ -69,7 +69,7 @@ def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", cas
                 env = dict(os.environ, XDG_DATA_HOME=str(profile))
                 # Linux/CI profiles must not share progress or settings.
                 command = [godot, "--headless", "--path", str(ROOT)]
-                scene = {"network": "net_test", "gameplay": "test_game", "rework": "rework", "features": "dev_features", "board": "board_test"}.get(suite, "regressions")
+                scene = {"network": "net_test", "gameplay": "test_game", "rework": "rework", "features": "dev_features", "board": "board_test", "creatures": "creatures"}.get(suite, "regressions")
                 # Fixed steps make the game's clock outrun the real one; the board answers in real time.
                 if suite not in ("network", "board"):
                     command.extend(["--fixed-fps", "240"])
@@ -135,7 +135,7 @@ def run(suite: str, godot: str, mode: str, timeout: int, group: str = "all", cas
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=["regressions", "gameplay", "network", "rework", "features", "board"])
+    parser.add_argument("suite", choices=["regressions", "gameplay", "network", "rework", "features", "board", "creatures"])
     parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"))
     parser.add_argument("--mode", default="coop", choices=["coop", "ffa", "teams", "fort", "mists", "bots", "botsffa", "ride", "chariot", "room", "commander", "bandit", "cartographer"])
     parser.add_argument("--case", default="", help="Run one named gameplay method")

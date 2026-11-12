@@ -1,5 +1,35 @@
 # Changelog
 
+## Development — Beyond the Mists, part 4: Creatures of Mesenlla
+
+These live only on the two new maps that come later in this update ("Map Exclusive · Mesenlla"), and only they roam there. Until then they can be tried in the Sandbox.
+
+### Creatures
+- Child of the Woods: small and quick, carrying whatever it found (Dagger, Sword, Spear, Flail, Short Bow or Crossbow), which it drops when it falls.
+- Woodland Cavalry: a Child of the Woods on a bear, rushing through with a spear and turning wide to come again. Bring the bear down and the rider fights on foot.
+- Bear: rears up on its hind legs before a heavy maul (1.8 times its blow). A stun cuts the maul short.
+- Mist Bear: paws the ground in mist, then charges in a straight line and throws you back.
+- Eagle and Mist Eagle: circle high and stoop. A Mist Eagle's stoop throws you back and leaves a ring of mist that bursts and slows.
+- Shapeshifter: a white stag until you come close or hurt it, then a clawed beast. Badly hurt, it turns back into the stag once to flee and heal.
+- Earth Elemental: pounds the ground around it (amber circle; staying in it hurts and stuns) and throws stones at range.
+- Mist Elemental: passes through walls, fades away and reappears behind you. When it falls, its mist bursts and slows.
+- Storm Elemental: keeps its distance and calls lightning where you are about to be (white circle).
+- Wyvern: hovers and breathes fire that comes down in a red circle and sets you alight.
+
+### Bosses (they arrive with their maps)
+- Great Revenant Elemental: a giant of boulders bound by mist. Pounds a wide circle around itself and throws boulders where you stand; below half health its boulders break loose and it throws two at a time.
+- War Wyvern: an armoured wyvern under a war banner. Breathes fire along a line of four circles, and below half health calls eagles.
+- Both shrug off long stuns, grow with the number of players, and show their name and health above them.
+
+### Everything you need to see it coming
+- Every special move has a tell: a rearing bear, pawing mist, raised fists, a fading body, and a ground circle in its own colour (mist, amber, white, red, stone) that fills before it strikes.
+- Each creature has its own model, movement, voice and Codex entry, in a new Codex section, "Creatures of Mesenlla", with the bosses under "Bosses".
+- The Sandbox list of enemies now scrolls, so the rest of its menu stays on screen.
+
+### Playing together
+- Creatures, their tells and their circles are the same on every phone.
+- Phones on this build only play with phones on the same build.
+
 ## Development — Beyond the Mists, part 3: Cartographer
 
 ### A new class: the Cartographer

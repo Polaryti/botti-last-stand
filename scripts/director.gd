@@ -245,7 +245,7 @@ func _sound(sound: String, volume: float, pitch := 1.0) -> void:
 func _clear_far_zombies() -> void:
 	if world.terrain.has_islands(): return # Keep the island garrisons rather than recycling them around the centre.
 	for z: Zombie in world.zombies.duplicate():
-		if not z.is_alive() or z.flies or z.dormant or z.hero or z.def.get("mist_boss", false) or z.is_hunting():
+		if not z.is_alive() or z.flies or z.dormant or z.hero or z.is_boss() or z.is_hunting():
 			continue
 		var near := INF
 		for p in world.players:

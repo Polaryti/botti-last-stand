@@ -255,10 +255,19 @@ func max_live_zombies() -> int:
 
 
 ## How many of each model to keep ready. Together they match max_live_zombies().
+## Beyond the Mists only its own creatures roam: the Children of the Woods and the beasts of the valleys.
+const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 6, "mist_eagle": 3, "shapeshifter": 2,
+	"earth_elemental": 2, "mist_elemental": 2, "storm_elemental": 2, "wyvern": 2, "great_revenant_elemental": 1, "war_wyvern": 1}
+
+
 func zombie_pool_plan() -> Dictionary:
+	if mode != Mode.SANDBOX and current_map() in SpawnRules.MESENLLA:
+		return MESENLLA_POOLS.duplicate()
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:
 		plan["dummy"] = 6
+		for model: String in MESENLLA_POOLS:
+			plan[model] = mini(int(MESENLLA_POOLS[model]), 4)
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent

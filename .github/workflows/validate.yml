@@ -41,6 +41,8 @@ jobs:
             group: world
           - suite: regressions
             mode: coop
+          - suite: creatures
+            mode: coop
           - suite: board
             mode: coop
           - suite: render
@@ -118,7 +120,7 @@ jobs:
           export XDG_DATA_HOME="$RUNNER_TEMP/visual-profile"
           export LIBGL_ALWAYS_SOFTWARE=1
           mkdir -p build/checks/screens
-          for scene in weather_shots ui_shots rework_shots mist_review weapon_shots atmosphere_review village_review dev_feature_shots store_shots status_audit_shots; do
+          for scene in weather_shots ui_shots rework_shots mist_review weapon_shots atmosphere_review village_review dev_feature_shots store_shots status_audit_shots creature_shots; do
             timeout 180s xvfb-run -a -s '-screen 0 1280x720x24' "$GODOT" --path . \
               --rendering-driver opengl3 --audio-driver Dummy "res://tests/$scene.tscn" \
               -- "$PWD/build/checks/screens" 2>&1 | tee "build/checks/$scene.log"
@@ -143,6 +145,7 @@ jobs:
           test -f build/checks/screens/together_hud.png
           test -f build/checks/screens/nightfall_outside.png
           test -f build/checks/screens/survey_waygates.png
+          test -f build/checks/screens/creatures_big_side.png
       - uses: actions/upload-artifact@v6
         if: always()
         with:

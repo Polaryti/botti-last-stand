@@ -408,6 +408,46 @@ def crest_cartographer():
         + at(76, 26, 0.3, star()) + at(18, 80, 0.16, circ(RED, 50, 50, 40)))
 CRESTS.append(crest_cartographer)
 
+# Beyond the Mists: the creatures of Mesenlla
+def bear():
+    # A bear's head from the front: round ears, a pale muzzle and a dark nose.
+    fur = ("#a5743f", "#4e3018")
+    return (circ(fur, 24, 24, 13) + circ(fur, 76, 24, 13) + circ("#5a3a20", 24, 24, 6, 0) + circ("#5a3a20", 76, 24, 6, 0)
+        + path(fur, "M14 52 C14 26 86 26 86 52 C86 78 70 92 50 92 C30 92 14 78 14 52Z")
+        + ell(("#e2c49a", "#a07850"), 50, 68, 18, 14) + ell(INK, 50, 60, 7, 5, 0, 0) + circ(INK, 36, 46, 4, 0) + circ(INK, 64, 46, 4, 0))
+def eagle():
+    # Wings spread wide, white head, hooked yellow beak.
+    brown = ("#8a5a30", "#3e2410")
+    return (path(brown, "M50 46 C36 30 16 24 2 30 C10 38 14 44 22 46 C14 50 14 54 22 58 C32 60 44 58 50 56Z")
+        + f'<g transform="translate(100 0) scale(-1 1)">{path(brown, "M50 46 C36 30 16 24 2 30 C10 38 14 44 22 46 C14 50 14 54 22 58 C32 60 44 58 50 56Z")}</g>'
+        + path(brown, "M40 50 L60 50 L64 80 L50 90 L36 80Z") + circ(("#ffffff", "#c8ccd6"), 50, 38, 11) + poly(GOLD, (50, 40), (60, 46), (52, 52)) + circ(INK, 46, 35, 2, 0))
+def antlers():
+    # A stag's crown of antlers over a pale head.
+    branch = lambda s: line("#efe6cf", 5, (50, 52), (50 + s * 22, 26), (50 + s * 30, 6)) + line("#efe6cf", 4, (50 + s * 22, 26), (50 + s * 40, 22)) + line("#efe6cf", 4, (50 + s * 14, 38), (50 + s * 30, 40))
+    return branch(-1) + branch(1) + path(("#f4f2ea", "#b8b4a6"), "M38 50 C38 44 62 44 62 50 L58 84 C56 92 44 92 42 84Z") + circ("#5fd4ff", 44, 58, 3, 0) + circ("#5fd4ff", 56, 58, 3, 0)
+def sprout():
+    # A small hooded figure of leaves: two leaves and green eyes in a bark face.
+    return (path(("#7cc456", "#2f6a1e"), "M50 6 C80 14 90 40 84 70 L16 70 C10 40 20 14 50 6Z")
+        + path(("#a07850", "#5a3a20"), "M30 40 C30 30 70 30 70 40 L68 66 C60 74 40 74 32 66Z") + ell("#c8ff8a", 41, 50, 5, 3, 0, 0) + ell("#c8ff8a", 59, 50, 5, 3, 0, 0)
+        + path(("#5aa83a", "#2f6a1e"), "M18 72 C24 92 44 96 50 92 C40 86 30 80 18 72Z") + path(("#5aa83a", "#2f6a1e"), "M82 72 C76 92 56 96 50 92 C60 86 70 80 82 72Z"))
+def boulder():
+    # Stones held together by a band of pale mist, with an amber eye.
+    return (poly(ROCK, (14, 70), (20, 34), (46, 18), (74, 24), (90, 50), (82, 82), (50, 92), (24, 88)) + poly(("#8c8379", "#4a433d"), (46, 18), (60, 40), (90, 50), (74, 24))
+        + path(("#7cc456", "#2f6a1e"), "M30 30 C40 22 52 22 58 28 C48 30 38 32 30 30Z", 2) + curve("#bff3ec", 5, "M10 58 C34 70 66 70 92 56", ink=False) + ell(("#ffe08a", "#e07a10"), 46, 52, 8, 5))
+def storm():
+    # A thundercloud with a bolt beneath it.
+    return (path(("#9aa3b8", "#454c62"), "M18 54 C6 54 6 34 20 32 C22 16 44 10 54 22 C62 12 82 16 82 32 C96 32 96 54 82 54Z")
+        + poly(("#ffffff", "#bfe0ff"), (52, 50), (36, 76), (50, 76), (40, 96), (66, 66), (52, 66), (62, 50)))
+def wyvern():
+    # A wyvern in flight from below: bat wings, a long neck and a barbed tail.
+    green = ("#7ea46a", "#33482a")
+    wing = "M50 44 C40 22 18 12 2 18 C6 30 12 34 8 46 C18 44 22 50 20 58 C32 52 40 54 50 56Z"
+    return (path(("#6f5446", "#3a2a22"), wing) + f'<g transform="translate(100 0) scale(-1 1)">{path(("#6f5446", "#3a2a22"), wing)}</g>'
+        + path(green, "M44 40 C44 26 56 26 56 40 L56 70 C56 76 44 76 44 70Z") + path(green, "M46 30 C46 18 54 18 54 30 L54 34 L46 34Z") + poly(green, (44, 14), (56, 14), (50, 4))
+        + curve("#33482a", 5, "M50 74 C52 84 46 90 50 96", ink=False) + poly(BONE, (50, 98), (44, 90), (56, 90)) + circ("#ffb52e", 47, 12, 2, 0) + circ("#ffb52e", 53, 12, 2, 0))
+for g in (bear, eagle, antlers, sprout, boulder, storm, wyvern):
+    PLAIN.append(g)
+
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),

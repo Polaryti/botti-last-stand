@@ -1449,11 +1449,17 @@ func show_sandbox_menu() -> void:
 	var box: VBoxContainer = root.get_meta("box")
 	box.custom_minimum_size.x = 1000
 	box.add_child(_soft("Bring in an enemy, a few steps in front of you", 23))
+	# Every enemy in the game no longer fits on one screen: the list scrolls, the rest stays put.
+	var enemy_scroll := DragScroll.new()
+	enemy_scroll.name = "SandboxEnemies"
+	enemy_scroll.custom_minimum_size = Vector2(1000, 250)
+	box.add_child(enemy_scroll)
 	var grid := GridContainer.new()
 	grid.columns = 5
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
-	box.add_child(grid)
+	enemy_scroll.add_child(grid)
 	var enemies: Array = ["dummy"]
 	enemies.append_array(ZombieDefs.ALL.keys())
 	for id: String in enemies:

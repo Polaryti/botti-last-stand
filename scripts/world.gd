@@ -1698,6 +1698,9 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	z.fort_shortcut = randf() < 0.25
 	if Net.is_host() and not _warming:
 		Net.zombie_spawned(z, id, z.position, minute)
+		if z.def.has("weapons"):
+			# It picked its weapon at random here; every phone shows the same one.
+			Net.zombie_weapon(z)
 	return true
 
 

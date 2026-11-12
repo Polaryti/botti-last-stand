@@ -366,7 +366,7 @@ func _rift_road() -> void:
 		return
 	for i in beacons.size():
 		for z: Zombie in world.zombies_near(beacons[i]["at"], GATE_REACH + 0.4, 6):
-			if not z.is_alive() or float(z.get_meta("gate_rest", -10.0)) > world.now or z.def.get("mist_boss", false) or z.def.get("hero", false):
+			if not z.is_alive() or float(z.get_meta("gate_rest", -10.0)) > world.now or z.is_boss() or z.def.get("hero", false):
 				continue
 			var far := i
 			for j in beacons.size():
