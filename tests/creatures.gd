@@ -497,10 +497,26 @@ func _bastion_map() -> void:
 	check(counts == [3, 3, 3], "each gate gets its share of them: %s" % str(counts))
 	check(near_foot == 9, "and they rise at the foot of that gate's lane (%d of 9)" % near_foot)
 	check(fort.has_lanes(), "the Bastion's enemies come up long lanes")
-	await seconds(2.5)
-	var climber: Zombie = w.zombies.back()
-	var pace := Vector2(climber.velocity.x, climber.velocity.z).length()
-	check(climber._marching and pace > climber._roam_speed * 1.6, "and come up them at a run, not stopping at the foot (%.1f m/s)" % pace)
+	# How far they come over a few seconds, not how fast one is going at one moment: a step can
+	# always pause on a bump or a neighbour.
+	await seconds(2.0)
+	var climbers := w.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and z.type_id == "child_of_woods")
+	var from := climbers.map(func(z: Zombie) -> Vector3: return z.position)
+	await seconds(6.0)
+	var paces: Array[float] = []
+	var marching := 0
+	for i in climbers.size():
+		var z: Zombie = climbers[i]
+		paces.append(Vector2(z.position.x - from[i].x, z.position.z - from[i].z).length() / 6.0)
+		if z._marching:
+			marching += 1
+	paces.sort()
+	var middle := paces[paces.size() / 2] if not paces.is_empty() else 0.0
+	var walk: float = ZombieDefs.ALL["child_of_woods"]["roam_speed"] * 1.5
+	# Three rise together at each foot and jostle at first, so the middle of them is checked against
+	# the walk, and the fastest against a run.
+	var fastest: float = paces.back() if not paces.is_empty() else 0.0
+	check(marching == climbers.size() and middle > walk and fastest > walk * 1.3, "and come up them at a run, not stopping at the foot (%d of %d running; %.1f m/s for the middle one and %.1f m/s for the fastest, against a %.1f m/s walk)" % [marching, climbers.size(), middle, fastest, walk])
 	clear()
 	# The garrison.
 	var g := w.garrison
