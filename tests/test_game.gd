@@ -3014,12 +3014,13 @@ func test_version_8() -> void:
 	ok(w.count_pickups(Pickup.Kind.WEAPON) == weapon_count, "every weapon is on show (%d)" % w.count_pickups(Pickup.Kind.WEAPON))
 	var missing := 0
 	for id: String in PowerDefs.ALL:
-		if not items.has(id):
+		# Pathfinder finds are unearthed by its beacons, never set out on a stand.
+		if not items.has(id) and not PowerDefs.ALL[id].has("spec"):
 			missing += 1
 	for id: String in PowerDefs.FOODS:
 		if not items.has(id):
 			missing += 1
-	ok(missing == 0 and items.has("arrows"), "and every item and familiar")
+	ok(missing == 0 and items.has("arrows") and not items.has("lantern"), "and every item and familiar, but no Pathfinder find")
 	var taken: Pickup = w.pickups[0]
 	var taken_id := taken.item_id
 	w.remove_pickup(taken)
