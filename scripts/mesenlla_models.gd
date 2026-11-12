@@ -1,8 +1,9 @@
 class_name MesenllaModels
 extends RefCounted
 ## The creatures of the Valleys of Mesenlla and Mist Bastion: low-poly bodies built from code, and the
-## light animation that moves them. Four-legged bodies move their legs in beast_gait.gdshader; the
-## rest are parts on pivots. Each model is a root facing +Z; what the animation needs is kept as meta.
+## light animation that moves them. All of them are parts on pivots; the bear a Child of the Woods
+## rides is the one body that still walks in beast_gait.gdshader, like a horse. Each model is a root
+## facing +Z; what the animation needs is kept as meta.
 ## The state a creature is in (rearing, charging, slamming...) is Zombie._current_anim, which is
 ## also what other phones are sent, so they show the same thing.
 
@@ -90,29 +91,6 @@ static func ghost_material() -> StandardMaterial3D:
 	return _ghost
 
 
-## A four-legged body with its own copy of the gait material, so each one walks at its own pace.
-static func _gaited(parent: Node3D, mesh: Mesh, belly: float, neck_z: float, mist := 0.0) -> MeshInstance3D:
-	if _gait_shader == null:
-		_gait_shader = load("res://assets/shaders/beast_gait.gdshader")
-	var mi := _part(parent, mesh)
-	var m := ShaderMaterial.new()
-	m.shader = _gait_shader
-	m.set_shader_parameter("belly", belly)
-	m.set_shader_parameter("neck_z", neck_z)
-	m.set_shader_parameter("mist", mist)
-	m.set_shader_parameter("gait", 0.0)
-	mi.material_override = m
-	mi.extra_cull_margin = 0.6
-	mi.rotation.y = PI # built head towards -Z, like the horse
-	return mi
-
-
-static func set_gait(body: MeshInstance3D, gait: float) -> void:
-	var m := body.material_override as ShaderMaterial
-	if m and absf(float(m.get_shader_parameter("gait")) - gait) > 0.06:
-		m.set_shader_parameter("gait", gait)
-
-
 # --- Bodies ----------------------------------------------------------------------
 
 ## A bear, head towards -Z: heavy shoulders, a hump, a short muzzle and pale claws.
@@ -159,25 +137,135 @@ static func bear_mount() -> MeshInstance3D:
 	return mi
 
 
-## A stag of pure white with a crown of antlers, head towards -Z.
-static func _stag_mesh(l: LowPoly) -> void:
+# --- Four legs on joints ------------------------------------------------------------
+
+## A four-legged creature put together from parts on pivots, facing +Z, so it can walk, rear, maul,
+## charge and fall over. The nodes:
+##   Rig            the whole animal; it rolls over when it dies
+##     Hind         at the hind hips: rearing tips everything above them up
+##       Torso      the body, the neck and the head ("Head"), and the forelegs
+##     LegBL, LegBR the hind legs, which stay on the ground when it rears
+## Each leg is a pivot at the hip or shoulder with its "Knee" below.
+static func _quadruped(root: Node3D, key: String, look: Dictionary) -> void:
+	var rig := _pivot(root, Vector3.ZERO, "Rig")
+	var hip: Vector3 = look["hip"]
+	var hind := _pivot(rig, hip, "Hind")
+	var torso := _pivot(hind, Vector3.ZERO, "Torso")
+	var body := _part(torso, _mesh(key + "_torso", look["torso"]), -hip)
+	var head := _pivot(torso, Vector3(look["neck"]) - hip, "Head")
+	var head_mesh := _part(head, _mesh(key + "_head", look["head"]))
+	var material: Material = look.get("material", null)
+	for part in [body, head_mesh]:
+		part.material_override = material
+	if look.has("eyes"):
+		_part(head, _mesh(key + "_eyes", look["eyes"])).material_override = glow_material()
+	if look.has("glow"):
+		_part(torso, _mesh(key + "_glow", look["glow"]), -hip).material_override = glow_material()
+	var shoulder: Vector3 = look["shoulder"]
+	for side: float in [-1.0, 1.0]:
+		var w: float = look["width"] * side
+		for front: bool in [true, false]:
+			var at := Vector3(w, shoulder.y, shoulder.z) if front else Vector3(w, hip.y, hip.z)
+			var parent: Node3D = torso if front else rig
+			var leg := _pivot(parent, at - hip if front else at, "Leg%s%s" % ["F" if front else "B", "L" if side < 0 else "R"])
+			var upper := _part(leg, _mesh("%s_upper_%s" % [key, front], look["upper_front" if front else "upper_hind"]))
+			var knee := _pivot(leg, Vector3(0, -float(look["upper_len"]), 0), "Knee")
+			var lower := _part(knee, _mesh("%s_lower_%s" % [key, front], look["lower"]))
+			upper.material_override = material
+			lower.material_override = material
+	root.set_meta("legs", ["LegFL", "LegFR", "LegBL", "LegBR"])
+
+
+## A bear's parts, facing +Z: a deep barrel of a body with a hump over the shoulders, a heavy head
+## with a short muzzle and round ears, thick legs and pale claws.
+static func _bear_look(fur: Color, dark: Color, muzzle: Color, eye: Color, misty: bool) -> Dictionary:
+	var look := {
+		"hip": Vector3(0, 0.76, -0.55), "shoulder": Vector3(0, 0.78, 0.48), "neck": Vector3(0, 0.98, 0.74), "width": 0.27, "upper_len": 0.36,
+		"torso": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.86, -0.82), Vector3(0, 0.92, 0.3), 0.42, 0.5, 8, fur)
+			l.prism(Vector3(0, 0.92, 0.3), Vector3(0, 0.9, 0.7), 0.5, 0.4, 8, fur.lightened(0.04))
+			l.prism(Vector3(0, 1.08, 0.08), Vector3(0, 1.12, 0.55), 0.3, 0.26, 7, fur.darkened(0.04))
+			l.box(Vector3(0, 0.62, 0.0), Vector3(0.62, 0.2, 1.0), dark)
+			l.prism(Vector3(0, 0.98, -0.82), Vector3(0, 0.92, -0.98), 0.1, 0.04, 5, dark),
+		"head": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.0, -0.12), Vector3(0, 0.04, 0.24), 0.26, 0.24, 8, fur)
+			l.prism(Vector3(0, -0.04, 0.24), Vector3(0, -0.08, 0.5), 0.15, 0.1, 7, muzzle)
+			l.box(Vector3(0, -0.02, 0.52), Vector3(0.12, 0.08, 0.05), BLACK)
+			l.box(Vector3(0, -0.15, 0.36), Vector3(0.16, 0.05, 0.14), dark)
+			for x: float in [-1.0, 1.0]:
+				l.prism(Vector3(x * 0.15, 0.2, 0.02), Vector3(x * 0.18, 0.31, 0.0), 0.07, 0.05, 6, dark),
+		"eyes": func(l: LowPoly) -> void:
+			for x: float in [-0.11, 0.11]:
+				l.box(Vector3(x, 0.08, 0.27), Vector3(0.05, 0.05, 0.03), eye),
+		"upper_front": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.1, 0), Vector3(0, -0.38, 0.02), 0.17, 0.13, 7, fur.darkened(0.08)),
+		"upper_hind": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.12, -0.04), Vector3(0, -0.38, 0.04), 0.2, 0.13, 7, fur.darkened(0.06)),
+		"lower": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.02, 0), Vector3(0, -0.3, 0.02), 0.13, 0.11, 7, dark)
+			l.box(Vector3(0, -0.35, 0.06), Vector3(0.24, 0.09, 0.3), dark.darkened(0.12))
+			for c in 3:
+				l.prism(Vector3(-0.08 + c * 0.08, -0.36, 0.2), Vector3(-0.08 + c * 0.08, -0.39, 0.29), 0.025, 0.0, 4, CLAW),
+	}
+	if misty:
+		look["glow"] = func(l: LowPoly) -> void:
+			# Mist streaming off its back in pale stripes.
+			for i in 4:
+				l.box(Vector3(0, 1.34 - i * 0.03, 0.45 - i * 0.3), Vector3(0.46 - i * 0.06, 0.05, 0.12), MIST_GLOW.darkened(0.25))
+		look["material"] = mist_body_material()
+	return look
+
+
+## The Shapeshifter's first shape: a stag of pure white on long legs, with a crown of antlers.
+static func _stag_look() -> Dictionary:
 	var white := Color(0.9, 0.9, 0.86)
-	var shade := Color(0.72, 0.72, 0.7)
-	l.box(Vector3(0, 1.05, 0.05), Vector3(0.5, 0.5, 1.25), white)
-	l.box(Vector3(0, 1.25, -0.62), Vector3(0.26, 0.6, 0.3), white, Vector3(-28, 0, 0))
-	l.box(Vector3(0, 1.62, -0.88), Vector3(0.24, 0.24, 0.42), white)
-	l.box(Vector3(0, 1.56, -1.12), Vector3(0.14, 0.14, 0.14), shade)
-	for x: float in [-1.0, 1.0]:
-		l.box(Vector3(x * 0.1, 1.68, -0.97), Vector3(0.05, 0.05, 0.03), Color(0.5, 0.9, 1.0))
-		l.prism(Vector3(x * 0.1, 1.74, -0.82), Vector3(x * 0.3, 2.2, -0.7), 0.03, 0.02, 4, BONE)
-		l.prism(Vector3(x * 0.3, 2.2, -0.7), Vector3(x * 0.42, 2.55, -0.85), 0.02, 0.0, 4, BONE)
-		l.prism(Vector3(x * 0.22, 2.0, -0.74), Vector3(x * 0.42, 2.1, -1.0), 0.018, 0.0, 4, BONE)
-		l.prism(Vector3(x * 0.3, 2.2, -0.7), Vector3(x * 0.5, 2.36, -0.5), 0.018, 0.0, 4, BONE)
-		l.box(Vector3(x * 0.18, 1.74, -0.76), Vector3(0.12, 0.06, 0.04), shade)
-	for leg: Vector2 in [Vector2(-0.17, -0.45), Vector2(0.17, -0.45), Vector2(-0.17, 0.55), Vector2(0.17, 0.55)]:
-		l.prism(Vector3(leg.x, 0.85, leg.y), Vector3(leg.x, 0.05, leg.y), 0.07, 0.04, 5, white)
-		l.box(Vector3(leg.x, 0.04, leg.y), Vector3(0.08, 0.08, 0.1), Color(0.25, 0.22, 0.2))
-	l.box(Vector3(0, 1.2, 0.72), Vector3(0.14, 0.2, 0.08), white)
+	var shade := Color(0.74, 0.74, 0.72)
+	var hoof := Color(0.25, 0.22, 0.2)
+	return {
+		"hip": Vector3(0, 1.0, -0.5), "shoulder": Vector3(0, 1.0, 0.45), "neck": Vector3(0, 1.55, 0.78), "width": 0.16, "upper_len": 0.46,
+		"torso": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 1.06, -0.66), Vector3(0, 1.1, 0.58), 0.25, 0.28, 7, white)
+			l.prism(Vector3(0, 1.12, 0.5), Vector3(0, 1.55, 0.78), 0.17, 0.12, 6, white)
+			l.box(Vector3(0, 0.92, 0.0), Vector3(0.3, 0.12, 0.9), shade)
+			l.prism(Vector3(0, 1.2, -0.66), Vector3(0, 1.05, -0.82), 0.08, 0.02, 5, white),
+		"head": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.04, -0.1), Vector3(0, 0.0, 0.2), 0.13, 0.11, 7, white)
+			l.prism(Vector3(0, 0.0, 0.2), Vector3(0, -0.06, 0.42), 0.1, 0.06, 6, shade)
+			l.box(Vector3(0, -0.04, 0.43), Vector3(0.06, 0.05, 0.03), BLACK)
+			for x: float in [-1.0, 1.0]:
+				l.prism(Vector3(x * 0.1, 0.12, -0.04), Vector3(x * 0.26, 0.2, -0.1), 0.05, 0.02, 4, shade)
+				l.prism(Vector3(x * 0.07, 0.14, 0.0), Vector3(x * 0.25, 0.58, -0.1), 0.03, 0.022, 4, BONE)
+				l.prism(Vector3(x * 0.25, 0.58, -0.1), Vector3(x * 0.38, 0.92, -0.28), 0.022, 0.0, 4, BONE)
+				l.prism(Vector3(x * 0.17, 0.38, -0.05), Vector3(x * 0.38, 0.48, 0.16), 0.018, 0.0, 4, BONE)
+				l.prism(Vector3(x * 0.25, 0.58, -0.1), Vector3(x * 0.46, 0.72, 0.08), 0.018, 0.0, 4, BONE)
+				l.prism(Vector3(x * 0.31, 0.75, -0.18), Vector3(x * 0.5, 0.86, -0.06), 0.015, 0.0, 4, BONE),
+		"eyes": func(l: LowPoly) -> void:
+			for x: float in [-0.1, 0.1]:
+				l.box(Vector3(x, 0.08, 0.14), Vector3(0.04, 0.04, 0.03), Color(0.5, 0.9, 1.0)),
+		"upper_front": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.08, 0), Vector3(0, -0.48, 0.02), 0.08, 0.05, 6, white),
+		"upper_hind": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.1, -0.06), Vector3(0, -0.48, -0.02), 0.12, 0.05, 6, white),
+		"lower": func(l: LowPoly) -> void:
+			l.prism(Vector3(0, 0.0, 0), Vector3(0, -0.46, 0.0), 0.045, 0.035, 5, white)
+			l.box(Vector3(0, -0.5, 0.02), Vector3(0.08, 0.08, 0.1), hoof),
+	}
+
+
+## Mist made flesh, opaque but glowing at the edges like the mist creatures: the Mist Bear.
+static var _mist_body: StandardMaterial3D
+
+
+static func mist_body_material() -> StandardMaterial3D:
+	if _mist_body == null:
+		_mist_body = StandardMaterial3D.new()
+		_mist_body.vertex_color_use_as_albedo = true
+		_mist_body.emission_enabled = true
+		_mist_body.emission = Color(0.1, 0.26, 0.3)
+		_mist_body.rim_enabled = true
+		_mist_body.rim = 1.0
+		_mist_body.rim_tint = 0.2
+	return _mist_body
 
 
 ## Standing up: the Shapeshifter's hulking second shape, half bear and half something older.
@@ -289,6 +377,89 @@ static func _wyvern_parts(root: Node3D, armoured: bool) -> void:
 			l.box(Vector3(side * 0.95, 0.02, -0.35), Vector3(1.9, 0.03, 0.8), WING)
 			l.box(Vector3(side * 1.55, 0.0, -0.4), Vector3(0.75, 0.025, 0.6), WING.darkened(0.15))))
 		root.set_meta("wing_l" if side < 0 else "wing_r", wing)
+	if armoured:
+		_riders(root, body)
+
+
+## Two Children of the Woods ride the War Wyvern, one behind the other, each with a short bow.
+## Their bows are drawn in turn; the arrows are shot in MesenllaMind.
+static var _rider_scene: PackedScene
+const RIDER_SEATS := [Vector3(0, 0.12, 0.52), Vector3(0, 0.12, 0.12)]
+const RIDER_SIZE := 0.62 # of a Child of the Woods standing on the ground, before the wyvern's own size
+
+
+static func _riders(root: Node3D, body: Node3D) -> void:
+	if _rider_scene == null:
+		_rider_scene = load("res://assets/characters/normal_b.glb")
+	var riders: Array[Node3D] = []
+	for i in RIDER_SEATS.size():
+		var rider := _rider_scene.instantiate() as Node3D
+		rider.name = "Rider%d" % i
+		rider.position = RIDER_SEATS[i]
+		rider.scale = Vector3.ONE * RIDER_SIZE / body.scale.x
+		body.add_child(rider)
+		var skeleton: Skeleton3D = rider.find_children("*", "Skeleton3D", true, false)[0]
+		var gear := child_gear()
+		gear["head2"] = child_eyes()
+		for key: String in gear:
+			var at := BoneAttachment3D.new()
+			at.bone_name = "head" if key == "head2" else key
+			skeleton.add_child(at)
+			var mi := MeshInstance3D.new()
+			mi.mesh = gear[key]
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if key == "head2":
+				mi.material_override = glow_material()
+			at.add_child(mi)
+		var hand := BoneAttachment3D.new()
+		hand.bone_name = "handslot.r"
+		skeleton.add_child(hand)
+		var bow := MeshInstance3D.new()
+		bow.mesh = _mesh("rider_bow", func(l: LowPoly) -> void:
+			# A short bow of bent wood, held upright, with its string.
+			var pts := [Vector3(0, -0.8, -0.14), Vector3(0, -0.45, 0.02), Vector3(0, 0.0, 0.08), Vector3(0, 0.45, 0.02), Vector3(0, 0.8, -0.14)]
+			for k in pts.size() - 1:
+				l.prism(pts[k], pts[k + 1], 0.06, 0.06, 5, BARK)
+			l.prism(pts[0], pts[pts.size() - 1], 0.008, 0.008, 3, BONE)
+			l.box(Vector3(0, 0, 0.07), Vector3(0.07, 0.16, 0.07), LEAF_DARK))
+		bow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		bow.rotation = Vector3(PI * 0.5, 0, 0) # upright in the outstretched hand
+		hand.add_child(bow)
+		for mi in rider.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var anim: AnimationPlayer = rider.find_children("*", "AnimationPlayer", true, false)[0]
+		BodyAnim.install(anim, skeleton)
+		anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+		anim.play("RideShoot")
+		rider.set_meta("anim", anim)
+		riders.append(rider)
+	root.set_meta("riders", riders)
+
+
+## Where a rider's arrow starts, and when (seconds into the shared clock) each rider looses: the
+## second rider shoots half a cycle after the first.
+static func rider_cycle(i: int, now: float) -> float:
+	return fmod(now + i * BodyAnim.RIDE_SHOT * 0.5, BodyAnim.RIDE_SHOT)
+
+
+## The riders draw and loose in time with the world's clock, so every phone shows the same, and turn
+## in the saddle towards the nearest player.
+static func _animate_riders(z: Zombie, root: Node3D) -> void:
+	var riders: Array = root.get_meta("riders", [])
+	var aim: Vector3 = Vector3.INF
+	var p := z.world.nearest_player(z.position) if z.world else null
+	if p:
+		aim = p.global_position
+	for i in riders.size():
+		var rider := riders[i] as Node3D
+		var anim := rider.get_meta("anim") as AnimationPlayer
+		if anim.current_animation != "RideShoot":
+			anim.play("RideShoot") # (playing before the body was in the scene does not take)
+		anim.seek(rider_cycle(i, z.world.now), true)
+		if aim != Vector3.INF:
+			var local := (rider.get_parent() as Node3D).to_local(aim)
+			var yaw := clampf(atan2(local.x, local.z), -1.3, 1.3)
+			rider.rotation.y = lerp_angle(rider.rotation.y, yaw, 0.15)
 
 
 static func _eagle_parts(root: Node3D, misty: bool) -> void:
@@ -321,20 +492,14 @@ static func build(id: String) -> Node3D:
 	var root := Node3D.new()
 	match id:
 		"bear":
-			root.set_meta("body", _gaited(root, _mesh("bear", func(l: LowPoly) -> void: _bear_mesh(l, FUR, FUR_DARK, MUZZLE, BLACK)), 0.62, -0.75))
+			_quadruped(root, "bear", _bear_look(FUR, FUR_DARK, MUZZLE, BLACK, false))
 		"mist_bear":
-			var body := _gaited(root, _mesh("mist_bear", func(l: LowPoly) -> void:
-				_bear_mesh(l, MIST_FUR, MIST_FUR.darkened(0.3), MIST_FUR.lightened(0.2), MIST_GLOW)
-				# Mist streaming off its back in pale stripes.
-				for i in 4:
-					l.box(Vector3(0, 1.38 - i * 0.03, -0.4 + i * 0.3), Vector3(0.5 - i * 0.06, 0.08, 0.16), MIST_GLOW.darkened(0.2))), 0.62, -0.75, 0.8)
-			body.scale = Vector3.ONE * 1.0
-			root.set_meta("body", body)
+			_quadruped(root, "mist_bear", _bear_look(MIST_FUR, MIST_FUR.darkened(0.3), MIST_FUR.lightened(0.2), MIST_GLOW, true))
 		"eagle", "mist_eagle":
 			_eagle_parts(root, id == "mist_eagle")
 		"shapeshifter":
 			var stag_holder := _pivot(root, Vector3.ZERO, "Stag")
-			root.set_meta("body", _gaited(stag_holder, _mesh("stag", func(l: LowPoly) -> void: _stag_mesh(l)), 0.85, -0.7))
+			_quadruped(stag_holder, "stag", _stag_look())
 			_were_parts(root)
 			(root.get_node("Beast") as Node3D).visible = false
 		"earth_elemental":
@@ -433,20 +598,16 @@ static func _label(root: Node3D, high: float) -> void:
 static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> void:
 	var t := z.world.now + float(z.net_id) * 0.37
 	var state := z._current_anim
+	# How long it has been in this state, for moves that play out over time (a maul, a slash).
+	if state != str(root.get_meta("act_state", "")):
+		root.set_meta("act_state", state)
+		root.set_meta("act_t", 0.0)
+	else:
+		root.set_meta("act_t", float(root.get_meta("act_t", 0.0)) + delta)
 	var speed := clampf(moving / maxf(z._speed, 0.1), 0.0, 1.0) if moving > 0.0 else 0.0
 	match z.model_id:
 		"bear", "mist_bear":
-			var body := root.get_meta("body") as MeshInstance3D
-			set_gait(body, 1.0 if state == "m_charge" else speed)
-			# Rearing tips it up on its hind legs; the maul brings it down hard.
-			var pitch := 0.0
-			if state == "m_rear":
-				pitch = -0.75
-			elif state == "m_swipe":
-				pitch = 0.18
-			body.rotation.x = lerpf(body.rotation.x, pitch, minf(1.0, delta * 9.0))
-			body.position.y = lerpf(body.position.y, 0.35 if state == "m_rear" else 0.0, minf(1.0, delta * 9.0))
-			body.position.z = lerpf(body.position.z, -0.4 if state == "m_rear" else 0.0, minf(1.0, delta * 9.0))
+			_animate_quadruped(z, root, delta, speed, state, false)
 		"eagle", "mist_eagle", "wyvern", "war_wyvern":
 			var rate := 3.0 if z.model_id.ends_with("eagle") else 1.6
 			var beat := sin(t * rate * 2.0) * (0.85 if state != "m_breath" else 0.35)
@@ -454,6 +615,12 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 				beat = -1.1 # wings folded for the stoop
 			(root.get_meta("wing_l") as Node3D).rotation.z = beat
 			(root.get_meta("wing_r") as Node3D).rotation.z = -beat
+			# A wyvern's wings are heard on each downstroke, on this phone only.
+			if z.model_id.ends_with("wyvern") and z.world.player:
+				var was := float(root.get_meta("beat", 0.0))
+				root.set_meta("beat", beat)
+				if was > 0.0 and beat <= 0.0:
+					Sfx.play_at("wing_flap", z.position, z.world.player.global_position, -9.0 if z.model_id == "war_wyvern" else -13.0)
 			var body := root.get_node_or_null("Body") as Node3D
 			if body:
 				var tail := body.get_node("Tail") as Node3D
@@ -466,9 +633,9 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 			stag.visible = not as_beast and state != "m_shift"
 			beast.visible = as_beast or (state == "m_shift" and fmod(t * 8.0, 1.0) > 0.5)
 			if stag.visible:
-				set_gait(root.get_meta("body") as MeshInstance3D, speed)
+				_animate_quadruped(z, stag, delta, speed, state, true)
 			if beast.visible:
-				_walk_upright(beast, t, speed, state == "m_swipe")
+				_walk_upright(beast, t, speed, state == "m_swipe", float(root.get_meta("act_t", 0.0)), delta)
 		"earth_elemental", "great_revenant_elemental":
 			var body := root.get_node("Body") as Node3D
 			body.position.y = sin(t * 1.5) * 0.04
@@ -503,21 +670,341 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 			(root.get_node("Cloud") as Node3D).position.y = 0.3 if state == "m_cast" else 0.0
 	if z.model_id == "war_wyvern":
 		_boss_label(z, root)
+		_animate_riders(z, root)
 
 
-static func _walk_upright(beast: Node3D, t: float, speed: float, swiping: bool) -> void:
-	var step := sin(t * 8.0) * 0.6 * speed
-	(beast.get_node("LegL") as Node3D).rotation.x = step
-	(beast.get_node("LegR") as Node3D).rotation.x = -step
+## Walking, trotting or galloping on four legs, rearing up, mauling and charging. Each leg swings
+## from the hip and folds at the knee while it comes forward, so the paws lift off the ground.
+static func _animate_quadruped(z: Zombie, root: Node3D, delta: float, speed: float, state: String, light: bool) -> void:
+	var rig := root.get_node("Rig") as Node3D
+	var hind := rig.get_node("Hind") as Node3D
+	var torso := hind.get_node("Torso") as Node3D
+	var head := torso.get_node("Head") as Node3D
+	var k := minf(1.0, delta * 10.0)
+	var charging := state == "m_charge"
+	var gait := 1.0 if charging else speed
+	# The legs' clock runs faster the faster it goes, and keeps its place between frames.
+	var pace := lerpf(5.5, 9.0, gait) if not light else lerpf(6.5, 10.5, gait)
+	var phase := float(root.get_meta("phase", randf() * TAU)) + delta * pace * (0.25 + gait)
+	root.set_meta("phase", fmod(phase, TAU * 8.0))
+	var amp := lerpf(0.0, 0.55, gait) if not charging else 0.8
+	var offsets := {"LegFL": 0.0, "LegBR": PI * 0.5 if not charging else PI, "LegFR": PI if not charging else 0.25, "LegBL": PI * 1.5 if not charging else PI + 0.25}
+	var rear := 0.0
+	var head_pitch := sin(phase * 2.0) * 0.06 * gait
+	var bob := absf(sin(phase)) * 0.05 * gait
+	if state == "m_rear":
+		rear = -0.95
+		head_pitch = -0.45
+		bob = 0.0
+	elif state == "m_swipe":
+		# The maul: forepaws flung up, then brought down hard with the head lunging after them.
+		var act := float(root.get_meta("act_t", 0.0))
+		rear = -0.4 if act < 0.12 else 0.16
+		head_pitch = -0.2 if act < 0.12 else 0.4
+		bob = 0.0
+	elif charging:
+		head_pitch = 0.22
+	else:
+		# Breathing while it stands.
+		torso.scale = Vector3.ONE * (1.0 + sin(z.world.now * 2.2 + float(z.net_id)) * 0.012 * (1.0 - gait))
+	hind.rotation.x = lerpf(hind.rotation.x, rear, minf(1.0, delta * (16.0 if state == "m_swipe" else 7.0)))
+	# Lower at the ends of each stride, when the legs reach out furthest.
+	rig.position.y = lerpf(rig.position.y, -bob if state != "m_rear" else 0.0, k)
+	rig.rotation.x = lerpf(rig.rotation.x, sin(phase * 2.0) * 0.05 if charging else 0.0, k)
+	head.rotation.x = lerpf(head.rotation.x, head_pitch, k)
+	head.rotation.y = lerpf(head.rotation.y, sin(z.world.now * 0.7 + float(z.net_id)) * 0.25 * (1.0 - gait), minf(1.0, delta * 3.0))
+	for leg_name: String in offsets:
+		var leg := (torso if leg_name.begins_with("LegF") else rig).get_node(leg_name) as Node3D
+		var knee := leg.get_node("Knee") as Node3D
+		var front := leg_name.begins_with("LegF")
+		var swing := 0.0
+		var fold := 0.0
+		if state == "m_rear" and front:
+			# Up on its hind legs, the forepaws claw at the air.
+			swing = -0.7 + sin(z.world.now * 9.0 + (0.0 if leg_name == "LegFL" else 1.6)) * 0.35
+			fold = 0.9
+		elif state == "m_swipe" and front:
+			var act := float(root.get_meta("act_t", 0.0))
+			swing = -1.35 if act < 0.12 else -0.35 + (0.12 if leg_name == "LegFL" else -0.05)
+			fold = 1.0 if act < 0.12 else 0.0
+		else:
+			var a: float = phase + float(offsets[leg_name])
+			swing = -sin(a) * amp
+			# Folded while the leg comes forward, straight while it carries the weight.
+			fold = maxf(0.0, cos(a)) * amp * (1.5 if front else 1.1)
+			if not front:
+				fold *= 0.8
+		leg.rotation.x = lerpf(leg.rotation.x, swing, minf(1.0, delta * 18.0))
+		knee.rotation.x = lerpf(knee.rotation.x, fold, minf(1.0, delta * 18.0))
+
+
+## The beast on two legs: a heavy stride with the arms swinging, and a slash that winds up over the
+## shoulder, twists through the body and rakes down and across.
+static func _walk_upright(beast: Node3D, t: float, speed: float, swiping: bool, act: float, delta: float) -> void:
+	var step := sin(t * 7.0) * 0.6 * speed
+	var leg_l := beast.get_node("LegL") as Node3D
+	var leg_r := beast.get_node("LegR") as Node3D
 	var arm_l := beast.get_node("ArmL") as Node3D
 	var arm_r := beast.get_node("ArmR") as Node3D
+	var head := beast.get_node("Head") as Node3D
+	var k := minf(1.0, delta * 20.0)
+	var target := {"arm_l": Vector3(-step * 0.6 - 0.2, 0, 0.15), "arm_r": Vector3(step * 0.6 - 0.2, 0, -0.15), "lean": 0.12 * speed, "twist": 0.0, "head": 0.0}
 	if swiping:
-		arm_r.rotation.x = -1.9
-		arm_l.rotation.x = -1.2
+		if act < 0.16:
+			# Wind up: the right arm high and back, the body turning away.
+			target = {"arm_l": Vector3(-0.9, 0, 0.4), "arm_r": Vector3(-2.7, 0, -0.5), "lean": -0.15, "twist": -0.45, "head": -0.2}
+		elif act < 0.34:
+			# The rake: down and across, the body coming round behind it.
+			target = {"arm_l": Vector3(-0.4, 0, 0.3), "arm_r": Vector3(0.35, 0, 0.6), "lean": 0.35, "twist": 0.4, "head": 0.25}
+		else:
+			target = {"arm_l": Vector3(-0.5, 0, 0.25), "arm_r": Vector3(0.1, 0, 0.3), "lean": 0.25, "twist": 0.2, "head": 0.15}
+		step = 0.0
+	leg_l.rotation.x = lerpf(leg_l.rotation.x, step if not swiping else 0.35, k)
+	leg_r.rotation.x = lerpf(leg_r.rotation.x, -step if not swiping else -0.3, k)
+	var al: Vector3 = target["arm_l"]
+	var ar: Vector3 = target["arm_r"]
+	arm_l.rotation = arm_l.rotation.lerp(al, k)
+	arm_r.rotation = arm_r.rotation.lerp(ar, k)
+	beast.rotation.x = lerpf(beast.rotation.x, float(target["lean"]), k)
+	beast.rotation.y = lerpf(beast.rotation.y, float(target["twist"]), k)
+	head.rotation.x = lerpf(head.rotation.x, float(target["head"]), k)
+	# A heavy body bobs with each step.
+	beast.position.y = -absf(sin(t * 7.0)) * 0.06 * speed
+
+
+# --- Falling ----------------------------------------------------------------------------
+
+## Every pivot and part where the body was built, so a body that fell can stand up again when the
+## same creature is used again.
+static func remember_pose(root: Node3D) -> void:
+	root.set_meta("rest", root.transform)
+	for n in root.find_children("*", "Node3D", true, false):
+		(n as Node3D).set_meta("rest", (n as Node3D).transform)
+
+
+static func reset_pose(root: Node3D) -> void:
+	root.transform = root.get_meta("rest", root.transform)
+	for n in root.find_children("*", "Node3D", true, false):
+		var node := n as Node3D
+		if node.has_meta("rest"):
+			node.transform = node.get_meta("rest")
+		node.remove_meta("fall")
+		if node is MeshInstance3D or node is Label3D:
+			node.visible = true
+	root.remove_meta("side")
+	# The Shapeshifter stands as a stag again, the Revenant's stones are still.
+	var beast := root.get_node_or_null("Beast") as Node3D
+	if beast:
+		beast.visible = false
+	var orbit := root.get_node_or_null("Orbit") as Node3D
+	if orbit:
+		orbit.visible = false
+
+
+## How long each kind takes to die before the body is gone.
+static func death_time(id: String) -> float:
+	match id:
+		"great_revenant_elemental", "war_wyvern":
+			return 3.2
+		"mist_elemental", "storm_elemental":
+			return 1.8
+	return 2.6
+
+
+## The moment it dies: which way it falls, and the boss's name taken down.
+static func begin_death(z: Zombie, root: Node3D) -> void:
+	root.set_meta("side", -1.0 if randf() < 0.5 else 1.0)
+	var label := root.get_node_or_null("BossHealth") as Label3D
+	if label:
+		label.visible = false
+	var as_beast := false
+	var beast := root.get_node_or_null("Beast") as Node3D
+	if beast and beast.visible:
+		as_beast = true
+	root.set_meta("as_beast", as_beast)
+	var stag := root.get_node_or_null("Stag") as Node3D
+	if stag:
+		stag.visible = not as_beast
+	# Pieces that come apart: their own way out and their own spin.
+	var loose: Array[Node3D] = []
+	match z.model_id:
+		"earth_elemental", "great_revenant_elemental":
+			var body := root.get_node("Body") as Node3D
+			for n in body.get_children():
+				loose.append(n as Node3D)
+			var orbit := root.get_node_or_null("Orbit") as Node3D
+			if orbit:
+				for n in orbit.get_children():
+					loose.append(n as Node3D)
+		"storm_elemental":
+			for n in root.get_node("Stones").get_children():
+				loose.append(n as Node3D)
+	var size := 2.0 if z.model_id == "great_revenant_elemental" else 1.0
+	for piece in loose:
+		var out := Vector3(piece.position.x, 0.0, piece.position.z)
+		out = out.normalized() if out.length() > 0.05 else Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized()
+		piece.set_meta("fall", {"v": out * randf_range(0.6, 1.6) * size + Vector3.UP * randf_range(0.5, 1.8) * size,
+			"spin": Vector3(randf_range(-4, 4), randf_range(-3, 3), randf_range(-4, 4)), "rest": false, "delay": randf_range(0.0, 0.35)})
+
+
+## Each frame of a death, k seconds after it began.
+static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> void:
+	var side := float(root.get_meta("side", 1.0))
+	var total := death_time(z.model_id)
+	# The last moments: the body sinks into the ground and is gone.
+	var sink := clampf((k - (total - 0.7)) / 0.7, 0.0, 1.0)
+	match z.model_id:
+		"bear", "mist_bear":
+			_fall_quadruped(root, k, side, 0.5)
+			root.position.y = -sink * 1.0
+		"shapeshifter":
+			if root.get_meta("as_beast", false):
+				_fall_upright(root.get_node("Beast") as Node3D, k, side)
+			else:
+				_fall_quadruped(root.get_node("Stag") as Node3D, k, side, 0.32)
+			root.position.y = -sink * 1.2
+		"eagle", "mist_eagle", "wyvern", "war_wyvern":
+			_fall_flyer(z, root, k, delta, side)
+			root.position.y -= sink * delta * 1.6
+		"earth_elemental", "great_revenant_elemental":
+			_crumble(z, root, k, delta)
+			var bands := root.get_node_or_null("Bands") as Node3D
+			if bands:
+				bands.scale = Vector3.ONE * maxf(0.01, 1.0 - k * 1.2)
+				bands.rotation.y += delta * 3.0
+			root.position.y = -sink * 0.8
+		"mist_elemental":
+			# Spun apart: the swirl whirls faster and wider, rises and thins to nothing.
+			var swirl := root.get_node("Swirl") as Node3D
+			swirl.rotation.y += delta * (3.0 + k * 14.0)
+			swirl.scale = Vector3.ONE * (1.0 + k * 0.9)
+			(root.get_node("Swirl/Ribbons") as Node3D).rotation.y -= delta * 8.0
+			(root.get_node("Core") as Node3D).scale = Vector3.ONE * maxf(0.01, 1.0 - k * 1.4)
+			root.position.y += delta * 0.9
+			root.scale = Vector3.ONE * maxf(0.01, 1.0 - clampf((k - 0.5) / 1.2, 0.0, 1.0))
+		"storm_elemental":
+			# It bursts: the cloud swells and tears, lightning flickers, the stones fall.
+			var cloud := root.get_node("Cloud") as Node3D
+			var swell := 1.0 + minf(k, 0.35) * 1.6
+			cloud.scale = Vector3.ONE * swell * maxf(0.01, 1.0 - clampf((k - 0.5) / 1.0, 0.0, 1.0))
+			cloud.rotation.y += delta * 5.0
+			var bolts := cloud.get_node("Bolts") as Node3D
+			bolts.visible = k < 1.1 and fmod(k * 13.0, 1.0) > 0.4
+			bolts.rotation.y = floor(k * 17.0) * 1.7
+			for stone in root.get_node("Stones").get_children():
+				_tumble(z, stone as Node3D, k, delta, 0.13)
+
+
+## Four legs give way: a stagger, then over onto its side, legs stiff, and still.
+static func _fall_quadruped(holder: Node3D, k: float, side: float, girth: float) -> void:
+	var rig := holder.get_node("Rig") as Node3D
+	var hind := rig.get_node("Hind") as Node3D
+	var torso := hind.get_node("Torso") as Node3D
+	var head := torso.get_node("Head") as Node3D
+	var over := smoothstep(0.18, 0.75, k)
+	# A last lurch up on the forelegs before it goes over.
+	hind.rotation.x = -0.25 * sin(clampf(k / 0.4, 0.0, 1.0) * PI) * (1.0 - over)
+	rig.rotation.z = side * 1.45 * over + side * 0.1 * sin(clampf((k - 0.75) / 0.3, 0.0, 1.0) * PI)
+	rig.position.y = girth * over
+	head.rotation.x = lerpf(0.0, 0.35, over)
+	head.rotation.z = -side * 0.4 * over
+	var twitch := sin(k * 22.0) * 0.12 * clampf((k - 0.8) / 0.2, 0.0, 1.0) * clampf((1.5 - k) / 0.4, 0.0, 1.0)
+	for leg_name: String in ["LegFL", "LegFR", "LegBL", "LegBR"]:
+		var front := leg_name.begins_with("LegF")
+		var leg := (torso if front else rig).get_node(leg_name) as Node3D
+		var knee := leg.get_node("Knee") as Node3D
+		leg.rotation.x = lerpf(leg.rotation.x, (-0.45 if front else 0.4) + twitch, minf(1.0, over * 0.3 + 0.05))
+		knee.rotation.x = lerpf(knee.rotation.x, 0.15, minf(1.0, over * 0.3 + 0.05))
+
+
+## Standing up when it dies: the knees go, it falls back and lies with its arms flung out.
+static func _fall_upright(body: Node3D, k: float, side: float) -> void:
+	var over := smoothstep(0.1, 0.8, k)
+	body.rotation.x = -1.5 * over
+	body.rotation.z = side * 0.25 * over
+	body.position.y = 0.25 * over
+	for leg_name: String in ["LegL", "LegR"]:
+		(body.get_node(leg_name) as Node3D).rotation.x = lerpf(0.0, 0.9, smoothstep(0.0, 0.35, k)) * (1.0 - over * 0.6)
+	(body.get_node("ArmL") as Node3D).rotation.z = -1.2 * over
+	(body.get_node("ArmR") as Node3D).rotation.z = 1.2 * over
+	(body.get_node("Head") as Node3D).rotation.x = -0.4 * over
+
+
+## A flyer shot down: wings flail and the body tips nose-first as it drops; on the ground it rolls
+## onto its side with a wing crumpled under it.
+static func _fall_flyer(z: Zombie, root: Node3D, k: float, delta: float, side: float) -> void:
+	var landed := z.position.y - z.world.ground_at(z.position) < 0.05
+	if not landed:
+		root.set_meta("landed_at", -1.0)
+	elif float(root.get_meta("landed_at", -1.0)) < 0.0:
+		root.set_meta("landed_at", k)
+	var since := k - float(root.get_meta("landed_at", -1.0)) if landed else 0.0
+	var flail := sin(k * 15.0) * 1.0 * maxf(0.0, 1.0 - k * 0.6) if not landed else 0.0
+	var wing_l := root.get_meta("wing_l") as Node3D
+	var wing_r := root.get_meta("wing_r") as Node3D
+	var body := root.get_node_or_null("Body") as Node3D
+	var big := z.model_id.ends_with("wyvern")
+	if not landed:
+		wing_l.rotation.z = flail
+		wing_r.rotation.z = -flail
+		if body:
+			body.rotation.x = lerpf(body.rotation.x, 0.8, minf(1.0, delta * 3.0))
+			(body.get_node("Tail") as Node3D).rotation.y = sin(k * 9.0) * 0.6
+		else:
+			root.rotation.z += delta * 9.0 * side
 	else:
-		arm_l.rotation.x = -step * 0.6 - 0.2
-		arm_r.rotation.x = step * 0.6 - 0.2
-	beast.rotation.x = 0.12 * speed
+		var lie := smoothstep(0.0, 0.45, since)
+		# Down: the body comes level, rolls over, and the wings lie flat, one of them folded.
+		root.rotation.z = lerpf(root.rotation.z if body == null else 0.0, side * (1.2 if body else 1.5), lie)
+		if body:
+			body.rotation.x = lerpf(0.8, 0.0, lie)
+			root.position.y = lerpf(0.0, 0.35 * body.scale.y, lie)
+		wing_l.rotation.z = lerpf(wing_l.rotation.z, 0.2 if side > 0 else -1.3, lie)
+		wing_r.rotation.z = lerpf(wing_r.rotation.z, 1.3 if side > 0 else -0.2, lie)
+		if big and since < delta * 1.5:
+			z.world.fx_gore(z.position + Vector3.UP * 0.2, Color(0.45, 0.4, 0.34))
+
+
+## Stone coming apart: the arms and the body break into their pieces, which fall and roll away while
+## the glowing core goes out.
+static func _crumble(z: Zombie, root: Node3D, k: float, delta: float) -> void:
+	var body := root.get_node("Body") as Node3D
+	var core := body.get_node_or_null("Core") as Node3D
+	if k < 0.3:
+		# A shudder first.
+		body.position.x = sin(k * 70.0) * 0.05
+		body.rotation.x = k * 0.5
+		return
+	for piece in body.get_children():
+		_tumble(z, piece as Node3D, k - 0.3, delta, 0.25 if z.model_id == "earth_elemental" else 0.5)
+	if core:
+		core.scale = Vector3.ONE * maxf(0.01, 1.0 - (k - 0.3) * 1.5) * (1.0 + sin(k * 40.0) * 0.15) * (2.0 if z.model_id == "great_revenant_elemental" else 1.0)
+	var orbit := root.get_node_or_null("Orbit") as Node3D
+	if orbit and orbit.visible:
+		for stone in orbit.get_children():
+			_tumble(z, stone as Node3D, k, delta, 0.2)
+
+
+## One loose piece: thrown out, falling, spinning, and coming to rest on the ground.
+static func _tumble(z: Zombie, piece: Node3D, k: float, delta: float, rest_height: float) -> void:
+	var fall: Variant = piece.get_meta("fall", null)
+	if fall == null or k < float(fall["delay"]) or bool(fall["rest"]):
+		return
+	var v: Vector3 = fall["v"]
+	piece.global_position += v * delta
+	v.y -= 9.8 * delta
+	var spin: Vector3 = fall["spin"]
+	piece.rotation += spin * delta
+	var ground := z.world.ground_at(piece.global_position) + rest_height
+	if piece.global_position.y <= ground and v.y < 0.0:
+		piece.global_position.y = ground
+		if absf(v.y) > 2.0:
+			v = Vector3(v.x * 0.5, -v.y * 0.3, v.z * 0.5)
+			spin *= 0.5
+		else:
+			fall["rest"] = true
+	fall["v"] = v
+	fall["spin"] = spin
 
 
 static func _boss_label(z: Zombie, root: Node3D) -> void:

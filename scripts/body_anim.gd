@@ -58,12 +58,27 @@ const POSES := {
 	"Meditate": [1.0,
 		[0.0, {"r": [Vector3(-0.3, -0.9, 0.3), Vector3(0.1, -0.3, 0.95)], "l": [Vector3(0.3, -0.9, 0.3), Vector3(-0.1, -0.3, 0.95)], "leg_r": [Vector3(-0.3, -0.25, 0.92), Vector3(0.2, -0.4, -0.9)], "leg_l": [Vector3(0.3, -0.25, 0.92), Vector3(-0.2, -0.4, -0.9)], "chest": Vector3(0.05, 0.0, 0.0), "drop": 0.24}],
 		[1.0, {"r": [Vector3(-0.3, -0.9, 0.3), Vector3(0.1, -0.3, 0.95)], "l": [Vector3(0.3, -0.9, 0.3), Vector3(-0.1, -0.3, 0.95)], "leg_r": [Vector3(-0.3, -0.25, 0.92), Vector3(0.2, -0.4, -0.9)], "leg_l": [Vector3(0.3, -0.25, 0.92), Vector3(-0.2, -0.4, -0.9)], "chest": Vector3(0.05, 0.0, 0.0), "drop": 0.24}]],
+	# Astride a War Wyvern with a bow: aim, draw, loose, and aim again, every RIDE_SHOT seconds.
+	"RideShoot": [2.4,
+		[0.0, RIDE_AIM],
+		[0.42, {"r": RIDE_BOW, "l": [Vector3(0.85, 0.2, 0.4), Vector3(-0.75, 0.15, -0.3)], "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(-0.05, -0.35, 0.0), "drop": 0.08}],
+		[0.5, {"r": RIDE_BOW, "l": [Vector3(0.9, 0.3, -0.1), Vector3(0.6, 0.35, -0.6)], "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(-0.05, -0.35, 0.0), "drop": 0.08}],
+		[0.9, RIDE_AIM],
+		[2.4, RIDE_AIM]],
 	"Vault": [0.5,
 		[0.0, {}],
 		[0.16, {"r": [Vector3(-0.2, 0.9, 0.4), Vector3(0.0, 0.8, 0.6)], "l": [Vector3(0.2, 0.9, 0.4), Vector3(0.0, 0.8, 0.6)], "leg_r": [Vector3(-0.1, -0.5, 0.85), Vector3(-0.1, -0.9, -0.3)], "chest": Vector3(-0.3, 0.0, 0.0)}],
 		[0.34, {"r": [Vector3(-0.4, -0.2, 0.9), Vector3(0.4, -0.2, 0.9)], "l": [Vector3(0.5, -0.5, 0.5), Vector3(0.2, -0.5, 0.8)], "leg_r": [Vector3(-0.1, -0.5, 0.85), Vector3(-0.1, -0.95, 0.2)], "chest": Vector3(0.4, 0.3, 0.0)}],
 		[0.5, {}]],
 }
+
+## A rider of the War Wyvern: knees out round its back, the bow held out in the right hand.
+const RIDE_LEG_R := [Vector3(-0.8, -0.35, 0.5), Vector3(-0.25, -0.95, 0.1)]
+const RIDE_LEG_L := [Vector3(0.8, -0.35, 0.5), Vector3(0.25, -0.95, 0.1)]
+const RIDE_BOW := [Vector3(-0.15, 0.2, 1.0), Vector3(-0.05, 0.15, 1.0)]
+const RIDE_AIM := {"r": RIDE_BOW, "l": [Vector3(0.45, 0.1, 0.9), Vector3(-0.3, 0.1, 0.95)], "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(-0.05, -0.25, 0.0), "drop": 0.08}
+const RIDE_SHOT := 2.4
+const RIDE_LOOSE := 0.5 # when in the cycle the arrow leaves the string
 
 static var _rest := {}
 

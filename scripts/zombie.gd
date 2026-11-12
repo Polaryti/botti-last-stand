@@ -111,6 +111,7 @@ var _attack_hit_pending := false
 var _groan_cd := 0.0
 var _flash := 0.0
 var _dying := 0.0
+var _death_total := 0.0 # how long this death takes, for creatures that fall in their own way
 var _burn_tick := 0.0
 var _stuck_timer := 0.0
 var _stuck_from := Vector3.ZERO
@@ -263,9 +264,15 @@ func _build_visual() -> void:
 	if _custom:
 		_visual = MistModels.build(model_id) if model_id in MistModels.KINDS else MesenllaModels.build(model_id) if model_id in MesenllaModels.KINDS else EnemyModels.build(model_id)
 		add_child(_visual)
-		for mi in _visual.find_children("*", "MeshInstance3D", false, false):
+		# A creature of Mesenlla is built of parts on pivots: all of them flash when struck.
+		var deep := model_id in MesenllaModels.KINDS
+		for mi in _visual.find_children("*", "MeshInstance3D", deep, false):
 			_parts.append(mi as MeshInstance3D)
 			(mi as MeshInstance3D).set_meta("mist_rest", (mi as MeshInstance3D).transform)
+			# Its own look (glowing eyes, mist, a walking shader) comes back after a flash.
+			(mi as MeshInstance3D).set_meta("own_material", (mi as MeshInstance3D).material_override)
+		if deep:
+			MesenllaModels.remember_pose(_visual)
 		_fit[model_id] = 1.0
 		if model_id == "mimic":
 			_build_lure()
@@ -374,6 +381,9 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	if model_id in MistModels.KINDS:
 		for part in _parts:
 			part.transform = part.get_meta("mist_rest", Transform3D.IDENTITY)
+	if model_id in MesenllaModels.KINDS:
+		# Back on its feet after the last time this body fell.
+		MesenllaModels.reset_pose(_visual)
 	mist_mind = MistMind.new() if id in MistModels.KINDS else null
 	mesenlla_mind = MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
@@ -554,6 +564,9 @@ func _show_mount(on: bool) -> void:
 	_mounted = on
 	if _horse_node:
 		_horse_node.visible = on
+		_horse_node.rotation.z = 0.0
+		_horse_node.position.y = 0.0
+		_visual.position.x = 0.0
 		_horse_node.scale = Vector3.ONE * _scale * HorseModel.RIDDEN_SIZE
 	_visual.position.y = HorseModel.SADDLE * _scale if on else 0.0
 	if def.get("rider", false):
@@ -678,7 +691,7 @@ func _restore_materials() -> void:
 		return
 	if _custom:
 		for p in _parts:
-			p.material_override = null
+			p.material_override = p.get_meta("own_material", null)
 		return
 	var ghost: Variant = def.get("ghost")
 	for p in _parts:
@@ -852,7 +865,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		bar_time = 2.5
 		_flash_on()
 		world.fx_gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
-		world.sfx_at("wraith" if type_id in MistModels.KINDS else "zombie_hurt", position, -8.0)
+		world.sfx_at(_hurt_sound(), position, -8.0)
 		Net.hit_zombie(self, amount, from_dir, knock, hit_pos)
 		return
 	if next_hitter != 0:
@@ -893,7 +906,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		world.sfx_at("thunk", position, -8.0)
 		return
 	_check_dismount()
-	world.sfx_at("wraith" if type_id in MistModels.KINDS else "zombie_hurt", position, -8.0)
+	world.sfx_at(_hurt_sound(), position, -8.0)
 	if type_id != "beast":
 		_hurt_stun = 0.1
 	var p := world.nearest_player(position)
@@ -908,11 +921,47 @@ const MESENLLA_VOICES := {"bear": "bear_roar", "mist_bear": "bear_roar", "eagle"
 	"war_wyvern": "wyvern_roar"}
 
 
+## How each of them sounds when struck, and when it dies.
+const MESENLLA_HURT := {"bear": "bear_hurt", "mist_bear": "bear_hurt", "eagle": "eagle_hurt", "mist_eagle": "eagle_hurt",
+	"child_of_woods": "woods_hurt", "woodland_cavalry": "woods_hurt", "earth_elemental": "stone_hit", "great_revenant_elemental": "stone_hit",
+	"mist_elemental": "mist_hurt", "storm_elemental": "storm_hurt", "wyvern": "wyvern_hurt", "war_wyvern": "wyvern_hurt"}
+const MESENLLA_DEATHS := {"bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
+	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
+	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
+	"war_wyvern": "wyvern_death"}
+
+
+## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.
+func _in_beast_form() -> bool:
+	return _current_anim in ["m_beast", "m_swipe"] or (mesenlla_mind != null and mesenlla_mind.form == "beast")
+
+
+func _voice() -> String:
+	if type_id == "shapeshifter":
+		return "beast_growl" if _in_beast_form() else "stag_call"
+	return MESENLLA_VOICES.get(type_id, "")
+
+
+func _hurt_sound() -> String:
+	if type_id in MistModels.KINDS:
+		return "wraith"
+	if type_id == "shapeshifter":
+		return "bear_hurt" if _in_beast_form() else "stag_hurt"
+	return MESENLLA_HURT.get(type_id, "zombie_hurt")
+
+
+## A plain blow: a bear's or the beast's claws rake the air; everything else snarls.
+func _attack_sound() -> String:
+	if type_id in ["bear", "mist_bear"] or (type_id == "shapeshifter" and _in_beast_form()):
+		return "claw_swipe"
+	return "attack"
+
+
 func _death_sound() -> String:
 	if type_id in MistModels.KINDS:
 		return "mist_burst"
-	if MESENLLA_VOICES.has(type_id):
-		return MESENLLA_VOICES[type_id]
+	if MESENLLA_DEATHS.has(type_id):
+		return MESENLLA_DEATHS[type_id]
 	match type_id:
 		"crow": return "crow"
 		"gargoyle": return "blast"
@@ -1095,6 +1144,10 @@ func _show_death() -> void:
 	if model_id in MistModels.KINDS:
 		_dying = 1.6
 		world.fx_mist(centre(), 2.0)
+	elif model_id in MesenllaModels.KINDS:
+		_dying = MesenllaModels.death_time(model_id)
+		_death_total = _dying
+		MesenllaModels.begin_death(self, _visual)
 	elif _anim == null:
 		_visual.rotation.x = -PI * 0.5
 		_visual.position.y = 0.2
@@ -1491,8 +1544,8 @@ func _take_weapon(p: Pickup) -> void:
 func _alert_sound() -> String:
 	if type_id in MistModels.KINDS:
 		return "wraith"
-	if MESENLLA_VOICES.has(type_id):
-		return MESENLLA_VOICES[type_id]
+	if _voice() != "":
+		return _voice()
 	match type_id:
 		"leaper": return "leaper"
 		"wraith": return "wraith"
@@ -1564,6 +1617,18 @@ func _physics_process(delta: float) -> void:
 		var floor_y := world.ground_at(position)
 		if position.y > floor_y:
 			position.y = maxf(floor_y, position.y - 14.0 * delta) # flyers and leapers fall out of the air
+		if model_id in MesenllaModels.KINDS:
+			MesenllaModels.animate_death(self, _visual, _death_total - _dying, delta)
+		elif _mounted and _horse_node:
+			# A rider and its mount go down together: the horse or bear rolls onto its side, the
+			# rider falls from the saddle to the ground beside it.
+			var k := clampf((2.2 - _dying) / 0.6, 0.0, 1.0)
+			var over := k * k * (3.0 - 2.0 * k)
+			_horse_node.rotation.z = 1.45 * over
+			_horse_node.position.y = 0.45 * over * _scale
+			_visual.position.y = HorseModel.SADDLE * _scale * (1.0 - over)
+			_visual.position.x = -0.7 * over * _scale
+			HorseModel.set_gait(_horse_node, 0.0)
 		if _dying <= 0.0:
 			release()
 		return
@@ -1700,8 +1765,8 @@ func _physics_process(delta: float) -> void:
 func _idle_sound() -> String:
 	if type_id in MistModels.KINDS:
 		return "wraith"
-	if MESENLLA_VOICES.has(type_id):
-		return MESENLLA_VOICES[type_id]
+	if _voice() != "":
+		return _voice()
 	match type_id:
 		"crow": return "crow"
 		"wraith": return "wraith"
@@ -2273,7 +2338,7 @@ func _combat(target: Target, dist: float, delta: float) -> void:
 		_attack_hit_pending = true
 		_current_anim = ""
 		_play(BodyAnim.mob_attack(weapon_id, def.get("claws", false)), 1.4, 0.1)
-		world.sfx_at("attack", position, -8.0)
+		world.sfx_at(_attack_sound(), position, -8.0)
 
 
 ## Walking straight at someone and getting nowhere: something the grid does not know about is in the way.

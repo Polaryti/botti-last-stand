@@ -267,6 +267,289 @@ def bolas_wrap():
 
 # --- Creatures of Mesenlla -------------------------------------------------------------
 
+def _wander(m, rate, depth, seed_scale=1.0):
+    """A slow random drift around 1, for pitch jitter and loudness shimmer."""
+    k = max(4, int(m / SR * rate) + 2)
+    pts = rng.normal(0, depth * seed_scale, k)
+    return 1.0 + np.interp(np.linspace(0, k - 1, m), np.arange(k), pts)
+
+
+def throat(m, f_curve, formants, breath=0.25, rough=0.3, sub=0.25):
+    """An animal voice: a glottal buzz following f_curve (one value per sample), with drifting pitch,
+    a subharmonic that growls, breath riding on the pulses, shaped by formant resonances
+    (centre Hz, width as a share of it, gain)."""
+    t = t_(m)
+    f = f_curve * _wander(m, 12, 0.025) * (1 + rough * 0.08 * np.sin(2 * np.pi * 27 * t + rng.random() * 6))
+    ph = np.cumsum(f) / SR
+    saw = 2.0 * (ph % 1.0) - 1.0
+    pulse = lowp(saw, 5000, 1)
+    growl_sub = np.sin(np.pi * 2 * ph * 0.5) * sub
+    gate = 0.5 + 0.5 * np.cos(2 * np.pi * ph)
+    air = noise(m) * (0.4 + 0.6 * gate) * breath * 3.0
+    src = (pulse + growl_sub) * (1 + rough * (rng.random(m) - 0.5)) + air
+    out = np.zeros(m)
+    for fc, width, gain in formants:
+        out += band(src, fc * (1 - width), fc * (1 + width)) * gain
+    return out * _wander(m, 8, 0.12)
+
+
+def curve(m, *points):
+    """A pitch path through (share of the sound, Hz) points."""
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    return np.interp(np.linspace(0, 1, m), xs, ys)
+
+
+def thud(m, at, weight=1.0, f=110):
+    """Something heavy meeting the ground at a time in seconds."""
+    out = np.zeros(m)
+    p = n(at)
+    k = m - p
+    if k <= 0:
+        return out
+    tt = t_(k)
+    out[p:] = (lowp(noise(k), f, 3) * 3.0 * np.exp(-tt * 9) + glide(f * 0.7, f * 0.35, k) * np.exp(-tt * 12) * 0.8) * weight
+    return out
+
+
+BEAR_FORMANTS = ((380, 0.35, 1.0), (820, 0.3, 0.7), (1700, 0.25, 0.3), (2600, 0.2, 0.12))
+WYVERN_FORMANTS = ((700, 0.35, 0.8), (1500, 0.3, 0.9), (2700, 0.2, 0.6), (3800, 0.15, 0.3))
+EAGLE_FORMANTS = ((1900, 0.4, 1.0), (3200, 0.3, 0.6), (4600, 0.2, 0.2))
+STAG_FORMANTS = ((300, 0.35, 1.0), (700, 0.3, 0.6), (1400, 0.25, 0.25))
+CHILD_FORMANTS = ((900, 0.35, 0.8), (2300, 0.3, 0.7), (3400, 0.2, 0.25))
+
+
+def bear_roar():
+    """A mountain bear: a deep, open-throated roar that swells and falls, with a chest rumble under it."""
+    m = n(1.6)
+    voice = throat(m, curve(m, (0, 85), (0.25, 128), (0.6, 112), (1, 70)), BEAR_FORMANTS, breath=0.35, rough=0.8, sub=0.45)
+    voice *= env(m, 0.12, 1.3)
+    rumble = lowp(noise(m), 90, 3) * 2.2 * env(m, 0.15, 1.2)
+    return reverb(voice + rumble, 0.9, 0.22)
+
+
+def bear_hurt():
+    """A bear struck: a short, sharp bawl."""
+    m = n(0.5)
+    voice = throat(m, curve(m, (0, 190), (0.3, 230), (1, 120)), BEAR_FORMANTS, breath=0.3, rough=0.9, sub=0.3)
+    return reverb(voice * env(m, 0.015, 2.2), 0.5, 0.15)
+
+
+def bear_death():
+    """A bear going down: a long groan sinking into a breath, and the body hitting the ground."""
+    m = n(2.1)
+    k = n(1.5)
+    groan = np.zeros(m)
+    groan[:k] = throat(k, curve(k, (0, 150), (0.2, 160), (1, 52)), BEAR_FORMANTS, breath=0.5, rough=0.9, sub=0.6) * env(k, 0.04, 1.5)
+    exhale = np.zeros(m)
+    q = n(1.25)
+    exhale[q:] = band(noise(m - q), 200, 1500) * env(m - q, 0.05, 2.0) * 0.5
+    return reverb(groan + exhale + thud(m, 1.05, 1.3, 95), 0.9, 0.2)
+
+
+def claw_swipe():
+    """A heavy paw raking the air: a fast low whoosh and the scrape of claws."""
+    m = n(0.45)
+    whoosh = sweep_filter(noise(m), 1400, 300, 0.6) * env(m, 0.04, 3) * 1.1
+    scrape = band(noise(m), 2500, 6000) * env(m, 0.01, 6) * 0.5
+    return whoosh + scrape
+
+
+def eagle_cry():
+    """A hunting eagle: a thin, piercing scream that breaks into a falling chatter."""
+    m = n(1.0)
+    k = n(0.45)
+    t = t_(m)
+    f = curve(m, (0, 2600), (0.12, 3100), (0.45, 2500), (1, 1900)) * (1 + 0.06 * np.sin(2 * np.pi * 18 * t) * (t > 0.45))
+    voice = throat(m, f, EAGLE_FORMANTS, breath=0.2, rough=0.25, sub=0.0)
+    chatter = 0.6 + 0.4 * np.sign(np.sin(2 * np.pi * 11 * t)) * (t > 0.45)
+    return reverb(voice * chatter * env(m, 0.02, 1.8), 0.9, 0.3)
+
+
+def eagle_hurt():
+    """An eagle struck: a single harsh, clipped squawk."""
+    m = n(0.3)
+    voice = throat(m, curve(m, (0, 2200), (0.4, 2600), (1, 1500)), EAGLE_FORMANTS, breath=0.4, rough=0.9, sub=0.0)
+    return voice * env(m, 0.01, 2.5)
+
+
+def eagle_death():
+    """An eagle falling: a falling cry, a flurry of feathers and a soft landing."""
+    m = n(1.1)
+    voice = throat(m, curve(m, (0, 2600), (1, 900)), EAGLE_FORMANTS, breath=0.3, rough=0.6, sub=0.0) * env(m, 0.02, 2.5)
+    flutter = band(noise(m), 600, 3000) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 14 * t_(m)))) * bell_env(m, 1.5) * 0.4
+    return reverb(voice + flutter + thud(m, 0.85, 0.4, 160), 0.7, 0.25)
+
+
+def wing_flap():
+    """One downstroke of great leathery wings: a deep push of air with the skin snapping taut."""
+    m = n(0.5)
+    push = lowp(noise(m), 420, 3) * 2.4 * env(m, 0.12, 2.2)
+    snap = band(noise(m), 500, 1800) * np.exp(-np.abs(t_(m) - 0.09) * 60) * 0.5
+    return push + snap
+
+
+def wyvern_roar():
+    """A wyvern: a high, tearing screech over a throaty roar that rattles at the end."""
+    m = n(1.7)
+    t = t_(m)
+    roar = throat(m, curve(m, (0, 180), (0.3, 300), (0.7, 260), (1, 150)), WYVERN_FORMANTS, breath=0.45, rough=1.0, sub=0.4)
+    screech = throat(m, curve(m, (0, 900), (0.35, 1350), (1, 800)), ((2200, 0.25, 1.0), (3600, 0.2, 0.6)), breath=0.5, rough=0.8, sub=0.0) * 0.55
+    rattle = 1.0 - 0.45 * (np.sin(2 * np.pi * 19 * t) > 0) * (t > 1.1)
+    return reverb((roar + screech) * rattle * env(m, 0.08, 1.4), 1.1, 0.3)
+
+
+def wyvern_hurt():
+    """A wyvern struck: a short shriek."""
+    m = n(0.55)
+    voice = throat(m, curve(m, (0, 600), (0.3, 1100), (1, 450)), WYVERN_FORMANTS, breath=0.5, rough=1.0, sub=0.2)
+    return reverb(voice * env(m, 0.01, 2.3), 0.5, 0.2)
+
+
+def wyvern_death():
+    """A wyvern brought down: a long shriek falling away, wings beating out of time, and the crash."""
+    m = n(2.6)
+    k = n(1.8)
+    shriek = np.zeros(m)
+    shriek[:k] = throat(k, curve(k, (0, 1100), (0.15, 1250), (1, 260)), WYVERN_FORMANTS, breath=0.5, rough=1.0, sub=0.4) * env(k, 0.02, 1.4)
+    wings = np.zeros(m)
+    for at in (0.2, 0.55, 0.8, 1.15):
+        p = n(at)
+        q = n(0.25)
+        wings[p:p + q] += lowp(noise(q), 380, 3) * 1.6 * env(q, 0.08, 2.5)
+    crash = thud(m, 1.85, 1.8, 80)
+    gravel = np.zeros(m)
+    p = n(1.88)
+    gravel[p:] = band(noise(m - p), 900, 4500) * np.exp(-t_(m - p) * 7) * 0.5
+    return reverb(shriek + wings + crash + gravel, 1.2, 0.25)
+
+
+def stag_call():
+    """The white stag: a hoarse, belling call that rises, holds and breaks."""
+    m = n(1.3)
+    t = t_(m)
+    voice = throat(m, curve(m, (0, 140), (0.2, 420), (0.7, 470), (0.85, 260), (1, 160)), STAG_FORMANTS + ((2400, 0.2, 0.25),), breath=0.55, rough=0.5, sub=0.2)
+    whistle = np.sin(2 * np.pi * np.cumsum(curve(m, (0, 900), (0.3, 1500), (0.8, 1450), (1, 700))) / SR) * bell_env(m, 2.0) * 0.12
+    return reverb(voice * env(m, 0.1, 1.2) + whistle, 1.0, 0.3)
+
+
+def stag_hurt():
+    """The white stag struck: a short, hoarse bleat."""
+    m = n(0.45)
+    voice = throat(m, curve(m, (0, 380), (0.25, 520), (1, 300)), STAG_FORMANTS + ((2400, 0.2, 0.3),), breath=0.6, rough=0.5, sub=0.0)
+    return reverb(voice * env(m, 0.015, 2.2), 0.5, 0.2)
+
+
+def beast_growl():
+    """The Shapeshifter's beast: a deep, wet snarl, half bear and half something older."""
+    m = n(1.2)
+    voice = throat(m, curve(m, (0, 70), (0.4, 95), (1, 60)), ((300, 0.35, 1.0), (650, 0.3, 0.8), (1500, 0.25, 0.4)), breath=0.6, rough=1.0, sub=0.7)
+    return reverb(voice * env(m, 0.1, 1.4), 0.9, 0.25)
+
+
+def shapeshifter_death():
+    """The Shapeshifter falling: its two voices, stag and beast, sliding together into one long breath."""
+    m = n(2.0)
+    beast = throat(m, curve(m, (0, 110), (1, 45)), BEAR_FORMANTS, breath=0.6, rough=0.9, sub=0.6) * env(m, 0.03, 1.6)
+    stag = throat(m, curve(m, (0, 520), (1, 140)), STAG_FORMANTS, breath=0.6, rough=0.4, sub=0.0) * env(m, 0.05, 2.0) * 0.6
+    sigh = sweep_filter(noise(m), 2500, 500, 0.5) * bell_env(m, 1.5) * 0.3
+    return reverb(beast + stag + sigh + thud(m, 1.2, 1.0, 100), 1.1, 0.3)
+
+
+def stone_hit():
+    """A blow on living stone: a dull knock and a trickle of grit."""
+    m = n(0.5)
+    tt = t_(m)
+    knock = band(noise(m), 200, 1100) * np.exp(-tt * 25) * 1.6 + glide(220, 150, m) * np.exp(-tt * 30) * 0.6
+    grit = band(noise(m), 2000, 6000) * np.exp(-tt * 9) * 0.25
+    return knock + grit
+
+
+def stone_crumble():
+    """An Earth Elemental coming apart: a groan of stone, then boulders tumbling down one after another."""
+    m = n(2.0)
+    groan = band(noise(m), 90, 500) * (0.6 + 0.4 * np.sin(2 * np.pi * 6 * t_(m))) * env(m, 0.05, 2.5) * 1.2
+    falls = np.zeros(m)
+    for i, at in enumerate((0.35, 0.55, 0.7, 0.9, 1.05, 1.3)):
+        falls += thud(m, at + rng.random() * 0.05, 0.55 + 0.1 * (i % 3), 120 + 30 * (i % 2))
+    grit = band(noise(m), 1200, 5000) * bell_env(m, 1.0) * 0.25
+    return reverb(groan + falls + grit, 1.1, 0.25)
+
+
+def revenant_death():
+    """The Great Revenant Elemental falling: a bellow fading under a landslide, the mist howling out of it."""
+    m = n(3.2)
+    bellow = np.zeros(m)
+    k = n(1.6)
+    bellow[:k] = throat(k, curve(k, (0, 60), (1, 30)), ((250, 0.4, 1.0), (600, 0.3, 0.6)), breath=0.5, rough=1.0, sub=0.7) * env(k, 0.05, 1.5) * 1.3
+    slide = lowp(noise(m), 160, 3) * 2.0 * bell_env(m, 0.7)
+    falls = np.zeros(m)
+    for i in range(9):
+        falls += thud(m, 0.5 + i * 0.22 + rng.random() * 0.06, 0.6, 90 + 20 * (i % 3))
+    howl = np.sin(2 * np.pi * np.cumsum(curve(m, (0, 420), (1, 180))) / SR) * bell_env(m, 1.2) * 0.2
+    return reverb(bellow + slide + falls + howl, 1.8, 0.4)
+
+
+def mist_hurt():
+    """A Mist Elemental struck: a hollow, breathy gasp."""
+    m = n(0.5)
+    return reverb(sweep_filter(noise(m), 700, 1800, 0.4) * env(m, 0.02, 2.5) + glide(380, 300, m) * env(m, 0.01, 4) * 0.3, 0.7, 0.4)
+
+
+def mist_dissipate():
+    """A Mist Elemental coming undone: a long exhale rising and thinning, and a glassy shimmer as it goes."""
+    m = n(1.8)
+    t = t_(m)
+    exhale = sweep_filter(noise(m), 500, 3200, 0.45) * bell_env(m, 0.8) * 0.9
+    shimmer = sum(np.sin(2 * np.pi * f * t + i) * 0.08 for i, f in enumerate((1318.5, 1567.98, 1975.5, 2637.0))) * np.linspace(0, 1, m) * env(m, 0.4, 1.0)
+    return reverb(exhale + shimmer, 1.4, 0.45)
+
+
+def storm_hurt():
+    """A Storm Elemental struck: a snapping crackle of sparks."""
+    m = n(0.4)
+    out = np.zeros(m)
+    for i in range(14):
+        p = n(rng.random() * 0.3)
+        k = n(0.006)
+        q = min(k, m - p)
+        out[p:p + q] += highp(noise(k), 2500)[:q] * (0.5 + rng.random())
+    return out + glide(900, 400, m) * env(m, 0.005, 6) * 0.2
+
+
+def storm_burst():
+    """A Storm Elemental bursting: a crack of thunder close by, rolling away, with the last sparks."""
+    m = n(2.4)
+    tt = t_(m)
+    crack = highp(noise(m), 1500) * np.exp(-tt * 25) * 1.2
+    boom = lowp(noise(m), 220, 3) * 3.0 * np.exp(-tt * 2.2) * (0.7 + 0.3 * np.sin(2 * np.pi * 3 * tt))
+    sparks = np.zeros(m)
+    for i in range(25):
+        p = n(0.1 + rng.random() * 1.2)
+        k = n(0.006)
+        q = min(k, m - p)
+        sparks[p:p + q] += highp(noise(k), 3000)[:q] * rng.random() * 0.6
+    return reverb(crack + boom + sparks, 1.5, 0.35)
+
+
+def woods_hurt():
+    """A Child of the Woods struck: a high little yelp and the crack of a twig."""
+    m = n(0.4)
+    voice = throat(m, curve(m, (0, 560), (0.3, 700), (1, 420)), CHILD_FORMANTS, breath=0.35, rough=0.3, sub=0.0) * env(m, 0.01, 2.4)
+    snap = band(noise(m), 1500, 5000) * np.exp(-t_(m) * 60) * 0.7
+    return voice + snap
+
+
+def woods_death():
+    """A Child of the Woods falling: a falling, whistled cry and a rustle of leaves settling."""
+    m = n(1.3)
+    t = t_(m)
+    cry = np.sin(2 * np.pi * np.cumsum(curve(m, (0, 1900), (0.5, 1200), (1, 700))) / SR) * env(m, 0.02, 2.0) * 0.35
+    leaves = band(noise(m), 1500, 6000) * (0.4 + 0.6 * np.abs(np.sin(2 * np.pi * 7 * t))) * bell_env(m, 1.2) * 0.35
+    return reverb(cry + leaves + thud(m, 0.6, 0.35, 180), 0.8, 0.25)
+
+
+
 def growl(m, f0, f1, rough=0.6):
     """A throat: a low saw-like voice gliding f0 to f1, roughened by fast flutter and noise."""
     t = t_(m)
@@ -277,14 +560,6 @@ def growl(m, f0, f1, rough=0.6):
     return lowp(voice * (1 + 0.5 * np.sin(2 * np.pi * 31 * t)) + buzz, 1400)
 
 
-def bear_roar():
-    """A mountain bear: a deep, rising-then-falling roar with a rumble under it."""
-    m = n(1.4)
-    roar = growl(m, 90, 70, 0.8) * bell_env(m, 0.8)
-    rumble = lowp(noise(m), 120, 3) * 2.0 * env(m, 0.1, 1.5)
-    return reverb(roar + rumble, 0.9, 0.25)
-
-
 def bear_maul():
     """Two paws coming down: a heavy whoosh into a thud and a short snarl."""
     m = n(0.7)
@@ -292,16 +567,6 @@ def bear_maul():
     thud = lowp(noise(m), 160, 3) * 2.4 * np.exp(-t_(m) * 14)
     snarl = growl(m, 140, 110, 1.0) * env(m, 0.02, 3) * 0.5
     return thud + whoosh + snarl
-
-
-def eagle_cry():
-    """A high, falling scream with a rasp in it."""
-    m = n(0.9)
-    t = t_(m)
-    f = 2400 * np.exp(-t * 0.9) + 600 * np.sin(2 * np.pi * 9 * t) * np.exp(-t * 2)
-    cry = np.sin(2 * np.pi * np.cumsum(f) / SR) + 0.3 * np.sin(4 * np.pi * np.cumsum(f) / SR)
-    rasp = band(noise(m), 2000, 5000) * 0.3
-    return reverb((cry + rasp) * env(m, 0.03, 2.2), 0.8, 0.3)
 
 
 def shapeshift():
@@ -380,14 +645,6 @@ def fire_breath():
         q = min(k, m - p)
         crackle[p:p + q] += band(noise(k), 2000, 7000)[:q] * rng.random() * 0.8
     return roar + crackle
-
-
-def wyvern_roar():
-    """A wyvern: a long, screeching roar, harsher and higher than a bear's."""
-    m = n(1.5)
-    roar = growl(m, 220, 160, 1.2) * bell_env(m, 0.7)
-    screech = band(noise(m), 1800, 4200) * bell_env(m, 1.5) * 0.4
-    return reverb(roar + screech, 1.0, 0.3)
 
 
 def boulder_throw():
@@ -492,6 +749,11 @@ if __name__ == "__main__":
     for name, gain in (("bear_roar", 0.75), ("bear_maul", 0.75), ("eagle_cry", 0.55), ("shapeshift", 0.65), ("quake_warning", 0.6),
                        ("earth_slam", 0.85), ("mist_blink", 0.55), ("storm_call", 0.55), ("fire_warning", 0.55), ("fire_breath", 0.7),
                        ("wyvern_roar", 0.75), ("boulder_throw", 0.65), ("boulder_impact", 0.85), ("revenant_roar", 0.85),
-                       ("stone_grind", 0.5), ("woods_chatter", 0.5), ("mist_muster", 0.6), ("portal_wound", 0.75)):
+                       ("stone_grind", 0.5), ("woods_chatter", 0.5), ("mist_muster", 0.6), ("portal_wound", 0.75),
+                       ("bear_hurt", 0.6), ("bear_death", 0.75), ("claw_swipe", 0.55), ("eagle_hurt", 0.5), ("eagle_death", 0.55),
+                       ("wing_flap", 0.6), ("wyvern_hurt", 0.6), ("wyvern_death", 0.8), ("stag_call", 0.6), ("stag_hurt", 0.55), ("beast_growl", 0.7),
+                       ("shapeshifter_death", 0.75), ("stone_hit", 0.55), ("stone_crumble", 0.8), ("revenant_death", 0.85),
+                       ("mist_hurt", 0.5), ("mist_dissipate", 0.6), ("storm_hurt", 0.5), ("storm_burst", 0.8), ("woods_hurt", 0.5),
+                       ("woods_death", 0.55)):
         save(name, globals()[name](), gain)
     print("Beyond the Mists sounds written to", SND)

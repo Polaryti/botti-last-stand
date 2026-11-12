@@ -1,5 +1,22 @@
 # Changelog
 
+## Development — Beyond the Mists, review fixes: creatures
+
+### Creatures of Mesenlla
+- Bears and Mist Bears have new bodies on joints: they walk with their legs swinging and folding at the knee, gallop when they charge, rear up clawing the air, and the maul flings the forepaws up and brings them down hard.
+- Bears no longer stop walking after their first hit: a hit flash used to wipe the material that moved their legs. Every creature of Mesenlla now gets its own look back after a flash, glowing eyes included.
+- The Shapeshifter walks as a stag on four legs, and as the beast it winds up over its shoulder and rakes down and across.
+- Every creature of Mesenlla dies in its own way: bears and the stag stagger and roll onto their side, the beast falls back, Earth Elementals and the Great Revenant break apart and their stones roll away, Mist Elementals whirl apart and thin away, Storm Elementals burst with lightning and drop their stones, eagles and wyverns tumble out of the sky and crash.
+- The Woodland Cavalry go down with their bears: the bear rolls over and the rider falls from the saddle.
+- Two Children of the Woods ride the War Wyvern with bows, drawing and shooting in turn at the nearest player within 34 m.
+
+### Sound
+- New hurt and death sounds for every creature of Mesenlla: bears, eagles, wyverns, the Shapeshifter in each of its shapes, the elementals, the Great Revenant and the Children of the Woods. Bears and the beast rake with their claws, and wyverns' wings are heard beating.
+- New roars for the bears, wyverns and eagles, and a call for the white stag.
+
+### Playing together
+- Phones on this build only play with phones on the same build.
+
 ## Development — Beyond the Mists, review fixes: skills, walls and screens
 
 ### Classes

@@ -56,6 +56,7 @@ func _ready() -> void:
 	await _revenant()
 	await _mesenlla_map()
 	await _bastion_map()
+	await _deaths()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -178,7 +179,21 @@ func _entries() -> void:
 func _bear() -> void:
 	var at := arena()
 	var z := raise("bear", at + Vector3(0, 0, -2.4))
-	check(z._custom and z._visual.has_meta("body"), "the bear has a body of its own")
+	check(z._custom and z._visual.get_node_or_null("Rig/Hind/Torso/Head") != null and z._visual.get_node_or_null("Rig/LegBL/Knee") != null, "the bear has a body of its own, on joints")
+	# It walks on its legs: they swing from the hip and fold at the knee.
+	var leg := z._visual.get_node("Rig/Hind/Torso/LegFL") as Node3D
+	var swings := []
+	z._current_anim = ""
+	for i in 12:
+		MesenllaModels.animate(z, z._visual, 0.05, z._speed)
+		swings.append(leg.rotation.x)
+	check(swings.max() - swings.min() > 0.3, "walking, its legs swing (%.2f)" % (swings.max() - swings.min()))
+	# A hit flashes every part of it, and each part gets its own look back after.
+	var eyes: Array = z._parts.filter(func(mi: MeshInstance3D) -> bool: return mi.get_meta("own_material", null) == MesenllaModels.glow_material())
+	check(z._parts.size() > 8 and eyes.size() >= 1, "all its parts flash when struck (%d)" % z._parts.size())
+	z._flash_on()
+	z._restore_materials()
+	check(eyes.all(func(mi: MeshInstance3D) -> bool: return mi.material_override == MesenllaModels.glow_material()), "and its glowing eyes glow again after the flash")
 	var hp0 := p.hp
 	check(await until_state(z, "m_rear", 6.0), "a bear close by rears up first")
 	check(z.is_warning(), "and that is its tell")
@@ -309,6 +324,15 @@ func _flyers() -> void:
 	war.mesenlla_mind.cooldown = 0.0
 	check(await until_state(war, "m_breath", 5.0), "the War Wyvern breathes too")
 	check(seals(MistSeal.Style.FIRE).size() == 4, "along a line of four rings")
+	# Two Children of the Woods ride it with bows and shoot in turn.
+	var riders: Array = war._visual.get_meta("riders", [])
+	check(riders.size() == 2, "two Children of the Woods ride the War Wyvern")
+	var shots := func() -> int: return w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.kind == Projectile.Kind.ENEMY_ARROW).size()
+	var shot_most := 0
+	for i in 40:
+		await seconds(0.1)
+		shot_most = maxi(shot_most, shots.call())
+	check(shot_most >= 1, "and their arrows fly at whoever is in range (%d in the air at most)" % shot_most)
 	war.hp = war.max_hp * 0.45
 	await seconds(0.3)
 	check(w.count_type("eagle") >= 2, "and below half health it calls eagles")
@@ -504,3 +528,46 @@ func _bastion_map() -> void:
 	check(w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel"), "and it leaves an Angel")
 	Game.fort_map = "fort"
 	Game.mode = Game.Mode.SANDBOX
+
+
+## Each creature of Mesenlla dies in its own way, with its own last sound, and stands up whole when
+## the same body is used again.
+func _deaths() -> void:
+	for id: String in ["bear", "mist_bear", "shapeshifter", "earth_elemental", "mist_elemental", "storm_elemental", "eagle", "wyvern"]:
+		var hurt := "zombie_hurt"
+		check(Sfx.NAMES.has(Zombie.MESENLLA_DEATHS[id]) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % Zombie.MESENLLA_DEATHS[id]), "%s has a death sound of its own: %s" % [id, Zombie.MESENLLA_DEATHS[id]])
+		if Zombie.MESENLLA_HURT.has(id):
+			hurt = Zombie.MESENLLA_HURT[id]
+			check(Sfx.NAMES.has(hurt) and Net.SOUNDS.has(hurt), "and a hurt sound: %s" % hurt)
+	for id: String in ["bear", "earth_elemental", "mist_elemental", "storm_elemental", "wyvern"]:
+		clear()
+		var z := raise(id, arena() + Vector3(0, 0, -8))
+		var body := z._visual
+		var rest := {}
+		for n in body.find_children("*", "Node3D", true, false):
+			if (n as Node3D).has_meta("rest"):
+				rest[n] = (n as Node3D).get_meta("rest")
+		z.take_damage(z.hp + 10.0, Vector3.ZERO, 0.0, z.centre())
+		check(not z.is_alive() and z._death_total == MesenllaModels.death_time(z.model_id), "%s falls over %.1f s" % [id, z._death_total])
+		await seconds(z._death_total * 0.55)
+		var moved := rest.keys().filter(func(n: Node3D) -> bool: return is_instance_valid(n) and not n.transform.is_equal_approx(rest[n])).size()
+		check(moved >= 3 or not body.transform.is_equal_approx(body.get_meta("rest")), "and its body comes down or apart as it dies (%d parts moved)" % moved)
+		await seconds(z._death_total * 0.6)
+		check(not z.active, "then it is gone")
+		# The same body, used again, is whole.
+		(w._pools[z.model_id] as Array).erase(z)
+		z.spawn(id, arena() + Vector3(0, 0, -8))
+		var wrong := rest.keys().filter(func(n: Node3D) -> bool: return not n.transform.is_equal_approx(rest[n])).size()
+		check(wrong == 0, "%s stands up whole when it comes back (%d parts out of place)" % [id, wrong])
+		z.release()
+	# The Woodland Cavalry go down with their bears.
+	clear()
+	var rider := raise("woodland_cavalry", arena() + Vector3(0, 0, -8))
+	check(rider._mounted, "a Woodland Cavalry rides its bear")
+	rider.take_damage(rider.hp + 10.0, Vector3.ZERO, 0.0, rider.centre())
+	await seconds(0.8)
+	check(rider._horse_node.rotation.z > 1.2 and rider._visual.position.y < HorseModel.SADDLE * 0.3, "killed in the saddle, the bear rolls over and the rider falls to the ground")
+	await seconds(2.0)
+	clear()
+	var again := raise("woodland_cavalry", arena() + Vector3(0, 0, -8))
+	check(is_zero_approx(again._horse_node.rotation.z) and again._mounted, "the next one rides upright")

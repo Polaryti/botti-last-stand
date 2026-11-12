@@ -378,9 +378,37 @@ func _storm(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 
 # --- Wyverns -------------------------------------------------------------------------------
 
+## The War Wyvern's two riders loose an arrow each, in turn, at whoever is nearest within bow range,
+## when their draw (MesenllaModels.rider_cycle) reaches the loose.
+const RIDER_RANGE := 34.0
+const RIDER_DAMAGE := 0.35 # of the wyvern's own blow
+var _rider_was := [0.0, 0.0]
+
+
+func _rider_shots(z: Zombie) -> void:
+	var riders: Array = z._visual.get_meta("riders", [])
+	for i in riders.size():
+		var cycle := MesenllaModels.rider_cycle(i, z.world.now)
+		var crossed: bool = float(_rider_was[i]) < BodyAnim.RIDE_LOOSE and cycle >= BodyAnim.RIDE_LOOSE
+		_rider_was[i] = cycle
+		if not crossed:
+			continue
+		var rider := riders[i] as Node3D
+		var from := rider.global_position + Vector3.UP * 0.6
+		var p := z.world.nearest_player(from)
+		if p == null or p.dead or from.distance_to(p.global_position) > RIDER_RANGE:
+			continue
+		var at := p.eye_position() - Vector3.UP * 0.3
+		if not z.world.has_line_of_sight(from, at):
+			continue
+		z.world.spawn_enemy_arrow(from, at + p.velocity * from.distance_to(at) / 26.0, z._damage * RIDER_DAMAGE, RIDER_RANGE, false, "War Wyvern rider")
+
+
 ## Hover, breathe, and fire comes down in rings along the ground: one under you, more for the War Wyvern.
 func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 	var war := kind == "war_wyvern"
+	if war:
+		_rider_shots(z)
 	if war and not called and z.hp < z.max_hp * 0.5:
 		called = true
 		z.world.director.show_banner("The War Wyvern calls the eagles of the peaks", 3.0)
