@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=24 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_hill.gd" id="1_s"]
 [ext_resource type="Script" path="res://scripts/map/map_level.gd" id="2_s"]
@@ -7,27 +7,26 @@
 [ext_resource type="Script" path="res://scripts/map/map_bridge.gd" id="5_s"]
 [ext_resource type="Script" path="res://scripts/map/map_ford.gd" id="6_s"]
 [ext_resource type="Script" path="res://scripts/map/map_mesenlla.gd" id="7_s"]
-[ext_resource type="Script" path="res://scripts/map/map_house.gd" id="8_s"]
-[ext_resource type="Script" path="res://scripts/map/map_spot.gd" id="9_s"]
+[ext_resource type="Script" path="res://scripts/map/map_spot.gd" id="8_s"]
+[ext_resource type="Script" path="res://scripts/map/map_house.gd" id="9_s"]
 [ext_resource type="Script" path="res://scripts/map/map_thing.gd" id="10_s"]
 [ext_resource type="Script" path="res://scripts/map/map_prop.gd" id="11_s"]
-[ext_resource type="Script" path="res://scripts/map/map_field.gd" id="12_s"]
-[ext_resource type="Script" path="res://scripts/map/map_tree.gd" id="13_s"]
-[ext_resource type="Script" path="res://scripts/map/map_root.gd" id="14_s"]
+[ext_resource type="Script" path="res://scripts/map/map_tree.gd" id="12_s"]
+[ext_resource type="Script" path="res://scripts/map/map_root.gd" id="13_s"]
 
 [sub_resource type="Curve3D" id="Curve_1"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0.4, 24, 0, 0, 0, 0, 0, 0, 0, 1.5, 8, 0, 0, 0, 0, 0, 0, 0, 6, -10, 0, 0, 0, 0, 0, 0, 0, 6, -14),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -4, 0.4, 24, 0, 0, 0, 0, 0, 0, -2, 1.5, 8, 0, 0, 0, 0, 0, 0, 0, 6, -10, 0, 0, 0, 0, 0, 0, 0, 6, -14),
 "tilts": PackedFloat32Array(0, 0, 0, 0)
 }
 point_count = 4
 
 [sub_resource type="Curve3D" id="Curve_2"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 1.5, 8, 0, 0, 0, 0, 0, 0, 0, 6, -12, 0, 0, 0, 0, 0, 0, 0, 6, -28),
-"tilts": PackedFloat32Array(0, 0, 0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -8, 0, 76, 0, 0, 0, 0, 0, 0, -8, 0, 46, 0, 0, 0, 0, 0, 0, -4, 0.4, 24, 0, 0, 0, 0, 0, 0, -2, 1.5, 8, 0, 0, 0, 0, 0, 0, 0, 6, -12, 0, 0, 0, 0, 0, 0, 0, 6, -26),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0)
 }
-point_count = 5
+point_count = 6
 
 [sub_resource type="Curve3D" id="Curve_3"]
 _data = {
@@ -45,48 +44,48 @@ point_count = 4
 
 [sub_resource type="Curve3D" id="Curve_5"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 24, 6, -30, 0, 0, 0, 0, 0, 0, 36, 7.5, -34, 0, 0, 0, 0, 0, 0, 48, 10, -40),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 24, 6, -30, 0, 0, 0, 0, 0, 0, 36, 7.5, -34, 0, 0, 0, 0, 0, 0, 50, 10, -40),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
 
 [sub_resource type="Curve3D" id="Curve_6"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 24, 6, -30, 0, 0, 0, 0, 0, 0, 36, 7.5, -34, 0, 0, 0, 0, 0, 0, 48, 10, -40),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 24, 6, -30, 0, 0, 0, 0, 0, 0, 36, 7.5, -34, 0, 0, 0, 0, 0, 0, 50, 10, -40),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
 
 [sub_resource type="Curve3D" id="Curve_7"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, -16, 0, 28, 0, 0, 0, 0, 0, 0, -34, 0.4, 26, 0, 0, 0, 0, 0, 0, -60, 0, 30),
-"tilts": PackedFloat32Array(0, 0, 0, 0)
-}
-point_count = 4
-
-[sub_resource type="Curve3D" id="Curve_8"]
-_data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 22, 0.6, 38, 0, 0, 0, 0, 0, 0, 44, 1.6, 34),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -46, 0.4, 22, 0, 0, 0, 0, 0, 0, -58, 2, 14, 0, 0, 0, 0, 0, 0, -70, 7, 6),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
 
+[sub_resource type="Curve3D" id="Curve_8"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -6, 0, 34, 0, 0, 0, 0, 0, 0, -20, 0, 30, 0, 0, 0, 0, 0, 0, -34, 0.4, 26, 0, 0, 0, 0, 0, 0, -46, 0.4, 22, 0, 0, 0, 0, 0, 0, -58, 2, 14, 0, 0, 0, 0, 0, 0, -70, 7, 6),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0)
+}
+point_count = 6
+
 [sub_resource type="Curve3D" id="Curve_9"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 60, 0, 0, 0, 0, 0, 0, -6, 0, 80, 0, 0, 0, 0, 0, 0, -14, 0, 100),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 12, 6, -46, 0, 0, 0, 0, 0, 0, 14, 3, -56, 0, 0, 0, 0, 0, 0, 12, 0, -64),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
 
 [sub_resource type="Curve3D" id="Curve_10"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 110, 0, 40, 0, 0, 0, 0, 0, 0, 80, 0, 52, 0, 0, 0, 0, 0, 0, 40, 0, 58, 0, 0, 0, 0, 0, 0, 6, 0, 56, 0, 0, 0, 0, 0, 0, -30, 0, 66, 0, 0, 0, 0, 0, 0, -70, 0, 60, 0, 0, 0, 0, 0, 0, -110, 0, 70),
-"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 12, 0, -70, 0, 0, 0, 0, 0, 0, 26, 0, -58, 0, 0, 0, 0, 0, 0, 34, 0, -30, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 30, 0, 0, 0, 0, 0, 0, 4, 0, 54, 0, 0, 0, 0, 0, 0, -30, 0, 66, 0, 0, 0, 0, 0, 0, -70, 0, 60, 0, 0, 0, 0, 0, 0, -112, 0, 70),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
-point_count = 7
+point_count = 9
 
 [node name="Mesenlla" type="Node3D"]
-script = ExtResource("14_s")
+script = ExtResource("13_s")
 roughness = 6.0
 calm_radius = 26.0
 look = "mesenlla"
@@ -94,100 +93,130 @@ look = "mesenlla"
 [node name="Land" type="Node3D" parent="."]
 
 [node name="Mountain1" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, -112)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, -118)
 script = ExtResource("1_s")
-height = 30
-radius = 30
+height = 40
+radius = 34
 
 [node name="Mountain2" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -62, 0, -104)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -40, 0, -112)
+script = ExtResource("1_s")
+height = 36
+radius = 30
+
+[node name="Mountain3" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 44, 0, -114)
+script = ExtResource("1_s")
+height = 38
+radius = 30
+
+[node name="Mountain4" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -92, 0, -96)
+script = ExtResource("1_s")
+height = 34
+radius = 30
+
+[node name="Mountain5" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 94, 0, -98)
+script = ExtResource("1_s")
+height = 34
+radius = 30
+
+[node name="Mountain6" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -112, 0, -40)
 script = ExtResource("1_s")
 height = 26
 radius = 28
 
-[node name="Mountain3" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 62, 0, -106)
+[node name="Mountain7" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 114, 0, -46)
 script = ExtResource("1_s")
-height = 28
+height = 26
 radius = 28
 
-[node name="Mountain4" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -100, 0, -60)
-script = ExtResource("1_s")
-height = 18
-radius = 24
-
-[node name="Mountain5" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 100, 0, -64)
+[node name="Mountain8" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -114, 0, 24)
 script = ExtResource("1_s")
 height = 20
-radius = 24
+radius = 26
 
-[node name="Mountain6" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -104, 0, 10)
+[node name="Mountain9" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 116, 0, 20)
 script = ExtResource("1_s")
-height = 9
+height = 20
+radius = 26
+
+[node name="Mountain10" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -30, 0, -92)
+script = ExtResource("1_s")
+height = 20
+radius = 18
+
+[node name="Mountain11" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 34, 0, -96)
+script = ExtResource("1_s")
+height = 22
+radius = 18
+
+[node name="Mountain12" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -86, 0, 86)
+script = ExtResource("1_s")
+height = 10
 radius = 22
 
-[node name="Mountain7" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 104, 0, 6)
+[node name="Mountain13" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 88, 0, 90)
 script = ExtResource("1_s")
 height = 11
 radius = 22
 
-[node name="Mountain8" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -30, 0, -88)
+[node name="Mountain14" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -72, 0, 40)
 script = ExtResource("1_s")
-height = 16
-radius = 18
+height = 8
+radius = 16
 
-[node name="Mountain9" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 32, 0, -90)
-script = ExtResource("1_s")
-height = 18
-radius = 18
-
-[node name="Mountain10" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -80, 0, 80)
-script = ExtResource("1_s")
-height = 6
-radius = 20
-
-[node name="Mountain11" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 84, 0, 84)
+[node name="Mountain15" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 78, 0, 52)
 script = ExtResource("1_s")
 height = 7
-radius = 20
+radius = 16
 
 [node name="OutpostShoulder" type="Node3D" parent="Land"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -30)
 script = ExtResource("2_s")
-size = Vector2(48, 40)
+size = Vector2(50, 40)
 blend = 14.0
 
-[node name="StoneMeadow" type="Node3D" parent="Land"]
+[node name="StoneHeights" type="Node3D" parent="Land"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -54, 14, -64)
 script = ExtResource("2_s")
 size = Vector2(30, 26)
 blend = 14.0
 
 [node name="EastCrag" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 58, 10, -42)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 60, 10, -42)
 script = ExtResource("2_s")
-size = Vector2(24, 22)
+size = Vector2(26, 24)
 blend = 12.0
 
-[node name="Hamlet" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -34, 0.4, 26)
+[node name="FallsPool" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 12, 0, -72)
 script = ExtResource("2_s")
-size = Vector2(36, 26)
+size = Vector2(26, 14)
 blend = 8.0
 
-[node name="Terraces" type="Node3D" parent="Land"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 44, 1.6, 34)
+[node name="CampClearing" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -34, 0.4, 26)
 script = ExtResource("2_s")
-size = Vector2(34, 30)
+size = Vector2(30, 24)
 blend = 8.0
+
+[node name="Overlook" type="Node3D" parent="Land"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -78, 7, 4)
+script = ExtResource("2_s")
+size = Vector2(16, 14)
+blend = 12.0
 
 [node name="Roads" type="Node3D" parent="."]
 
@@ -230,294 +259,303 @@ script = ExtResource("3_s")
 width = 3.0
 curve = SubResource("Curve_6")
 
-[node name="HamletTrack" type="Path3D" parent="Roads"]
+[node name="OverlookCut" type="Path3D" parent="Roads"]
 script = ExtResource("3_s")
-width = 3.2
+width = 4.0
+draw = false
+cut = true
+cut_blend = 8.0
 curve = SubResource("Curve_7")
 
-[node name="TerraceTrack" type="Path3D" parent="Roads"]
+[node name="CampTrack" type="Path3D" parent="Roads"]
 script = ExtResource("3_s")
 width = 3.2
 curve = SubResource("Curve_8")
 
-[node name="SouthTrack" type="Path3D" parent="Roads"]
+[node name="FallsTrack" type="Path3D" parent="Roads"]
 script = ExtResource("3_s")
 width = 3.0
 curve = SubResource("Curve_9")
 
 [node name="Water" type="Node3D" parent="."]
 
-[node name="Stream" type="Path3D" parent="Water"]
+[node name="River" type="Path3D" parent="Water"]
 script = ExtResource("4_s")
-width = 3.6
+width = 4.2
 curve = SubResource("Curve_10")
 
 [node name="LogBridge" type="Node3D" parent="Water"]
-transform = Transform3D(0.99027, 0, -0.13917, 0, 1, 0, 0.13917, 0, 0.99027, 0, 0, 57)
+transform = Transform3D(0.96593, 0, -0.25882, 0, 1, 0, 0.25882, 0, 0.96593, -8, 0, 59)
 script = ExtResource("5_s")
 length = 14.0
 hump = 0.8
 stone_built = false
 
 [node name="Ford" type="Node3D" parent="Water"]
-transform = Transform3D(0.99027, 0, 0.13917, 0, 1, 0, -0.13917, 0, 0.99027, -52, 0, 63)
+transform = Transform3D(-0.08716, 0, -0.99619, 0, 1, 0, 0.99619, 0, -0.08716, 33, 0, -16)
+script = ExtResource("6_s")
+size = Vector2(8, 16)
+
+[node name="Ford2" type="Node3D" parent="Water"]
+transform = Transform3D(0.99027, 0, 0.13917, 0, 1, 0, -0.13917, 0, 0.99027, -54, 0, 63)
 script = ExtResource("6_s")
 size = Vector2(8, 18)
 
+[node name="GreatFalls" type="Node3D" parent="Water"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 12, 0, -77)
+script = ExtResource("7_s")
+kind = "waterfall"
+size = 22.0
+wide = 6.0
+on_ground = false
+
+[node name="CragFalls" type="Node3D" parent="Water"]
+transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, 45, 0, -38)
+script = ExtResource("7_s")
+kind = "waterfall"
+size = 11.0
+wide = 3.0
+on_ground = false
+
+[node name="FallsMark" type="Node3D" parent="Water"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 12, 0, -70)
+script = ExtResource("8_s")
+kind = "place"
+text = "Falls"
+
 [node name="Outpost" type="Node3D" parent="."]
+
+[node name="Hall" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -40)
+script = ExtResource("9_s")
+width = 14.0
+depth = 9.0
+height = 3.6
+ridge = "x"
+walls = Color(0.5, 0.36, 0.24, 1)
+roof = Color(0.2, 0.46, 0.38, 1)
+beams = true
+south = "door:0"
+north = "window:-3, window:3"
+east = "window:0"
+west = "window:0"
+
+[node name="HallLoot" type="Node3D" parent="Outpost/Hall"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
+script = ExtResource("8_s")
+kind = "loot"
+
+[node name="HallBanners" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -35.25)
+script = ExtResource("7_s")
+kind = "wall_banners"
+size = 12.0
 
 [node name="PalisadeNorth" type="Node3D" parent="Outpost"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -49)
 script = ExtResource("7_s")
 kind = "palisade"
 size = 44.0
-
-[node name="PalisadeSouth" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -13)
-script = ExtResource("7_s")
-kind = "palisade"
-size = 44.0
-openings = "18-26"
+openings = "6-12, 30-34"
 
 [node name="PalisadeWest" type="Node3D" parent="Outpost"]
-transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, -22, 6, -31)
+transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, -23, 6, -31)
 script = ExtResource("7_s")
 kind = "palisade"
-size = 36.0
-openings = "15-22"
+size = 34.0
+openings = "10-24"
 
 [node name="PalisadeEast" type="Node3D" parent="Outpost"]
-transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, 22, 6, -31)
+transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, 23, 6, -31)
 script = ExtResource("7_s")
 kind = "palisade"
-size = 36.0
-openings = "15-22"
+size = 34.0
+openings = "12-22"
+
+[node name="PalisadeSouthW" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -15, 6, -14)
+script = ExtResource("7_s")
+kind = "palisade"
+size = 14.0
+
+[node name="PalisadeSouthE" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 15, 6, -14)
+script = ExtResource("7_s")
+kind = "palisade"
+size = 14.0
+openings = "0-3"
 
 [node name="TowerNW" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -19, 6, -46)
-script = ExtResource("7_s")
-kind = "watchtower"
-size = 6.0
-
-[node name="TowerNE" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 19, 6, -46)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -19, 6, -45)
 script = ExtResource("7_s")
 kind = "watchtower"
 size = 6.0
 
 [node name="TowerGate" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -8, 6, -16)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 8, 6, -16)
 script = ExtResource("7_s")
 kind = "watchtower"
 size = 5.0
 
-[node name="GreatPortal" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -45)
-script = ExtResource("7_s")
-kind = "mist_gate"
-size = 6.0
-
 [node name="LodgeFire" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -29)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -26)
 script = ExtResource("7_s")
 kind = "lodge_fire"
 
-[node name="LodgeWest" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -12, 6, -32)
-script = ExtResource("8_s")
-width = 8.0
-depth = 7.0
-height = 3.0
-ridge = "x"
-walls = Color(0.46, 0.45, 0.47, 1)
-roof = Color(0.25, 0.25, 0.32, 1)
-beams = true
-south = "door:0"
-north = "window:0"
-east = "window:0"
-west = "window:0"
+[node name="Tent1" type="Node3D" parent="Outpost"]
+transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, -14, 6, -34)
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.4
 
-[node name="Loot1" type="Node3D" parent="Outpost/LodgeWest"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
-script = ExtResource("9_s")
+[node name="Tent2" type="Node3D" parent="Outpost"]
+transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, -14, 6, -26)
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.0
+
+[node name="Tent3" type="Node3D" parent="Outpost"]
+transform = Transform3D(-0.00000, 0, 1.00000, 0, 1, 0, -1.00000, 0, -0.00000, 14, 6, -34)
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.4
+
+[node name="Tent4" type="Node3D" parent="Outpost"]
+transform = Transform3D(-0.34202, 0, 0.93969, 0, 1, 0, -0.93969, 0, -0.34202, 15, 6, -24)
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.0
+
+[node name="Tent5" type="Node3D" parent="Outpost"]
+transform = Transform3D(0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, 0.93969, -7, 6, -19)
+script = ExtResource("7_s")
+kind = "tent"
+size = 2.8
+
+[node name="TentLoot" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 14, 6, -34)
+script = ExtResource("8_s")
 kind = "loot"
 
-[node name="LodgeEast" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 12, 6, -32)
-script = ExtResource("8_s")
-width = 8.0
-depth = 7.0
-height = 3.0
-ridge = "x"
-walls = Color(0.46, 0.45, 0.47, 1)
-roof = Color(0.25, 0.25, 0.32, 1)
-beams = true
-south = "door:0"
-north = "window:-1"
-east = "window:0"
-west = "window:0"
-
-[node name="Loot2" type="Node3D" parent="Outpost/LodgeEast"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
-script = ExtResource("9_s")
-kind = "loot"
-
-[node name="StoreWest" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -13, 6, -42)
-script = ExtResource("8_s")
-width = 7.0
-depth = 6.0
-height = 3.0
-ridge = "x"
-walls = Color(0.46, 0.45, 0.47, 1)
-roof = Color(0.25, 0.25, 0.32, 1)
-beams = true
-south = "door:1"
-north = ""
-east = "window:0"
-west = "window:0"
-
-[node name="Loot3" type="Node3D" parent="Outpost/StoreWest"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
-script = ExtResource("9_s")
-kind = "loot"
-
-[node name="StoreEast" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 13, 6, -42)
-script = ExtResource("8_s")
-width = 7.0
-depth = 6.0
-height = 3.0
-ridge = "x"
-walls = Color(0.46, 0.45, 0.47, 1)
-roof = Color(0.25, 0.25, 0.32, 1)
-beams = true
-south = "door:-1"
-north = ""
-east = "window:0"
-west = "window:0"
-
-[node name="Loot4" type="Node3D" parent="Outpost/StoreEast"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
-script = ExtResource("9_s")
-kind = "loot"
-
-[node name="Banner1" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -4, 6, -14)
+[node name="Bunting1" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -22)
 script = ExtResource("7_s")
-kind = "banner"
-size = 5.5
+kind = "bunting"
+size = 12.0
 
-[node name="Banner2" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 4, 6, -14)
+[node name="Bunting2" type="Node3D" parent="Outpost"]
+transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, -9, 6, -31)
 script = ExtResource("7_s")
-kind = "banner"
-size = 5.5
+kind = "bunting"
+size = 8.0
 
-[node name="Banner3" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -6, 6, -44)
+[node name="Bunting3" type="Node3D" parent="Outpost"]
+transform = Transform3D(0.00000, 0, -1.00000, 0, 1, 0, 1.00000, 0, 0.00000, 9, 6, -31)
 script = ExtResource("7_s")
-kind = "banner"
-size = 5.5
+kind = "bunting"
+size = 8.0
 
-[node name="Banner4" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 6, 6, -44)
+[node name="Bunting4" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -15)
 script = ExtResource("7_s")
-kind = "banner"
-size = 5.5
-
-[node name="Banner5" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -21, 6, -32)
-script = ExtResource("7_s")
-kind = "banner"
-size = 5.5
-
-[node name="Banner6" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 21, 6, -32)
-script = ExtResource("7_s")
-kind = "banner"
-size = 5.5
+kind = "bunting"
+size = 9.0
 
 [node name="Lantern1" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -5, 6, -24)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -5, 6, -22)
 script = ExtResource("10_s")
 kind = "lantern"
 
 [node name="Lantern2" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 5, 6, -24)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 5, 6, -22)
 script = ExtResource("10_s")
 kind = "lantern"
 
 [node name="Lantern3" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -16, 6, -22)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -12, 6, -18)
 script = ExtResource("10_s")
 kind = "lantern"
 
 [node name="Lantern4" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 16, 6, -22)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 12, 6, -18)
 script = ExtResource("10_s")
 kind = "lantern"
 
 [node name="Prop1" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -17, 6, -26)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -18, 6, -21)
 script = ExtResource("11_s")
 kind = "barrel"
 
 [node name="Prop2" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 17, 6, -25)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 18, 6, -19)
 script = ExtResource("11_s")
 kind = "crate_big"
 
 [node name="Prop3" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 16, 6, -26.4)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 17, 6, -20.4)
 script = ExtResource("11_s")
 kind = "crate_small"
 
 [node name="Prop4" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -17, 6, -37)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -9, 6, -46)
 script = ExtResource("11_s")
 kind = "lumber"
 
 [node name="Prop5" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 4, 6, -36)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -6, 6, -46)
+script = ExtResource("11_s")
+kind = "lumber_small"
+
+[node name="Prop6" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 6, 6, -34)
 script = ExtResource("11_s")
 kind = "weapon_rack"
 
-[node name="Prop6" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -16, 6, -24)
+[node name="Prop7" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -17, 6, -19)
 script = ExtResource("11_s")
 kind = "sack"
 
+[node name="Prop8" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 10, 6, -34)
+script = ExtResource("11_s")
+kind = "barrel"
+
+[node name="Prop9" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -10, 6, -15)
+script = ExtResource("11_s")
+kind = "crate_long"
+
 [node name="Start1" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -3, 6, -26)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -3, 6, -24)
+script = ExtResource("8_s")
 kind = "start"
 
 [node name="Start2" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 3, 6, -26)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 3, 6, -24)
+script = ExtResource("8_s")
 kind = "start"
 
 [node name="Start3" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -3, 6, -32)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -3, 6, -30)
+script = ExtResource("8_s")
 kind = "start"
 
 [node name="Start4" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 3, 6, -32)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 3, 6, -30)
+script = ExtResource("8_s")
 kind = "start"
 
 [node name="Poi1" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -29)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -26)
+script = ExtResource("8_s")
 kind = "poi"
 
-[node name="PortalMark" type="Node3D" parent="Outpost"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -43)
-script = ExtResource("9_s")
+[node name="WatchMark" type="Node3D" parent="Outpost"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 6, -32)
+script = ExtResource("8_s")
 kind = "place"
-text = "Great Portal"
+text = "Mesenlla Watch"
 
 [node name="Heights" type="Node3D" parent="."]
 
@@ -529,7 +567,7 @@ size = 7.0
 
 [node name="BossRise" type="Node3D" parent="Heights"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -54, 14, -64)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "place"
 text = "boss"
 
@@ -540,1258 +578,3516 @@ kind = "crystals"
 size = 3.0
 
 [node name="CragTower" type="Node3D" parent="Heights"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 60, 10, -46)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 64, 10, -48)
 script = ExtResource("7_s")
 kind = "watchtower"
 size = 7.0
 
+[node name="CragTent" type="Node3D" parent="Heights"]
+transform = Transform3D(-0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, -0.93969, 66, 10, -36)
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.0
+
 [node name="CragCrystals" type="Node3D" parent="Heights"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 52, 10, -36)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 56, 10, -50)
 script = ExtResource("7_s")
 kind = "crystals"
 size = 3.6
 
 [node name="CragLoot" type="Node3D" parent="Heights"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 62, 10, -38)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 64, 10, -38)
+script = ExtResource("8_s")
 kind = "loot"
 
 [node name="StonesLoot" type="Node3D" parent="Heights"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -48, 14, -70)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "loot"
 
 [node name="StonesMark" type="Node3D" parent="Heights"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -54, 14, -64)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "place"
 text = "Ring of Stones"
 
-[node name="Hamlet" type="Node3D" parent="."]
+[node name="OverlookTower" type="Node3D" parent="Heights"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -82, 7, 2)
+script = ExtResource("7_s")
+kind = "watchtower"
+size = 5.0
 
-[node name="Lodge1" type="Node3D" parent="Hamlet"]
-transform = Transform3D(0.99027, 0, -0.13917, 0, 1, 0, 0.13917, 0, 0.99027, -44, 0.4, 20)
+[node name="OverlookBunting" type="Node3D" parent="Heights"]
+transform = Transform3D(0.86603, 0, -0.50000, 0, 1, 0, 0.50000, 0, 0.86603, -76, 7, 8)
+script = ExtResource("7_s")
+kind = "bunting"
+size = 8.0
+
+[node name="OverlookLoot" type="Node3D" parent="Heights"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -76, 7, 0)
 script = ExtResource("8_s")
-width = 9.0
-depth = 7.0
-height = 3.0
-ridge = "x"
-walls = Color(0.46, 0.45, 0.47, 1)
-roof = Color(0.25, 0.25, 0.32, 1)
-beams = true
-south = "door:0"
-north = "window:0"
-east = "window:0"
-west = "window:0"
-
-[node name="Loot1" type="Node3D" parent="Hamlet/Lodge1"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
-script = ExtResource("9_s")
 kind = "loot"
 
-[node name="Lodge2" type="Node3D" parent="Hamlet"]
-transform = Transform3D(0.99452, 0, 0.10453, 0, 1, 0, -0.10453, 0, 0.99452, -26, 0.4, 18)
-script = ExtResource("8_s")
-width = 8.0
-depth = 7.0
-height = 3.0
-ridge = "x"
-walls = Color(0.46, 0.45, 0.47, 1)
-roof = Color(0.25, 0.25, 0.32, 1)
-beams = true
-south = "door:0"
-north = "window:0"
-east = "window:0"
-west = "window:0"
+[node name="Camp" type="Node3D" parent="."]
 
-[node name="Loot2" type="Node3D" parent="Hamlet/Lodge2"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
-script = ExtResource("9_s")
-kind = "loot"
+[node name="CampTent1" type="Node3D" parent="Camp"]
+transform = Transform3D(0.50000, 0, -0.86603, 0, 1, 0, 0.86603, 0, 0.50000, -42, 0.4, 20)
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.2
 
-[node name="Lodge3" type="Node3D" parent="Hamlet"]
+[node name="CampTent2" type="Node3D" parent="Camp"]
+transform = Transform3D(0.76604, 0, 0.64279, 0, 1, 0, -0.64279, 0, 0.76604, -28, 0.4, 18)
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.0
+
+[node name="CampTent3" type="Node3D" parent="Camp"]
 transform = Transform3D(-1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, -1.00000, -36, 0.4, 34)
-script = ExtResource("8_s")
-width = 9.0
-depth = 7.0
-height = 3.0
-ridge = "x"
-walls = Color(0.46, 0.45, 0.47, 1)
-roof = Color(0.25, 0.25, 0.32, 1)
-beams = true
-south = "door:0"
-north = "window:0"
-east = "window:0"
-west = "window:0"
+script = ExtResource("7_s")
+kind = "tent"
+size = 3.4
 
-[node name="Loot3" type="Node3D" parent="Hamlet/Lodge3"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 0)
-script = ExtResource("9_s")
-kind = "loot"
-
-[node name="Well" type="Node3D" parent="Hamlet"]
+[node name="CampFire" type="Node3D" parent="Camp"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -34, 0.4, 26)
 script = ExtResource("10_s")
-kind = "well"
+kind = "bonfire"
 
-[node name="Cart" type="Node3D" parent="Hamlet"]
-transform = Transform3D(0.86603, 0, -0.50000, 0, 1, 0, 0.50000, 0, 0.86603, -22, 0.4, 28)
-script = ExtResource("10_s")
-kind = "cart"
-
-[node name="Logs" type="Node3D" parent="Hamlet"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -48, 0.4, 30)
+[node name="CampLogs" type="Node3D" parent="Camp"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -46, 0.4, 30)
 script = ExtResource("10_s")
 kind = "log_pile"
 
-[node name="HamletBanner" type="Node3D" parent="Hamlet"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -30, 0.4, 24)
-script = ExtResource("7_s")
-kind = "banner"
-size = 5.0
+[node name="CampLogs2" type="Node3D" parent="Camp"]
+transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, -24, 0.4, 32)
+script = ExtResource("10_s")
+kind = "log_pile"
 
-[node name="Poi2" type="Node3D" parent="Hamlet"]
+[node name="CampCart" type="Node3D" parent="Camp"]
+transform = Transform3D(0.86603, 0, -0.50000, 0, 1, 0, 0.50000, 0, 0.86603, -22, 0.4, 22)
+script = ExtResource("10_s")
+kind = "cart"
+
+[node name="CampProp1" type="Node3D" parent="Camp"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -40, 0.4, 30)
+script = ExtResource("11_s")
+kind = "lumber"
+
+[node name="CampProp2" type="Node3D" parent="Camp"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -38, 0.4, 31.5)
+script = ExtResource("11_s")
+kind = "lumber_small"
+
+[node name="CampProp3" type="Node3D" parent="Camp"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -30, 0.4, 34)
+script = ExtResource("11_s")
+kind = "crate_big"
+
+[node name="CampProp4" type="Node3D" parent="Camp"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -29, 0.4, 35.5)
+script = ExtResource("11_s")
+kind = "barrel"
+
+[node name="CampBunting" type="Node3D" parent="Camp"]
+transform = Transform3D(0.98481, 0, -0.17365, 0, 1, 0, 0.17365, 0, 0.98481, -34, 0.4, 18)
+script = ExtResource("7_s")
+kind = "bunting"
+size = 10.0
+
+[node name="CampLoot" type="Node3D" parent="Camp"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -30, 0.4, 20)
+script = ExtResource("8_s")
+kind = "loot"
+
+[node name="CampLoot2" type="Node3D" parent="Camp"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -40, 0.4, 34)
+script = ExtResource("8_s")
+kind = "loot"
+
+[node name="Poi2" type="Node3D" parent="Camp"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -34, 0.4, 28)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "poi"
 
-[node name="HamletMark" type="Node3D" parent="Hamlet"]
+[node name="CampMark" type="Node3D" parent="Camp"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -34, 0.4, 26)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "place"
-text = "Hamlet"
+text = "Woodcutters' Camp"
 
-[node name="Garden1" type="Node3D" parent="Hamlet"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 38, 1.6, 30)
-script = ExtResource("12_s")
-size = Vector2(16, 12)
-crop = "garden"
+[node name="Arches" type="Node3D" parent="."]
 
-[node name="Orchard" type="Node3D" parent="Hamlet"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 52, 1.6, 40)
-script = ExtResource("12_s")
-size = Vector2(14, 14)
-crop = "orchard"
+[node name="RoadArch" type="Node3D" parent="Arches"]
+transform = Transform3D(0.99027, 0, -0.13917, 0, 1, 0, 0.13917, 0, 0.99027, -3, 0, 16)
+script = ExtResource("7_s")
+kind = "arch"
+size = 16.0
 
-[node name="TerraceLoot" type="Node3D" parent="Hamlet"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 44, 1.6, 22)
-script = ExtResource("9_s")
-kind = "loot"
+[node name="RiverArch" type="Node3D" parent="Arches"]
+transform = Transform3D(0.52992, 0, -0.84805, 0, 1, 0, 0.84805, 0, 0.52992, 22, 0, 18)
+script = ExtResource("7_s")
+kind = "arch"
+size = 20.0
+
+[node name="WestArch" type="Node3D" parent="Arches"]
+transform = Transform3D(0.86603, 0, -0.50000, 0, 1, 0, 0.50000, 0, 0.86603, -84, 0, -30)
+script = ExtResource("7_s")
+kind = "arch"
+size = 18.0
 
 [node name="Mist" type="Node3D" parent="."]
 
 [node name="Rift1" type="Node3D" parent="Mist"]
-transform = Transform3D(0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, 0.93969, -72, 0, 8)
-script = ExtResource("7_s")
-kind = "rift"
-size = 14.0
-
-[node name="Rift2" type="Node3D" parent="Mist"]
-transform = Transform3D(0.81915, 0, 0.57358, 0, 1, 0, -0.57358, 0, 0.81915, 34, 0, 12)
-script = ExtResource("7_s")
-kind = "rift"
-size = 10.0
-
-[node name="Rift3" type="Node3D" parent="Mist"]
-transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, 8, 0, 78)
-script = ExtResource("7_s")
-kind = "rift"
-size = 12.0
-
-[node name="Rift4" type="Node3D" parent="Mist"]
-transform = Transform3D(0.99619, 0, -0.08716, 0, 1, 0, 0.08716, 0, 0.99619, 70, 0, -10)
+transform = Transform3D(0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, 0.93969, -72, 0, 30)
 script = ExtResource("7_s")
 kind = "rift"
 size = 9.0
 
+[node name="Rift2" type="Node3D" parent="Mist"]
+transform = Transform3D(0.81915, 0, 0.57358, 0, 1, 0, -0.57358, 0, 0.81915, 46, 0, 6)
+script = ExtResource("7_s")
+kind = "rift"
+size = 8.0
+
+[node name="Rift3" type="Node3D" parent="Mist"]
+transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, 20, 0, 82)
+script = ExtResource("7_s")
+kind = "rift"
+size = 10.0
+
+[node name="Rift4" type="Node3D" parent="Mist"]
+transform = Transform3D(0.99619, 0, -0.08716, 0, 1, 0, 0.08716, 0, 0.99619, 76, 0, -10)
+script = ExtResource("7_s")
+kind = "rift"
+size = 8.0
+
 [node name="Crystals1" type="Node3D" parent="Mist"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -66, 0, 2)
-script = ExtResource("7_s")
-kind = "crystals"
-size = 2.6
-
-[node name="Crystals2" type="Node3D" parent="Mist"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 40, 0, 8)
-script = ExtResource("7_s")
-kind = "crystals"
-size = 2.2
-
-[node name="Crystals3" type="Node3D" parent="Mist"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 14, 0, 82)
-script = ExtResource("7_s")
-kind = "crystals"
-size = 2.8
-
-[node name="Crystals4" type="Node3D" parent="Mist"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -90, 0, -30)
 script = ExtResource("7_s")
 kind = "crystals"
 size = 2.4
 
-[node name="Crystals5" type="Node3D" parent="Mist"]
+[node name="Crystals2" type="Node3D" parent="Mist"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 88, 0, 40)
 script = ExtResource("7_s")
 kind = "crystals"
 size = 2.4
 
+[node name="Crystals3" type="Node3D" parent="Mist"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -14, 0, -60)
+script = ExtResource("7_s")
+kind = "crystals"
+size = 2.0
+
 [node name="Island1" type="Node3D" parent="Mist"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -40, 0, -8)
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -62, 0, -4)
 script = ExtResource("7_s")
 kind = "floating_island"
-size = 16.0
-lift = 26.0
+size = 14.0
+lift = 32.0
 
 [node name="Island2" type="Node3D" parent="Mist"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 64, 0, 22)
 script = ExtResource("7_s")
 kind = "floating_island"
 size = 12.0
-lift = 30.0
+lift = 38.0
 
 [node name="Island3" type="Node3D" parent="Mist"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 12, 0, 80)
 script = ExtResource("7_s")
 kind = "floating_island"
-size = 20.0
-lift = 34.0
+size = 18.0
+lift = 40.0
 
 [node name="Island4" type="Node3D" parent="Mist"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -84, 0, -72)
 script = ExtResource("7_s")
 kind = "floating_island"
 size = 14.0
-lift = 40.0
+lift = 46.0
 
 [node name="Island5" type="Node3D" parent="Mist"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 82, 0, -88)
 script = ExtResource("7_s")
 kind = "floating_island"
-size = 18.0
-lift = 44.0
+size = 16.0
+lift = 50.0
 
 [node name="Island6" type="Node3D" parent="Mist"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -20, 0, -70)
 script = ExtResource("7_s")
 kind = "floating_island"
 size = 10.0
-lift = 52.0
+lift = 56.0
 
 [node name="RiftMark" type="Node3D" parent="Mist"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -72, 0, 8)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -72, 0, 30)
+script = ExtResource("8_s")
 kind = "place"
 text = "Rift"
 
 [node name="Forest" type="Node3D" parent="."]
 
 [node name="Tree1" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.58303, 0, 0.81245, 0, 1, 0, -0.81245, 0, -0.58303, -35.2, 0, -69.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.2
-tall = 1.19
+transform = Transform3D(0.96558, 0, -0.26012, 0, 1, 0, 0.26012, 0, 0.96558, -65.6, 0, 2.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.24
 
 [node name="Tree2" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99891, 0, 0.04670, 0, 1, 0, -0.04670, 0, -0.99891, -26.9, 0, -88.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.1
-tall = 1.15
-
-[node name="Tree3" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.88963, 0, -0.45668, 0, 1, 0, 0.45668, 0, -0.88963, -86.0, 0, -81.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.5
-tall = 1.04
-
-[node name="Tree4" type="Node3D" parent="Forest"]
-transform = Transform3D(0.62998, 0, 0.77661, 0, 1, 0, -0.77661, 0, 0.62998, 95.3, 0, -90.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.9
-tall = 1.05
-
-[node name="Tree5" type="Node3D" parent="Forest"]
-transform = Transform3D(0.40363, 0, 0.91492, 0, 1, 0, -0.91492, 0, 0.40363, -76.4, 0, -38.3)
-script = ExtResource("13_s")
+transform = Transform3D(0.05060, 0, -0.99872, 0, 1, 0, 0.99872, 0, 0.05060, 100.3, 0, 96.7)
+script = ExtResource("12_s")
 kind = "fir"
 size = 6.5
-tall = 1.2
+tall = 1.07
+
+[node name="Tree3" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.17603, 0, -0.98438, 0, 1, 0, 0.98438, 0, -0.17603, -97.7, 0, -7.5)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.6
+tall = 1.16
+
+[node name="Tree4" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.81049, 0, -0.58575, 0, 1, 0, 0.58575, 0, -0.81049, 103.5, 0, 103.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.7
+tall = 1.27
+
+[node name="Tree5" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.79940, 0, -0.60080, 0, 1, 0, 0.60080, 0, -0.79940, 72.1, 0, -23.6)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.9
+tall = 1.34
 
 [node name="Tree6" type="Node3D" parent="Forest"]
-transform = Transform3D(0.27320, 0, -0.96196, 0, 1, 0, 0.96196, 0, 0.27320, -87.4, 0, -88.1)
-script = ExtResource("13_s")
-kind = "fir"
+transform = Transform3D(0.02269, 0, -0.99974, 0, 1, 0, 0.99974, 0, 0.02269, -88.8, 0, 26.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
 size = 8.0
-tall = 1.15
+tall = 1.04
 
 [node name="Tree7" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.87056, 0, -0.49206, 0, 1, 0, 0.49206, 0, -0.87056, 96.0, 0, -76.4)
-script = ExtResource("13_s")
-kind = "fir"
+transform = Transform3D(-0.61927, 0, 0.78518, 0, 1, 0, -0.78518, 0, -0.61927, -83.0, 0, -91.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
 size = 8.3
 tall = 1.05
 
 [node name="Tree8" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.49155, 0, 0.87085, 0, 1, 0, -0.87085, 0, -0.49155, -2.2, 0, -92.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.3
-tall = 1.2
+transform = Transform3D(0.80779, 0, -0.58948, 0, 1, 0, 0.58948, 0, 0.80779, -47.9, 0, 98.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.6
+tall = 1.22
 
 [node name="Tree9" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.30009, 0, 0.95391, 0, 1, 0, -0.95391, 0, -0.30009, 32.8, 0, -87.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.9
-tall = 1.35
+transform = Transform3D(0.04389, 0, -0.99904, 0, 1, 0, 0.99904, 0, 0.04389, 101.8, 0, -59.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.9
+tall = 1.05
 
 [node name="Tree10" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.97118, 0, -0.23836, 0, 1, 0, 0.23836, 0, -0.97118, 33.7, 0, -95.5)
-script = ExtResource("13_s")
+transform = Transform3D(0.36929, 0, -0.92931, 0, 1, 0, 0.92931, 0, 0.36929, 95.5, 0, -3.4)
+script = ExtResource("12_s")
 kind = "fir"
 size = 6.5
-tall = 1.04
+tall = 1.09
 
 [node name="Tree11" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.77430, 0, -0.63281, 0, 1, 0, 0.63281, 0, -0.77430, -74.1, 0, -50.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.6
-tall = 1.03
+transform = Transform3D(0.97264, 0, 0.23234, 0, 1, 0, -0.23234, 0, 0.97264, 49.8, 0, 91.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.4
+tall = 0.91
 
 [node name="Tree12" type="Node3D" parent="Forest"]
-transform = Transform3D(0.44716, 0, -0.89445, 0, 1, 0, 0.89445, 0, 0.44716, 91.5, 0, -69.8)
-script = ExtResource("13_s")
+transform = Transform3D(0.13532, 0, -0.99080, 0, 1, 0, 0.99080, 0, 0.13532, -54.4, 0, 42.6)
+script = ExtResource("12_s")
 kind = "fir"
-size = 6.7
-tall = 1.08
+size = 7.8
+tall = 1.02
 
 [node name="Tree13" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.68112, 0, -0.73217, 0, 1, 0, 0.73217, 0, -0.68112, -99.2, 0, -16.2)
-script = ExtResource("13_s")
+transform = Transform3D(0.92872, 0, -0.37078, 0, 1, 0, 0.37078, 0, 0.92872, 12.3, 0, 73.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.8
+tall = 1.16
+
+[node name="Tree14" type="Node3D" parent="Forest"]
+transform = Transform3D(0.97277, 0, 0.23179, 0, 1, 0, -0.23179, 0, 0.97277, 99.9, 0, 32.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.1
+tall = 1.25
+
+[node name="Tree15" type="Node3D" parent="Forest"]
+transform = Transform3D(0.80974, 0, 0.58679, 0, 1, 0, -0.58679, 0, 0.80974, -99.6, 0, 28.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.0
+tall = 1.26
+
+[node name="Tree16" type="Node3D" parent="Forest"]
+transform = Transform3D(0.25193, 0, 0.96775, 0, 1, 0, -0.96775, 0, 0.25193, 49.3, 0, 42.4)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 8.3
+tall = 1.0
+
+[node name="Tree17" type="Node3D" parent="Forest"]
+transform = Transform3D(0.72807, 0, 0.68550, 0, 1, 0, -0.68550, 0, 0.72807, 75.6, 0, 15.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.7
+tall = 1.35
+
+[node name="Tree18" type="Node3D" parent="Forest"]
+transform = Transform3D(0.87771, 0, 0.47920, 0, 1, 0, -0.47920, 0, 0.87771, -86.6, 0, 52.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.5
+tall = 1.05
+
+[node name="Tree19" type="Node3D" parent="Forest"]
+transform = Transform3D(0.77738, 0, 0.62903, 0, 1, 0, -0.62903, 0, 0.77738, -50.8, 0, -101.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.7
+tall = 1.01
+
+[node name="Tree20" type="Node3D" parent="Forest"]
+transform = Transform3D(0.95106, 0, 0.30902, 0, 1, 0, -0.30902, 0, 0.95106, 79.1, 0, -24.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.4
+tall = 1.25
+
+[node name="Tree21" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.36245, 0, -0.93200, 0, 1, 0, 0.93200, 0, -0.36245, 70.5, 0, 100.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.2
+
+[node name="Tree22" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.68829, 0, 0.72543, 0, 1, 0, -0.72543, 0, -0.68829, 60.6, 0, -100.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.1
+tall = 0.91
+
+[node name="Tree23" type="Node3D" parent="Forest"]
+transform = Transform3D(0.43090, 0, -0.90240, 0, 1, 0, 0.90240, 0, 0.43090, 63.9, 0, 95.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.25
+
+[node name="Tree24" type="Node3D" parent="Forest"]
+transform = Transform3D(0.85359, 0, -0.52094, 0, 1, 0, 0.52094, 0, 0.85359, -47.4, 0, -32.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.3
+tall = 1.32
+
+[node name="Tree25" type="Node3D" parent="Forest"]
+transform = Transform3D(0.28964, 0, 0.95714, 0, 1, 0, -0.95714, 0, 0.28964, 90.0, 0, 46.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.1
+tall = 1.12
+
+[node name="Tree26" type="Node3D" parent="Forest"]
+transform = Transform3D(0.80896, 0, 0.58787, 0, 1, 0, -0.58787, 0, 0.80896, 92.4, 0, -7.5)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.2
+tall = 1.07
+
+[node name="Tree27" type="Node3D" parent="Forest"]
+transform = Transform3D(0.92009, 0, -0.39170, 0, 1, 0, 0.39170, 0, 0.92009, 74.0, 0, -31.5)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.1
+tall = 1.1
+
+[node name="Tree28" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.37179, 0, 0.92832, 0, 1, 0, -0.92832, 0, -0.37179, 62.4, 0, -68.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.0
+tall = 1.11
+
+[node name="Tree29" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.37802, 0, -0.92580, 0, 1, 0, 0.92580, 0, -0.37802, -86.1, 0, -57.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.2
+tall = 1.2
+
+[node name="Tree30" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.97466, 0, 0.22368, 0, 1, 0, -0.22368, 0, -0.97466, -24.7, 0, 71.8)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.5
+tall = 0.95
+
+[node name="Tree31" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.85680, 0, -0.51566, 0, 1, 0, 0.51566, 0, -0.85680, 97.6, 0, 3.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.7
+tall = 1.19
+
+[node name="Tree32" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.40988, 0, -0.91214, 0, 1, 0, 0.91214, 0, -0.40988, 95.0, 0, 88.1)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.2
+tall = 1.02
+
+[node name="Tree33" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98187, 0, 0.18955, 0, 1, 0, -0.18955, 0, -0.98187, -37.0, 0, -30.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.4
+tall = 1.07
+
+[node name="Tree34" type="Node3D" parent="Forest"]
+transform = Transform3D(0.88455, 0, 0.46645, 0, 1, 0, -0.46645, 0, 0.88455, 73.1, 0, 23.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.4
+tall = 1.11
+
+[node name="Tree35" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.88120, 0, -0.47275, 0, 1, 0, 0.47275, 0, -0.88120, -58.6, 0, 103.7)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.2
+tall = 1.29
+
+[node name="Tree36" type="Node3D" parent="Forest"]
+transform = Transform3D(0.74840, 0, -0.66324, 0, 1, 0, 0.66324, 0, 0.74840, 60.3, 0, -77.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.34
+
+[node name="Tree37" type="Node3D" parent="Forest"]
+transform = Transform3D(0.39982, 0, -0.91659, 0, 1, 0, 0.91659, 0, 0.39982, 38.6, 0, -64.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.3
+tall = 0.94
+
+[node name="Tree38" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.46419, 0, -0.88574, 0, 1, 0, 0.88574, 0, -0.46419, -61.6, 0, 70.8)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.9
+tall = 1.27
+
+[node name="Tree39" type="Node3D" parent="Forest"]
+transform = Transform3D(0.50863, 0, -0.86099, 0, 1, 0, 0.86099, 0, 0.50863, 21.0, 0, -101.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.4
+tall = 1.07
+
+[node name="Tree40" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99964, 0, 0.02694, 0, 1, 0, -0.02694, 0, -0.99964, 2.6, 0, -100.8)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.8
+tall = 1.05
+
+[node name="Tree41" type="Node3D" parent="Forest"]
+transform = Transform3D(0.72829, 0, 0.68527, 0, 1, 0, -0.68527, 0, 0.72829, 100.4, 0, 63.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.3
+tall = 1.12
+
+[node name="Tree42" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.61607, 0, -0.78769, 0, 1, 0, 0.78769, 0, -0.61607, 40.5, 0, 55.6)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.2
+tall = 0.9
+
+[node name="Tree43" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.30153, 0, 0.95346, 0, 1, 0, -0.95346, 0, -0.30153, 92.5, 0, 34.5)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.6
+tall = 1.06
+
+[node name="Tree44" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.71011, 0, -0.70409, 0, 1, 0, 0.70409, 0, -0.71011, 54.4, 0, 99.9)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.5
+tall = 0.95
+
+[node name="Tree45" type="Node3D" parent="Forest"]
+transform = Transform3D(0.36537, 0, 0.93086, 0, 1, 0, -0.93086, 0, 0.36537, -83.5, 0, -51.8)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.6
+tall = 1.06
+
+[node name="Tree46" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.76580, 0, 0.64308, 0, 1, 0, -0.64308, 0, -0.76580, -88.2, 0, 20.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.17
+
+[node name="Tree47" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.20911, 0, -0.97789, 0, 1, 0, 0.97789, 0, -0.20911, -91.8, 0, 92.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.8
+tall = 1.2
+
+[node name="Tree48" type="Node3D" parent="Forest"]
+transform = Transform3D(0.93972, 0, 0.34194, 0, 1, 0, -0.34194, 0, 0.93972, -53.0, 0, -95.1)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.9
+tall = 1.15
+
+[node name="Tree49" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98029, 0, -0.19755, 0, 1, 0, 0.19755, 0, -0.98029, -88.7, 0, 84.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.9
+tall = 1.25
+
+[node name="Tree50" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.87489, 0, -0.48433, 0, 1, 0, 0.48433, 0, -0.87489, -61.6, 0, -93.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.3
+tall = 1.2
+
+[node name="Tree51" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.70721, 0, 0.70700, 0, 1, 0, -0.70700, 0, -0.70721, 57.8, 0, 6.4)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.8
+tall = 1.27
+
+[node name="Tree52" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99189, 0, 0.12707, 0, 1, 0, -0.12707, 0, 0.99189, -29.3, 0, -47.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.09
+
+[node name="Tree53" type="Node3D" parent="Forest"]
+transform = Transform3D(0.89805, 0, -0.43990, 0, 1, 0, 0.43990, 0, 0.89805, 86.5, 0, 78.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.2
+tall = 1.04
+
+[node name="Tree54" type="Node3D" parent="Forest"]
+transform = Transform3D(0.22938, 0, -0.97334, 0, 1, 0, 0.97334, 0, 0.22938, -60.2, 0, -32.5)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 8.1
+tall = 1.09
+
+[node name="Tree55" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.39526, 0, 0.91857, 0, 1, 0, -0.91857, 0, -0.39526, 87.5, 0, -15.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.2
+tall = 1.02
+
+[node name="Tree56" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.20534, 0, -0.97869, 0, 1, 0, 0.97869, 0, -0.20534, -41.8, 0, 57.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.5
+tall = 1.07
+
+[node name="Tree57" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.33735, 0, -0.94138, 0, 1, 0, 0.94138, 0, -0.33735, -27.8, 0, -79.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.8
+tall = 1.28
+
+[node name="Tree58" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.76073, 0, -0.64907, 0, 1, 0, 0.64907, 0, -0.76073, -37.9, 0, -20.9)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.2
+tall = 1.0
+
+[node name="Tree59" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.96177, 0, 0.27387, 0, 1, 0, -0.27387, 0, -0.96177, 8.4, 0, 70.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.6
+tall = 1.18
+
+[node name="Tree60" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.08122, 0, 0.99670, 0, 1, 0, -0.99670, 0, -0.08122, 14.0, 0, 97.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.2
+tall = 1.03
+
+[node name="Tree61" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99084, 0, 0.13502, 0, 1, 0, -0.13502, 0, -0.99084, 83.0, 0, -86.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.2
+tall = 1.27
+
+[node name="Tree62" type="Node3D" parent="Forest"]
+transform = Transform3D(0.86067, 0, 0.50917, 0, 1, 0, -0.50917, 0, 0.86067, 55.1, 0, -22.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.0
+tall = 1.25
+
+[node name="Tree63" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.88114, 0, -0.47286, 0, 1, 0, 0.47286, 0, -0.88114, 73.5, 0, 63.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.28
+
+[node name="Tree64" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98200, 0, 0.18886, 0, 1, 0, -0.18886, 0, 0.98200, -16.5, 0, -73.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.1
+
+[node name="Tree65" type="Node3D" parent="Forest"]
+transform = Transform3D(0.84195, 0, 0.53956, 0, 1, 0, -0.53956, 0, 0.84195, -91.7, 0, -39.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.6
+tall = 1.05
+
+[node name="Tree66" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.19393, 0, -0.98102, 0, 1, 0, 0.98102, 0, -0.19393, -96.4, 0, -81.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.5
+tall = 0.95
+
+[node name="Tree67" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.54679, 0, -0.83727, 0, 1, 0, 0.83727, 0, -0.54679, -68.1, 0, 53.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.5
+tall = 1.32
+
+[node name="Tree68" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99506, 0, 0.09923, 0, 1, 0, -0.09923, 0, -0.99506, 9.8, 0, 95.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.18
+
+[node name="Tree69" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.12484, 0, -0.99218, 0, 1, 0, 0.99218, 0, -0.12484, -48.6, 0, 7.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.9
+tall = 0.92
+
+[node name="Tree70" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.86698, 0, -0.49835, 0, 1, 0, 0.49835, 0, -0.86698, 45.0, 0, -83.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.9
+tall = 1.28
+
+[node name="Tree71" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.97887, 0, -0.20447, 0, 1, 0, 0.20447, 0, -0.97887, -60.7, 0, 9.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.11
+
+[node name="Tree72" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99784, 0, -0.06574, 0, 1, 0, 0.06574, 0, 0.99784, 97.1, 0, 68.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.1
+tall = 1.16
+
+[node name="Tree73" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.25909, 0, 0.96585, 0, 1, 0, -0.96585, 0, -0.25909, 92.6, 0, 13.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.3
+tall = 1.24
+
+[node name="Tree74" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99736, 0, 0.07260, 0, 1, 0, -0.07260, 0, -0.99736, 19.3, 0, -85.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.4
+tall = 1.01
+
+[node name="Tree75" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99358, 0, 0.11316, 0, 1, 0, -0.11316, 0, 0.99358, 30.6, 0, 55.5)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 6.5
+tall = 1.07
+
+[node name="Tree76" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99827, 0, 0.05879, 0, 1, 0, -0.05879, 0, -0.99827, 60.3, 0, 33.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.0
+tall = 1.13
+
+[node name="Tree77" type="Node3D" parent="Forest"]
+transform = Transform3D(0.62889, 0, -0.77749, 0, 1, 0, 0.77749, 0, 0.62889, 60.0, 0, 67.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.7
+tall = 1.18
+
+[node name="Tree78" type="Node3D" parent="Forest"]
+transform = Transform3D(0.86632, 0, -0.49948, 0, 1, 0, 0.49948, 0, 0.86632, 44.4, 0, 101.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.5
+tall = 1.07
+
+[node name="Tree79" type="Node3D" parent="Forest"]
+transform = Transform3D(0.65846, 0, -0.75262, 0, 1, 0, 0.75262, 0, 0.65846, -53.1, 0, 15.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.1
+tall = 1.34
+
+[node name="Tree80" type="Node3D" parent="Forest"]
+transform = Transform3D(0.71746, 0, -0.69660, 0, 1, 0, 0.69660, 0, 0.71746, 84.0, 0, 9.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.8
+tall = 1.21
+
+[node name="Tree81" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.83788, 0, 0.54586, 0, 1, 0, -0.54586, 0, -0.83788, -97.3, 0, -66.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.5
+tall = 1.13
+
+[node name="Tree82" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.62913, 0, 0.77730, 0, 1, 0, -0.77730, 0, -0.62913, -6.7, 0, -74.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.5
+tall = 1.12
+
+[node name="Tree83" type="Node3D" parent="Forest"]
+transform = Transform3D(0.05046, 0, 0.99873, 0, 1, 0, -0.99873, 0, 0.05046, -96.1, 0, 35.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.4
+tall = 1.07
+
+[node name="Tree84" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98672, 0, 0.16245, 0, 1, 0, -0.16245, 0, -0.98672, 52.4, 0, -3.0)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.1
+tall = 1.32
+
+[node name="Tree85" type="Node3D" parent="Forest"]
+transform = Transform3D(0.90536, 0, -0.42464, 0, 1, 0, 0.42464, 0, 0.90536, -37.3, 0, -92.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.8
+tall = 1.21
+
+[node name="Tree86" type="Node3D" parent="Forest"]
+transform = Transform3D(0.84866, 0, 0.52894, 0, 1, 0, -0.52894, 0, 0.84866, -21.5, 0, -93.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.02
+
+[node name="Tree87" type="Node3D" parent="Forest"]
+transform = Transform3D(0.03813, 0, -0.99927, 0, 1, 0, 0.99927, 0, 0.03813, 51.3, 0, 13.9)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.6
+tall = 0.9
+
+[node name="Tree88" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98093, 0, -0.19436, 0, 1, 0, 0.19436, 0, 0.98093, -41.8, 0, -36.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.2
+tall = 0.91
+
+[node name="Tree89" type="Node3D" parent="Forest"]
+transform = Transform3D(0.79703, 0, 0.60394, 0, 1, 0, -0.60394, 0, 0.79703, 82.9, 0, -40.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.9
+tall = 1.32
+
+[node name="Tree90" type="Node3D" parent="Forest"]
+transform = Transform3D(0.78590, 0, -0.61836, 0, 1, 0, 0.61836, 0, 0.78590, -5.7, 0, -68.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.02
+
+[node name="Tree91" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.24543, 0, 0.96942, 0, 1, 0, -0.96942, 0, -0.24543, 76.9, 0, 44.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.7
+tall = 0.98
+
+[node name="Tree92" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.49800, 0, 0.86718, 0, 1, 0, -0.86718, 0, -0.49800, 34.2, 0, 60.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.7
+tall = 1.32
+
+[node name="Tree93" type="Node3D" parent="Forest"]
+transform = Transform3D(0.85374, 0, -0.52070, 0, 1, 0, 0.52070, 0, 0.85374, 100.5, 0, -12.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.28
+
+[node name="Tree94" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.97108, 0, -0.23874, 0, 1, 0, 0.23874, 0, -0.97108, -44.7, 0, 53.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.6
+tall = 1.01
+
+[node name="Tree95" type="Node3D" parent="Forest"]
+transform = Transform3D(0.56415, 0, 0.82567, 0, 1, 0, -0.82567, 0, 0.56415, -0.0, 0, -66.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.1
+tall = 1.18
+
+[node name="Tree96" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.82057, 0, 0.57155, 0, 1, 0, -0.57155, 0, -0.82057, 56.8, 0, 59.6)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.7
+tall = 0.91
+
+[node name="Tree97" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.08125, 0, -0.99669, 0, 1, 0, 0.99669, 0, -0.08125, 44.7, 0, 15.1)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.5
+tall = 1.01
+
+[node name="Tree98" type="Node3D" parent="Forest"]
+transform = Transform3D(0.96486, 0, -0.26277, 0, 1, 0, 0.26277, 0, 0.96486, 62.1, 0, -88.9)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.0
+tall = 0.98
+
+[node name="Tree99" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.03178, 0, 0.99949, 0, 1, 0, -0.99949, 0, -0.03178, -28.2, 0, -59.0)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.3
+tall = 1.16
+
+[node name="Tree100" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99970, 0, 0.02436, 0, 1, 0, -0.02436, 0, 0.99970, -95.8, 0, -54.0)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.3
+tall = 0.91
+
+[node name="Tree101" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.52006, 0, -0.85413, 0, 1, 0, 0.85413, 0, -0.52006, 54.8, 0, 48.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.7
+tall = 1.13
+
+[node name="Tree102" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.84210, 0, 0.53932, 0, 1, 0, -0.53932, 0, -0.84210, 100.1, 0, 23.1)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.0
+tall = 1.12
+
+[node name="Tree103" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.07743, 0, -0.99700, 0, 1, 0, 0.99700, 0, -0.07743, 75.4, 0, -61.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.1
+tall = 1.06
+
+[node name="Tree104" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.16602, 0, 0.98612, 0, 1, 0, -0.98612, 0, -0.16602, -22.3, 0, 88.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.27
+
+[node name="Tree105" type="Node3D" parent="Forest"]
+transform = Transform3D(0.94108, 0, -0.33819, 0, 1, 0, 0.33819, 0, 0.94108, 84.7, 0, -99.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.0
+tall = 1.03
+
+[node name="Tree106" type="Node3D" parent="Forest"]
+transform = Transform3D(0.65655, 0, -0.75428, 0, 1, 0, 0.75428, 0, 0.65655, -22.1, 0, -54.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.4
+tall = 1.04
+
+[node name="Tree107" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.75634, 0, -0.65418, 0, 1, 0, 0.65418, 0, -0.75634, 43.0, 0, -49.8)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.1
+tall = 1.0
+
+[node name="Tree108" type="Node3D" parent="Forest"]
+transform = Transform3D(0.84469, 0, -0.53525, 0, 1, 0, 0.53525, 0, 0.84469, 35.5, 0, 87.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.7
+tall = 1.06
+
+[node name="Tree109" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98954, 0, -0.14429, 0, 1, 0, 0.14429, 0, 0.98954, -54.1, 0, -84.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.1
+tall = 1.08
+
+[node name="Tree110" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.86256, 0, -0.50596, 0, 1, 0, 0.50596, 0, -0.86256, 24.0, 0, 94.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.4
+tall = 1.0
+
+[node name="Tree111" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.78592, 0, -0.61833, 0, 1, 0, 0.61833, 0, -0.78592, -29.0, 0, 99.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.5
+tall = 1.04
+
+[node name="Tree112" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.57073, 0, -0.82114, 0, 1, 0, 0.82114, 0, -0.57073, -54.2, 0, -1.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.7
+tall = 1.12
+
+[node name="Tree113" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.22248, 0, -0.97494, 0, 1, 0, 0.97494, 0, -0.22248, 40.6, 0, 38.8)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.1
+tall = 1.13
+
+[node name="Tree114" type="Node3D" parent="Forest"]
+transform = Transform3D(0.75930, 0, -0.65074, 0, 1, 0, 0.65074, 0, 0.75930, -52.1, 0, -36.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.4
+tall = 1.25
+
+[node name="Tree115" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.01141, 0, -0.99993, 0, 1, 0, 0.99993, 0, -0.01141, -70.2, 0, 76.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.5
+tall = 1.25
+
+[node name="Tree116" type="Node3D" parent="Forest"]
+transform = Transform3D(0.70613, 0, -0.70808, 0, 1, 0, 0.70808, 0, 0.70613, 53.9, 0, 71.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.1
+tall = 1.28
+
+[node name="Tree117" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.79672, 0, -0.60434, 0, 1, 0, 0.60434, 0, -0.79672, -65.6, 0, -101.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.9
+tall = 1.22
+
+[node name="Tree118" type="Node3D" parent="Forest"]
+transform = Transform3D(0.72834, 0, -0.68521, 0, 1, 0, 0.68521, 0, 0.72834, 90.1, 0, 101.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.8
+tall = 1.15
+
+[node name="Tree119" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.77721, 0, -0.62924, 0, 1, 0, 0.62924, 0, -0.77721, -35.3, 0, -98.5)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.1
+tall = 1.1
+
+[node name="Tree120" type="Node3D" parent="Forest"]
+transform = Transform3D(0.78193, 0, -0.62336, 0, 1, 0, 0.62336, 0, 0.78193, 24.5, 0, 55.2)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.3
+tall = 1.06
+
+[node name="Tree121" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.15031, 0, -0.98864, 0, 1, 0, 0.98864, 0, -0.15031, 90.2, 0, -51.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.0
+tall = 1.22
+
+[node name="Tree122" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.71579, 0, 0.69832, 0, 1, 0, -0.69832, 0, -0.71579, -61.9, 0, 76.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.4
+tall = 1.23
+
+[node name="Tree123" type="Node3D" parent="Forest"]
+transform = Transform3D(0.48809, 0, -0.87279, 0, 1, 0, 0.87279, 0, 0.48809, -46.4, 0, 91.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.5
+tall = 1.01
+
+[node name="Tree124" type="Node3D" parent="Forest"]
+transform = Transform3D(0.32736, 0, 0.94490, 0, 1, 0, -0.94490, 0, 0.32736, -101.8, 0, -60.3)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.5
+tall = 1.14
+
+[node name="Tree125" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98912, 0, -0.14709, 0, 1, 0, 0.14709, 0, 0.98912, 68.2, 0, 55.7)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.5
+tall = 1.32
+
+[node name="Tree126" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.42452, 0, 0.90542, 0, 1, 0, -0.90542, 0, -0.42452, -45.9, 0, 84.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.2
+tall = 1.04
+
+[node name="Tree127" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.97290, 0, 0.23124, 0, 1, 0, -0.23124, 0, -0.97290, -67.1, 0, -82.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.9
+tall = 0.98
+
+[node name="Tree128" type="Node3D" parent="Forest"]
+transform = Transform3D(0.18966, 0, -0.98185, 0, 1, 0, 0.98185, 0, 0.18966, 94.1, 0, -61.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.3
+tall = 1.34
+
+[node name="Tree129" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.74481, 0, 0.66728, 0, 1, 0, -0.66728, 0, -0.74481, -37.0, 0, -65.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.5
+tall = 0.95
+
+[node name="Tree130" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.50659, 0, 0.86219, 0, 1, 0, -0.86219, 0, -0.50659, 80.6, 0, 74.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.7
+tall = 1.16
+
+[node name="Tree131" type="Node3D" parent="Forest"]
+transform = Transform3D(0.69956, 0, -0.71457, 0, 1, 0, 0.71457, 0, 0.69956, -72.4, 0, -6.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.8
+tall = 1.3
+
+[node name="Tree132" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99921, 0, 0.03967, 0, 1, 0, -0.03967, 0, 0.99921, 101.9, 0, -1.9)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.1
+tall = 1.03
+
+[node name="Tree133" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.18504, 0, -0.98273, 0, 1, 0, 0.98273, 0, -0.18504, -90.5, 0, 77.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.4
+tall = 1.07
+
+[node name="Tree134" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.95244, 0, 0.30473, 0, 1, 0, -0.30473, 0, -0.95244, 29.9, 0, -88.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.5
+tall = 1.27
+
+[node name="Tree135" type="Node3D" parent="Forest"]
+transform = Transform3D(0.74003, 0, -0.67257, 0, 1, 0, 0.67257, 0, 0.74003, 84.4, 0, 61.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.9
+tall = 1.11
+
+[node name="Tree136" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.97788, 0, -0.20917, 0, 1, 0, 0.20917, 0, -0.97788, -33.4, 0, -38.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.1
+tall = 1.24
+
+[node name="Tree137" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.63899, 0, -0.76921, 0, 1, 0, 0.76921, 0, -0.63899, -77.1, 0, -79.9)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 8.5
+tall = 1.08
+
+[node name="Tree138" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.44455, 0, 0.89575, 0, 1, 0, -0.89575, 0, -0.44455, 91.9, 0, -32.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.3
+
+[node name="Tree139" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.33928, 0, 0.94068, 0, 1, 0, -0.94068, 0, -0.33928, 50.6, 0, 21.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.3
+tall = 1.1
+
+[node name="Tree140" type="Node3D" parent="Forest"]
+transform = Transform3D(0.58917, 0, 0.80801, 0, 1, 0, -0.80801, 0, 0.58917, 35.8, 0, -53.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.7
+tall = 1.29
+
+[node name="Tree141" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.47696, 0, 0.87892, 0, 1, 0, -0.87892, 0, -0.47696, -32.5, 0, 82.8)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.9
+tall = 1.11
+
+[node name="Tree142" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.55653, 0, 0.83083, 0, 1, 0, -0.83083, 0, -0.55653, 102.5, 0, -21.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 10.0
+tall = 1.14
+
+[node name="Tree143" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.02140, 0, -0.99977, 0, 1, 0, 0.99977, 0, -0.02140, -27.1, 0, -74.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.3
+tall = 1.26
+
+[node name="Tree144" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98848, 0, -0.15136, 0, 1, 0, 0.15136, 0, 0.98848, 64.7, 0, 48.0)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 8.2
+tall = 1.12
+
+[node name="Tree145" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.95428, 0, -0.29890, 0, 1, 0, 0.29890, 0, -0.95428, -77.0, 0, -85.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.3
+tall = 1.08
+
+[node name="Tree146" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.85551, 0, -0.51778, 0, 1, 0, 0.51778, 0, -0.85551, -82.3, 0, 72.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.4
+tall = 1.14
+
+[node name="Tree147" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.31354, 0, -0.94958, 0, 1, 0, 0.94958, 0, -0.31354, -101.8, 0, -72.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.04
+
+[node name="Tree148" type="Node3D" parent="Forest"]
+transform = Transform3D(0.75707, 0, 0.65334, 0, 1, 0, -0.65334, 0, 0.75707, -94.4, 0, -17.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.7
+tall = 1.06
+
+[node name="Tree149" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99496, 0, -0.10027, 0, 1, 0, 0.10027, 0, -0.99496, 69.8, 0, -91.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.2
+tall = 1.11
+
+[node name="Tree150" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.66431, 0, -0.74746, 0, 1, 0, 0.74746, 0, -0.66431, -56.1, 0, 51.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.9
+tall = 1.34
+
+[node name="Tree151" type="Node3D" parent="Forest"]
+transform = Transform3D(0.93712, 0, -0.34901, 0, 1, 0, 0.34901, 0, 0.93712, 37.4, 0, -86.2)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.6
+tall = 1.22
+
+[node name="Tree152" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.87682, 0, 0.48082, 0, 1, 0, -0.48082, 0, -0.87682, 54.8, 0, -94.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.8
+tall = 1.26
+
+[node name="Tree153" type="Node3D" parent="Forest"]
+transform = Transform3D(0.00980, 0, 0.99995, 0, 1, 0, -0.99995, 0, 0.00980, -102.8, 0, 49.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 9.0
+tall = 1.15
+
+[node name="Tree154" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.92931, 0, 0.36931, 0, 1, 0, -0.36931, 0, -0.92931, -89.1, 0, -79.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.3
+tall = 1.33
+
+[node name="Tree155" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.90995, 0, -0.41471, 0, 1, 0, 0.41471, 0, -0.90995, 87.8, 0, -60.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.5
+tall = 1.01
+
+[node name="Tree156" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.83957, 0, 0.54326, 0, 1, 0, -0.54326, 0, -0.83957, 57.9, 0, -82.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.6
+tall = 1.12
+
+[node name="Tree157" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.20907, 0, 0.97790, 0, 1, 0, -0.97790, 0, -0.20907, 41.1, 0, -55.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.7
+tall = 1.13
+
+[node name="Tree158" type="Node3D" parent="Forest"]
+transform = Transform3D(0.97582, 0, -0.21858, 0, 1, 0, 0.21858, 0, 0.97582, 99.0, 0, 85.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.7
+tall = 1.3
+
+[node name="Tree159" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.97596, 0, 0.21797, 0, 1, 0, -0.21797, 0, -0.97596, -34.7, 0, -72.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.4
+tall = 1.07
+
+[node name="Tree160" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.17246, 0, -0.98502, 0, 1, 0, 0.98502, 0, -0.17246, -99.8, 0, 7.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.7
+tall = 0.97
+
+[node name="Tree161" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.53608, 0, 0.84417, 0, 1, 0, -0.84417, 0, -0.53608, 1.9, 0, 77.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.1
+tall = 1.03
+
+[node name="Tree162" type="Node3D" parent="Forest"]
+transform = Transform3D(0.73016, 0, -0.68327, 0, 1, 0, 0.68327, 0, 0.73016, -55.7, 0, 93.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.4
+tall = 1.04
+
+[node name="Tree163" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.39637, 0, 0.91809, 0, 1, 0, -0.91809, 0, -0.39637, 101.7, 0, -39.7)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.2
+tall = 1.34
+
+[node name="Tree164" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.29653, 0, 0.95502, 0, 1, 0, -0.95502, 0, -0.29653, -2.9, 0, -87.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.9
+tall = 1.12
+
+[node name="Tree165" type="Node3D" parent="Forest"]
+transform = Transform3D(0.96776, 0, 0.25189, 0, 1, 0, -0.25189, 0, 0.96776, -99.8, 0, -2.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.8
+tall = 1.18
+
+[node name="Tree166" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99999, 0, -0.00428, 0, 1, 0, 0.00428, 0, 0.99999, 95.1, 0, -99.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.1
+tall = 1.1
+
+[node name="Tree167" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.51110, 0, -0.85952, 0, 1, 0, 0.85952, 0, -0.51110, 69.3, 0, -19.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.0
+tall = 1.18
+
+[node name="Tree168" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.06432, 0, -0.99793, 0, 1, 0, 0.99793, 0, -0.06432, 79.4, 0, -67.5)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.6
+tall = 1.06
+
+[node name="Tree169" type="Node3D" parent="Forest"]
+transform = Transform3D(0.20158, 0, 0.97947, 0, 1, 0, -0.97947, 0, 0.20158, -17.8, 0, 101.9)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.9
+tall = 1.1
+
+[node name="Tree170" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.22105, 0, 0.97526, 0, 1, 0, -0.97526, 0, -0.22105, 86.2, 0, -74.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.2
+tall = 0.94
+
+[node name="Tree171" type="Node3D" parent="Forest"]
+transform = Transform3D(0.90035, 0, -0.43516, 0, 1, 0, 0.43516, 0, 0.90035, 37.1, 0, 79.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.1
+tall = 1.33
+
+[node name="Tree172" type="Node3D" parent="Forest"]
+transform = Transform3D(0.07973, 0, 0.99682, 0, 1, 0, -0.99682, 0, 0.07973, 98.3, 0, -8.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.4
+tall = 1.01
+
+[node name="Tree173" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.93131, 0, 0.36422, 0, 1, 0, -0.36422, 0, -0.93131, 46.5, 0, -55.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.12
+
+[node name="Tree174" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99346, 0, -0.11416, 0, 1, 0, 0.11416, 0, -0.99346, -25.2, 0, -103.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.7
+tall = 1.17
+
+[node name="Tree175" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.89439, 0, -0.44730, 0, 1, 0, 0.44730, 0, -0.89439, -11.9, 0, -86.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.4
+tall = 1.18
+
+[node name="Tree176" type="Node3D" parent="Forest"]
+transform = Transform3D(0.69072, 0, 0.72313, 0, 1, 0, -0.72313, 0, 0.69072, 60.7, 0, 23.0)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.8
+tall = 1.15
+
+[node name="Tree177" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.64166, 0, 0.76699, 0, 1, 0, -0.76699, 0, -0.64166, -77.9, 0, 47.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.2
+tall = 1.14
+
+[node name="Tree178" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.38974, 0, 0.92092, 0, 1, 0, -0.92092, 0, -0.38974, -56.4, 0, 32.0)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.0
+tall = 1.06
+
+[node name="Tree179" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99709, 0, -0.07627, 0, 1, 0, 0.07627, 0, -0.99709, 85.6, 0, -43.6)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.6
+tall = 1.18
+
+[node name="Tree180" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.46794, 0, -0.88376, 0, 1, 0, 0.88376, 0, -0.46794, -96.6, 0, 75.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.2
+tall = 1.08
+
+[node name="Tree181" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98659, 0, -0.16321, 0, 1, 0, 0.16321, 0, -0.98659, -89.4, 0, -93.1)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.3
+tall = 0.96
+
+[node name="Tree182" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.00737, 0, -0.99997, 0, 1, 0, 0.99997, 0, -0.00737, 95.5, 0, -78.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.3
+tall = 1.32
+
+[node name="Tree183" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.18958, 0, 0.98187, 0, 1, 0, -0.98187, 0, -0.18958, 8.6, 0, 103.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.3
+tall = 1.1
+
+[node name="Tree184" type="Node3D" parent="Forest"]
+transform = Transform3D(0.90202, 0, -0.43170, 0, 1, 0, 0.43170, 0, 0.90202, 30.7, 0, 42.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.3
+tall = 1.02
+
+[node name="Tree185" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98634, 0, -0.16471, 0, 1, 0, 0.16471, 0, -0.98634, 50.8, 0, -20.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.1
+tall = 1.02
+
+[node name="Tree186" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.40059, 0, -0.91626, 0, 1, 0, 0.91626, 0, -0.40059, -100.5, 0, -88.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.3
+tall = 1.21
+
+[node name="Tree187" type="Node3D" parent="Forest"]
+transform = Transform3D(0.15030, 0, -0.98864, 0, 1, 0, 0.98864, 0, 0.15030, 35.6, 0, 50.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.8
+tall = 1.23
+
+[node name="Tree188" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.87957, 0, 0.47577, 0, 1, 0, -0.47577, 0, -0.87957, -91.6, 0, 17.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.8
+tall = 1.26
+
+[node name="Tree189" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.24347, 0, -0.96991, 0, 1, 0, 0.96991, 0, -0.24347, 93.7, 0, -46.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.5
+tall = 1.23
+
+[node name="Tree190" type="Node3D" parent="Forest"]
+transform = Transform3D(0.47309, 0, 0.88101, 0, 1, 0, -0.88101, 0, 0.47309, 102.2, 0, 14.4)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.4
+tall = 1.24
+
+[node name="Tree191" type="Node3D" parent="Forest"]
+transform = Transform3D(0.43753, 0, -0.89920, 0, 1, 0, 0.89920, 0, 0.43753, 7.8, 0, -99.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.4
+tall = 1.09
+
+[node name="Tree192" type="Node3D" parent="Forest"]
+transform = Transform3D(0.19726, 0, -0.98035, 0, 1, 0, 0.98035, 0, 0.19726, 40.6, 0, -98.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.1
+tall = 1.31
+
+[node name="Tree193" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.54241, 0, -0.84012, 0, 1, 0, 0.84012, 0, -0.54241, 65.0, 0, 14.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.7
+tall = 1.34
+
+[node name="Tree194" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.65789, 0, -0.75312, 0, 1, 0, 0.75312, 0, -0.65789, 86.4, 0, 36.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.9
+tall = 0.96
+
+[node name="Tree195" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.80863, 0, 0.58831, 0, 1, 0, -0.58831, 0, -0.80863, 40.7, 0, -91.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.3
+tall = 1.34
+
+[node name="Tree196" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99480, 0, -0.10180, 0, 1, 0, 0.10180, 0, 0.99480, -36.9, 0, -6.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.1
+tall = 1.09
+
+[node name="Tree197" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98354, 0, 0.18069, 0, 1, 0, -0.18069, 0, -0.98354, 52.8, 0, 25.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.2
+tall = 1.16
+
+[node name="Tree198" type="Node3D" parent="Forest"]
+transform = Transform3D(0.86705, 0, 0.49822, 0, 1, 0, -0.49822, 0, 0.86705, 69.9, 0, 38.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.2
+tall = 1.35
+
+[node name="Tree199" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99646, 0, -0.08402, 0, 1, 0, 0.08402, 0, 0.99646, 98.0, 0, 9.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.6
+tall = 1.35
+
+[node name="Tree200" type="Node3D" parent="Forest"]
+transform = Transform3D(0.06323, 0, -0.99800, 0, 1, 0, 0.99800, 0, 0.06323, -94.9, 0, 13.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.8
+tall = 1.34
+
+[node name="Tree201" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.74224, 0, -0.67014, 0, 1, 0, 0.67014, 0, -0.74224, -90.3, 0, -65.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.7
+tall = 1.06
+
+[node name="Tree202" type="Node3D" parent="Forest"]
+transform = Transform3D(-1.00000, 0, 0.00145, 0, 1, 0, -0.00145, 0, -1.00000, -93.9, 0, -98.2)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.8
+tall = 1.06
+
+[node name="Tree203" type="Node3D" parent="Forest"]
+transform = Transform3D(0.85590, 0, -0.51714, 0, 1, 0, 0.51714, 0, 0.85590, 46.3, 0, -93.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.1
+tall = 1.13
+
+[node name="Tree204" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99830, 0, -0.05836, 0, 1, 0, 0.05836, 0, 0.99830, -72.9, 0, 14.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.4
+tall = 1.12
+
+[node name="Tree205" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.26823, 0, 0.96335, 0, 1, 0, -0.96335, 0, -0.26823, 80.6, 0, 18.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.8
+tall = 1.13
+
+[node name="Tree206" type="Node3D" parent="Forest"]
+transform = Transform3D(0.77039, 0, 0.63757, 0, 1, 0, -0.63757, 0, 0.77039, -80.6, 0, 99.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.8
+tall = 1.2
+
+[node name="Tree207" type="Node3D" parent="Forest"]
+transform = Transform3D(0.92472, 0, -0.38064, 0, 1, 0, 0.38064, 0, 0.92472, 103.8, 0, 70.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.2
+tall = 1.27
+
+[node name="Tree208" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.17119, 0, 0.98524, 0, 1, 0, -0.98524, 0, -0.17119, -103.6, 0, -35.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.5
+tall = 1.02
+
+[node name="Tree209" type="Node3D" parent="Forest"]
+transform = Transform3D(0.57775, 0, -0.81621, 0, 1, 0, 0.81621, 0, 0.57775, 74.2, 0, 90.5)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.2
+tall = 1.24
+
+[node name="Tree210" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.96765, 0, -0.25231, 0, 1, 0, 0.25231, 0, -0.96765, -17.9, 0, -65.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.9
+tall = 1.01
+
+[node name="Tree211" type="Node3D" parent="Forest"]
+transform = Transform3D(0.44939, 0, 0.89333, 0, 1, 0, -0.89333, 0, 0.44939, 29.5, 0, -98.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.1
+tall = 1.05
+
+[node name="Tree212" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98757, 0, 0.15718, 0, 1, 0, -0.15718, 0, 0.98757, -32.4, 0, -79.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.7
+tall = 1.24
+
+[node name="Tree213" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.78261, 0, 0.62251, 0, 1, 0, -0.62251, 0, -0.78261, -6.6, 0, -101.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.8
+tall = 1.05
+
+[node name="Tree214" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99492, 0, -0.10062, 0, 1, 0, 0.10062, 0, -0.99492, 37.9, 0, 102.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.5
+tall = 1.32
+
+[node name="Tree215" type="Node3D" parent="Forest"]
+transform = Transform3D(0.08541, 0, 0.99635, 0, 1, 0, -0.99635, 0, 0.08541, 103.9, 0, -94.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.0
+tall = 1.21
+
+[node name="Tree216" type="Node3D" parent="Forest"]
+transform = Transform3D(0.91900, 0, 0.39425, 0, 1, 0, -0.39425, 0, 0.91900, -75.7, 0, 81.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.6
+tall = 1.02
+
+[node name="Tree217" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98276, 0, -0.18486, 0, 1, 0, 0.18486, 0, -0.98276, -81.3, 0, -96.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.7
+tall = 1.21
+
+[node name="Tree218" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.95789, 0, 0.28714, 0, 1, 0, -0.28714, 0, -0.95789, 93.3, 0, 24.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.8
+tall = 0.93
+
+[node name="Tree219" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.87694, 0, -0.48059, 0, 1, 0, 0.48059, 0, -0.87694, 93.6, 0, 75.9)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.4
+tall = 0.98
+
+[node name="Tree220" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.65920, 0, -0.75197, 0, 1, 0, 0.75197, 0, -0.65920, 40.9, 0, 47.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.23
+
+[node name="Tree221" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.77698, 0, 0.62953, 0, 1, 0, -0.62953, 0, -0.77698, -27.3, 0, -67.4)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.2
+tall = 1.27
+
+[node name="Tree222" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.59784, 0, -0.80161, 0, 1, 0, 0.80161, 0, -0.59784, 78.3, 0, 97.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.1
+tall = 1.12
+
+[node name="Tree223" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.02898, 0, -0.99958, 0, 1, 0, 0.99958, 0, -0.02898, 62.1, 0, 87.6)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.9
+tall = 0.92
+
+[node name="Tree224" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.13092, 0, 0.99139, 0, 1, 0, -0.99139, 0, -0.13092, 53.9, 0, -57.0)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.1
+tall = 0.97
+
+[node name="Tree225" type="Node3D" parent="Forest"]
+transform = Transform3D(0.04979, 0, 0.99876, 0, 1, 0, -0.99876, 0, 0.04979, 11.9, 0, -83.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.0
+tall = 1.14
+
+[node name="Tree226" type="Node3D" parent="Forest"]
+transform = Transform3D(0.45518, 0, 0.89040, 0, 1, 0, -0.89040, 0, 0.45518, 35.2, 0, -71.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.5
+tall = 1.28
+
+[node name="Tree227" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.18415, 0, -0.98290, 0, 1, 0, 0.98290, 0, -0.18415, -84.8, 0, -73.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.4
+tall = 1.04
+
+[node name="Tree228" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.45109, 0, 0.89248, 0, 1, 0, -0.89248, 0, -0.45109, -48.4, 0, 55.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.6
+tall = 1.09
+
+[node name="Tree229" type="Node3D" parent="Forest"]
+transform = Transform3D(0.51160, 0, -0.85922, 0, 1, 0, 0.85922, 0, 0.51160, -71.0, 0, 67.8)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.4
+tall = 1.04
+
+[node name="Tree230" type="Node3D" parent="Forest"]
+transform = Transform3D(0.16325, 0, 0.98659, 0, 1, 0, -0.98659, 0, 0.16325, -55.9, 0, 83.2)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.0
+tall = 1.08
+
+[node name="Tree231" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98205, 0, -0.18861, 0, 1, 0, 0.18861, 0, 0.98205, -73.8, 0, -94.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.29
+
+[node name="Tree232" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.16272, 0, 0.98667, 0, 1, 0, -0.98667, 0, -0.16272, -75.5, 0, 18.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.3
+tall = 1.08
+
+[node name="Tree233" type="Node3D" parent="Forest"]
+transform = Transform3D(0.96727, 0, 0.25376, 0, 1, 0, -0.25376, 0, 0.96727, -41.0, 0, -10.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.4
+tall = 1.21
+
+[node name="Tree234" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.42162, 0, 0.90677, 0, 1, 0, -0.90677, 0, -0.42162, 91.1, 0, -68.4)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.9
+tall = 1.29
+
+[node name="Tree235" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.82675, 0, 0.56257, 0, 1, 0, -0.56257, 0, -0.82675, -61.6, 0, 82.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.33
+
+[node name="Tree236" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.29707, 0, -0.95486, 0, 1, 0, 0.95486, 0, -0.29707, -43.5, 0, -100.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.1
+tall = 1.1
+
+[node name="Tree237" type="Node3D" parent="Forest"]
+transform = Transform3D(0.94691, 0, -0.32149, 0, 1, 0, 0.32149, 0, 0.94691, 81.9, 0, 47.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.7
+tall = 1.3
+
+[node name="Tree238" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99765, 0, -0.06853, 0, 1, 0, 0.06853, 0, -0.99765, 84.9, 0, -93.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.8
+tall = 1.26
+
+[node name="Tree239" type="Node3D" parent="Forest"]
+transform = Transform3D(0.97792, 0, -0.20899, 0, 1, 0, 0.20899, 0, 0.97792, 78.8, 0, 57.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.2
+tall = 1.03
+
+[node name="Tree240" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99259, 0, -0.12152, 0, 1, 0, 0.12152, 0, 0.99259, 68.4, 0, -56.5)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.9
+tall = 1.11
+
+[node name="Tree241" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.13341, 0, -0.99106, 0, 1, 0, 0.99106, 0, -0.13341, -49.2, 0, -82.7)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.5
+tall = 1.18
+
+[node name="Tree242" type="Node3D" parent="Forest"]
+transform = Transform3D(0.58055, 0, 0.81423, 0, 1, 0, -0.81423, 0, 0.58055, 29.0, 0, -73.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.9
+tall = 1.29
+
+[node name="Tree243" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.34654, 0, 0.93804, 0, 1, 0, -0.93804, 0, -0.34654, -95.0, 0, -91.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 10.0
+tall = 1.23
+
+[node name="Tree244" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99155, 0, -0.12972, 0, 1, 0, 0.12972, 0, 0.99155, -103.2, 0, -21.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.6
+tall = 1.07
+
+[node name="Tree245" type="Node3D" parent="Forest"]
+transform = Transform3D(0.65210, 0, 0.75814, 0, 1, 0, -0.75814, 0, 0.65210, 22.1, 0, 64.1)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.2
+tall = 1.22
+
+[node name="Tree246" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.79695, 0, -0.60404, 0, 1, 0, 0.60404, 0, -0.79695, 68.8, 0, 25.9)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.9
+tall = 1.31
+
+[node name="Tree247" type="Node3D" parent="Forest"]
+transform = Transform3D(0.14860, 0, -0.98890, 0, 1, 0, 0.98890, 0, 0.14860, -21.8, 0, -78.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.4
+tall = 1.19
+
+[node name="Tree248" type="Node3D" parent="Forest"]
+transform = Transform3D(0.12547, 0, 0.99210, 0, 1, 0, -0.99210, 0, 0.12547, -43.4, 0, -2.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.2
+tall = 1.29
+
+[node name="Tree249" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99285, 0, 0.11940, 0, 1, 0, -0.11940, 0, 0.99285, 57.3, 0, -71.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.8
+tall = 1.09
+
+[node name="Tree250" type="Node3D" parent="Forest"]
+transform = Transform3D(0.41746, 0, 0.90870, 0, 1, 0, -0.90870, 0, 0.41746, -83.4, 0, 93.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.8
+tall = 1.12
+
+[node name="Tree251" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.66990, 0, -0.74246, 0, 1, 0, 0.74246, 0, -0.66990, 56.5, 0, 16.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.8
+tall = 1.27
+
+[node name="Tree252" type="Node3D" parent="Forest"]
+transform = Transform3D(0.97878, 0, 0.20493, 0, 1, 0, -0.20493, 0, 0.97878, 77.9, 0, -93.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.5
+tall = 1.05
+
+[node name="Tree253" type="Node3D" parent="Forest"]
+transform = Transform3D(0.73066, 0, 0.68274, 0, 1, 0, -0.68274, 0, 0.73066, 86.5, 0, 88.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.1
+tall = 1.01
+
+[node name="Tree254" type="Node3D" parent="Forest"]
+transform = Transform3D(0.93846, 0, -0.34539, 0, 1, 0, 0.34539, 0, 0.93846, -30.4, 0, -86.9)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.5
+tall = 1.03
+
+[node name="Tree255" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99519, 0, 0.09799, 0, 1, 0, -0.09799, 0, 0.99519, -85.4, 0, 40.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.4
+tall = 1.14
+
+[node name="Tree256" type="Node3D" parent="Forest"]
+transform = Transform3D(0.85141, 0, 0.52450, 0, 1, 0, -0.52450, 0, 0.85141, -75.5, 0, -40.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.2
+tall = 1.02
+
+[node name="Tree257" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99934, 0, 0.03641, 0, 1, 0, -0.03641, 0, -0.99934, 97.5, 0, 53.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.33
+
+[node name="Tree258" type="Node3D" parent="Forest"]
+transform = Transform3D(0.93759, 0, 0.34775, 0, 1, 0, -0.34775, 0, 0.93759, -46.5, 0, 70.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.9
+tall = 1.3
+
+[node name="Tree259" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.24591, 0, -0.96929, 0, 1, 0, 0.96929, 0, -0.24591, -72.0, 0, -100.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.8
+tall = 1.21
+
+[node name="Tree260" type="Node3D" parent="Forest"]
+transform = Transform3D(0.91150, 0, 0.41131, 0, 1, 0, -0.41131, 0, 0.91150, -95.7, 0, 23.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.3
+tall = 0.99
+
+[node name="Tree261" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.90543, 0, 0.42449, 0, 1, 0, -0.42449, 0, -0.90543, 68.4, 0, 69.6)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.6
+tall = 1.13
+
+[node name="Tree262" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99406, 0, -0.10886, 0, 1, 0, 0.10886, 0, 0.99406, 45.6, 0, -65.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.8
+tall = 1.03
+
+[node name="Tree263" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.45409, 0, 0.89096, 0, 1, 0, -0.89096, 0, -0.45409, 58.8, 0, -13.3)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.8
+tall = 0.92
+
+[node name="Tree264" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.93234, 0, -0.36159, 0, 1, 0, 0.36159, 0, -0.93234, 74.7, 0, -102.8)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.3
+tall = 1.12
+
+[node name="Tree265" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.81301, 0, 0.58225, 0, 1, 0, -0.58225, 0, -0.81301, 76.9, 0, -80.3)
+script = ExtResource("12_s")
 kind = "fir"
 size = 7.7
 tall = 1.33
 
-[node name="Tree14" type="Node3D" parent="Forest"]
-transform = Transform3D(0.92448, 0, -0.38122, 0, 1, 0, 0.38122, 0, 0.92448, -79.3, 0, 26.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.2
-tall = 1.07
-
-[node name="Tree15" type="Node3D" parent="Forest"]
-transform = Transform3D(0.94593, 0, -0.32437, 0, 1, 0, 0.32437, 0, 0.94593, -67.5, 0, -32.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.0
-tall = 1.05
-
-[node name="Tree16" type="Node3D" parent="Forest"]
-transform = Transform3D(0.98719, 0, -0.15954, 0, 1, 0, 0.15954, 0, 0.98719, -79.7, 0, -27.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.6
-tall = 1.21
-
-[node name="Tree17" type="Node3D" parent="Forest"]
-transform = Transform3D(0.99906, 0, 0.04332, 0, 1, 0, -0.04332, 0, 0.99906, -30.5, 0, -27.2)
-script = ExtResource("13_s")
-kind = "broad"
-size = 7.4
-tall = 1.17
-
-[node name="Tree18" type="Node3D" parent="Forest"]
-transform = Transform3D(0.95295, 0, 0.30312, 0, 1, 0, -0.30312, 0, 0.95295, -67.7, 0, -95.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.6
-tall = 1.05
-
-[node name="Tree19" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.98444, 0, 0.17570, 0, 1, 0, -0.17570, 0, -0.98444, 8.6, 0, -94.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.9
-tall = 1.3
-
-[node name="Tree20" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.05761, 0, -0.99834, 0, 1, 0, 0.99834, 0, -0.05761, -94.4, 0, -44.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.1
-tall = 1.33
-
-[node name="Tree21" type="Node3D" parent="Forest"]
-transform = Transform3D(0.32863, 0, -0.94446, 0, 1, 0, 0.94446, 0, 0.32863, 91.0, 0, -27.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.6
-tall = 1.22
-
-[node name="Tree22" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.49555, 0, -0.86858, 0, 1, 0, 0.86858, 0, -0.49555, 50.0, 0, -4.4)
-script = ExtResource("13_s")
-kind = "broad"
-size = 8.4
-tall = 1.34
-
-[node name="Tree23" type="Node3D" parent="Forest"]
-transform = Transform3D(0.69799, 0, -0.71610, 0, 1, 0, 0.71610, 0, 0.69799, 45.0, 0, -66.0)
-script = ExtResource("13_s")
+[node name="Tree266" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.12760, 0, -0.99183, 0, 1, 0, 0.99183, 0, -0.12760, -94.3, 0, 30.8)
+script = ExtResource("12_s")
 kind = "fir"
 size = 6.5
-tall = 1.32
-
-[node name="Tree24" type="Node3D" parent="Forest"]
-transform = Transform3D(0.46243, 0, 0.88666, 0, 1, 0, -0.88666, 0, 0.46243, 61.3, 0, -70.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.9
-tall = 1.23
-
-[node name="Tree25" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.58944, 0, 0.80781, 0, 1, 0, -0.80781, 0, -0.58944, -97.2, 0, 94.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.6
-tall = 1.33
-
-[node name="Tree26" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.26670, 0, -0.96378, 0, 1, 0, 0.96378, 0, -0.26670, -57.8, 0, -49.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.7
 tall = 1.21
 
-[node name="Tree27" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.60685, 0, -0.79481, 0, 1, 0, 0.79481, 0, -0.60685, -48.1, 0, -16.2)
-script = ExtResource("13_s")
-kind = "broad"
-size = 7.4
-tall = 1.2
-
-[node name="Tree28" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.92909, 0, 0.36985, 0, 1, 0, -0.36985, 0, -0.92909, 56.9, 0, -78.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.7
-tall = 1.1
-
-[node name="Tree29" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.93459, 0, -0.35572, 0, 1, 0, 0.35572, 0, -0.93459, -72.6, 0, -75.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.2
-tall = 1.08
-
-[node name="Tree30" type="Node3D" parent="Forest"]
-transform = Transform3D(0.21161, 0, 0.97735, 0, 1, 0, -0.97735, 0, 0.21161, -85.4, 0, 33.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.7
-tall = 1.05
-
-[node name="Tree31" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.80253, 0, -0.59661, 0, 1, 0, 0.59661, 0, -0.80253, 76.6, 0, 93.5)
-script = ExtResource("13_s")
-kind = "broad"
-size = 7.5
-tall = 1.35
-
-[node name="Tree32" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.90886, 0, -0.41711, 0, 1, 0, 0.41711, 0, -0.90886, 66.5, 0, -67.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.5
-tall = 1.12
-
-[node name="Tree33" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.17409, 0, 0.98473, 0, 1, 0, -0.98473, 0, -0.17409, -60.9, 0, -36.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.1
-tall = 1.19
-
-[node name="Tree34" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.48998, 0, -0.87173, 0, 1, 0, 0.87173, 0, -0.48998, -11.9, 0, -96.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.9
-tall = 1.18
-
-[node name="Tree35" type="Node3D" parent="Forest"]
-transform = Transform3D(0.23871, 0, 0.97109, 0, 1, 0, -0.97109, 0, 0.23871, -87.1, 0, 97.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.9
-tall = 1.04
-
-[node name="Tree36" type="Node3D" parent="Forest"]
-transform = Transform3D(0.18119, 0, 0.98345, 0, 1, 0, -0.98345, 0, 0.18119, -46.9, 0, -92.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.8
-tall = 1.05
-
-[node name="Tree37" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.66395, 0, 0.74778, 0, 1, 0, -0.74778, 0, -0.66395, 37.6, 0, -14.9)
-script = ExtResource("13_s")
-kind = "broad"
-size = 8.4
-tall = 1.03
-
-[node name="Tree38" type="Node3D" parent="Forest"]
-transform = Transform3D(0.65076, 0, 0.75928, 0, 1, 0, -0.75928, 0, 0.65076, 71.2, 0, -86.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.4
-tall = 1.12
-
-[node name="Tree39" type="Node3D" parent="Forest"]
-transform = Transform3D(0.07259, 0, -0.99736, 0, 1, 0, 0.99736, 0, 0.07259, -74.2, 0, 5.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.3
-tall = 1.06
-
-[node name="Tree40" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.37973, 0, -0.92510, 0, 1, 0, 0.92510, 0, -0.37973, -89.9, 0, -59.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.9
-tall = 1.27
-
-[node name="Tree41" type="Node3D" parent="Forest"]
-transform = Transform3D(0.99350, 0, -0.11387, 0, 1, 0, 0.11387, 0, 0.99350, -42.0, 0, 0.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.8
-tall = 1.01
-
-[node name="Tree42" type="Node3D" parent="Forest"]
-transform = Transform3D(0.91686, 0, 0.39921, 0, 1, 0, -0.39921, 0, 0.91686, 46.6, 0, 10.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.3
-tall = 1.29
-
-[node name="Tree43" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.05721, 0, 0.99836, 0, 1, 0, -0.99836, 0, -0.05721, -74.0, 0, -85.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.8
-tall = 1.06
-
-[node name="Tree44" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.08311, 0, -0.99654, 0, 1, 0, 0.99654, 0, -0.08311, -68.5, 0, -10.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.9
-tall = 1.34
-
-[node name="Tree45" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.98734, 0, -0.15865, 0, 1, 0, 0.15865, 0, -0.98734, -99.8, 0, -23.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.5
-tall = 1.07
-
-[node name="Tree46" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.08891, 0, -0.99604, 0, 1, 0, 0.99604, 0, -0.08891, 0.9, 0, -99.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.3
-tall = 1.14
-
-[node name="Tree47" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.33427, 0, -0.94248, 0, 1, 0, 0.94248, 0, -0.33427, -91.7, 0, -95.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.7
-tall = 1.2
-
-[node name="Tree48" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.62171, 0, 0.78325, 0, 1, 0, -0.78325, 0, -0.62171, -34.8, 0, 96.9)
-script = ExtResource("13_s")
-kind = "broad"
-size = 6.1
-tall = 1.29
-
-[node name="Tree49" type="Node3D" parent="Forest"]
-transform = Transform3D(0.67025, 0, -0.74213, 0, 1, 0, 0.74213, 0, 0.67025, -54.0, 0, -93.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.1
-tall = 1.04
-
-[node name="Tree50" type="Node3D" parent="Forest"]
-transform = Transform3D(0.98840, 0, 0.15187, 0, 1, 0, -0.15187, 0, 0.98840, -46.9, 0, 45.9)
-script = ExtResource("13_s")
-kind = "broad"
-size = 7.5
-tall = 1.13
-
-[node name="Tree51" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.02475, 0, -0.99969, 0, 1, 0, 0.99969, 0, -0.02475, 23.4, 0, 28.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.2
-tall = 1.11
-
-[node name="Tree52" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.47070, 0, 0.88230, 0, 1, 0, -0.88230, 0, -0.47070, -87.9, 0, -46.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.1
-tall = 1.24
-
-[node name="Tree53" type="Node3D" parent="Forest"]
-transform = Transform3D(0.78498, 0, 0.61952, 0, 1, 0, -0.61952, 0, 0.78498, -6.7, 0, -76.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.6
-tall = 1.34
-
-[node name="Tree54" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.96695, 0, -0.25495, 0, 1, 0, 0.25495, 0, -0.96695, 87.3, 0, -96.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.5
-tall = 1.34
-
-[node name="Tree55" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.87181, 0, 0.48984, 0, 1, 0, -0.48984, 0, -0.87181, 89.1, 0, -57.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.4
-tall = 1.18
-
-[node name="Tree56" type="Node3D" parent="Forest"]
-transform = Transform3D(0.80046, 0, 0.59939, 0, 1, 0, -0.59939, 0, 0.80046, 40.7, 0, -53.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.5
-tall = 1.01
-
-[node name="Tree57" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.95252, 0, -0.30447, 0, 1, 0, 0.30447, 0, -0.95252, -99.3, 0, -1.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.9
-tall = 1.05
-
-[node name="Tree58" type="Node3D" parent="Forest"]
-transform = Transform3D(0.53110, 0, 0.84731, 0, 1, 0, -0.84731, 0, 0.53110, -99.7, 0, 50.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.4
-tall = 1.32
-
-[node name="Tree59" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99763, 0, 0.06883, 0, 1, 0, -0.06883, 0, -0.99763, -42.9, 0, 87.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.6
-tall = 1.13
-
-[node name="Tree60" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.95271, 0, -0.30387, 0, 1, 0, 0.30387, 0, -0.95271, 9.8, 0, 43.9)
-script = ExtResource("13_s")
-kind = "broad"
-size = 8.3
-tall = 1.23
-
-[node name="Tree61" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.98477, 0, -0.17388, 0, 1, 0, 0.17388, 0, -0.98477, 85.4, 0, -74.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.0
-tall = 1.1
-
-[node name="Tree62" type="Node3D" parent="Forest"]
-transform = Transform3D(0.52701, 0, -0.84986, 0, 1, 0, 0.84986, 0, 0.52701, -21.1, 0, -66.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.6
-tall = 1.32
-
-[node name="Tree63" type="Node3D" parent="Forest"]
-transform = Transform3D(0.83150, 0, 0.55552, 0, 1, 0, -0.55552, 0, 0.83150, -0.6, 0, -56.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 9.0
-tall = 1.16
-
-[node name="Tree64" type="Node3D" parent="Forest"]
-transform = Transform3D(0.84191, 0, -0.53961, 0, 1, 0, 0.53961, 0, 0.84191, -72.1, 0, -61.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.0
-tall = 1.03
-
-[node name="Tree65" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.68625, 0, 0.72736, 0, 1, 0, -0.72736, 0, -0.68625, -44.5, 0, 93.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.6
-tall = 1.08
-
-[node name="Tree66" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.25166, 0, 0.96782, 0, 1, 0, -0.96782, 0, -0.25166, 69.7, 0, 74.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.7
-tall = 1.17
-
-[node name="Tree67" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.77657, 0, -0.63003, 0, 1, 0, 0.63003, 0, -0.77657, 17.4, 0, -100.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.8
-tall = 1.29
-
-[node name="Tree68" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99014, 0, 0.14007, 0, 1, 0, -0.14007, 0, -0.99014, -78.2, 0, -69.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.0
-tall = 1.33
-
-[node name="Tree69" type="Node3D" parent="Forest"]
-transform = Transform3D(0.10925, 0, -0.99401, 0, 1, 0, 0.99401, 0, 0.10925, -8.5, 0, 10.3)
-script = ExtResource("13_s")
-kind = "broad"
-size = 8.8
-tall = 1.23
-
-[node name="Tree70" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.01127, 0, -0.99994, 0, 1, 0, 0.99994, 0, -0.01127, -39.2, 0, -74.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.9
-tall = 1.24
-
-[node name="Tree71" type="Node3D" parent="Forest"]
-transform = Transform3D(0.96954, 0, 0.24495, 0, 1, 0, -0.24495, 0, 0.96954, 76.8, 0, -4.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.1
-tall = 1.11
-
-[node name="Tree72" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.52545, 0, -0.85082, 0, 1, 0, 0.85082, 0, -0.52545, 33.5, 0, 85.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.3
-tall = 1.24
-
-[node name="Tree73" type="Node3D" parent="Forest"]
-transform = Transform3D(0.16683, 0, -0.98599, 0, 1, 0, 0.98599, 0, 0.16683, -0.8, 0, -62.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.3
-tall = 1.23
-
-[node name="Tree74" type="Node3D" parent="Forest"]
-transform = Transform3D(0.98681, 0, 0.16190, 0, 1, 0, -0.16190, 0, 0.98681, -21.3, 0, -57.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.4
-tall = 1.02
-
-[node name="Tree75" type="Node3D" parent="Forest"]
-transform = Transform3D(0.80220, 0, 0.59706, 0, 1, 0, -0.59706, 0, 0.80220, -88.0, 0, -21.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.7
-tall = 1.26
-
-[node name="Tree76" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.02319, 0, 0.99973, 0, 1, 0, -0.99973, 0, -0.02319, -62.9, 0, 87.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.1
-tall = 1.23
-
-[node name="Tree77" type="Node3D" parent="Forest"]
-transform = Transform3D(0.26446, 0, -0.96440, 0, 1, 0, 0.96440, 0, 0.26446, -75.3, 0, 92.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.1
-tall = 1.29
-
-[node name="Tree78" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.69688, 0, -0.71719, 0, 1, 0, 0.71719, 0, -0.69688, 64.4, 0, -13.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.8
-tall = 1.07
-
-[node name="Tree79" type="Node3D" parent="Forest"]
-transform = Transform3D(0.37876, 0, 0.92550, 0, 1, 0, -0.92550, 0, 0.37876, -27.2, 0, 79.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.3
-tall = 1.01
-
-[node name="Tree80" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.98787, 0, -0.15526, 0, 1, 0, 0.15526, 0, -0.98787, -95.1, 0, -53.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.9
-tall = 1.33
-
-[node name="Tree81" type="Node3D" parent="Forest"]
-transform = Transform3D(0.54044, 0, 0.84138, 0, 1, 0, -0.84138, 0, 0.54044, 32.9, 0, -75.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.9
-tall = 1.2
-
-[node name="Tree82" type="Node3D" parent="Forest"]
-transform = Transform3D(0.02927, 0, -0.99957, 0, 1, 0, 0.99957, 0, 0.02927, -25.4, 0, 47.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.5
-tall = 1.31
-
-[node name="Tree83" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.57075, 0, 0.82112, 0, 1, 0, -0.82112, 0, -0.57075, 98.5, 0, 1.5)
-script = ExtResource("13_s")
-kind = "broad"
-size = 9.0
-tall = 1.04
-
-[node name="Tree84" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.27100, 0, -0.96258, 0, 1, 0, 0.96258, 0, -0.27100, 82.9, 0, -91.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.4
-tall = 1.07
-
-[node name="Tree85" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.72919, 0, 0.68431, 0, 1, 0, -0.68431, 0, -0.72919, -78.8, 0, 19.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.7
-tall = 1.13
-
-[node name="Tree86" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.46654, 0, -0.88450, 0, 1, 0, 0.88450, 0, -0.46654, -59.3, 0, -97.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.0
-tall = 1.06
-
-[node name="Tree87" type="Node3D" parent="Forest"]
-transform = Transform3D(0.28069, 0, 0.95980, 0, 1, 0, -0.95980, 0, 0.28069, -37.6, 0, -59.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.6
-tall = 1.02
-
-[node name="Tree88" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.95079, 0, 0.30984, 0, 1, 0, -0.30984, 0, -0.95079, -79.7, 0, -20.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.9
-tall = 1.03
-
-[node name="Tree89" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.84362, 0, -0.53695, 0, 1, 0, 0.53695, 0, -0.84362, -67.3, 0, 39.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.8
-tall = 1.11
-
-[node name="Tree90" type="Node3D" parent="Forest"]
-transform = Transform3D(0.28702, 0, -0.95792, 0, 1, 0, 0.95792, 0, 0.28702, 99.3, 0, -27.2)
-script = ExtResource("13_s")
-kind = "broad"
-size = 6.0
-tall = 1.32
-
-[node name="Tree91" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.63419, 0, 0.77318, 0, 1, 0, -0.77318, 0, -0.63419, -97.0, 0, 10.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.7
-tall = 1.03
-
-[node name="Tree92" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99118, 0, 0.13255, 0, 1, 0, -0.13255, 0, -0.99118, -70.8, 0, -43.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.8
-tall = 1.04
-
-[node name="Tree93" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.76202, 0, -0.64756, 0, 1, 0, 0.64756, 0, -0.76202, -89.3, 0, 85.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.7
-tall = 1.22
-
-[node name="Tree94" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.82526, 0, -0.56476, 0, 1, 0, 0.56476, 0, -0.82526, 57.2, 0, -55.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.5
-tall = 1.29
-
-[node name="Tree95" type="Node3D" parent="Forest"]
-transform = Transform3D(0.04686, 0, 0.99890, 0, 1, 0, -0.99890, 0, 0.04686, 45.0, 0, 79.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.1
-tall = 1.29
-
-[node name="Tree96" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99783, 0, -0.06592, 0, 1, 0, 0.06592, 0, -0.99783, -95.3, 0, 23.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.7
-tall = 1.27
-
-[node name="Tree97" type="Node3D" parent="Forest"]
-transform = Transform3D(0.78209, 0, -0.62316, 0, 1, 0, 0.62316, 0, 0.78209, 56.0, 0, -8.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.4
-tall = 1.15
-
-[node name="Tree98" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99796, 0, 0.06380, 0, 1, 0, -0.06380, 0, -0.99796, -81.7, 0, -11.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.1
-tall = 1.22
-
-[node name="Tree99" type="Node3D" parent="Forest"]
-transform = Transform3D(0.17277, 0, 0.98496, 0, 1, 0, -0.98496, 0, 0.17277, -83.6, 0, 46.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.5
-tall = 1.02
-
-[node name="Tree100" type="Node3D" parent="Forest"]
-transform = Transform3D(0.99970, 0, 0.02435, 0, 1, 0, -0.02435, 0, 0.99970, -72.8, 0, 71.4)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.2
-tall = 1.29
-
-[node name="Tree101" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99870, 0, -0.05106, 0, 1, 0, 0.05106, 0, -0.99870, -61.3, 0, 96.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.9
-tall = 1.32
-
-[node name="Tree102" type="Node3D" parent="Forest"]
-transform = Transform3D(0.74978, 0, -0.66168, 0, 1, 0, 0.66168, 0, 0.74978, 35.9, 0, 79.1)
-script = ExtResource("13_s")
-kind = "broad"
-size = 7.6
-tall = 1.22
-
-[node name="Tree103" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.68557, 0, 0.72801, 0, 1, 0, -0.72801, 0, -0.68557, 16.0, 0, 76.5)
-script = ExtResource("13_s")
-kind = "broad"
-size = 7.2
-tall = 1.28
-
-[node name="Tree104" type="Node3D" parent="Forest"]
-transform = Transform3D(0.95432, 0, -0.29879, 0, 1, 0, 0.29879, 0, 0.95432, -64.6, 0, 48.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.5
-tall = 1.09
-
-[node name="Tree105" type="Node3D" parent="Forest"]
-transform = Transform3D(0.59101, 0, -0.80666, 0, 1, 0, 0.80666, 0, 0.59101, 32.7, 0, -37.5)
-script = ExtResource("13_s")
+[node name="Tree267" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99184, 0, -0.12751, 0, 1, 0, 0.12751, 0, -0.99184, -1.9, 0, 97.5)
+script = ExtResource("12_s")
 kind = "fir"
 size = 7.8
-tall = 1.15
+tall = 1.13
 
-[node name="Tree106" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.71185, 0, 0.70233, 0, 1, 0, -0.70233, 0, -0.71185, 17.8, 0, -59.2)
-script = ExtResource("13_s")
+[node name="Tree268" type="Node3D" parent="Forest"]
+transform = Transform3D(0.05418, 0, -0.99853, 0, 1, 0, 0.99853, 0, 0.05418, -81.1, 0, 88.2)
+script = ExtResource("12_s")
 kind = "fir"
-size = 7.4
-tall = 1.05
+size = 7.5
+tall = 1.03
 
-[node name="Tree107" type="Node3D" parent="Forest"]
-transform = Transform3D(0.59127, 0, -0.80647, 0, 1, 0, 0.80647, 0, 0.59127, 87.3, 0, -51.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.3
-tall = 1.22
+[node name="Tree269" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.82131, 0, -0.57049, 0, 1, 0, 0.57049, 0, -0.82131, -29.9, 0, -22.6)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 6.8
+tall = 0.96
 
-[node name="Tree108" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99905, 0, 0.04364, 0, 1, 0, -0.04364, 0, -0.99905, -60.1, 0, 21.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.9
-tall = 1.28
-
-[node name="Tree109" type="Node3D" parent="Forest"]
-transform = Transform3D(0.76791, 0, 0.64055, 0, 1, 0, -0.64055, 0, 0.76791, -39.9, 0, -90.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.3
-tall = 1.25
-
-[node name="Tree110" type="Node3D" parent="Forest"]
-transform = Transform3D(0.78907, 0, -0.61430, 0, 1, 0, 0.61430, 0, 0.78907, -9.5, 0, -54.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.7
-tall = 1.01
-
-[node name="Tree111" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.06510, 0, -0.99788, 0, 1, 0, 0.99788, 0, -0.06510, 76.0, 0, -97.0)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.7
-tall = 1.26
-
-[node name="Tree112" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.68135, 0, 0.73196, 0, 1, 0, -0.73196, 0, -0.68135, 76.0, 0, -34.3)
-script = ExtResource("13_s")
+[node name="Tree270" type="Node3D" parent="Forest"]
+transform = Transform3D(0.69624, 0, -0.71781, 0, 1, 0, 0.71781, 0, 0.69624, -51.4, 0, -42.0)
+script = ExtResource("12_s")
 kind = "broad"
-size = 8.1
+size = 6.2
+tall = 1.08
+
+[node name="Tree271" type="Node3D" parent="Forest"]
+transform = Transform3D(0.91140, 0, -0.41151, 0, 1, 0, 0.41151, 0, 0.91140, -98.8, 0, 84.7)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.1
+tall = 1.27
+
+[node name="Tree272" type="Node3D" parent="Forest"]
+transform = Transform3D(0.80007, 0, -0.59990, 0, 1, 0, 0.59990, 0, 0.80007, 71.1, 0, 6.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.3
+tall = 1.09
+
+[node name="Tree273" type="Node3D" parent="Forest"]
+transform = Transform3D(0.63256, 0, -0.77451, 0, 1, 0, 0.77451, 0, 0.63256, 69.4, 0, -66.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.1
 tall = 1.23
 
-[node name="Tree113" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.56137, 0, -0.82756, 0, 1, 0, 0.82756, 0, -0.56137, -78.7, 0, 85.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.4
-tall = 1.01
-
-[node name="Tree114" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.66658, 0, 0.74543, 0, 1, 0, -0.74543, 0, -0.66658, -91.7, 0, 38.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.1
-tall = 1.26
-
-[node name="Tree115" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.65377, 0, -0.75670, 0, 1, 0, 0.75670, 0, -0.65377, -86.8, 0, 18.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.5
-tall = 1.29
-
-[node name="Tree116" type="Node3D" parent="Forest"]
-transform = Transform3D(0.67437, 0, 0.73839, 0, 1, 0, -0.73839, 0, 0.67437, 78.3, 0, -86.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.7
-tall = 1.33
-
-[node name="Tree117" type="Node3D" parent="Forest"]
-transform = Transform3D(0.76257, 0, -0.64691, 0, 1, 0, 0.64691, 0, 0.76257, -78.6, 0, -58.9)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.1
-tall = 1.3
-
-[node name="Tree118" type="Node3D" parent="Forest"]
-transform = Transform3D(0.04625, 0, 0.99893, 0, 1, 0, -0.99893, 0, 0.04625, 26.3, 0, -42.5)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.6
-tall = 1.11
-
-[node name="Tree119" type="Node3D" parent="Forest"]
-transform = Transform3D(0.84132, 0, -0.54054, 0, 1, 0, 0.54054, 0, 0.84132, 40.9, 0, 7.6)
-script = ExtResource("13_s")
+[node name="Tree274" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.03477, 0, -0.99940, 0, 1, 0, 0.99940, 0, -0.03477, 37.3, 0, -94.3)
+script = ExtResource("12_s")
 kind = "broad"
-size = 8.5
+size = 7.7
+tall = 1.19
+
+[node name="Tree275" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.75180, 0, -0.65939, 0, 1, 0, 0.65939, 0, -0.75180, 83.0, 0, -31.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.0
+tall = 1.05
+
+[node name="Tree276" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.71951, 0, 0.69448, 0, 1, 0, -0.69448, 0, -0.71951, 42.8, 0, 70.9)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 6.6
+tall = 0.98
+
+[node name="Tree277" type="Node3D" parent="Forest"]
+transform = Transform3D(0.04514, 0, -0.99898, 0, 1, 0, 0.99898, 0, 0.04514, -55.1, 0, 24.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.3
+tall = 1.12
+
+[node name="Tree278" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.96136, 0, 0.27528, 0, 1, 0, -0.27528, 0, -0.96136, 68.0, 0, -82.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.5
+tall = 1.35
+
+[node name="Tree279" type="Node3D" parent="Forest"]
+transform = Transform3D(0.92872, 0, -0.37077, 0, 1, 0, 0.37077, 0, 0.92872, -80.5, 0, 54.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.3
+tall = 1.0
+
+[node name="Tree280" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.76616, 0, 0.64265, 0, 1, 0, -0.64265, 0, -0.76616, -96.4, 0, 96.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.6
+tall = 1.15
+
+[node name="Tree281" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.10044, 0, 0.99494, 0, 1, 0, -0.99494, 0, -0.10044, -15.0, 0, 5.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.6
+tall = 1.05
+
+[node name="Tree282" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99763, 0, 0.06875, 0, 1, 0, -0.06875, 0, -0.99763, 48.4, 0, 75.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.2
+tall = 1.17
+
+[node name="Tree283" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.10578, 0, -0.99439, 0, 1, 0, 0.99439, 0, -0.10578, 23.9, 0, 68.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
 tall = 1.06
 
-[node name="Tree120" type="Node3D" parent="Forest"]
-transform = Transform3D(0.07646, 0, 0.99707, 0, 1, 0, -0.99707, 0, 0.07646, -99.7, 0, -59.6)
-script = ExtResource("13_s")
+[node name="Tree284" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.01896, 0, 0.99982, 0, 1, 0, -0.99982, 0, -0.01896, 30.3, 0, 34.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.3
+tall = 1.16
+
+[node name="Tree285" type="Node3D" parent="Forest"]
+transform = Transform3D(0.89092, 0, -0.45415, 0, 1, 0, 0.45415, 0, 0.89092, 48.3, 0, 51.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.22
+
+[node name="Tree286" type="Node3D" parent="Forest"]
+transform = Transform3D(0.60739, 0, 0.79440, 0, 1, 0, -0.79440, 0, 0.60739, -68.1, 0, -37.4)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.5
+tall = 1.03
+
+[node name="Tree287" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.80430, 0, 0.59423, 0, 1, 0, -0.59423, 0, -0.80430, 28.5, 0, 60.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.7
+tall = 1.01
+
+[node name="Tree288" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.63129, 0, -0.77554, 0, 1, 0, 0.77554, 0, -0.63129, 51.1, 0, -61.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.4
+tall = 1.28
+
+[node name="Tree289" type="Node3D" parent="Forest"]
+transform = Transform3D(0.88098, 0, -0.47315, 0, 1, 0, 0.47315, 0, 0.88098, 97.4, 0, -87.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.03
+
+[node name="Tree290" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.69406, 0, 0.71992, 0, 1, 0, -0.71992, 0, -0.69406, -59.7, 0, 17.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.2
+tall = 1.1
+
+[node name="Tree291" type="Node3D" parent="Forest"]
+transform = Transform3D(0.19262, 0, -0.98127, 0, 1, 0, 0.98127, 0, 0.19262, -18.6, 0, -88.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.6
+tall = 1.05
+
+[node name="Tree292" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.36282, 0, -0.93186, 0, 1, 0, 0.93186, 0, -0.36282, -86.0, 0, 78.3)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.8
+tall = 1.13
+
+[node name="Tree293" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.37048, 0, 0.92884, 0, 1, 0, -0.92884, 0, -0.37048, 44.5, 0, 28.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.5
+tall = 0.93
+
+[node name="Tree294" type="Node3D" parent="Forest"]
+transform = Transform3D(0.23548, 0, -0.97188, 0, 1, 0, 0.97188, 0, 0.23548, 1.4, 0, 101.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.0
+tall = 1.02
+
+[node name="Tree295" type="Node3D" parent="Forest"]
+transform = Transform3D(0.25690, 0, 0.96644, 0, 1, 0, -0.96644, 0, 0.25690, 88.1, 0, -85.1)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.6
+tall = 1.32
+
+[node name="Tree296" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99865, 0, -0.05190, 0, 1, 0, 0.05190, 0, -0.99865, 99.9, 0, -28.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.12
+
+[node name="Tree297" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.92046, 0, 0.39083, 0, 1, 0, -0.39083, 0, -0.92046, 91.6, 0, -91.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.6
+tall = 1.1
+
+[node name="Tree298" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.75459, 0, 0.65619, 0, 1, 0, -0.65619, 0, -0.75459, 30.2, 0, 94.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.4
+tall = 1.21
+
+[node name="Tree299" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99881, 0, -0.04873, 0, 1, 0, 0.04873, 0, 0.99881, 86.2, 0, 94.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.1
+tall = 0.99
+
+[node name="Tree300" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.19874, 0, -0.98005, 0, 1, 0, 0.98005, 0, -0.19874, 4.2, 0, -92.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.03
+
+[node name="Tree301" type="Node3D" parent="Forest"]
+transform = Transform3D(0.50660, 0, 0.86218, 0, 1, 0, -0.86218, 0, 0.50660, -66.3, 0, 69.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.6
+tall = 1.29
+
+[node name="Tree302" type="Node3D" parent="Forest"]
+transform = Transform3D(0.57888, 0, 0.81541, 0, 1, 0, -0.81541, 0, 0.57888, -34.0, 0, -14.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.9
+tall = 0.94
+
+[node name="Tree303" type="Node3D" parent="Forest"]
+transform = Transform3D(0.95356, 0, -0.30121, 0, 1, 0, 0.30121, 0, 0.95356, -52.8, 0, 102.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.9
+tall = 1.08
+
+[node name="Tree304" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.96938, 0, 0.24558, 0, 1, 0, -0.24558, 0, -0.96938, -60.8, 0, 95.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.1
+tall = 1.27
+
+[node name="Tree305" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.93734, 0, 0.34842, 0, 1, 0, -0.34842, 0, -0.93734, -91.2, 0, -49.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.3
+tall = 1.13
+
+[node name="Tree306" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.75947, 0, -0.65054, 0, 1, 0, 0.65054, 0, -0.75947, 65.5, 0, 79.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.2
+tall = 1.04
+
+[node name="Tree307" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.26226, 0, -0.96500, 0, 1, 0, 0.96500, 0, -0.26226, -84.5, 0, 46.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.14
+
+[node name="Tree308" type="Node3D" parent="Forest"]
+transform = Transform3D(0.81468, 0, 0.57992, 0, 1, 0, -0.57992, 0, 0.81468, 85.3, 0, 73.4)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.0
+tall = 1.04
+
+[node name="Tree309" type="Node3D" parent="Forest"]
+transform = Transform3D(0.12007, 0, -0.99277, 0, 1, 0, 0.99277, 0, 0.12007, -48.2, 0, -24.7)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.2
+tall = 1.12
+
+[node name="Tree310" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.71451, 0, 0.69963, 0, 1, 0, -0.69963, 0, -0.71451, -98.0, 0, -29.1)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.4
+tall = 1.17
+
+[node name="Tree311" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.41208, 0, -0.91115, 0, 1, 0, 0.91115, 0, -0.41208, -75.6, 0, -62.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.3
+
+[node name="Tree312" type="Node3D" parent="Forest"]
+transform = Transform3D(0.28433, 0, 0.95873, 0, 1, 0, -0.95873, 0, 0.28433, -102.6, 0, 90.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.0
+tall = 1.23
+
+[node name="Tree313" type="Node3D" parent="Forest"]
+transform = Transform3D(0.49168, 0, 0.87078, 0, 1, 0, -0.87078, 0, 0.49168, 49.5, 0, 102.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.5
+tall = 1.3
+
+[node name="Tree314" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.95161, 0, 0.30731, 0, 1, 0, -0.30731, 0, -0.95161, 32.8, 0, 25.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.6
+tall = 1.25
+
+[node name="Tree315" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99993, 0, 0.01209, 0, 1, 0, -0.01209, 0, -0.99993, -75.3, 0, -47.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.7
+tall = 1.26
+
+[node name="Tree316" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.03923, 0, -0.99923, 0, 1, 0, 0.99923, 0, -0.03923, 38.4, 0, 27.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.3
+tall = 1.13
+
+[node name="Tree317" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99175, 0, -0.12820, 0, 1, 0, 0.12820, 0, -0.99175, 96.7, 0, 58.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.1
+tall = 1.16
+
+[node name="Tree318" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.05019, 0, 0.99874, 0, 1, 0, -0.99874, 0, -0.05019, 37.0, 0, 19.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.2
+tall = 1.14
+
+[node name="Tree319" type="Node3D" parent="Forest"]
+transform = Transform3D(0.50917, 0, -0.86066, 0, 1, 0, 0.86066, 0, 0.50917, -57.1, 0, -88.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.6
+tall = 1.1
+
+[node name="Tree320" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.18347, 0, -0.98302, 0, 1, 0, 0.98302, 0, -0.18347, 27.2, 0, 87.6)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 7.8
+tall = 1.03
+
+[node name="Tree321" type="Node3D" parent="Forest"]
+transform = Transform3D(0.87942, 0, 0.47605, 0, 1, 0, -0.47605, 0, 0.87942, 75.6, 0, 29.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.2
+tall = 1.26
+
+[node name="Tree322" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.27339, 0, 0.96190, 0, 1, 0, -0.96190, 0, -0.27339, -31.9, 0, -66.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.6
+tall = 1.25
+
+[node name="Tree323" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.24440, 0, -0.96967, 0, 1, 0, 0.96967, 0, -0.24440, 68.1, 0, -6.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.4
+tall = 1.34
+
+[node name="Tree324" type="Node3D" parent="Forest"]
+transform = Transform3D(0.02986, 0, -0.99955, 0, 1, 0, 0.99955, 0, 0.02986, -72.0, 0, -51.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.0
+tall = 1.2
+
+[node name="Tree325" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.68294, 0, -0.73048, 0, 1, 0, 0.73048, 0, -0.68294, -90.3, 0, 6.5)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.4
+tall = 1.15
+
+[node name="Tree326" type="Node3D" parent="Forest"]
+transform = Transform3D(0.64116, 0, 0.76741, 0, 1, 0, -0.76741, 0, 0.64116, 49.9, 0, -9.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.4
+tall = 1.07
+
+[node name="Tree327" type="Node3D" parent="Forest"]
+transform = Transform3D(0.92848, 0, 0.37138, 0, 1, 0, -0.37138, 0, 0.92848, -41.1, 0, 9.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.4
+tall = 1.3
+
+[node name="Tree328" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.33016, 0, 0.94392, 0, 1, 0, -0.94392, 0, -0.33016, -80.4, 0, -8.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.5
+tall = 1.14
+
+[node name="Tree329" type="Node3D" parent="Forest"]
+transform = Transform3D(0.55878, 0, 0.82932, 0, 1, 0, -0.82932, 0, 0.55878, 70.2, 0, -1.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.1
+tall = 1.31
+
+[node name="Tree330" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.91472, 0, -0.40408, 0, 1, 0, 0.40408, 0, -0.91472, 81.6, 0, -55.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.19
+
+[node name="Tree331" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99381, 0, 0.11113, 0, 1, 0, -0.11113, 0, 0.99381, 53.9, 0, 32.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.7
+tall = 1.27
+
+[node name="Tree332" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.35739, 0, -0.93396, 0, 1, 0, 0.93396, 0, -0.35739, 83.6, 0, 27.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.7
+tall = 1.12
+
+[node name="Tree333" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.83295, 0, -0.55336, 0, 1, 0, 0.55336, 0, -0.83295, -76.0, 0, 42.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.8
+tall = 1.18
+
+[node name="Tree334" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.81366, 0, 0.58134, 0, 1, 0, -0.58134, 0, -0.81366, 56.0, 0, 1.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.9
+tall = 1.15
+
+[node name="Tree335" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.16439, 0, 0.98640, 0, 1, 0, -0.98640, 0, -0.16439, -28.0, 0, -98.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.0
+tall = 1.1
+
+[node name="Tree336" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.83839, 0, -0.54507, 0, 1, 0, 0.54507, 0, -0.83839, 30.9, 0, 72.0)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.4
+tall = 1.13
+
+[node name="Tree337" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.71998, 0, -0.69399, 0, 1, 0, 0.69399, 0, -0.71998, -19.6, 0, 97.5)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.3
+tall = 1.09
+
+[node name="Tree338" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.02001, 0, 0.99980, 0, 1, 0, -0.99980, 0, -0.02001, 38.3, 0, -76.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.7
+tall = 1.21
+
+[node name="Tree339" type="Node3D" parent="Forest"]
+transform = Transform3D(0.02689, 0, -0.99964, 0, 1, 0, 0.99964, 0, 0.02689, -100.5, 0, -15.8)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.13
+
+[node name="Tree340" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.88906, 0, -0.45779, 0, 1, 0, 0.45779, 0, -0.88906, 102.6, 0, -51.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.8
+tall = 1.09
+
+[node name="Tree341" type="Node3D" parent="Forest"]
+transform = Transform3D(0.83842, 0, -0.54503, 0, 1, 0, 0.54503, 0, 0.83842, 85.0, 0, -10.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.2
+tall = 1.35
+
+[node name="Tree342" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98964, 0, 0.14355, 0, 1, 0, -0.14355, 0, -0.98964, 102.9, 0, 45.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.01
+
+[node name="Tree343" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.70017, 0, -0.71398, 0, 1, 0, 0.71398, 0, -0.70017, -13.2, 0, -94.1)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.8
+tall = 0.95
+
+[node name="Tree344" type="Node3D" parent="Forest"]
+transform = Transform3D(0.92751, 0, 0.37380, 0, 1, 0, -0.37380, 0, 0.92751, -37.4, 0, -61.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.4
+tall = 1.16
+
+[node name="Tree345" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.17008, 0, 0.98543, 0, 1, 0, -0.98543, 0, -0.17008, 49.1, 0, -14.6)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.4
+tall = 1.18
+
+[node name="Tree346" type="Node3D" parent="Forest"]
+transform = Transform3D(0.95287, 0, 0.30337, 0, 1, 0, -0.30337, 0, 0.95287, -34.8, 0, 93.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.8
+tall = 1.16
+
+[node name="Tree347" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.82514, 0, -0.56492, 0, 1, 0, 0.56492, 0, -0.82514, -37.9, 0, 3.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.5
+tall = 1.18
+
+[node name="Tree348" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.30974, 0, -0.95082, 0, 1, 0, 0.95082, 0, -0.30974, -88.1, 0, -10.0)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.5
+tall = 1.06
+
+[node name="Tree349" type="Node3D" parent="Forest"]
+transform = Transform3D(0.59088, 0, 0.80676, 0, 1, 0, -0.80676, 0, 0.59088, 79.9, 0, 1.2)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.1
+tall = 0.94
+
+[node name="Tree350" type="Node3D" parent="Forest"]
+transform = Transform3D(0.27186, 0, 0.96234, 0, 1, 0, -0.96234, 0, 0.27186, -13.4, 0, -99.7)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.8
+tall = 1.09
+
+[node name="Tree351" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.86879, 0, 0.49518, 0, 1, 0, -0.49518, 0, -0.86879, 45.3, 0, -60.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.3
+tall = 1.04
+
+[node name="Tree352" type="Node3D" parent="Forest"]
+transform = Transform3D(0.45043, 0, -0.89281, 0, 1, 0, 0.89281, 0, 0.45043, -38.6, 0, -46.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.5
+tall = 1.23
+
+[node name="Tree353" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98954, 0, -0.14429, 0, 1, 0, 0.14429, 0, 0.98954, -64.8, 0, 101.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.3
+tall = 1.22
+
+[node name="Tree354" type="Node3D" parent="Forest"]
+transform = Transform3D(0.06564, 0, 0.99784, 0, 1, 0, -0.99784, 0, 0.06564, -0.0, 0, -94.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.1
+tall = 1.17
+
+[node name="Tree355" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.65286, 0, 0.75748, 0, 1, 0, -0.75748, 0, -0.65286, 56.6, 0, 75.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.0
+tall = 1.18
+
+[node name="Tree356" type="Node3D" parent="Forest"]
+transform = Transform3D(0.46083, 0, -0.88749, 0, 1, 0, 0.88749, 0, 0.46083, 74.0, 0, -48.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.0
+tall = 0.93
+
+[node name="Tree357" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99550, 0, 0.09478, 0, 1, 0, -0.09478, 0, 0.99550, 10.5, 0, -89.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.06
+
+[node name="Tree358" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.68901, 0, 0.72475, 0, 1, 0, -0.72475, 0, -0.68901, 41.0, 0, -69.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.9
+tall = 1.27
+
+[node name="Tree359" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.62823, 0, -0.77802, 0, 1, 0, 0.77802, 0, -0.62823, 95.4, 0, -54.2)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.4
+tall = 1.24
+
+[node name="Tree360" type="Node3D" parent="Forest"]
+transform = Transform3D(0.86687, 0, -0.49853, 0, 1, 0, 0.49853, 0, 0.86687, -47.3, 0, -12.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.3
+tall = 1.24
+
+[node name="Tree361" type="Node3D" parent="Forest"]
+transform = Transform3D(0.26251, 0, -0.96493, 0, 1, 0, 0.96493, 0, 0.26251, 59.6, 0, -94.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.5
+tall = 1.07
+
+[node name="Tree362" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.98236, 0, -0.18698, 0, 1, 0, 0.18698, 0, -0.98236, -102.2, 0, 12.3)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.5
+tall = 1.16
+
+[node name="Tree363" type="Node3D" parent="Forest"]
+transform = Transform3D(0.92564, 0, -0.37842, 0, 1, 0, 0.37842, 0, 0.92564, 6.3, 0, 85.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.9
+tall = 1.13
+
+[node name="Tree364" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.72680, 0, 0.68685, 0, 1, 0, -0.68685, 0, -0.72680, 35.7, 0, -102.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.2
+tall = 1.34
+
+[node name="Tree365" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.33129, 0, -0.94353, 0, 1, 0, 0.94353, 0, -0.33129, -31.2, 0, 90.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 10.0
+tall = 1.3
+
+[node name="Tree366" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99996, 0, 0.00903, 0, 1, 0, -0.00903, 0, -0.99996, 50.0, 0, -98.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.6
+tall = 1.1
+
+[node name="Tree367" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99425, 0, 0.10707, 0, 1, 0, -0.10707, 0, 0.99425, 11.9, 0, 86.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.1
+tall = 1.18
+
+[node name="Tree368" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.50911, 0, 0.86070, 0, 1, 0, -0.86070, 0, -0.50911, 55.4, 0, 40.1)
+script = ExtResource("12_s")
 kind = "fir"
 size = 8.9
 tall = 1.0
 
-[node name="Tree121" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.57339, 0, -0.81928, 0, 1, 0, 0.81928, 0, -0.57339, -63.1, 0, -1.1)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.5
-tall = 1.09
+[node name="Tree369" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.68821, 0, 0.72551, 0, 1, 0, -0.72551, 0, -0.68821, 80.4, 0, 38.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.6
+tall = 1.16
 
-[node name="Tree122" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.99994, 0, -0.01058, 0, 1, 0, 0.01058, 0, -0.99994, 88.8, 0, -43.3)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.3
-tall = 1.22
-
-[node name="Tree123" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.96999, 0, -0.24316, 0, 1, 0, 0.24316, 0, -0.96999, 76.8, 0, -53.3)
-script = ExtResource("13_s")
-kind = "fir"
+[node name="Tree370" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.53782, 0, 0.84306, 0, 1, 0, -0.84306, 0, -0.53782, -43.6, 0, 47.4)
+script = ExtResource("12_s")
+kind = "broad"
 size = 7.6
-tall = 1.26
+tall = 1.35
 
-[node name="Tree124" type="Node3D" parent="Forest"]
-transform = Transform3D(0.75063, 0, 0.66072, 0, 1, 0, -0.66072, 0, 0.75063, 54.7, 0, 15.8)
-script = ExtResource("13_s")
+[node name="Tree371" type="Node3D" parent="Forest"]
+transform = Transform3D(0.76774, 0, 0.64076, 0, 1, 0, -0.64076, 0, 0.76774, -103.4, 0, 97.3)
+script = ExtResource("12_s")
 kind = "fir"
-size = 6.7
-tall = 1.07
+size = 7.4
+tall = 1.03
 
-[node name="Tree125" type="Node3D" parent="Forest"]
-transform = Transform3D(0.01520, 0, -0.99988, 0, 1, 0, 0.99988, 0, 0.01520, -69.1, 0, -68.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 7.0
-tall = 1.18
+[node name="Tree372" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.39201, 0, -0.91996, 0, 1, 0, 0.91996, 0, -0.39201, -78.7, 0, 94.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.9
+tall = 1.06
 
-[node name="Tree126" type="Node3D" parent="Forest"]
-transform = Transform3D(0.97220, 0, 0.23414, 0, 1, 0, -0.23414, 0, 0.97220, 45.7, 0, -79.6)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.3
-tall = 1.13
-
-[node name="Tree127" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.64715, 0, 0.76236, 0, 1, 0, -0.76236, 0, -0.64715, -13.0, 0, -60.8)
-script = ExtResource("13_s")
-kind = "fir"
-size = 6.3
-tall = 1.07
-
-[node name="Tree128" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.80539, 0, -0.59275, 0, 1, 0, 0.59275, 0, -0.80539, -22.3, 0, -93.2)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.4
-tall = 1.24
-
-[node name="Tree129" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.82607, 0, -0.56357, 0, 1, 0, 0.56357, 0, -0.82607, -71.6, 0, 20.7)
-script = ExtResource("13_s")
-kind = "fir"
-size = 8.2
+[node name="Tree373" type="Node3D" parent="Forest"]
+transform = Transform3D(0.34617, 0, -0.93817, 0, 1, 0, 0.93817, 0, 0.34617, -43.8, 0, -82.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.1
 tall = 1.32
 
-[node name="Tree130" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.17366, 0, 0.98480, 0, 1, 0, -0.98480, 0, -0.17366, -15.8, 0, -54.3)
-script = ExtResource("13_s")
+[node name="Tree374" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99822, 0, -0.05967, 0, 1, 0, 0.05967, 0, 0.99822, -42.4, 0, 76.7)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.2
+tall = 0.91
+
+[node name="Tree375" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.93995, 0, -0.34132, 0, 1, 0, 0.34132, 0, -0.93995, -95.8, 0, 50.5)
+script = ExtResource("12_s")
 kind = "fir"
-size = 8.6
+size = 7.3
 tall = 1.27
 
+[node name="Tree376" type="Node3D" parent="Forest"]
+transform = Transform3D(0.85124, 0, 0.52478, 0, 1, 0, -0.52478, 0, 0.85124, -24.3, 0, 100.6)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.6
+tall = 1.07
+
+[node name="Tree377" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.33338, 0, 0.94279, 0, 1, 0, -0.94279, 0, -0.33338, -84.7, 0, -68.7)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.4
+tall = 1.14
+
+[node name="Tree378" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.85798, 0, -0.51369, 0, 1, 0, 0.51369, 0, -0.85798, -18.5, 0, -100.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.7
+tall = 1.3
+
+[node name="Tree379" type="Node3D" parent="Forest"]
+transform = Transform3D(0.28971, 0, 0.95712, 0, 1, 0, -0.95712, 0, 0.28971, 70.1, 0, -97.6)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.3
+tall = 1.34
+
+[node name="Tree380" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99937, 0, -0.03558, 0, 1, 0, 0.03558, 0, -0.99937, 99.0, 0, -33.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.2
+tall = 1.13
+
+[node name="Tree381" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.87482, 0, 0.48445, 0, 1, 0, -0.48445, 0, -0.87482, -27.6, 0, -90.7)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.1
+tall = 1.16
+
+[node name="Tree382" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.79936, 0, 0.60085, 0, 1, 0, -0.60085, 0, -0.79936, -20.0, 0, 80.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.5
+tall = 1.08
+
+[node name="Tree383" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.56863, 0, 0.82259, 0, 1, 0, -0.82259, 0, -0.56863, -102.8, 0, 1.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.1
+tall = 1.35
+
+[node name="Tree384" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.53193, 0, -0.84679, 0, 1, 0, 0.84679, 0, -0.53193, 90.0, 0, 72.5)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.6
+tall = 1.35
+
+[node name="Tree385" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.91017, 0, 0.41425, 0, 1, 0, -0.41425, 0, -0.91017, 22.5, 0, -92.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.6
+tall = 1.07
+
+[node name="Tree386" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.75961, 0, 0.65038, 0, 1, 0, -0.65038, 0, -0.75961, -91.2, 0, 51.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.3
+tall = 1.02
+
+[node name="Tree387" type="Node3D" parent="Forest"]
+transform = Transform3D(0.09099, 0, -0.99585, 0, 1, 0, 0.99585, 0, 0.09099, -45.5, 0, 103.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.3
+tall = 1.08
+
+[node name="Tree388" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.82049, 0, 0.57166, 0, 1, 0, -0.57166, 0, -0.82049, -102.0, 0, 18.9)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.1
+tall = 1.21
+
+[node name="Tree389" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.44968, 0, 0.89319, 0, 1, 0, -0.89319, 0, -0.44968, -60.3, 0, -48.7)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.4
+tall = 1.15
+
+[node name="Tree390" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.83927, 0, 0.54371, 0, 1, 0, -0.54371, 0, -0.83927, -35.9, 0, 53.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.8
+tall = 1.16
+
+[node name="Tree391" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.96953, 0, -0.24496, 0, 1, 0, 0.24496, 0, -0.96953, -60.1, 0, -41.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.4
+tall = 1.35
+
+[node name="Tree392" type="Node3D" parent="Forest"]
+transform = Transform3D(0.03459, 0, 0.99940, 0, 1, 0, -0.99940, 0, 0.03459, 63.4, 0, 101.9)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.7
+tall = 1.34
+
+[node name="Tree393" type="Node3D" parent="Forest"]
+transform = Transform3D(0.87686, 0, 0.48074, 0, 1, 0, -0.48074, 0, 0.87686, -41.6, 0, -96.2)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.7
+tall = 1.14
+
+[node name="Tree394" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98284, 0, 0.18445, 0, 1, 0, -0.18445, 0, 0.98284, 94.8, 0, -40.7)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.3
+tall = 1.07
+
+[node name="Tree395" type="Node3D" parent="Forest"]
+transform = Transform3D(0.99116, 0, 0.13267, 0, 1, 0, -0.13267, 0, 0.99116, 42.5, 0, 89.4)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 8.9
+tall = 1.03
+
+[node name="Tree396" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.93601, 0, 0.35197, 0, 1, 0, -0.35197, 0, -0.93601, 51.2, 0, -66.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.9
+tall = 1.11
+
+[node name="Tree397" type="Node3D" parent="Forest"]
+transform = Transform3D(0.48153, 0, -0.87643, 0, 1, 0, 0.87643, 0, 0.48153, 58.1, 0, 43.8)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.2
+tall = 1.17
+
+[node name="Tree398" type="Node3D" parent="Forest"]
+transform = Transform3D(0.65453, 0, -0.75604, 0, 1, 0, 0.75604, 0, 0.65453, -74.9, 0, -67.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.9
+tall = 1.16
+
+[node name="Tree399" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.95256, 0, 0.30434, 0, 1, 0, -0.30434, 0, -0.95256, -88.7, 0, 103.8)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 9.3
+tall = 1.01
+
+[node name="Tree400" type="Node3D" parent="Forest"]
+transform = Transform3D(0.90509, 0, 0.42523, 0, 1, 0, -0.42523, 0, 0.90509, -16.3, 0, -79.6)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.6
+tall = 1.16
+
+[node name="Tree401" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.97838, 0, 0.20680, 0, 1, 0, -0.20680, 0, -0.97838, 63.5, 0, 57.3)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.6
+tall = 1.08
+
+[node name="Tree402" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.10027, 0, -0.99496, 0, 1, 0, 0.99496, 0, -0.10027, 91.8, 0, 54.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.7
+tall = 1.13
+
+[node name="Tree403" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.63514, 0, -0.77239, 0, 1, 0, 0.77239, 0, -0.63514, -66.9, 0, 92.9)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 7.3
+tall = 1.2
+
+[node name="Tree404" type="Node3D" parent="Forest"]
+transform = Transform3D(0.95129, 0, 0.30829, 0, 1, 0, -0.30829, 0, 0.95129, -16.6, 0, 88.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.6
+tall = 1.22
+
+[node name="Tree405" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.82715, 0, -0.56198, 0, 1, 0, 0.56198, 0, -0.82715, 34.0, 0, 65.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 7.3
+tall = 1.09
+
+[node name="Tree406" type="Node3D" parent="Forest"]
+transform = Transform3D(0.98655, 0, 0.16347, 0, 1, 0, -0.16347, 0, 0.98655, 68.3, 0, 32.1)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.8
+tall = 1.33
+
+[node name="Tree407" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.58931, 0, 0.80791, 0, 1, 0, -0.80791, 0, -0.58931, 74.1, 0, -38.3)
+script = ExtResource("12_s")
+kind = "giant_fir"
+size = 7.2
+tall = 0.97
+
+[node name="Tree408" type="Node3D" parent="Forest"]
+transform = Transform3D(0.57447, 0, 0.81852, 0, 1, 0, -0.81852, 0, 0.57447, 52.1, 0, 64.1)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.3
+tall = 1.27
+
+[node name="Tree409" type="Node3D" parent="Forest"]
+transform = Transform3D(0.92339, 0, -0.38387, 0, 1, 0, 0.38387, 0, 0.92339, -59.2, 0, -26.5)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 8.6
+tall = 1.05
+
+[node name="Tree410" type="Node3D" parent="Forest"]
+transform = Transform3D(-1.00000, 0, 0.00279, 0, 1, 0, -0.00279, 0, -1.00000, 85.8, 0, 52.2)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.6
+tall = 1.16
+
+[node name="Tree411" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.04037, 0, 0.99918, 0, 1, 0, -0.99918, 0, -0.04037, 81.9, 0, 69.4)
+script = ExtResource("12_s")
+kind = "tall_pine"
+size = 9.8
+tall = 1.13
+
+[node name="Tree412" type="Node3D" parent="Forest"]
+transform = Transform3D(0.60698, 0, -0.79472, 0, 1, 0, 0.79472, 0, 0.60698, -61.1, 0, 1.7)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.4
+tall = 1.27
+
+[node name="Tree413" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99511, 0, -0.09881, 0, 1, 0, 0.09881, 0, -0.99511, -28.8, 0, -30.0)
+script = ExtResource("12_s")
+kind = "fir"
+size = 6.3
+tall = 1.01
+
+[node name="Tree414" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99248, 0, -0.12237, 0, 1, 0, 0.12237, 0, -0.99248, -103.2, 0, 58.6)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 8.0
+tall = 0.99
+
+[node name="Tree415" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.81627, 0, -0.57767, 0, 1, 0, 0.57767, 0, -0.81627, -93.7, 0, -73.9)
+script = ExtResource("12_s")
+kind = "mossy_oak"
+size = 8.0
+tall = 1.01
+
+[node name="Tree416" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99714, 0, 0.07562, 0, 1, 0, -0.07562, 0, -0.99714, 86.6, 0, 3.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.0
+tall = 1.07
+
+[node name="Tree417" type="Node3D" parent="Forest"]
+transform = Transform3D(0.86339, 0, 0.50453, 0, 1, 0, -0.50453, 0, 0.86339, 66.7, 0, -25.5)
+script = ExtResource("12_s")
+kind = "broad"
+size = 7.1
+tall = 1.1
+
+[node name="Tree418" type="Node3D" parent="Forest"]
+transform = Transform3D(0.97516, 0, 0.22150, 0, 1, 0, -0.22150, 0, 0.97516, 72.3, 0, 58.4)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.6
+tall = 1.14
+
+[node name="Tree419" type="Node3D" parent="Forest"]
+transform = Transform3D(0.64280, 0, 0.76603, 0, 1, 0, -0.76603, 0, 0.64280, 43.3, 0, 77.4)
+script = ExtResource("12_s")
+kind = "broad"
+size = 6.4
+tall = 1.04
+
+[node name="Tree420" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.87030, 0, 0.49252, 0, 1, 0, -0.49252, 0, -0.87030, -84.9, 0, -99.9)
+script = ExtResource("12_s")
+kind = "fir"
+size = 8.5
+tall = 1.08
+
+[node name="Undergrowth1" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -6.7, 0, -82.6)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.0
+
+[node name="Undergrowth2" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -13.0, 0, -54.1)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.1
+
+[node name="Undergrowth3" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -94.6, 0, 16.1)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.9
+
+[node name="Undergrowth4" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 20.3, 0, 39.3)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 4.0
+
+[node name="Undergrowth5" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -19.9, 0, -87.7)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.8
+
+[node name="Undergrowth6" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 93.7, 0, 40.7)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.8
+
+[node name="Undergrowth7" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 52.7, 0, -70.8)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 7.0
+
+[node name="Undergrowth8" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -93.8, 0, -80.5)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.8
+
+[node name="Undergrowth9" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -58.4, 0, 0.6)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.2
+
+[node name="Undergrowth10" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 44.2, 0, -11.2)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.1
+
+[node name="Undergrowth11" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 64.2, 0, -57.0)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.2
+
+[node name="Undergrowth12" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 13.1, 0, -89.9)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 4.7
+
+[node name="Undergrowth13" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 89.6, 0, 37.3)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.6
+
+[node name="Undergrowth14" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -20.9, 0, -70.9)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.4
+
+[node name="Undergrowth15" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 51.4, 0, 69.9)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.7
+
+[node name="Undergrowth16" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 27.6, 0, -90.5)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 4.8
+
+[node name="Undergrowth17" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -72.9, 0, -83.9)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.6
+
+[node name="Undergrowth18" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 57.8, 0, 93.5)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.9
+
+[node name="Undergrowth19" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -14.5, 0, 74.9)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 4.2
+
+[node name="Undergrowth20" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 44.7, 0, -31.0)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 7.0
+
+[node name="Undergrowth21" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -26.1, 0, 51.9)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 4.2
+
+[node name="Undergrowth22" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 92.9, 0, -48.4)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.2
+
+[node name="Undergrowth23" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -34.0, 0, -92.7)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.6
+
+[node name="Undergrowth24" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -54.8, 0, -86.4)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.6
+
+[node name="Undergrowth25" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 41.0, 0, -86.3)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.7
+
+[node name="Undergrowth26" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 59.1, 0, 47.4)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 4.0
+
+[node name="Undergrowth27" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -19.8, 0, -55.9)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.2
+
+[node name="Undergrowth28" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -72.8, 0, -6.6)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.3
+
+[node name="Undergrowth29" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -26.5, 0, -52.6)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.5
+
+[node name="Undergrowth30" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -59.5, 0, 43.7)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.4
+
+[node name="Undergrowth31" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -50.9, 0, -86.3)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.1
+
+[node name="Undergrowth32" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 87.0, 0, 17.8)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.6
+
+[node name="Undergrowth33" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 7.7, 0, 22.0)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 6.5
+
+[node name="Undergrowth34" type="Node3D" parent="Forest"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -39.2, 0, -67.8)
+script = ExtResource("7_s")
+kind = "undergrowth"
+size = 5.3
+
 [node name="FallenLog1" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.58798, 0, -0.80887, 0, 1, 0, 0.80887, 0, -0.58798, -80, 0, 22)
+transform = Transform3D(0.98821, 0, -0.15312, 0, 1, 0, 0.15312, 0, 0.98821, -80, 0, 22)
 script = ExtResource("10_s")
 kind = "fallen_log"
 
 [node name="FallenLog2" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.89447, 0, -0.44714, 0, 1, 0, 0.44714, 0, -0.89447, -64, 0, -18)
+transform = Transform3D(0.55762, 0, -0.83009, 0, 1, 0, 0.83009, 0, 0.55762, -64, 0, -18)
 script = ExtResource("10_s")
 kind = "fallen_log"
 
 [node name="FallenLog3" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.53476, 0, -0.84501, 0, 1, 0, 0.84501, 0, -0.53476, 30, 0, -8)
+transform = Transform3D(-0.03189, 0, -0.99949, 0, 1, 0, 0.99949, 0, -0.03189, 40, 0, 40)
 script = ExtResource("10_s")
 kind = "fallen_log"
 
 [node name="FallenLog4" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.43015, 0, -0.90276, 0, 1, 0, 0.90276, 0, -0.43015, -12, 0, 46)
+transform = Transform3D(-0.89830, 0, -0.43938, 0, 1, 0, 0.43938, 0, -0.89830, -12, 0, 46)
 script = ExtResource("10_s")
 kind = "fallen_log"
 
 [node name="FallenLog5" type="Node3D" parent="Forest"]
-transform = Transform3D(0.14431, 0, -0.98953, 0, 1, 0, 0.98953, 0, 0.14431, 70, 0, 70)
+transform = Transform3D(-0.27370, 0, -0.96181, 0, 1, 0, 0.96181, 0, -0.27370, 70, 0, 70)
+script = ExtResource("10_s")
+kind = "fallen_log"
+
+[node name="FallenLog6" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.99918, 0, -0.04055, 0, 1, 0, 0.04055, 0, -0.99918, -60, 0, -40)
 script = ExtResource("10_s")
 kind = "fallen_log"
 
 [node name="Loot1" type="Node3D" parent="Forest"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -90, 0, 40)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -90, 0, 46)
+script = ExtResource("8_s")
 kind = "loot"
 
 [node name="Loot2" type="Node3D" parent="Forest"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 90, 0, 20)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "loot"
 
 [node name="Loot3" type="Node3D" parent="Forest"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -20, 0, 90)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "loot"
 
 [node name="Loot4" type="Node3D" parent="Forest"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 70, 0, -20)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "loot"
 
 [node name="Loot5" type="Node3D" parent="Forest"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -95, 0, -20)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -96, 0, -20)
+script = ExtResource("8_s")
 kind = "loot"
 
 [node name="Rock1" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.38567, 0, -0.92264, 0, 1, 0, 0.92264, 0, -0.38567, -20, 0, 52)
+transform = Transform3D(0.21824, 0, 0.97590, 0, 1, 0, -0.97590, 0, 0.21824, -20, 0, 52)
+script = ExtResource("11_s")
+kind = "rock"
+grow = 3.0
+
+[node name="Rock2" type="Node3D" parent="Forest"]
+transform = Transform3D(0.73724, 0, 0.67563, 0, 1, 0, -0.67563, 0, 0.73724, 26, 0, 70)
+script = ExtResource("11_s")
+kind = "rock"
+grow = 2.1
+
+[node name="Rock3" type="Node3D" parent="Forest"]
+transform = Transform3D(0.42883, 0, -0.90338, 0, 1, 0, 0.90338, 0, 0.42883, -60, 0, -30)
+script = ExtResource("11_s")
+kind = "rock"
+grow = 2.6
+
+[node name="Rock4" type="Node3D" parent="Forest"]
+transform = Transform3D(-0.06741, 0, 0.99773, 0, 1, 0, -0.99773, 0, -0.06741, 80, 0, -30)
 script = ExtResource("11_s")
 kind = "rock"
 grow = 2.2
 
-[node name="Rock2" type="Node3D" parent="Forest"]
-transform = Transform3D(0.81682, 0, -0.57689, 0, 1, 0, 0.57689, 0, 0.81682, 26, 0, 70)
-script = ExtResource("11_s")
-kind = "rock"
-grow = 1.9
-
-[node name="Rock3" type="Node3D" parent="Forest"]
-transform = Transform3D(0.20204, 0, 0.97938, 0, 1, 0, -0.97938, 0, 0.20204, -60, 0, -30)
-script = ExtResource("11_s")
-kind = "rock"
-grow = 2.3
-
-[node name="Rock4" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.68631, 0, 0.72731, 0, 1, 0, -0.72731, 0, -0.68631, 80, 0, -30)
-script = ExtResource("11_s")
-kind = "rock"
-grow = 1.7
-
 [node name="Rock5" type="Node3D" parent="Forest"]
-transform = Transform3D(-0.88692, 0, -0.46192, 0, 1, 0, 0.46192, 0, -0.88692, -96, 0, 70)
+transform = Transform3D(0.42934, 0, 0.90314, 0, 1, 0, -0.90314, 0, 0.42934, -96, 0, 70)
 script = ExtResource("11_s")
 kind = "rock"
-grow = 1.9
+grow = 2.5
+
+[node name="Rock6" type="Node3D" parent="Forest"]
+transform = Transform3D(0.41875, 0, 0.90810, 0, 1, 0, -0.90810, 0, 0.41875, 40, 0, -60)
+script = ExtResource("11_s")
+kind = "rock"
+grow = 1.6
+
+[node name="Rock7" type="Node3D" parent="Forest"]
+transform = Transform3D(0.53239, 0, 0.84650, 0, 1, 0, -0.84650, 0, 0.53239, -30, 0, -46)
+script = ExtResource("11_s")
+kind = "rock"
+grow = 2.8
 
 [node name="Rivals" type="Node3D" parent="."]
 
 [node name="Rival1" type="Node3D" parent="Rivals"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -80, 0, 70)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -80, 0, 76)
+script = ExtResource("8_s")
 kind = "rival"
 
 [node name="Rival2" type="Node3D" parent="Rivals"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 80, 0, 74)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 80, 0, 76)
+script = ExtResource("8_s")
 kind = "rival"
 
 [node name="Rival3" type="Node3D" parent="Rivals"]
-transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -70, 0, -10)
-script = ExtResource("9_s")
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -62, 0, -12)
+script = ExtResource("8_s")
 kind = "rival"
 
 [node name="Rival4" type="Node3D" parent="Rivals"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 76, 0, 4)
-script = ExtResource("9_s")
+script = ExtResource("8_s")
 kind = "rival"

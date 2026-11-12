@@ -12,6 +12,7 @@ const LAYER := 4
 const HEIGHT := 1.8
 const LOOPS := ["Idle", "Walking_A", "Walking_C", "Running_A"]
 const ATTACK_TIME := 0.62
+const MARCH_UNTIL := 6.0 # how near its gate a zombie running up a lane slows to a walk
 const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its height
 ## Bodies that share another's animated model, dressed differently.
 const BODY_FILES := {"woods_child": "normal_b"}
@@ -88,6 +89,7 @@ var _path := PackedVector3Array()
 var _path_i := 0
 var _needs_path := false
 var _full_path := false
+var _marching := false # in a fort with long lanes, running up its lane to the gate
 var _next_plan := 0.0
 var _goal := Vector3.ZERO
 var _has_goal := false
@@ -1380,6 +1382,7 @@ func _decide(target: Target, to: Vector3, dist: float, dt: float) -> void:
 		return
 	if _special_think(dist):
 		return
+	_marching = false
 	if world.fort and not flies and _fort_plan(target, dist):
 		return
 	if _sees:
@@ -1464,13 +1467,17 @@ func _fort_plan(target: Target, dist: float) -> bool:
 	_hold = false
 	var g := fort.gate_for(self)
 	if me_inside or phases or not g["closed"]:
-		_fort_goal(fort.heart_at + (position - fort.heart_at).normalized() * 2.2)
+		var heart := fort.heart_at + (position - fort.heart_at).normalized() * 2.2
+		_fort_goal(heart)
+		_marching = fort.has_lanes() and Vector2(position.x - heart.x, position.z - heart.z).length() > MARCH_UNTIL
 		if Vector2(position.x - fort.heart_at.x, position.z - fort.heart_at.z).length() < 3.8:
 			_hold = true
 			_fort_strike(-1, fort.heart_at)
 		return true
 	var front := fort.gate_front(g, position)
 	_fort_goal(front)
+	# Up a long lane they come at a run, and only slow to a walk for the last few steps to the gate.
+	_marching = fort.has_lanes() and Vector2(position.x - front.x, position.z - front.z).length() > MARCH_UNTIL
 	if Vector2(position.x - front.x, position.z - front.z).length() < 1.6:
 		_hold = true
 		_fort_strike(g["i"], g["at"])
@@ -2193,6 +2200,8 @@ func _desired_speed() -> float:
 		mult *= Player.BLEED_SPEED
 	if _charges and _special_left > 0.0:
 		mult *= 2.6
+	if _marching:
+		return _speed * mult
 	match state:
 		State.CHASE: return _speed * mult
 		State.SEARCH, State.INVESTIGATE: return _roam_speed * 1.5 * mult
@@ -2251,8 +2260,12 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 				_needs_path = false
 			while _path_i < _path.size() and Vector2(_path[_path_i].x - position.x, _path[_path_i].z - position.z).length() < 0.65:
 				_path_i += 1
-			# A long journey is planned one stretch at a time.
-			if _path_i >= _path.size() and not _arrived() and not _needs_path and world.now >= _next_plan:
+			# A long journey is planned one stretch at a time, the next one asked for a few steps before
+			# this one runs out, so the walker never stands waiting for it.
+			var leg_ending := _path.size() > 0 and _path_i < _path.size() \
+					and Vector2(_path[-1].x - position.x, _path[-1].z - position.z).length() < 3.0 \
+					and Vector2(_path[-1].x - _goal.x, _path[-1].z - _goal.z).length() > 1.3
+			if (_path_i >= _path.size() or leg_ending) and not _arrived() and not _needs_path and world.now >= _next_plan:
 				_next_plan = world.now + 0.4
 				_needs_path = true
 				_full_path = _path.is_empty() # the stretches led nowhere, so plan the whole way once
@@ -2283,7 +2296,7 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 	if _anim != null and _attack_left <= 0.0:
 		if velocity.length_squared() < 0.04:
 			_play("Idle")
-		elif state == State.CHASE:
+		elif state == State.CHASE or _marching:
 			_play("Running_A", maxf(0.55, _speed / 5.0))
 		else:
 			_play("Walking_C" if type_id == "normal" else "Walking_A", maxf(0.5, velocity.length() / 1.8))

@@ -293,6 +293,8 @@ func setup(game_mode: int) -> void:
 	_build_fx()
 	director = Director.new(self)
 	add_child(director)
+	if map_id in SpawnRules.MESENLLA:
+		add_child(Ambience.new(self)) # wisps, motes and falling leaves or mist round the camera
 	if mode == Game.Mode.MENU:
 		menu_camera = Camera3D.new()
 		menu_camera.far = 340.0
@@ -369,17 +371,19 @@ func show_lightning(amount: float) -> void:
 
 
 ## A clear view of the arena sword, its moonlit terraces and the distant islands.
-## The main menu's slow tour of the Valleys of Mesenlla: from the stream up past the hamlet to the
-## Ring of Stones, over the outpost and its Great Portal, under the islands and back. Where the camera
-## is and what it looks at both follow smooth curves through these, so it never stops or jerks.
+## The main menu's slow tour of the Valleys of Mesenlla: up the river from the south past the arch,
+## along the outpost, to the great falls, high over the outpost towards the Ring of Stones, back over
+## the woodcutters' camp and down to the river by the bridge. Low only over water and clearings, high
+## over the forest, whose oldest firs stand over thirty metres. Where the camera is and what it looks at
+## both follow smooth curves through these, so it never stops or jerks.
 const MENU_TOUR := [
-	[Vector3(8, 15, 62), Vector3(-4, 12, -26)],
-	[Vector3(-14, 8, 40), Vector3(-36, 3, 24)],
-	[Vector3(-50, 12, 40), Vector3(-62, 12, -12)],
-	[Vector3(-78, 21, -18), Vector3(-54, 15, -62)],
-	[Vector3(-34, 19, -50), Vector3(0, 9, -42)],
-	[Vector3(18, 14, -4), Vector3(0, 9, -42)],
-	[Vector3(48, 11, 28), Vector3(18, 22, 74)],
+	[Vector3(4, 12, 62), Vector3(12, 12, -70)],
+	[Vector3(2, 32, 54), Vector3(22, 8, 14)],
+	[Vector3(34, 30, -4), Vector3(2, 8, -30)],
+	[Vector3(14, 20, -42), Vector3(12, 10, -78)],
+	[Vector3(-14, 44, -22), Vector3(-54, 14, -64)],
+	[Vector3(-34, 34, 28), Vector3(-8, 2, 58)],
+	[Vector3(-14, 13, 60), Vector3(20, 8, 30)],
 ]
 const MENU_LEG := 22.0 # seconds from one point of the tour to the next
 

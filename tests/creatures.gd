@@ -380,8 +380,19 @@ func _mesenlla_map() -> void:
 	check(p.camera.far >= 200.0, "and a view far enough for the islands in the sky")
 	check(p.global_position.y > 4.0 and absf(p.global_position.x) < 20.0, "players start in the outpost on the mountain shoulder (%.1f, %.1f, %.1f)" % [p.global_position.x, p.global_position.y, p.global_position.z])
 	var names := w.map_marks.map(func(m: Dictionary) -> String: return m["name"])
-	for mark: String in ["Great Portal", "Ring of Stones", "Hamlet", "Rift", "boss"]:
+	for mark: String in ["Mesenlla Watch", "Ring of Stones", "Woodcutters' Camp", "Rift", "Falls", "boss"]:
 		check(names.has(mark), "the map knows its %s" % mark)
+	check(not names.has("Great Portal") and not names.has("Hamlet"), "and no longer has a portal or a hamlet")
+	var kinds := w.map_features.map(func(f: Dictionary) -> String: return f["kind"])
+	check(kinds.count("falls") == 2 and kinds.count("arch") == 3 and kinds.count("rift") == 4 and not kinds.has("portal"), "two waterfalls, three arches of rock and four rifts are drawn on the Map: %s" % str(kinds))
+	# The rifts stand above the ground now, not sunk into it.
+	var tall_trees := 0
+	for mm in w.find_children("*", "MultiMeshInstance3D", true, false):
+		var mesh := (mm as MultiMeshInstance3D).multimesh.mesh
+		if mesh == MesenllaBuilder.tree_mesh("giant_fir"):
+			tall_trees += (mm as MultiMeshInstance3D).multimesh.instance_count
+	check(tall_trees >= 40, "the forest has its giant firs (%d)" % tall_trees)
+	check(w.get_node_or_null("Ambience") != null, "and its own air: wisps of mist, motes and falling leaves")
 	for z: Zombie in w.zombies:
 		check(SpawnRules.is_mesenlla(z.def), "only creatures of Mesenlla are out (%s)" % z.type_id)
 	var foreign := 0
@@ -451,6 +462,25 @@ func _bastion_map() -> void:
 		var foot: Vector3 = (g["lane"] as Array)[0]
 		var reach := w.grid.flood(foot)
 		check(reach.has(w.grid.nearest_free(w.grid.to_cell(fort.gate_front(g, foot)))), "the %s lane climbs to its gate" % g["name"])
+	# Nobody gets round the outside of the outer lanes, and the inside of the middle gate is clear.
+	var west_reach := w.grid.flood((fort.gates[0]["lane"] as Array)[0])
+	var beyond := 0
+	for c: Vector2i in west_reach:
+		if absf(w.grid.to_world(c).x) > 75.5:
+			beyond += 1
+	check(beyond == 0, "nothing paths round the outside of the outer spines (%d cells)" % beyond)
+	var space := w.get_world_3d().direct_space_state
+	for side: float in [-1.0, 1.0]:
+		for z: float in [-90.0, -40.0, 30.0, 100.0]:
+			var from := Vector3(side * 70.0, w.ground_at(Vector3(side * 70.0, 0, z)) + 1.0, z)
+			var ray := PhysicsRayQueryParameters3D.create(from, from + Vector3(side * 10.0, 0, 0), Terrain.BARRIER)
+			check(not space.intersect_ray(ray).is_empty(), "an unseen wall stops anyone going beyond x = %.0f at z = %.0f" % [side * 75.0, z])
+	var blocked := 0
+	for x in range(-3, 4):
+		for z in range(-52, -48):
+			if not w.grid.is_free(w.grid.to_cell(Vector3(x, 0, z))):
+				blocked += 1
+	check(blocked == 0, "no stairs stand in front of the middle gate on the inside (%d cells blocked)" % blocked)
 	# Only Mesenlla's creatures, and they come up the lanes.
 	var plan := Game.zombie_pool_plan()
 	check(plan.has("war_wyvern") and not plan.has("great_revenant_elemental") and plan.keys().all(func(m: String) -> bool: return ZombieDefs.ALL.values().any(func(d: Dictionary) -> bool: return d["models"].has(m) and SpawnRules.is_mesenlla(d))), "only creatures of Mesenlla are brought up: %s" % str(plan.keys()))
@@ -466,6 +496,11 @@ func _bastion_map() -> void:
 				near_foot += 1
 	check(counts == [3, 3, 3], "each gate gets its share of them: %s" % str(counts))
 	check(near_foot == 9, "and they rise at the foot of that gate's lane (%d of 9)" % near_foot)
+	check(fort.has_lanes(), "the Bastion's enemies come up long lanes")
+	await seconds(2.5)
+	var climber: Zombie = w.zombies.back()
+	var pace := Vector2(climber.velocity.x, climber.velocity.z).length()
+	check(climber._marching and pace > climber._roam_speed * 1.6, "and come up them at a run, not stopping at the foot (%.1f m/s)" % pace)
 	clear()
 	# The garrison.
 	var g := w.garrison

@@ -197,7 +197,7 @@ func _draw() -> void:
 
 
 ## Landmarks beyond the land: islands hanging overhead (their shadow and a dashed edge), glowing
-## rifts, rings of standing stones, portals and waystones.
+## rifts, rings of standing stones, portals, waystones, waterfalls and arches of rock.
 func _draw_features() -> void:
 	var scale := size.x / (world.terrain.half_extent * 2.0)
 	var pulse := 0.75 + 0.25 * sin(_t * 2.2)
@@ -226,6 +226,20 @@ func _draw_features() -> void:
 				draw_arc(p, 5.0, 0.0, TAU, 20, Color(0.55, 0.85, 1.0), 2.5, true)
 			"waystone":
 				draw_circle(p, 3.0, Color(0.45, 0.95, 0.92, pulse))
+			"falls":
+				# White water dropping over a dark lip, spreading into foam.
+				var across: Vector2 = f["dir"] * maxf(s, 5.0) * 0.6
+				draw_line(p - across, p + across, Color(0.2, 0.18, 0.24), 4.0, true)
+				for k in 3:
+					var x := -0.5 + k * 0.5
+					draw_line(p + across * x, p + across * x + Vector2(across.y, -across.x).normalized() * -8.0, Color(0.85, 0.95, 1.0, 0.85), 2.0, true)
+				draw_circle(p + Vector2(across.y, -across.x).normalized() * -9.0, 4.0, Color(0.85, 0.95, 1.0, 0.45))
+			"arch":
+				# Seen from above: two feet of rock and the span between them.
+				var half: Vector2 = f["dir"] * s * 0.5
+				draw_line(p - half, p + half, Color(0.48, 0.62, 0.36, 0.9), 4.0, true)
+				draw_circle(p - half, 3.5, Color(0.42, 0.4, 0.43))
+				draw_circle(p + half, 3.5, Color(0.42, 0.4, 0.43))
 
 
 ## A stronghold's gates, coloured by how they stand (open gates in red), and its heart or portal.

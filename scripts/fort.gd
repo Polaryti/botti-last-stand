@@ -105,6 +105,14 @@ func add_door(at: Vector3, out: Vector3) -> void:
 	doors.append({"at": at, "out": out})
 
 
+## Whether this fort's enemies come up long lanes (Mist Bastion) rather than out of the woods round it.
+func has_lanes() -> bool:
+	for g in gates:
+		if not (g["lane"] as Array).is_empty():
+			return true
+	return false
+
+
 ## Where the enemies sent against a gate come from: the foot of its lane.
 func add_lane(gate: int, foot: Vector3) -> void:
 	if gate >= 0 and gate < gates.size():

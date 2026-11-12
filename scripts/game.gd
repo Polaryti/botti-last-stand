@@ -296,8 +296,8 @@ const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 
 
 
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
-const BASTION_POOLS := {"woods_child": 15, "bear": 4, "mist_bear": 2, "eagle": 6, "mist_eagle": 3, "shapeshifter": 2,
-	"earth_elemental": 3, "mist_elemental": 2, "storm_elemental": 2, "wyvern": 2, "war_wyvern": 1}
+const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6, "mist_eagle": 3, "shapeshifter": 3,
+	"earth_elemental": 4, "mist_elemental": 3, "storm_elemental": 3, "wyvern": 2, "war_wyvern": 1}
 
 
 func zombie_pool_plan() -> Dictionary:

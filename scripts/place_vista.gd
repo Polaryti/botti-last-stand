@@ -2,9 +2,9 @@ class_name PlaceVista
 extends Control
 ## A painted view of where a match is about to be played, for the loading screen: the place's sky,
 ## ridges fading into the distance, and what it is known for (the Village's church and lit windows,
-## the Fort's walls, the Mists' islands over nothing, Mesenlla's twilight outpost, Mist Bastion's
-## citadel and its turning Great Portal). Drawn from shapes, the same every time for the same place;
-## mist drifts and portals glow while the world loads.
+## the Fort's walls, the Mists' islands over nothing, Mesenlla's forested valley with its waterfall,
+## arch and outpost, Mist Bastion's citadel and its turning Great Portal). Drawn from shapes, the same
+## every time for the same place; mist drifts, water falls and portals glow while the world loads.
 
 var place := "village"
 var _t := 0.0
@@ -206,26 +206,61 @@ func _mesenlla(w: float, h: float) -> void:
 	_island(Vector2(w * 0.68, h * 0.2), w * 0.11, rock, _look("accent"))
 	_island(Vector2(w * 0.88, h * 0.32), w * 0.07, rock, _look("accent"))
 	_island(Vector2(w * 0.46, h * 0.12), w * 0.05, rock, _look("accent"))
-	# The outpost on its shoulder: a palisade, two watchtowers, lit lodges, and the Great Portal.
+	# A waterfall pouring down a cliff on the left, white water shimmering, spray at its foot.
+	var cliff := _look("near").darkened(0.15)
+	var fx := w * 0.2
+	var lip := h * 0.36
+	draw_colored_polygon(PackedVector2Array([Vector2(fx - w * 0.14, h), Vector2(fx - w * 0.06, lip - h * 0.02), Vector2(fx + w * 0.05, lip), Vector2(fx + w * 0.1, h)]), cliff)
+	var fall := 0.6 + 0.2 * sin(_t * 3.0)
+	for k in 4:
+		var x := fx - w * 0.012 + k * w * 0.009
+		var flick := 0.5 + 0.5 * sin(_t * 6.0 + k * 1.7)
+		draw_line(Vector2(x, lip + h * 0.005), Vector2(x + w * 0.004, _ground(x)), Color(0.85, 0.95, 1.0, 0.45 + 0.35 * flick), w * 0.006)
+	_glow(Vector2(fx, _ground(fx) - h * 0.01), h * 0.06, Color(0.85, 0.95, 1.0), 0.45 * fall)
+	# An arch of mossy rock over the valley floor.
+	var ax := w * 0.42
+	var ag := _ground(ax)
+	var stone := _look("far").darkened(0.1)
+	var arch := PackedVector2Array()
+	var inner := PackedVector2Array()
+	for k in 17:
+		var a := PI * k / 16.0
+		arch.append(Vector2(ax - cos(a) * w * 0.07, ag - sin(a) * h * 0.2))
+		inner.append(Vector2(ax - cos(a) * w * 0.05, ag - sin(a) * h * 0.16))
+	for k in 16:
+		draw_colored_polygon(PackedVector2Array([arch[k], arch[k + 1], inner[k + 1], inner[k]]), stone)
+		draw_line(arch[k], arch[k + 1], Color(0.36, 0.55, 0.3, 0.9), 3.0, true)
+	# The outpost in the forest: a timber hall under a green roof, red banners on its front, a
+	# watchtower and tents, lit from within.
 	var dark := _look("near").darkened(0.35)
-	var cx := w * 0.7
+	var cx := w * 0.72
 	var g := _ground(cx)
-	var left := cx - w * 0.1
-	var right := cx + w * 0.1
-	var x := left
-	while x < right:
-		draw_colored_polygon(PackedVector2Array([Vector2(x, g + 4), Vector2(x, g - h * 0.035), Vector2(x + w * 0.004, g - h * 0.045), Vector2(x + w * 0.008, g - h * 0.035), Vector2(x + w * 0.008, g + 4)]), dark)
-		x += w * 0.009
-	for tx: float in [left + w * 0.01, right - w * 0.01]:
-		draw_rect(Rect2(tx - w * 0.008, g - h * 0.1, w * 0.016, h * 0.1), dark)
-		draw_colored_polygon(PackedVector2Array([Vector2(tx - w * 0.013, g - h * 0.1), Vector2(tx, g - h * 0.13), Vector2(tx + w * 0.013, g - h * 0.1)]), dark)
-		draw_circle(Vector2(tx, g - h * 0.085), h * 0.005, Color(_look("glow"), 0.9))
-	var pulse := 0.75 + 0.25 * sin(_t * 1.8)
-	_glow(Vector2(cx, g - h * 0.07), h * 0.07, _look("accent"), 0.5 * pulse)
-	draw_rect(Rect2(cx - w * 0.018, g - h * 0.1, w * 0.006, h * 0.1), dark)
-	draw_rect(Rect2(cx + w * 0.012, g - h * 0.1, w * 0.006, h * 0.1), dark)
-	draw_rect(Rect2(cx - w * 0.02, g - h * 0.108, w * 0.04, h * 0.01), dark)
-	draw_rect(Rect2(cx - w * 0.012, g - h * 0.097, w * 0.024, h * 0.095), Color(_look("accent"), 0.55 * pulse))
+	draw_rect(Rect2(cx - w * 0.06, g - h * 0.07, w * 0.12, h * 0.07), Color(0.32, 0.22, 0.16))
+	draw_colored_polygon(PackedVector2Array([Vector2(cx - w * 0.075, g - h * 0.07), Vector2(cx - w * 0.045, g - h * 0.115), Vector2(cx + w * 0.045, g - h * 0.115), Vector2(cx + w * 0.075, g - h * 0.07)]), Color(0.18, 0.4, 0.34))
+	for bx: float in [-0.035, 0.0, 0.035]:
+		draw_rect(Rect2(cx + w * bx - w * 0.006, g - h * 0.062, w * 0.012, h * 0.045), Color(0.7, 0.12, 0.14))
+	draw_rect(Rect2(cx - w * 0.008, g - h * 0.03, w * 0.016, h * 0.03), Color(_look("glow"), 0.9))
+	var tx := cx + w * 0.11
+	draw_rect(Rect2(tx - w * 0.008, g - h * 0.12, w * 0.016, h * 0.12), dark)
+	draw_colored_polygon(PackedVector2Array([Vector2(tx - w * 0.013, g - h * 0.12), Vector2(tx, g - h * 0.15), Vector2(tx + w * 0.013, g - h * 0.12)]), dark)
+	draw_circle(Vector2(tx, g - h * 0.105), h * 0.005, Color(_look("glow"), 0.9))
+	for t: float in [-0.12, -0.095]:
+		var x := cx + w * t
+		draw_colored_polygon(PackedVector2Array([Vector2(x - w * 0.012, g), Vector2(x, g - h * 0.03), Vector2(x + w * 0.012, g)]), Color(0.7, 0.64, 0.52))
+	# Bunting from the hall to the tower.
+	var pts := PackedVector2Array()
+	for k in 9:
+		var f := k / 8.0
+		pts.append(Vector2(lerpf(cx + w * 0.06, tx, f), g - h * 0.1 + sin(f * PI) * h * 0.015))
+	draw_polyline(pts, Color(0.75, 0.7, 0.55, 0.8), 1.0, true)
+	for k in range(1, 8):
+		draw_colored_polygon(PackedVector2Array([pts[k] - Vector2(w * 0.003, 0), pts[k] + Vector2(w * 0.003, 0), pts[k] + Vector2(0, h * 0.012)]), Color(0.72, 0.1, 0.12))
+	# Tall firs crowding the valley.
+	for k in 14:
+		var x := w * (0.05 + k * 0.07) + sin(k * 3.1) * w * 0.02
+		var base := _ground(x) + h * 0.02
+		var tall := h * (0.16 + 0.08 * sin(k * 1.7) ** 2)
+		draw_colored_polygon(PackedVector2Array([Vector2(x - w * 0.022, base), Vector2(x, base - tall), Vector2(x + w * 0.022, base)]), _look("near").darkened(0.5))
 
 
 func _bastion(w: float, h: float) -> void:

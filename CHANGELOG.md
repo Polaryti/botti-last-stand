@@ -1,5 +1,32 @@
 # Changelog
 
+## Development — Beyond the Mists, review fixes: the maps
+
+### Valleys of Mesenlla
+- The Valleys are redrawn as a deep, heavily forested valley with real heights: mountains all round, a raised shoulder for the outpost, the stone heights in the north-west, a crag in the east and an overlook in the west.
+- A makeshift outpost replaces the hamlet: a plank hall with a green roof and red hangings, palisades, two watchtowers, tents, strings of bunting, lanterns and a fire. The crops, apple trees, houses and the Great Portal are gone.
+- The Great Falls drops into a pool at the head of the valley, and a smaller fall comes off the east crag; the river runs from them through the valley, crossed by a log bridge and fords.
+- Three arches of mossy rock: over the road, over the river and in the western woods.
+- The Woodcutters' Camp in the south-west, a watchtower and tent on the crag, and a tower on the overlook.
+- Rifts stand upright, torn open above the ground, with crystals and a scar at their feet.
+- About 420 trees, with three new kinds: giant firs over thirty metres tall, tall pines and mossy oaks. The forest floor has ferns, mushrooms (some of them glowing), mossy stones and stumps.
+- The Map names the Mesenlla Watch, the Ring of Stones, the Woodcutters' Camp, the Rift and the Falls, and draws the falls and the arches.
+- The title screen's tour flies up the river, past the arches and the outpost to the falls, high over the forest to the Ring of Stones and back down to the bridge. No tree stands in its way.
+- The loading screen's painting shows the falls, an arch, the green-roofed hall, a tower, tents, bunting and firs.
+
+### The air beyond the Mists
+- Long wisps of mist drift through the trees on the wind, and motes of mist light hang and wander in the twilight. In the Valleys, leaves come down from the forest; at Mist Bastion, fine mist sifts down and amber sparks rise.
+
+### Mist Bastion
+- The stairs up to the wall walk inside the middle gate now climb away from it, along the wall to the west, so the gateway is clear.
+- Enemies no longer linger at the foot of the lanes: they run up them to their gate (at their full speed, slowing only for the last 6 m), and plan the next stretch of a long way before reaching the end of the last, so they never stop to wait for it.
+- Far more enemies: up to 1.6 times as many at once as on other maps, starting at 12 instead of 6, with more Children of the Woods (26 in the pool, was 15), bears (6, was 4), Mist Bears, Shapeshifters and elementals.
+- An unseen wall beyond each outer spine stops anyone going round the outside of the west and east lanes, and the outer spines now run the whole length of the slopes.
+- New dressing: mist braziers in the yard, at each gate and at each lane's post, rune hangings on the citadel's walls, a camp with a tent, weapon rack and stores beside each post, waymarks along the lanes, and giant firs, tall pines, mossy oaks and undergrowth in the woods.
+
+### Both maps
+- The floating banners are gone.
+
 ## Development — Beyond the Mists, review fixes: creatures
 
 ### Creatures of Mesenlla

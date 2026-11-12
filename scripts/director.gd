@@ -2,6 +2,7 @@ class_name Director
 extends Node
 ## Runs the night: roaming population, Beast howls, supplies, and dawn.
 
+const BASTION_CROWD := 1.6 # how many more come up the lanes of Mist Bastion than roam other maps
 const FIRST_BEAST := 170.0
 const BEAST_EVERY := 85.0
 const MAX_BEASTS := 2
@@ -152,7 +153,11 @@ func target_population() -> int:
 	var cap := Game.max_live_zombies()
 	var mists := world.terrain.has_islands() and not Net.fog_rules()
 	if mists: cap += 4
-	var start := mini(12 if mists else 6, cap)
+	var bastion := world.map_id == "bastion"
+	if bastion:
+		# Three lanes to fill: Mist Bastion is fought against far bigger numbers.
+		cap = int(round(cap * BASTION_CROWD))
+	var start := mini(12 if mists or bastion else 6, cap)
 	# A slow start while the player finds a weapon, then the crowd builds.
 	var t := pow(clampf(elapsed / (Game.NIGHT_LENGTH * 0.75), 0.0, 1.0), 1.3)
 	var crowd := lerpf(start, cap, t) * (1.0 + 0.35 * (world.players.size() - 1))

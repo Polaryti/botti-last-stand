@@ -152,7 +152,7 @@ jobs:
           test -f build/checks/screens/nightfall_outside.png
           test -f build/checks/screens/survey_waygates.png
           test -f build/checks/screens/creatures_big_side.png
-          test -f build/checks/screens/mesenlla_portal.png
+          test -f build/checks/screens/mesenlla_falls.png
           test -f build/checks/screens/bastion_portal.png
       - uses: actions/upload-artifact@v6
         if: always()

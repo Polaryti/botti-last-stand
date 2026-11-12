@@ -1,7 +1,8 @@
 class_name BastionBuilder
 ## Mist Bastion, drawn by code: the citadel on the summit with its three gates and posterns, the Great
 ## Portal it guards (a ring of runestones turning in the air above an anchor stone), jagged rock
-## spines that keep the three lanes apart, and the waystones the Mist Soldiers step out of.
+## spines that keep the three lanes apart, the waystones the Mist Soldiers step out of, and the
+## Bastion's dressing: mist braziers, rune hangings on its walls and the waymarks along its lanes.
 ## The citadel tells the Fort rules where its walls, gates, doors and portal are.
 ## Pieces are placed without a turn: the citadel's walls run along X and Z.
 
@@ -299,3 +300,70 @@ static func waystone(b: MapBuilder) -> void:
 	MesenllaBuilder._shine(b, g)
 	b.w.add_glow(b.xf * Vector3(0, 3.0, 0), MesenllaBuilder.MIST_GLOW, 3.2, 150.0)
 	MesenllaBuilder._mist(b, Vector3(0, 0.4, 0), Vector3(1.6, 0.3, 1.6), MesenllaBuilder.MIST_GLOW, 6, 0.15)
+
+
+## A brazier of mist fire on a stone foot: a slate bowl on a short column, cold blue flame in it.
+static func brazier(b: MapBuilder) -> void:
+	var l := b.cell()
+	l.prism(Vector3(0, -0.2, 0), Vector3(0, 0.25, 0), 0.7, 0.6, 6, SLATE_DARK)
+	l.prism(Vector3(0, 0.25, 0), Vector3(0, 1.1, 0), 0.26, 0.22, 6, SLATE)
+	l.prism(Vector3(0, 1.1, 0), Vector3(0, 1.45, 0), 0.32, 0.72, 8, SLATE_LIGHT)
+	for k in 4:
+		var a := TAU * k / 4.0 + PI * 0.25
+		l.prism(Vector3(cos(a) * 0.62, 1.35, sin(a) * 0.62), Vector3(cos(a) * 0.7, 1.62, sin(a) * 0.7), 0.06, 0.0, 4, BAND)
+	b.solid(Vector3(0, 0.7, 0), Vector3(0.9, 1.4, 0.9))
+	var flame := b.mesh()
+	flame.prism(Vector3(0, 1.4, 0), Vector3(0, 1.48, 0), 0.6, 0.6, 8, MesenllaBuilder.MIST_GLOW.darkened(0.2))
+	for k in 5:
+		var a := TAU * k / 5.0
+		var at := Vector3(cos(a) * 0.28, 1.45, sin(a) * 0.28)
+		flame.prism(at, at + Vector3(0, 0.45 + 0.2 * (k % 2), 0), 0.16, 0.0, 4, MesenllaBuilder.MIST_GLOW)
+	flame.prism(Vector3(0, 1.45, 0), Vector3(0, 2.2, 0), 0.24, 0.0, 5, MesenllaBuilder.RUNE.lightened(0.3))
+	MesenllaBuilder._shine(b, flame)
+	b.w.add_glow(b.xf * Vector3(0, 1.8, 0), MesenllaBuilder.MIST_GLOW, 3.0, 150.0)
+	MesenllaBuilder._light(b, Vector3(0, 2.2, 0), MesenllaBuilder.MIST_GLOW, 1.1, 7.0)
+	MesenllaBuilder._mist(b, Vector3(0, 1.9, 0), Vector3(0.3, 0.2, 0.3), MesenllaBuilder.MIST_GLOW, 5, 0.5)
+
+
+## Long hangings of slate-blue cloth against a wall, the piece's front facing out from it (+Z), each
+## with the Bastion's rune worked on it in glowing thread, and a mist brazier's glow between them.
+static func rune_banners(b: MapBuilder, width: float) -> void:
+	var l := b.cell()
+	var g := b.mesh()
+	var count := maxi(2, int(width / 3.6))
+	for k in count:
+		var x := (float(k) + 0.5) / count * width - width * 0.5
+		l.box(Vector3(x, 4.1, 0.05), Vector3(1.3, 0.1, 0.1), IRONWOOD)
+		l.box(Vector3(x, 2.6, 0.07), Vector3(1.0, 3.0, 0.03), BAND.darkened(0.15))
+		l.box(Vector3(x, 2.6, 0.08), Vector3(0.84, 2.8, 0.02), Color(0.2, 0.22, 0.36))
+		# The swallow-tailed foot of the cloth.
+		for side: float in [-1.0, 1.0]:
+			l._tri(Vector3(x + side * 0.5, 1.1, 0.07), Vector3(x, 1.1, 0.07), Vector3(x + side * 0.3, 0.6, 0.07), Vector3(x, 1.0, -1), BAND.darkened(0.15))
+		# The rune: a ring cut by a stroke, as on the Great Portal's stones.
+		g.prism(Vector3(x, 2.9, 0.09), Vector3(x, 2.9, 0.1), 0.3, 0.3, 10, MesenllaBuilder.RUNE)
+		g.prism(Vector3(x, 2.9, 0.1), Vector3(x, 2.9, 0.11), 0.22, 0.22, 10, Color(0.2, 0.22, 0.36))
+		g.box(Vector3(x, 2.6, 0.12), Vector3(0.06, 0.9, 0.01), MesenllaBuilder.RUNE)
+		g.box(Vector3(x, 1.6, 0.1), Vector3(0.6, 0.05, 0.01), MesenllaBuilder.RUNE.darkened(0.2))
+	MesenllaBuilder._shine(b, g)
+
+
+## A waymark beside a lane: a leaning slab with a glowing rune on its face, its foot in moss.
+static func lane_stone(b: MapBuilder, tall: float) -> void:
+	var r := b.seeded()
+	var l := b.cell()
+	var lean := Vector3(r.randf_range(-0.12, 0.12), 1.0, r.randf_range(-0.12, 0.12)).normalized()
+	l.prism(Vector3(0, -0.4, 0), lean * tall, 0.42, 0.3, 4, SPINE if r.randf() < 0.5 else SLATE)
+	l.prism(lean * tall, lean * (tall + 0.35), 0.3, 0.0, 4, SPINE_DARK)
+	l.prism(Vector3(0, -0.05, 0), Vector3(0, 0.12, 0), 0.75, 0.6, 7, MesenllaBuilder.MOSS)
+	b.solid(Vector3(0, tall * 0.5, 0), Vector3(0.6, tall, 0.6))
+	var g := b.mesh()
+	var face := lean * (tall * 0.62) + Vector3(0, 0, 0.3)
+	g.box(face, Vector3(0.08, 0.5, 0.02), MesenllaBuilder.RUNE)
+	g.box(face + Vector3(0, 0.12, 0), Vector3(0.3, 0.06, 0.02), MesenllaBuilder.RUNE)
+	MesenllaBuilder._shine(b, g)
+
+
+## An unseen wall along the piece's X axis: the edge of the land you can walk, beyond the outer spines.
+## It stops everyone, and nothing paths through it.
+static func bound(b: MapBuilder, length: float) -> void:
+	b.w.add_barrier_xf(b.xf.translated_local(Vector3(0, 20.0, 0)), Vector3(length, 120.0, 2.0))

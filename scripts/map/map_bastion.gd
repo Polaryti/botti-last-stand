@@ -2,14 +2,16 @@
 class_name MapBastion
 extends MapPiece
 ## A part of Mist Bastion, drawn by code (scripts/map/bastion_builder.gd): the citadel and its gates,
-## the Great Portal, a rock spine between two lanes, or a waystone for the Mist Soldiers.
+## the Great Portal, a rock spine between two lanes, a waystone for the Mist Soldiers, a mist brazier,
+## rune hangings for a wall, a waymark beside a lane, or an unseen bound at the edge of the land.
 ## Place the citadel before the Great Portal, and without a turn: the Fort rules read its walls.
 
-@export_enum("citadel", "great_portal", "rock_spine", "waystone") var kind := "citadel":
+@export_enum("citadel", "great_portal", "rock_spine", "waystone", "brazier", "rune_banners", "lane_stone", "bound") var kind := "citadel":
 	set(v):
 		kind = v
 		refresh()
-## citadel: its width (X) and depth (Z). great_portal: x is the ring's radius. rock_spine: x is its length.
+## citadel: its width (X) and depth (Z). great_portal: x is the ring's radius. rock_spine and bound: x
+## is its length. rune_banners: x is the width of wall they hang on. lane_stone: x is its height.
 @export var size := Vector2(52, 36):
 	set(v):
 		size = v
@@ -32,6 +34,10 @@ func build(b: MapBuilder) -> void:
 		"great_portal": BastionBuilder.great_portal(b, size.x)
 		"rock_spine": BastionBuilder.rock_spine(b, size.x)
 		"waystone": BastionBuilder.waystone(b)
+		"brazier": BastionBuilder.brazier(b)
+		"rune_banners": BastionBuilder.rune_banners(b, size.x)
+		"lane_stone": BastionBuilder.lane_stone(b, size.x)
+		"bound": BastionBuilder.bound(b, size.x)
 
 
 func land(t: Terrain, at: Transform3D) -> void:

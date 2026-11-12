@@ -151,7 +151,10 @@ func flush() -> void:
 	for key: String in _trees:
 		var list: Array[Transform3D] = []
 		list.assign(_trees[key])
-		w.add_child(Models.scatter(Models.merged(key.get_slice("|", 0)), list))
+		var source := key.get_slice("|", 0)
+		# "proc:<kind>" are trees drawn by code (MesenllaBuilder.tree_mesh), the rest come from files.
+		var tree_mesh: Mesh = MesenllaBuilder.tree_mesh(source.substr(5)) if source.begins_with("proc:") else Models.merged(source)
+		w.add_child(Models.scatter(tree_mesh, list))
 	_trees.clear()
 	for key: Vector2i in _cells:
 		(_cells[key] as LowPoly).base = Transform3D.IDENTITY

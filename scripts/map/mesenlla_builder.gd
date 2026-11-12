@@ -21,7 +21,6 @@ const RUNE := Color(0.55, 1.0, 0.92)
 
 static var _glow_mat: StandardMaterial3D
 static var _portal_mat: ShaderMaterial
-static var _banner_mat: ShaderMaterial
 
 
 ## Unshaded and coloured by the mesh, for what shines on its own.
@@ -192,37 +191,64 @@ static func floating_island(b: MapBuilder, width: float) -> void:
 	_mist(b, lip + Vector3(0, -width * 0.5, 0), Vector3(0.6, width * 0.5, 0.6), MIST_GLOW.lerp(Color.WHITE, 0.3), 8, -0.6)
 
 
-## A crack in the world: a dark, jagged fissure with a violet glow along its lips and mist rising.
+## A tear in the world standing upright above the ground: a jagged slit of violet light taller than a
+## man, ringed by shards of rock lifted into the air around it, crystals breaking out beneath and mist
+## pouring out of it. Its length is how wide the scar on the ground under it runs.
 static func rift(b: MapBuilder, length: float) -> void:
 	_feature(b, "rift", length)
 	var r := b.seeded()
-	var l := b.mesh()
+	var high := clampf(length * 0.6, 4.5, 6.5)
+	var lift := 1.0
+	# The tear: a jagged lens of light, darker at its heart, from two zig-zag edges.
 	var g := b.mesh()
-	var steps := maxi(4, int(length / 1.6))
+	var steps := 9
 	var left: Array[Vector3] = []
 	var right: Array[Vector3] = []
 	for i in steps + 1:
 		var t := float(i) / steps
-		var z := (t - 0.5) * length
-		var half := sin(t * PI) * r.randf_range(0.7, 1.3) * 0.9 + 0.05
-		var bend := sin(t * 5.0 + r.randf()) * 0.6
-		left.append(Vector3(bend - half, 0.05, z))
-		right.append(Vector3(bend + half, 0.05, z))
+		var y := lift + t * high
+		var half := sin(t * PI) * (0.55 + r.randf_range(-0.12, 0.12)) + 0.02
+		var bend := sin(t * 4.2 + r.randf()) * 0.25
+		left.append(Vector3(bend - half, y, 0))
+		right.append(Vector3(bend + half, y, 0))
 	for i in steps:
-		l._tri(left[i], right[i], right[i + 1], Vector3(0, -2, left[i].z), Color(0.04, 0.03, 0.07))
-		l._tri(left[i], right[i + 1], left[i + 1], Vector3(0, -2, left[i].z), Color(0.04, 0.03, 0.07))
-		for side: Array[Vector3] in [left, right]:
-			var a: Vector3 = side[i]
-			var c: Vector3 = side[i + 1]
-			g.prism(a + Vector3.UP * 0.02, c + Vector3.UP * 0.02, 0.07, 0.07, 4, RIFT_GLOW if i % 2 else MIST_GLOW)
+		for face: float in [-1.0, 1.0]:
+			var off := Vector3(0, 0, 0.01 * face)
+			g._tri(left[i] + off, right[i] + off, right[i + 1] + off, Vector3(0, left[i].y, -face), RIFT_GLOW)
+			g._tri(left[i] + off, right[i + 1] + off, left[i + 1] + off, Vector3(0, left[i].y, -face), RIFT_GLOW.lightened(0.15))
 		var mid := (left[i] + right[i]) * 0.5
-		g.prism(mid, mid + Vector3(0, 0.02, 0), (right[i].x - left[i].x) * 0.3, (right[i].x - left[i].x) * 0.3, 5, RIFT_GLOW.darkened(0.3))
-	b.add(l)
+		var mid2 := (left[i + 1] + right[i + 1]) * 0.5
+		g.prism(mid, mid2, (right[i].x - left[i].x) * 0.22 + 0.02, (right[i + 1].x - left[i + 1].x) * 0.22 + 0.02, 4, Color(0.95, 0.88, 1.0))
+		for side: Array[Vector3] in [left, right]:
+			g.prism(side[i], side[i + 1], 0.06, 0.06, 4, MIST_GLOW)
 	_shine(b, g)
-	for z in [-length * 0.25, length * 0.25]:
-		b.w.add_glow(b.xf * Vector3(0, 0.6, z), RIFT_GLOW, 4.0, 120.0)
-	_light(b, Vector3(0, 1.2, 0), RIFT_GLOW, 2.2, length * 0.6 + 4.0)
-	_mist(b, Vector3(0, 0.6, 0), Vector3(0.6, 0.4, length * 0.45), RIFT_GLOW, 12, 0.9)
+	# Shards of rock torn from the ground, hanging around the tear, and the scar beneath it.
+	var l := b.mesh()
+	for k in 7:
+		var a := r.randf() * TAU
+		var d := r.randf_range(1.0, 2.2)
+		var at := Vector3(cos(a) * d, lift + r.randf_range(0.3, high * 0.9), sin(a) * d * 0.6)
+		var size := r.randf_range(0.25, 0.6)
+		l.prism(at + Vector3.UP * size, at - Vector3.UP * size * 1.4, size * 0.7, 0.0, 5, ROCK_DARK if k % 2 else ROCK)
+	var scar := maxf(length * 0.5, 2.0)
+	for k in 6:
+		var z := (k / 5.0 - 0.5) * scar
+		l.box(Vector3(r.randf_range(-0.4, 0.4), 0.04, z), Vector3(r.randf_range(0.6, 1.2), 0.08, scar / 5.0), Color(0.1, 0.08, 0.14))
+	b.add(l)
+	crystals_at(b, Vector3(0.9, 0, 0.4), 1.6)
+	crystals_at(b, Vector3(-0.8, 0, -0.5), 1.2)
+	b.solid(Vector3(0, lift + high * 0.5, 0), Vector3(1.2, high, 0.5))
+	b.w.add_glow(b.xf * Vector3(0, lift + high * 0.5, 0), RIFT_GLOW, high * 1.4, 160.0)
+	_light(b, Vector3(0, lift + high * 0.5, 0.8), RIFT_GLOW, 2.4, high * 2.2)
+	_mist(b, Vector3(0, lift + high * 0.5, 0), Vector3(0.5, high * 0.4, 0.3), RIFT_GLOW, 14, 0.5)
+
+
+## A few crystals at a spot relative to the piece, for dressing other landmarks.
+static func crystals_at(b: MapBuilder, local: Vector3, size: float) -> void:
+	var keep := b.xf
+	b.xf = b.xf.translated_local(local)
+	crystals(b, size)
+	b.xf = keep
 
 
 ## The Great Portal that led here from Mist Bastion: two weathered pillars and a lintel of carved
@@ -321,46 +347,6 @@ static func standing_stones(b: MapBuilder, radius: float) -> void:
 	_mist(b, Vector3(0, 0.4, 0), Vector3(radius * 0.6, 0.2, radius * 0.6), MIST_GLOW, 6, 0.3)
 
 
-## A tall Mesenlla banner: azure cloth with an amber sun over mountains, on a pole with a cross-bar.
-static func banner(b: MapBuilder, tall: float) -> void:
-	var l := b.cell()
-	l.prism(Vector3.ZERO, Vector3.UP * tall, 0.08, 0.06, 6, BARK)
-	l.box(Vector3(0, tall - 0.2, 0), Vector3(1.6, 0.08, 0.08), BARK)
-	l.prism(Vector3.UP * tall, Vector3.UP * (tall + 0.25), 0.12, 0.0, 5, AMBER)
-	b.solid(Vector3.UP * 1.0, Vector3(0.3, 2.0, 0.3))
-	if b.is_preview:
-		return
-	var cloth := b.mesh()
-	cloth.box(Vector3(0, -1.1, 0), Vector3(1.4, 2.2, 0.03), AZURE)
-	cloth.box(Vector3(0, -0.55, 0.02), Vector3(0.5, 0.5, 0.02), AMBER)
-	cloth.prism(Vector3(-0.45, -1.7, 0.02), Vector3(-0.1, -1.1, 0.02), 0.25, 0.0, 3, Color(0.9, 0.92, 0.95))
-	cloth.prism(Vector3(0.25, -1.7, 0.02), Vector3(0.5, -1.2, 0.02), 0.22, 0.0, 3, Color(0.9, 0.92, 0.95))
-	cloth.box(Vector3(0, -2.25, 0), Vector3(1.4, 0.1, 0.035), AMBER)
-	var mi := MeshInstance3D.new()
-	mi.mesh = cloth.commit()
-	mi.transform = b.xf * Transform3D(Basis.IDENTITY, Vector3(0, tall - 0.25, 0.06))
-	if _banner_mat == null:
-		# Coloured by the cloth's own mesh, and stirring in the mountain wind from the pole outwards.
-		var sh := Shader.new()
-		sh.code = """
-shader_type spatial;
-render_mode cull_disabled, specular_disabled;
-void vertex() {
-	float free_edge = smoothstep(-0.7, 0.7, VERTEX.x) * smoothstep(0.0, -1.5, VERTEX.y);
-	VERTEX.z += sin(TIME * 2.6 - VERTEX.x * 5.0 + VERTEX.y * 1.5) * 0.08 * (0.3 + free_edge);
-}
-void fragment() {
-	ALBEDO = COLOR.rgb;
-	ROUGHNESS = 1.0;
-}
-"""
-		_banner_mat = ShaderMaterial.new()
-		_banner_mat.shader = sh
-	mi.material_override = _banner_mat
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	b.w.add_child(mi)
-
-
 ## Mist crystals breaking out of the ground in a cluster, pale and shining.
 static func crystals(b: MapBuilder, size: float) -> void:
 	var r := b.seeded()
@@ -452,3 +438,318 @@ static func lodge_fire(b: MapBuilder) -> void:
 		var a := TAU * i / 6.0
 		var at := Vector3(cos(a) * 2.6, 0, sin(a) * 2.6)
 		l.box(at + Vector3.UP * 0.22, Vector3(1.3, 0.44, 0.4), LOG, Vector3(0, -rad_to_deg(a) + 90.0, 0))
+
+
+# --- The valley: water, arches, the makeshift outpost and the forest floor ---------------------------
+
+const WATER := Color(0.55, 0.8, 0.95)
+const MOSS := Color(0.3, 0.5, 0.22)
+const MOSS_LIGHT := Color(0.42, 0.62, 0.28)
+const CANVAS := Color(0.78, 0.72, 0.6)
+const CANVAS_DARK := Color(0.6, 0.54, 0.44)
+const CRIMSON := Color(0.72, 0.1, 0.12)
+const JADE_TILE := Color(0.18, 0.46, 0.38)
+static var _fall_mat: ShaderMaterial
+
+
+## A waterfall down a rock face: the cliff it pours over (a slab of rock, so it never hangs in the
+## air), white water sliding down it, a churning pool of foam at its foot and spray hanging over it.
+## Falls towards the piece's +Z; high is how far it drops.
+static func waterfall(b: MapBuilder, high: float, wide: float) -> void:
+	_feature(b, "falls", wide)
+	var r := b.seeded()
+	var l := b.mesh()
+	# The cliff: a wall of rock from the ground to the lip, rough with columns and ledges, deep enough
+	# to meet the mountain behind it, and moss along the top where the stream comes over.
+	var face := wide + 10.0
+	var columns := int(face / 1.8)
+	for k in columns:
+		var x := (float(k) + 0.5) / columns * face - face * 0.5
+		var near := absf(x) < wide * 0.5 + 0.4
+		var top := high + (0.4 if near else r.randf_range(0.6, 2.6))
+		var front := -0.4 - (0.6 if near else r.randf_range(0.0, 1.2))
+		l.box(Vector3(x, top * 0.5 - 0.5, front - 4.0), Vector3(1.9, top + 1.0, 8.0), ROCK if (k + int(top)) % 3 else ROCK_DARK)
+		l.box(Vector3(x, top + 0.25, front - 4.0), Vector3(1.95, 0.5, 8.0), MOSS if k % 2 else MOSS_LIGHT)
+		# Ledges across the face.
+		if not near and k % 2 == 0:
+			l.box(Vector3(x, top * r.randf_range(0.3, 0.7), front + 0.2), Vector3(2.0, 0.4, 0.7), ROCK_DARK)
+	# Shoulders of rock either side, stepping down and back into the mountain, so the cliff never
+	# stands alone like a wall.
+	for side: float in [-1.0, 1.0]:
+		for k in 4:
+			var x := side * (face * 0.5 + 1.5 + k * 2.6)
+			var top := high * (0.85 - k * 0.2)
+			l.box(Vector3(x, top * 0.5 - 0.5, -5.0 - k * 1.5), Vector3(2.8, top + 1.0, 9.0), ROCK if k % 2 else ROCK_DARK)
+			l.box(Vector3(x, top + 0.25, -5.0 - k * 1.5), Vector3(2.85, 0.5, 9.0), MOSS_LIGHT if k % 2 else MOSS)
+	# The stream that feeds it, along the top.
+	l.box(Vector3(0, high + 0.52, -4.0), Vector3(wide * 0.9, 0.06, 8.0), Color(0.42, 0.62, 0.8))
+	b.add(l)
+	b.solid(Vector3(0, high * 0.5, -4.4), Vector3(face, high, 8.0))
+	# The falling water and the foam: a scrolling sheet in its own shader.
+	if not b.is_preview:
+		var sheet := LowPoly.new()
+		var bands := 8
+		for k in bands:
+			var t0 := float(k) / bands
+			var t1 := float(k + 1) / bands
+			# It bows out a little as it falls.
+			var z0 := 0.1 + sin(t0 * PI) * 0.6
+			var z1 := 0.1 + sin(t1 * PI) * 0.6
+			for side: float in [-1.0, 1.0]:
+				sheet._tri(Vector3(-wide * 0.5, high * (1.0 - t0), z0), Vector3(wide * 0.5, high * (1.0 - t0), z0), Vector3(wide * 0.5, high * (1.0 - t1), z1), Vector3(0, high * (1.0 - t0), z0 - side), Color(1, 1, 1, 1.0 - t0 * 0.2))
+				sheet._tri(Vector3(-wide * 0.5, high * (1.0 - t0), z0), Vector3(wide * 0.5, high * (1.0 - t1), z1), Vector3(-wide * 0.5, high * (1.0 - t1), z1), Vector3(0, high * (1.0 - t0), z0 - side), Color(1, 1, 1, 1.0 - t1 * 0.2))
+		var mi := MeshInstance3D.new()
+		mi.mesh = sheet.commit()
+		mi.transform = b.xf
+		mi.material_override = _falling_water()
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		b.w.add_child(mi)
+	var foam := b.mesh()
+	for k in 9:
+		var a := r.randf() * TAU
+		var d := r.randf_range(0.2, wide * 0.6)
+		foam.prism(Vector3(cos(a) * d, -0.15, 1.2 + sin(a) * d * 0.6), Vector3(cos(a) * d, 0.25, 1.2 + sin(a) * d * 0.6), r.randf_range(0.5, 1.0), 0.2, 6, Color(0.92, 0.97, 1.0))
+	_shine(b, foam)
+	_mist(b, Vector3(0, 1.0, 1.4), Vector3(wide * 0.6, 0.8, 1.2), Color(0.85, 0.95, 1.0), 16, 0.8)
+	_mist(b, Vector3(0, high * 0.5, 0.6), Vector3(wide * 0.4, high * 0.4, 0.3), Color(0.85, 0.95, 1.0), 8, -0.5)
+	b.w.add_glow(b.xf * Vector3(0, high * 0.4, 0.8), Color(0.6, 0.85, 1.0), wide * 1.5, 200.0)
+
+
+static func _falling_water() -> ShaderMaterial:
+	if _fall_mat:
+		return _fall_mat
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_mix;
+uniform vec3 water = vec3(0.62, 0.84, 0.98);
+void fragment() {
+	// Streaks of white racing down, broken into ropes of water.
+	vec3 w = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float lines = 0.5 + 0.5 * sin(w.x * 5.3 + sin(w.x * 1.7) * 2.0);
+	float fall = fract(w.y * 0.35 + TIME * 1.4 + lines * 0.6);
+	float streak = smoothstep(0.55, 1.0, fall) * (0.6 + 0.4 * lines);
+	ALBEDO = mix(water, vec3(1.0), streak * 0.8 + 0.2);
+	ALPHA = (0.55 + streak * 0.4) * COLOR.a;
+}
+"""
+	_fall_mat = ShaderMaterial.new()
+	_fall_mat.shader = sh
+	return _fall_mat
+
+
+## A great arch of rock, worn through by the mountain, moss and grass along its back and vines hanging
+## from it. Spans the piece's X axis; you can walk under it but not through its legs.
+static func arch(b: MapBuilder, span: float) -> void:
+	_feature(b, "arch", span)
+	var r := b.seeded()
+	var l := b.mesh()
+	var g := b.mesh()
+	var half := span * 0.5
+	var rise := span * 0.62
+	var thick := maxf(2.2, span * 0.16)
+	var segs := 22
+	var prev := Vector3.ZERO
+	for k in segs + 1:
+		var t := float(k) / segs
+		var a := PI * t
+		# A rounded arch, a little lopsided, its feet sunk into the ground.
+		var at := Vector3(-cos(a) * half, sin(a) * rise - 0.8, sin(a * 2.0) * thick * 0.25)
+		var fat := thick * (1.3 - 0.4 * sin(a))
+		if k > 0:
+			var stone := ROCK.lerp(ROCK_DARK, 0.25 + 0.25 * sin(k * 1.7))
+			l.prism(prev, at, fat, fat, 8, stone)
+			# Moss on its back, thickest along the top, and grass tufts on it.
+			var moss_cover := 0.55 + 0.45 * sin(a)
+			g.prism(prev + Vector3.UP * fat * 0.55, at + Vector3.UP * fat * 0.55, fat * 0.8 * moss_cover + 0.2, fat * 0.8 * moss_cover + 0.2, 8, MOSS_LIGHT.lerp(MOSS, 0.5 + 0.5 * sin(k * 2.3)))
+			if k > 2 and k < segs - 2 and k % 3 == 0:
+				for v in 2:
+					var drop := Vector3(r.randf_range(-0.4, 0.4), 0, (v - 0.5) * fat * 1.2)
+					g.prism(at + drop, at + drop + Vector3.DOWN * r.randf_range(1.2, 2.6), 0.08, 0.04, 4, MOSS.darkened(0.15))
+		prev = at
+	# Boulders round its feet.
+	for x: float in [-half, half]:
+		for k in 3:
+			var at := Vector3(x + r.randf_range(-1.5, 1.5), 0, r.randf_range(-1.5, 1.5))
+			l.prism(at + Vector3.DOWN * 0.3, at + Vector3.UP * r.randf_range(0.6, 1.4), r.randf_range(0.7, 1.2), 0.4, 6, ROCK_DARK)
+	b.add(l)
+	b.add(g)
+	for x: float in [-half, half]:
+		b.solid(Vector3(x, rise * 0.25, 0), Vector3(thick * 2.0, rise * 0.5, thick * 2.0))
+	# Too high to reach, but it stops shots and flyers like the rock it is.
+	for k in 5:
+		var a := PI * (k + 0.5) / 5.0
+		b.collider(Vector3(-cos(a) * half, sin(a) * rise, 0), Vector3(thick * 1.6, thick * 1.6, thick * 2.0))
+
+
+## A canvas tent on poles, its door flap tied back: shelter for the outpost's scouts.
+static func tent(b: MapBuilder, size: float) -> void:
+	var l := b.mesh()
+	var w := size * 0.5
+	var high := size * 0.72
+	var deep := size * 1.2
+	for z: float in [-deep * 0.5, deep * 0.5]:
+		l.prism(Vector3(0, 0, z), Vector3(0, high + 0.25, z), 0.06, 0.05, 5, LOG_DARK)
+	l.prism(Vector3(0, high, -deep * 0.5 - 0.1), Vector3(0, high, deep * 0.5 + 0.1), 0.05, 0.05, 5, LOG_DARK)
+	# Two sloping sheets and the back wall.
+	for side: float in [-1.0, 1.0]:
+		var foot := Vector3(side * w, 0.05, 0)
+		var ridge := Vector3(0, high, 0)
+		var n := Vector3(side, w / high, 0).normalized()
+		var c := CANVAS if side < 0 else CANVAS_DARK
+		l._tri(foot + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, deep * 0.5), foot - n, c)
+		l._tri(foot + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, deep * 0.5), foot + Vector3(0, 0, deep * 0.5), foot - n, c)
+	l._tri(Vector3(-w, 0.05, -deep * 0.5), Vector3(w, 0.05, -deep * 0.5), Vector3(0, high, -deep * 0.5), Vector3(0, high * 0.3, 0), CANVAS_DARK)
+	# The door flaps folded back, and the red stripe of Mesenlla along the ridge.
+	for side: float in [-1.0, 1.0]:
+		l._tri(Vector3(side * w, 0.05, deep * 0.5), Vector3(side * w * 0.45, high * 0.55, deep * 0.5 + 0.05), Vector3(0, high, deep * 0.5), Vector3(0, high * 0.3, deep * 0.4), CANVAS.lightened(0.08))
+	l.box(Vector3(0, high + 0.02, 0), Vector3(0.3, 0.06, deep + 0.1), CRIMSON)
+	# Guy ropes and pegs.
+	for side: float in [-1.0, 1.0]:
+		for z: float in [-deep * 0.4, deep * 0.4]:
+			l.prism(Vector3(side * w * 0.5, high * 0.5, z), Vector3(side * (w + 0.9), 0.05, z), 0.015, 0.015, 3, Color(0.75, 0.7, 0.55))
+	b.add(l)
+	b.solid(Vector3(0, high * 0.4, -deep * 0.15), Vector3(size * 0.9, high * 0.8, deep * 0.7))
+
+
+## Red pennants strung on a sagging line between two poles, across the piece's X axis.
+static func bunting(b: MapBuilder, length: float) -> void:
+	var l := b.cell()
+	var half := length * 0.5
+	var tall := 4.2
+	var ends: Array[Vector3] = []
+	for x: float in [-half, half]:
+		var foot := b.xf.affine_inverse() * b.on_ground(Vector3(x, 0, 0))
+		l.prism(foot + Vector3.DOWN * 0.3, foot + Vector3.UP * tall, 0.07, 0.05, 5, LOG_DARK)
+		l.prism(foot + Vector3.UP * tall, foot + Vector3.UP * (tall + 0.2), 0.08, 0.0, 4, AMBER)
+		ends.append(foot + Vector3.UP * (tall - 0.2))
+		b.solid(foot + Vector3.UP * 1.0, Vector3(0.25, 2.0, 0.25))
+	var count := maxi(4, int(length / 0.9))
+	var prev := ends[0]
+	for k in count + 1:
+		var t := float(k) / count
+		var at := ends[0].lerp(ends[1], t) + Vector3.DOWN * sin(t * PI) * length * 0.08
+		if k > 0:
+			l.prism(prev, at, 0.012, 0.012, 3, Color(0.75, 0.7, 0.55))
+			if k < count:
+				var mid := (prev + at) * 0.5
+				var col := CRIMSON if k % 3 else AMBER.darkened(0.1)
+				l._tri(mid + Vector3(-0.22, 0, 0), mid + Vector3(0.22, 0, 0), mid + Vector3(0, -0.55, 0), mid + Vector3(0, -0.2, -1), col)
+				l._tri(mid + Vector3(0.22, 0, 0), mid + Vector3(-0.22, 0, 0), mid + Vector3(0, -0.55, 0), mid + Vector3(0, -0.2, 1), col)
+		prev = at
+
+
+## Long red banners hung flat against a wall, the piece's front facing out from it (+Z), with a
+## lantern between each pair: dressing for the outpost's hall.
+static func wall_banners(b: MapBuilder, width: float) -> void:
+	var l := b.cell()
+	var count := maxi(2, int(width / 3.2))
+	for k in count:
+		var x := (float(k) + 0.5) / count * width - width * 0.5
+		l.box(Vector3(x, 3.4, 0.04), Vector3(1.0, 0.08, 0.08), LOG_DARK)
+		l.box(Vector3(x, 2.2, 0.06), Vector3(0.8, 2.3, 0.03), CRIMSON)
+		l.box(Vector3(x, 2.4, 0.08), Vector3(0.36, 0.36, 0.02), AMBER)
+		l._tri(Vector3(x - 0.4, 1.05, 0.06), Vector3(x + 0.4, 1.05, 0.06), Vector3(x, 0.7, 0.06), Vector3(x, 1.0, -1), CRIMSON)
+	var glow := b.mesh()
+	for k in count - 1:
+		var x := (float(k) + 1.0) / count * width - width * 0.5
+		glow.box(Vector3(x, 2.6, 0.25), Vector3(0.24, 0.32, 0.24), AMBER)
+		b.w.add_glow(b.xf * Vector3(x, 2.6, 0.4), AMBER, 2.2, 120.0)
+	_shine(b, glow)
+
+
+## The forest floor in a ring: ferns, mushrooms (a few of them glowing), mossy stones and a stump.
+static func undergrowth(b: MapBuilder, radius: float) -> void:
+	var r := b.seeded()
+	var l := b.cell()
+	var glow := b.mesh()
+	var glowing := false
+	var count := int(radius * radius * 0.35)
+	for k in count:
+		var a := r.randf() * TAU
+		var d := sqrt(r.randf()) * radius
+		var at := b.xf.affine_inverse() * b.on_ground(Vector3(cos(a) * d, 0, sin(a) * d))
+		match k % 6:
+			0, 1, 2:
+				# A fern: fronds arching out from the middle.
+				var fronds := 5
+				var size := r.randf_range(0.5, 0.95)
+				for f in fronds:
+					var fa := TAU * f / fronds + r.randf()
+					var tip := at + Vector3(cos(fa) * size, size * 0.55, sin(fa) * size)
+					l.prism(at, tip, 0.09, 0.02, 3, PINE if f % 2 else MOSS)
+			3:
+				var size := r.randf_range(0.25, 0.5)
+				l.prism(at, at + Vector3.UP * size, 0.05, 0.04, 4, Color(0.85, 0.8, 0.7))
+				var cap := CRIMSON.lightened(0.1) if r.randf() < 0.6 else Color(0.8, 0.6, 0.35)
+				l.prism(at + Vector3.UP * size, at + Vector3.UP * (size + 0.14), size * 0.55, 0.05, 6, cap)
+			4:
+				if r.randf() < 0.45:
+					# A glowing mushroom of the mist.
+					var size := r.randf_range(0.2, 0.4)
+					glow.prism(at, at + Vector3.UP * size, 0.04, 0.03, 4, MIST_GLOW.lightened(0.3))
+					glow.prism(at + Vector3.UP * size, at + Vector3.UP * (size + 0.1), size * 0.6, 0.04, 6, MIST_GLOW)
+					glowing = true
+				else:
+					l.prism(at + Vector3.DOWN * 0.1, at + Vector3.UP * r.randf_range(0.2, 0.45), r.randf_range(0.3, 0.6), 0.15, 5, ROCK_DARK)
+					l.prism(at + Vector3.UP * 0.2, at + Vector3.UP * 0.35, 0.4, 0.1, 5, MOSS)
+			5:
+				if r.randf() < 0.25:
+					l.prism(at, at + Vector3.UP * 0.5, 0.45, 0.4, 7, BARK)
+					l.prism(at + Vector3.UP * 0.5, at + Vector3.UP * 0.53, 0.4, 0.36, 7, LOG.lightened(0.2))
+	if glowing:
+		_shine(b, glow)
+
+
+# --- Trees of the valley ------------------------------------------------------------------------
+
+static var _tree_meshes := {}
+
+
+## The valley's own trees, at size 1 (MapTree scales them): "giant_fir", an old fir three times a
+## man's reach of the common ones, its trunk bare far up; "tall_pine", slender with a high crown; and
+## "mossy_oak", broad and low with a heavy round crown and moss on its limbs.
+static func tree_mesh(kind: String) -> Mesh:
+	if _tree_meshes.has(kind):
+		return _tree_meshes[kind]
+	var l := LowPoly.new()
+	var r := RandomNumberGenerator.new()
+	r.seed = hash(kind)
+	match kind:
+		"giant_fir":
+			l.prism(Vector3.DOWN * 0.1, Vector3.UP * 2.9, 0.085, 0.02, 7, BARK)
+			for k in 3:
+				var a := TAU * k / 3.0 + 0.4
+				l.prism(Vector3.ZERO, Vector3(cos(a) * 0.17, -0.05, sin(a) * 0.17), 0.05, 0.01, 4, BARK.darkened(0.1))
+			# Tiers of boughs from a third of the way up, wide at the bottom, narrowing to a spire.
+			var tiers := 11
+			for k in tiers:
+				var t := float(k) / tiers
+				var y := 0.55 + t * 2.2
+				var w := lerpf(0.8, 0.14, pow(t, 0.9)) * r.randf_range(0.92, 1.08)
+				l.prism(Vector3(0, y, 0), Vector3(0, y + 0.5, 0), w, 0.0, 9, PINE if k % 2 else PINE_DARK)
+			l.prism(Vector3(0, 2.75, 0), Vector3(0, 3.1, 0), 0.08, 0.0, 6, PINE)
+		"tall_pine":
+			l.prism(Vector3.DOWN * 0.1, Vector3.UP * 1.8, 0.05, 0.015, 6, BARK.lightened(0.15))
+			for k in 5:
+				var t := float(k) / 5.0
+				var y := 0.9 + t * 0.9
+				var w := lerpf(0.36, 0.1, t)
+				l.prism(Vector3(0, y, 0), Vector3(0, y + 0.3, 0), w, 0.0, 7, PINE.lightened(0.06) if k % 2 else PINE)
+		"mossy_oak":
+			l.prism(Vector3.DOWN * 0.1, Vector3.UP * 0.55, 0.12, 0.09, 7, BARK)
+			for k in 4:
+				var a := TAU * k / 4.0 + r.randf()
+				var limb := Vector3(cos(a) * 0.42, 0.85, sin(a) * 0.42)
+				l.prism(Vector3.UP * 0.5, limb, 0.07, 0.04, 5, BARK)
+				l.prism(Vector3.UP * 0.5 + (limb - Vector3.UP * 0.5) * 0.3, limb, 0.05, 0.03, 4, MOSS)
+			# A heavy crown of round clumps.
+			for k in 7:
+				var a := TAU * k / 7.0
+				var d := 0.35 if k else 0.0
+				var at := Vector3(cos(a) * d, 1.0 + r.randf_range(-0.08, 0.12), sin(a) * d)
+				var size := r.randf_range(0.3, 0.42)
+				l.prism(at + Vector3.DOWN * size * 0.6, at + Vector3.UP * size * 0.6, size, size * 0.55, 8, MOSS_LIGHT.darkened(0.25) if k % 2 else MOSS.darkened(0.15))
+			l.prism(Vector3(0, 1.2, 0), Vector3(0, 1.48, 0), 0.4, 0.12, 8, MOSS_LIGHT.darkened(0.2))
+	_tree_meshes[kind] = l.commit()
+	return _tree_meshes[kind]
