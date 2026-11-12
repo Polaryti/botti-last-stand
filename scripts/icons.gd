@@ -55,7 +55,8 @@ static func weapon(id: String) -> String:
 	return {"dagger": "dagger", "sword": "sword", "spear": "spear", "mace": "mace", "lance": "lance", "scythe": "scythe",
 		"flail": "flail", "bell_hammer": "bell_hammer", "pitchfork": "pitchfork", "torch": "torch", "bow": "bow",
 		"crossbow": "crossbow", "longbow": "longbow", "axes": "axe", "javelins": "javelins", "fists": "hand", "bo": "bo",
-		"blowgun": "blowgun", "war_staff": "staff", "musket": "crossbow", "staff": "staff", "claws": "claw"}.get(id, "sword")
+		"blowgun": "blowgun", "war_staff": "staff", "musket": "crossbow", "staff": "staff", "claws": "claw",
+		"greatsword": "greatsword", "battleaxe": "battleaxe", "chakram": "chakram"}.get(id, "sword")
 
 
 static func power(id: String) -> String:

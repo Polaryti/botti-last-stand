@@ -51,5 +51,54 @@ const COPY := {
 static func description(id: String) -> String:
 	return " ".join(COPY[id])
 
+
+## The same stat line on the Codex, the Armory and the class screen.
+static func stats_line(id: String) -> String:
+	var d: Dictionary = ClassDefs.ALL[id]
+	return "Base health %d · Speed %d%%" % [int(d["hp"]), roundi(float(d["speed"]) * 100.0)]
+
+
+## Tag colours: background, border, text. Map badges and weapon groups share one shape.
+const TAG_STYLES := {
+	"melee": [Color("2b3140"), Color("9aa5ba"), Color("dfe5ef")],
+	"two_handed": [Color("3d2a14"), Color("efa93f"), Color("ffd99a")],
+	"ranged": [Color("1d3c2c"), Color("7fc08a"), Color("b2e8b5")],
+	"exclusive": [Color("33213f"), Color("b98ae0"), Color("e3ccff")],
+	"map_green": [Color("1d3c2c"), Color("7fc08a"), Color("b2e8b5")],
+	"map_mists": [Color("193e4b"), Color("6fb6d6"), Color("a5f0ec")],
+	"map_mesenlla": [Color("4a2a12"), Color("e7a04c"), Color("ffd9a6")],
+}
+
+
+static func tag(text: String, style: String) -> PanelContainer:
+	var colors: Array = TAG_STYLES[style]
+	var badge := PanelContainer.new()
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	badge.add_theme_stylebox_override("panel", UiTheme.flat(colors[0], colors[1], 6, 7.0))
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_override("font", UiTheme.bold_font())
+	label.add_theme_font_size_override("font_size", 19)
+	label.add_theme_color_override("font_color", colors[2])
+	badge.add_child(label)
+	return badge
+
+
+## Which weapon groups a class can wield, as a row of tags.
+static func weapon_tags(id: String) -> HFlowContainer:
+	var row := HFlowContainer.new()
+	row.name = "WeaponTags"
+	row.add_theme_constant_override("h_separation", 8)
+	row.add_theme_constant_override("v_separation", 6)
+	for cat: String in ClassDefs.weapon_categories(id):
+		row.add_child(tag(WeaponDefs.CATEGORY_NAMES[cat], cat))
+	return row
+
+
+## "Map Exclusive · …" in the colour of the maps it belongs to.
+static func map_tag(data: Dictionary) -> PanelContainer:
+	var style := "map_mesenlla" if SpawnRules.is_mesenlla(data) else ("map_green" if data.get("maps", []).has("village") or data.get("maps", []).has("fort") else "map_mists")
+	return tag("Map Exclusive · " + SpawnRules.names(data), style)
+
 static func profession(spec: Dictionary) -> String:
 	return spec["desc"].strip_edges().trim_suffix(".") + ". " + str(spec["entry"]["desc"]).split(". ")[0].trim_suffix(".") + "."

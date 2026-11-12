@@ -119,10 +119,11 @@ func _classes() -> void:
 		var paths := PackedStringArray()
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:
 			paths.append(spec["name"])
-		var note := "Base health %d, speed %d%%. Paths: %s." % [int(d["hp"]), int(round(float(d["speed"]) * 100.0)), ", ".join(paths)]
+		var note := "%s. Paths: %s." % [ClassPresentation.stats_line(id), ", ".join(paths)]
 		if not Game.owns_class(id):
 			note += " " + acquisition(id)
-		_row(ClassDefs.icon(id), ClassDefs.color(id), d["name"], d["desc"], note)
+		_row(ClassDefs.icon(id), ClassDefs.color(id), d["name"], ClassPresentation.description(id), note)
+		_list.get_child(-1).get_child(1).add_child(ClassPresentation.weapon_tags(id))
 
 
 ## Families are kept together; alphabetical order is only used within a family.
@@ -160,18 +161,9 @@ func _enemies() -> void:
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], d["desc"], note)
 		_map_badge(d, d.get("maps", []).has("village"))
 
-func _map_badge(data: Dictionary, green := true) -> void:
+func _map_badge(data: Dictionary, _green := true) -> void:
 	if not data.has("maps"): return
-	var badge := PanelContainer.new()
-	badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	badge.add_theme_stylebox_override("panel", UiTheme.flat(Color("1d3c2c") if green else Color("193e4b"), UiTheme.MOSS if green else UiTheme.MIST, 6, 7.0))
-	var label := Label.new()
-	label.text = "Map Exclusive · " + SpawnRules.names(data)
-	label.add_theme_font_override("font", UiTheme.bold_font())
-	label.add_theme_font_size_override("font_size", 19)
-	label.add_theme_color_override("font_color", Color("b2e8b5") if green else Color("a5f0ec"))
-	badge.add_child(label)
-	_list.get_child(-1).get_child(1).add_child(badge)
+	_list.get_child(-1).get_child(1).add_child(ClassPresentation.map_tag(data))
 
 func _section(title: String) -> void:
 	var label := Label.new()
@@ -211,7 +203,13 @@ func _weapons() -> void:
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
 		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
-		_map_badge(d, not d.get("maps", []).has("mists"))
+		var tags := HFlowContainer.new()
+		tags.add_theme_constant_override("h_separation", 8)
+		var cat := WeaponDefs.category(id)
+		tags.add_child(ClassPresentation.tag(WeaponDefs.CATEGORY_NAMES[cat], cat))
+		if d.has("maps"):
+			tags.add_child(ClassPresentation.map_tag(d))
+		_list.get_child(-1).get_child(1).add_child(tags)
 
 
 static func acquisition(id: String) -> String:
@@ -231,7 +229,7 @@ static func acquisition(id: String) -> String:
 ## General conditions only. Profession skills remain in their class trees.
 func _statuses() -> void:
 	for entry: Dictionary in StatusCatalog.TIMED:
-		if entry["field"] not in ["burn_time", "bleed_left", "poison_left", "slowed_left", "invis_left", "guard_left"]: continue
+		if entry["field"] not in ["burn_time", "bleed_left", "poison_left", "slowed_left", "invis_left", "invis_lockout", "guard_left"]: continue
 		_row(entry["icon"], UiTheme.BLOOD if entry["field"] in ["burn_time", "bleed_left", "poison_left"] else UiTheme.MIST, entry["name"], entry["desc"])
 	_row("status_frozen", UiTheme.MIST, "Frozen", "Ice prevents movement until its timer ends. You can still look around.")
 	_row("status_stunned", UiTheme.EMBER, "Stunned", "An impact briefly interrupts movement until its timer ends.")

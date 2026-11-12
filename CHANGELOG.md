@@ -1,5 +1,27 @@
 # Changelog
 
+## Development — Beyond the Mists, part 1: Weapons
+
+### Two-Handed weapons
+- A new weapon group, Two-Handed. The Bell Hammer, Pitchfork and Scythe are Two-Handed, joined by the new Greatsword.
+- Only Infantry, Chivalry, Monk, Adept, Artificer and Commander can wield Two-Handed weapons. Melee and ranged rules for every class are unchanged.
+- Greatsword: wide, heavy sweeps that cut through up to five. Found on every map.
+
+### Found beyond the Mists ("Map Exclusive · Mesenlla")
+- Battleaxe (Two-Handed): every third blow in a row is a cleaving chop that does double damage and throws enemies back.
+- Rift Chakram (ranged): a ring of mist-glass that ricochets on to three more enemies and needs no arrows.
+- Both will lie on the new maps when they arrive later in this update.
+
+### Codex, Armory and class screen
+- Each class shows the weapon groups it can wield as tags: Melee, Two-Handed, Ranged and Exclusive Weapon. Weapons in the Codex show their group.
+- Class stats and descriptions read the same on the Codex, the Armory and the class screen.
+
+### Stealth
+- After invisibility ends, for any reason, you cannot turn invisible again for 3 seconds. A "Revealed" icon on the effects row counts it down.
+
+### Playing together
+- Phones on this build only play with phones on the same build.
+
 ## Development — Smoother Crowds
 - Store class descriptions and profession summaries scroll within the detail panel, while the preview and purchase controls stay visible.
 - Terrain and bridge checks do less repeated work in busy areas, with the same walking surfaces and approach margins.

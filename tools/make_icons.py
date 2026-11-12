@@ -349,6 +349,20 @@ def crest_commander():
 
 CRESTS = [crest_commander, crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
 
+# Beyond the Mists: two-handed and Mesenlla weapons
+def greatsword():
+    # Longer and broader than the Sword: a wide blade with a fuller, a straight bar guard and a two-hand grip.
+    return (poly(STEEL, (50, 0), (61, 10), (61, 54), (39, 54), (39, 10)) + line("#7a859c", 3, (50, 10), (50, 50), ink=False)
+        + rect(DSTEEL, 18, 53, 64, 7) + rect(LEATHER, 45, 60, 10, 28) + line("#2a2f3f", 2, (45, 70), (55, 70), ink=False) + line("#2a2f3f", 2, (45, 78), (55, 78), ink=False) + circ(BRASS, 50, 93, 6))
+def battleaxe():
+    return (line("#c08a52", 7, (64, 96), (40, 6)) + "".join(line("#a22a20", 8, a, b, ink=False) for a, b in [((60, 84), (62, 78)), ((44, 24), (45, 20))])
+        + path(STEEL, "M44 16 C30 8 12 14 8 30 C6 44 14 58 28 66 C24 54 26 44 34 38 L48 34 Z") + poly(DSTEEL, (48, 20), (64, 12), (52, 30)))
+def chakram():
+    teeth = "".join(turn(a, poly(MIST, (50, 2), (56, 14), (44, 14))) for a in (0, 90, 180, 270))
+    return teeth + circ(MIST, 50, 50, 38) + circ("#12141c", 50, 50, 22, 0) + circ("none", 50, 50, 22, 3) + line("#7a4d26", 7, (32, 50), (68, 50)) + circ("#40f0e2", 50, 50, 6, 1.5)
+for g in (greatsword, battleaxe, chakram):
+    PLAIN.append(g)
+
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),

@@ -27,6 +27,7 @@ var on_burst := Callable() # thrown things: what happens where it lands
 var chaos_left := 0 # bomblets: how many more times it bounces off and goes on
 var sparks := 0 # darts: how many others the spark jumps to
 var poison_trail := false
+var spins := false # a thrown ring turns flat as it flies
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
@@ -79,6 +80,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	scale = Vector3.ONE
 	rotation = Vector3.ZERO
 	_spin = 0.0
+	spins = false
 	_owner_assigned = false
 	poison = Vector2.ZERO
 	poison_trail = false
@@ -210,6 +212,9 @@ func _fly(delta: float) -> void:
 		if kind == Kind.AXE:
 			_spin += delta * 18.0
 			rotate_object_local(Vector3.RIGHT, _spin)
+		elif spins:
+			_spin += delta * 22.0
+			rotate_object_local(Vector3.UP, _spin)
 		return
 	var c: Object = hit["collider"]
 	var at: Vector3 = hit["position"]
@@ -354,7 +359,7 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 			Game.note_poison(poison.x * poison.y)
 	if stagger > 0.0:
 		z.stun(stagger)
-	world.sfx_at("thunk", at, -3.0)
+	world.sfx_at("chakram_hit" if spins else "thunk", at, -3.0)
 	_exclude.append(z.get_rid())
 	if blast_radius > 0.0:
 		_explode(at)

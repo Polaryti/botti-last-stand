@@ -684,7 +684,8 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 	var title := _body(c["name"], 38)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
-	words.add_child(_soft("Health %d. Speed %d%%." % [int(c["hp"]), int(round(float(c["speed"]) * 100.0))], 24))
+	words.add_child(_soft(ClassPresentation.stats_line(id), 24))
+	words.add_child(ClassPresentation.weapon_tags(id))
 	# The preview and action stay visible; prose can grow without stretching the screen.
 	var scroll := DragScroll.new()
 	scroll.name = "ClassDescriptionScroll"
@@ -986,7 +987,8 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	words.add_child(title)
 	words.add_child(_body(ClassPresentation.COPY[id][0], 23))
 	var d: Dictionary = ClassDefs.ALL[id]
-	words.add_child(_soft("Base health %d · Speed %d%%\nStarting weapon: %s · Starting arrows: %d" % [int(d["hp"]), roundi(float(d["speed"]) * 100), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], 21))
+	words.add_child(_soft("%s\nStarting weapon: %s · Starting arrows: %d" % [ClassPresentation.stats_line(id), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], 21))
+	words.add_child(ClassPresentation.weapon_tags(id))
 	words.add_child(_body(ClassPresentation.COPY[id][1], 22))
 	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL

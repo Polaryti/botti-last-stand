@@ -35,6 +35,7 @@ func _ready() -> void:
 	await _traversal()
 	_music_and_polish()
 	await _after_0212()
+	await _beyond_weapons()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -464,3 +465,127 @@ func _codex_and_concealment() -> void:
 	shot.launch(Projectile.Kind.FIREBALL, w._fireball_mesh, Vector3(0, 5, 0), Vector3.FORWARD, 0, 20, 1)
 	check(shot._flame.visible and not shot._arrow_aura.visible, "pooled fireballs reset the arrow effect")
 	shot.queue_free()
+
+
+## 0.22 step 1: Two-Handed weapons, the Greatsword, the Mesenlla weapons, tags and the 3 s reveal.
+func _beyond_weapons() -> void:
+	for id: String in ["bell_hammer", "pitchfork", "scythe", "greatsword", "battleaxe"]:
+		check(WeaponDefs.category(id) == "two_handed", "%s is a Two-Handed weapon" % id)
+	check(WeaponDefs.category("sword") == "melee" and WeaponDefs.category("chakram") == "ranged" and WeaponDefs.category("lance") == "exclusive" and WeaponDefs.category("bo") == "exclusive", "the other groups")
+	var expect := {"infantry": ["melee", "two_handed", "ranged"], "ranger": ["melee", "ranged"], "heavy": ["melee"], "chivalry": ["melee", "two_handed", "exclusive"],
+		"magician": ["exclusive"], "revenant": ["exclusive"], "monk": ["melee", "two_handed", "ranged", "exclusive"], "adept": ["melee", "two_handed"],
+		"plague_doctor": ["melee", "ranged", "exclusive"], "artificer": ["melee", "two_handed", "ranged"], "commander": ["melee", "two_handed", "ranged", "exclusive"]}
+	for id: String in expect:
+		check(ClassDefs.weapon_categories(id) == Array(expect[id], TYPE_STRING, "", null), "%s wields %s (got %s)" % [id, str(expect[id]), str(ClassDefs.weapon_categories(id))])
+	var cls := p.class_id
+	for id: String in ["infantry", "chivalry", "monk", "adept", "artificer", "commander"]:
+		p.setup_class(id)
+		check(p.can_use("greatsword") and p.can_use("scythe"), "%s can wield Two-Handed weapons" % id)
+	for id: String in ["ranger", "heavy", "plague_doctor"]:
+		p.setup_class(id)
+		check(not p.can_use("greatsword") and not p.can_use("bell_hammer") and p.can_use("sword"), "%s cannot, and keeps its one-handed melee" % id)
+	p.setup_class("ranger")
+	check(p.can_use("chakram") and p.can_use("bow"), "ranged rules are unchanged")
+	p.setup_class("magician")
+	check(not p.can_use("greatsword") and p.can_use("staff"), "the Magician still holds only its Staff")
+	# Where they are found.
+	check(SpawnRules.allows(WeaponDefs.ALL["greatsword"], "village") and SpawnRules.allows(WeaponDefs.ALL["greatsword"], "mists") and SpawnRules.allows(WeaponDefs.ALL["greatsword"], "mesenlla"), "the Greatsword lies on every map")
+	for id: String in ["battleaxe", "chakram"]:
+		check(not SpawnRules.allows(WeaponDefs.ALL[id], "village") and SpawnRules.allows(WeaponDefs.ALL[id], "mesenlla") and SpawnRules.allows(WeaponDefs.ALL[id], "bastion"), "%s only beyond the Mists" % id)
+		check(SpawnRules.names(WeaponDefs.ALL[id]) == "Mesenlla", "%s's badge says Mesenlla" % id)
+	for id: String in ["greatsword", "battleaxe", "chakram"]:
+		check(WeaponDefs.mesh(id) != null and ResourceLoader.exists("res://assets/icons/%s.png" % Icons.weapon(id)) and Icons.weapon(id) == id, "%s has its own model and icon" % id)
+	for sound: String in ["heavy_swing", "cleave", "chakram_throw", "chakram_hit"]:
+		check(ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound) and Sfx.NAMES.has(sound), "%s sound" % sound)
+	# The Battleaxe: every third blow in a row cleaves for double.
+	p.setup_class("infantry")
+	p.slots = ["battleaxe", null]
+	p.current = 0
+	p._equip()
+	p.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
+	p.rotation = Vector3.ZERO
+	p.camera.rotation = Vector3.ZERO
+	w.spawn_zombie("normal", p.global_position + Vector3(0, 0, -1.6))
+	var z: Zombie = w.zombies.back()
+	z.set_physics_process(false)
+	var losses: Array[float] = []
+	for i in 3:
+		z.hp = 5000.0
+		z.max_hp = 5000.0
+		z.position = p.global_position + Vector3(0, 0, -1.6)
+		p._do_melee_hit()
+		losses.append(5000.0 - z.hp)
+	check(losses[0] > 0.0 and is_equal_approx(losses[0], losses[1]) and absf(losses[2] - losses[0] * 2.0) < 1.0, "blows 1 and 2 are equal, the third does double (%s)" % str(losses))
+	z.release()
+	# The Rift Chakram ricochets.
+	p.slots = ["chakram", null]
+	p._equip()
+	var row: Array[Zombie] = []
+	for i in 4:
+		w.spawn_zombie("normal", p.global_position + Vector3(i * 3.0 * (1 if i % 2 else -1) * 0.5, 0, -9.0 - i * 2.0))
+		var zz: Zombie = w.zombies.back()
+		zz.set_physics_process(false)
+		zz.hp = 500.0
+		row.append(zz)
+	p._fire_arrow(p.weapon_def())
+	var shot: Projectile = w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.spins).back()
+	check(shot != null and shot.bounces >= 3, "a thrown chakram carries three ricochets")
+	for i in 120:
+		await get_tree().physics_frame
+	var struck := row.filter(func(zz: Zombie) -> bool: return zz.hp < 500.0).size()
+	check(struck >= 3, "and strikes several enemies in turn (%d)" % struck)
+	for zz in row: zz.release()
+	# Invisibility, then three seconds before the next.
+	p.invis_left = 2.0
+	check(p.invis_left > 0.0 and p.can_vanish(), "invisible")
+	p.invis_left = 4.0
+	check(is_equal_approx(p.invis_left, 4.0), "a running invisibility can be lengthened")
+	p.invis_left = 0.0
+	check(is_equal_approx(p.invis_lockout, Player.INVIS_LOCKOUT) and not p.can_vanish(), "coming out of it starts the 3 s reveal")
+	p._act({"do": "invis", "secs": 5.0}, {})
+	check(p.invis_left == 0.0, "nothing hides you during it")
+	check(p.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "eye+clock"), "the reveal shows on the effects row")
+	p._tick_ability_timers(1.6)
+	p._tick_ability_timers(1.5)
+	p._act({"do": "invis", "secs": 5.0}, {})
+	check(p.invis_left > 4.0, "after 3 s it works again")
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.setup_class(cls)
+	# Weapon groups read the same on the class screen, the Armory and the Codex.
+	var m := Main.new()
+	add_child(m)
+	await frames(2)
+	for id: String in ["infantry", "magician"]:
+		var want := ClassDefs.weapon_categories(id).map(func(c: String) -> String: return WeaponDefs.CATEGORY_NAMES[c])
+		m.show_class_picker(Game.Mode.NIGHT)
+		m._fill_class_detail(m.panel.get_meta("detail"), id, Game.Mode.NIGHT)
+		check(_tag_texts(m.panel) == want, "class screen tags for %s: %s" % [id, str(_tag_texts(m.panel))])
+		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == ClassPresentation.stats_line(id)), "class screen stat line for %s" % id)
+		m.show_armory(id)
+		m._fill_armory(m.panel.get_meta("detail"), id)
+		check(_tag_texts(m.panel) == want, "Armory tags for %s" % id)
+		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text.begins_with(ClassPresentation.stats_line(id))), "Armory stat line for %s" % id)
+	var codex := CodexPanel.new()
+	add_child(codex)
+	codex._list = VBoxContainer.new()
+	codex.add_child(codex._list)
+	codex._classes()
+	var codex_tags := codex._list.find_children("WeaponTags", "HFlowContainer", true, false)
+	check(codex_tags.size() == ClassDefs.ALL.size(), "every class in the Codex has weapon tags")
+	codex._list.queue_free()
+	codex._list = VBoxContainer.new()
+	codex.add_child(codex._list)
+	codex._weapons()
+	var texts := codex._list.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(texts.has("Two-Handed") and texts.has("Map Exclusive · Mesenlla") and texts.has("Greatsword"), "the Codex weapons show their group and the Mesenlla badge")
+	codex.queue_free()
+	m.queue_free()
+	await frames(2)
+
+
+func _tag_texts(root: Node) -> Array:
+	var rows := root.find_children("WeaponTags", "HFlowContainer", true, false)
+	if rows.is_empty():
+		return []
+	return (rows[0] as Node).find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)

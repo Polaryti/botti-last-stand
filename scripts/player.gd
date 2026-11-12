@@ -117,7 +117,17 @@ var flags := {}
 var spec_id := ""
 var _buffs := {} # key -> {stat, val, left, stacks}
 var _triggers := {} # event -> list of effect dictionaries with runtime counters
-var invis_left := 0.0
+## Seconds of invisibility left. Coming out of it, for any reason, starts INVIS_LOCKOUT: until that
+## runs out nothing can make you invisible again (an invisibility still running can be lengthened).
+const INVIS_LOCKOUT := 3.0
+var invis_lockout := 0.0
+var invis_left := 0.0:
+	set(value):
+		if value > 0.0 and invis_left <= 0.0 and invis_lockout > 0.0:
+			return
+		if value <= 0.0 and invis_left > 0.0:
+			invis_lockout = INVIS_LOCKOUT
+		invis_left = maxf(0.0, value)
 var guard_left := 0.0
 var dome_left := 0.0
 var oath_reserve := 0.0
@@ -171,6 +181,8 @@ var riding_left := 0.0
 var _shot_count := 0
 var _flail_stacks := 0
 var _flail_idle := 0.0
+var _cleave_count := 0 # Battleaxe blows in a row
+var _cleave_idle := 0.0
 var _axe_out := false
 var _trampled := {}
 
@@ -485,6 +497,11 @@ func status_effects() -> Array[Dictionary]:
 	return out
 
 
+## Whether something can make you invisible now: not within INVIS_LOCKOUT of the last time you were.
+func can_vanish() -> bool:
+	return invis_left > 0.0 or invis_lockout <= 0.0
+
+
 ## A stat including temporary buffs.
 func m(stat: String) -> float:
 	var v: float = mods[stat]
@@ -528,7 +545,8 @@ func has_empty_slot() -> bool:
 	return _slot_free(0) or _slot_free(1)
 
 
-## Class rule: Heavy Infantry and Chivalry cannot use ranged weapons, unless unlocked.
+## Class rules: some classes cannot use ranged weapons unless unlocked, and only classes trained for
+## them wield Two-Handed weapons (ClassDefs.weapon_categories).
 func can_use(id: String) -> bool:
 	if not WeaponDefs.ALL.has(id):
 		return false
@@ -545,6 +563,8 @@ func can_use(id: String) -> bool:
 		return id == "bo"
 	if id == "bo":
 		return class_id == "monk"
+	if WeaponDefs.is_two_handed(id) and not class_def().get("two_handed", false):
+		return false
 	if WeaponDefs.is_ranged(id):
 		return bool(class_def()["ranged"]) or has_flag("ranged_ok")
 	return true
@@ -1195,8 +1215,9 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 			if z:
 				world.spawn_ally("skeleton", z.position, float(e["secs"]) * m("ally_time"))
 		"invis":
-			invis_left = maxf(invis_left, float(e["secs"]))
-			say("Invisible")
+			if can_vanish():
+				invis_left = maxf(invis_left, float(e["secs"]))
+				say("Invisible")
 		"guard":
 			guard_left = maxf(guard_left, float(e["secs"]))
 			sfx("block", -6.0, 1.3, 0.2)
@@ -1674,6 +1695,7 @@ func _tick_ability_timers(delta: float) -> void:
 			_buffs.erase(key)
 	_tick_triggers(delta)
 	invis_left = maxf(0.0, invis_left - delta)
+	invis_lockout = maxf(0.0, invis_lockout - delta)
 	guard_left = maxf(0.0, guard_left - delta)
 	dome_left = maxf(0.0, dome_left - delta)
 	_riposte_cd -= delta
@@ -2298,8 +2320,11 @@ func _tick_mist(delta: float) -> void:
 			world.fx_blast(global_position + Vector3.UP, 1.6, Color(0.5, 0.75, 1.0, 0.4))
 		"shadow":
 			shadow_kills = 0
-			invis_left = maxf(invis_left, SHROUD_TIME)
-			say("Invisible")
+			if can_vanish():
+				invis_left = maxf(invis_left, SHROUD_TIME)
+				say("Invisible")
+			else:
+				say("Can't vanish for %d s" % ceili(invis_lockout))
 			world.fx_mist(global_position + Vector3.UP, 1.0)
 
 
@@ -3096,6 +3121,7 @@ func _process_step(delta: float) -> void:
 		if _melee_pending < 0.0:
 			_do_melee_hit()
 	_flail_idle += delta
+	_cleave_idle += delta
 	if _flail_idle > 1.4:
 		_flail_stacks = 0
 	_handle_fire()
@@ -3158,7 +3184,10 @@ func _handle_fire() -> void:
 			_flail_idle = 0.0
 			if d.get("momentum", false):
 				_flail_stacks = mini(3, _flail_stacks + 1)
-			sfx("swing", -3.0, 1.15 if weapon_id() == "dagger" else 1.0)
+			if WeaponDefs.is_two_handed(weapon_id()):
+				sfx("heavy_swing", -3.0, randf_range(0.92, 1.05))
+			else:
+				sfx("swing", -3.0, 1.15 if weapon_id() == "dagger" else 1.0)
 		WeaponDefs.Kind.RANGED:
 			if d.get("returning", false):
 				_throw_axe(d)
@@ -3245,7 +3274,10 @@ func _fire_arrow(d: Dictionary) -> void:
 		_swing_time = 0.3
 		_swing = 0.0
 		_swing_keys = "throw"
-		sfx("swing", -3.0, 0.75)
+		if d["shot"] == "chakram":
+			sfx("chakram_throw", -3.0, randf_range(0.95, 1.05))
+		else:
+			sfx("swing", -3.0, 0.75)
 	else:
 		sfx("crossbow" if weapon_id() == "crossbow" else "bow", -2.0, 0.85 if weapon_id() == "longbow" else 1.0)
 	_noise(4.0)
@@ -3315,7 +3347,18 @@ func _do_melee_hit() -> void:
 		_bashing = false
 	if d.is_empty() or d["kind"] != WeaponDefs.Kind.MELEE:
 		return
-	var hits := world.melee_hit(self, d, melee_stats(d))
+	var stats := melee_stats(d)
+	# Battleaxe: every third blow in a row is a cleaving chop.
+	if int(d.get("cleave", 0)) > 0:
+		_cleave_count = _cleave_count + 1 if _cleave_idle < 2.0 else 1
+		_cleave_idle = 0.0
+		if _cleave_count % int(d["cleave"]) == 0:
+			stats["damage"] *= 2.0
+			stats["knock"] *= 1.8
+			say("Cleave!")
+			world.fx_blast(global_position + Vector3.UP * 0.3 - global_basis.z * 1.6, 1.4, Color(0.95, 0.75, 0.5, 0.45))
+			sfx("cleave", -1.0, randf_range(0.95, 1.05))
+	var hits := world.melee_hit(self, d, stats)
 	if hits > 0 and d != BASH:
 		fire("melee_swing", {})
 	_next_hit_mult = 1.0

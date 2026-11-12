@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 40
+const PROTOCOL := 41
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -44,7 +44,7 @@ const PVP_DAMAGE := 0.55 # players hit each other less hard than they hit the un
 const KILL_POINTS := 5
 const RULE_NAMES := ["Co-op Night", "All vs All", "Teams", "Defend the Fort"]
 const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "crow", "gargoyle", "leaper", "wraith", "banshee", "mimic", "creak",
-	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf"]
+	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf", "chakram_hit", "cleave"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep"]
 

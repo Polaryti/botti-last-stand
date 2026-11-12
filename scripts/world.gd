@@ -1217,6 +1217,8 @@ func _shot_mesh(id: String) -> Mesh:
 	match id:
 		"javelin":
 			return WeaponDefs.mesh("javelins")
+		"chakram":
+			return WeaponDefs.chakram_mesh()
 		"stone":
 			if _stone_mesh == null:
 				var l := LowPoly.new()
@@ -1230,8 +1232,10 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 	var bounce := int(p.m("bounces")) + (PowerDefs.BOUNCES if p.has_power("bounce_arrows") else 0)
 	var burning := p.has_power("fire_arrows") or (p.is_riding() and (p.has_flag("riding_fire") or p.has_flag("war_machine")))
 	var d := p.weapon_def() if from_hand else {}
+	bounce += int(d.get("bounces", 0))
 	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
+		shot.spins = str(d.get("shot", "")) == "chakram"
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
@@ -1241,7 +1245,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+			Net.shot(3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
 
 
 func familiar_arrow(p: Player, target: Node3D) -> void:
@@ -1692,9 +1696,12 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = _axe_proj
 	elif mesh == 2:
 		m = _orb_mesh(col)
+	elif mesh == 3:
+		m = WeaponDefs.chakram_mesh()
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
+		shot.spins = mesh == 3
 		if mesh == 0 and col.g > col.r + 0.3:
 			shot.poison_trail = true
 

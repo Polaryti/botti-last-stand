@@ -4,7 +4,7 @@ class_name WeaponDefs
 enum Kind { MELEE, RANGED, SPELL }
 
 const DAMAGE := 25.0
-const ALIGNED_HELD := ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow"]
+const ALIGNED_HELD := ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword"]
 const HAND_TURN := PI * 0.5
 const TORCH_FIRE := 0.575 # how high up a torch the fire starts
 
@@ -19,13 +19,13 @@ const ALL := {
 		"knock": 4.0, "swing": "smash", "weight": 1.6, "pos": Vector3(0.28, -0.3, -0.46), "scale": 0.72},
 	"lance": {"only": "chivalry", "power": 1.5, "name": "Lance", "charge": true, "desc": "Chivalry only. Cannot be dropped or found as loot. The longest reach, through up to two enemies. Half as strong again while you run or ride.", "kind": Kind.MELEE, "rate": 0.75, "range": 5.2, "cone": 16.0, "max_hits": 2,
 		"knock": 3.0, "swing": "thrust", "weight": 0.7, "pos": Vector3(0.24, -0.22, 0.35), "scale": 1.0},
-	"scythe": {"maps": ["village", "fort"], "power": 0.8, "name": "Scythe", "bleed": true, "desc": "Slow, and sweeps a huge arc through a whole crowd. Leaves them bleeding.", "kind": Kind.MELEE, "rate": 0.95, "range": 3.3, "cone": 210.0, "max_hits": 8,
+	"scythe": {"maps": ["village", "fort"], "two_handed": true, "power": 0.8, "name": "Scythe", "bleed": true, "desc": "Slow, and sweeps a huge arc through a whole crowd. Leaves them bleeding.", "kind": Kind.MELEE, "rate": 0.95, "range": 3.3, "cone": 210.0, "max_hits": 8,
 		"knock": 2.0, "swing": "reap", "arc": 1.2, "weight": 1.2, "pos": Vector3(0.4, -0.4, -0.65), "scale": 0.72},
 	"flail": {"power": 0.95, "name": "Flail", "desc": "Gets faster the longer you keep swinging.", "kind": Kind.MELEE, "rate": 0.85, "range": 2.5, "cone": 100.0, "max_hits": 3,
 		"knock": 2.0, "swing": "flail", "momentum": true, "weight": 1.2, "pos": Vector3(0.28, -0.1, -0.7), "scale": 0.72},
-	"bell_hammer": {"maps": ["mists"], "power": 1.3, "name": "Bell Hammer", "desc": "Stuns all it hits, and everyone can hear it.", "kind": Kind.MELEE, "rate": 1.05, "range": 2.5, "cone": 130.0, "max_hits": 6,
+	"bell_hammer": {"maps": ["mists"], "two_handed": true, "power": 1.3, "name": "Bell Hammer", "desc": "Stuns all it hits, and everyone can hear it.", "kind": Kind.MELEE, "rate": 1.05, "range": 2.5, "cone": 130.0, "max_hits": 6,
 		"knock": 4.0, "swing": "overhead", "stun": 1.3, "loud": 22.0, "weight": 1.0, "pos": Vector3(0.22, -0.4, -0.5), "scale": 0.5},
-	"pitchfork": {"maps": ["village", "fort"], "power": 0.8, "name": "Pitchfork", "desc": "Stabs straight through up to three in a row.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.8, "cone": 16.0, "max_hits": 3,
+	"pitchfork": {"maps": ["village", "fort"], "two_handed": true, "power": 0.8, "name": "Pitchfork", "desc": "Stabs straight through up to three in a row.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.8, "cone": 16.0, "max_hits": 3,
 		"knock": 1.5, "swing": "thrust", "weight": 1.3, "pos": Vector3(0.22, -0.24, 0.0), "scale": 1.0},
 	"torch": {"maps": ["village", "fort"], "power": 0.55, "name": "Torch", "desc": "Sets enemies on fire and lights your way.", "kind": Kind.MELEE, "rate": 0.5, "range": 2.0, "cone": 80.0, "max_hits": 2,
 		"knock": 1.0, "swing": "slash", "burns": true, "weight": 1.2, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.72},
@@ -49,6 +49,13 @@ const ALL := {
 		"knock": 1.2, "swing": "claw", "cost": 5.0, "hidden": true, "weight": 0.0, "pos": Vector3(0.27, -0.33, -0.5), "scale": 0.52},
 	"staff": {"only": "magician", "name": "Staff", "desc": "Bolts of magic that use refilling mana.", "kind": Kind.SPELL, "rate": 0.45, "range": 30.0, "speed": 30.0, "gravity": 0.0, "cost": 10.0,
 		"knock": 1.5, "weight": 0.0, "pos": Vector3(0.26, -0.38, -0.5), "scale": 0.6},
+	# Two-Handed: only classes trained for them (ClassDefs "two_handed") can wield these.
+	"greatsword": {"two_handed": true, "power": 1.45, "name": "Greatsword", "desc": "A long blade swung with both hands. Wide, heavy sweeps cut through up to five.", "kind": Kind.MELEE, "rate": 0.8, "range": 3.2, "cone": 150.0, "max_hits": 5,
+		"knock": 2.5, "swing": "slash", "weight": 0.9, "pos": Vector3(0.3, -0.36, -0.55), "scale": 0.62},
+	"battleaxe": {"maps": ["mesenlla", "bastion"], "two_handed": true, "power": 1.5, "name": "Battleaxe", "cleave": 3, "desc": "A bearded axe from the mountain outposts. Every third blow in a row is a cleaving chop: double damage, and it throws them back.", "kind": Kind.MELEE, "rate": 0.95, "range": 2.8, "cone": 120.0, "max_hits": 4,
+		"knock": 2.5, "swing": "overhead", "weight": 1.0, "pos": Vector3(0.24, -0.4, -0.5), "scale": 0.55},
+	"chakram": {"maps": ["mesenlla", "bastion"], "power": 1.0, "name": "Rift Chakram", "shot": "chakram", "bounces": 3, "free_ammo": true, "desc": "A ring of mist-glass that the valley scouts throw. Ricochets on to three more enemies, and needs no arrows.", "kind": Kind.RANGED, "rate": 0.6, "range": 28.0, "speed": 30.0, "gravity": 0.0,
+		"knock": 1.0, "weight": 0.9, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
 	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.1, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
 	"musket": {"only": "commander", "hidden": true, "name": "Musket", "desc": "Fire shoots; Melee thrusts the bayonet. Powder replenishes while reloading.", "kind": Kind.RANGED, "rate": 1.25, "range": 55.0, "speed": 90.0, "gravity": 0.0, "power": 2.4, "free_ammo": true, "knock": 3.0, "weight": 0.0, "pos": Vector3(0.17, -0.22, -0.4), "scale": 0.8},
 
@@ -103,6 +110,23 @@ static func held_size(id: String) -> float:
 	return float(ALL[id]["scale"]) * 1.6
 
 
+static func is_two_handed(id: String) -> bool:
+	return bool(ALL.get(id, {}).get("two_handed", false))
+
+
+## The four groups the Codex, Armory and class screens talk about.
+static func category(id: String) -> String:
+	var d: Dictionary = ALL[id]
+	if d.has("only") or d.get("hidden", false):
+		return "exclusive"
+	if d.get("two_handed", false):
+		return "two_handed"
+	return "ranged" if d["kind"] != Kind.MELEE else "melee"
+
+
+const CATEGORY_NAMES := {"melee": "Melee", "two_handed": "Two-Handed", "ranged": "Ranged", "exclusive": "Exclusive Weapon"}
+
+
 static func is_ranged(id: String) -> bool:
 	return ALL[id]["kind"] == Kind.RANGED
 
@@ -137,7 +161,64 @@ static func mesh(id: String) -> Mesh:
 		"staff", "war_staff": m = _staff()
 		"musket": m = _musket()
 		"claws": m = _claws()
+		"greatsword": m = _greatsword()
+		"battleaxe": m = _battleaxe()
+		"chakram": m = chakram_mesh()
 	_meshes[id] = m
+	return m
+
+
+## A long two-hand blade: leather grip for both hands, a broad crossguard and a fullered blade.
+static func _greatsword() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.42, 0), Vector3(0, -0.06, 0), 0.026, 0.026, 6, WOOD.darkened(0.35))
+	for y: float in [-0.36, -0.25, -0.14]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.03, 0), 0.031, 0.031, 6, BRASS.darkened(0.3))
+	l.box(Vector3(0, -0.46, 0), Vector3(0.06, 0.06, 0.06), BRASS)
+	l.box(Vector3(0, -0.04, 0), Vector3(0.36, 0.05, 0.06), DARK)
+	l.box(Vector3(-0.19, -0.02, 0), Vector3(0.05, 0.08, 0.07), BRASS)
+	l.box(Vector3(0.19, -0.02, 0), Vector3(0.05, 0.08, 0.07), BRASS)
+	l.box(Vector3(0, 0.62, 0), Vector3(0.11, 1.24, 0.022), STEEL)
+	l.box(Vector3(0, 0.55, 0.012), Vector3(0.025, 1.0, 0.004), STEEL.darkened(0.25))
+	l.prism(Vector3(0, 1.24, 0), Vector3(0, 1.4, 0), 0.06, 0.0, 4, STEEL.lightened(0.1))
+	return l.commit()
+
+
+## A bearded mountain axe: long ash haft, a crescent head with a hooked beard and a back spike.
+static func _battleaxe() -> Mesh:
+	# The head lies along Z so it shows its broad face in the hand, like the Bell Hammer's.
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.75, 0), Vector3(0, 0.66, 0), 0.03, 0.026, 6, LIGHT_WOOD.darkened(0.1))
+	for y: float in [-0.65, -0.5, 0.42]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.06, 0), 0.036, 0.036, 6, Color(0.55, 0.12, 0.1))
+	var head := STEEL.darkened(0.05)
+	l.box(Vector3(0, 0.55, 0.12), Vector3(0.04, 0.18, 0.2), head)
+	l.box(Vector3(0, 0.52, 0.27), Vector3(0.03, 0.42, 0.12), head.lightened(0.12))
+	l.prism(Vector3(0, 0.32, 0.3), Vector3(0, 0.22, 0.2), 0.03, 0.0, 4, head)
+	l.prism(Vector3(0, 0.55, -0.03), Vector3(0, 0.58, -0.22), 0.04, 0.0, 4, head)
+	l.box(Vector3(0, 0.55, 0), Vector3(0.07, 0.2, 0.07), DARK)
+	return l.commit()
+
+
+## A flat ring of pale mist-glass with a cyan core, three notches and a leather grip across it.
+static func chakram_mesh() -> Mesh:
+	if _meshes.has("_chakram"):
+		return _meshes["_chakram"]
+	var l := LowPoly.new()
+	var glass := Color(0.66, 0.9, 0.95)
+	var core := Color(0.25, 0.95, 0.9)
+	var n := 12
+	for i in n:
+		var a0 := TAU * i / n
+		var a1 := TAU * (i + 1) / n
+		var p0 := Vector3(cos(a0), 0, sin(a0)) * 0.2
+		var p1 := Vector3(cos(a1), 0, sin(a1)) * 0.2
+		l.box((p0 + p1) * 0.5, Vector3(p0.distance_to(p1) + 0.01, 0.025, 0.06), glass if i % 4 else core, Vector3(0, -rad_to_deg((a0 + a1) * 0.5) + 90.0, 0))
+		if i % 4 == 0:
+			l.prism(p0 * 1.05, p0 * 1.45, 0.03, 0.0, 4, glass.lightened(0.2))
+	l.box(Vector3.ZERO, Vector3(0.34, 0.03, 0.035), Color(0.36, 0.22, 0.12))
+	var m := l.commit()
+	_meshes["_chakram"] = m
 	return m
 
 
