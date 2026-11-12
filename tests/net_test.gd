@@ -1300,7 +1300,11 @@ func _bandit() -> void:
 		pl.current = 0
 		pl._equip()
 	else:
-		ok(pl.class_id == "bandit" and pl.weapon_id() == "dagger", "the client plays a Bandit with a Dagger")
+		ok(pl.class_id == "bandit" and ClassDefs.ALL["bandit"]["weapon"] == "dagger", "the client plays a Bandit, who starts with a Dagger")
+		# Whatever it picked up on the way in, the Thief goes in with a Dagger and a free hand.
+		pl.slots = ["dagger", null]
+		pl.current = 0
+		pl._equip()
 		pl.grant_all_points()
 		for step in 4:
 			pl.choose_ability(step, 0)
