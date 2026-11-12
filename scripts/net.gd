@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 45
+const PROTOCOL := 46
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -84,6 +84,9 @@ var started_loading := false
 
 var _beacon: PacketPeerUDP
 var _listener: PacketPeerUDP
+var _searchers := 0 # how many screens are looking for games
+var _addresses := PackedStringArray()
+var _addresses_at := 0
 var _beacon_timer := 0.0
 var _answer: PacketPeerUDP
 var _ask_timer := 0.0
@@ -601,7 +604,18 @@ func _choice(cls: String, team: int) -> void:
 	_share_lobby()
 
 
+## This phone's addresses on a local network. Listing them can be slow on a phone, so the answer is
+## kept for a few seconds.
 func local_addresses() -> PackedStringArray:
+	var now := Time.get_ticks_msec()
+	if now - _addresses_at < 5000 and _addresses_at > 0:
+		return _addresses
+	_addresses_at = now
+	_addresses = _list_addresses()
+	return _addresses
+
+
+func _list_addresses() -> PackedStringArray:
 	var out := PackedStringArray()
 	for a: String in IP.get_local_addresses():
 		if a.begins_with("192.168.") or a.begins_with("10.") or (a.begins_with("172.") and a.get_slice(".", 1).to_int() >= 16 and a.get_slice(".", 1).to_int() < 32):
@@ -660,7 +674,11 @@ func _send_beacon() -> void:
 		_beacon.put_packet(text)
 
 
+## Looking for games on the Wi-Fi. Each screen that looks starts it and stops it; the search stops
+## only when no screen wants it any more, so going from one Play Together tab to the next (the new
+## screen starts before the old one has gone) keeps it going.
 func start_search() -> void:
+	_searchers += 1
 	if _listener:
 		return
 	PhoneNet.use_wifi()
@@ -677,6 +695,9 @@ func start_search() -> void:
 
 
 func stop_search() -> void:
+	_searchers = maxi(0, _searchers - 1)
+	if _searchers > 0:
+		return
 	stop_search_keep_rooms()
 	rooms.clear()
 	if not active():
@@ -1194,6 +1215,7 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.FREEZE: z.freeze(a)
 		Zombie.Effect.TAUNT: z.taunted_by(Vector3(a, 0.0, b))
 		Zombie.Effect.PULL: z.pull_to(Vector3(a, 0.0, b))
+		Zombie.Effect.DISARM: z.disarm(a > 0.5)
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -1373,6 +1395,19 @@ func _survey_beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -
 		return
 	if world and is_instance_valid(world):
 		world.plant_beacon(owner_peer, at, SurveyNet.sane(cfg), yaw)
+
+
+func survey_settings(owner_peer: int, cfg: Dictionary) -> void:
+	_survey_settings.rpc(owner_peer, cfg)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _survey_settings(owner_peer: int, cfg: Dictionary) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != owner_peer and not (sender == 1 and is_bot(owner_peer)):
+		return
+	if world and is_instance_valid(world):
+		world.refresh_survey(owner_peer, SurveyNet.sane(cfg))
 
 
 ## What other phones only see of a Cartographer's beacons: 0 a falling star, 1 a creature thrown through a Waygate.

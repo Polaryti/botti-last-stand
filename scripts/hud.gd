@@ -8,6 +8,7 @@ signal tree_requested
 signal sandbox_requested
 signal command_map_requested
 
+const UNLINKED := Color(1.0, 0.5, 0.34) # the beacon button, when a beacon planted now would link to nothing
 const JOY_R := 88.0
 const KI_COLOUR := Color(1.0, 0.78, 0.28)
 const COL_BG := Color(0.05, 0.05, 0.07, 0.72)
@@ -681,6 +682,9 @@ func _draw_weapon(s: Vector2) -> void:
 		_text("%d mist" % int(player.mana), Vector2(x, y), 22, UiTheme.MIST)
 	elif player.class_def().get("ki", false):
 		_text("%d Ki" % int(player.mana), Vector2(x, y), 22, KI_COLOUR)
+	elif WeaponDefs.own_ammo(player.weapon_id()) > 0:
+		var throws := player.ammo_of(player.weapon_id())
+		_text("%d throws" % throws, Vector2(x, y), 22, UiTheme.BONE if throws > 0 else UiTheme.BLOOD.lightened(0.25))
 	elif WeaponDefs.uses_arrows(d):
 		_text("%d arrows" % player.arrows, Vector2(x, y), 22, UiTheme.BONE if player.arrows > 0 else UiTheme.BLOOD.lightened(0.25))
 	elif player.arrows > 0:
@@ -715,6 +719,9 @@ func _draw_controls() -> void:
 				tint = UiTheme.MIST if player.burst_cd_left <= 0.0 and player.mana >= player.burst_cost() else Color(0.6, 0.6, 0.6)
 			"art":
 				tint = UiTheme.MIST if player.art_cd_left <= 0.0 and player.mana >= player.art_cost() else Color(0.6, 0.6, 0.6)
+				if player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
+					# Planted here, the beacon would link to none of the others.
+					tint = UNLINKED if player.art_cd_left <= 0.0 else UNLINKED.darkened(0.35)
 			"zoom":
 				if player.zoomed:
 					tint = UiTheme.EMBER
@@ -737,7 +744,9 @@ func _draw_controls() -> void:
 			_centered("Hold to drop", pos + Vector2(0, r + 14), 17, UiTheme.BONE)
 		if id == "take" and player.nearby_weapon:
 			_centered(player.nearby_weapon.display_name(), pos + Vector2(0, -r - 18), 26, UiTheme.BONE)
-		if id == "art" and player.art_label() != "":
+		if id == "art" and player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
+			_centered("Too far to link", pos + Vector2(0, -r - 14), 18, UNLINKED.lightened(0.3))
+		elif id == "art" and player.art_label() != "":
 			_centered(player.art_label(), pos + Vector2(0, -r - 14), 18, UiTheme.BONE)
 		if id == "burst" or id == "art":
 			var left: float = player.burst_cd_left if id == "burst" else player.art_cd_left

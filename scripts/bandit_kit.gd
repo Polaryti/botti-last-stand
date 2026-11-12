@@ -106,7 +106,7 @@ static func steal(p: Player) -> void:
 	p.rotation.y = p.yaw
 	p.world.fx_mist(spot + Vector3.UP, 0.9)
 	if p.can_vanish():
-		p.invis_left = maxf(p.invis_left, STEAL_HIDE + p.m("steal_hide"))
+		p.invis_left = maxf(p.invis_left, STEAL_HIDE + p.m("steal_hide") + p.m("shadow_time"))
 	p.world.sfx_at("steal", spot, -3.0)
 	var targets: Array[Node3D] = [t]
 	if p.has_flag("steal_all"):
@@ -170,7 +170,7 @@ static func nightfall(p: Player) -> void:
 	for i in NightfallDome.FLAGS.size():
 		if p.has_flag(NightfallDome.FLAGS[i]):
 			bits |= 1 << i
-	var linger := NIGHT_LINGER + p.m("night_linger")
+	var linger := NIGHT_LINGER + p.m("night_linger") + p.m("shadow_time")
 	p.world.spawn_nightfall(p.net_id(), p.global_position, radius, secs, linger, bits)
 	if Net.active():
 		Net.nightfall(p.net_id(), p.global_position, radius, secs, linger, bits)
@@ -189,6 +189,10 @@ static func dagger_fan(p: Player) -> void:
 		var d := dir.rotated(Vector3.UP, angle)
 		p.world.spawn_knife(p, from, d * FAN_SPEED, FAN_RANGE, dmg, int(p.m("fan_bounces")), p.has_flag("fan_bleed"), p.has_flag("fan_slow"), p.has_flag("fan_close"))
 	p.world.sfx_at("dagger_fan", from, -3.0)
+	# Long Shadows: the Highwayman slips out of sight behind the knives.
+	if p.m("shadow_time") > 0.0 and p.can_vanish():
+		p.invis_left = maxf(p.invis_left, p.m("shadow_time"))
+		p.world.fx_mist(p.global_position + Vector3.UP, 0.8)
 	p._swing_time = 0.3
 	p._swing = 0.0
 	p._swing_keys = "throw"

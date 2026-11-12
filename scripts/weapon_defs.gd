@@ -54,7 +54,7 @@ const ALL := {
 		"knock": 2.5, "swing": "slash", "weight": 0.9, "pos": Vector3(0.3, -0.36, -0.55), "scale": 0.62},
 	"battleaxe": {"maps": ["mesenlla", "bastion"], "two_handed": true, "power": 1.5, "name": "Battleaxe", "cleave": 3, "desc": "A bearded axe from the mountain outposts. Every third blow in a row is a cleaving chop: double damage, and it throws them back.", "kind": Kind.MELEE, "rate": 0.95, "range": 2.8, "cone": 120.0, "max_hits": 4,
 		"knock": 2.5, "swing": "overhead", "weight": 1.0, "pos": Vector3(0.24, -0.4, -0.5), "scale": 0.55},
-	"chakram": {"maps": ["mesenlla", "bastion"], "power": 1.0, "name": "Rift Chakram", "shot": "chakram", "bounces": 3, "free_ammo": true, "desc": "A ring of mist-glass that the valley scouts throw. Ricochets on to three more enemies, and needs no arrows.", "kind": Kind.RANGED, "rate": 0.6, "range": 28.0, "speed": 30.0, "gravity": 0.0,
+	"chakram": {"maps": ["mesenlla", "bastion"], "power": 1.0, "name": "Rift Chakram", "shot": "chakram", "bounces": 3, "own_ammo": 20, "own_ammo_max": 40, "desc": "A ring of mist-glass that the valley scouts throw. Ricochets on to three more enemies. Needs no arrows: each Rift Chakram picked up gives 20 throws, up to 40.", "kind": Kind.RANGED, "rate": 0.6, "range": 28.0, "speed": 30.0, "gravity": 0.0,
 		"knock": 1.0, "weight": 0.9, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
 	# Pathfinder finds: unearthed by a Pathfinder's beacons, and only a Pathfinder can use them.
 	"machete": {"only": "cartographer", "spec": "pathfinder", "power": 0.95, "name": "Pathfinder's Machete", "bleed": true, "desc": "Pathfinder only, unearthed by its beacons. Quick, wide chops that clear a path and leave enemies bleeding.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.7, "cone": 115.0, "max_hits": 3,
@@ -137,7 +137,17 @@ static func is_ranged(id: String) -> bool:
 
 
 static func uses_arrows(d: Dictionary) -> bool:
-	return d["kind"] == Kind.RANGED and not d.get("returning", false) and not d.get("free_ammo", false)
+	return d["kind"] == Kind.RANGED and not d.get("returning", false) and not d.get("free_ammo", false) and not d.has("own_ammo")
+
+
+## Throws that come with one weapon picked up, for a weapon with its own ammunition (the Rift
+## Chakram), or 0 for any other.
+static func own_ammo(id: String) -> int:
+	return int(ALL.get(id, {}).get("own_ammo", 0))
+
+
+static func own_ammo_max(id: String) -> int:
+	return int(ALL.get(id, {}).get("own_ammo_max", 0))
 
 
 static func mesh(id: String) -> Mesh:

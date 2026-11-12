@@ -49,6 +49,7 @@ func add_collider(_at: Vector3, _size: Vector3) -> void: pass
 func add_collider_xf(_t: Transform3D, _size: Vector3) -> void: pass
 func add_barrier(_at: Vector3, _size: Vector3) -> void: pass
 func add_barrier_xf(_t: Transform3D, _size: Vector3) -> void: pass
+func add_window_xf(_t: Transform3D, _size: Vector3) -> void: pass
 func add_enemy_block(_at: Vector3, _size: Vector3) -> void: pass
 func add_wedge(_t: Transform3D, _points: PackedVector3Array) -> void: pass
 func grid_block_turned(_t: Transform3D, _size: Vector3) -> void: pass

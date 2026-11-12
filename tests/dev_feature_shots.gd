@@ -116,6 +116,19 @@ func _ready() -> void:
 	await snap("nightfall_blind", spot + Vector3(0, 1.65, 2), spot + Vector3(0, 1.4, -8))
 	w.player.night_blind_left = 0.0
 	hud.visible = false
+	await snap("nightfall_inside", spot + Vector3(1.5, 1.65, 1.0), spot + Vector3(-4, 0.2, -5))
+	# On a slope: the dome meets the ground all round, and its rim lies on the ground.
+	var hill := spot
+	var steepest := 0.0
+	for i in 60:
+		var probe := Vector3(randf_range(-60, 60), 0, randf_range(-60, 60))
+		var rise := absf(w.ground_at(probe + Vector3(5, 0, 0)) - w.ground_at(probe - Vector3(5, 0, 0)))
+		if rise > steepest and w.grid.is_free(w.grid.to_cell(probe)):
+			steepest = rise
+			hill = Vector3(probe.x, w.ground_at(probe), probe.z)
+	w.spawn_nightfall(98, hill, 6.0, 30.0, 1.5, 0)
+	await get_tree().create_timer(0.4).timeout
+	await snap("nightfall_slope", hill + Vector3(10, 3.5, 6), hill + Vector3.UP * 1.0)
 	# A Cartographer's linked beacons, a Star Reader's constellation and a Worlds Traveler's Waygates.
 	var base := {"kind": "", "max": 3, "link": 24.0, "radius": 4.0, "heal": 2.0, "mark": 10.0, "bonus": 0.2, "power": 15.0, "gate_speed": 0.3, "gate_rest": 3.0, "gate_heal": 0.0, "bits": 0}
 	var field := Vector3(0, 0, 96)
@@ -131,6 +144,20 @@ func _ready() -> void:
 		w.plant_beacon(202, sky + offset, stars, 0.0)
 	await get_tree().create_timer(0.3).timeout
 	await snap("survey_constellation", sky + Vector3(0, w.ground_at(sky) + 8.0, 13), sky + Vector3(0, w.ground_at(sky) + 0.5, -5))
+	# Starlight striking what stands in the constellation.
+	var struck: Array[Zombie] = []
+	for offset: Vector3 in [Vector3(-2.5, 0, -3), Vector3(2.0, 0, -1.5), Vector3(0.5, 0, -6)]:
+		w.spawn_zombie("normal", sky + offset)
+		var star_target: Zombie = w.zombies.back()
+		star_target.set_physics_process(false)
+		star_target.position.y = w.ground_at(star_target.position)
+		struck.append(star_target)
+	await get_tree().create_timer(0.3).timeout
+	for z: Zombie in struck:
+		SurveyNet.show_starlight(w, z.position, z.centre().y - z.position.y)
+	await snap("survey_starlight", sky + Vector3(1.5, w.ground_at(sky) + 3.2, 6.5), sky + Vector3(0, w.ground_at(sky) + 1.6, -3))
+	for z: Zombie in struck:
+		z.release()
 	var gates := base.duplicate()
 	gates["kind"] = "gates"
 	var road := Vector3(40, 0, 96)

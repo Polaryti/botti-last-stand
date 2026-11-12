@@ -56,6 +56,7 @@ var lane_marks: Array[Dictionary] = []
 var garrison: Garrison
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
 var _enemy_blocks: StaticBody3D
+var _windows: StaticBody3D
 var portals: MistPortals
 var caches: MistCaches
 var _ledge_body: StaticBody3D
@@ -250,6 +251,10 @@ func setup(game_mode: int) -> void:
 	_barriers.collision_layer = Terrain.BARRIER
 	_barriers.collision_mask = 0
 	add_child(_barriers)
+	_windows = StaticBody3D.new()
+	_windows.collision_layer = Terrain.BARRIER | Terrain.WINDOW
+	_windows.collision_mask = 0
+	add_child(_windows)
 	_enemy_blocks = StaticBody3D.new()
 	_enemy_blocks.collision_layer = Terrain.ENEMY_ONLY
 	_enemy_blocks.collision_mask = 0
@@ -510,6 +515,16 @@ func ground_at(at: Vector3) -> float:
 	if h < FALL_DEATH and terrain.has_islands():
 		return terrain.island_floor(at.x, at.z) # over the void, what flies stays level with the islands
 	return h
+
+
+## A window's opening: it stops bodies like a barrier, and blades (see _reachable), not sight or shots.
+func add_window_xf(t: Transform3D, size: Vector3) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = t
+	_windows.add_child(cs)
 
 
 func add_barrier(at: Vector3, size: Vector3) -> void:
@@ -1058,6 +1073,12 @@ func nearest_weapon_pickup(from: Vector3, radius: float) -> Pickup:
 	return best
 
 
+## Whether a blow can reach from a to b: nothing solid between, and no window either.
+func _reachable(a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.LAYER | Terrain.WINDOW)
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+
 func has_line_of_sight(a: Vector3, b: Vector3) -> bool:
 	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.LAYER)
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
@@ -1259,7 +1280,8 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 			continue
 		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos(minf(half_cone + atan2(body, dist), PI)):
 			continue
-		if not has_line_of_sight(origin, centre):
+		# A blade cannot reach through a wall, nor through a window.
+		if not _reachable(origin, centre):
 			continue
 		damage_zombie(z, attacker.modify_damage(z, float(stats["damage"])), forward, float(stats["knock"]), centre, false)
 		attacker.on_melee_connect(z, d)
@@ -1282,7 +1304,7 @@ func _melee_rivals(attacker: Player, origin: Vector3, flat_forward: Vector3, ran
 			continue
 		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos_limit:
 			continue
-		if has_line_of_sight(origin, centre):
+		if _reachable(origin, centre):
 			hit_rival(t, damage, attacker.global_position)
 			fx_gore(centre, Color(0.6, 0.1, 0.08))
 			attacker.on_hit(false)
@@ -1381,6 +1403,13 @@ func plant_beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> 
 	at.y = ground_at(at)
 	survey.add(at, cfg, yaw)
 	return survey
+
+
+## A Cartographer's beacons take up its new settings.
+func refresh_survey(owner_peer: int, cfg: Dictionary) -> void:
+	var found: Variant = surveys.get(owner_peer)
+	if found != null and is_instance_valid(found):
+		(found as SurveyNet).refresh(cfg)
 
 
 func spawn_nightfall(owner_peer: int, at: Vector3, radius: float, seconds: float, linger: float, bits: int) -> NightfallDome:
@@ -2230,13 +2259,14 @@ func _open_ground_near_players() -> Vector3:
 	return Vector3(clampf(at.x, -half_size + 3, half_size - 3), 0, clampf(at.z, -half_size + 3, half_size - 3))
 
 
-func drop_weapon(at: Vector3, id: String) -> void:
+## throws: for a weapon with its own ammunition, what it still has; -1 for a fresh one.
+func drop_weapon(at: Vector3, id: String, throws := -1) -> void:
 	# A class's own weapon never ends up on the ground for someone else to find.
 	if not WeaponDefs.lies_around(id):
 		return
 	var c := grid.nearest_free(grid.to_cell(at))
 	var target := at if grid.is_free(grid.to_cell(at)) else grid.to_world(c)
-	spawn_pickup_at(target, Pickup.Kind.WEAPON, id)
+	spawn_pickup_at(target, Pickup.Kind.WEAPON, id, throws + 1 if throws >= 0 and WeaponDefs.own_ammo(id) > 0 else 0)
 
 
 func remove_pickup(p: Pickup) -> void:
@@ -2262,8 +2292,11 @@ func count_pickups(kind: int) -> int:
 func collect_weapon(who: Player, p: Pickup) -> void:
 	if not who.can_use(p.weapon_id):
 		return
-	who.give_weapon(p.weapon_id)
-	who.add_arrows(p.bonus_arrows)
+	if WeaponDefs.own_ammo(p.weapon_id) > 0:
+		who.give_weapon(p.weapon_id, p.throws())
+	else:
+		who.give_weapon(p.weapon_id)
+		who.add_arrows(p.bonus_arrows)
 	who.sfx("weapon_change")
 	remove_pickup(p)
 
@@ -2302,8 +2335,14 @@ func _scan_pickups_for(who: Player) -> void:
 				if not who.can_use(p.weapon_id):
 					pass
 				elif who.carries(p.weapon_id):
-					# Spare copy: bows give their arrows, the rest stay on the ground.
-					if p.bonus_arrows > 0:
+					# Spare copy: a Rift Chakram gives its throws, bows give their arrows, the rest stay on the ground.
+					if WeaponDefs.own_ammo(p.weapon_id) > 0:
+						if who.ammo_of(p.weapon_id) < WeaponDefs.own_ammo_max(p.weapon_id) and p.throws() > 0:
+							var got := who.add_own_ammo(p.weapon_id, p.throws())
+							who.say("+%d throws" % got)
+							who.sfx("pickup", -5.0)
+							remove_pickup(p)
+					elif p.bonus_arrows > 0:
 						who.add_arrows(p.bonus_arrows)
 						who.sfx("pickup", -5.0)
 						remove_pickup(p)

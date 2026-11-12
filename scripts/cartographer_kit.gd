@@ -48,11 +48,47 @@ static func config(p: Player) -> Dictionary:
 		"gate_speed": GATE_SPEED + p.m("gate_speed"), "gate_rest": maxf(0.5, GATE_REST + p.m("gate_rest")), "gate_heal": p.m("gate_heal"), "bits": bits}
 
 
-static func cast(p: Player) -> void:
+## After learning a skill, the beacons already standing are told, on every phone.
+static func retune(p: Player) -> void:
+	var cfg := config(p)
+	p.world.refresh_survey(p.net_id(), cfg)
+	if Net.active():
+		Net.survey_settings(p.net_id(), cfg)
+
+
+## Where the next beacon goes: a little in front of the Cartographer, on the ground.
+static func plant_point(p: Player) -> Vector3:
 	var ahead := -p.global_basis.z
 	ahead.y = 0.0
 	ahead = ahead.normalized() if ahead.length() > 0.1 else Vector3.FORWARD
-	var at := p.global_position + ahead * PLANT_AHEAD
+	return p.global_position + ahead * PLANT_AHEAD
+
+
+## Whether a beacon planted now would stand alone: other beacons will still be up after it is planted
+## (the oldest is pulled up when the set is full), yet none is close enough to link with it. The first
+## beacon, or one that starts a new profession's set, has nothing to link with and is never "alone".
+static func would_stand_alone(p: Player) -> bool:
+	var found: Variant = p.world.surveys.get(p.net_id())
+	if found == null or not is_instance_valid(found):
+		return false
+	var survey := found as SurveyNet
+	if survey.kind() != kind_of(p.spec_id):
+		return false
+	var cfg := config(p)
+	var standing := survey.beacons.duplicate()
+	while not standing.is_empty() and standing.size() >= int(cfg["max"]):
+		standing.pop_front()
+	if standing.is_empty():
+		return false
+	var at := plant_point(p)
+	for b: Dictionary in standing:
+		if SurveyNet._flat(at, b["at"]) <= float(cfg["link"]):
+			return false
+	return true
+
+
+static func cast(p: Player) -> void:
+	var at := plant_point(p)
 	at.y = p.world.ground_at(at)
 	var cfg := config(p)
 	p.world.plant_beacon(p.net_id(), at, cfg, p.yaw)

@@ -114,6 +114,11 @@ func collider(at: Vector3, size: Vector3) -> void:
 	w.add_collider_xf(xf.translated_local(at), size)
 
 
+## A window's opening: stops bodies and blades, not sight or shots.
+func window_gap(at: Vector3, size: Vector3) -> void:
+	w.add_window_xf(xf.translated_local(at), size)
+
+
 func mesh() -> LowPoly:
 	var l := LowPoly.new()
 	l.base = xf
@@ -654,6 +659,12 @@ func wall(l: LowPoly, a: Vector2, b: Vector2, h: float, openings: Array, col: Co
 		seg.call(cursor, left, 0.0, h)
 		seg.call(left, right, 0.0, o["sill"])
 		seg.call(left, right, o["top"], h)
+		if float(o["sill"]) > 0.0 and not o.get("bare", false):
+			# A window is looked and shot through, never climbed through or jumped at. (A bare gap
+			# in a ruined wall stays open.)
+			var m := (left + right) * 0.5
+			var gap := Vector3(mid.x + (m if along_x else 0.0), (float(o["sill"]) + float(o["top"])) * 0.5, mid.y + (0.0 if along_x else m))
+			window_gap(gap, Vector3(right - left, float(o["top"]) - float(o["sill"]), t) if along_x else Vector3(t, float(o["top"]) - float(o["sill"]), right - left))
 		if not o.get("bare", false):
 			_frame(l, mid, along_x, left, right, o["sill"], o["top"], t)
 		cursor = right

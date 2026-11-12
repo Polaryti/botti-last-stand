@@ -42,6 +42,8 @@ func _ready() -> void:
 	await _bandit()
 	print("REWORK cartographer")
 	await _cartographer()
+	print("REWORK walls")
+	await _walls_protect()
 	print("REWORK statuses")
 	_statuses()
 	_projectile_lifecycle()
@@ -834,6 +836,20 @@ func _bandit() -> void:
 	var look := -p.global_basis.z
 	check(look.dot((victim.position - p.global_position).normalized()) > 0.8, "facing it")
 	check(p.invis_left > 2.0 and victim.hp < 1000.0, "invisible, and the blow lands")
+	p.mods["shadow_time"] = 0.0
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	victim.weapon_id = ""
+	BanditKit.cast(p)
+	var hidden_for := p.invis_left
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.mods["shadow_time"] = 2.0
+	BanditKit.cast(p)
+	check(is_equal_approx(p.invis_left, hidden_for + 2.0), "Long Shadows keeps a Thief hidden 2 s longer after a Steal (%.1f, was %.1f)" % [p.invis_left, hidden_for])
+	p.mods["shadow_time"] = 0.0
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
 	check(victim.weapon_id == "" and w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "sword"), "the stolen Sword lies on the ground")
 	victim.weapon_id = "lance"
 	BanditKit.cast(p)
@@ -854,6 +870,27 @@ func _bandit() -> void:
 	BanditKit.cast(p)
 	check(p.weapon_id() == "mace" and p.slots.has("dagger") and not p.slots.has("spear"), "with both hands full, Fence swaps the stolen Mace for the Spear held")
 	check(w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "spear"), "and the Spear drops")
+	# Grand Larceny: every armed foe round the target is struck and disarmed too.
+	p.flags.erase("steal_keep")
+	p.flags["steal_all"] = true
+	victim.weapon_id = "sword"
+	var crowd: Array[Zombie] = []
+	for k in 3:
+		w.spawn_zombie("clever", victim.position + Vector3(cos(k * 2.1), 0, sin(k * 2.1)) * 2.5)
+		var other: Zombie = w.zombies.back()
+		other.set_physics_process(false)
+		other.hp = 1000.0
+		other.max_hp = 1000.0
+		other.weapon_id = ["sword", "spear", "mace"][k]
+		crowd.append(other)
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.art_cd_left = 0.0
+	BanditKit.cast(p)
+	check(victim.weapon_id == "", "Grand Larceny disarms the target")
+	check(crowd.all(func(o: Zombie) -> bool: return o.weapon_id == "" and o.hp < 1000.0), "and strikes and disarms every armed foe within 4 m of it: %s" % str(crowd.map(func(o: Zombie) -> String: return "%s %.0f %.1f m" % [o.weapon_id, o.hp, o.position.distance_to(victim.position)])))
+	for o in crowd: o.release()
+	p.flags.erase("steal_all")
 	victim.release()
 	# Steal goes for nothing when nothing is near.
 	p.art_cd_left = 0.0
@@ -890,6 +927,19 @@ func _bandit() -> void:
 	BanditKit.dagger_fan(p)
 	var thrown := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() - before
 	check(thrown == BanditKit.FAN_KNIVES, "five knives in a fan (%d)" % thrown)
+	p.mods["shadow_time"] = 0.0
+	p.invis_left = 0.0
+	for q: Projectile in w._projectiles: q.stop()
+	BanditKit.dagger_fan(p)
+	check(p.invis_left <= 0.0, "without Long Shadows a Dagger Fan does not hide the Highwayman")
+	p.mods["shadow_time"] = 2.0
+	p.invis_lockout = 0.0
+	for q: Projectile in w._projectiles: q.stop()
+	BanditKit.dagger_fan(p)
+	check(is_equal_approx(p.invis_left, 2.0), "with Long Shadows it hides the Highwayman for 2 s (%.1f)" % p.invis_left)
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.mods["shadow_time"] = 0.0
 	p.mods["fan_knives"] = 2.0
 	for q: Projectile in w._projectiles: q.stop()
 	BanditKit.dagger_fan(p)
@@ -917,7 +967,7 @@ func plant_at(spots: Array) -> SurveyNet:
 
 func _cartographer() -> void:
 	var d: Dictionary = ClassDefs.ALL["cartographer"]
-	check(d["weapon"] == "spear" and ClassDefs.price("cartographer") == 880 and ClassDefs.for_sale().has("cartographer"), "the Cartographer starts with a Spear and is sold in the Store")
+	check(d["weapon"] == "spear" and ClassDefs.price("cartographer") == 0 and not ClassDefs.for_sale().has("cartographer") and d.get("earned", "") == "beyond", "the Cartographer starts with a Spear and is earned beyond the Mists, not bought")
 	check(ClassDefs.weapon_categories("cartographer") == Array(["melee", "ranged", "exclusive"], TYPE_STRING, "", null), "Cartographer wields Melee and Ranged weapons, and the Pathfinder's own")
 	check(Game.CODES.values().has("cartographer"), "a Cartographer code exists, kept only as a hash")
 	var specs: Array = AbilityData.tree("cartographer")["specs"].map(func(x: Dictionary) -> String: return x["id"])
@@ -989,6 +1039,23 @@ func _cartographer() -> void:
 	p.global_position = Vector3(gate_b.x, w.ground_at(gate_b) + 0.05, gate_b.z)
 	await frames(3)
 	check(SurveyNet._flat(p.global_position, gate_b) < 0.5, "not again until the rest is over")
+	# Learning Veiled Passage and Rift Road works on the gates already standing.
+	check(not survey.has("gate_hide") and not survey.has("rift_road"), "these gates were raised before Veiled Passage and Rift Road")
+	p.flags["gate_hide"] = true
+	p.flags["rift_road"] = true
+	CartographerKit.retune(p)
+	check(survey.has("gate_hide") and survey.has("rift_road") and survey.beacons.size() == 2, "learning them reaches the gates already raised")
+	p.gate_rest_left = 0.0
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.global_position = Vector3(gate_a.x, w.ground_at(gate_a) + 0.05, gate_a.z)
+	await frames(3)
+	check(SurveyNet._flat(p.global_position, gate_b) < 2.5 and p.invis_left > 1.5, "Veiled Passage hides you coming out of an old gate (%.1f s)" % p.invis_left)
+	p.global_position = gate_b + Vector3(30, 0, 0)
+	var walker := target(gate_a + Vector3(0.6, 0, 0))
+	await frames(3)
+	check(SurveyNet._flat(walker.position, gate_b) < 2.5 and walker._stun > 0.0, "and Rift Road throws a creature walking into it out of the far gate, stunned")
+	walker.release()
 	survey.queue_free()
 	w.surveys.erase(p.net_id())
 	# Pathfinder: new ground unearths finds only a Pathfinder can use.
@@ -1015,3 +1082,66 @@ func _cartographer() -> void:
 		if is_instance_valid(left):
 			left.queue_free()
 	w.surveys.clear()
+
+
+## A wall between a shot and a body protects the body: an arrow flying along a wall does not graze a
+## creature on its far side, and a thrown axe coming back through a wall strikes nothing behind it.
+func _walls_protect() -> void:
+	pawn("ranger")
+	var base := Vector3(30, 0, -30)
+	base.y = w.ground_at(base)
+	# A wall 6 m long running along Z, 0.3 m thick, 3 m tall.
+	w.add_solid(base + Vector3(0, 1.5, 0), Vector3(0.3, 3.0, 6.0))
+	await frames(2)
+	var behind := target(base + Vector3(0.55, 0, 0))
+	var hp0 := behind.hp
+	# An arrow flying along the near face of the wall, 0.3 m from it.
+	p.global_position = base + Vector3(-0.45, 0, 6.0)
+	w.spawn_player_arrow(p, base + Vector3(-0.45, 1.0, 3.5), Vector3(0, 0, -40), 0.0, 20.0, 1.0, 30.0)
+	await frames(20)
+	check(is_equal_approx(behind.hp, hp0), "an arrow along a wall does not hit a creature behind it (%.0f)" % (hp0 - behind.hp))
+	# Without the wall the same shot grazes it.
+	var open := target(base + Vector3(-0.45 + 0.55, 0, -12.0))
+	var open_hp := open.hp
+	w.spawn_player_arrow(p, base + Vector3(-0.45, 1.0, -8.5), Vector3(0, 0, -40), 0.0, 20.0, 1.0, 30.0)
+	await frames(20)
+	check(open.hp < open_hp, "while in the open the same shot grazes it (%.0f)" % (open_hp - open.hp))
+	open.release()
+	# A thrown axe coming back through the wall.
+	hp0 = behind.hp
+	p.global_position = base + Vector3(-4.0, 0, 0)
+	w.spawn_axe(p, base + Vector3(-3.5, 1.4, 0.0), Vector3(-30, 0, 0), 8.0, 1.0, 30.0)
+	await frames(10)
+	p.global_position = base + Vector3(4.0, 0, 0)
+	await frames(40)
+	check(is_equal_approx(behind.hp, hp0), "an axe flying back through a wall does not strike what is behind it (%.0f)" % (hp0 - behind.hp))
+	behind.release()
+	# A window: seen and shot through, but no blade reaches through it and nobody jumps at it.
+	var panes := w._windows.get_children()
+	check(not panes.is_empty(), "the houses' windows are filled in (%d)" % panes.size())
+	if panes.is_empty():
+		return
+	var pane := panes[0] as CollisionShape3D
+	var size := (pane.shape as BoxShape3D).size
+	var normal := pane.transform.basis * (Vector3.RIGHT if size.x < size.z else Vector3.BACK)
+	normal = Vector3(normal.x, 0, normal.z).normalized()
+	var sill := pane.transform.origin
+	var near := sill + normal * 1.0
+	near.y = w.ground_at(near)
+	var far := sill - normal * 1.1
+	far.y = w.ground_at(far)
+	pawn("infantry")
+	p.global_position = near
+	var look := far - near
+	p.yaw = atan2(-look.x, -look.z)
+	p.rotation.y = p.yaw
+	p.pitch = -0.15
+	p.head.rotation.x = p.pitch
+	var outside := target(far)
+	await frames(2)
+	check(w.has_line_of_sight(p.eye_position(), outside.centre()), "a creature outside a window can be seen")
+	var sword := WeaponDefs.ALL["sword"]
+	var landed := w.melee_hit(p, sword, p.melee_stats(sword))
+	check(landed == 0, "but a sword swung through the window does not reach it")
+	check(not p._should_auto_jump(look.normalized()), "and walking up to a window never jumps at it")
+	outside.release()

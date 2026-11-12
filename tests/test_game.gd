@@ -710,8 +710,8 @@ func test_version_18() -> void:
 	Game.unlocked.erase("adept")
 	Game.redeemed.erase(_code_of("adept"))
 	ok(not Game.owns_class("adept"), "the Adept is locked")
-	ok(ClassDefs.price("adept") == 1150 and not ClassDefs.for_sale().has("adept"), "it keeps its price, but is not sold while switched off")
-	ok(Game.redeem_key(_code_of("adept"))["result"] == "disabled" and not Game.owns_class("adept") and not Game.redeemed.has(_code_of("adept")), "its code is kept for when it returns")
+	ok(ClassDefs.price("adept") == 1150 and ClassDefs.for_sale().has("adept"), "it is sold again, at its old price")
+	ok(Game.redeem_key(_code_of("adept"))["result"] == "opened" and Game.owns_class("adept") and Game.redeemed.has(_code_of("adept")), "and its code opens it")
 	Game.unlocked["monk"] = true
 	# The Bo and the hands are nobody's item.
 	ok(WeaponDefs.ALL["bo"].get("hidden", false) and WeaponDefs.ALL["fists"].get("hidden", false), "neither the Bo nor empty hands are offered anywhere")
@@ -1131,6 +1131,19 @@ func test_version_20_1() -> void:
 	ok(texts.any(func(t: String) -> bool: return t.begins_with("Version 9.0.0 is out")), "the menu says a new version is out")
 	up.state = Updates.State.NONE
 	m._fill_update_box()
+	# The menu looks again when a match ends, and not when coming back from another menu screen.
+	m.show_menu()
+	await frames(2)
+	ok(up.state == Updates.State.NONE, "going between menu screens does not look again")
+	m.world.mode = Game.Mode.NIGHT
+	m.show_menu()
+	await frames(1)
+	ok(up.state == Updates.State.CHECKING, "back from a match, the menu looks for a new version again")
+	if up._http:
+		up._http.queue_free()
+		up._http = null
+	up.state = Updates.State.NONE
+	m._fill_update_box()
 	# The skill tree's words fit their cards, however long.
 	Game.player_class = "monk"
 	await start_clean()
@@ -1461,7 +1474,7 @@ func test_version_19_1() -> void:
 	ok(pl.weapon_id() == "bo" and not pl.can_drop_weapon(), "the Bo can't be dropped")
 	# Who can be had, and how.
 	ok(ClassDefs.for_sale().has("monk") and ClassDefs.price("monk") > ClassDefs.price("artificer"), "the Monk is in the Store, above the Artificer")
-	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and not ClassDefs.for_sale().has("adept"), "and nothing that is earned, nor the switched-off Adept")
+	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and not ClassDefs.for_sale().has("cartographer"), "and nothing that is earned")
 	var saved_mode := Game.mode
 	var saved_unlocks := Game.unlocked.duplicate()
 	var saved_poison := Game.poison_dealt
@@ -1486,6 +1499,41 @@ func test_version_19_1() -> void:
 	ok(not Game.owns_class("revenant"), "four dawns in the Mists are not enough")
 	Game.note_mists_win()
 	ok(Game.owns_class("revenant"), "five open the Revenant")
+	# Three wins in the Valleys of Mesenlla and three at Mist Bastion earn the Cartographer.
+	var saved_beyond := [Game.mesenlla_wins, Game.bastion_wins]
+	var saved_fort := Game.fort_map
+	Game.unlocked.erase("cartographer")
+	Game.mesenlla_wins = 0
+	Game.bastion_wins = 0
+	ok(Game.earn_text("cartographer") == "Win 3 matches in the Valleys of Mesenlla and 3 in Mist Bastion to unlock this class. So far: 0 and 0.", "the Cartographer says how it is earned: %s" % Game.earn_text("cartographer"))
+	Game.night_map = "village"
+	Game.note_beyond_win()
+	ok(Game.mesenlla_wins == 0 and Game.bastion_wins == 0, "a win in the Village counts for neither")
+	Game.night_map = "mesenlla"
+	for i in 5:
+		Game.note_beyond_win()
+	ok(Game.mesenlla_wins == 5 and not Game.owns_class("cartographer"), "wins in the Valleys alone are not enough")
+	Game.mode = Game.Mode.FORT
+	Game.fort_map = "bastion"
+	Game.note_beyond_win()
+	Game.note_beyond_win()
+	ok(Game.bastion_wins == 2 and not Game.owns_class("cartographer"), "nor two at Mist Bastion")
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_beyond_win()
+	ok(Game.bastion_wins == 2, "the Sandbox counts for nothing")
+	Game.mode = Game.Mode.FORT
+	Game.note_beyond_win()
+	ok(Game.owns_class("cartographer") and Game.fresh_unlocks.has("cartographer"), "the third at Mist Bastion opens the Cartographer")
+	ok(Game.earn_text("cartographer").ends_with("So far: 3 and 3."), "and the count stops at what was needed")
+	Game.save_settings()
+	Game.mesenlla_wins = 0
+	Game.bastion_wins = 0
+	Game.load_settings()
+	ok(Game.mesenlla_wins == 5 and Game.bastion_wins == 3, "the wins are saved")
+	Game.mesenlla_wins = saved_beyond[0]
+	Game.bastion_wins = saved_beyond[1]
+	Game.fort_map = saved_fort
+	Game.mode = Game.Mode.NIGHT
 	Game.fresh_unlocks.clear()
 	Game.unlocked = saved_unlocks
 	Game.poison_dealt = saved_poison
@@ -2025,6 +2073,17 @@ func test_version_15() -> void:
 		(m.panel.find_child("PlayHere", true, false) as Button).pressed.emit()
 		await frames(2)
 	ok(Game.fort_map == "bastion", "Play here remembers Mist Bastion")
+	# Play Together shows at once and looks for games just after; changing tabs keeps looking.
+	m.show_together(0)
+	ok(Net._listener == null, "Play Together is on screen before it starts looking for games")
+	await get_tree().create_timer(0.3).timeout
+	ok(Net._listener != null, "then it looks for games nearby")
+	m.show_together(1)
+	await get_tree().create_timer(0.3).timeout
+	ok(Net._listener != null and Net._searchers == 1, "and keeps looking on the next tab (%d)" % Net._searchers)
+	m.show_menu()
+	await frames(3)
+	ok(Net._listener == null and Net._searchers == 0, "until you leave")
 	Game.mode = Game.Mode.FORT
 	ok(Game.current_map() == "bastion", "where the next Fort is held")
 	Game.fort_map = saved_fort
@@ -2757,9 +2816,9 @@ func test_version_9() -> void:
 	var counts := [0, 0, 0]
 	for i in 10000:
 		counts[Weather.roll()] += 1
-	ok(counts[0] > 6800 and counts[0] < 7700, "most nights are clear (%d)" % counts[0])
-	ok(counts[1] > 1700 and counts[1] < 2300, "some are wet (%d)" % counts[1])
-	ok(counts[2] > 500 and counts[2] < 900, "and a few have a storm (%d)" % counts[2])
+	ok(counts[0] > 7500 and counts[0] < 8300, "most nights are clear: 79%% (%d)" % counts[0])
+	ok(counts[1] > 1350 and counts[1] < 1850, "some are wet: 16%% (%d)" % counts[1])
+	ok(counts[2] > 350 and counts[2] < 650, "and a few have a storm: 5%% (%d)" % counts[2])
 	ok(w.weather.kind == Weather.Kind.CLEAR or w.weather.kind == Weather.Kind.RAIN or w.weather.kind == Weather.Kind.STORM, "tonight has weather")
 	w.weather.set_kind(Weather.Kind.STORM)
 	w.weather._next_strike = 9999.0
@@ -2847,10 +2906,15 @@ func test_version_8() -> void:
 	ok(Game.owns_class("artificer"), "and the class is yours")
 	ok(Game.redeem_key(_code_of("artificer"))["result"] == "used", "the same code cannot be used twice")
 	Game.unlocked.clear()
-	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598 and ClassDefs.price("bandit") == 860 and ClassDefs.price("cartographer") == 880, "the prices are set")
+	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598 and ClassDefs.price("bandit") == 860 and ClassDefs.price("adept") == 1150, "the prices are set")
+	ok(ClassDefs.price("cartographer") == 0, "the Cartographer is earned, not bought")
+	var cartographer_code := Game.redeem_key(_code_of("cartographer"))
+	ok(cartographer_code["result"] == "opened" and Game.owns_class("cartographer"), "though its code still opens it")
+	Game.unlocked.clear()
+	Game.redeemed.clear()
 	ok(ClassDefs.price("infantry") == 0, "the others are free")
 	var sale := ClassDefs.for_sale()
-	ok(sale.size() == 4 and sale.has("monk") and sale.has("artificer") and sale.has("bandit") and sale.has("cartographer") and not sale.has("adept"), "the Store sells Monk, Artificer, Bandit and Cartographer, and not the switched-off Adept")
+	ok(sale.size() == 4 and sale.has("monk") and sale.has("artificer") and sale.has("bandit") and sale.has("adept") and not sale.has("cartographer"), "the Store sells Monk, Artificer, Bandit and Adept; the Cartographer is earned")
 	Game.doubloons = 597
 	ok(not Game.buy_class("artificer") and Game.doubloons == 597, "you cannot buy what you cannot pay for")
 	Game.doubloons = 599
@@ -3426,6 +3490,9 @@ func aim_at(z: Zombie, height := 0.55) -> void:
 func equip(id: String) -> void:
 	pl.slots = [id, null]
 	pl.current = 0
+	pl.own_ammo.clear()
+	if WeaponDefs.own_ammo(id) > 0:
+		pl.add_own_ammo(id, WeaponDefs.own_ammo_max(id)) # as if two had been picked up
 	pl._equip()
 	await seconds(0.3)
 
@@ -5353,7 +5420,7 @@ func test_review() -> void:
 	m.show_class_picker(Game.Mode.NIGHT)
 	await frames(2)
 	var rows: Node = m.panel.get_meta("list")
-	ok(rows.get_child_count() == ClassDefs.ALL.size() - 1, "every class but the switched-off Adept is listed")
+	ok(rows.get_child_count() == ClassDefs.ALL.size(), "every class is listed, the Adept too")
 	(rows.get_child(2) as Button).pressed.emit()
 	await frames(1)
 	await _press("Play as Heavy Infantry")

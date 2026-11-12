@@ -36,7 +36,8 @@ var close_from := Vector3.INF # Point Blank: half as strong again within 6 m of 
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
-var garrison := false # shot by a Mist Soldier: nobody's, and nobody is credited with what it kills
+var garrison := false
+var _through_wall := false # a returning axe that has passed through a wall # shot by a Mist Soldier: nobody's, and nobody is credited with what it kills
 var _owner_assigned := false
 var _returning := false
 var _spin := 0.0
@@ -122,6 +123,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	owner_player = null
 	garrison = false
 	_returning = false
+	_through_wall = false
 	_flame.scale = Vector3.ONE * (0.3 if k in [Kind.ARROW, Kind.ENEMY_ARROW] else 1.0)
 	_flame.visible = k == Kind.FIREBALL or (on_fire and k not in [Kind.ARROW, Kind.ENEMY_ARROW])
 	_update_arrow_aura()
@@ -214,6 +216,8 @@ func _fly(delta: float) -> void:
 	elif not _is_friendly() and Net.is_host() and not Net.bot_players().is_empty():
 		# The host's enemies shoot at its bots too. Nobody else's phone fires these.
 		mask |= Avatar.LAYER_AVATAR
+	if _returning and not _through_wall and _walled(position, next):
+		_through_wall = true
 	var q := PhysicsRayQueryParameters3D.create(position, next, mask, _exclude)
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	if _is_friendly() and not visual:
@@ -232,6 +236,10 @@ func _fly(delta: float) -> void:
 		return
 	var c: Object = hit["collider"]
 	var at: Vector3 = hit["position"]
+	# A returning axe flies back through walls to its thrower, but once through one it strikes nothing.
+	if _returning and c is CollisionObject3D and (_through_wall or _walled(position, at)):
+		_exclude.append((c as CollisionObject3D).get_rid())
+		return
 	if _is_friendly() and c is Zombie:
 		_hit_zombie(c as Zombie, at)
 		return
@@ -316,7 +324,17 @@ func _grazed_body(from: Vector3, step: Vector3, ray_hit: Dictionary) -> Dictiona
 	var touching := space.intersect_shape(_graze_query, 1)
 	if touching.is_empty():
 		return {}
+	# Only a body the shot could actually touch: not one on the far side of a wall it flies along.
+	var body := touching[0]["collider"] as Node3D
+	if body and _walled(at, body.global_position + Vector3.UP * 0.9):
+		return {}
 	return {"collider": touching[0]["collider"], "position": at}
+
+
+## Whether a wall or the ground stands between two points.
+func _walled(a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.LAYER)
+	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 func _turn_back() -> void:

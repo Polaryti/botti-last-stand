@@ -46,23 +46,24 @@ func _ready() -> void:
 	get_tree().quit(1 if failures else 0)
 func _prices() -> void:
 	check(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598, "both original Store classes cost exactly 15% more")
-	# Adept is switched off: not sold, not offered, not bought, and its code waits.
+	# Adept is back: sold again, offered to those who own it, and its code opens it.
 	var had_adept := Game.unlocked.has("adept")
+	var had_class := Game.player_class
 	Game.unlocked.erase("adept")
-	check(ClassDefs.disabled("adept") and not ClassDefs.for_sale().has("adept"), "Adept is not in the Store")
+	check(not ClassDefs.disabled("adept") and ClassDefs.for_sale().has("adept") and ClassDefs.price("adept") == 1150, "Adept is in the Store again, for 1,150")
 	Game.doubloons = 5000
-	check(not Game.buy_class("adept") and Game.doubloons == 5000 and not Game.owns_class("adept"), "and cannot be bought")
-	check(CodexPanel.acquisition("adept") == "Not available at this time.", "the Codex says it is not available")
-	Game.unlocked["adept"] = true
-	check(not ClassDefs.available().has("adept"), "a phone that owns it cannot pick it")
+	check(Game.buy_class("adept") and Game.doubloons == 3850 and Game.owns_class("adept"), "and can be bought")
+	check(CodexPanel.acquisition("adept") != "Not available at this time.", "the Codex no longer says it is unavailable")
+	check(ClassDefs.available().has("adept"), "a phone that owns it can pick it")
 	Game.player_class = "adept"
 	Game.save_settings()
 	Game.load_settings()
-	check(Game.player_class == "infantry" and Game.unlocked.has("adept"), "a saved Adept choice becomes Infantry, and ownership is kept")
-	check(not Net.class_slot_available("adept", 1), "nobody can take it in a game together")
+	check(Game.player_class == "adept", "a saved Adept choice stays Adept")
+	check(Net.class_slot_available("adept", 1), "and it can be taken in a game together")
+	Game.player_class = had_class
 	if not had_adept:
 		Game.unlocked.erase("adept")
-		Game.save_settings()
+	Game.save_settings()
 	check(MistStorm.EVERY == 70.0, "scheduled Mist Storms use the new seventy-second cadence")
 func _heavy() -> void:
 	Game.owned_items["oathkeeper"] = true
@@ -535,6 +536,55 @@ func _beyond_weapons() -> void:
 	var struck := row.filter(func(zz: Zombie) -> bool: return zz.hp < 500.0).size()
 	check(struck >= 3, "and strikes several enemies in turn (%d)" % struck)
 	for zz in row: zz.release()
+	# The Rift Chakram's own throws: 20 with each one picked up, up to 40, one spent with each throw.
+	p.slots = ["sword", null]
+	p.current = 0
+	p.own_ammo.clear()
+	p._equip()
+	var arrows_before := p.arrows
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	var fresh := w.spawn_pickup_at(p.global_position + Vector3(0.6, 0, 0), Pickup.Kind.WEAPON, "chakram")
+	check(fresh.throws() == 20, "a Rift Chakram found lying about brings 20 throws")
+	w._scan_pickups_for(p)
+	check(p.carries("chakram") and p.ammo_of("chakram") == 20 and p.arrows == arrows_before, "picked up, it gives 20 throws and no arrows")
+	w.spawn_pickup_at(p.global_position + Vector3(0.6, 0, 0), Pickup.Kind.WEAPON, "chakram")
+	w._scan_pickups_for(p)
+	check(p.ammo_of("chakram") == 40, "a second one adds 20 more (%d)" % p.ammo_of("chakram"))
+	var third := w.spawn_pickup_at(p.global_position + Vector3(0.6, 0, 0), Pickup.Kind.WEAPON, "chakram")
+	w._scan_pickups_for(p)
+	check(p.ammo_of("chakram") == 40 and is_instance_valid(third) and w.pickups.has(third), "40 is the most: a third one stays on the ground")
+	w.remove_pickup(third)
+	p.current = p.slots.find("chakram")
+	p._equip()
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(p.ammo_of("chakram") == 39 and p.arrows == arrows_before, "a throw spends one throw and no arrows")
+	p.own_ammo["chakram"] = 0
+	p._cooldown = 0.0
+	var thrown := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.spins).size()
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.spins).size() == thrown and p.toast == "No throws left", "with none left it cannot be thrown")
+	# Put down, it keeps what it had: picking it up again gives nothing new.
+	p.own_ammo["chakram"] = 7
+	p.slots = ["chakram", "sword"]
+	p.current = 0
+	p._equip()
+	p.drop_current_weapon()
+	check(not p.carries("chakram") and p.ammo_of("chakram") == 0, "dropped, its throws go with it")
+	var put_down: Pickup = w.pickups.filter(func(q: Pickup) -> bool: return q.weapon_id == "chakram").back()
+	check(put_down.throws() == 7, "the Rift Chakram on the ground keeps its 7 throws (%d)" % put_down.throws())
+	p.shun_weapon = ""
+	p.global_position = put_down.global_position
+	w._scan_pickups_for(p)
+	check(p.carries("chakram") and p.ammo_of("chakram") == 7, "taken back, it has the same 7 (%d)" % p.ammo_of("chakram"))
+	p.slots = ["sword", null]
+	p.current = 0
+	p.own_ammo.clear()
+	p._equip()
 	# Invisibility, then three seconds before the next.
 	p.invis_left = 2.0
 	check(p.invis_left > 0.0 and p.can_vanish(), "invisible")

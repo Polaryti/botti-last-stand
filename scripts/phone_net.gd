@@ -10,21 +10,39 @@ const HIGH_PERF := 3 # WifiManager.WIFI_MODE_FULL_HIGH_PERF, before that
 
 static var _bound := false
 static var _lock: Variant = null
+## Looked up once: reaching into Android for these is slow, and Play Together asks often.
+static var _activity_ref: Variant = null
+static var _manager_ref: Variant = null
 
 
 static func _activity() -> Variant:
+	if _activity_ref != null:
+		return _activity_ref
 	if OS.get_name() != "Android" or not Engine.has_singleton("AndroidRuntime"):
 		return null
-	return Engine.get_singleton("AndroidRuntime").call("getActivity")
+	_activity_ref = Engine.get_singleton("AndroidRuntime").call("getActivity")
+	return _activity_ref
+
+
+static func _connectivity() -> Variant:
+	if _manager_ref != null:
+		return _manager_ref
+	var activity: Variant = _activity()
+	if activity == null:
+		return null
+	_manager_ref = activity.getSystemService("connectivity")
+	return _manager_ref
+
+
+## Whether this phone is held to its Wi-Fi right now.
+static func bound() -> bool:
+	return _bound
 
 
 ## Everything this phone opens from now on goes over Wi-Fi, if it is on one. A phone with its hotspot
 ## on has no Wi-Fi network of its own, so nothing changes for it.
 static func use_wifi() -> void:
-	var activity: Variant = _activity()
-	if activity == null:
-		return
-	var manager: Variant = activity.getSystemService("connectivity")
+	var manager: Variant = _connectivity()
 	if manager == null:
 		return
 	var networks: Variant = manager.getAllNetworks()
@@ -44,19 +62,14 @@ static func use_wifi() -> void:
 ## Always asked for, because a network that has gone away must never keep hold of this phone.
 static func use_default() -> void:
 	_bound = false
-	var activity: Variant = _activity()
-	if activity:
-		var manager: Variant = activity.getSystemService("connectivity")
-		if manager:
-			manager.bindProcessToNetwork(null)
+	var manager: Variant = _connectivity()
+	if manager:
+		manager.bindProcessToNetwork(null)
 
 
 ## The last resort when nothing can be opened: tied by hand to the network the phone is using now.
 static func use_active() -> void:
-	var activity: Variant = _activity()
-	if activity == null:
-		return
-	var manager: Variant = activity.getSystemService("connectivity")
+	var manager: Variant = _connectivity()
 	if manager == null:
 		return
 	var active: Variant = manager.getActiveNetwork()

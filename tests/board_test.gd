@@ -266,7 +266,9 @@ func _screens() -> void:
 			break
 	# Olaf played one night as a Trapper and then one Fort as a Guardian: the latest wins a tie.
 	check(said.has("Olaf the Bold") and said.has("440") and said.has("Heavy Infantry · Guardian"), "the leaderboard lists players, points and most played: %s" % str(said))
-	check(said.any(func(t: String) -> bool: return t.begins_with("You: #1 with 440 points")), "and where you are")
+	check(not said.any(func(t: String) -> bool: return t.begins_with("You: #")), "your own row is marked in the list, with no rank line repeating it under it")
+	var badges := m.ui_layer.find_children("Played", "IconView", true, false)
+	check(badges.size() >= 1 and badges.any(func(b: IconView) -> bool: return b.icon == "spec_guardian"), "each row shows the emblem of what that player plays most: %s" % str(badges.map(func(b: IconView) -> String: return b.icon)))
 	m.show_leaderboard("", "fort")
 	deadline = Time.get_ticks_msec() + 8000
 	while Time.get_ticks_msec() < deadline:

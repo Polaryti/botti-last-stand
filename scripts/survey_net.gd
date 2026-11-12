@@ -95,6 +95,18 @@ func add(at: Vector3, settings: Dictionary, yaw: float) -> void:
 		world.sfx_at("beacon_plant", at, -3.0)
 
 
+## The Cartographer learned something: the beacons already standing work the new way too (a gate
+## raised before Veiled Passage hides you all the same). A new profession waits for the next beacon,
+## which pulls the old markers up.
+func refresh(settings: Dictionary) -> void:
+	if str(settings.get("kind", "")) != kind():
+		return
+	cfg = settings
+	while beacons.size() > int(cfg.get("max", CartographerKit.BEACONS)):
+		(beacons.pop_front()["node"] as Node3D).queue_free()
+	_rebuild_lines()
+
+
 ## Whether this phone does the Cartographer's sums: its own player, or a bot on the host.
 func owner_is_here() -> bool:
 	if not Net.active():
@@ -242,6 +254,13 @@ func _stars(delta: float) -> void:
 				_falling_star()
 
 
+## Seconds until the next Falling Star, or -1 while none is coming (no Star Stones up, or not learned).
+func next_fall() -> float:
+	if kind() != "stars" or not has("falling_star") or beacons.is_empty():
+		return -1.0
+	return maxf(0.0, FALL_EVERY - _fall_clock)
+
+
 ## Every phone shows the starlight on the creatures it sees; only the Cartographer's phone deals it.
 func _starlight() -> void:
 	var dealing := owner_is_here()
@@ -249,7 +268,7 @@ func _starlight() -> void:
 	var dmg := float(cfg.get("power", CartographerKit.STAR_DAMAGE))
 	var struck := 0
 	for z: Zombie in _zombies_in_sky():
-		world.fx_spark(z.centre() + Vector3(0.3, 7.0, 0.2), z.centre())
+		show_starlight(world, z.position, z.centre().y - z.position.y)
 		struck += 1
 		if dealing:
 			z.take_damage(dmg, Vector3.ZERO, 0.0, z.centre())
@@ -260,6 +279,7 @@ func _starlight() -> void:
 		for r in world.rivals_near(_centre(), 60.0):
 			if starlit(r.global_position):
 				world.hit_rival(r, dmg, r.global_position + Vector3.UP * 6.0)
+				show_starlight(world, r.global_position, 0.9)
 				if has("star_slow"):
 					world.status_rival(r, Net.Status.SLOW, STAR_SLOW)
 				struck += 1
@@ -299,6 +319,146 @@ func _falling_star() -> void:
 			world.hit_rival(r, FALL_DAMAGE, at)
 			world.status_rival(r, Net.Status.STUN, FALL_STUN)
 		world.end_act(was)
+
+
+## Starlight striking one creature: a shaft of pale gold light drops from high above onto it, a
+## four-pointed star flares where it lands and a ring of light spreads on the ground under it.
+## Only Star Stones make it, so it reads as theirs at a glance.
+static func show_starlight(w: World, at: Vector3, chest := 0.9) -> void:
+	if w == null or not w.is_inside_tree():
+		return
+	var root := Node3D.new()
+	w.add_child(root)
+	root.global_position = at
+	var beam := MeshInstance3D.new()
+	beam.mesh = _beam_mesh()
+	beam.material_override = (_starlight_material("beam") as Material).duplicate()
+	beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	beam.position = Vector3(0, chest + BEAM_HEIGHT * 0.5, 0)
+	beam.scale = Vector3(0.3, 1.0, 0.3)
+	root.add_child(beam)
+	# A wider, fainter sheath of light around the shaft.
+	var halo := MeshInstance3D.new()
+	halo.mesh = _beam_mesh()
+	halo.material_override = (_starlight_material("halo") as Material).duplicate()
+	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	halo.position = beam.position
+	halo.scale = Vector3(1.0, 1.0, 1.0) * Vector3(0.9, 1.0, 0.9)
+	root.add_child(halo)
+	var star := MeshInstance3D.new()
+	star.mesh = _quad(1.0)
+	star.material_override = (_starlight_material("star") as Material).duplicate()
+	star.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	star.position = Vector3(0, chest * 1.6, 0) # on top of the creature, where the shaft strikes it
+	star.scale = Vector3.ONE * 0.2
+	root.add_child(star)
+	var ring := MeshInstance3D.new()
+	ring.mesh = _quad(1.0)
+	ring.material_override = (_starlight_material("ring") as Material).duplicate()
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.rotation.x = -PI * 0.5
+	ring.position = Vector3(0, 0.06, 0)
+	ring.scale = Vector3.ONE * 0.4
+	root.add_child(ring)
+	# One tween per part, each running its steps in turn.
+	# The shaft lands in a blink, then thins away.
+	var t := beam.create_tween()
+	t.tween_property(beam, "scale", Vector3.ONE, 0.06)
+	t.tween_interval(0.04)
+	t.tween_property(beam, "scale", Vector3(0.05, 1.0, 0.05), 0.34).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	t.parallel().tween_property(beam.material_override, "albedo_color:a", 0.0, 0.34)
+	var th := halo.create_tween().set_parallel(true)
+	th.tween_property(halo, "scale", Vector3(3.2, 1.0, 3.2), 0.42).set_ease(Tween.EASE_OUT)
+	th.tween_property(halo.material_override, "albedo_color:a", 0.0, 0.42)
+	# The star flares, turns a little and goes out.
+	var ts := star.create_tween()
+	ts.tween_interval(0.03)
+	ts.tween_property(star, "scale", Vector3.ONE * 1.6, 0.09).set_ease(Tween.EASE_OUT)
+	ts.tween_property(star, "scale", Vector3.ONE * 0.1, 0.34).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	ts.parallel().tween_property(star.material_override, "albedo_color:a", 0.0, 0.34)
+	# The ring spreads on the ground; when it is gone, so is the rest.
+	var tr := ring.create_tween()
+	tr.tween_interval(0.04)
+	tr.tween_property(ring, "scale", Vector3.ONE * 2.4, 0.5).set_ease(Tween.EASE_OUT)
+	tr.parallel().tween_property(ring.material_override, "albedo_color:a", 0.0, 0.5)
+	tr.tween_callback(root.queue_free)
+
+
+const BEAM_HEIGHT := 9.0
+static var _starlight_look := {}
+static var _starlight_beam: Mesh
+static var _starlight_quad: Mesh
+
+
+static func _beam_mesh() -> Mesh:
+	if _starlight_beam == null:
+		var c := CylinderMesh.new()
+		c.top_radius = 0.04
+		c.bottom_radius = 0.16
+		c.height = BEAM_HEIGHT
+		c.radial_segments = 8
+		c.rings = 1
+		c.cap_top = false
+		c.cap_bottom = false
+		_starlight_beam = c
+	return _starlight_beam
+
+
+static func _quad(size: float) -> Mesh:
+	if _starlight_quad == null:
+		var q := QuadMesh.new()
+		q.size = Vector2.ONE * size
+		_starlight_quad = q
+	return _starlight_quad
+
+
+## Additive, unlit and drawn over the fog: "beam" plain gold, "star" a four-pointed glint that always
+## faces the camera, "ring" a thin circle of light for the ground.
+static func _starlight_material(which: String) -> StandardMaterial3D:
+	if not _starlight_look.has(which):
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		m.disable_fog = true
+		m.no_depth_test = false
+		match which:
+			"beam":
+				m.albedo_color = Color(1.0, 0.92, 0.66, 0.95)
+			"halo":
+				m.albedo_color = Color(1.0, 0.82, 0.45, 0.28)
+			"star", "twinkle":
+				m.albedo_color = Color(1.0, 0.94, 0.72, 1.0 if which == "star" else 0.85)
+				m.albedo_texture = _glint_texture(true)
+				m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+				m.billboard_keep_scale = true
+			"ring":
+				m.albedo_color = Color(1.0, 0.86, 0.5, 0.8)
+				m.albedo_texture = _glint_texture(false)
+		_starlight_look[which] = m
+	return _starlight_look[which]
+
+
+## Made once: a four-pointed star with a soft middle, or a thin soft ring.
+static func _glint_texture(star: bool) -> Texture2D:
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	for y in n:
+		for x in n:
+			var u := (x + 0.5) / n * 2.0 - 1.0
+			var v := (y + 0.5) / n * 2.0 - 1.0
+			var a := 0.0
+			if star:
+				var r := sqrt(u * u + v * v)
+				var arms := exp(-absf(u) * 22.0) * maxf(0.0, 1.0 - absf(v)) + exp(-absf(v) * 22.0) * maxf(0.0, 1.0 - absf(u))
+				var diag := (exp(-absf(u - v) * 30.0) + exp(-absf(u + v) * 30.0)) * maxf(0.0, 1.0 - r * 1.8) * 0.5
+				a = clampf(arms + diag + exp(-r * r * 30.0), 0.0, 1.0)
+			else:
+				var r2 := sqrt(u * u + v * v)
+				a = exp(-pow((r2 - 0.82) / 0.07, 2.0)) + exp(-pow((r2 - 0.82) / 0.2, 2.0)) * 0.3
+			img.set_pixel(x, y, Color(1, 1, 1, clampf(a, 0.0, 1.0)))
+	return ImageTexture.create_from_image(img)
 
 
 static func show_falling_star(w: World, at: Vector3) -> void:
@@ -653,18 +813,17 @@ func _rebuild_lines() -> void:
 				v = 1.0 - v
 			var spot: Vector3 = pts[0] + (pts[1] - pts[0]) * u + (pts[2] - pts[0]) * v
 			spot.y = world.ground_at(spot) + randf_range(2.2, 3.4)
+			# Little four-pointed stars, each twinkling in its own time.
 			var mote := MeshInstance3D.new()
-			var q := QuadMesh.new()
-			q.size = Vector2(0.26, 0.26)
-			mote.mesh = q
-			var mm := StandardMaterial3D.new()
-			mm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			mm.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-			mm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-			mm.albedo_color = Color(STARLIGHT, 0.9)
-			mm.disable_fog = true
-			mote.material_override = mm
+			mote.mesh = _quad(1.0)
+			mote.material_override = _starlight_material("twinkle")
 			mote.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			mote.position = spot
+			var size := randf_range(0.4, 0.62)
+			mote.scale = Vector3.ONE * size
 			add_child(mote)
+			var tw := mote.create_tween().set_loops()
+			tw.tween_interval(randf_range(0.0, 1.6))
+			tw.tween_property(mote, "scale", Vector3.ONE * size * 0.35, 0.5).set_trans(Tween.TRANS_SINE)
+			tw.tween_property(mote, "scale", Vector3.ONE * size, 0.5).set_trans(Tween.TRANS_SINE)
 			_lines.append(mote)

@@ -17,8 +17,10 @@ var _left := 8.0
 var _life := 8.0
 var _shell: MeshInstance3D
 var _rim: MeshInstance3D
+var _veil: CanvasLayer
+var _rim_left := 0.0
+static var _shell_shader: Shader
 var _stars: GPUParticles3D
-static var _shell_mat: ShaderMaterial
 
 
 func _init(owner_world: World, peer: int, at: Vector3, dome_radius: float, seconds: float, linger_secs: float, switches: int) -> void:
@@ -41,30 +43,37 @@ func _ready() -> void:
 	var sphere := SphereMesh.new()
 	sphere.radius = 1.0
 	sphere.height = 2.0
-	sphere.is_hemisphere = true
+	# A whole sphere sunk to its middle, so it meets sloping ground on every side with no gap under it.
+	sphere.is_hemisphere = false
 	sphere.radial_segments = 32
-	sphere.rings = 12
+	sphere.rings = 20
 	_shell = MeshInstance3D.new()
 	_shell.mesh = sphere
 	_shell.material_override = _material()
 	_shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_shell.scale = Vector3.ONE * 0.01
 	add_child(_shell)
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.97
-	ring.outer_radius = 1.03
-	ring.rings = 48
+	# The edge of the night, lying on the ground however it slopes.
 	_rim = MeshInstance3D.new()
-	_rim.mesh = ring
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	glow.albedo_color = Color(0.72, 0.5, 0.95)
 	glow.disable_fog = true
+	glow.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_rim.material_override = glow
 	_rim.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_rim.scale = Vector3(radius, 1.0, radius)
-	_rim.position.y = 0.06
 	add_child(_rim)
+	_lay_rim()
+	# Seen from inside, the dark is over everything you look at, not on a line across the ground.
+	_veil = CanvasLayer.new()
+	_veil.layer = 0
+	_veil.visible = false
+	var shade := ColorRect.new()
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.material = _veil_material()
+	_veil.add_child(shade)
+	add_child(_veil)
 	# A few slow motes of starlight inside the dark.
 	_stars = GPUParticles3D.new()
 	_stars.amount = 40
@@ -80,36 +89,94 @@ func _ready() -> void:
 	_stars.process_material = pm
 	var mote := QuadMesh.new()
 	mote.size = Vector2(0.08, 0.08)
-	var mote_mat := StandardMaterial3D.new()
-	mote_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mote_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	mote_mat.albedo_color = Color(0.86, 0.8, 1.0)
-	mote_mat.disable_fog = true
-	mote.material = mote_mat
+	mote.material = _mote_material()
 	_stars.draw_pass_1 = mote
 	_stars.position.y = radius * 0.35
 	add_child(_stars)
 
 
-## Dark glass: deepest at the edge, nearly clear on the top, with a faint violet sheen.
-static func _material() -> ShaderMaterial:
-	if _shell_mat:
-		return _shell_mat
-	var sh := Shader.new()
-	sh.code = """
+## Dark glass: deepest at the edge, nearly clear on the top, with a faint violet sheen. From inside
+## (inside = 1) only a faint sheen is left, since the veil over the screen does the darkening.
+## Each dome has its own material, since one may be seen from inside while another is not.
+func _material() -> ShaderMaterial:
+	if _shell_shader == null:
+		_shell_shader = Shader.new()
+		_shell_shader.code = """
 shader_type spatial;
 render_mode unshaded, blend_mix, cull_disabled, depth_draw_never, fog_disabled;
 uniform float fade = 1.0;
+uniform float inside = 0.0;
 void fragment() {
 	float edge = 1.0 - abs(dot(NORMAL, VIEW));
 	float band = 0.5 + 0.5 * sin(TIME * 0.7 + UV.y * 18.0);
 	ALBEDO = mix(vec3(0.03, 0.02, 0.07), vec3(0.42, 0.26, 0.62), edge * 0.6 + band * 0.06);
-	ALPHA = clamp(0.42 + edge * 0.45, 0.0, 0.92) * fade;
+	ALPHA = mix(clamp(0.42 + edge * 0.45, 0.0, 0.92), edge * 0.18, inside) * fade;
 }
 """
-	_shell_mat = ShaderMaterial.new()
-	_shell_mat.shader = sh
-	return _shell_mat
+	var m := ShaderMaterial.new()
+	m.shader = _shell_shader
+	return m
+
+
+## The screen seen from inside: a deep violet dusk, darker towards the edges.
+static func _veil_material() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type canvas_item;
+uniform float fade = 1.0;
+void fragment() {
+	float d = distance(UV, vec2(0.5));
+	COLOR = vec4(0.1, 0.03, 0.2, (0.4 + smoothstep(0.2, 0.75, d) * 0.4) * fade);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	return m
+
+
+## A soft round point of starlight, rather than a square.
+static func _mote_material() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, fog_disabled, cull_disabled;
+void vertex() {
+	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
+}
+void fragment() {
+	float d = distance(UV, vec2(0.5)) * 2.0;
+	ALBEDO = vec3(0.86, 0.8, 1.0);
+	ALPHA = clamp(1.0 - d, 0.0, 1.0) * 0.9;
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	return m
+
+
+## A band of light round the dome's edge, each piece set on the ground where it lies.
+func _lay_rim() -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	const PARTS := 64
+	var points: Array[Vector3] = []
+	for i in PARTS + 1:
+		var a := TAU * i / PARTS
+		var flat := Vector3(cos(a), 0, sin(a))
+		var inner := flat * (radius - 0.08)
+		var outer := flat * (radius + 0.08)
+		var at := position + flat * radius
+		var y := (world.ground_at(at) if world else position.y) - position.y + 0.07
+		points.append(Vector3(inner.x, y, inner.z))
+		points.append(Vector3(outer.x, y, outer.z))
+	for i in PARTS:
+		var a := points[i * 2]
+		var b := points[i * 2 + 1]
+		var c := points[i * 2 + 2]
+		var d := points[i * 2 + 3]
+		for v: Vector3 in [a, b, c, b, d, c]:
+			st.add_vertex(v)
+	_rim.mesh = st.commit()
 
 
 func contains(at: Vector3) -> bool:
@@ -128,7 +195,20 @@ func _physics_process(delta: float) -> void:
 	# It grows out of the ground in a quarter second and thins away in its last half second.
 	var grow := clampf((_life - _left) / 0.25, 0.0, 1.0)
 	_shell.scale = Vector3(radius, radius * 0.8, radius) * grow
-	(_shell.material_override as ShaderMaterial).set_shader_parameter("fade", clampf(_left / 0.5, 0.0, 1.0))
+	var fade := clampf(_left / 0.5, 0.0, 1.0)
+	var mat := _shell.material_override as ShaderMaterial
+	mat.set_shader_parameter("fade", fade)
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	var seen_inside := cam != null and contains(cam.global_position) and grow > 0.5
+	mat.set_shader_parameter("inside", 1.0 if seen_inside else 0.0)
+	_veil.visible = seen_inside
+	if seen_inside:
+		((_veil.get_child(0) as ColorRect).material as ShaderMaterial).set_shader_parameter("fade", fade)
+	if has("night_follow"):
+		_rim_left -= delta
+		if _rim_left <= 0.0:
+			_rim_left = 0.25
+			_lay_rim()
 	_tend(world.player)
 	if Net.is_host() or not Net.active():
 		for bot: Player in Net.bot_pawns():

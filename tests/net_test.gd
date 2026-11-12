@@ -1394,6 +1394,42 @@ func _bandit() -> void:
 	if host:
 		ok(pl.hp < hp_before, "the fan's knives reach this phone (%.0f)" % pl.hp)
 	await sync(207)
+	# Grand Larceny from this phone's Thief on the host's armed creatures: the host disarms them for
+	# real, and their weapons lie on the ground on both phones.
+	var den := Vector3(-30, 0, 60)
+	if host:
+		pl.global_position = Vector3(30, w.ground_at(Vector3(30, 0, 60)) + 0.05, 60)
+		for k in 3:
+			var at := den + Vector3(cos(k * 2.1), 0, sin(k * 2.1)) * (0.0 if k == 0 else 1.6)
+			w.spawn_zombie("clever", at)
+			var armed: Zombie = w.zombies.back()
+			armed.set_physics_process(false)
+			armed.hp = 1000.0
+			armed.max_hp = 1000.0
+			armed.weapon_id = ["sword", "spear", "mace"][k]
+			Net.zombie_weapon(armed)
+	await wait(1.0)
+	await sync(208)
+	var armed_ones := func() -> Array: return w.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and z.position.distance_to(den) < 6.0)
+	if not host:
+		ok((armed_ones.call() as Array).size() == 3 and (armed_ones.call() as Array).all(func(z: Zombie) -> bool: return z.weapon_id != ""), "three armed creatures stand on this phone too")
+		pl.spec_id = "thief"
+		pl.flags["steal_all"] = true
+		pl.flags.erase("steal_keep")
+		pl.invis_left = 0.0
+		pl.invis_lockout = 0.0
+		pl.art_cd_left = 0.0
+		pl.global_position = den + Vector3(0, w.ground_at(den) + 0.05, 7.0)
+		await wait(0.2)
+		pl.use_art()
+	await wait(1.5)
+	await sync(209)
+	var after: Array = armed_ones.call()
+	ok(after.size() == 3 and after.all(func(z: Zombie) -> bool: return z.weapon_id == ""), "Grand Larceny disarms all three on this phone: %s" % str(after.map(func(z: Zombie) -> String: return z.weapon_id)))
+	var dropped := w.pickups.filter(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.global_position.distance_to(den) < 8.0).map(func(i: Pickup) -> String: return i.item_id)
+	dropped.sort()
+	ok(dropped == ["mace", "spear", "sword"], "and their weapons lie on the ground on this phone: %s" % str(dropped))
+	await sync(210)
 
 
 
@@ -1423,6 +1459,9 @@ func _cartographer() -> void:
 			pl.rotation.y = 0.0
 			CartographerKit.cast(pl)
 		pl.global_position = Vector3(base.x + 4.0, w.ground_at(base) + 0.05, base.z + 6.0)
+		# Veiled Passage, learned after the gates were raised.
+		pl.flags["gate_hide"] = true
+		CartographerKit.retune(pl)
 	await wait(0.8)
 	await sync(301)
 	var survey: SurveyNet = w.surveys.get(Net.my_id() if not host else _other())
@@ -1433,6 +1472,7 @@ func _cartographer() -> void:
 		pl.global_position = Vector3(gate_a.x, w.ground_at(gate_a) + 0.05, gate_a.z)
 		await wait(0.3)
 		ok(SurveyNet._flat(pl.global_position, survey.beacons[1]["at"]) < 2.5, "a friend on this phone steps through a Waygate and out of the other")
+		ok(survey.has("gate_hide") and pl.invis_left > 1.0, "hidden by Veiled Passage, learned after the gates were raised (%.1f s)" % pl.invis_left)
 	await sync(302)
 	# Star Reader: the client's stones, and the host's creature inside them.
 	if not host:

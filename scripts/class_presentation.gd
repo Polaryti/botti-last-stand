@@ -74,13 +74,14 @@ const TAG_STYLES := {
 	"exclusive": [Color("33213f"), Color("b98ae0"), Color("e3ccff")],
 	"map_green": [Color("1d3c2c"), Color("7fc08a"), Color("b2e8b5")],
 	"map_mists": [Color("193e4b"), Color("6fb6d6"), Color("a5f0ec")],
-	"map_mesenlla": [Color("4a2a12"), Color("e7a04c"), Color("ffd9a6")],
+	"map_mesenlla": [Color("2a1f4d"), UiTheme.TWILIGHT, Color("e2d8ff")], # the twilight violet of the lands beyond the Mists
 }
 
 
 static func tag(text: String, style: String) -> PanelContainer:
 	var colors: Array = TAG_STYLES[style]
 	var badge := PanelContainer.new()
+	badge.set_meta("tag", true) # a tag's word never wraps
 	badge.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	badge.add_theme_stylebox_override("panel", UiTheme.flat(colors[0], colors[1], 6, 7.0))
 	var label := Label.new()

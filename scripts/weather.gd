@@ -6,8 +6,8 @@ extends Node3D
 
 enum Kind { CLEAR, RAIN, STORM }
 
-const STORM_CHANCE := 0.07
-const RAIN_CHANCE := 0.2
+const STORM_CHANCE := 0.05 # of nights
+const RAIN_CHANCE := 0.16 # of nights, besides the storms
 const STRIKE_RADIUS := 4.5
 const STRIKE_WARNING := 1.1
 const PLAYER_DAMAGE := 40.0

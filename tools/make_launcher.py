@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Draws the launcher icon (plain, adaptive and themed) and the boot splash. All original.
 The picture is the village bell in front of the moon, lit from below by a fire you cannot see.
-The splash uses the wordmark, so run tools/make_ui.py first if that changed.
+The splash is the twilight of the lands beyond the Mists under the wordmark, so run tools/make_ui.py
+first if that changed.
 Run from the project root."""
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 SS = 4  # drawn large, then scaled down
 TOP = np.array([0.043, 0.067, 0.122])
@@ -146,13 +147,124 @@ def icons():
     rounded(plain, 96).save("icon.png")
 
 
+# The splash belongs to Beyond the Mists: twilight over the mountains past the Mists, not the village night.
+DUSK_TOP = np.array([0.075, 0.05, 0.165])
+DUSK_MID = np.array([0.34, 0.2, 0.46])
+DUSK_LOW = np.array([0.96, 0.58, 0.38])
+VIOLET = (168, 128, 255)
+
+
+def _ridge(w, h, rng, base, tall, sharp=True):
+    """One mountain line across the picture, as polygon points closed along the bottom."""
+    f1, f2 = rng.uniform(1.1, 2.0), rng.uniform(3.2, 5.6)
+    p1, p2 = rng.uniform(0, 6.3), rng.uniform(0, 6.3)
+    pts = []
+    for i in range(241):
+        u = i / 240.0
+        v = np.sin(u * np.pi * f1 + p1) * 0.6 + np.sin(u * np.pi * f2 + p2) * 0.28 + rng.uniform(-0.03, 0.03)
+        if sharp:
+            v = abs(v) * 1.4 - 0.2
+        pts.append((u * w, (base - v * tall) * h))
+    return pts + [(w, h), (0, h)]
+
+
+def twilight(w, h, seed=11):
+    """The endless twilight of the lands beyond the Mists: violet above, peach on the horizon, three
+    ranges of peaks fading into it, rock shards floating with a glint of mist light, and a low mist."""
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:h, 0:w]
+    v = (yy / h)[..., None]
+    up = np.clip(v / 0.4, 0, 1)
+    down = np.clip((v - 0.4) / 0.22, 0, 1)
+    rgb = DUSK_TOP * (1 - up) + DUSK_MID * up
+    rgb = rgb * (1 - down) + DUSK_LOW * down
+    # Where the sun has gone down: a warm glow low on the right.
+    sun = np.exp(-((xx / w - 0.72) * w / h / 0.42) ** 2 - ((yy / h - 0.62) / 0.2) ** 2)[..., None]
+    rgb = rgb + sun * np.array([0.22, 0.12, 0.04])
+    im = Image.fromarray(np.uint8(np.clip(rgb, 0, 1) * 255 + 0.5)).convert("RGBA")
+    draw = ImageDraw.Draw(im)
+    for _ in range(int(w * h / 4200)):
+        x, y = rng.uniform(0, w), rng.uniform(0, h * 0.42)
+        r = rng.uniform(0.35, 1.0) * h / 700
+        a = int(rng.uniform(90, 220) * (1 - y / (h * 0.45)))
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(235, 225, 255, a))
+    # Floating shards of rock, high and far, each with a cyan glint underneath.
+    shards = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shards)
+    for cx, cy, s in ((0.13, 0.2, 0.05), (0.31, 0.11, 0.028), (0.87, 0.14, 0.04), (0.66, 0.08, 0.022), (0.95, 0.33, 0.026)):
+        x, y, r = cx * w, cy * h, s * h
+        top = [(x - r * 1.2, y), (x - r * 0.5, y - r * 0.35), (x + r * 0.6, y - r * 0.3), (x + r * 1.25, y + r * 0.05)]
+        tip = (x + r * 0.1, y + r * 1.9)
+        sd.polygon(top + [tip], fill=(52, 38, 76, 255))
+        sd.polygon([(x - r * 1.2, y), (x - r * 0.5, y - r * 0.35), (x + r * 0.6, y - r * 0.3), (x + r * 1.25, y + r * 0.05), (x + r * 0.1, y + r * 0.35)], fill=(92, 72, 118, 255))
+        sd.ellipse((tip[0] - r * 0.22, tip[1] - r * 0.22, tip[0] + r * 0.22, tip[1] + r * 0.22), fill=(120, 245, 235, 255))
+    lights = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    for cx, cy, s in ((0.13, 0.2, 0.05), (0.31, 0.11, 0.028), (0.87, 0.14, 0.04), (0.66, 0.08, 0.022), (0.95, 0.33, 0.026)):
+        x, y, r = cx * w, (cy + s * 1.9) * h, s * h * 0.9
+        ImageDraw.Draw(lights).ellipse((x + s * h * 0.1 - r, y - r, x + s * h * 0.1 + r, y + r), fill=(110, 240, 230, 120))
+    im.alpha_composite(lights.filter(ImageFilter.GaussianBlur(h * 0.02)))
+    im.alpha_composite(shards)
+    # Three ranges, the far one pale with the horizon's light on its snow.
+    for k, (base, tall, tone) in enumerate(((0.6, 0.2, (122, 82, 128)), (0.7, 0.16, (70, 48, 92)), (0.8, 0.12, (38, 27, 56)))):
+        layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        ImageDraw.Draw(layer).polygon(_ridge(w, h, rng, base, tall), fill=tone + (255,))
+        if k == 0:
+            # Snow on the far peaks: the ridge shifted down a little, cut out of a pale copy.
+            snow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            ImageDraw.Draw(snow).polygon(_ridge(w, h, np.random.default_rng(seed + 100), base - 0.035, tall * 0.9), fill=(246, 214, 206, 150))
+            mask = np.minimum(np.asarray(layer)[..., 3], 255 - np.asarray(snow.filter(ImageFilter.GaussianBlur(2)))[..., 3])
+            cap = np.asarray(layer).copy()
+            cap[..., :3] = (236, 196, 196)
+            cap[..., 3] = (mask * (np.clip(1.0 - (yy / h - (base - tall * 1.1)) / (tall * 0.6), 0, 1))).astype(np.uint8) // 2
+            im.alpha_composite(layer)
+            im.alpha_composite(Image.fromarray(cap, "RGBA"))
+        else:
+            im.alpha_composite(layer)
+        # Mist lying in each valley.
+        mist = np.exp(-((yy / h - (base + 0.03)) / 0.03) ** 2) * (0.35 - 0.08 * k)
+        haze = np.zeros((h, w, 4), dtype=np.uint8)
+        haze[..., :3] = (205, 170, 230)
+        haze[..., 3] = np.uint8(np.clip(mist, 0, 1) * 255)
+        im.alpha_composite(Image.fromarray(haze, "RGBA"))
+    # Tall firs close by, darkest of all, a little taller towards the edges.
+    near = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    nd = ImageDraw.Draw(near)
+    for base, tone, scale in ((0.86, (26, 18, 40), 0.15), (0.94, (13, 9, 22), 0.2)):
+        x = -0.05 * w
+        pts = [(0, h)]
+        while x < w * 1.05:
+            edge = 0.55 + 0.9 * abs(x / w - 0.5)
+            th = rng.uniform(0.55, 1.0) * scale * h * edge
+            tw = th * 0.36
+            y = base * h + rng.uniform(-0.006, 0.006) * h
+            pts += [(x - tw * 0.5, y), (x - tw * 0.18, y - th * 0.45), (x - tw * 0.28, y - th * 0.45), (x, y - th), (x + tw * 0.28, y - th * 0.45), (x + tw * 0.18, y - th * 0.45), (x + tw * 0.5, y)]
+            x += tw * rng.uniform(0.6, 1.0)
+        pts.append((w, h))
+        nd.polygon(pts, fill=tone + (255,))
+    im.alpha_composite(near)
+    return im
+
+
 def splash():
     w, h = 1280, 720
-    im = sky(w, h, (0.76, 0.24), 0.15).convert("RGBA")
+    im = twilight(w, h)
     mark = Image.open("assets/ui/wordmark.png").convert("RGBA")
-    scale = 880.0 / mark.width
-    mark = mark.resize((880, int(mark.height * scale)), Image.LANCZOS)
-    im.alpha_composite(mark, ((w - mark.width) // 2, int(h * 0.5 - mark.height * 0.62)))
+    scale = 860.0 / mark.width
+    mark = mark.resize((860, int(mark.height * scale)), Image.LANCZOS)
+    top = int(h * 0.36 - mark.height * 0.62)
+    im.alpha_composite(mark, ((w - mark.width) // 2, top))
+    # The update's name under it, in the violet of the lands beyond the Mists.
+    font = ImageFont.truetype("assets/fonts/Cinzel-Bold.ttf", 46)
+    text = "Beyond the Mists"
+    box = ImageDraw.Draw(im).textbbox((0, 0), text, font=font)
+    at = ((w - (box[2] - box[0])) // 2 - box[0], top + mark.height - 6)
+    shade = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(shade).text(at, text, font=font, fill=(18, 10, 34, 210))
+    im.alpha_composite(shade.filter(ImageFilter.GaussianBlur(5)))
+    halo = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(halo).text(at, text, font=font, fill=VIOLET + (150,))
+    im.alpha_composite(halo.filter(ImageFilter.GaussianBlur(9)))
+    ImageDraw.Draw(im).text(at, text, font=font, fill=(214, 198, 255))
     im.convert("RGB").save("assets/ui/splash.png")
 
 

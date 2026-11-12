@@ -21,7 +21,7 @@ const ALL := {
 		"tips": ["Leave an island when its Mist Storm warning sounds.",
 			"The Veil Regent's crown attack has a safe eye in the middle. Stand in it.",
 			"Portals open and close in turn. Watch the map for the open ones."]},
-	"mesenlla": {"name": "Valleys of Mesenlla", "icon": "map_mesenlla", "color": Color(0.91, 0.63, 0.3), "plays": "Survive the Night, Co-op, All vs All and Teams",
+	"mesenlla": {"name": "Valleys of Mesenlla", "icon": "map_mesenlla", "color": UiTheme.TWILIGHT, "plays": "Survive the Night, Co-op, All vs All and Teams",
 		"lore": "Fleeing a collapsed world and having conquered the heart of the Mists, new paths open to distant lands through its portals. The first leads to a mountain outpost under an endless twilight.",
 		"tips": ["A bear rears up before it mauls. Step back, or stun it.",
 			"Leave a coloured circle before it fills: each one is a blow on its way.",

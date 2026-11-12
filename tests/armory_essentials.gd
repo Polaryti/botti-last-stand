@@ -11,6 +11,9 @@ func _ready() -> void:
 		m._fill_armory(m.panel.get_meta("detail"), id)
 		await get_tree().process_frame
 		var labels := m.panel.find_children("*", "Label", true, false)
+		# The weapon tags sit in a row, each word on one line.
+		var tags := m.panel.find_child("WeaponTags", true, false) as HFlowContainer
+		assert(tags != null and tags.get_children().all(func(t: Control) -> bool: return (t.get_child(0) as Label).autowrap_mode == TextServer.AUTOWRAP_OFF))
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:
 			assert(ClassPresentation.profession(spec).ends_with("."))
 			assert(labels.any(func(l: Label) -> bool: return l.text == spec["name"]))

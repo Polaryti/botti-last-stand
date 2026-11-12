@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED }
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -1050,11 +1050,16 @@ func blind(seconds: float) -> void:
 
 ## Robbed by a Thief: the weapon falls (or, with drop false, is taken). Returns what it held, or "".
 ## Class weapons and weapons that never lie about stay put.
+## Knocks the weapon out of its hand: onto the ground, or (drop false) nowhere, for a Thief's Fence.
+## On a phone that is not the host this one is only a copy, so the host is told to do it for real:
+## the host drops the weapon and tells every phone the creature is unarmed.
 func disarm(drop := true) -> String:
 	if weapon_id == "" or not WeaponDefs.lies_around(weapon_id):
 		return ""
 	var held := weapon_id
-	if drop:
+	if puppet:
+		Net.effect_zombie(self, Effect.DISARM, 1.0 if drop else 0.0)
+	elif drop:
 		world.drop_weapon(position + Vector3(0, 0, 0.6), held)
 	weapon_id = ""
 	if _hand_mesh:
@@ -1150,6 +1155,11 @@ func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_nam
 
 func net_weapon(id: String) -> void:
 	weapon_id = id
+	if id == "" or not WeaponDefs.ALL.has(id):
+		# Disarmed on the host: empty the hand here too.
+		if _hand_mesh:
+			_hand_mesh.equip("")
+		return
 	_show_weapon(id)
 
 

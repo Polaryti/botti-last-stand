@@ -519,8 +519,8 @@ SPECS = {
     "thief": ("bandit", lambda: at(44, 58, 0.66, hand()) + at(68, 30, 0.42, circ(GOLD, 50, 50, 34) + circ("none", 50, 50, 22, 2)) + at(30, 26, 0.3, dagger())),
     "mercenary": ("bandit", lambda: path(NIGHT, "M10 76 C14 30 86 30 90 76Z") + at(50, 50, 0.38, moon()) + at(30, 40, 0.14, star()) + at(70, 36, 0.12, star())),
     "highwayman": ("bandit", lambda: "".join(at(50 + dx, 56, 0.5, turn(a, dagger())) for dx, a in ((-20, -36), (-10, -18), (0, 0), (10, 18), (20, 36)))),
-    "star_reader": ("cartographer", lambda: path(NIGHT, "M12 80 L12 20 L88 20 L88 80Z", 0) + line("#cfe8ff", 3, (26, 66), (50, 30), (76, 58), (26, 66), ink=False)
-        + at(26, 66, 0.22, star()) + at(50, 30, 0.26, star()) + at(76, 58, 0.22, star())),
+    "star_reader": ("cartographer", lambda: line("#cfe8ff", 4, (24, 68), (50, 28), (78, 60), (24, 68))
+        + at(24, 68, 0.26, star()) + at(50, 28, 0.3, star()) + at(78, 60, 0.26, star())),
     "worlds_traveler": ("cartographer", lambda: at(50, 52, 0.78, waygate()) + at(76, 24, 0.24, star())),
     "pathfinder": ("cartographer", lambda: at(36, 58, 0.62, turn(-20, machete())) + at(68, 40, 0.5, compass())),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),

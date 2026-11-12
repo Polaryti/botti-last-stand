@@ -16,6 +16,7 @@ const BED_Y := -1.25 # shallow enough for anyone to wade across
 const LAYER := 16 # the ground: blocks the player, sight and shots
 const BARRIER := 32 # the river and the cliffs: block bodies, but not sight or shots
 const ENEMY_ONLY := 128 # blocks enemies and nothing else
+const WINDOW := 8 # a window's opening: seen and shot through, never climbed through or struck through
 const STEEP := 0.86 # height per metre: steeper than about 40 degrees cannot be walked
 const BANK := 5.0
 const WADE := 0.6 # how deep the water can be before it stops you

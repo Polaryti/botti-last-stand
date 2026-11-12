@@ -28,6 +28,8 @@ var doubloons := 0
 var board_prizes := {} # week -> doubloons, for leaderboard prizes already paid
 var finished_games := 0
 var mists_wins := 0
+var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
+var bastion_wins := 0
 var poison_dealt := 0.0
 var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
@@ -45,6 +47,7 @@ const VERSUS_MAPS := ["village", "mesenlla"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
+const WINS_FOR_CARTOGRAPHER := 3 # in each of the Valleys of Mesenlla and Mist Bastion
 const POISON_FOR_PLAGUE := 3000
 var sensitivity := 1.0
 var quality := 1 # 0 low, 1 medium, 2 high
@@ -161,6 +164,8 @@ func earn_text(id: String) -> String:
 			return "Survive until dawn %d times in The Mists to unlock this class. So far: %d." % [WINS_FOR_REVENANT, mini(mists_wins, WINS_FOR_REVENANT)]
 		"poison":
 			return "Deal %d poison damage to unlock this class. So far: %d." % [POISON_FOR_PLAGUE, mini(int(poison_dealt), POISON_FOR_PLAGUE)]
+		"beyond":
+			return "Win %d matches in the Valleys of Mesenlla and %d in Mist Bastion to unlock this class. So far: %d and %d." % [WINS_FOR_CARTOGRAPHER, WINS_FOR_CARTOGRAPHER, mini(mesenlla_wins, WINS_FOR_CARTOGRAPHER), mini(bastion_wins, WINS_FOR_CARTOGRAPHER)]
 	return ""
 
 
@@ -180,6 +185,23 @@ func note_mists_win() -> void:
 	mists_wins += 1
 	if mists_wins >= WINS_FOR_REVENANT and not unlocked.has("revenant"):
 		_earn("revenant")
+	save_settings()
+
+
+## A match won beyond the Mists: dawn reached in the Valleys of Mesenlla or at Mist Bastion, or a
+## versus match won in the Valleys. Three wins in each earn the Cartographer.
+func note_beyond_win() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	match current_map():
+		"mesenlla":
+			mesenlla_wins += 1
+		"bastion":
+			bastion_wins += 1
+		_:
+			return
+	if mesenlla_wins >= WINS_FOR_CARTOGRAPHER and bastion_wins >= WINS_FOR_CARTOGRAPHER and not unlocked.has("cartographer"):
+		_earn("cartographer")
 	save_settings()
 
 
@@ -347,6 +369,8 @@ func load_settings() -> void:
 	board_prizes = _saved(c, "progress", "board_prizes", {})
 	finished_games = maxi(0, _saved(c, "progress", "finished_games", 0))
 	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
+	mesenlla_wins = maxi(0, _saved(c, "progress", "mesenlla_wins", 0))
+	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
 	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
 	owned_items = _saved(c, "progress", "owned_items", {})
 	switched_off = _saved(c, "progress", "switched_off", {})
@@ -385,6 +409,8 @@ func save_settings() -> void:
 	c.set_value("progress", "board_prizes", board_prizes)
 	c.set_value("progress", "finished_games", finished_games)
 	c.set_value("progress", "mists_wins", mists_wins)
+	c.set_value("progress", "mesenlla_wins", mesenlla_wins)
+	c.set_value("progress", "bastion_wins", bastion_wins)
 	c.set_value("progress", "poison_dealt", poison_dealt)
 	c.set_value("progress", "owned_items", owned_items)
 	c.set_value("progress", "switched_off", switched_off)

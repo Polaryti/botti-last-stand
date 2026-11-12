@@ -1,5 +1,44 @@
 # Changelog
 
+## Development — Beyond the Mists, review fixes: skills, walls and screens
+
+### Classes
+- The Adept is back: in the Store for 1,150 Doubloons, offered to bots, and its class code opens it again.
+- The Cartographer is now earned, not bought: win 3 matches in the Valleys of Mesenlla and 3 at Mist Bastion (dawn reached, or a versus match won in the Valleys). Its class code still opens it.
+- Grand Larceny now disarms the creatures around its target on every phone, not only on the host.
+- Long Shadows: every Bandit invisibility (Into the Shadows, Steal, Nightfall's linger) lasts 2 s longer, and Dagger Fan hides the Highwayman for 2 s.
+- Veiled Passage, Rift Road and every other Cartographer skill now work through gates and beacons already standing when the skill is learned, on every phone.
+- Star Reader: starlight comes down as a shaft of gold light with a star flaring where it lands and a ring spreading underneath; the stars over a constellation are four-pointed and twinkle.
+- Star Reader: the Falling Star shows on the status bar with the seconds until the next one.
+- Cartographer: the beacon button turns orange and says Too far to link when a beacon planted there would link to none of those still standing.
+- The Star Reader emblem no longer has a dark backdrop, only the constellation.
+
+### Weapons
+- The Rift Chakram has its own throws: each one picked up gives 20, up to 40, and each throw spends one. A chakram put down keeps the throws it had. The HUD shows the throws left.
+
+### Walls and windows
+- Arrows, darts and thrown weapons no longer hit through walls, and a returning axe that passed through a wall no longer strikes on its way back.
+- Melee blows no longer land through windows, and players and creatures no longer jump up into windows.
+
+### Mercenary
+- Nightfall's dome now meets the ground all round, slopes included, with a soft rim on the ground, round motes of night and a deeper darkness for those caught inside.
+
+### Screens
+- A new boot splash: twilight over the mountains beyond the Mists, with floating rock shards and the name of the update.
+- Play Together: the room shows each player with their class emblem, and you pick your class from tiles with each class's emblem. Start and Leave stay at the bottom, however long the room gets.
+- Play Together opens straight away instead of freezing for about a second, and searching for nearby games keeps going when switching tabs.
+- Leaderboard: each player's row shows the emblem of the class or profession they play most. The rank line under the list is gone; your row is marked in the list.
+- Armory: weapon tags sit in one row again.
+- Codex: map entries have no tags, and the Mist Bastion garrison entries are gone.
+- The Valleys of Mesenlla tag and the Beyond the Mists title on the menu are in the update's twilight violet.
+- The game looks for a new version again each time a match ends and the menu comes back.
+
+### Weather
+- Rain and storms are a little rarer: storms on 5% of nights (was 7%), rain on 16% (was 20%).
+
+### Playing together
+- Phones on this build only play with phones on the same build.
+
 ## Development — Beyond the Mists, part 7: a new way in
 
 ### Title screen

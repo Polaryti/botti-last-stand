@@ -86,6 +86,7 @@ var _ki_swing := -1
 var hp := 100.0
 var kills := 0
 var arrows := 0
+var own_ammo := {} # throws left for each weapon with its own ammunition that you carry (the Rift Chakram)
 var slots: Array = [null, null]
 var current := 0
 var yaw := 0.0
@@ -384,6 +385,7 @@ func setup_class(id: String) -> void:
 	slots = [c["weapon"], null]
 	current = 0
 	arrows = int(c["arrows"])
+	own_ammo.clear()
 	mods["speed"] = float(c["speed"])
 	mods["damage_taken"] = float(c.get("damage_taken", 1.0))
 	mods["mana_regen"] = float(c.get("mana_regen", 1.0))
@@ -501,6 +503,12 @@ func status_effects() -> Array[Dictionary]:
 		var storm := world.mist_storm
 		var remaining := storm.warning - storm.elapsed if storm.elapsed < storm.warning else (-1.0 if storm.finale else maxf(0, storm.warning + storm.duration - storm.elapsed))
 		out.append({"icon": "mist+clock", "color": Color(0.7, 0.4, 0.95), "left": remaining, "stacks": 1})
+	if world and has_flag("falling_star"):
+		# The Star Reader's Falling Star: when the next one comes down.
+		var found: Variant = world.surveys.get(net_id())
+		var fall := (found as SurveyNet).next_fall() if found != null and is_instance_valid(found) else -1.0
+		if fall >= 0.0:
+			out.append({"icon": "star+crown", "color": ClassDefs.color(class_id), "left": fall, "stacks": 1})
 	if world and not is_bot() and world.best_cover(global_position) != null:
 		out.append({"icon": "shield_rect+heart", "color": ClassDefs.color("heavy"), "left": -1.0, "stacks": 1})
 	return out
@@ -582,7 +590,10 @@ func can_use(id: String) -> bool:
 	return true
 
 
-func give_weapon(id: String) -> void:
+## throws: for a weapon with its own ammunition, how many it brings; -1 for a fresh one's share.
+func give_weapon(id: String, throws := -1) -> void:
+	if WeaponDefs.own_ammo(id) > 0:
+		add_own_ammo(id, throws if throws >= 0 else WeaponDefs.own_ammo(id))
 	if class_def().get("one_weapon", false):
 		current = 0
 		slots[0] = id
@@ -609,6 +620,27 @@ func add_arrows(n: int) -> void:
 	arrows = mini(max_arrows(), arrows + n)
 
 
+func ammo_of(id: String) -> int:
+	return int(own_ammo.get(id, 0))
+
+
+## More throws for a weapon with its own ammunition, up to what it can hold. Says how many were added.
+func add_own_ammo(id: String, n: int) -> int:
+	var was := ammo_of(id)
+	own_ammo[id] = clampi(was + n, 0, WeaponDefs.own_ammo_max(id))
+	return int(own_ammo[id]) - was
+
+
+## Nothing left to shoot from this weapon: no arrows for a bow, no throws for a Rift Chakram.
+func out_of_ammo(id: String) -> bool:
+	if id == "" or not WeaponDefs.ALL.has(id):
+		return false
+	var d: Dictionary = WeaponDefs.ALL[id]
+	if WeaponDefs.own_ammo(id) > 0:
+		return ammo_of(id) <= 0
+	return WeaponDefs.uses_arrows(d) and arrows <= 0
+
+
 func heal(amount: float) -> void:
 	hp = minf(max_hp(), hp + amount)
 	heal_flash = 1.0
@@ -627,7 +659,7 @@ func take_nearby_weapon() -> void:
 		_swap_slot_index()
 		var old: Variant = slots[current]
 		if old and old != "fists":
-			world.drop_weapon(global_position - camera.global_basis.z * 1.2, old)
+			world.drop_weapon(global_position - camera.global_basis.z * 1.2, old, _part_with(old))
 	world.collect_weapon(self, p)
 	nearby_weapon = null
 
@@ -647,7 +679,7 @@ func drop_current_weapon() -> void:
 	if not can_drop_weapon():
 		return
 	var spot := global_position - camera.global_basis.z * 1.6
-	world.drop_weapon(spot, slots[current])
+	world.drop_weapon(spot, slots[current], _part_with(slots[current]))
 	# It lies where it fell until you have walked away from it, or it would be back in your hand.
 	shun_weapon = slots[current]
 	shun_at = spot
@@ -658,6 +690,15 @@ func drop_current_weapon() -> void:
 		slots[current] = null
 		current = 1 - current
 	_equip()
+
+
+## A weapon leaves your hands: the throws it had go with it (-1 for a weapon without its own).
+func _part_with(id: String) -> int:
+	if WeaponDefs.own_ammo(id) <= 0:
+		return -1
+	var left := ammo_of(id)
+	own_ammo.erase(id)
+	return left
 
 
 func switch_weapon() -> void:
@@ -1043,6 +1084,8 @@ func choose_ability(step: int, index: int) -> bool:
 		for item: String in ShopDefs.for_class(class_id):
 			if has_item(item) and ShopDefs.ITEMS[item].has("effect"):
 				_apply_ability({"on": [ShopDefs.ITEMS[item]["effect"].duplicate(true)]})
+	if class_id == "cartographer":
+		CartographerKit.retune(self)
 	sfx("ui_choose", -3.0)
 	return true
 
@@ -3069,6 +3112,7 @@ func _should_auto_jump(dir: Vector3) -> bool:
 	var space := get_world_3d().direct_space_state
 	var from := global_position
 	var reach := 1.5 if is_riding() else 0.95
+	# Barriers count: a window's opening is not a gap to jump through.
 	var low := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 0.35, from + Vector3.UP * 0.35 + flat * reach, 1)
 	var ahead := space.intersect_ray(low)
 	if ahead.is_empty():
@@ -3076,7 +3120,7 @@ func _should_auto_jump(dir: Vector3) -> bool:
 	# Stairs and slopes are walked up, not jumped at.
 	if (ahead["normal"] as Vector3).y > 0.5:
 		return false
-	var high := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.25, from + Vector3.UP * 1.25 + flat * (reach + 0.35), 1)
+	var high := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.25, from + Vector3.UP * 1.25 + flat * (reach + 0.35), 1 | Terrain.WINDOW)
 	if not space.intersect_ray(high).is_empty():
 		return false
 	var overhead := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.7, from + Vector3.UP * 2.9, 1)
@@ -3193,6 +3237,9 @@ func _handle_fire() -> void:
 	if WeaponDefs.uses_arrows(d) and arrows <= 0:
 		_bash("No arrows")
 		return
+	if WeaponDefs.own_ammo(weapon_id()) > 0 and ammo_of(weapon_id()) <= 0:
+		_bash("No throws left")
+		return
 	if d["kind"] == WeaponDefs.Kind.SPELL and mana < float(d["cost"]) * m("spell_cost"):
 		_bash("No mana")
 		return
@@ -3228,6 +3275,8 @@ func _handle_fire() -> void:
 			else:
 				if WeaponDefs.uses_arrows(d) and randf() >= m("arrow_save"):
 					arrows -= 1
+				elif WeaponDefs.own_ammo(weapon_id()) > 0:
+					own_ammo[weapon_id()] = ammo_of(weapon_id()) - 1
 				_fire_arrow(d)
 		WeaponDefs.Kind.SPELL:
 			mana -= float(d["cost"]) * m("spell_cost")

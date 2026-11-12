@@ -551,7 +551,7 @@ static func _bandit() -> Dictionary:
 	return {"core": [
 		[a("sly_hands", "Sly Hands", "Attack 15% faster", "hand+clock", {"melee_rate": 0.15, "ranged_rate": 0.15}),
 		a("light_purse", "Light Purse", "+10% move speed", "boot+up", {"speed": 0.1})],
-		[a("long_shadows", "Long Shadows", "Your invisibility lasts 2 s longer", "moon+clock", {"shadow_time": 2.0}),
+		[a("long_shadows", "Long Shadows", "All your invisibility lasts 2 s longer, and Dagger Fan hides you for 2 s", "moon+clock", {"shadow_time": 2.0}),
 		a("ambusher", "Ambusher", "+60% damage on unaware enemies or from behind", "dagger+up", {"backstab": 0.6})],
 		[a("cutpurse", "Cutpurse", "Each kill heals 3", "heart+dagger", {}, [t("kill", "heal", {"n": 3.0})]),
 		a("slippery", "Slippery", "15% chance to avoid any hit", "boot+eye_closed", {"dodge": 0.15})],

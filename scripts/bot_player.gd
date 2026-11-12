@@ -393,7 +393,7 @@ func _manage_weapons() -> void:
 	var d := p.weapon_def()
 	var other: Variant = p.slots[1 - p.current]
 	var other_def: Dictionary = WeaponDefs.ALL.get(other, {}) if other else {}
-	if not d.is_empty() and WeaponDefs.uses_arrows(d) and p.arrows <= 0 and not other_def.is_empty():
+	if not d.is_empty() and p.out_of_ammo(p.weapon_id()) and not other_def.is_empty():
 		p.switch_weapon()
 		return
 	if p.nearby_weapon and is_instance_valid(p.nearby_weapon) and _worth(p.nearby_weapon) > 0.0:
@@ -403,7 +403,7 @@ func _manage_weapons() -> void:
 		return
 	var dist := _target.global_position.distance_to(p.global_position)
 	var ranged_now: bool = not d.is_empty() and d["kind"] != WeaponDefs.Kind.MELEE
-	var ranged_other: bool = other_def["kind"] != WeaponDefs.Kind.MELEE and (not WeaponDefs.uses_arrows(other_def) or p.arrows > 0)
+	var ranged_other: bool = other_def["kind"] != WeaponDefs.Kind.MELEE and not p.out_of_ammo(str(other))
 	if ranged_now and dist < 3.5 and not ranged_other:
 		p.switch_weapon()
 	elif not ranged_now and ranged_other and dist > 7.0:

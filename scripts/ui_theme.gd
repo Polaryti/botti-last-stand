@@ -12,6 +12,7 @@ const COAL := Color("1b1408") # text on ember
 const BLOOD := Color("c8432f") # danger
 const MIST := Color("6fb6d6") # mana and mist
 const MOSS := Color("7fc08a") # safe
+const TWILIGHT := Color("a880ff") # the lands beyond the Mists
 
 static var _title: Font
 static var _bold: Font
