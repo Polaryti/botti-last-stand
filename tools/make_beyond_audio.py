@@ -440,6 +440,38 @@ def woods_chatter():
     return reverb(clicks + whistle, 0.6, 0.25)
 
 
+def mist_muster():
+    """A Mist Soldier steps out of a waystone: mist rushing in, a rising chord of glassy chimes and a
+    short call on a far-off horn."""
+    m = n(1.6)
+    t = t_(m)
+    rush = sweep_filter(noise(m), 300, 2400, 0.6) * bell_env(m, 0.8) * 0.9
+    chimes = np.zeros(m)
+    for i, f in enumerate((523.25, 659.25, 783.99, 1046.5)):
+        p = n(0.08 + i * 0.09)
+        k = m - p
+        tt = t_(k)
+        chimes[p:] += (np.sin(2 * np.pi * f * tt) + 0.3 * np.sin(2 * np.pi * f * 2.76 * tt)) * np.exp(-tt * 3.0) * 0.22
+    horn = np.zeros(m)
+    p = n(0.55)
+    k = n(0.8)
+    tt = t_(k)
+    f = 196.0 * (1 + 0.012 * np.sin(2 * np.pi * 5 * tt))
+    tone = sum(np.sin(2 * np.pi * np.cumsum(f * h) / SR) / h ** 1.3 for h in range(1, 7))
+    horn[p:p + k] = lowp(tone, 1400) * env(k, 0.08, 1.2) * 0.3
+    return reverb(rush + chimes + horn, 1.4, 0.4)
+
+
+def portal_wound():
+    """The Great Portal struck: a deep crack through stone, and the ring answering with a low,
+    unsteady hum that falls away."""
+    m = n(1.5)
+    t = t_(m)
+    crack = band(noise(m), 300, 3000) * np.exp(-t * 20) * 1.4 + lowp(noise(m), 120, 3) * np.exp(-t * 6) * 2.0
+    hum = (np.sin(2 * np.pi * np.cumsum(np.linspace(110, 92, m)) / SR) + 0.6 * np.sin(2 * np.pi * np.cumsum(np.linspace(116.5, 97, m)) / SR)) * bell_env(m, 0.7) * np.exp(-t * 1.5) * 0.45
+    return reverb(crack + hum, 1.3, 0.35)
+
+
 if __name__ == "__main__":
     os.makedirs(SND, exist_ok=True)
     save("heavy_swing", heavy_swing(), 0.6)
@@ -460,6 +492,6 @@ if __name__ == "__main__":
     for name, gain in (("bear_roar", 0.75), ("bear_maul", 0.75), ("eagle_cry", 0.55), ("shapeshift", 0.65), ("quake_warning", 0.6),
                        ("earth_slam", 0.85), ("mist_blink", 0.55), ("storm_call", 0.55), ("fire_warning", 0.55), ("fire_breath", 0.7),
                        ("wyvern_roar", 0.75), ("boulder_throw", 0.65), ("boulder_impact", 0.85), ("revenant_roar", 0.85),
-                       ("stone_grind", 0.5), ("woods_chatter", 0.5)):
+                       ("stone_grind", 0.5), ("woods_chatter", 0.5), ("mist_muster", 0.6), ("portal_wound", 0.75)):
         save(name, globals()[name](), gain)
     print("Beyond the Mists sounds written to", SND)

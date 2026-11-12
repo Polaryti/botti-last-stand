@@ -2006,6 +2006,22 @@ func test_version_15() -> void:
 	await frames(2)
 	var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 	ok(m.panel.find_children("*", "Button", true, false).size() >= 3, "you can choose where to spend the night")
+	# Choosing where to hold the fort: the Fort, or Mist Bastion.
+	var saved_fort := Game.fort_map
+	var mode_before := Game.mode
+	m.show_fort_picker()
+	await frames(2)
+	var rows: Array = m.panel.find_children("*", "Button", true, false).filter(func(b: Button) -> bool:
+		return b.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == "Mist Bastion"))
+	ok(rows.size() == 1, "Defend the Fort asks where: the Fort or Mist Bastion")
+	if rows.size() == 1:
+		(rows[0] as Button).pressed.emit()
+		await frames(2)
+	ok(Game.fort_map == "bastion", "and remembers Mist Bastion")
+	Game.mode = Game.Mode.FORT
+	ok(Game.current_map() == "bastion", "where the next Fort is held")
+	Game.fort_map = saved_fort
+	Game.mode = mode_before
 	m.show_menu()
 	await frames(2)
 	await start_clean()

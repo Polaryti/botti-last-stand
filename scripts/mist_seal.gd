@@ -4,6 +4,8 @@ extends Node3D
 ## The style says what lands when it closes: mist that slows (the Mists), a quake that stuns, a bolt
 ## of lightning, a gout of fire, or a boulder thrown from whoever cast it (Mesenlla).
 const LIMIT := 16
+## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
+const PORTAL_SHARE := 1.5
 enum Style { MIST, QUAKE, STORM, FIRE, BOULDER }
 const LOOKS := {
 	Style.MIST: [Color(0.2, 0.8, 1.0), Color(0.85, 0.4, 1.0)],
@@ -165,6 +167,9 @@ func strike() -> void:
 				Style.FIRE: p.ignite(3.0)
 		elif style == Style.FIRE:
 			target.ignite(3.0)
+	# What falls on a stronghold's portal hurts it, as surely as claws do. The host decides.
+	if world.fort and (not Net.active() or Net.is_host()) and Vector2(world.fort.heart_at.x - position.x, world.fort.heart_at.z - position.z).length() <= radius + 1.0:
+		world.fort.hit_heart(damage * PORTAL_SHARE)
 
 func contains(at: Vector3) -> bool:
 	var distance := Vector2(at.x - position.x, at.z - position.z).length()

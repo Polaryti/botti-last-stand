@@ -26,7 +26,8 @@ OUT = "assets/music/"
 TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5, "menu": -16.0,
     "mists_night": -16.0, "mists_hunted": -13.5, "mists_dawn": -14.5,
     "fort_night": -15.0, "fort_hunted": -13.5, "fort_dawn": -14.5,
-    "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0}
+    "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0,
+    "bastion_night": -15.5, "bastion_hunted": -13.5, "bastion_dawn": -14.5}
 
 NAMES = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
 SAMPLES = ""
@@ -524,6 +525,24 @@ class Drums:
         x = self._read(files[score.rng.integers(0, len(files))])[:int(SR * 4.0)]
         y = x / max(1e-5, np.abs(x).max()) * 0.5 * vel * score.level(beat // 4 + 1)
         score._add(self.bells_bus, y.astype(np.float32), beat * BEAT)
+
+    TUBULAR = {"C4": 60, "G4": 67, "C5": 72, "F5": 77}
+
+    def tubular(self, score, midi, beat, vel):
+        """A tubular bell on this note, from the nearest of the four recorded ones: the Bastion's bells."""
+        if not hasattr(self, "tower_bus"):
+            self.tower_bus = Instrument("Percussion/TB", 0.7, 0.18, 0.62, lead=0.0)
+        name = min(self.TUBULAR, key=lambda k: abs(self.TUBULAR[k] - midi))
+        path = glob.glob(os.path.join(SAMPLES, "Percussion/TB_hit_%s_*.wav" % name))[0]
+        x = self._read(path)
+        ratio = 2.0 ** ((midi - self.TUBULAR[name]) / 12.0)
+        pos = np.arange(int(min(len(x) / ratio - 2, SR * 5.0))) * ratio
+        i = pos.astype(np.int32)
+        f = (pos - i).astype(np.float32)[:, None]
+        y = x[i] * (1.0 - f) + x[i + 1] * f
+        y = y / max(1e-5, np.abs(y).max()) * 0.42 * vel * score.level(beat // 4 + 1)
+        y[-int(SR * 0.4):] *= np.linspace(1.0, 0.0, int(SR * 0.4), dtype=np.float32)[:, None]
+        score._add(self.tower_bus, y.astype(np.float32), beat * BEAT)
 
     def gong(self, score, beat, vel):
         names = ["p", "mf", "f", "fff"]
@@ -1280,6 +1299,144 @@ def compose_menu_mesenlla(o):
     return s
 
 
+# --- Mist Bastion ---------------------------------------------------------------------------------
+# E minor on the peaks, solemn and bright at once: the citadel's tubular bells tolling, the harp
+# turning like the Great Portal, strings, a flute and piccolo calling from the walls. Its own theme.
+
+BAS_CHORDS = ["Em", "C", "G", "D", "Em", "Am", "Bsus", "B",
+    "C", "G", "D", "Em", "Am", "Em", "Bsus", "B",
+    "Em", "C", "G", "D", "Em", "Am", "Bsus", "B",
+    "C", "G", "D", "Em", "Am", "C", "Bsus", "B"]
+BAS_DAWN_CHORDS = ["G", "D", "Em", "C", "G", "C", "D", "D",
+    "C", "G", "D", "Em", "C", "G", "D", "G",
+    "G", "D", "Em", "C", "G", "C", "D", "D",
+    "C", "G", "Am", "D", "C", "G", "D", "G"]
+BAS_A = "E5:2 B4:1 E5:1 | G5:3 E5:1 | D5:1.5 B4:.5 G4:2 | A4:2 F#5:1 D5:1 | E5:2 G5:1 B5:1 | C6:2 A5:1 E5:1 | E5:1.5 F#5:.5 E5:2 | D#5:4"
+BAS_B = "G5:3 E5:1 | D5:2 B4:1 D5:1 | F#5:3 D5:1 | E5:2 B4:2 | A5:3 C6:1 | B5:2 G5:1 E5:1 | F#5:2 E5:1 B4:1 | D#5:2 F#5:1 B4:1"
+BAS_B_LATE = "G5:3 E5:1 | D5:2 B4:1 D5:1 | F#5:3 A5:1 | G5:2 E5:2"
+BAS_CLOSING = "E5:2 C5:2 | F#5:1 E5:1 B4:1 E5:1 | D#5:4"
+BAS_DAWN_A = "G4:2 D5:1.5 C5:.5 | A4:2 F#4:1 A4:1 | E5:2 B4:1.5 G4:.5 | C5:3 E5:1 | D5:2 G5:1.5 F#5:.5 | E5:2 D5:1 C5:1 | D5:1.5 E5:.5 F#5:2 | D5:4"
+BAS_DAWN_B = "E5:3 G5:1 | D5:2 B4:1 D5:1 | F#5:3 A5:1 | G5:2 E5:1 B4:1 | C5:3 E5:1 | D5:2 B4:1 G4:1 | A4:2 F#4:1 A4:1 | G4:4"
+BAS_DAWN_C = "G5:2 E5:2 | D5:3 B4:1 | C5:2 E5:1 A5:1 | A5:3 F#5:1 | G5:2 E5:1 C5:1 | B5:2 G5:2 | A5:2 F#5:1 D5:1 | G5:4"
+OVER_B = (4, 6, 7, 9, 11, 0, 2)  # E minor, for sweeps
+
+
+def toll(s, d, chords, first_bar, every, vel, lo=60, hi=76):
+    """The citadel's bells: the chord's root high in the tower, now and then its fifth after it."""
+    for i, ch in enumerate(chords):
+        if i % every:
+            continue
+        beat = (first_bar + i - 1) * 4.0
+        root = root_in(ch, lo)
+        d.tubular(s, root, beat, vel)
+        if i % (every * 2) == every:
+            d.tubular(s, min(hi, root + 7), beat + 2.0, vel * 0.7)
+
+
+def compose_bastion_night(o):
+    s = Score("bastion_night", 133)
+    d = o.drums
+    s.dynamics = [(1, 0.52), (8, 0.56), (9, 0.62), (16, 0.72), (17, 0.9), (24, 0.94), (25, 0.74), (29, 0.6), (32, 0.52), (33, 0.52)]
+    ch = BAS_CHORDS
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.64, up_only=i % 2 == 0)
+    low_strings(s, o, ch, 1, 0.5)
+    play_pad(s, o.violas, ch, 1, 2, 55, 67, 0.32)
+    toll(s, d, ch[:16], 1, 2, 0.8)
+    toll(s, d, ch[24:], 25, 4, 0.7)
+    # I. A horn far off on the walls, the flute answering.
+    s.play_line(o.horns, BAS_A, 1, vel=0.6, players=2)
+    piping(s, o.flute_short, ch[4:8], 5, 0.75)
+    # II. Violins take the answer; the piccolo calls from the next tower.
+    s.play_line(o.violins, BAS_B, 9, vel=0.6, players=2)
+    piping(s, o.piccolo, ch[12:16], 13, 0.5)
+    sparkle(s, o.glock, ch[8:16], 9, 1, 0.85, lo=79, hi=91)
+    harp_run(s, o.harp, 62.0, 2.0, 52, 88, 0.55, OVER_B)
+    d.swell(s, 64.0, 0.42, "Median")
+    # III. Everyone on the walls: the theme in strings and flute, horns beneath, the bells on every bar.
+    s.play_line(o.violins, BAS_A, 17, vel=0.84, players=3)
+    s.play_line(o.flute, BAS_A, 17, vel=0.56)
+    s.play_line(o.horns, BAS_A, 17, shift=-12, vel=0.56, players=2)
+    pulse_low(s, o, ch[16:24], 17, 0.56)
+    toll(s, d, ch[16:24], 17, 1, 0.6)
+    for bar in (17, 19, 21, 23):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.52)
+    for bar in (17, 25):
+        d.belltree(s, (bar - 1) * 4.0, 0.62)
+    # IV. The watch goes on.
+    s.play_line(o.flute, BAS_B_LATE, 25, vel=0.62, swell=True)
+    piping(s, o.piccolo, ch[24:28], 25, 0.34)
+    s.play_line(o.violins, BAS_CLOSING, 30, vel=0.58, players=2)
+    return s
+
+
+def compose_bastion_hunted(o):
+    s = Score("bastion_hunted", 144)
+    d = o.drums
+    s.dynamics = [(1, 0.84), (8, 0.88), (9, 0.88), (16, 0.94), (17, 1.0), (24, 1.0), (25, 0.9), (32, 0.96), (33, 0.84)]
+    ch = BAS_CHORDS
+    drive_strings(s, o, ch[:8], 1, 0.78)
+    drive_strings(s, o, ch[8:], 9, 0.86, violins=True)
+    for i, c in enumerate(ch):
+        drum_bar(s, d, c, i + 1, 0.84)
+        march_bar(s, d, i + 1, 0.5, busy=i >= 16)
+        harp_bar(s, o.harp, c, i + 1, 0.56, up_only=True)
+    for bar in (8, 16, 24, 32):
+        drum_fill(s, d, ch[bar - 1], bar, 0.82)
+    for bar in (9, 17, 25):
+        d.crash(s, (bar - 1) * 4.0, 0.64)
+    toll(s, d, ch, 1, 2, 0.74)
+    s.play_line(o.horns, BAS_A, 1, vel=0.82, players=3)
+    s.play_line(o.flute, BAS_A, 1, vel=0.56)
+    s.play_line(o.violins, BAS_B, 9, vel=0.9, players=3)
+    s.play_line(o.trumpets, BAS_B, 9, shift=-12, vel=0.78, players=2)
+    s.play_line(o.violins, BAS_A, 17, vel=1.0, players=3)
+    s.play_line(o.trombones, BAS_A, 17, shift=-24, vel=0.84, players=2)
+    s.play_line(o.piccolo, BAS_A, 17, vel=0.5)
+    for i in range(24, 32):
+        brass_stabs(s, o, ch[i], i + 1, 0.84)
+    s.play_line(o.violins, BAS_B_LATE, 25, vel=0.9, players=3)
+    s.play_line(o.violins, BAS_CLOSING, 30, vel=0.86, players=3)
+    s.play_line(o.horns, BAS_CLOSING, 30, shift=-12, vel=0.86, players=3)
+    return s
+
+
+def compose_bastion_dawn(o):
+    s = Score("bastion_dawn", 155)
+    d = o.drums
+    s.dynamics = [(1, 0.9), (16, 0.95), (17, 0.7), (24, 0.8), (25, 1.0), (33, 0.9)]
+    ch = BAS_DAWN_CHORDS
+    low_strings(s, o, ch, 1, 0.76)
+    play_pad(s, o.violas, ch, 1, 3, 55, 71, 0.6, players=2)
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.72, up_only=True)
+    sparkle(s, o.glock, ch, 1, 2, 0.66, lo=79, hi=91)
+    toll(s, d, ch, 1, 2, 0.8)
+    for bar in (1, 9, 17, 25):
+        harp_run(s, o.harp, (bar - 1) * 4.0 - 2.0, 2.0, 55, 91, 0.6, (7, 9, 11, 0, 2, 4, 6))
+        d.belltree(s, (bar - 1) * 4.0, 0.78)
+    s.play_line(o.violins, BAS_DAWN_A, 1, shift=12, vel=0.9, players=3)
+    s.play_line(o.flute, BAS_DAWN_A, 1, shift=12, vel=0.6)
+    s.play_line(o.horns, BAS_DAWN_A, 1, vel=0.66, players=2)
+    s.play_line(o.violins, BAS_DAWN_B, 9, shift=12, vel=0.92, players=3)
+    piping(s, o.piccolo, ch[8:16], 9, 0.48)
+    play_pad(s, o.trombones, ch[:16], 1, 2, 43, 55, 0.54)
+    for bar in list(range(1, 17)) + list(range(25, 33)):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.6)
+    # The bells alone with the flute, as the light reaches the walls.
+    s.play_line(o.flute, BAS_DAWN_A, 17, shift=12, vel=0.66)
+    play_pad(s, o.vln_trem, ch[16:24], 17, 3, 67, 83, 0.32)
+    toll(s, d, ch[16:24], 17, 1, 0.66)
+    d.swell(s, 96.0, 0.62, "Median")
+    # And the sun over the peaks.
+    s.play_line(o.violins, BAS_DAWN_C, 25, vel=0.95, players=3)
+    s.play_line(o.trumpets, BAS_DAWN_C, 25, shift=-12, vel=0.84, players=2)
+    s.play_line(o.piccolo, BAS_DAWN_C, 25, vel=0.48)
+    play_pad(s, o.trombones, ch[24:32], 25, 2, 43, 55, 0.66)
+    pulse_low(s, o, ch[24:32], 25, 0.7)
+    return s
+
+
 def hall(seconds=2.9, seed=5):
     """The room everything is played in: a big stone hall, bright for a moment, then dark."""
     rng = np.random.default_rng(seed)
@@ -1387,7 +1544,8 @@ COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_d
     "mists_night": compose_mists_night, "mists_hunted": compose_mists_hunted, "mists_dawn": compose_mists_dawn,
     "fort_night": compose_fort_night, "fort_hunted": compose_fort_hunted, "fort_dawn": compose_fort_dawn,
     "mesenlla_night": compose_mesenlla_night, "mesenlla_hunted": compose_mesenlla_hunted, "mesenlla_dawn": compose_mesenlla_dawn,
-    "menu_mesenlla": compose_menu_mesenlla}
+    "menu_mesenlla": compose_menu_mesenlla,
+    "bastion_night": compose_bastion_night, "bastion_hunted": compose_bastion_hunted, "bastion_dawn": compose_bastion_dawn}
 
 
 def main():

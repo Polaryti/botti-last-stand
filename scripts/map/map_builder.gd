@@ -172,8 +172,8 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look == "mesenlla" else 0.0)
-	if look == "mesenlla":
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA else 0.0)
+	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
 		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
 		mat.set_shader_parameter("dirt", Vector3(0.24, 0.19, 0.17))
@@ -1505,6 +1505,7 @@ func _fort_side(l: LowPoly, side: int, door_at: float) -> void:
 	w.add_collider(over_at, over_gate)
 	var over_door := _box_size(side, 1.9, top - 2.5, t)
 	var door_point := _point(side, door_at, h)
+	w.fort.add_door(door_point, Fort.DIRS[side])
 	l.box(door_point + Vector3.UP * (2.5 + (top - 2.5) * 0.5), over_door, CASTLE_DARK)
 	w.add_collider(door_point + Vector3.UP * (2.5 + (top - 2.5) * 0.5), over_door)
 	# Only players fit through the small door.

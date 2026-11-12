@@ -120,7 +120,10 @@ func _as_host() -> void:
 	if rules == "mesenlla":
 		Net.set_night_map("mesenlla")
 		ok(Net.night_map == "mesenlla", "the host picks the Valleys of Mesenlla")
-	Net.set_rules({"mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	if rules == "bastion":
+		Net.set_fort_map("bastion")
+		ok(Net.fort_map == "bastion", "the host picks Mist Bastion")
+	Net.set_rules({"bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -270,6 +273,8 @@ func _play() -> void:
 		await _cartographer()
 	elif rules == "mesenlla":
 		await _mesenlla()
+	elif rules == "bastion":
+		await _bastion()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -1542,6 +1547,60 @@ func _mesenlla() -> void:
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.
+## Mist Bastion on two phones: the same stronghold, the host's garrison on both, a gate falling, and
+## the War Wyvern's burning pass at the Great Portal.
+func _bastion() -> void:
+	await _clear_zombies_on_host()
+	w.director.set_process(false)
+	ok(Game.mode == Game.Mode.FORT and w.map_id == "bastion" and Net.fort_map == "bastion", "both phones are at Mist Bastion")
+	var f := w.fort
+	ok(f != null and f.gates.size() == 3 and f.region.size() == 4, "with its three gates and its walls")
+	await sync(410)
+	# The host musters the garrison, and the other phone sees them.
+	if host:
+		w.garrison.tick(Garrison.FIRST)
+	await until(func() -> bool: return w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and not a.dead).size() >= 3, 4.0)
+	await sync(411)
+	var mine := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and not a.dead)
+	if host:
+		ok(mine.size() == 3 and mine.all(func(a: Ally) -> bool: return a.remote_owner == 0), "the host musters a Mist Soldier for each lane")
+	else:
+		ok(mine.size() == 3 and mine.all(func(a: Ally) -> bool: return a.remote_owner == 1), "and they stand on this phone too, as the host's")
+		ok(w.garrison != null and w.garrison.next_at == Garrison.FIRST, "this phone musters none of its own")
+	await sync(412)
+	# The west gate falls on both phones.
+	var g: Dictionary = f.gates[0]
+	if host:
+		f.hit_gate(g, 99999.0, g["at"])
+	await until(func() -> bool: return not g["closed"], 4.0)
+	await sync(413)
+	ok(not g["closed"] and g["name"] == "west", "the west gate falling reaches both phones")
+	# The War Wyvern, and a burning pass at the Great Portal while everyone is away from it.
+	var away := Vector3(-46.0 if host else 46.0, 0, 60)
+	pl.global_position = Vector3(away.x, w.ground_at(away) + 0.05, away.z)
+	await wait(0.4)
+	await sync(414)
+	var portal_hp := f.heart_hp
+	if host:
+		w.director.elapsed = 520.0
+		w.director._tick_mist_boss()
+		for z: Zombie in w.zombies:
+			if z.type_id == "war_wyvern":
+				z.mesenlla_mind._pass_left = 0.0
+	await until(func() -> bool: return w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "war_wyvern"), 4.0)
+	ok(w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "war_wyvern"), "the War Wyvern comes on both phones")
+	await sync(415)
+	var saw_fire := [false]
+	var deadline := Time.get_ticks_msec() + 16000
+	while Time.get_ticks_msec() < deadline and not (saw_fire[0] and f.heart_hp < portal_hp):
+		if w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.FIRE and Vector2(s.position.x - f.heart_at.x, s.position.z - f.heart_at.z).length() < 12.0):
+			saw_fire[0] = true
+		await get_tree().process_frame
+	ok(saw_fire[0], "its fire comes down on the Great Portal on this phone")
+	ok(f.heart_hp < portal_hp, "and the portal's wound reaches this phone (%.0f)" % (portal_hp - f.heart_hp))
+	await sync(416)
+
+
 func until(condition: Callable, timeout: float) -> void:
 	var deadline := Time.get_ticks_msec() + int(timeout * 1000.0)
 	while not condition.call() and Time.get_ticks_msec() < deadline:

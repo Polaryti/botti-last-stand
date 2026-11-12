@@ -34,6 +34,7 @@ const FIRST_WYVERN := 300.0
 const WYVERN_EVERY := 95.0
 const MAX_WYVERNS := 1
 const MESENLLA_BOSS := "great_revenant_elemental"
+const BASTION_BOSS := "war_wyvern"
 
 var world: World
 var running := false
@@ -111,7 +112,9 @@ func begin(with_zombies: bool) -> void:
 		for i in target_population():
 			_spawn_roamer()
 		var opening := "Survive until dawn"
-		if world.fort:
+		if world.map_id == "bastion":
+			opening = "Hold the Great Portal until dawn and bring down the War Wyvern"
+		elif world.fort:
 			opening = "Hold the fort until dawn"
 		elif requires_regent():
 			opening = "Survive ten minutes and defeat the %s" % ("Great Revenant Elemental" if world.map_id == "mesenlla" else "Veil Regent")
@@ -300,7 +303,7 @@ func _pick_roamer() -> String:
 
 
 func _tick_mist_boss() -> void:
-	if not _follows_host and not sandbox and world.map_id == "mesenlla" and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
+	if not _follows_host and not sandbox and world.map_id in SpawnRules.MESENLLA and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		_raise_mesenlla_boss()
 		return
 	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
@@ -316,6 +319,7 @@ func _tick_mist_boss() -> void:
 
 
 ## The Great Revenant Elemental rises from the Ring of Stones, the boulders of the meadow drawing together.
+## Over Mist Bastion the War Wyvern comes up from the valley instead, for the Great Portal.
 func _raise_mesenlla_boss() -> void:
 	var at := Vector3.ZERO
 	for mark: Dictionary in world.map_marks:
@@ -323,6 +327,12 @@ func _raise_mesenlla_boss() -> void:
 			at = Vector3(mark["at"].x, 0, mark["at"].y)
 	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(at)))
 	spot.y = world.ground_at(spot)
+	if world.map_id == "bastion":
+		if world.spawn_zombie(BASTION_BOSS, spot):
+			_mist_boss_spawned = true
+			show_banner("The War Wyvern comes for the Great Portal", 4.0)
+			_sound("wyvern_roar", 4.0)
+		return
 	if world.spawn_zombie(MESENLLA_BOSS, spot):
 		_mist_boss_spawned = true
 		CommandField.visual_impact(world, spot, 10.0, true)
@@ -331,7 +341,7 @@ func _raise_mesenlla_boss() -> void:
 		_sound("revenant_roar", 2.0)
 
 
-## A boss has fallen: the Veil Regent or the Great Revenant Elemental. Dawn can come now.
+## A boss has fallen: the Veil Regent, the Great Revenant Elemental or the War Wyvern. Dawn can come now.
 func boss_fallen(_z: Zombie) -> void:
 	_mist_boss_defeated = true
 
@@ -360,7 +370,9 @@ func _tick_mesenlla() -> void:
 
 func _tick_specials() -> void:
 	_tick_mist_boss()
-	if world.map_id == "mesenlla":
+	if world.garrison:
+		world.garrison.tick(elapsed)
+	if world.map_id in SpawnRules.MESENLLA:
 		_tick_mesenlla()
 		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
@@ -444,4 +456,4 @@ func _spawn_roamer() -> void:
 
 ## The Mists end only when the Veil Regent falls, and Mesenlla only when the Great Revenant Elemental does.
 func requires_regent() -> bool:
-	return (world.terrain.has_islands() or world.map_id == "mesenlla") and not sandbox and not Net.fog_rules()
+	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA) and not sandbox and not Net.fog_rules()

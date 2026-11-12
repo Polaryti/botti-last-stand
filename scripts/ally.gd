@@ -2,12 +2,25 @@ class_name Ally
 extends Target
 ## Friendly fighter: Ghost Knight familiar or summoned skeleton. Follows the player,
 ## attacks nearby zombies, and draws attacks away from the player.
+## Mist Soldiers (the mist_ kinds) belong to nobody: Mist Bastion's garrison holds a post on its
+## lane, fights what comes within reach of it and goes back to it. Nobody is credited with their kills.
 ## Bodies are pooled, because building one in the middle of a fight would stutter.
 
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
-const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0}
-const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger"] # new kinds go at the end: their index travels between phones
+const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0,
+	"mist_infantry": 180.0, "mist_ranger": 110.0, "mist_heavy": 340.0}
+const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger",
+	"mist_infantry", "mist_ranger", "mist_heavy"] # new kinds go at the end: their index travels between phones
+## Mist Bastion's garrison: who they are, what they hit for (a weapon blow is 1) and how far from
+## their post they will go after an enemy.
+const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy"]
+const GARRISON_BLOW := {"mist_infantry": 1.0, "mist_heavy": 1.6}
+const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2}
+const GARRISON_SIGHT := 18.0
+const GARRISON_LEASH := 16.0
+const HEAVY_GUARD := 0.3 # the Mist Heavy's tower shield takes this much off every blow
+const RANGER_SHOT := 0.9 # of a weapon blow, every 1.1 seconds
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
 const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
 const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}
@@ -34,6 +47,9 @@ var net_yaw := 0.0
 var net_biting := false
 var _snake: SnakeBody
 var guarded := 0.0
+## For a Mist Soldier: the lane it holds (its gate's number) and where on it.
+var lane := -1
+var post := Vector3.INF
 
 var _visual: Node3D
 var _anim: AnimationPlayer
@@ -67,7 +83,8 @@ func _init(owner_world: World, ally_kind: String) -> void:
 	if BEASTS.has(ally_kind):
 		_build_beast(_visual_root())
 		return
-	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever", "ranger": "clever"}.get(ally_kind, "skeleton")
+	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever", "ranger": "clever",
+		"mist_infantry": "clever", "mist_ranger": "clever", "mist_heavy": "beast"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
 		_scenes[model] = load("res://assets/characters/%s.glb" % model)
 	_visual = (_scenes[model] as PackedScene).instantiate()
@@ -84,12 +101,12 @@ func _init(owner_world: World, ally_kind: String) -> void:
 		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		p.extra_cull_margin = 1.0
 		top = maxf(top, p.get_aabb().end.y)
-		if ally_kind not in ["skeleton", "body", "magician", "artificer", "infantry", "ranger"]:
+		if ally_kind not in ["skeleton", "body", "magician", "artificer", "infantry", "ranger"] and ally_kind not in GARRISON:
 			p.material_override = _ghost()
 	_visual.scale = Vector3.ONE * height / float(Zombie.BODY_TOP.get(model, maxf(top, 0.5)))
 	if ally_kind == "body":
 		ClassDefs.dress(_visual, "monk")
-	elif ally_kind in ["magician", "artificer", "infantry", "ranger"]:
+	elif ally_kind in ["magician", "artificer", "infantry", "ranger"] or ally_kind in GARRISON:
 		ClassDefs.dress(_visual, ally_kind)
 		_equip_retinue()
 
@@ -102,6 +119,8 @@ func activate(seconds: float) -> void:
 	life = seconds
 	remote_owner = 0
 	master = null
+	lane = -1
+	post = Vector3.INF
 	_found_at = -100.0
 	dead = false
 	hp = HEALTH[kind]
@@ -224,7 +243,13 @@ func _play(n: String, speed := 1.0) -> void:
 
 
 func _master() -> Player:
+	if kind in GARRISON:
+		return null
 	return master if master != null and is_instance_valid(master) else world.player
+
+
+func is_garrison() -> bool:
+	return kind in GARRISON
 
 
 func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
@@ -238,6 +263,8 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 		return
 	if guarded > 0.0:
 		amount *= 1.0 - WorldLight.DOME_REDUCTION
+	if kind == "mist_heavy":
+		amount *= 1.0 - HEAVY_GUARD
 	# A Guardian shields its own summons too.
 	if me and me.m("cover") > 0.0 and global_position.distance_to(me.global_position) <= me.m("cover_radius"):
 		amount *= 1.0 - me.m("cover")
@@ -302,6 +329,9 @@ func _tick_own(delta: float) -> void:
 	_cooldown -= delta
 	_attack_left -= delta
 	_think -= delta
+	if kind in GARRISON:
+		_tick_garrison(delta)
+		return
 	if _think <= 0.0:
 		_think = 0.25
 		_foe = world.nearest_zombie(global_position + Vector3.UP, 16.0, true)
@@ -399,6 +429,62 @@ func _tick_own(delta: float) -> void:
 	_move_wolf(delta, dir != Vector3.ZERO)
 
 
+## A Mist Soldier: hold the post, fight whatever comes near it, and go back to it. The Ranger shoots
+## from where it stands and steps back from anything that gets close; the Infantry and the Heavy close in.
+func _tick_garrison(delta: float) -> void:
+	if _foe and not _foe.is_alive():
+		_foe = null
+	if _think <= 0.0:
+		_think = 0.25
+		_foe = world.nearest_zombie(global_position + Vector3.UP, GARRISON_SIGHT, true)
+		if _foe and post != Vector3.INF and _foe.position.distance_to(post) > GARRISON_LEASH + 4.0:
+			_foe = null
+	var heavy := kind == "mist_heavy"
+	var dir := Vector3.ZERO
+	var speed: float = GARRISON_SPEED[kind]
+	if _foe:
+		var to := _foe.position - position
+		to.y = 0.0
+		if kind == "mist_ranger":
+			if _cooldown <= 0.0:
+				_cooldown = 1.1
+				world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT)
+				_attack_left = 0.35
+				_current = ""
+				_play("2H_Ranged_Shoot", 1.5)
+			var home := post if post != Vector3.INF else position
+			if to.length() < 5.0 and position.distance_to(home) < GARRISON_LEASH:
+				dir = -to.normalized()
+		else:
+			var reach := ATTACK_RANGE + (0.5 if heavy else 0.0)
+			if to.length() > reach * 0.8:
+				dir = to.normalized()
+			if to.length() < reach and _cooldown <= 0.0:
+				_cooldown = ATTACK_EVERY * (1.35 if heavy else 1.0)
+				_attack_left = 0.5
+				_current = ""
+				var swing := "2H_Melee_Attack_Chop" if heavy and _anim and _anim.has_animation("2H_Melee_Attack_Chop") else "1H_Melee_Attack_Chop"
+				_play(swing, 1.5)
+				_foe.next_hitter = -1 # nobody's kill
+				_foe.take_damage(WeaponDefs.DAMAGE * float(GARRISON_BLOW[kind]), to.normalized(), 4.0 if heavy else 2.0, _foe.centre())
+				world.sfx_at("clang", position, -9.0)
+		if to.length() > 0.01:
+			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 9.0))
+	elif post != Vector3.INF:
+		var to := post - position
+		to.y = 0.0
+		if to.length() > 1.5:
+			dir = to.normalized()
+			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 7.0))
+	if _attack_left > 0.0:
+		dir = Vector3.ZERO
+	velocity = dir * speed
+	move_and_slide()
+	position.y = world.ground_at(position)
+	if _attack_left <= 0.0:
+		_play("Running_A" if dir != Vector3.ZERO else "Idle")
+
+
 ## Now and then a bite turns something up: food, or a few arrows. Never twice in quick succession.
 func _forage() -> void:
 	if world.now - _found_at < FOX_FIND_GAP or randf() >= FOX_FOOD:
@@ -460,7 +546,7 @@ func _equip_retinue() -> void:
 	attachment.bone_name = bone
 	skeleton.add_child(attachment)
 	var hand := MeshInstance3D.new()
-	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind == "ranger" else "sword"
+	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind in ["ranger", "mist_ranger"] else "battleaxe" if kind == "mist_heavy" else "sword"
 	hand.mesh = WeaponDefs.mesh(weapon)
 	hand.rotation = WeaponDefs.hand_rotation(weapon)
 	hand.scale = Vector3.ONE * 0.8 / _visual.scale.x

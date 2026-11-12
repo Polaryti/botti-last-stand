@@ -448,6 +448,30 @@ def wyvern():
 for g in (bear, eagle, antlers, sprout, boulder, storm, wyvern):
     PLAIN.append(g)
 
+# Beyond the Mists: Mist Bastion's garrison
+GLASS = ("#d8fffb", "#3fc4bc")
+MSTEEL = ("#c9d8de", "#5a6c76")
+def mist_infantry():
+    # A rounded sallet with a glowing eye-slit and a crest of three mist-glass fins, over a kite shield.
+    return (path(("#2f7f86", "#123a40"), "M24 54 L76 54 L72 80 L50 96 L28 80Z")
+        + circ("none", 50, 72, 10, 3).replace('stroke="#12141c"', 'stroke="#bff7f2"')
+        + poly(GLASS, (40, 22), (46, 4), (50, 22)) + poly(GLASS, (48, 20), (56, 2), (58, 22)) + poly(GLASS, (56, 22), (66, 8), (64, 26))
+        + path(MSTEEL, "M22 52 C20 22 80 22 78 52 C82 56 84 62 76 62 L24 62 C16 62 18 56 22 52Z")
+        + rect(INK, 30, 42, 40, 8, 2, 0) + rect(GLASS, 33, 44, 34, 4, 1, 0))
+def mist_ranger():
+    # A deep teal hood with a circlet of mist-glass, and a bow drawn across it.
+    return (path(("#2b6b78", "#0f3038"), "M50 6 C80 10 92 44 86 90 L14 90 C8 44 20 10 50 6Z")
+        + ell(INK, 50, 58, 22, 24, 0, 0) + ell(("#bff7f2", "#3fc4bc"), 41, 56, 4, 3, 0, 0) + ell(("#bff7f2", "#3fc4bc"), 59, 56, 4, 3, 0, 0)
+        + curve("#bff7f2", 5, "M24 40 C40 30 60 30 76 40", ink=False) + poly(GLASS, (46, 34), (50, 24), (54, 34))
+        + curve("#c08a52", 5, "M88 10 C64 34 64 66 88 92", ink=False) + line("#e9eef5", 1.6, (88, 10), (88, 92), ink=False))
+def mist_heavy():
+    # A closed great helm with a lit visor, crowned by two curved horns of mist-glass.
+    return (path(GLASS, "M30 30 C20 22 16 10 22 2 C26 12 32 18 40 22Z") + path(GLASS, "M70 30 C80 22 84 10 78 2 C74 12 68 18 60 22Z")
+        + path(MSTEEL, "M24 32 C24 16 76 16 76 32 L78 86 C70 94 30 94 22 86Z")
+        + rect(INK, 26, 46, 48, 9, 2, 0) + rect(GLASS, 30, 48.5, 40, 4, 1, 0) + rect(MSTEEL, 46, 56, 8, 26, 1, 2))
+for g in (mist_infantry, mist_ranger, mist_heavy):
+    PLAIN.append(g)
+
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),

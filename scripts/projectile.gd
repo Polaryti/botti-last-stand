@@ -36,6 +36,7 @@ var close_from := Vector3.INF # Point Blank: half as strong again within 6 m of 
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
+var garrison := false # shot by a Mist Soldier: nobody's, and nobody is credited with what it kills
 var _owner_assigned := false
 var _returning := false
 var _spin := 0.0
@@ -119,6 +120,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	sparks = 0
 	source = ""
 	owner_player = null
+	garrison = false
 	_returning = false
 	_flame.scale = Vector3.ONE * (0.3 if k in [Kind.ARROW, Kind.ENEMY_ARROW] else 1.0)
 	_flame.visible = k == Kind.FIREBALL or (on_fire and k not in [Kind.ARROW, Kind.ENEMY_ARROW])
@@ -137,6 +139,8 @@ func set_owner_player(p: Player) -> void:
 
 
 func _owner() -> Player:
+	if garrison:
+		return null
 	if _owner_assigned:
 		return owner_player if is_instance_valid(owner_player) else null
 	return world.player
@@ -359,7 +363,10 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		amount = shooter.modify_damage(z, amount)
 	if fire and z.phases:
 		amount *= 1.5
-	if amount > 0.0:
+	if amount > 0.0 and garrison:
+		z.next_hitter = -1
+		z.take_damage(amount, _vel.normalized(), knock, at)
+	elif amount > 0.0:
 		world.damage_zombie(z, amount, _vel.normalized(), knock, at, head)
 	if sparks > 0 and shooter:
 		shooter.spark_from(z, sparks, amount)

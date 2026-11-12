@@ -1038,6 +1038,9 @@ func _die() -> void:
 	elif type_id == "great_revenant_elemental":
 		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
 		world.director.show_banner("The Great Revenant Elemental crumbles. An Angel rises from the mist", 4.0)
+	elif type_id == "war_wyvern":
+		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
+		world.director.show_banner("The War Wyvern falls from the sky. An Angel rises from the mist", 4.0)
 	world.on_zombie_killed(self)
 
 

@@ -326,19 +326,20 @@ func _bar(r: Rect2, f: float, col: Color) -> void:
 		draw_style_box(_fill, Rect2(r.position, Vector2(maxf(r.size.x * part, minf(r.size.y, r.size.x)), r.size.y)))
 
 
-## The portal, the four gates, and how much wood you carry.
+## The portal, the gates, and how much wood you carry.
 func _draw_fort(s: Vector2, centre: Vector2) -> void:
 	var fort := player.world.fort
 	var w := 260.0
 	var top := 194.0 if player.class_id == "adept" else 122.0
 	_bar(Rect2(centre.x - w * 0.5, top, w, 12), fort.heart_hp / Fort.HEART_HP, Color(0.9, 0.3, 0.24))
 	_centered("Portal", Vector2(centre.x - w * 0.5 - 36, top + 6), 18, UiTheme.BONE)
-	var gate_w := (w - 18.0) / 4.0
+	var gate_count := maxi(1, fort.gates.size())
+	var gate_w := (w - 6.0 * (gate_count - 1)) / gate_count
 	for i in fort.gates.size():
 		var g: Dictionary = fort.gates[i]
 		var r := Rect2(centre.x - w * 0.5 + i * (gate_w + 6.0), top + 20, gate_w, 9)
 		_bar(r, float(g["hp"]) / Fort.GATE_HP, Color(0.72, 0.5, 0.26) if g["closed"] else Color(0.8, 0.2, 0.15))
-		_centered(["N", "E", "S", "W"][i], r.get_center() + Vector2(0, 16), 15, UiTheme.BONE)
+		_centered(str(g["short"]), r.get_center() + Vector2(0, 16), 15, UiTheme.BONE)
 	const WOOD_COL := Color(0.92, 0.72, 0.42)
 	_centered("Wood %d of %d" % [player.wood, Fort.WOOD_MAX], Vector2(centre.x, top + 60), 20, WOOD_COL)
 	_draw_gate_compass(fort, Vector2(centre.x + w * 0.5 + 66.0, top + 26.0))
@@ -359,7 +360,7 @@ func _draw_gate_compass(fort: Fort, at: Vector2) -> void:
 			col = Color(1.0, 0.3, 0.22)
 		elif fort.wood_needed(g) > 0:
 			col = Color(0.95, 0.65, 0.25)
-		_centered(["N", "E", "S", "W"][g["i"]], at + dir * RADIUS + Vector2(0, 7), 20, col)
+		_centered(str(g["short"]), at + dir * RADIUS + Vector2(0, 7), 20, col)
 
 
 ## All vs All: what the fog is doing, and the way back if you are out in it.

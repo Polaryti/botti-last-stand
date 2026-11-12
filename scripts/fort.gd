@@ -1,8 +1,11 @@
 @tool
 class_name Fort
 extends Node
-## Defend the Fort: four wooden gates and a heart in the keep. The host decides what happens to
-## them. Each player repairs gates by coming close with wood, and the gate mends as they stand there.
+## Defend the Fort: wooden gates and a heart to protect. The host decides what happens to them. Each
+## player repairs gates by coming close with wood, and the gate mends as they stand there.
+## The Fort is a square with four gates round its keep (add_gate). Other strongholds, like Mist
+## Bastion, give their own wall outline, floor height, gates, small doors and the lanes their enemies
+## come up (set_region, add_gate_at, add_door, add_lane).
 
 signal fallen
 
@@ -38,6 +41,12 @@ var _dirty := true
 var _banner_left := 0.0
 var _over := false
 var repairing := -1 # the gate the local player is mending right now
+## The wall's outline seen from above, for a stronghold that is not the square Fort. Empty: the square.
+var region := PackedVector2Array()
+## The height of the ground inside the walls. Higher than this by 3 m is up on the wall.
+var floor_y := 0.0
+## Small doors only players fit through: {at: on the wall's line, out: which way is outside}.
+var doors: Array[Dictionary] = []
 
 
 func _init(owner_world: World) -> void:
@@ -45,8 +54,13 @@ func _init(owner_world: World) -> void:
 
 
 func add_gate(i: int, node: Node3D, rows: Array[Node3D]) -> void:
-	var dir := DIRS[i]
-	var at := dir * HALF
+	add_gate_at(NAMES[i], DIRS[i] * HALF, DIRS[i], node, rows)
+
+
+## A gate anywhere: at is the middle of the gateway on the ground, dir the way out. Gates on a
+## stronghold that is not the square face along the X or Z axis too.
+func add_gate_at(gate_name: String, at: Vector3, dir: Vector3, node: Node3D, rows: Array[Node3D]) -> void:
+	var i := gates.size()
 	var along_x := absf(dir.z) > 0.5
 	var size := Vector3(GATE_W, GATE_H, WALL_T) if along_x else Vector3(WALL_T, GATE_H, GATE_W)
 	var body := StaticBody3D.new()
@@ -59,10 +73,11 @@ func add_gate(i: int, node: Node3D, rows: Array[Node3D]) -> void:
 	cs.position = at + Vector3.UP * GATE_H * 0.5
 	body.add_child(cs)
 	world.add_child(body)
-	gates.append({"i": i, "at": at, "dir": dir, "size": size, "hp": GATE_HP, "closed": true, "node": node, "rows": rows, "shape": cs})
+	gates.append({"i": i, "name": gate_name, "short": gate_name.left(1).to_upper(), "at": at, "dir": dir, "size": size, "hp": GATE_HP, "closed": true,
+		"node": node, "rows": rows, "shape": cs, "lane": [] as Array[Vector3]})
 	world.grid.set_box(at, size, true)
 	var sign_board := Label3D.new()
-	sign_board.text = NAMES[i].to_upper()
+	sign_board.text = gate_name.to_upper()
 	sign_board.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 	sign_board.font_size = 96
 	sign_board.outline_size = 24
@@ -78,6 +93,22 @@ func add_gate(i: int, node: Node3D, rows: Array[Node3D]) -> void:
 	gates.back()["requirement"] = requirement
 	gates.back()["inner_requirement"] = inner
 	_show_gate(gates.back())
+
+
+## The outline of a stronghold's walls, and the height of the ground inside them.
+func set_region(outline: PackedVector2Array, ground_y: float) -> void:
+	region = outline
+	floor_y = ground_y
+
+
+func add_door(at: Vector3, out: Vector3) -> void:
+	doors.append({"at": at, "out": out})
+
+
+## Where the enemies sent against a gate come from: the foot of its lane.
+func add_lane(gate: int, foot: Vector3) -> void:
+	if gate >= 0 and gate < gates.size():
+		(gates[gate]["lane"] as Array[Vector3]).append(foot)
 
 
 func _wall_label(label_name: String, at: Vector3, facing: Vector3) -> Label3D:
@@ -105,12 +136,35 @@ func set_heart(at: Vector3, mesh: Node3D) -> void:
 
 
 func inside(p: Vector3) -> bool:
-	return absf(p.x) < HALF and absf(p.z) < HALF
+	if region.is_empty():
+		return absf(p.x) < HALF and absf(p.z) < HALF
+	return Geometry2D.is_point_in_polygon(Vector2(p.x, p.z), region)
+
+
+## How far outside the walls a point is, in metres from their outer face (less than 0 inside).
+func outside_by(p: Vector3) -> float:
+	if region.is_empty():
+		return maxf(absf(p.x), absf(p.z)) - HALF - WALL_T * 0.5
+	var flat := Vector2(p.x, p.z)
+	var best := INF
+	for i in region.size():
+		var a := region[i]
+		var b := region[(i + 1) % region.size()]
+		best = minf(best, flat.distance_to(Geometry2D.get_closest_point_to_segment(flat, a, b)))
+	return (-best if inside(p) else best) - WALL_T * 0.5
+
+
+## A point just outside the walls that every lane and the woods connect to.
+func outside_point() -> Vector3:
+	if region.is_empty() or gates.is_empty():
+		return DIRS[0] * (HALF + 8.0)
+	var g: Dictionary = gates[0]
+	return (g["at"] as Vector3) + (g["dir"] as Vector3) * 8.0
 
 
 ## Up on the wall, where nothing on foot can reach.
 func on_wall(p: Vector3) -> bool:
-	return p.y > 3.0
+	return p.y > floor_y + 3.0
 
 
 func any_open() -> bool:
@@ -135,7 +189,9 @@ func gate_for(z: Zombie) -> Dictionary:
 
 ## The gate with the fewest zombies sent against it right now; ties are broken at random.
 func least_pressed_gate(zombies: Array[Zombie]) -> int:
-	var counts := [0, 0, 0, 0]
+	var counts: Array[int] = []
+	counts.resize(gates.size())
+	counts.fill(0)
 	for z in zombies:
 		if z.is_alive() and z.fort_gate >= 0 and z.fort_gate < counts.size():
 			counts[z.fort_gate] += 1
@@ -144,7 +200,7 @@ func least_pressed_gate(zombies: Array[Zombie]) -> int:
 	for i in gates.size():
 		if counts[i] == low:
 			options.append(i)
-	return options[randi() % options.size()] if not options.is_empty() else randi() % 4
+	return options[randi() % options.size()] if not options.is_empty() else randi() % maxi(1, gates.size())
 
 
 func gate_nearest(p: Vector3) -> Dictionary:
@@ -172,7 +228,7 @@ func hit_gate(g: Dictionary, damage: float, from: Vector3) -> void:
 		_set_closed(g, false)
 		world.sfx_at("blast", g["at"], 0.0)
 		world.fx_blast((g["at"] as Vector3) + Vector3.UP * 2.0, 3.0, Color(0.5, 0.34, 0.18, 0.5))
-		world.banner("The %s gate has fallen!" % NAMES[g["i"]], 3.5)
+		world.banner("The %s gate has fallen!" % g["name"], 3.5)
 	_show_gate(g)
 
 
@@ -183,8 +239,14 @@ func hit_heart(damage: float) -> void:
 	_dirty = true
 	if _banner_left <= 0.0:
 		_banner_left = 12.0
-		world.banner("They are at the portal!", 3.0)
-		world.sfx_at("banshee", heart_at, -6.0)
+		if world.map_id == "bastion":
+			world.banner("The Great Portal is under attack!", 3.0)
+			world.sfx_at("portal_wound", heart_at, -2.0)
+			if Net.is_host():
+				Net.sound_at("portal_wound", heart_at, -2.0)
+		else:
+			world.banner("They are at the portal!", 3.0)
+			world.sfx_at("banshee", heart_at, -6.0)
 	if heart_hp <= 0.0:
 		_over = true
 		if _heart_mesh:

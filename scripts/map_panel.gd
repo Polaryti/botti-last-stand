@@ -60,7 +60,7 @@ static func _bake(w: World) -> ImageTexture:
 		var p0 := Vector2i(int((r.position.x + half) / (half * 2.0) * SIDE), int((r.position.y + half) / (half * 2.0) * SIDE))
 		var size := Vector2i(maxi(2, int(r.size.x / (half * 2.0) * SIDE)), maxi(2, int(r.size.y / (half * 2.0) * SIDE)))
 		img.fill_rect(Rect2i(p0, size), UiTheme.BONE.darkened(0.15))
-	if w.fort:
+	if w.fort and w.fort.region.is_empty():
 		var wall := UiTheme.ASH
 		var a := int((half - Fort.HALF) / (half * 2.0) * SIDE)
 		var b := SIDE - a
@@ -68,6 +68,18 @@ static func _bake(w: World) -> ImageTexture:
 		img.fill_rect(Rect2i(a, b - 3, b - a, 3), wall)
 		img.fill_rect(Rect2i(a, a, 3, b - a), wall)
 		img.fill_rect(Rect2i(b - 3, a, 3, b - a), wall)
+	elif w.fort:
+		# A stronghold of its own shape: its outline, drawn a pixel at a time along each wall.
+		var outline := w.fort.region
+		for i in outline.size():
+			var from := outline[i]
+			var to := outline[(i + 1) % outline.size()]
+			var steps := maxi(1, int(from.distance_to(to)))
+			for k in steps + 1:
+				var p := from.lerp(to, float(k) / steps)
+				var px := int((p.x + half) / (half * 2.0) * SIDE)
+				var py := int((p.y + half) / (half * 2.0) * SIDE)
+				img.fill_rect(Rect2i(px - 1, py - 1, 3, 3).intersection(Rect2i(0, 0, SIDE, SIDE)), UiTheme.ASH)
 	_images[key] = ImageTexture.create_from_image(img)
 	return _images[key]
 

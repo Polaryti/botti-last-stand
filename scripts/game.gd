@@ -33,9 +33,13 @@ var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
 var night_map := "village"
+var fort_map := "fort"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
 	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."}}
+## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
+const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
+	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
 const VERSUS_MAPS := ["village", "mesenlla"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
@@ -101,9 +105,13 @@ func owns_class(id: String) -> bool:
 ## Which map a night is played on: the host decides in a game together.
 func current_map() -> String:
 	if Net.active():
+		if Net.rules == Net.Rules.FORT:
+			return Net.fort_map if FORT_MAPS.has(Net.fort_map) else "fort"
 		if Net.pvp():
 			return Net.night_map if Net.night_map in VERSUS_MAPS else "village"
 		return Net.night_map
+	if mode == Mode.FORT:
+		return fort_map
 	return night_map
 
 
@@ -265,7 +273,14 @@ const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 
 	"earth_elemental": 2, "mist_elemental": 2, "storm_elemental": 2, "wyvern": 2, "great_revenant_elemental": 1, "war_wyvern": 1}
 
 
+## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
+const BASTION_POOLS := {"woods_child": 15, "bear": 4, "mist_bear": 2, "eagle": 6, "mist_eagle": 3, "shapeshifter": 2,
+	"earth_elemental": 3, "mist_elemental": 2, "storm_elemental": 2, "wyvern": 2, "war_wyvern": 1}
+
+
 func zombie_pool_plan() -> Dictionary:
+	if mode == Mode.FORT and current_map() == "bastion":
+		return BASTION_POOLS.duplicate()
 	if mode == Mode.NIGHT and current_map() in SpawnRules.MESENLLA:
 		return MESENLLA_POOLS.duplicate()
 	var plan := _zombie_pools()
@@ -339,6 +354,9 @@ func load_settings() -> void:
 	night_map = _saved(c, "progress", "night_map", "village")
 	if not MAPS.has(night_map):
 		night_map = "village"
+	fort_map = _saved(c, "progress", "fort_map", "fort")
+	if not FORT_MAPS.has(fort_map):
+		fort_map = "fort"
 	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
 		pet = "wolf"
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class) or ClassDefs.disabled(player_class):
@@ -372,6 +390,7 @@ func save_settings() -> void:
 	c.set_value("progress", "switched_off", switched_off)
 	c.set_value("progress", "pet", pet)
 	c.set_value("progress", "night_map", night_map)
+	c.set_value("progress", "fort_map", fort_map)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)

@@ -511,14 +511,13 @@ func _walk_dir(delta: float) -> Vector3:
 				var best := INF
 				var door := Vector3.ZERO
 				var outward := Vector3.ZERO
-				for side in 4:
-					var dir: Vector3 = Fort.DIRS[side]
-					var point: Vector3 = dir * Fort.HALF + Vector3(dir.z, 0, -dir.x) * Fort.DOORS[side]
+				for d: Dictionary in world.fort.doors:
+					var point: Vector3 = d["at"]
 					var cost := here.distance_to(point) + _goal.distance_to(point)
 					if cost < best:
 						best = cost
 						door = point
-						outward = dir
+						outward = d["out"]
 				var from_side := -1.0 if world.fort.inside(here) else 1.0
 				var approach := door + outward * from_side * 4.0
 				aim = approach

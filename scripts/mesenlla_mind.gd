@@ -32,6 +32,8 @@ const STORM_RANGE := Vector2(10.0, 18.0) # the distance it likes to keep
 const BREATH_TELL := 1.2
 const BREATH_RADIUS := 2.4
 const BREATH_EVERY := 8.0
+const PASS_EVERY := 22.0 # the War Wyvern's burning passes over a stronghold's portal
+const PASS_GIVE_UP := 9.0
 const QUAKE_RADIUS := 6.5
 const QUAKE_TELL := 1.3
 const BOULDER_RADIUS := 3.2
@@ -49,6 +51,8 @@ var form := "stag"
 var fled_once := false
 var enraged := false
 var called := false
+var _pass_left := 8.0
+var _at_portal := false
 var _trail := 0.0
 
 
@@ -383,7 +387,36 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		for i in 3:
 			var a := TAU * i / 3.0
 			z.world.spawn_zombie("eagle", z.position + Vector3(cos(a) * 6.0, 0, sin(a) * 6.0))
+	# Over a stronghold, the War Wyvern breaks off every so often to make a burning pass at its portal.
+	var fort := z.world.fort
+	if war and fort and phase == "":
+		_pass_left -= delta
+		if _pass_left <= 0.0 and fort.heart_hp > 0.0:
+			phase = "pass"
+			left = PASS_GIVE_UP
+	if phase == "pass":
+		left -= delta
+		var over := fort.heart_at + Vector3.UP * float(z.def["fly_height"])
+		var drift := over - z.position
+		z.position += drift.normalized() * minf(drift.length(), z._speed * 1.3 * delta)
+		_face(z, fort.heart_at, delta, 4.0)
+		var flat := Vector2(fort.heart_at.x - z.position.x, fort.heart_at.z - z.position.z)
+		if flat.length() < 14.0 or left <= 0.0:
+			_pass_left = PASS_EVERY
+			_at_portal = true
+			phase = "breath"
+			left = BREATH_TELL + 0.3
+			cooldown = BREATH_EVERY * 0.85
+			_show(z, "m_breath", true)
+			z.world.sfx_at("wyvern_roar", z.position, 3.0)
+			var along := Vector3(flat.x, 0.0, flat.y).normalized() if flat.length() > 0.5 else Vector3.FORWARD
+			# A line of fire that ends on the portal, coming from where the wyvern came.
+			for i in 4:
+				MistSeal.cast(z, _ground(z, fort.heart_at - along * (3 - i) * BREATH_RADIUS * 1.6), BREATH_RADIUS * 1.15, BREATH_TELL + i * 0.15, z._damage, 0.0, MistSeal.Style.FIRE)
+		z._animate_custom(delta, 1.0)
+		return true
 	if phase == "" and cooldown <= 0.0 and z._sees and dist < 28.0 and z._dive <= 0.0 and z._windup <= 0.0:
+		_at_portal = false
 		phase = "breath"
 		left = BREATH_TELL + 0.3
 		cooldown = BREATH_EVERY * (0.85 if war else 1.0)
@@ -399,10 +432,11 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			MistSeal.cast(z, _ground(z, spot), BREATH_RADIUS * (1.15 if war else 1.0), BREATH_TELL + i * 0.15, z._damage, 0.0, MistSeal.Style.FIRE)
 	if phase == "breath":
 		left -= delta
-		var hover := target.global_position + Vector3.UP * float(z.def["fly_height"]) * 0.75
+		var focus := fort.heart_at if _at_portal and fort else target.global_position
+		var hover := focus + Vector3.UP * float(z.def["fly_height"]) * 0.75
 		var drift := hover - z.position
 		z.position += drift.normalized() * minf(drift.length(), z._speed * 0.3 * delta)
-		_face(z, target.global_position, delta, 6.0)
+		_face(z, focus, delta, 6.0)
 		if left <= 0.3:
 			z.mesenlla_warning = false
 		if left <= 0.0:

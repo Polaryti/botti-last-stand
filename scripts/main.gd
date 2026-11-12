@@ -71,7 +71,7 @@ func _ready() -> void:
 	if Game.test_map != "":
 		# Someone pressed F6 on a map in the editor, so go straight to it.
 		var map := Game.test_map
-		start_game(Game.Mode.SANDBOX if map.contains("sandbox") else (Game.Mode.FORT if map.contains("fort") else Game.Mode.NIGHT))
+		start_game(Game.Mode.SANDBOX if map.contains("sandbox") else (Game.Mode.FORT if map.contains("fort") or map.contains("bastion") else Game.Mode.NIGHT))
 		return
 	show_menu()
 
@@ -152,7 +152,7 @@ func show_menu(rebuild := false) -> void:
 	gap.custom_minimum_size.y = 14
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
-	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal to The Mists.", func() -> void: show_class_picker(Game.Mode.FORT)))
+	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal.", func() -> void: show_fort_picker()))
 	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Leaderboard", "The top players of all time, and of this week.", func() -> void: show_leaderboard()))
@@ -551,9 +551,28 @@ func show_map_picker() -> void:
 	panel = root
 
 
+## Which stronghold to hold.
+func show_fort_picker() -> void:
+	_clear_ui()
+	_back = show_menu
+	var root := _modal("Defend the Fort")
+	var box: VBoxContainer = root.get_meta("box")
+	box.custom_minimum_size.x = 860
+	for id: String in Game.FORT_MAPS:
+		var chosen := id
+		var row := _menu_row(Game.FORT_MAPS[id]["name"], Game.FORT_MAPS[id]["desc"], func() -> void:
+			Game.fort_map = chosen
+			Game.save_settings()
+			show_class_picker(Game.Mode.FORT))
+		row.custom_minimum_size.x = 800
+		box.add_child(row)
+	box.add_child(_button("Back", show_menu, Vector2(160, 60)))
+	panel = root
+
+
 func show_class_picker(mode: int) -> void:
 	_clear_ui()
-	_back = show_map_picker if mode == Game.Mode.NIGHT else show_menu
+	_back = show_map_picker if mode == Game.Mode.NIGHT else show_fort_picker if mode == Game.Mode.FORT else show_menu
 	var root := _two_panes("Choose your class")
 	var list: VBoxContainer = root.get_meta("list")
 	var detail: VBoxContainer = root.get_meta("detail")
@@ -1772,10 +1791,14 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		for r in Net.RULE_NAMES.size():
 			var pick := r
 			kinds.add_child(_button(Net.RULE_NAMES[r], func() -> void: Net.set_rules(pick), Vector2(215, 58), Net.rules == r))
-		if Net.rules != Net.Rules.FORT:
-			var maps := HBoxContainer.new()
-			maps.add_theme_constant_override("separation", 8)
-			body.add_child(maps)
+		var maps := HBoxContainer.new()
+		maps.add_theme_constant_override("separation", 8)
+		body.add_child(maps)
+		if Net.rules == Net.Rules.FORT:
+			for id: String in Game.FORT_MAPS:
+				var chosen_fort := id
+				maps.add_child(_button(Game.FORT_MAPS[id]["name"], func() -> void: Net.set_fort_map(chosen_fort), Vector2(215, 52), Net.fort_map == id))
+		else:
 			for id: String in Game.MAPS:
 				if Net.pvp() and id not in Game.VERSUS_MAPS:
 					continue
@@ -2010,7 +2033,7 @@ func _board_line(seconds: float, kills: int, won: bool) -> String:
 	var mode := "fort" if Game.mode == Game.Mode.FORT else "night"
 	if Net.active():
 		mode = {Net.Rules.COOP: "coop", Net.Rules.FFA: "ffa", Net.Rules.TEAMS: "teams", Net.Rules.FORT: "fort"}.get(Net.rules, "coop")
-	var map := "fort" if Game.mode == Game.Mode.FORT else Game.current_map()
+	var map := Game.current_map()
 	var difficulty: int = Net.difficulty if Net.active() else Game.difficulty
 	_counted = {}
 	var points := Board.record_match(seconds, kills, won, mode, map, world.player.class_id, world.player.spec_id, difficulty)
@@ -2185,7 +2208,7 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 	if not is_instance_valid(list) or _board_period != period or _board_kind != kind:
 		return
 	asking.queue_free()
-	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village and the Valleys of Mesenlla", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort", "coop": "Co-op nights in the Village and the Valleys of Mesenlla", "versus": "All vs All and Teams"}[kind]
+	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village and the Valleys of Mesenlla", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort and Mist Bastion", "coop": "Co-op nights in the Village and the Valleys of Mesenlla", "versus": "All vs All and Teams"}[kind]
 	note.text = ("Points from %s, since the leaderboard began." if period == "all" else "Points from %s since Monday 00:00 UTC.") % what
 	if not result["ok"]:
 		list.add_child(_board_problem(result["error"]))
@@ -2235,7 +2258,8 @@ static func _map_word(map: String) -> String:
 	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion"}.get(map, map.capitalize())
 
 
-## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort".
+## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort",
+## and Mist Bastion "Fort · Mist Bastion".
 static func _match_word(mode: String, map: String) -> String:
 	var word: String = {"night": "Night", "coop": "Co-op", "fort": "Fort", "ffa": "All vs All", "teams": "Teams"}.get(mode, mode.capitalize())
 	return word if map == "fort" or map == "" else word + " · " + _map_word(map)

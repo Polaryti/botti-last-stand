@@ -48,6 +48,10 @@ var play_half := 110.0
 var start_spots: Array[Vector3] = []
 var dummy_spots: Array[Vector3] = []
 var rival_spots: Array[Vector3] = []
+## On a stronghold with lanes: {kind: lane, muster or post, gate, at} (see MapSpot).
+var lane_marks: Array[Dictionary] = []
+## Mist Bastion's Mist Soldiers (null on every other map).
+var garrison: Garrison
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
 var _enemy_blocks: StaticBody3D
 var portals: MistPortals
@@ -224,7 +228,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
@@ -262,12 +266,16 @@ func setup(game_mode: int) -> void:
 	builder.skip_beyond = mode == Game.Mode.MENU
 	builder.build(map)
 	map.free()
+	if fort:
+		for mark: Dictionary in lane_marks:
+			if mark["kind"] == "lane":
+				fort.add_lane(int(mark["gate"]), mark["at"])
 	grid.astar.update()
 	grid.build_far_grid()
 	prepare_forest_wood()
 	if terrain.has_islands():
 		_mists_look()
-	elif map_id == "mesenlla":
+	elif map_id in SpawnRules.MESENLLA:
 		_mesenlla_look()
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
 		var atmosphere := MistAtmosphere.new()
@@ -294,6 +302,10 @@ func setup(game_mode: int) -> void:
 		add_child(fog)
 	_build_zombie_pools()
 	prepare_allies("ghost", 1)
+	if map_id == "bastion" and fort:
+		garrison = Garrison.new(self)
+		for kind: String in Garrison.ORDER:
+			prepare_allies(kind, 3)
 	player = Player.new(self)
 	add_child(player)
 	var start: Vector3 = start_spots[0] if not start_spots.is_empty() else Vector3.ZERO
@@ -361,7 +373,7 @@ func _map_file() -> String:
 		return Game.test_map
 	match mode:
 		Game.Mode.MENU: return "res://maps/mists.tscn"
-		Game.Mode.FORT: return "res://maps/fort.tscn"
+		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
 			if Game.current_map() == "mists":
@@ -688,6 +700,11 @@ func _mesenlla_look() -> void:
 	night_sky_shows = true
 	night_moon_colour = Color(1.0, 0.72, 0.6)
 	night_moon = 0.55
+	if map_id == "bastion":
+		# Up on the peaks the twilight is colder, and the Great Portal's mist is everywhere.
+		night_fog_colour = Color(0.2, 0.2, 0.32)
+		night_ambient = Color(0.46, 0.48, 0.68)
+		night_moon_colour = Color(0.9, 0.78, 0.86)
 	var atmosphere := MistAtmosphere.new()
 	atmosphere.name = "MesenllaAura"
 	atmosphere.world = self
@@ -696,7 +713,7 @@ func _mesenlla_look() -> void:
 	# Islands hang high and far off: the sky has to be further away than they are.
 	_sky_root.scale = Vector3.ONE * 2.3
 	_sky_material.set_shader_parameter("dusk", 1.0)
-	_sky_material.set_shader_parameter("tint", Vector3(1.1, 0.95, 1.2))
+	_sky_material.set_shader_parameter("tint", Vector3(1.0, 0.95, 1.25) if map_id == "bastion" else Vector3(1.1, 0.95, 1.2))
 	_sky_value = -1.0
 	_apply_sky(_last_dawn)
 
@@ -1372,6 +1389,17 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 			shot.scale = Vector3.ONE
 
 
+## A Mist Ranger's arrow: it belongs to nobody, so nobody is credited with what it kills.
+func garrison_arrow(from: Vector3, target: Vector3, dmg: float) -> void:
+	var vel := (target - from).normalized() * 40.0
+	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(""), from, vel, 0.0, 30.0, dmg, 1.0)
+	if shot:
+		shot.garrison = true
+		if Net.active():
+			Net.shot(0, from, vel, 0.0, 30.0, false, Color.WHITE)
+	sfx_at("bow", from, -9.0)
+
+
 func mirror_bolt(from: Vector3, target: Vector3) -> void:
 	var shot := _launch(Projectile.Kind.BOLT, _orb_mesh(Color(0.75, 0.55, 1.0)), from, (target - from).normalized() * 26.0, 0.0, 26.0, WeaponDefs.DAMAGE, 1.0)
 	if shot:
@@ -1712,7 +1740,7 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	if pool.is_empty():
 		return false
 	# Defend the Fort: each new zombie goes against the gate with the fewest, and rises on its side.
-	var gate := fort.least_pressed_gate(zombies) if fort and fort.gates.size() == 4 else -1
+	var gate := fort.least_pressed_gate(zombies) if fort and not fort.gates.is_empty() else -1
 	if at == Vector3.INF:
 		at = _pick_spawn_point(gate)
 		if at == Vector3.INF and gate >= 0:
@@ -1820,14 +1848,14 @@ func prepare_forest_wood() -> void:
 	near_wood_spots.clear()
 	field_wood_spots.clear()
 	if fort == null: return
-	var reachable := grid.flood(Fort.DIRS[0] * (Fort.HALF + 8.0))
+	var reachable := grid.flood(fort.outside_point())
 	# The open ground round the walls, every 3 m: how far out decides near or field.
-	var reach := Fort.HALF + 30.0
+	var reach := Fort.HALF + 30.0 if fort.region.is_empty() else half_size
 	var x := -reach
 	while x <= reach:
 		var z := -reach
 		while z <= reach:
-			var out := maxf(absf(x), absf(z)) - Fort.HALF - Fort.WALL_T * 0.5
+			var out := fort.outside_by(Vector3(x, 0, z))
 			if out >= 6.0 and out <= 30.0:
 				var at := Vector3(x, 0, z)
 				at.y = ground_at(at)
@@ -1990,9 +2018,17 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 		else:
 			var a := randf() * TAU
 			p = random_player_position() + Vector3(cos(a), 0, sin(a)) * randf_range(28.0, 62.0)
-			if fort:
+			if fort and not fort.region.is_empty() and not fort.gates.is_empty():
+				# A stronghold with lanes: up from the foot of the lane to its gate (any lane, if it has none).
+				var lane: Array = fort.gates[fort_gate if fort_gate >= 0 else randi() % fort.gates.size()]["lane"]
+				if lane.is_empty():
+					continue
+				var foot: Vector3 = lane.pick_random()
+				var b := randf() * TAU
+				p = foot + Vector3(cos(b), 0, sin(b)) * randf_range(0.0, 9.0)
+			elif fort:
 				if fort_gate >= 0:
-					var d: Vector3 = Fort.DIRS[fort_gate]
+					var d: Vector3 = fort.gates[fort_gate]["dir"]
 					a = atan2(d.z, d.x) + randf_range(-0.7, 0.7)
 				p = Vector3(cos(a), 0, sin(a)) * randf_range(44.0, 72.0)
 			if absf(p.x) > half_size - 2.0 or absf(p.z) > half_size - 2.0:
@@ -2294,6 +2330,27 @@ func spawn_ally(kind: String, at: Vector3, seconds: float) -> void:
 	placed.y = ground_at(placed) + (Ally.RAVEN_HEIGHT if kind == "raven" else 0.0)
 	a.global_position = placed
 	allies.append(a)
+
+
+## A Mist Soldier steps out of the mist at its lane's waystone, to hold the post on that lane.
+func spawn_garrison(kind: String, gate: int, at: Vector3, post: Vector3) -> Ally:
+	var spare: Array = _spare_allies.get(kind, [])
+	var a: Ally
+	if spare.is_empty():
+		a = Ally.new(self, kind)
+		add_child(a)
+	else:
+		a = spare.pop_back()
+	a.activate(INF)
+	a.lane = gate
+	a.post = post
+	_ally_seq = (_ally_seq + 1) % 250
+	a.net_index = _ally_seq
+	var placed := grid.to_world(grid.nearest_free(grid.to_cell(at)))
+	placed.y = ground_at(placed)
+	a.global_position = placed
+	allies.append(a)
+	return a
 
 
 ## Someone else's summons, as they are right now.

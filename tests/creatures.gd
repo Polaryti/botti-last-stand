@@ -1,6 +1,7 @@
 extends Node
 ## The creatures of Mesenlla, one by one, in a Sandbox: their entries, their bodies, and every special
-## move with its tell. Run with tools/run_checks.py creatures.
+## move with its tell; then their two maps, the Valleys of Mesenlla and Mist Bastion with its garrison.
+## Run with tools/run_checks.py creatures.
 
 var checks := 0
 var failures := 0
@@ -54,6 +55,7 @@ func _ready() -> void:
 	await _flyers()
 	await _revenant()
 	await _mesenlla_map()
+	await _bastion_map()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -387,3 +389,118 @@ func _mesenlla_map() -> void:
 	check(w.director._mist_boss_defeated, "when it falls, dawn can come")
 	check(w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel"), "and it leaves an Angel")
 	Game.night_map = "village"
+
+
+## Mist Bastion: the Great Portal behind three gates, three lanes up to them, the garrison that holds
+## them, and the War Wyvern.
+func _bastion_map() -> void:
+	clear()
+	w.queue_free()
+	await frames(2)
+	Game.mode = Game.Mode.FORT
+	Game.fort_map = "bastion"
+	check(Game.current_map() == "bastion", "Defend the Fort can be played at Mist Bastion")
+	w = World.new()
+	add_child(w)
+	w.setup(Game.Mode.FORT)
+	w.director.running = false
+	for z: Zombie in w.zombies.duplicate():
+		z.release()
+	p = w.player
+	var fort := w.fort
+	check(w.map_id == "bastion" and fort != null, "Mist Bastion loads as a stronghold of its own")
+	check(Sfx.music_set == "bastion" and ResourceLoader.exists("res://assets/music/bastion_night.ogg") and ResourceLoader.exists("res://assets/music/bastion_hunted.ogg") and ResourceLoader.exists("res://assets/music/bastion_dawn.ogg"), "with music of its own")
+	check(Board.MAPS.has("bastion") and Game.FORT_MAPS.has("bastion"), "chosen like the Fort, and counted on the leaderboard")
+	check(fort.gates.map(func(g: Dictionary) -> String: return g["name"]) == ["west", "middle", "east"], "three gates, one for each lane: %s" % str(fort.gates.map(func(g: Dictionary) -> String: return g["name"])))
+	check(fort.gates.map(func(g: Dictionary) -> String: return g["short"]) == ["W", "M", "E"], "shown as W, M and E")
+	check(fort.doors.size() == 3, "a postern beside each gate")
+	check(fort.gates.all(func(g: Dictionary) -> bool: return (g["lane"] as Array).size() == 1), "and each gate the foot of its lane")
+	check(is_equal_approx(fort.floor_y, 16.0) and fort.inside(fort.heart_at) and fort.inside(p.global_position), "players start inside the walls, round the Great Portal on the summit")
+	check(not fort.on_wall(p.global_position) and fort.on_wall(p.global_position + Vector3.UP * 4.0), "the wall walk counts from the summit, not the valley")
+	check(fort.outside_by(fort.heart_at) < 0.0 and fort.outside_by(Vector3(0, 0, 40)) > 60.0, "the walls know how far out a place is")
+	check(w.near_wood_spots.size() > 10 and w.field_wood_spots.size() > 10, "wood lies outside the walls to mend the gates (%d near, %d further)" % [w.near_wood_spots.size(), w.field_wood_spots.size()])
+	var names := w.map_marks.map(func(m: Dictionary) -> String: return m["name"])
+	for mark: String in ["Great Portal", "West Lane", "Middle Lane", "East Lane", "boss"]:
+		check(names.has(mark), "the map knows the %s" % mark)
+	# Each lane leads to its own gate.
+	for g: Dictionary in fort.gates:
+		var foot: Vector3 = (g["lane"] as Array)[0]
+		var reach := w.grid.flood(foot)
+		check(reach.has(w.grid.nearest_free(w.grid.to_cell(fort.gate_front(g, foot)))), "the %s lane climbs to its gate" % g["name"])
+	# Only Mesenlla's creatures, and they come up the lanes.
+	var plan := Game.zombie_pool_plan()
+	check(plan.has("war_wyvern") and not plan.has("great_revenant_elemental") and plan.keys().all(func(m: String) -> bool: return ZombieDefs.ALL.values().any(func(d: Dictionary) -> bool: return d["models"].has(m) and SpawnRules.is_mesenlla(d))), "only creatures of Mesenlla are brought up: %s" % str(plan.keys()))
+	w.player.global_position = fort.heart_at + Vector3(0, 0.1, 6)
+	var counts := [0, 0, 0]
+	var near_foot := 0
+	for i in 9:
+		if w.spawn_zombie("child_of_woods"):
+			var z: Zombie = w.zombies.back()
+			counts[z.fort_gate] += 1
+			var foot: Vector3 = (fort.gates[z.fort_gate]["lane"] as Array)[0]
+			if Vector2(z.position.x - foot.x, z.position.z - foot.z).length() < 12.0:
+				near_foot += 1
+	check(counts == [3, 3, 3], "each gate gets its share of them: %s" % str(counts))
+	check(near_foot == 9, "and they rise at the foot of that gate's lane (%d of 9)" % near_foot)
+	clear()
+	# The garrison.
+	var g := w.garrison
+	check(g != null, "Mist Bastion has its garrison")
+	g.tick(10.0)
+	check(w.allies.filter(func(a: Ally) -> bool: return a.is_garrison()).is_empty(), "nobody comes out of the waystones at once")
+	g.tick(Garrison.FIRST)
+	var soldiers := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison())
+	check(soldiers.size() == 3 and soldiers.all(func(a: Ally) -> bool: return a.kind == "mist_infantry") and soldiers.map(func(a: Ally) -> int: return a.lane) == [0, 1, 2], "then a Mist Infantry for each lane")
+	check(soldiers.all(func(a: Ally) -> bool: return a.global_position.distance_to(g.mark(a.lane, "muster")) < 2.5 and a.post == g.mark(a.lane, "post")), "stepping out of its lane's waystone, to hold its post")
+	check(w.director.banner.contains("Mist Soldiers"), "and everyone is told")
+	g.tick(Garrison.FIRST + Garrison.EVERY)
+	var second := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and a.kind == "mist_ranger")
+	check(second.size() == 3, "next comes a Mist Ranger on each lane")
+	g.tick(Garrison.FIRST + Garrison.EVERY * 2.0)
+	check(w.allies.filter(func(a: Ally) -> bool: return a.is_garrison()).size() == 3 * Garrison.PER_LANE, "and no more than %d hold a lane" % Garrison.PER_LANE)
+	check(g.next_kind(0, 100.0) == "mist_infantry" and g.next_kind(0, Garrison.HEAVY_FROM) == "mist_heavy", "the Heavy's turn waits for 3:00")
+	var walker: Ally = soldiers[1]
+	await seconds(9.0)
+	check(walker.global_position.distance_to(walker.post) < 3.0, "a soldier walks down to its post (%.1f m off)" % walker.global_position.distance_to(walker.post))
+	# They fight what comes near, and nobody is credited with what they kill.
+	var kid := raise("child_of_woods", walker.post + Vector3(2.5, 0, 2.5))
+	kid.set_physics_process(false)
+	var xp_before := p.xp
+	await seconds(6.0)
+	check(not kid.is_alive() and kid.last_hitter == -1, "the garrison fights what comes near its post (hp %.0f, credited to %d)" % [kid.hp, kid.last_hitter])
+	check(p.xp == xp_before, "and its kills are nobody's")
+	var heavy := w.spawn_garrison("mist_heavy", 1, walker.post, walker.post)
+	var hp_full := heavy.hp
+	heavy.hurt(100.0, heavy.global_position)
+	check(is_equal_approx(hp_full - heavy.hp, 100.0 * (1.0 - Ally.HEAVY_GUARD)), "the Mist Heavy's shield takes %d%% off every blow" % int(Ally.HEAVY_GUARD * 100.0))
+	check(Ally.KINDS.slice(-3) == Garrison.ORDER, "the soldiers travel to other phones by their place among the summons")
+	# The Great Portal: what lands on it hurts it.
+	var portal_hp := fort.heart_hp
+	var seal := MistSeal.create(w, fort.heart_at, 3.0, 0.0, 0.1, 20.0, -1, MistSeal.Style.FIRE)
+	await seconds(0.4)
+	check(seal != null and fort.heart_hp < portal_hp, "fire landing on the Great Portal hurts it (%.0f)" % (portal_hp - fort.heart_hp))
+	# The War Wyvern.
+	check(w.director.requires_regent(), "dawn waits for the War Wyvern")
+	w.director.elapsed = 520.0
+	w.director._tick_mist_boss()
+	var boss: Zombie = null
+	for z: Zombie in w.zombies:
+		if z.type_id == "war_wyvern":
+			boss = z
+	check(boss != null and w.director.banner.contains("War Wyvern"), "the War Wyvern comes for the Great Portal")
+	p.global_position = Vector3(-60, w.ground_at(Vector3(-60, 0, 60)), 60)
+	portal_hp = fort.heart_hp
+	boss.mesenlla_mind._pass_left = 0.0
+	var pass_seals := 0
+	for i in 60:
+		await seconds(0.25)
+		pass_seals = maxi(pass_seals, w.mist_seals.filter(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.FIRE and Vector2(s.position.x - fort.heart_at.x, s.position.z - fort.heart_at.z).length() < 12.0).size())
+		if fort.heart_hp < portal_hp:
+			break
+	check(pass_seals >= 3 and fort.heart_hp < portal_hp, "it makes a burning pass along a lane to the portal (%d circles, %.0f damage)" % [pass_seals, portal_hp - fort.heart_hp])
+	boss.take_damage(100000.0, Vector3.ZERO, 0.0, boss.centre())
+	await frames(2)
+	check(w.director._mist_boss_defeated, "when it falls, dawn can come")
+	check(w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel"), "and it leaves an Angel")
+	Game.fort_map = "fort"
+	Game.mode = Game.Mode.SANDBOX

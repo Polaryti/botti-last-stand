@@ -1,5 +1,39 @@
 # Changelog
 
+## Development — Beyond the Mists, part 6: Mist Bastion
+
+### A new map for Defend the Fort
+- Defend the Fort now asks where: the Fort, or Mist Bastion. In Play Together the host chooses the same way.
+- A citadel on a mountaintop beyond the Mists guards a Great Portal: a ring of runestones turning slowly in the air above its anchor stone, with obelisks round it and a pillar of mist rising from it.
+- The creatures of Mesenlla climb three lanes to the citadel's west, middle and east gates, kept apart by jagged spines of rock with two ways through each. Each gate goes against its own lane, and each has a postern beside it that only players fit through. Stairs lead up to the walls.
+- Floating islands, rifts and mist crystals over the lanes; barracks, banners, lanterns and a watch fire inside the walls; luminous twilight, colder up on the peaks.
+- Mend the gates with wood as in the Fort. The HUD shows the gates as W, M and E.
+
+### The garrison: Mist Soldiers
+- From 0:20, and every 40 seconds while a lane has fewer than two, a Mist Soldier steps out of each lane's waystone and holds a post on that lane, fighting whatever comes near and walking back to it.
+- Mist Infantry (180 health): sword and kite shield. Mist Ranger (110 health): shoots from its post and steps back from anything that gets close. Mist Heavy (from 3:00, 340 health): battleaxe blows at 1.6 times a weapon blow that throw enemies back, and a tower shield that takes 30% off every blow.
+- They belong to no one: their kills give no one XP or leaderboard kills.
+- Each has its own gear in the Mists' colours, with glowing mist-glass, its own icon and a Codex entry.
+
+### The War Wyvern
+- At about 8:30 the War Wyvern comes for the Great Portal, making a burning pass along a lane every 22 seconds: a line of fire that ends on the portal. Dawn waits until it falls, and it leaves an Angel familiar.
+- Any closing circle that lands on the Great Portal damages it.
+
+### Music and sound
+- Three new pieces for the night, the hunt and the dawn: the citadel's tubular bells, harp, strings, flute and piccolo.
+- New sounds for a soldier stepping out of the mist and for the Great Portal being struck.
+
+### Leaderboard and Codex
+- Mist Bastion counts on the Fort leaderboard.
+- The Codex has Mist Bastion among the maps and the garrison under Familiars, marked Map Exclusive · Mesenlla.
+
+### Fixes
+- A win at the Fort no longer counts towards the five Mists wins that earn the Revenant when the Mists were the last Survive the Night map chosen, alone or together.
+
+### Playing together
+- The stronghold, the garrison, the gates, the War Wyvern and the portal's health are the same on every phone. The host musters the soldiers.
+- Phones on this build only play with phones on the same build.
+
 ## Development — Beyond the Mists, part 5: Valleys of Mesenlla
 
 *Fleeing a collapsed world and having conquered the heart of the Mists, new paths open to distant lands through its portals.* The first of them leads to a mountainside outpost in the Valleys of Mesenlla.

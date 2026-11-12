@@ -181,6 +181,18 @@ func _familiars() -> void:
 		if d["familiar"]:
 			_row(Icons.power(id), Color(d["color"]).darkened(0.35), d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
 			_map_badge(d)
+	# Allies that belong to no one: Mist Bastion's garrison.
+	_section("Mist Bastion garrison")
+	for id: String in Garrison.ORDER:
+		_row(id, Color(0.16, 0.42, 0.44), Garrison.NAMES[id], GARRISON_TEXT[id], "Health %d. Their kills give no one XP" % int(Ally.HEALTH[id]))
+		_map_badge({"maps": ["bastion"]})
+
+
+const GARRISON_TEXT := {
+	"mist_infantry": "Steps out of a lane's waystone at Mist Bastion and holds a post on that lane with sword and kite shield, fighting whatever comes near and walking back to it.",
+	"mist_ranger": "Shoots at enemies near its post (90% of a weapon blow every 1.1 seconds) and steps back from anything that gets close.",
+	"mist_heavy": "From 3:00. Battleaxe blows at 1.6 times a weapon blow that throw enemies back, and a tower shield that takes 30% off every blow it takes.",
+}
 
 
 func _items() -> void:
@@ -241,3 +253,5 @@ func _maps() -> void:
 	_row("map_mists", UiTheme.MIST, "The Mists", "The heart of mysterious worlds lying beyond our own.")
 	_row("map_mesenlla", Color(0.91, 0.63, 0.3), "Valleys of Mesenlla", "Fleeing a collapsed world and having conquered the heart of the Mists, new paths open to distant lands through its portals. The first leads to a mountain outpost under an endless twilight. Survive the night there, alone, together or against each other.")
 	_map_badge({"maps": ["mesenlla"]})
+	_row("map_bastion", Color(0.45, 0.85, 0.82), "Mist Bastion", "Beyond the Mists, a Great Portal turns on a mountaintop, walled in by a citadel. Defend it until dawn as the creatures of Mesenlla climb three lanes to its gates, with Mist Soldiers holding each lane, and bring down the War Wyvern when it comes for the portal.")
+	_map_badge({"maps": ["bastion"]})

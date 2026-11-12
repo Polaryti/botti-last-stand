@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 44
+const PROTOCOL := 45
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -47,7 +47,7 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf", "chakram_hit", "cleave", "vanish", "steal", "nightfall", "dagger_fan",
 	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_wrap",
 	"bear_roar", "bear_maul", "eagle_cry", "shapeshift", "quake_warning", "earth_slam", "mist_blink", "storm_call", "fire_warning",
-	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter"]
+	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter", "mist_muster", "portal_wound"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -56,6 +56,7 @@ const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
 var night_map := "village" # which map a co-op night is played on: the host's choice
+var fort_map := "fort" # which stronghold Defend the Fort is played on: the host's choice
 var online: EpicNet # stays once made, because its system can only start once
 var room_code := ""
 var room_problem := "" # why there is no short code
@@ -242,7 +243,7 @@ func _balance_bots() -> void:
 func _share_lobby() -> void:
 	_room_dirty = true
 	_balance_bots()
-	_lobby.rpc(roster, rules, difficulty, night_map)
+	_lobby.rpc(roster, rules, difficulty, night_map, fort_map)
 	lobby_changed.emit()
 
 
@@ -483,7 +484,7 @@ func _on_peer_disconnected(id: int) -> void:
 	_loaded.erase(id)
 	_remove_peer(id)
 	if in_game:
-		_lobby.rpc(roster, rules, difficulty, night_map)
+		_lobby.rpc(roster, rules, difficulty, night_map, fort_map)
 		lobby_changed.emit()
 	else:
 		_share_lobby()
@@ -541,8 +542,9 @@ func _refused(reason: String) -> void:
 
 
 @rpc("authority", "reliable")
-func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map: String) -> void:
+func _lobby(new_roster: Dictionary, new_rules: int, new_difficulty: int, new_map: String, new_fort_map: String) -> void:
 	night_map = new_map
+	fort_map = new_fort_map if Game.FORT_MAPS.has(new_fort_map) else "fort"
 	roster = new_roster
 	if roster.has(my_id()):
 		Game.player_class = str(roster[my_id()]["class"])
@@ -927,6 +929,12 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 func set_night_map(id: String) -> void:
 	if is_host() and not in_game and Game.MAPS.has(id):
 		night_map = id
+		_share_lobby()
+
+
+func set_fort_map(id: String) -> void:
+	if is_host() and not in_game and Game.FORT_MAPS.has(id):
+		fort_map = id
 		_share_lobby()
 
 

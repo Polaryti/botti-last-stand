@@ -18,9 +18,13 @@ const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
 const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
-	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0)}
+	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0),
+	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6)}
 ## How the bare steel of an armoured body is tinted.
-const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5)}
+const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5), "mist_heavy": Vector3(0.66, 0.92, 0.98)}
+## Mist-glass on the Mist Soldiers, which glows in the dark. Pieces named "bone:glow" are made of it.
+const MIST_GLASS := Color(0.45, 0.95, 0.92)
+const MIST_STEEL := Color(0.5, 0.6, 0.66)
 
 static var _made := {}
 
@@ -35,16 +39,19 @@ static func wear(body: Node3D, id: String) -> void:
 	if skeleton == null:
 		return
 	var pieces := _pieces(id)
-	for bone: String in pieces:
+	for key: String in pieces:
+		var bone := key.get_slice(":", 0)
 		if skeleton.find_bone(bone) < 0:
 			continue
 		var at := BoneAttachment3D.new()
 		at.bone_name = bone
 		skeleton.add_child(at)
 		var part := MeshInstance3D.new()
-		part.mesh = pieces[bone]
+		part.mesh = pieces[key]
 		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		part.extra_cull_margin = 1.0
+		if key.ends_with(":glow"):
+			part.material_override = MesenllaBuilder.glow_material()
 		at.add_child(part)
 	if id == "revenant":
 		for mi in body.find_children("*", "MeshInstance3D", true, false):
@@ -96,6 +103,9 @@ static func _pieces(id: String) -> Dictionary:
 			"artificer": built = _artificer()
 			"bandit": built = _bandit()
 			"cartographer": built = _cartographer()
+			"mist_infantry": built = _mist_infantry()
+			"mist_ranger": built = _mist_ranger()
+			"mist_heavy": built = _mist_heavy()
 		_made[id] = built
 	return _made[id]
 
@@ -339,6 +349,85 @@ static func _cartographer() -> Dictionary:
 	hips.box(Vector3(-0.44, 0.06, 0.12), Vector3(0.14, 0.3, 0.26), LEATHER)
 	hips.box(Vector3(-0.44, 0.2, 0.12), Vector3(0.16, 0.06, 0.28), DARK_LEATHER)
 	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+
+
+## Mist Infantry: a rounded sallet with a crest of three mist-glass fins and a glowing eye-slit, a kite
+## shield on the back with the Great Portal's ring on it, and a pauldron on the shield arm.
+static func _mist_infantry() -> Dictionary:
+	var head := LowPoly.new()
+	head.prism(Vector3(0, 0.72, 0.02), Vector3(0, 1.08, 0), 0.7, 0.42, 10, MIST_STEEL)
+	head.prism(Vector3(0, 1.08, 0), Vector3(0, 1.16, 0), 0.42, 0.18, 10, MIST_STEEL.darkened(0.15))
+	head.prism(Vector3(0, 0.74, -0.2), Vector3(0, 0.62, -0.78), 0.44, 0.12, 8, MIST_STEEL.darkened(0.1)) # the tail at the neck
+	head.box(Vector3(0, 0.82, 0.62), Vector3(0.9, 0.2, 0.1), DARK_STEEL)
+	var glass := LowPoly.new()
+	glass.box(Vector3(0, 0.84, 0.68), Vector3(0.7, 0.05, 0.02), MIST_GLASS)
+	for i in 3:
+		var z := 0.18 - i * 0.22
+		glass.prism(Vector3(0, 1.1 - i * 0.03, z), Vector3(0, 1.38 - i * 0.07, z - 0.1), 0.07, 0.0, 4, MIST_GLASS)
+	var chest := LowPoly.new()
+	chest.prism(Vector3(0, 0.42, -0.5), Vector3(0, -0.5, -0.5), 0.5, 0.06, 4, MIST_STEEL.darkened(0.25))
+	chest.prism(Vector3(0, 0.4, -0.54), Vector3(0, -0.44, -0.54), 0.44, 0.05, 4, Color(0.12, 0.3, 0.33))
+	chest.prism(Vector3(-0.5, 0.2, 0), Vector3(-0.78, 0.18, 0), 0.26, 0.32, 8, MIST_STEEL)
+	chest.box(Vector3(0, -0.02, 0.34), Vector3(0.14, 0.82, 0.04), DARK_LEATHER, Vector3(0, 0, -32))
+	var emblem := LowPoly.new()
+	for i in 8:
+		var a0 := TAU * i / 8.0
+		var a1 := TAU * (i + 0.7) / 8.0
+		emblem.prism(Vector3(cos(a0) * 0.18, 0.04 + sin(a0) * 0.18, -0.6), Vector3(cos(a1) * 0.18, 0.04 + sin(a1) * 0.18, -0.6), 0.03, 0.03, 4, MIST_GLASS)
+	return {"head": head.commit(), "head:glow": glass.commit(), "chest": chest.commit(), "chest:glow": emblem.commit()}
+
+
+## Mist Ranger: a deep hood held by a circlet of mist-glass, a long quiver whose fletchings glow, and a
+## short cloak of the portal's teal.
+static func _mist_ranger() -> Dictionary:
+	const HOOD := Color(0.12, 0.26, 0.3)
+	var head := LowPoly.new()
+	head.prism(Vector3(0, 0.6, -0.08), Vector3(0, 1.12, -0.12), 0.74, 0.3, 8, HOOD)
+	head.prism(Vector3(0, 1.1, -0.14), Vector3(0, 1.32, -0.42), 0.3, 0.0, 6, HOOD.darkened(0.15))
+	var glass := LowPoly.new()
+	glass.prism(Vector3(0, 0.9, 0.0), Vector3(0, 0.95, 0.0), 0.66, 0.66, 12, MIST_GLASS)
+	glass.prism(Vector3(0, 0.92, 0.66), Vector3(0, 1.08, 0.7), 0.06, 0.0, 4, MIST_GLASS)
+	var chest := LowPoly.new()
+	chest.prism(Vector3(0.24, -0.42, -0.42), Vector3(0.3, 0.56, -0.5), 0.15, 0.18, 8, DARK_LEATHER)
+	chest.prism(Vector3(0, 0.36, -0.02), Vector3(0, -0.36, -0.2), 0.36, 0.66, 8, Color(0.1, 0.32, 0.34))
+	chest.box(Vector3(0, -0.02, 0.34), Vector3(0.12, 0.84, 0.04), LEATHER, Vector3(0, 0, 32))
+	var glints := LowPoly.new()
+	for i in 4:
+		var off := Vector3(0.05 * i, 0.0, 0.03 * (i % 2))
+		var top := Vector3(0.34, 1.02, -0.52) + off
+		chest.prism(Vector3(0.28, 0.5, -0.5) + off, top, 0.018, 0.018, 4, Color(0.8, 0.8, 0.82))
+		glints.box(top + Vector3(0, 0.05, 0), Vector3(0.1, 0.18, 0.02), MIST_GLASS)
+	return {"head": head.commit(), "head:glow": glass.commit(), "chest": chest.commit(), "chest:glow": glints.commit()}
+
+
+## Mist Heavy: a closed great helm crowned by two curved mist-glass horns, round pauldrons rimmed with
+## light, and a tabard bearing the Great Portal's ring.
+static func _mist_heavy() -> Dictionary:
+	var head := LowPoly.new()
+	head.prism(Vector3(0, 0.02, 0), Vector3(0, 1.0, 0), 0.7, 0.68, 8, MIST_STEEL.darkened(0.1))
+	head.prism(Vector3(0, 1.0, 0), Vector3(0, 1.16, 0), 0.68, 0.36, 8, MIST_STEEL)
+	head.box(Vector3(0, 0.56, 0.66), Vector3(0.86, 0.12, 0.08), BLACK)
+	head.box(Vector3(0, 0.4, 0.67), Vector3(0.12, 0.42, 0.06), MIST_STEEL.lightened(0.2))
+	var glass := LowPoly.new()
+	glass.box(Vector3(0, 0.57, 0.71), Vector3(0.66, 0.04, 0.02), MIST_GLASS)
+	for side: float in [-1.0, 1.0]:
+		var a := Vector3(side * 0.5, 0.92, 0)
+		var b := Vector3(side * 0.82, 1.3, -0.1)
+		var c := Vector3(side * 0.7, 1.72, -0.28)
+		glass.prism(a, b, 0.11, 0.08, 5, MIST_GLASS)
+		glass.prism(b, c, 0.08, 0.0, 5, MIST_GLASS)
+	var chest := LowPoly.new()
+	var rims := LowPoly.new()
+	for side: float in [-1.0, 1.0]:
+		chest.prism(Vector3(side * 0.34, 0.16, 0), Vector3(side * 0.86, 0.16, 0), 0.3, 0.4, 10, MIST_STEEL)
+		rims.prism(Vector3(side * 0.86, 0.16, 0), Vector3(side * 0.9, 0.16, 0), 0.41, 0.41, 10, MIST_GLASS)
+	chest.box(Vector3(0, -0.28, 0.36), Vector3(0.62, 0.84, 0.04), Color(0.1, 0.24, 0.28))
+	chest.prism(Vector3(0, 0.3, -0.2), Vector3(0, -0.6, -0.42), 0.5, 0.74, 8, Color(0.08, 0.2, 0.24))
+	for i in 8:
+		var a0 := TAU * i / 8.0
+		var a1 := TAU * (i + 0.7) / 8.0
+		rims.prism(Vector3(cos(a0) * 0.16, -0.2 + sin(a0) * 0.16, 0.39), Vector3(cos(a1) * 0.16, -0.2 + sin(a1) * 0.16, 0.39), 0.03, 0.03, 4, MIST_GLASS)
+	return {"head": head.commit(), "head:glow": glass.commit(), "chest": chest.commit(), "chest:glow": rims.commit()}
 
 
 ## Artificer: a leather cap with brass goggles, and a boiler on the back with a chimney and a gear.
