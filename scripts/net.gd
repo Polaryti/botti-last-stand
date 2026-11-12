@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 41
+const PROTOCOL := 42
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -44,7 +44,7 @@ const PVP_DAMAGE := 0.55 # players hit each other less hard than they hit the un
 const KILL_POINTS := 5
 const RULE_NAMES := ["Co-op Night", "All vs All", "Teams", "Defend the Fort"]
 const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "crow", "gargoyle", "leaper", "wraith", "banshee", "mimic", "creak",
-	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf", "chakram_hit", "cleave"]
+	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf", "chakram_hit", "cleave", "vanish", "steal", "nightfall", "dagger_fan"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep"]
 
@@ -1316,6 +1316,47 @@ func _bot_cast(peer: int, anim_name: String) -> void:
 
 func bot_players() -> Array:
 	return _bots.values()
+
+
+## The host's bots as players, for effects that look after everyone on this phone.
+func bot_pawns() -> Array[Player]:
+	var out: Array[Player] = []
+	for bot: BotPlayer in _bots.values():
+		if bot.pawn and is_instance_valid(bot.pawn):
+			out.append(bot.pawn)
+	return out
+
+
+## A Thief's Steal: the robbed player or bot lets go of the weapon in hand, on whichever phone it lives.
+## A Thief (by: a person, or one of the host's bots) knocks the weapon out of someone's hand.
+func disarm(peer: int, by: int, stun := false) -> void:
+	_disarm.rpc(peer, by, stun)
+	_disarm(peer, by, stun)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _disarm(peer: int, by: int, stun: bool) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	# A phone speaks for its own person; only the host speaks for its bots.
+	if sender != 0 and sender != by and not (sender == 1 and is_bot(by)):
+		return
+	if world == null or not is_instance_valid(world) or world.player == null or not bots_foes(by, peer):
+		return
+	if peer == my_id():
+		BanditKit.be_robbed(world.player, stun)
+	elif is_host() and _bots.has(peer) and (_bots[peer] as BotPlayer).pawn:
+		BanditKit.be_robbed((_bots[peer] as BotPlayer).pawn, stun)
+
+
+## A Mercenary's Nightfall, so every phone can look after its own people inside it.
+func nightfall(owner_peer: int, at: Vector3, radius: float, seconds: float, linger: float, bits: int) -> void:
+	_nightfall.rpc(owner_peer, at, radius, seconds, linger, bits)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _nightfall(owner_peer: int, at: Vector3, radius: float, seconds: float, linger: float, bits: int) -> void:
+	if world and is_instance_valid(world):
+		world.spawn_nightfall(owner_peer, at, radius, seconds, linger, bits)
 
 
 ## The host's player or one of its bots, by peer id. Null for anyone on another phone.

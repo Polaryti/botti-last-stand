@@ -136,10 +136,59 @@ def chakram_hit():
     return reverb(glass(1720, 0.6, 6.0) * 0.55 + knock, 0.5, 0.3)
 
 
+# --- Bandit -------------------------------------------------------------------
+
+def vanish():
+    """Into the Shadows: a breath drawn in, a soft falling hush and a muffled low swell."""
+    m = n(0.8)
+    breath = sweep_filter(noise(m), 2600, 500, 0.5) * env(m, 0.08, 1.6)
+    hush = lowp(noise(m), 900) * bell_env(m, 1.0) * 0.6
+    low = glide(220, 110, m) * env(m, 0.2, 1.4) * 0.35
+    return reverb(breath + hush + low, 0.9, 0.35)
+
+
+def steal():
+    """A Thief's Steal: a quick blink of air, a snatch, and a little jingle of coins."""
+    m = n(0.55)
+    blink = sweep_filter(noise(m), 1200, 3800, 0.4) * env(m, 0.005, 6) * 0.9
+    snatch = band(noise(m), 500, 2400) * np.exp(-t_(m) * 30) * 0.8
+    coins = np.zeros(m)
+    for start, f in ((0.12, 3100), (0.17, 3600), (0.23, 2900), (0.3, 4100)):
+        k = n(0.2)
+        p = n(start)
+        q = min(k, m - p)
+        coins[p:p + q] += metal(f, 30, 0.2)[:q] * 0.22
+    return blink + snatch + coins
+
+
+def nightfall():
+    """Nightfall: a deep, falling swell like dusk arriving all at once, with a faint chime of stars."""
+    m = n(1.6)
+    swell = lowp(noise(m), 320, 3) * 3.0 * bell_env(m, 0.7)
+    fall = glide(330, 98, m) * env(m, 0.3, 1.2) * 0.5 + glide(495, 147, m) * env(m, 0.3, 1.4) * 0.25
+    stars = sum(glass(f, 1.6, 3.0) * a for f, a in ((2093, 0.06), (2637, 0.05), (3136, 0.04)))
+    return reverb(swell + fall + stars, 1.4, 0.4)
+
+
+def dagger_fan():
+    """A Highwayman's Dagger Fan: several thin blades leaving the hand a hair apart."""
+    m = n(0.5)
+    out = np.zeros(m)
+    for i in range(5):
+        k = n(0.22)
+        p = n(0.025 * i)
+        out[p:p + k] += highp(sweep_filter(noise(k), 1600 + i * 180, 4200, 0.3), 1200) * bell_env(k, 2.0) * (0.9 - i * 0.08)
+    return out
+
+
 if __name__ == "__main__":
     os.makedirs(SND, exist_ok=True)
     save("heavy_swing", heavy_swing(), 0.6)
     save("cleave", cleave(), 0.85)
     save("chakram_throw", chakram_throw(), 0.55)
     save("chakram_hit", chakram_hit(), 0.55)
+    save("vanish", vanish(), 0.6)
+    save("steal", steal(), 0.65)
+    save("nightfall", nightfall(), 0.75)
+    save("dagger_fan", dagger_fan(), 0.6)
     print("Beyond the Mists sounds written to", SND)

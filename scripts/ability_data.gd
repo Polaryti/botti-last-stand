@@ -38,6 +38,7 @@ static func tree(class_id: String) -> Dictionary:
 			"adept": _cache[class_id] = _adept()
 			"plague_doctor": _cache[class_id] = _plague_doctor()
 			"commander": _cache[class_id] = _commander()
+			"bandit": _cache[class_id] = _bandit()
 	return _cache[class_id]
 
 
@@ -539,4 +540,52 @@ static func _commander() -> Dictionary:
 			[a("rally_recovery", "Rally Recovery", "Command and Last Command also heal living allies within rally range by 20", "heart+clock", {}, [], "rally_recovery"),
 			a("infantry_drill", "Infantry Drill", "Summons deal 30% more damage", "ghost+sword", {"ally_damage": 0.3})]],
 			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry and a Ranger for 20 s. 60 s cooldown", "", {}, [], "last_command"))
+	]}
+
+
+## The Bandit vanishes before it does anything else. Into the Shadows is its ability from the start;
+## each path replaces it with something of its own (BanditKit), and the tree sharpens that.
+static func _bandit() -> Dictionary:
+	var plum := Color(0.48, 0.23, 0.36)
+	return {"core": [
+		[a("sly_hands", "Sly Hands", "Attack 15% faster", "hand+clock", {"melee_rate": 0.15, "ranged_rate": 0.15}),
+		a("light_purse", "Light Purse", "+10% move speed", "boot+up", {"speed": 0.1})],
+		[a("long_shadows", "Long Shadows", "Your invisibility lasts 2 s longer", "moon+clock", {"shadow_time": 2.0}),
+		a("ambusher", "Ambusher", "+60% damage on unaware enemies or from behind", "dagger+up", {"backstab": 0.6})],
+		[a("cutpurse", "Cutpurse", "Each kill heals 3", "heart+dagger", {}, [t("kill", "heal", {"n": 3.0})]),
+		a("slippery", "Slippery", "15% chance to avoid any hit", "boot+eye_closed", {"dodge": 0.15})],
+	], "specs": [
+		_spec("thief", "Thief", "Takes what others are holding, and is gone before they notice.", plum,
+			a("thief_entry", "Thief", "Steal replaces Into the Shadows: appear in front of the nearest foe within 14 m, turn invisible, strike, and knock their weapon to the ground", "hand+dagger", {}, [], "art_steal"),
+			[[a("long_reach", "Long Reach", "Steal reaches 6 m further", "hand+up", {"steal_range": 6.0}),
+			a("nimble", "Nimble", "Steal comes back 25% sooner", "hand+clock", {"art_cd": -0.25})],
+			[a("heavy_hand", "Heavy Hand", "Steal strikes 60% harder", "hand+up", {"steal_damage": 0.6}),
+			a("pocket_sand", "Pocket Sand", "Steal stuns its target for 1.5 s", "star+hand", {}, [], "steal_stun")],
+			[a("slip_away", "Slip Away", "After a Steal, +35% speed for 3 s", "boot+hand", {}, [], "steal_dash"),
+			a("light_step", "Light Step", "Invisibility after a Steal lasts 2 s longer", "moon+hand", {"steal_hide": 2.0})],
+			[a("unseen_blade", "Unseen Blade", "+40% damage on unaware enemies or from behind", "dagger+eye_closed", {"backstab": 0.4}),
+			a("fence", "Fence", "A weapon stolen from a creature goes straight to your hand, even when both are full: the one you hold drops", "hand+plus", {}, [], "steal_keep")]],
+			a("grand_larceny", "Grand Larceny", "Steal also strikes and disarms every foe within 4 m of its target", "hand+crown", {}, [], "steal_all")),
+		_spec("mercenary", "Mercenary", "Sells the night: friends inside it disappear, foes inside it go half blind.", plum,
+			a("mercenary_entry", "Mercenary", "Nightfall replaces Into the Shadows: a dome of night for 8 s. You and friends inside are invisible, and stay so 1.5 s after leaving; enemies inside barely see", "moon+shield", {}, [], "art_nightfall"),
+			[[a("wide_night", "Wide Night", "The dome is 2 m wider", "moon+up", {"night_radius": 2.0}),
+			a("long_night", "Long Night", "The dome lasts 3 s longer", "moon+clock", {"night_time": 3.0})],
+			[a("paid_in_full", "Paid in Full", "+25% damage while inside your dome", "sword+moon", {}, [], "night_damage"),
+			a("hired_blades", "Hired Blades", "Friends inside your dome take 20% less damage", "shield+moon", {}, [], "night_guard")],
+			[a("pitch_black", "Pitch Black", "Enemies inside your dome are slowed", "wind+moon", {}, [], "night_slow"),
+			a("on_contract", "On Contract", "Nightfall comes back 25% sooner", "moon+clock", {"art_cd": -0.25})],
+			[a("night_watch", "Night Watch", "You and friends inside heal 2 health a second", "heart+moon", {}, [], "night_heal"),
+			a("cover_of_dark", "Cover of Dark", "Invisibility lingers 2 s longer after leaving the dome", "eye_closed+moon", {"night_linger": 2.0})]],
+			a("endless_night", "Endless Night", "Your dome follows you, and lasts 4 s longer", "moon+crown", {"night_time": 4.0}, [], "night_follow")),
+		_spec("highwayman", "Highwayman", "Stops the road with a fan of knives, and keeps what falls.", plum,
+			a("highwayman_entry", "Highwayman", "Dagger Fan replaces Into the Shadows: throw five knives in a fan. Plunder: 12% of your kills leave food, arrows or a potion", "dagger+burst", {"plunder": 0.12}, [], "art_fan"),
+			[[a("more_blades", "More Blades", "Two more knives in each fan", "dagger+plus", {"fan_knives": 2.0}),
+			a("honed", "Honed", "Knives hit 30% harder", "dagger+up", {"fan_damage": 0.3})],
+			[a("serrated", "Serrated", "Knives make enemies bleed", "drop+dagger", {}, [], "fan_bleed"),
+			a("quick_draw", "Quick Draw", "Dagger Fan comes back 25% sooner", "dagger+clock", {"art_cd": -0.25})],
+			[a("rich_pickings", "Rich Pickings", "Plunder from 10% more of your kills", "crown+plus", {"plunder": 0.1}),
+			a("stand_deliver", "Stand and Deliver", "Knives slow what they hit for 2 s", "wind+dagger", {}, [], "fan_slow")],
+			[a("ricochet_knives", "Ricochet", "Each knife bounces on to one more enemy", "swap+dagger", {"fan_bounces": 1.0}),
+			a("point_blank", "Point Blank", "Knives hit 50% harder within 6 m", "target+dagger", {}, [], "fan_close")]],
+			a("dead_or_alive", "Dead or Alive", "Every Dagger Fan throws a second fan a moment later", "dagger+crown", {}, [], "fan_twice")),
 	]}

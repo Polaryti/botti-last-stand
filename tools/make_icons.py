@@ -347,7 +347,13 @@ def crest_adept():
 def crest_commander():
     return lozenge("commander", at(50, 55, 0.68, banner()) + at(50, 23, 0.35, crown()))
 
-CRESTS = [crest_commander, crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
+def crest_bandit():
+    # A plum hood-shaped shield with a masked eye-slit and a dagger point-down through it.
+    return (path(("#a8577f", "#3d1430"), "M50 2 C74 10 92 28 92 52 C92 76 72 92 50 98 C28 92 8 76 8 52 C8 28 26 10 50 2Z", 4)
+        + path(("#2a1020", "#0c0509"), "M18 44 C30 34 70 34 82 44 L78 56 C64 50 36 50 22 56Z", 2)
+        + ell("#f2e2ff", 36, 48, 6, 3, 0, 0) + ell("#f2e2ff", 64, 48, 6, 3, 0, 0)
+        + at(50, 62, 0.5, turn(180, dagger())))
+CRESTS = [crest_bandit, crest_commander, crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
 
 # Beyond the Mists: two-handed and Mesenlla weapons
 def greatsword():
@@ -366,7 +372,7 @@ for g in (greatsword, battleaxe, chakram):
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
-    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368")}
+    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -407,6 +413,9 @@ SPECS = {
     "iron_mountain": ("monk", lambda: at(50, 50, 0.84, mountain())),
     "blade_dancer": ("adept", lambda: at(50, 50, 0.72, spiral()) + at(50, 50, 0.6, turn(35, sword()))),
     "mirror_step": ("adept", lambda: at(32, 50, 0.46, boot()) + at(68, 50, 0.46, f'<g transform="translate(100 0) scale(-1 1)">{boot()}</g>') + at(50, 22, 0.28, swap())),
+    "thief": ("bandit", lambda: at(44, 58, 0.66, hand()) + at(68, 30, 0.42, circ(GOLD, 50, 50, 34) + circ("none", 50, 50, 22, 2)) + at(30, 26, 0.3, dagger())),
+    "mercenary": ("bandit", lambda: path(NIGHT, "M10 76 C14 30 86 30 90 76Z") + at(50, 50, 0.38, moon()) + at(30, 40, 0.14, star()) + at(70, 36, 0.12, star())),
+    "highwayman": ("bandit", lambda: "".join(at(50 + dx, 56, 0.5, turn(a, dagger())) for dx, a in ((-20, -36), (-10, -18), (0, 0), (10, 18), (20, 36)))),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),
 }
 

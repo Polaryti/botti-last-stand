@@ -1236,6 +1236,8 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
 		shot.spins = str(d.get("shot", "")) == "chakram"
+		if shot.spins:
+			shot.hit_sound = "chakram_hit"
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
@@ -1254,6 +1256,34 @@ func familiar_arrow(p: Player, target: Node3D) -> void:
 	var dir := (aim - from).normalized()
 	spawn_player_arrow(p, from, dir * 40.0, 0.0, PowerDefs.ARCHER_RANGE + 5.0, 1.0, WeaponDefs.DAMAGE * p.damage_multiplier(), false)
 	sfx_at("bow", from, -9.0)
+
+
+## A Highwayman's thrown knife.
+func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float, bounce: int, bleed: bool, slows: bool, close: bool) -> void:
+	var shot := _launch(Projectile.Kind.ARROW, WeaponDefs.mesh("dagger"), at, vel, 0.0, max_range, dmg, 1.0, false, bounce)
+	if shot == null:
+		return
+	shot.set_owner_player(p)
+	shot.from_player = true
+	shot.spins = true
+	shot.spin_axis = Vector3.RIGHT
+	if bleed:
+		shot.bleed = Vector2(8.0, 4.0)
+	if slows:
+		shot.slow_secs = 2.0
+	if close:
+		shot.close_from = at
+	if Net.active():
+		Net.shot(4, at, vel, 0.0, max_range, false, Color.WHITE)
+
+
+## A Mercenary's Nightfall, on this phone.
+func spawn_nightfall(owner_peer: int, at: Vector3, radius: float, seconds: float, linger: float, bits: int) -> NightfallDome:
+	at.y = ground_at(at)
+	var dome := NightfallDome.new(self, owner_peer, at, radius, seconds, linger, bits)
+	add_child(dome)
+	sfx_at("nightfall", at, -2.0)
+	return dome
 
 
 func spawn_axe(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: float, dmg: float) -> void:
@@ -1698,10 +1728,14 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = _orb_mesh(col)
 	elif mesh == 3:
 		m = WeaponDefs.chakram_mesh()
+	elif mesh == 4:
+		m = WeaponDefs.mesh("dagger")
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
-		shot.spins = mesh == 3
+		shot.spins = mesh == 3 or mesh == 4
+		if mesh == 4:
+			shot.spin_axis = Vector3.RIGHT
 		if mesh == 0 and col.g > col.r + 0.3:
 			shot.poison_trail = true
 

@@ -27,6 +27,12 @@ const TIMED := [
 		"desc": "You have just been invisible. Nothing can hide you again until this runs out."
 	},
 	{
+		"field": "night_blind_left",
+		"name": "Benighted",
+		"icon": "eye+moon",
+		"desc": "Standing inside an enemy Bandit's Nightfall: your view darkens and the people it hides cannot be seen."
+	},
+	{
 		"field": "void_left",
 		"name": "Void Walker",
 		"icon": "eye_closed+star",

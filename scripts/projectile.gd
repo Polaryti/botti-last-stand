@@ -28,6 +28,11 @@ var chaos_left := 0 # bomblets: how many more times it bounces off and goes on
 var sparks := 0 # darts: how many others the spark jumps to
 var poison_trail := false
 var spins := false # a thrown ring turns flat as it flies
+var spin_axis := Vector3.UP # ...and a thrown knife tumbles end over end
+var hit_sound := ""
+var bleed := Vector2.ZERO # damage per second and seconds of bleeding, for a Highwayman's knives
+var slow_secs := 0.0
+var close_from := Vector3.INF # Point Blank: half as strong again within 6 m of here
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
@@ -81,6 +86,11 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	rotation = Vector3.ZERO
 	_spin = 0.0
 	spins = false
+	spin_axis = Vector3.UP
+	hit_sound = ""
+	bleed = Vector2.ZERO
+	slow_secs = 0.0
+	close_from = Vector3.INF
 	_owner_assigned = false
 	poison = Vector2.ZERO
 	poison_trail = false
@@ -214,7 +224,7 @@ func _fly(delta: float) -> void:
 			rotate_object_local(Vector3.RIGHT, _spin)
 		elif spins:
 			_spin += delta * 22.0
-			rotate_object_local(Vector3.UP, _spin)
+			rotate_object_local(spin_axis, _spin)
 		return
 	var c: Object = hit["collider"]
 	var at: Vector3 = hit["position"]
@@ -338,6 +348,8 @@ func _burst_here(at: Vector3) -> void:
 func _hit_zombie(z: Zombie, at: Vector3) -> void:
 	var head := z.headshot_at(at.y)
 	var amount := damage * (2.0 if head and sharp else 1.0)
+	if close_from != Vector3.INF and close_from.distance_to(at) <= 6.0:
+		amount *= 1.5
 	var shooter := _owner()
 	if from_player and shooter:
 		amount = shooter.modify_damage(z, amount)
@@ -359,7 +371,11 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 			Game.note_poison(poison.x * poison.y)
 	if stagger > 0.0:
 		z.stun(stagger)
-	world.sfx_at("chakram_hit" if spins else "thunk", at, -3.0)
+	if bleed.y > 0.0:
+		z.add_dot(bleed.x, bleed.y, true)
+	if slow_secs > 0.0:
+		z.slow(slow_secs)
+	world.sfx_at(hit_sound if hit_sound != "" else "thunk", at, -3.0)
 	_exclude.append(z.get_rid())
 	if blast_radius > 0.0:
 		_explode(at)

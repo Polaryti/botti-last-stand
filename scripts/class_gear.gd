@@ -17,7 +17,8 @@ const BLACK := Color(0.06, 0.06, 0.08)
 const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
-const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22)}
+const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
+	"bandit": Vector3(0.36, 0.16, 0.28)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5)}
 
@@ -93,6 +94,7 @@ static func _pieces(id: String) -> Dictionary:
 			"adept": built = _adept()
 			"plague_doctor": built = _plague_doctor()
 			"artificer": built = _artificer()
+			"bandit": built = _bandit()
 		_made[id] = built
 	return _made[id]
 
@@ -273,6 +275,38 @@ static func _plague_doctor() -> Dictionary:
 	hips.prism(Vector3(0, 0.26, 0), Vector3(0, -0.36, -0.03), 0.5, 0.66, 8, Color(0.1, 0.1, 0.12))
 	hips.prism(Vector3(0.46, 0.14, 0.2), Vector3(0.46, -0.18, 0.2), 0.04, 0.12, 6, BRASS)
 	hips.prism(Vector3(0.46, -0.18, 0.2), Vector3(0.46, -0.28, 0.2), 0.12, 0.06, 6, Color(0.5, 0.95, 0.25))
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+
+
+## Bandit: a deep plum hood with a black cloth mask over the nose, a short ragged cape, a belt of
+## knives across the chest and a coin purse at the hip.
+static func _bandit() -> Dictionary:
+	const PLUM := Color(0.3, 0.12, 0.22)
+	const DEEP := Color(0.17, 0.07, 0.13)
+	var head := LowPoly.new()
+	# The hood: round over the crown and falling to a point behind; its front edge frames the face.
+	head.prism(Vector3(0, 0.34, -0.08), Vector3(0, 1.02, -0.16), 0.7, 0.46, 8, PLUM)
+	head.prism(Vector3(0, 1.02, -0.16), Vector3(0, 1.0, -0.62), 0.4, 0.04, 6, PLUM)
+	head.box(Vector3(0, 0.86, 0.46), Vector3(0.86, 0.16, 0.12), DEEP, Vector3(12, 0, 0))
+	# Black cloth over the nose and mouth, knotted behind; the eyes stay clear.
+	head.box(Vector3(0, 0.1, 0.6), Vector3(0.9, 0.2, 0.12), BLACK)
+	head.prism(Vector3(0, 0.02, 0.64), Vector3(0, -0.2, 0.7), 0.24, 0.04, 5, BLACK)
+	var chest := LowPoly.new()
+	chest.prism(Vector3(0, 0.36, -0.04), Vector3(0, -0.06, -0.12), 0.4, 0.62, 8, DEEP)
+	# A short cape to the small of the back, torn into points at the hem.
+	chest.box(Vector3(0, -0.2, -0.36), Vector3(0.92, 0.66, 0.05), PLUM, Vector3(-4, 0, 0))
+	for i in 4:
+		var x := -0.33 + i * 0.22
+		chest.prism(Vector3(x, -0.5, -0.38), Vector3(x + 0.02, -0.72, -0.4), 0.1, 0.0, 4, PLUM)
+	chest.box(Vector3(0, -0.02, 0.36), Vector3(0.14, 0.92, 0.04), DARK_LEATHER, Vector3(0, 0, -34))
+	for i in 3:
+		var along := Vector3(-0.15 + i * 0.15, 0.22 - i * 0.22, 0.4)
+		chest.prism(along, along + Vector3(0.04, 0.2, 0.0), 0.025, 0.0, 4, STEEL)
+		chest.box(along - Vector3(0.0, 0.05, 0.0), Vector3(0.05, 0.08, 0.04), BLACK)
+	var hips := LowPoly.new()
+	hips.prism(Vector3(-0.44, 0.16, 0.2), Vector3(-0.44, -0.16, 0.2), 0.08, 0.15, 7, LEATHER)
+	hips.prism(Vector3(-0.44, 0.16, 0.2), Vector3(-0.44, 0.22, 0.2), 0.06, 0.03, 7, GOLD)
+	hips.box(Vector3(0.46, 0.0, 0.14), Vector3(0.05, 0.36, 0.08), DARK_LEATHER)
 	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
 
 

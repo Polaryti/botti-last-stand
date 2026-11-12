@@ -51,6 +51,11 @@ func _ready() -> void:
 	m.show_store("revenant")
 	await wait(0.2)
 	await snap("store_can_buy")
+	Game.doubloons = 900
+	m.show_store("bandit")
+	await wait(0.2)
+	await snap("store_bandit")
+	Game.unlocked["bandit"] = true
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await wait(0.2)
 	await snap("classes_sandbox")

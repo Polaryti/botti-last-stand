@@ -27,6 +27,8 @@ const ALL := {
 		"desc": "The beaked mask has seen it all. Starts with a Blowgun and 32 darts. Takes 10% less damage. Cures friends, spreads sickness, or commands the rats."},
 	"artificer": {"two_handed": true, "name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 598,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
+	"bandit": {"name": "Bandit", "weapon": "dagger", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "hidden": true, "price": 860,
+		"desc": "Lives off the road and the dark. Starts with a Dagger, and Into the Shadows turns it invisible. Uses melee and ranged weapons."},
 	"commander": {"two_handed": true, "name": "Commander", "weapon": "sword", "arrows": 0, "hp": 110.0, "speed": 1.05, "ranged": true, "hidden": true, "unavailable": true, "unique": true, "no_bots": true,
 		"desc": "First prize in VRAIN tournaments. Only one Commander per match; never a bot. Command rallies allies, then becomes Last Command at level 10."},
 }
@@ -37,7 +39,8 @@ static func icon(id: String) -> String:
 
 static func color(id: String) -> Color:
 	return {"commander": Color(0.78, 0.59, 0.2), "infantry": Color(0.62, 0.2, 0.14), "ranger": Color(0.22, 0.46, 0.26), "heavy": Color(0.36, 0.4, 0.48),
-		"adept": Color(0.3, 0.36, 0.72), "chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22), "monk": Color(0.76, 0.46, 0.14), "plague_doctor": Color(0.26, 0.32, 0.24)}[id]
+		"adept": Color(0.3, 0.36, 0.72), "chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22), "monk": Color(0.76, 0.46, 0.14), "plague_doctor": Color(0.26, 0.32, 0.24),
+		"bandit": Color(0.48, 0.23, 0.36)}[id]
 
 
 ## Some classes share a body with another, but not its clothes or its gear.

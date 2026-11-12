@@ -42,6 +42,10 @@ const COPY := {
 		"Carry the cure into the sickness.",
 		"Fight with an exclusive blowgun and master poison, medicine or vermin."
 	],
+	"bandit": [
+		"What the dark hides, the Bandit keeps.",
+		"Turn invisible on demand and specialize in stealing, mercenary night or knife-throwing plunder."
+	],
 	"commander": [
 		"A single voice can turn the battle.",
 		"Use Command and unlock a profession-specific Last Command at level ten."

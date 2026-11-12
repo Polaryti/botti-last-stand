@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _adept()
 	print("REWORK commander")
 	await _commander()
+	await _bandit()
 	print("REWORK statuses")
 	_statuses()
 	_projectile_lifecycle()
@@ -789,3 +790,112 @@ func _guardian_protection() -> void:
 	Net._dome_fx(p.position + Vector3.UP * 0.5, 6.0, 3.0)
 	check(ally.guarded == 3.0, "a remotely cast Guardian dome protects locally owned summons")
 	w.remove_ally(ally)
+
+
+## 0.22 step 2: the Bandit.
+func _bandit() -> void:
+	var d: Dictionary = ClassDefs.ALL["bandit"]
+	check(d["weapon"] == "dagger" and ClassDefs.price("bandit") == 860 and ClassDefs.for_sale().has("bandit"), "the Bandit starts with a Dagger and is sold in the Store")
+	check(ClassDefs.weapon_categories("bandit") == Array(["melee", "ranged"], TYPE_STRING, "", null), "Bandit wields Melee and Ranged weapons")
+	check(Game.CODES.values().has("bandit"), "a Bandit code exists, kept only as a hash")
+	var specs: Array = AbilityData.tree("bandit")["specs"].map(func(s: Dictionary) -> String: return s["id"])
+	check(specs == ["thief", "mercenary", "highwayman"], "Thief, Mercenary and Highwayman")
+	for id: String in ["crest_bandit", "spec_thief", "spec_mercenary", "spec_highwayman"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for s: String in ["vanish", "steal", "nightfall", "dagger_fan"]:
+		check(Sfx.NAMES.has(s) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % s), "%s sound" % s)
+	# Into the Shadows, before a profession.
+	pawn("bandit")
+	check(p.art_def()["name"] == "Into the Shadows", "the Bandit's own ability is Into the Shadows")
+	p.use_art()
+	check(p._cast_kind == "bandit", "it casts as the Bandit")
+	await frames(10)
+	check(p.invis_left > 3.0, "and turns the Bandit invisible (%.1f)" % p.invis_left)
+	p.invis_left = 0.0
+	p.art_cd_left = 0.0
+	BanditKit.into_shadows(p)
+	check(p.invis_left == 0.0, "but not again within 3 s of coming out")
+	p.invis_lockout = 0.0
+	# Steal: in front of the nearest foe, invisible, a blow, and the weapon on the ground.
+	pawn("bandit", 0)
+	check(p.art_def()["name"] == "Steal", "Thief replaces it with Steal")
+	w.spawn_zombie("clever", p.global_position + Vector3(0, 0, -10))
+	var victim: Zombie = w.zombies.back()
+	victim.set_physics_process(false)
+	victim.hp = 1000.0
+	victim.max_hp = 1000.0
+	victim.weapon_id = "sword"
+	victim.rotation.y = 0.0
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	BanditKit.cast(p)
+	check(p.global_position.distance_to(victim.position) < 2.2, "the Thief appears beside its target (%.1f m)" % p.global_position.distance_to(victim.position))
+	var look := -p.global_basis.z
+	check(look.dot((victim.position - p.global_position).normalized()) > 0.8, "facing it")
+	check(p.invis_left > 2.0 and victim.hp < 1000.0, "invisible, and the blow lands")
+	check(victim.weapon_id == "" and w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "sword"), "the stolen Sword lies on the ground")
+	victim.weapon_id = "lance"
+	BanditKit.cast(p)
+	check(victim.weapon_id == "lance", "a class weapon cannot be stolen")
+	victim.weapon_id = "spear"
+	p.flags["steal_keep"] = true
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.slots = ["dagger", null]
+	BanditKit.cast(p)
+	check(p.slots.has("spear") and victim.weapon_id == "", "Fence puts the stolen weapon in the Thief's empty hand")
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	victim.weapon_id = "mace"
+	p.slots = ["dagger", "spear"]
+	p.current = 1
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	BanditKit.cast(p)
+	check(p.weapon_id() == "mace" and p.slots.has("dagger") and not p.slots.has("spear"), "with both hands full, Fence swaps the stolen Mace for the Spear held")
+	check(w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "spear"), "and the Spear drops")
+	victim.release()
+	# Steal goes for nothing when nothing is near.
+	p.art_cd_left = 0.0
+	BanditKit.cast(p)
+	check(p.art_cd_left <= 0.5, "nothing to steal from costs no cooldown")
+	# A robbed player keeps a class weapon or a last weapon, and drops anything else.
+	pawn("ranger")
+	p.slots = ["bow", "sword"]
+	p.current = 1
+	p._equip()
+	BanditKit.be_robbed(p, false)
+	check(p.slots[1] == null and p.weapon_id() == "bow", "a robbed player drops the weapon in hand")
+	BanditKit.be_robbed(p, false)
+	check(p.weapon_id() == "bow", "but never the last one")
+	# Nightfall: friends inside vanish and stay hidden a moment, creatures inside barely see.
+	pawn("bandit", 1)
+	check(p.art_def()["name"] == "Nightfall", "Mercenary replaces it with Nightfall")
+	var near := target(p.global_position + Vector3(4, 0, 0))
+	BanditKit.cast(p)
+	var dome: NightfallDome = w.find_children("Nightfall", "NightfallDome", false, false).back() if not w.find_children("Nightfall", "NightfallDome", false, false).is_empty() else null
+	check(dome != null and is_equal_approx(dome.radius, BanditKit.NIGHT_RADIUS), "a dome of night rises")
+	await frames(4)
+	check(p.invis_left > 1.0, "the Mercenary inside it is invisible")
+	check(near.blind_left > 0.0 and not near._can_see(p, p.global_position - near.position, 4.0), "a creature inside it cannot see four metres")
+	p.global_position += Vector3(BanditKit.NIGHT_RADIUS + 3.0, 0, 0)
+	await frames(2)
+	check(p.invis_left > 1.0, "and the darkness lingers just after leaving")
+	dome.queue_free()
+	near.release()
+	# The Highwayman's Dagger Fan, and Plunder.
+	pawn("bandit", 2)
+	check(p.art_def()["name"] == "Dagger Fan", "Highwayman replaces it with Dagger Fan")
+	var before := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size()
+	BanditKit.dagger_fan(p)
+	var thrown := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() - before
+	check(thrown == BanditKit.FAN_KNIVES, "five knives in a fan (%d)" % thrown)
+	p.mods["fan_knives"] = 2.0
+	for q: Projectile in w._projectiles: q.stop()
+	BanditKit.dagger_fan(p)
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() == 7, "More Blades adds two")
+	for q: Projectile in w._projectiles: q.stop()
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	p.mods["plunder"] = 1.0
+	var mark := target(p.global_position + Vector3(0, 0, -3))
+	p.on_kill(mark)
+	check(not w.pickups.is_empty() and w.pickups.back().kind in [Pickup.Kind.FOOD, Pickup.Kind.ARROWS, Pickup.Kind.POWER], "Plunder leaves something behind")
+	mark.release()

@@ -1,5 +1,25 @@
 # Changelog
 
+## Development — Beyond the Mists, part 2: Bandit
+
+### A new class: the Bandit
+- In the Store for 860 Doubloons, or with a class code. 95 health, 110% speed. Starts with a Dagger and uses melee and ranged weapons, but not Two-Handed ones.
+- Into the Shadows: invisible for 4 seconds, every 12 seconds. Core skills add longer shadows, faster attacks, speed, backstabs, healing on kills and dodging.
+- Its own hooded look with a face mask, a torn cape, a knife belt and a purse, with its own crest, skill icons and sounds.
+
+### Professions
+- Thief: Steal replaces Into the Shadows, every 10 seconds. The Thief appears in front of the nearest foe within 14 m (players first, then bots, then creatures), turns invisible, strikes, and knocks the weapon in their hand to the ground. Class weapons and a last weapon are never taken; a Monk can lose its weapon and fights on with its fists. Skills add reach, a stun, a speed burst, a creature's weapon straight into your hand, and at the top Grand Larceny, which robs everything within 4 m of the target.
+- Mercenary: Nightfall replaces Into the Shadows. A dome of night, 6 m in radius, for 8 seconds, every 22 seconds: the Mercenary and friends inside are invisible and stay so 1.5 seconds after leaving, while enemies inside barely see (creatures lose sight beyond 3 m; players' views darken). Skills add size, time, damage, protection, slowing and healing, and at the top Endless Night, a dome that follows you.
+- Highwayman: Dagger Fan replaces Into the Shadows. Five knives in a 40° fan every 8 seconds, and Plunder: 12% of kills leave food, arrows or a potion. Skills add knives, damage, bleeding, slowing, ricochets and close-range power, and at the top Dead or Alive, a second fan right after the first.
+
+### Codex
+- The Bandit, its professions and skills are in the Codex, Armory and class screen with the same stats, description and weapon tags.
+- New status: Benighted, shown while you stand inside an enemy's Nightfall.
+
+### Playing together
+- Steal, Nightfall and Dagger Fan work online and with bots, and the Bandit counts on the Leaderboard. A weapon knocked from a player falls at the Thief's feet, so a free hand picks it up.
+- Phones on this build only play with phones on the same build.
+
 ## Development — Beyond the Mists, part 1: Weapons
 
 ### Two-Handed weapons

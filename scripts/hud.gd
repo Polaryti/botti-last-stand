@@ -271,6 +271,14 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, s), Color(0.3, 0.9, 0.4, player.heal_flash * 0.1))
 	if player.level_flash > 0.0:
 		_draw_level_flash(s)
+	# Inside an enemy's Nightfall: the edges of sight close in.
+	if player.night_blind_left > 0.0:
+		var dark := Color(0.02, 0.01, 0.05, 0.62)
+		draw_rect(Rect2(Vector2.ZERO, s), Color(dark, 0.35))
+		var r := minf(s.x, s.y) * 0.32
+		for i in 6:
+			var band := r + i * minf(s.x, s.y) * 0.08
+			draw_arc(centre, band + 60.0, 0.0, TAU, 64, Color(dark, 0.16 + i * 0.06), 120.0)
 	var cross := 40.0
 	draw_texture_rect(_crosshair, Rect2(centre - Vector2.ONE * cross * 0.5, Vector2.ONE * cross), false, Color(1, 1, 1, 0.85))
 	if player.hit_marker > 0.0:

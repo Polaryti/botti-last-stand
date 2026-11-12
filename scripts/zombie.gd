@@ -44,6 +44,7 @@ var state: int = State.ROAM
 var _pull_at := Vector3.ZERO
 var _pull_left := 0.0
 var weapon_id := ""
+var blind_left := 0.0 # inside an enemy Nightfall: sees only BLIND_SIGHT metres
 var burn_time := 0.0
 var xp_value := 10
 var reveal_left := 0.0
@@ -389,6 +390,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_perch_lost = 0.0
 	hero_minute = minute
 	weapon_id = ""
+	blind_left = 0.0
 	hp = float(def["hp"])
 	xp_value = int(def["xp"])
 	_speed = def["speed"]
@@ -992,6 +994,26 @@ func _die() -> void:
 	world.on_zombie_killed(self)
 
 
+func blind(seconds: float) -> void:
+	blind_left = maxf(blind_left, seconds)
+
+
+## Robbed by a Thief: the weapon falls (or, with drop false, is taken). Returns what it held, or "".
+## Class weapons and weapons that never lie about stay put.
+func disarm(drop := true) -> String:
+	if weapon_id == "" or not WeaponDefs.lies_around(weapon_id):
+		return ""
+	var held := weapon_id
+	if drop:
+		world.drop_weapon(position + Vector3(0, 0, 0.6), held)
+	weapon_id = ""
+	if _hand_mesh:
+		_hand_mesh.equip("")
+	if Net.is_host():
+		Net.zombie_weapon(self)
+	return held
+
+
 ## The host says this body is dead.
 func net_die() -> void:
 	_show_death()
@@ -1170,6 +1192,8 @@ func _start_chase(at: Vector3) -> void:
 
 func _can_see(target: Target, to: Vector3, dist: float) -> bool:
 	var sight := _sight
+	if blind_left > 0.0:
+		sight = minf(sight, NightfallDome.BLIND_SIGHT)
 	if world.grid.in_crops(target.global_position):
 		sight *= 0.5
 	if target.is_unseen():
@@ -1527,6 +1551,7 @@ func _physics_process(delta: float) -> void:
 	_attack_cd -= delta
 	_hurt_stun -= delta
 	_slow -= delta
+	blind_left = maxf(0.0, blind_left - delta)
 	_tick_flash(delta)
 	if _airborne:
 		# A leap always finishes, even if something stuns it in mid-air.

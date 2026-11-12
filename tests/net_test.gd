@@ -83,7 +83,7 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer", "commander"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit"]:
 		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
@@ -110,7 +110,7 @@ func _as_host() -> void:
 	if rules == "mists":
 		Net.set_night_map("mists")
 		ok(true, "the host picks the Mists")
-	Net.set_rules({"commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -126,7 +126,7 @@ func _as_host() -> void:
 		Net.set_bots(2)
 	if rules == "room":
 		Net.set_bots(1)
-	if rules == "teams":
+	if rules == "teams" or rules == "bandit":
 		# Put the two on opposite teams.
 		Net.roster[1]["team"] = 0
 		for p: int in Net.roster:
@@ -151,7 +151,7 @@ func _as_host() -> void:
 	await wait(0.1)
 	Net.set_rules(chosen)
 	await wait(0.2)
-	if rules == "teams":
+	if rules == "teams" or rules == "bandit":
 		Net.roster[1]["team"] = 0
 		for p: int in Net.roster:
 			if p != 1:
@@ -188,12 +188,14 @@ func _as_client() -> void:
 	_press("Infantry")
 	if rules == "commander":
 		Net.set_my_class("commander")
+	if rules == "bandit":
+		Net.set_my_class("bandit")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == ("commander" if rules == "commander" else "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -250,6 +252,8 @@ func _play() -> void:
 		await _mists()
 	elif rules == "commander":
 		await _commander()
+	elif rules == "bandit":
+		await _bandit()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -1270,6 +1274,101 @@ func _commander() -> void:
 	await until(func() -> bool: return w.allies.any(func(a: Ally) -> bool: return a.kind == "artificer" and not a.dead), 4.0)
 	ok(w.allies.any(func(a: Ally) -> bool: return a.kind == "artificer" and not a.dead), "Gunner's summoned Artificer reaches both phones")
 	await sync(108)
+
+
+## A Bandit on the other phone, on the other team: Steal robs this player, a last weapon stays,
+## Nightfall hides the Mercenary and darkens this player's view, and a Dagger Fan reaches them.
+func _bandit() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		for it: Pickup in w.pickups.duplicate():
+			w.remove_pickup(it)
+	var spot := Vector3(-1.5 if host else 1.5, 0, 36)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.input_fire = false
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	await wait(0.6)
+	await sync(200)
+	if host:
+		ok(Net.bots_foes(Net.my_id(), _other()), "the Bandit's phone is on the other team")
+		pl.slots = ["sword", "mace"]
+		pl.current = 0
+		pl._equip()
+	else:
+		ok(pl.class_id == "bandit" and pl.weapon_id() == "dagger", "the client plays a Bandit with a Dagger")
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 0)
+		ok(pl.spec_id == "thief" and pl.art_def()["name"] == "Steal", "and becomes a Thief")
+	await wait(0.6)
+	await sync(201)
+	var hp_before := pl.hp
+	if not host:
+		ok(BanditKit.steal_target(pl) == _avatar(), "Steal goes for the other player")
+		pl.art_cd_left = 0.0
+		pl.use_art()
+	await wait(1.0)
+	await sync(202)
+	if host:
+		ok(pl.hp < hp_before, "the Thief's blow lands on this phone (%.0f)" % pl.hp)
+		ok(pl.weapon_id() == "mace" and not pl.slots.has("sword"), "and the Sword is knocked out of this player's hand")
+		ok(_avatar().is_unseen(), "the Thief is invisible to this player")
+	else:
+		ok(pl.global_position.distance_to(_avatar().global_position) < 2.5, "the Thief appears beside the other player (%.1f m)" % pl.global_position.distance_to(_avatar().global_position))
+		ok(pl.invis_left > 0.0, "and turns invisible")
+		# The Sword fell at the Thief's feet, and a free hand picks it up.
+		ok(pl.slots.has("sword"), "the Thief walks off with the other player's Sword")
+		pl.art_cd_left = 0.0
+		pl.use_art()
+	await wait(1.0)
+	await sync(203)
+	if host:
+		ok(pl.weapon_id() == "mace", "a last weapon is never stolen")
+	# Nightfall: the Mercenary vanishes inside; the other team's player inside barely sees.
+	if not host:
+		pl.spec_id = "mercenary"
+		pl.invis_left = 0.0
+		pl.invis_lockout = 0.0
+		pl.art_cd_left = 0.0
+		ok(pl.art_def()["name"] == "Nightfall", "a Mercenary casts Nightfall")
+		pl.use_art()
+	await wait(1.0)
+	await sync(204)
+	ok(w.get_children().filter(func(n: Node) -> bool: return n is NightfallDome).size() == 1, "the dome of night is on both phones")
+	if host:
+		ok(pl.night_blind_left > 0.0, "this player, inside an enemy dome, is Benighted")
+		ok(pl.invis_left <= 0.0, "and is not hidden by it")
+		ok(_avatar().is_unseen(), "the Mercenary inside cannot be seen")
+	else:
+		ok(pl.invis_left > 0.0 and pl.night_blind_left <= 0.0, "the Mercenary is hidden, not darkened")
+	await sync(205)
+	# A Highwayman's Dagger Fan, from 6 m away.
+	if host:
+		pl.guard_left = 0.0
+	hp_before = pl.hp
+	if not host:
+		pl.spec_id = "highwayman"
+		pl.art_cd_left = 0.0
+		var them := _avatar().global_position
+		pl.global_position = them + Vector3(6, 0, 0)
+		var to := them - pl.global_position
+		pl.yaw = atan2(-to.x, -to.z)
+		pl.rotation.y = pl.yaw
+		pl.pitch = 0.0
+		pl.head.rotation.x = 0.0
+		await wait(0.2)
+		ok(pl.art_def()["name"] == "Dagger Fan", "a Highwayman throws a Dagger Fan")
+		pl.use_art()
+	await wait(1.2)
+	await sync(206)
+	if host:
+		ok(pl.hp < hp_before, "the fan's knives reach this phone (%.0f)" % pl.hp)
+	await sync(207)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.

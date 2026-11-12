@@ -106,5 +106,15 @@ func _ready() -> void:
 	w.stock_wood()
 	var wood: Pickup = w.pickups.back()
 	await snap("forest_firewood", wood.position + Vector3(5, 3, 5), wood.position + Vector3.UP * 0.4)
+	# A Mercenary's Nightfall from outside, and from inside an enemy's.
+	var spot := Vector3(0, w.ground_at(Vector3(0, 0, 60)), 60)
+	w.spawn_nightfall(99, spot, 6.0, 30.0, 1.5, 0)
+	await get_tree().create_timer(0.4).timeout
+	await snap("nightfall_outside", spot + Vector3(9, 2.4, 9), spot + Vector3.UP * 1.5)
+	hud.visible = true
+	w.player.night_blind_left = 5.0
+	await snap("nightfall_blind", spot + Vector3(0, 1.65, 2), spot + Vector3(0, 1.4, -8))
+	w.player.night_blind_left = 0.0
+	hud.visible = false
 	canvas.queue_free()
 	await preload("res://tests/scene_cleanup.gd").finish(w)

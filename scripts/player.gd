@@ -112,7 +112,9 @@ var mods := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_
 	"bomb_damage": 70.0, "bomb_radius": 4.5, "bomb_fire": 4.0, "bomb_count": 1.0, "bomb_throw": 1.0,
 	"turret_rate": 1.0, "turret_damage": 1.0,
 	"volley_darts": 7.0, "volley_jumps": 3.0, "flask_time": 3.0, "flask_radius": 6.0, "inv_damage": 1.0, "inv_heal": 0.0,
-	"swap_range": 9.0, "swap_burst": 50.0, "swap_radius": 4.0, "swap_decoys": 1.0, "swap_decoy_time": 5.0}
+	"swap_range": 9.0, "swap_burst": 50.0, "swap_radius": 4.0, "swap_decoys": 1.0, "swap_decoy_time": 5.0,
+	"shadow_time": 0.0, "steal_range": 0.0, "steal_damage": 1.0, "steal_hide": 0.0, "night_radius": 0.0, "night_time": 0.0, "night_linger": 0.0,
+	"fan_knives": 0.0, "fan_damage": 1.0, "fan_bounces": 0.0, "plunder": 0.0}
 var flags := {}
 var spec_id := ""
 var _buffs := {} # key -> {stat, val, left, stacks}
@@ -121,6 +123,7 @@ var _triggers := {} # event -> list of effect dictionaries with runtime counters
 ## runs out nothing can make you invisible again (an invisibility still running can be lengthened).
 const INVIS_LOCKOUT := 3.0
 var invis_lockout := 0.0
+var night_blind_left := 0.0 # standing in an enemy's Nightfall: the HUD darkens
 var invis_left := 0.0:
 	set(value):
 		if value > 0.0 and invis_left <= 0.0 and invis_lockout > 0.0:
@@ -479,7 +482,7 @@ func status_effects() -> Array[Dictionary]:
 	for entry: Dictionary in StatusCatalog.TIMED:
 		var remaining := float(get(entry["field"]))
 		if remaining > 0 and remaining < 900:
-			out.append({"icon": ("status_frozen" if is_iced else "status_stunned") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
+			out.append({"icon": ("status_frozen" if is_iced else "status_stunned") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left", "night_blind_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
 		if key == "command_ranged" or key == "command_spell":
@@ -1325,6 +1328,8 @@ func _on_kill(z: Zombie) -> void:
 			void_left += 1.0
 			invis_left = maxf(invis_left, void_left)
 	add_arrows(int(class_def().get("kill_arrows", 0)))
+	if m("plunder") > 0.0:
+		BanditKit.plunder(self, z.position)
 	fire("kill", {"z": z})
 	if _assassin_kill:
 		_assassin_kill = false
@@ -1696,6 +1701,7 @@ func _tick_ability_timers(delta: float) -> void:
 	_tick_triggers(delta)
 	invis_left = maxf(0.0, invis_left - delta)
 	invis_lockout = maxf(0.0, invis_lockout - delta)
+	night_blind_left = maxf(0.0, night_blind_left - delta)
 	guard_left = maxf(0.0, guard_left - delta)
 	dome_left = maxf(0.0, dome_left - delta)
 	_riposte_cd -= delta
@@ -1738,6 +1744,8 @@ func has_burst() -> bool:
 func art_def() -> Dictionary:
 	if class_id == "commander":
 		return CommanderKit.art(self)
+	if class_id == "bandit":
+		return BanditKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -1921,7 +1929,7 @@ func use_art() -> void:
 		return
 	mana -= art_cost()
 	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * m("art_cd"))
-	_cast_kind = "command" if class_id == "commander" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -2310,6 +2318,7 @@ func _tick_mist(delta: float) -> void:
 		"iron_mountain": _mountain_stomp()
 		"stance": _change_stance()
 		"command": CommanderKit.cast(self)
+		"bandit": BanditKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1

@@ -229,8 +229,8 @@ static func acquisition(id: String) -> String:
 ## General conditions only. Profession skills remain in their class trees.
 func _statuses() -> void:
 	for entry: Dictionary in StatusCatalog.TIMED:
-		if entry["field"] not in ["burn_time", "bleed_left", "poison_left", "slowed_left", "invis_left", "invis_lockout", "guard_left"]: continue
-		_row(entry["icon"], UiTheme.BLOOD if entry["field"] in ["burn_time", "bleed_left", "poison_left"] else UiTheme.MIST, entry["name"], entry["desc"])
+		if entry["field"] not in ["burn_time", "bleed_left", "poison_left", "slowed_left", "invis_left", "invis_lockout", "night_blind_left", "guard_left"]: continue
+		_row(entry["icon"], UiTheme.BLOOD if entry["field"] in ["burn_time", "bleed_left", "poison_left", "night_blind_left"] else UiTheme.MIST, entry["name"], entry["desc"])
 	_row("status_frozen", UiTheme.MIST, "Frozen", "Ice prevents movement until its timer ends. You can still look around.")
 	_row("status_stunned", UiTheme.EMBER, "Stunned", "An impact briefly interrupts movement until its timer ends.")
 

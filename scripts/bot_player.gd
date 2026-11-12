@@ -602,7 +602,22 @@ func _use_skills() -> void:
 	var low := p.hp < p.max_hp() * 0.4
 	var near := _enemies_within(4.5)
 	var kind := "stance" if p.class_id == "adept" else ("ki_blast" if p.class_id == "monk" and p.spec_id == "" else p.spec_id)
+	if p.class_id == "bandit" and p.spec_id == "":
+		kind = "into_shadows"
 	match kind:
+		"into_shadows":
+			if p.invis_left <= 0.0 and p.can_vanish() and ((low and near > 0) or (has_target and dist < 8.0)):
+				p.use_art()
+		"thief":
+			if has_target and dist < BanditKit.STEAL_RANGE + p.m("steal_range") and BanditKit.steal_target(p) != null:
+				p.use_art()
+		"mercenary":
+			if near >= 2 or (low and near > 0):
+				p.use_art()
+		"highwayman":
+			if has_target and dist < 15.0:
+				_face(_target_point(), false)
+				p.use_art()
 		"ki_blast":
 			if near >= 2 or (near >= 1 and p.hp < p.max_hp() * 0.7):
 				p.use_art()
