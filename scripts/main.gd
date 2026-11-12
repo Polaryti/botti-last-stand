@@ -1772,11 +1772,13 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		for r in Net.RULE_NAMES.size():
 			var pick := r
 			kinds.add_child(_button(Net.RULE_NAMES[r], func() -> void: Net.set_rules(pick), Vector2(215, 58), Net.rules == r))
-		if Net.rules == Net.Rules.COOP:
+		if Net.rules != Net.Rules.FORT:
 			var maps := HBoxContainer.new()
 			maps.add_theme_constant_override("separation", 8)
 			body.add_child(maps)
 			for id: String in Game.MAPS:
+				if Net.pvp() and id not in Game.VERSUS_MAPS:
+					continue
 				var chosen_map := id
 				maps.add_child(_button(Game.MAPS[id]["name"], func() -> void: Net.set_night_map(chosen_map), Vector2(215, 52), Net.night_map == id))
 		var levels := HBoxContainer.new()
@@ -2183,7 +2185,7 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 	if not is_instance_valid(list) or _board_period != period or _board_kind != kind:
 		return
 	asking.queue_free()
-	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort", "coop": "Co-op nights in the Village", "versus": "All vs All and Teams"}[kind]
+	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village and the Valleys of Mesenlla", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort", "coop": "Co-op nights in the Village and the Valleys of Mesenlla", "versus": "All vs All and Teams"}[kind]
 	note.text = ("Points from %s, since the leaderboard began." if period == "all" else "Points from %s since Monday 00:00 UTC.") % what
 	if not result["ok"]:
 		list.add_child(_board_problem(result["error"]))
@@ -2230,7 +2232,7 @@ func _note_pending(mine: Label) -> void:
 
 
 static func _map_word(map: String) -> String:
-	return {"village": "Village", "mists": "Mists", "fort": "Fort"}.get(map, map.capitalize())
+	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion"}.get(map, map.capitalize())
 
 
 ## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort".

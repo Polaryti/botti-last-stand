@@ -152,7 +152,7 @@ func _enemies() -> void:
 			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
 		var locations := PackedStringArray()
-		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort"}.get(map_id, map_id.capitalize()))
+		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
 		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
 		if d.get("mist_boss", false) or d.get("mesenlla_boss", false):
@@ -239,3 +239,5 @@ func _maps() -> void:
 	_row("map_village", UiTheme.BONE, "The Village", "The first village to be overrun and razed by the zombie hordes.")
 	_row("map_fort", UiTheme.BONE, "The Fort", "The last bastion protecting the portal to The Mists.")
 	_row("map_mists", UiTheme.MIST, "The Mists", "The heart of mysterious worlds lying beyond our own.")
+	_row("map_mesenlla", Color(0.91, 0.63, 0.3), "Valleys of Mesenlla", "Fleeing a collapsed world and having conquered the heart of the Mists, new paths open to distant lands through its portals. The first leads to a mountain outpost under an endless twilight. Survive the night there, alone, together or against each other.")
+	_map_badge({"maps": ["mesenlla"]})

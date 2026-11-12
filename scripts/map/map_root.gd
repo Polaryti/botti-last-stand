@@ -15,6 +15,8 @@ extends Node3D
 @export var roughness := 5.5
 ## Inside this distance from the centre the land is smooth.
 @export var calm_radius := 30.0
+## Which lands this is, for its light, mist, music and creatures. The Village, Fort and Mists maps leave it.
+@export_enum("village", "mesenlla", "bastion") var look := "village"
 ## Redraw the land by itself after a hill, a road or a building moves. Turn off if it gets in the way.
 @export var auto_redraw := true
 @export_tool_button("Redraw the whole map") var redraw_button := rebuild_preview

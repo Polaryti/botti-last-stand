@@ -15,6 +15,7 @@ var args_soak := false
 var _their_count := -1
 var _their_positions := PackedVector3Array()
 var _step := -1
+var _told := ""
 
 
 func ok(cond: bool, what: String) -> void:
@@ -28,6 +29,12 @@ func ok(cond: bool, what: String) -> void:
 
 func wait(t: float) -> void:
 	await get_tree().create_timer(t).timeout
+
+
+## A word from the other phone, for what both should agree on.
+@rpc("any_peer", "reliable", "call_remote")
+func told(text: String) -> void:
+	_told = text
 
 
 ## Both sides meet at each numbered step, so the test reads as one story.
@@ -110,7 +117,10 @@ func _as_host() -> void:
 	if rules == "mists":
 		Net.set_night_map("mists")
 		ok(true, "the host picks the Mists")
-	Net.set_rules({"cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	if rules == "mesenlla":
+		Net.set_night_map("mesenlla")
+		ok(Net.night_map == "mesenlla", "the host picks the Valleys of Mesenlla")
+	Net.set_rules({"mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -258,6 +268,8 @@ func _play() -> void:
 		await _bandit()
 	elif rules == "cartographer":
 		await _cartographer()
+	elif rules == "mesenlla":
+		await _mesenlla()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -1444,6 +1456,89 @@ func _cartographer() -> void:
 		var under: Zombie = w.zombies.back()
 		ok(under.hp < hp_before, "the other phone's starlight strikes this phone's creature (%.0f)" % (hp_before - under.hp))
 	await sync(305)
+
+
+
+## Two phones in the Valleys of Mesenlla: the creatures look and act the same on both, a tell's circle
+## reaches the other phone and hurts there, and the boss rises on both.
+func _mesenlla() -> void:
+	ok(w.map_id == "mesenlla" and Game.zombie_pool_plan().has("woods_child"), "both phones are in the Valleys of Mesenlla")
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := w.start_spots[0] if not w.start_spots.is_empty() else Vector3.ZERO
+	pl.global_position = Vector3(base.x + (-2.0 if host else 2.0), w.ground_at(base) + 0.05, base.z)
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	await wait(0.6)
+	await sync(400)
+	# A Child of the Woods carries the same weapon on both phones.
+	if host:
+		w.spawn_zombie("child_of_woods", base + Vector3(0, 0, -6))
+		var kid: Zombie = w.zombies.back()
+		kid.set_physics_process(false)
+		told.rpc(kid.weapon_id)
+	await wait(0.8)
+	await sync(401)
+	if not host:
+		var kids := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "child_of_woods")
+		ok(kids.size() == 1 and kids[0].weapon_id == _told and _told != "", "the Child of the Woods holds the same %s here" % _told)
+	await sync(402)
+	# An Earth Elemental's amber circle closes on the other phone's player.
+	var hp_before := pl.hp
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("earth_elemental", them + Vector3(0, 0, -2.5))
+		var rock: Zombie = w.zombies.back()
+		rock.mesenlla_mind.cooldown = 0.0
+		rock._start_chase(them)
+		rock.mesenlla_mind.tick(rock, _avatar(), them - rock.position, rock.position.distance_to(them), 0.0)
+	await wait(0.4)
+	await sync(403)
+	ok(w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.QUAKE), "the amber circle shows on this phone")
+	if not host:
+		var rocks := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "earth_elemental")
+		ok(rocks.size() == 1 and rocks[0].is_warning() and rocks[0]._current_anim == "m_slam", "and the elemental raises its fists here too")
+	# The stun is short (it is cut for players), so watch for it while the circle closes.
+	var stunned := false
+	var until := Time.get_ticks_msec() + int((MesenllaMind.SLAM_TELL + 0.6) * 1000.0)
+	while Time.get_ticks_msec() < until:
+		stunned = stunned or pl.frozen_left > 0.0
+		await get_tree().process_frame
+	await sync(404)
+	if not host:
+		ok(pl.hp < hp_before and stunned, "staying inside hurts and stuns the player on this phone (%.0f)" % (hp_before - pl.hp))
+	await sync(405)
+	# The Shapeshifter changes shape on both phones.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		w.spawn_zombie("shapeshifter", base + Vector3(0, 0, -8))
+		var shifter: Zombie = w.zombies.back()
+		shifter.set_physics_process(false)
+		shifter.mesenlla_mind._set_form(shifter, "beast")
+	await wait(0.8)
+	await sync(406)
+	if not host:
+		var shifters := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "shapeshifter")
+		ok(shifters.size() == 1 and shifters[0]._current_anim == "m_beast" and (shifters[0]._visual.get_node("Beast") as Node3D).visible, "the Shapeshifter's beast shows on this phone")
+	await sync(407)
+	# And the boss rises at the Ring of Stones for everyone.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		w.director.elapsed = 520.0
+		w.director._tick_mist_boss()
+	await wait(1.0)
+	await sync(408)
+	var bosses := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "great_revenant_elemental")
+	ok(bosses.size() == 1 and (bosses[0]._visual.get_node("BossHealth") as Label3D).text.begins_with("GREAT REVENANT ELEMENTAL"), "the Great Revenant Elemental stands on both phones, its name over it")
+	ok(w.director.banner.contains("Great Revenant Elemental"), "and both are told")
+	await sync(409)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.

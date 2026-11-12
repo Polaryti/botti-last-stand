@@ -1094,7 +1094,7 @@ func _z_died(net_id: int, killer: int) -> void:
 	var z: Zombie = world.zombie_by_id(net_id)
 	if z == null or not z.active:
 		return
-	if z.def.get("mist_boss", false): world.director._mist_boss_defeated = true
+	if z.is_boss(): world.director._mist_boss_defeated = true
 	z.net_die()
 	_credit(z, killer)
 

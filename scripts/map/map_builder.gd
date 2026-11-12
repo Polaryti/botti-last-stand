@@ -24,6 +24,7 @@ const GRASS_TIP := Color(0.42, 0.56, 0.24)
 const BRASS := Color(0.78, 0.6, 0.24)
 const FORT_PLANK := Color(0.42, 0.28, 0.16)
 
+var look := "village" # which lands: "mesenlla" has rock on its steep slopes
 var w # the World in the game, a MapPreview in the editor
 var terrain: Terrain
 var quality := 1 # 0 low, 1 medium, 2 high
@@ -54,6 +55,7 @@ func _init(world: Variant, p_terrain: Terrain) -> void:
 
 ## The whole map, for the game.
 func build(root: MapRoot) -> void:
+	look = root.look
 	_reserve_plants(root, Transform3D.IDENTITY)
 	ground()
 	w.play_half = root.play_half
@@ -170,7 +172,11 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() else 0.0)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look == "mesenlla" else 0.0)
+	if look == "mesenlla":
+		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
+		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
+		mat.set_shader_parameter("dirt", Vector3(0.24, 0.19, 0.17))
 	_ground_material = mat
 	var j := 0
 	while j < terrain.vertices_per_side - 1:

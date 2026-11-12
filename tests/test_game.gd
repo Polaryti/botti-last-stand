@@ -1314,7 +1314,7 @@ func test_version_20() -> void:
 	ok(not _saw_mist_roamer, "no Rift Stalker walks the ordinary maps")
 	var in_mists := {}
 	for i in 300:
-		in_mists[ZombieDefs.pick_roamer(600.0, true)] = true
+		in_mists[ZombieDefs.pick_roamer(600.0, "mists")] = true
 	ok(in_mists.has("rift_stalker"), "the Mists have them")
 	Game.night_map = "village"
 	Game.mode = Game.Mode.NIGHT

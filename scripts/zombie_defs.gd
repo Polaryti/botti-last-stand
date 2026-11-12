@@ -38,7 +38,7 @@ const ALL := {
 	"mist_bear": {"name": "Mist Bear", "icon": "bear+mist", "desc": "A bear the Mists have soaked through. Paws the ground in a cloud of mist, then charges in a straight line and throws you back. Sidestep the charge.", "hp": 300.0, "roam_speed": 1.6, "speed": 3.9, "damage": 22.0, "scale": 1.15, "xp": 48,
 		"sight": 34.0, "models": ["mist_bear"], "from": 200.0, "weight": 1.4, "custom": true, "maps": ["mesenlla", "bastion"], "shoves": true, "radius": 0.85, "tall": 1.75},
 	"eagle": {"name": "Eagle", "icon": "eagle", "desc": "Circles high over the slopes, then folds its wings and stoops on you. A roof or an overhang stops it.", "hp": 40.0, "roam_speed": 6.0, "speed": 7.0, "damage": 8.0, "scale": 1.0, "xp": 10,
-		"sight": 40.0, "models": ["eagle"], "from": 45.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 7.0, "maps": ["mesenlla", "bastion"]},
+		"sight": 40.0, "models": ["eagle"], "from": 120.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 7.0, "maps": ["mesenlla", "bastion"]},
 	"mist_eagle": {"name": "Mist Eagle", "icon": "eagle+mist", "desc": "An eagle of living mist. Its stoop throws you back and leaves a ring of mist that bursts a moment later and slows: keep moving after it strikes.", "hp": 70.0, "roam_speed": 6.0, "speed": 7.4, "damage": 12.0, "scale": 1.2, "xp": 20,
 		"sight": 44.0, "models": ["mist_eagle"], "from": 180.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 8.0, "maps": ["mesenlla", "bastion"], "shoves": true},
 	"shapeshifter": {"name": "Shapeshifter", "icon": "antlers", "desc": "Looks like a white stag until you come close or hurt it. Then it becomes a great clawed beast. Badly hurt, it turns back into the stag to flee and heal.", "hp": 170.0, "roam_speed": 2.2, "speed": 5.2, "damage": 20.0, "scale": 1.0, "xp": 40,
@@ -46,7 +46,7 @@ const ALL := {
 	"child_of_woods": {"name": "Child of the Woods", "icon": "sprout", "desc": "Small, quick and never alone. Each carries whatever weapon it found: a blade, a spear or a bow. Drops it when it falls.", "hp": 70.0, "roam_speed": 1.8, "speed": 3.8, "damage": 9.0, "scale": 0.8, "xp": 14,
 		"sight": 32.0, "tint": Color(0.55, 0.62, 0.36), "models": ["woods_child"], "from": 0.0, "weight": 10.0, "maps": ["mesenlla", "bastion"], "weapons": ["dagger", "sword", "spear", "flail", "bow", "crossbow"]},
 	"woodland_cavalry": {"name": "Woodland Cavalry", "icon": "bear+spear", "desc": "A Child of the Woods riding a bear. Rushes through you with a spear and turns wide to come again. Bring the bear down and its rider fights on foot.", "hp": 280.0, "roam_speed": 3.0, "speed": 7.4, "damage": 18.0, "scale": 0.85, "xp": 46,
-		"sight": 40.0, "tint": Color(0.55, 0.62, 0.36), "models": ["woods_child"], "from": 240.0, "weight": 0.0, "weapon": "spear", "rider": true, "mount": "bear", "maps": ["mesenlla", "bastion"]},
+		"sight": 40.0, "tint": Color(0.55, 0.62, 0.36), "models": ["woods_child"], "from": 300.0, "weight": 0.0, "weapon": "spear", "rider": true, "mount": "bear", "maps": ["mesenlla", "bastion"]},
 	"earth_elemental": {"name": "Earth Elemental", "icon": "boulder", "desc": "Mossy boulders held together by old mist. Slow, but it pounds the ground: get out of the amber circle before it closes.", "hp": 280.0, "roam_speed": 1.1, "speed": 2.5, "damage": 20.0, "scale": 1.0, "xp": 42,
 		"sight": 28.0, "models": ["earth_elemental"], "from": 120.0, "weight": 1.6, "custom": true, "maps": ["mesenlla", "bastion"], "shoves": true, "radius": 0.8, "tall": 2.3},
 	"mist_elemental": {"name": "Mist Elemental", "icon": "mist+orb", "desc": "A swirl of mist around a bone-white heart. Passes through walls and vanishes, to appear behind you. When it falls, its mist bursts and slows everyone near.", "hp": 130.0, "roam_speed": 2.0, "speed": 3.2, "damage": 15.0, "scale": 1.0, "xp": 30,
@@ -99,18 +99,31 @@ static func def_of(id: String) -> Dictionary:
 	return DUMMY if id == "dummy" else ALL[id]
 
 
-static func pick_roamer(elapsed: float, islands := false) -> String:
+## Whether this kind wanders the given map at this point of the night. Beyond the Mists only its own
+## creatures roam, and they roam nowhere else.
+static func roams(id: String, elapsed: float, map_id: String) -> bool:
+	var d: Dictionary = ALL[id]
+	if elapsed < float(d.get("from", 9999.0)):
+		return false
+	if map_id in SpawnRules.MESENLLA:
+		return d.get("maps", []).has(map_id)
+	if d.get("only_islands", false) and map_id != "mists":
+		return false
+	return SpawnRules.allows(d, map_id)
+
+
+static func pick_roamer(elapsed: float, map_id := "village") -> String:
 	var total := 0.0
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)) and SpawnRules.allows(ALL[id], "mists" if islands else "village"):
+		if roams(id, elapsed, map_id):
 			total += float(ALL[id].get("weight", 0.0))
 	var r := randf() * total
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)) and SpawnRules.allows(ALL[id], "mists" if islands else "village"):
+		if roams(id, elapsed, map_id):
 			var w: float = ALL[id].get("weight", 0.0)
 			if w <= 0.0:
 				continue
 			r -= w
 			if r <= 0.0:
 				return id
-	return "normal"
+	return "child_of_woods" if map_id in SpawnRules.MESENLLA else "normal"

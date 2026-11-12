@@ -1,5 +1,31 @@
 # Changelog
 
+## Development — Beyond the Mists, part 5: Valleys of Mesenlla
+
+*Fleeing a collapsed world and having conquered the heart of the Mists, new paths open to distant lands through its portals.* The first of them leads to a mountainside outpost in the Valleys of Mesenlla.
+
+### A new map for Survive the Night
+- Choose the Valleys of Mesenlla alone, in Co-op Night, or in versus (All vs All and Teams).
+- You start inside a palisaded outpost on a mountain shoulder, beside the Great Portal you came through: watchtowers, lodges of stone and slate with supplies, banners, lanterns and a fire.
+- Below lie slopes and terraces, a stream crossed by a log bridge and a ford, a hamlet, a high stone meadow with the Ring of Stones, and a crag to the east.
+- The Mists have followed you: rocky islands float above the valley, rifts glow in the ground, crystals grow beside them and mist drifts over everything under a luminous twilight sky.
+- Only the Creatures of Mesenlla roam here. Eagles circle in every 55 seconds (with a Mist Eagle once it is late), the Woodland Cavalry ride from 5:00, and a Wyvern comes down from 5:00.
+- At about 8:30 the Great Revenant Elemental rises at the Ring of Stones. Dawn waits until it falls, and it leaves an Angel familiar.
+- The Battleaxe and the Rift Chakram lie about; the Village's farm tools do not.
+
+### Music
+- Three new pieces for the night, the hunt and the dawn, on harps, strings, recorders, flutes and bells.
+
+### Leaderboard
+- Nights in the Valleys of Mesenlla count on the Survive the Night board.
+
+### Codex
+- The Valleys of Mesenlla have their own entry, and every Creature of Mesenlla now says where it lives.
+
+### Playing together
+- The map, its creatures and its boss are the same on every phone.
+- Phones on this build only play with phones on the same build.
+
 ## Development — Beyond the Mists, part 4: Creatures of Mesenlla
 
 These live only on the two new maps that come later in this update ("Map Exclusive · Mesenlla"), and only they roam there. Until then they can be tried in the Sandbox.

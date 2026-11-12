@@ -22,6 +22,7 @@ const MUSIC_SETS := {
 	"village": ["night", "hunted", "dawn"],
 	"mists": ["mists_night", "mists_hunted", "mists_dawn"],
 	"fort": ["fort_night", "fort_hunted", "fort_dawn"],
+	"mesenlla": ["mesenlla_night", "mesenlla_hunted", "mesenlla_dawn"],
 	"menu": ["menu", "", ""],
 }
 const MUSIC_BUS := "Music"

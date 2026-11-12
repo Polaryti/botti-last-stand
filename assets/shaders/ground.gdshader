@@ -10,6 +10,7 @@ uniform sampler2D roads : hint_default_white, filter_linear, repeat_disable;
 uniform vec3 dirt;
 uniform float map_half = 110.0;
 uniform float mask_reach = 3.0;
+uniform vec3 tint = vec3(1.0); // the grass of other lands
 uniform float cliffs = 0.0; // on the islands, the steep faces are banded rock
 
 varying vec2 at;
@@ -24,7 +25,7 @@ void vertex() {
 
 void fragment() {
 	vec3 grain = texture(tile, UV).rgb;
-	vec3 land = grain * COLOR.rgb;
+	vec3 land = grain * COLOR.rgb * tint;
 	float edge = (texture(roads, at / (2.0 * map_half) + 0.5).r * 2.0 - 1.0) * mask_reach;
 	// Grain at two sizes makes the edge wander and fray, the way a worn track does, so bare earth
 	// fades into the grass instead of stopping at a line.

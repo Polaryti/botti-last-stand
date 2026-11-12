@@ -597,7 +597,7 @@ func _mists() -> void:
 	check(village_only, "Village roster excludes mist-only enemies")
 	var seen := {}
 	for i in 400:
-		seen[ZombieDefs.pick_roamer(550.0, true)] = true
+		seen[ZombieDefs.pick_roamer(550.0, "mists")] = true
 	check(seen.has("lantern_wisp") and seen.has("mist_weaver") and not seen.has("veil_regent"), "Mists roaming waves include both spirits and exclude the scheduled boss")
 	mw.spawn_zombie("lantern_wisp", mp.position + Vector3.RIGHT * 12)
 	var spirit: Zombie = mw.zombies.back()

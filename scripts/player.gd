@@ -312,7 +312,8 @@ func _init(owner_world: World, as_bot := 0) -> void:
 	camera = Camera3D.new()
 	camera.fov = BASE_FOV
 	camera.near = 0.06
-	camera.far = 460.0 if owner_world.terrain.has_islands() else 100.0
+	# The Mists and Mesenlla have islands far off in the sky; elsewhere the fog ends the view.
+	camera.far = 460.0 if owner_world.terrain.has_islands() else 240.0 if owner_world.map_id == "mesenlla" else 100.0
 	head.add_child(camera)
 	_vm_root = Node3D.new()
 	camera.add_child(_vm_root)

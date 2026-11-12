@@ -21,7 +21,8 @@ const NAME_MIN = 3;
 const NAME_MAX = 16;
 const RESERVED = new Set(["admin", "administrator", "moderator", "mod", "botti", "system", "server", "host", "bot", "you"]);
 const MODES = new Set(["night", "fort", "coop", "ffa", "teams"]);
-const MAPS = new Set(["village", "mists", "fort"]);
+// The Valleys of Mesenlla count with the Village boards (Night, Co-op, Versus); Mist Bastion with the Fort.
+const MAPS = new Set(["village", "mists", "fort", "mesenlla", "bastion"]);
 export const BOARDS = ["all", "night", "mists", "fort", "coop", "versus"];
 const NIGHT_LENGTH = 600;
 const MAX_SECONDS = 3600;

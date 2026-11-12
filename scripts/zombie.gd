@@ -1035,6 +1035,9 @@ func _die() -> void:
 	if def.get("mist_boss", false):
 		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
 		world.director.show_banner("The Veil Regent falls. The mist releases an Angel", 4.0)
+	elif type_id == "great_revenant_elemental":
+		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
+		world.director.show_banner("The Great Revenant Elemental crumbles. An Angel rises from the mist", 4.0)
 	world.on_zombie_killed(self)
 
 

@@ -28,6 +28,12 @@ const WOOD_EVERY := 4.0 # Defend the Fort: seconds between new pieces of wood, w
 const FIRST_RIDER := 300.0
 const RIDER_EVERY := 75.0
 const MAX_RIDERS := 2
+## Beyond the Mists: eagles circle in from the peaks, wyverns come down late, and the Woodland
+## Cavalry ride through the valley.
+const FIRST_WYVERN := 300.0
+const WYVERN_EVERY := 95.0
+const MAX_WYVERNS := 1
+const MESENLLA_BOSS := "great_revenant_elemental"
 
 var world: World
 var running := false
@@ -60,6 +66,7 @@ var _storm_index := 0
 var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
 var _mist_boss_defeated := false
+var _next_wyvern := FIRST_WYVERN
 
 
 func _init(owner_world: World) -> void:
@@ -107,7 +114,7 @@ func begin(with_zombies: bool) -> void:
 		if world.fort:
 			opening = "Hold the fort until dawn"
 		elif requires_regent():
-			opening = "Survive ten minutes and defeat the Veil Regent"
+			opening = "Survive ten minutes and defeat the %s" % ("Great Revenant Elemental" if world.map_id == "mesenlla" else "Veil Regent")
 		elif Net.fog_rules():
 			opening = "Three lives. Last one standing"
 		show_banner(opening, 4.0)
@@ -287,12 +294,15 @@ func minute() -> int:
 
 
 func _pick_roamer() -> String:
-	var kind := ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands())
+	var kind := ZombieDefs.pick_roamer(elapsed, world.spawn_map())
 	# Leave two pooled bodies available for the Regent's second phase.
 	return "rift_stalker" if kind == "lantern_wisp" and world.count_type(kind) >= 3 else kind
 
 
 func _tick_mist_boss() -> void:
+	if not _follows_host and not sandbox and world.map_id == "mesenlla" and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
+		_raise_mesenlla_boss()
+		return
 	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		var throne := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3.ZERO)))
 		throne.y = world.ground_at(throne)
@@ -305,8 +315,54 @@ func _tick_mist_boss() -> void:
 			_sound("mist_regent", 0.0)
 
 
+## The Great Revenant Elemental rises from the Ring of Stones, the boulders of the meadow drawing together.
+func _raise_mesenlla_boss() -> void:
+	var at := Vector3.ZERO
+	for mark: Dictionary in world.map_marks:
+		if mark["name"] == "boss":
+			at = Vector3(mark["at"].x, 0, mark["at"].y)
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(at)))
+	spot.y = world.ground_at(spot)
+	if world.spawn_zombie(MESENLLA_BOSS, spot):
+		_mist_boss_spawned = true
+		CommandField.visual_impact(world, spot, 10.0, true)
+		if Net.is_host(): Net.command_impact_visual(spot, 10.0, true)
+		show_banner("The Great Revenant Elemental rises at the Ring of Stones", 4.0)
+		_sound("revenant_roar", 2.0)
+
+
+## A boss has fallen: the Veil Regent or the Great Revenant Elemental. Dawn can come now.
+func boss_fallen(_z: Zombie) -> void:
+	_mist_boss_defeated = true
+
+
+## What only happens beyond the Mists.
+func _tick_mesenlla() -> void:
+	if elapsed >= _next_crows:
+		_next_crows = elapsed + CROWS_EVERY
+		# A pair of eagles, and a Mist Eagle with them once the night is old.
+		for i in 2:
+			world.spawn_zombie("eagle")
+		if elapsed >= ZombieDefs.ALL["mist_eagle"]["from"]:
+			world.spawn_zombie("mist_eagle")
+		world.sfx_at("eagle_cry", world.player.global_position + Vector3(18, 6, 0), -2.0)
+	if elapsed >= _next_rider and elapsed >= ZombieDefs.ALL["woodland_cavalry"]["from"]:
+		_next_rider = elapsed + RIDER_EVERY
+		if world.count_type("woodland_cavalry") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("woodland_cavalry"):
+			_sound("bear_roar", 0.0)
+			show_banner("Riders of the woods...", 3.0)
+	if elapsed >= _next_wyvern:
+		_next_wyvern = elapsed + WYVERN_EVERY
+		if world.count_type("wyvern") < MAX_WYVERNS + (1 if _last_stand else 0) and world.spawn_zombie("wyvern"):
+			_sound("wyvern_roar", 2.0)
+			show_banner("A wyvern over the valley!", 3.0)
+
+
 func _tick_specials() -> void:
 	_tick_mist_boss()
+	if world.map_id == "mesenlla":
+		_tick_mesenlla()
+		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
 		_next_rider = elapsed + RIDER_EVERY
 		if world.count_type("rider") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("rider"):
@@ -386,5 +442,6 @@ func _spawn_roamer() -> void:
 			return
 
 
+## The Mists end only when the Veil Regent falls, and Mesenlla only when the Great Revenant Elemental does.
 func requires_regent() -> bool:
-	return world.terrain.has_islands() and not sandbox and not Net.fog_rules()
+	return (world.terrain.has_islands() or world.map_id == "mesenlla") and not sandbox and not Net.fog_rules()

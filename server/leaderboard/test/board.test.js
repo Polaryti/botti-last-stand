@@ -238,6 +238,10 @@ test("Fort matches count, each on its own board", async () => {
   assert.equal(boardOf({ mode: "coop", map: "village" }), "coop");
   assert.equal(boardOf({ mode: "ffa", map: "village" }), "versus");
   assert.equal(boardOf({ mode: "night", map: "village" }), "night");
+  assert.equal(boardOf({ mode: "night", map: "mesenlla" }), "night");
+  assert.equal(boardOf({ mode: "coop", map: "mesenlla" }), "coop");
+  assert.equal(boardOf({ mode: "teams", map: "mesenlla" }), "versus");
+  assert.equal(boardOf({ mode: "fort", map: "bastion" }), "fort");
   const now = MONDAY + 40 * 86400000;
   const a = token();
   await call("POST", "/v1/players", { body: { name: "Fort Keeper", token: a }, now });

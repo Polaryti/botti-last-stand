@@ -53,6 +53,7 @@ func _ready() -> void:
 	await _storm()
 	await _flyers()
 	await _revenant()
+	await _mesenlla_map()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -163,7 +164,7 @@ func _entries() -> void:
 	Game.mode = Game.Mode.SANDBOX
 	var strays := 0
 	for i in 300:
-		if SpawnRules.is_mesenlla(ZombieDefs.ALL[ZombieDefs.pick_roamer(600.0, false)]):
+		if SpawnRules.is_mesenlla(ZombieDefs.ALL[ZombieDefs.pick_roamer(600.0, "village")]):
 			strays += 1
 	check(strays == 0, "the Village never picks a creature of Mesenlla to roam (%d)" % strays)
 	var bosses := ["great_revenant_elemental", "war_wyvern"]
@@ -332,3 +333,57 @@ func _revenant() -> void:
 	check(seals(MistSeal.Style.BOULDER).size() >= 2, "and it throws two at a time")
 	z.stun(3.0)
 	check(z._stun <= 0.61, "a boss shrugs off a long stun")
+
+
+## The Valleys of Mesenlla as a night: its own light, music, creatures, weapons, specials and boss.
+func _mesenlla_map() -> void:
+	clear()
+	w.queue_free()
+	await frames(2)
+	Game.mode = Game.Mode.NIGHT
+	Game.night_map = "mesenlla"
+	w = World.new()
+	add_child(w)
+	w.setup(Game.Mode.NIGHT)
+	w.director.running = false
+	p = w.player
+	check(w.map_id == "mesenlla" and w.spawn_map() == "mesenlla", "the Valleys of Mesenlla load as their own map")
+	check(Game.MAPS.has("mesenlla") and Game.VERSUS_MAPS.has("mesenlla") and Board.MAPS.has("mesenlla"), "playable alone, together and in versus, and counted on the leaderboard")
+	check(Sfx.MUSIC_SETS.has("mesenlla") and ResourceLoader.exists("res://assets/music/mesenlla_night.ogg") and ResourceLoader.exists("res://assets/music/mesenlla_hunted.ogg") and ResourceLoader.exists("res://assets/music/mesenlla_dawn.ogg"), "with music of its own")
+	check(is_equal_approx(float(w._sky_material.get_shader_parameter("dusk")), 1.0), "under a twilight sky")
+	check(p.camera.far >= 200.0, "and a view far enough for the islands in the sky")
+	check(p.global_position.y > 4.0 and absf(p.global_position.x) < 20.0, "players start in the outpost on the mountain shoulder (%.1f, %.1f, %.1f)" % [p.global_position.x, p.global_position.y, p.global_position.z])
+	var names := w.map_marks.map(func(m: Dictionary) -> String: return m["name"])
+	for mark: String in ["Great Portal", "Ring of Stones", "Hamlet", "Rift", "boss"]:
+		check(names.has(mark), "the map knows its %s" % mark)
+	for z: Zombie in w.zombies:
+		check(SpawnRules.is_mesenlla(z.def), "only creatures of Mesenlla are out (%s)" % z.type_id)
+	var foreign := 0
+	for i in 400:
+		var id := ZombieDefs.pick_roamer(600.0, "mesenlla")
+		if not ZombieDefs.ALL[id].get("maps", []).has("mesenlla"):
+			foreign += 1
+	check(foreign == 0, "and only they are chosen to roam")
+	var seen := {}
+	for i in 600:
+		seen[WeaponDefs.pick_random("mesenlla")] = true
+	check(seen.has("battleaxe") and seen.has("chakram"), "the Battleaxe and the Rift Chakram lie about")
+	check(not seen.has("pitchfork") and not seen.has("scythe") and not seen.has("torch"), "and the Village's farm tools do not")
+	check(w.director.requires_regent(), "dawn waits for the boss here too")
+	w.director.elapsed = 400.0
+	w.director._tick_mesenlla()
+	check(w.count_type("eagle") >= 2 and w.count_type("woodland_cavalry") == 1 and w.count_type("wyvern") == 1, "eagles circle in, the Woodland Cavalry ride and a wyvern comes down")
+	w.director.elapsed = 520.0
+	w.director._tick_mist_boss()
+	check(w.count_type("great_revenant_elemental") == 1, "the Great Revenant Elemental rises")
+	var boss: Zombie = null
+	for z: Zombie in w.zombies:
+		if z.type_id == "great_revenant_elemental":
+			boss = z
+	check(boss != null and Vector2(boss.position.x + 54.0, boss.position.z + 64.0).length() < 8.0, "at the Ring of Stones")
+	check(w.director.banner.contains("Great Revenant Elemental"), "and everyone is told")
+	boss.take_damage(100000.0, Vector3.ZERO, 0.0, boss.centre())
+	await frames(2)
+	check(w.director._mist_boss_defeated, "when it falls, dawn can come")
+	check(w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel"), "and it leaves an Angel")
+	Game.night_map = "village"

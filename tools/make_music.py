@@ -25,7 +25,8 @@ OUT = "assets/music/"
 # How loud each stem ends up, as the average level in dB. The hunted stem is the loudest.
 TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5, "menu": -16.0,
     "mists_night": -16.0, "mists_hunted": -13.5, "mists_dawn": -14.5,
-    "fort_night": -15.0, "fort_hunted": -13.5, "fort_dawn": -14.5}
+    "fort_night": -15.0, "fort_hunted": -13.5, "fort_dawn": -14.5,
+    "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0}
 
 NAMES = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
 SAMPLES = ""
@@ -225,7 +226,8 @@ def parse_line(text, bar, shift=0):
 
 CHORDS = {"Dm": (2, 5, 9), "Bb": (10, 2, 5), "F": (5, 9, 0), "C": (0, 4, 7), "Gm": (7, 10, 2), "A": (9, 1, 4), "Asus": (9, 2, 4), "Am": (9, 0, 4),
     "Em": (4, 7, 11), "G": (7, 11, 2), "D": (2, 6, 9), "B": (11, 3, 6), "Bsus": (11, 4, 6),
-    "Cm": (0, 3, 7), "Ab": (8, 0, 3), "Eb": (3, 7, 10), "Fm": (5, 8, 0), "Gsus": (7, 0, 2), "GM": (7, 11, 2)}
+    "Cm": (0, 3, 7), "Ab": (8, 0, 3), "Eb": (3, 7, 10), "Fm": (5, 8, 0), "Gsus": (7, 0, 2), "GM": (7, 11, 2),
+    "F#m": (6, 9, 1), "E": (4, 8, 11), "Esus": (4, 9, 11), "Bm": (11, 2, 6), "C#m": (1, 4, 8)}
 
 NIGHT_CHORDS = ["Dm", "Bb", "F", "C", "Dm", "Bb", "Gm", "A",
     "Bb", "F", "C", "Dm", "Bb", "F", "Gm", "A",
@@ -514,6 +516,15 @@ class Drums:
         x = self._one("Triangle3-Hit_v%d_*.wav", float(np.clip(vel, 0.05, 1.0)), score, [1, 2])[:int(SR * 3.0)]
         score._add(self.bright_bus, (x / max(1e-5, np.abs(x).max()) * 0.3 * vel).astype(np.float32), beat * BEAT)
 
+    def belltree(self, score, beat, vel):
+        """A bell tree stroke: a shower of little bells, falling."""
+        if not hasattr(self, "bells_bus"):
+            self.bells_bus = Instrument("Percussion/BellTree", 0.7, -0.24, 0.6, lead=0.0)
+        files = sorted(glob.glob(os.path.join(SAMPLES, "Percussion/BellTree_Stroke*_Sum.wav")))
+        x = self._read(files[score.rng.integers(0, len(files))])[:int(SR * 4.0)]
+        y = x / max(1e-5, np.abs(x).max()) * 0.5 * vel * score.level(beat // 4 + 1)
+        score._add(self.bells_bus, y.astype(np.float32), beat * BEAT)
+
     def gong(self, score, beat, vel):
         names = ["p", "mf", "f", "fff"]
         v = float(np.clip(vel, 0.05, 1.0))
@@ -554,6 +565,9 @@ class Orchestra:
         self.oboe = Instrument(W + "Oboe/Vib", 0.85, 0.08, 0.5, lead=0.04, release=0.45)
         self.bassoon = Instrument(W + "Bassoon/vib", 0.8, 0.22, 0.4, lead=0.04, release=0.4)
         self.glock = Instrument("Percussion/Glock", 0.42, 0.24, 0.55, lead=0.0, release=1.2, short=True, keep=4.0)
+        # Mesenlla: a piccolo played softly stands in for the shepherds' recorders.
+        self.piccolo = Instrument(W + "Piccolo/Sus", 1.1, 0.2, 0.55, lead=0.04, release=0.45)
+        self.flute_short = Instrument(W + "Flute/stac", 0.7, -0.14, 0.45, lead=0.0, release=0.3, short=True)
 
 
 def low_strings(s, o, chords, first_bar, vel, basses=True):
@@ -1102,6 +1116,170 @@ def compose_fort_dawn(o):
 
 # --- Mixing -------------------------------------------------------------------------------------
 
+# --- Mesenlla -----------------------------------------------------------------------------------
+# F sharp minor, luminous rather than dark: harp everywhere, strings like evening air, a flute and a
+# piccolo for the shepherds' pipes, and bells (glockenspiel, bell tree, triangle). Its own theme.
+
+MES_CHORDS = ["F#m", "D", "A", "E", "F#m", "D", "Bm", "Esus",
+    "D", "A", "E", "F#m", "G", "D", "Esus", "E",
+    "F#m", "D", "A", "E", "F#m", "D", "Bm", "Esus",
+    "D", "A", "G", "D", "Bm", "D", "Esus", "E"]
+MES_DAWN_CHORDS = ["A", "E", "F#m", "D", "A", "D", "E", "E",
+    "D", "A", "E", "F#m", "D", "A", "E", "A",
+    "A", "E", "F#m", "D", "A", "D", "E", "E",
+    "D", "A", "Bm", "E", "D", "A", "E", "A"]
+MES_A = "F#4:2 C#5:1.5 B4:.5 | A4:2 F#4:1 A4:1 | E5:2 C#5:1.5 D5:.5 | B4:3 G#4:1 | F#4:2 C#5:1.5 D5:.5 | F#5:2 E5:1 D5:1 | C#5:1.5 D5:.5 B4:2 | B4:4"
+MES_B = "A5:3 F#5:1 | E5:2 C#5:1 E5:1 | G#5:3 E5:1 | F#5:2 C#5:2 | D5:3 B4:1 | A5:2 F#5:1 D5:1 | E5:2 B4:1 E5:1 | G#5:2 E5:1 B4:1"
+MES_B_LATE = "A5:3 F#5:1 | E5:2 C#5:1 E5:1 | D5:3 B4:1 | F#5:2 D5:2"
+MES_CLOSING = "F#5:2 D5:2 | E5:1 B4:1 A4:1 B4:1 | B4:4"
+MES_DAWN_A = "A4:2 E5:1.5 D5:.5 | B4:2 G#4:1 B4:1 | F#5:2 C#5:1.5 A4:.5 | D5:3 F#5:1 | E5:2 A5:1.5 G#5:.5 | F#5:2 E5:1 D5:1 | E5:1.5 F#5:.5 G#5:2 | E5:4"
+MES_DAWN_B = "F#5:3 A5:1 | E5:2 C#5:1 E5:1 | G#5:3 B5:1 | A5:2 F#5:1 C#5:1 | D5:3 F#5:1 | E5:2 C#5:1 A4:1 | B4:2 G#4:1 B4:1 | A4:4"
+MES_DAWN_C = "A5:2 F#5:2 | E5:3 C#5:1 | D5:2 F#5:1 B5:1 | B5:3 G#5:1 | A5:2 F#5:1 D5:1 | C#6:2 A5:2 | B5:2 G#5:1 E5:1 | A5:4"
+OVER_E = (6, 8, 9, 11, 1, 2, 4)  # A major from F sharp, for sweeps over E
+
+
+def piping(s, inst, chords, first_bar, vel):
+    """A shepherd's pipe tune in short notes over the chord, like a call across the valley."""
+    figure = ((0, 0.0, 0.5), (1, 0.5, 0.5), (2, 1.0, 1.0), (1, 2.0, 0.5), (0, 2.5, 1.5))
+    for i, ch in enumerate(chords):
+        top = tones(ch, 74, 86)
+        beat = (first_bar + i - 1) * 4.0
+        for k, (step, at, length) in enumerate(figure):
+            s.note(inst, top[min(step, len(top) - 1)], beat + at, length, vel * (1.0 if k == 0 else 0.8))
+
+
+def compose_mesenlla_night(o):
+    s = Score("mesenlla_night", 88)
+    d = o.drums
+    s.dynamics = [(1, 0.5), (8, 0.55), (9, 0.6), (16, 0.7), (17, 0.88), (24, 0.92), (25, 0.72), (29, 0.58), (32, 0.5), (33, 0.5)]
+    ch = MES_CHORDS
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.66, up_only=i % 4 == 3)
+    play_pad(s, o.violas, ch, 1, 2, 57, 69, 0.32)
+    low_strings(s, o, ch, 1, 0.44, basses=False)
+    sparkle(s, o.glock, ch, 1, 1, 0.72, lo=81, hi=93)
+    for bar in (1, 9, 17, 25):
+        d.belltree(s, (bar - 1) * 4.0, 0.6)
+    # I. The flute alone over the harp.
+    s.play_line(o.flute, MES_A, 1, vel=0.7)
+    # II. The pipes answer from across the valley; violins take the answer.
+    s.play_line(o.violins, MES_B, 9, vel=0.62, players=2)
+    piping(s, o.piccolo, ch[8:12], 9, 0.55)
+    play_pad(s, o.vln_trem, ch[12:16], 13, 2, 69, 81, 0.28)
+    harp_run(s, o.harp, 62.0, 2.0, 57, 88, 0.55, OVER_E)
+    d.swell(s, 64.0, 0.42, "Median")
+    # III. The theme in the strings and flute together, the horns very far off.
+    s.play_line(o.violins, MES_A, 17, shift=12, vel=0.82, players=3)
+    s.play_line(o.flute, MES_A, 17, shift=12, vel=0.5)
+    s.play_line(o.horns, MES_A, 17, vel=0.42, players=2)
+    pulse_low(s, o, ch[16:24], 17, 0.52)
+    for bar in (17, 19, 21, 23):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.48)
+        d.triangle(s, (bar - 1) * 4.0, 0.42)
+    # IV. The light fading: pipes, flute and bells.
+    s.play_line(o.flute, MES_B_LATE, 25, vel=0.6, swell=True)
+    piping(s, o.piccolo, ch[24:28], 25, 0.36)
+    s.play_line(o.violins, MES_CLOSING, 30, vel=0.58, players=2)
+    return s
+
+
+def compose_mesenlla_hunted(o):
+    s = Score("mesenlla_hunted", 99)
+    d = o.drums
+    s.dynamics = [(1, 0.82), (8, 0.86), (9, 0.86), (16, 0.92), (17, 1.0), (24, 1.0), (25, 0.9), (32, 0.96), (33, 0.82)]
+    ch = MES_CHORDS
+    drive_strings(s, o, ch[:8], 1, 0.76)
+    drive_strings(s, o, ch[8:], 9, 0.84, violins=True)
+    for i, c in enumerate(ch):
+        drum_bar(s, d, c, i + 1, 0.84)
+        harp_bar(s, o.harp, c, i + 1, 0.58, up_only=True)
+    for bar in (8, 16, 24, 32):
+        drum_fill(s, d, ch[bar - 1], bar, 0.82)
+    for bar in (9, 17, 25):
+        d.crash(s, (bar - 1) * 4.0, 0.62)
+        d.belltree(s, (bar - 1) * 4.0, 0.8)
+    s.play_line(o.horns, MES_A, 1, vel=0.8, players=3)
+    s.play_line(o.flute, MES_A, 1, shift=12, vel=0.6)
+    s.play_line(o.violins, MES_B, 9, vel=0.9, players=3)
+    s.play_line(o.trumpets, MES_B, 9, shift=-12, vel=0.8, players=2)
+    s.play_line(o.violins, MES_A, 17, shift=12, vel=1.0, players=3)
+    s.play_line(o.trombones, MES_A, 17, shift=-12, vel=0.86, players=2)
+    s.play_line(o.piccolo, MES_A, 17, shift=12, vel=0.55)
+    for i in range(24, 32):
+        brass_stabs(s, o, ch[i], i + 1, 0.86)
+    s.play_line(o.violins, MES_B_LATE, 25, vel=0.9, players=3)
+    s.play_line(o.violins, MES_CLOSING, 30, vel=0.86, players=3)
+    s.play_line(o.horns, MES_CLOSING, 30, shift=-12, vel=0.86, players=3)
+    sparkle(s, o.glock, ch, 1, 1, 0.66, lo=81, hi=93)
+    return s
+
+
+def compose_mesenlla_dawn(o):
+    s = Score("mesenlla_dawn", 111)
+    d = o.drums
+    s.dynamics = [(1, 0.9), (16, 0.95), (17, 0.7), (24, 0.8), (25, 1.0), (33, 0.9)]
+    ch = MES_DAWN_CHORDS
+    low_strings(s, o, ch, 1, 0.76)
+    play_pad(s, o.violas, ch, 1, 3, 57, 72, 0.62, players=2)
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.74, up_only=True)
+    sparkle(s, o.glock, ch, 1, 1, 0.72, lo=81, hi=93)
+    for bar in (1, 9, 17, 25):
+        harp_run(s, o.harp, (bar - 1) * 4.0 - 2.0, 2.0, 57, 90, 0.6, (9, 11, 1, 2, 4, 6, 8))
+        d.belltree(s, (bar - 1) * 4.0, 0.8)
+        d.triangle(s, (bar - 1) * 4.0, 0.55)
+    s.play_line(o.violins, MES_DAWN_A, 1, shift=12, vel=0.9, players=3)
+    s.play_line(o.flute, MES_DAWN_A, 1, shift=12, vel=0.62)
+    s.play_line(o.horns, MES_DAWN_A, 1, vel=0.64, players=2)
+    s.play_line(o.violins, MES_DAWN_B, 9, vel=0.92, players=3)
+    piping(s, o.piccolo, ch[8:16], 9, 0.5)
+    play_pad(s, o.trombones, ch[:16], 1, 2, 45, 57, 0.54)
+    for bar in list(range(1, 17)) + list(range(25, 33)):
+        c = ch[bar - 1]
+        d.timp(s, root_in(c, 38), (bar - 1) * 4.0, 0.62)
+    # A breath of morning: the flute and harp alone.
+    s.play_line(o.flute, MES_DAWN_A, 17, shift=12, vel=0.66)
+    play_pad(s, o.vln_trem, ch[16:24], 17, 3, 69, 84, 0.32)
+    d.roll(s, 37 + 12, 92.0, 4.0, 0.3, 0.9)
+    d.swell(s, 96.0, 0.62, "Median")
+    # And the sunrise over the peaks.
+    s.play_line(o.violins, MES_DAWN_C, 25, vel=0.95, players=3)
+    s.play_line(o.trumpets, MES_DAWN_C, 25, shift=-12, vel=0.86, players=2)
+    s.play_line(o.piccolo, MES_DAWN_C, 25, vel=0.5)
+    play_pad(s, o.trombones, ch[24:32], 25, 2, 45, 57, 0.66)
+    pulse_low(s, o, ch[24:32], 25, 0.7)
+    return s
+
+
+def compose_menu_mesenlla(o):
+    """The main menu over the Valleys: the theme as a lullaby for harp, flute and bells, then the pipes and strings."""
+    s = Score("menu_mesenlla", 122)
+    d = o.drums
+    s.dynamics = [(1, 0.5), (8, 0.55), (9, 0.6), (16, 0.7), (17, 0.86), (24, 0.92), (25, 0.68), (32, 0.5), (33, 0.5)]
+    ch = MES_CHORDS[:16] + MES_DAWN_CHORDS[16:24] + MES_CHORDS[24:32]
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.7, up_only=i % 2 == 1)
+    low_strings(s, o, ch, 1, 0.44, basses=False)
+    sparkle(s, o.glock, ch, 1, 1, 0.7, lo=81, hi=93)
+    for bar in (1, 9, 17, 25):
+        d.belltree(s, (bar - 1) * 4.0, 0.62)
+    s.play_line(o.flute, MES_A, 1, vel=0.66)
+    play_pad(s, o.violas, ch[:8], 1, 2, 57, 69, 0.32)
+    s.play_line(o.solo_violin, MES_B, 9, vel=0.66)
+    piping(s, o.piccolo, ch[12:16], 13, 0.4)
+    play_pad(s, o.violins, ch[8:16], 9, 3, 65, 77, 0.32)
+    harp_run(s, o.harp, 62.0, 2.0, 57, 88, 0.55, OVER_E)
+    s.play_line(o.violins, MES_DAWN_A, 17, shift=12, vel=0.84, players=3)
+    s.play_line(o.horns, MES_DAWN_A, 17, vel=0.52, players=2)
+    pulse_low(s, o, ch[16:24], 17, 0.5)
+    for bar in (17, 19, 21, 23):
+        d.triangle(s, (bar - 1) * 4.0, 0.45)
+    s.play_line(o.flute, MES_B_LATE, 25, vel=0.6, swell=True)
+    s.play_line(o.solo_violin, MES_CLOSING, 30, vel=0.6)
+    play_pad(s, o.violas, ch[24:32], 25, 2, 57, 69, 0.34)
+    return s
+
+
 def hall(seconds=2.9, seed=5):
     """The room everything is played in: a big stone hall, bright for a moment, then dark."""
     rng = np.random.default_rng(seed)
@@ -1207,7 +1385,9 @@ def write(name, x):
 
 COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_dawn, "menu": compose_menu,
     "mists_night": compose_mists_night, "mists_hunted": compose_mists_hunted, "mists_dawn": compose_mists_dawn,
-    "fort_night": compose_fort_night, "fort_hunted": compose_fort_hunted, "fort_dawn": compose_fort_dawn}
+    "fort_night": compose_fort_night, "fort_hunted": compose_fort_hunted, "fort_dawn": compose_fort_dawn,
+    "mesenlla_night": compose_mesenlla_night, "mesenlla_hunted": compose_mesenlla_hunted, "mesenlla_dawn": compose_mesenlla_dawn,
+    "menu_mesenlla": compose_menu_mesenlla}
 
 
 def main():

@@ -137,7 +137,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("suite", choices=["regressions", "gameplay", "network", "rework", "features", "board", "creatures"])
     parser.add_argument("--godot", default=os.environ.get("GODOT", "godot"))
-    parser.add_argument("--mode", default="coop", choices=["coop", "ffa", "teams", "fort", "mists", "bots", "botsffa", "ride", "chariot", "room", "commander", "bandit", "cartographer"])
+    parser.add_argument("--mode", default="coop", choices=["coop", "ffa", "teams", "fort", "mists", "bots", "botsffa", "ride", "chariot", "room", "commander", "bandit", "cartographer", "mesenlla"])
     parser.add_argument("--case", default="", help="Run one named gameplay method")
     parser.add_argument("--group", default="all", choices=["all", "core", "recent", "legacy", "classes", "world"])
     parser.add_argument("--timeout", type=int, default=1200)

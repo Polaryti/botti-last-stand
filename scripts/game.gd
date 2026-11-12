@@ -34,7 +34,10 @@ var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
 var night_map := "village"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
-	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."}}
+	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
+	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."}}
+## The maps All vs All and Teams can be played on: the Mists have no room to run.
+const VERSUS_MAPS := ["village", "mesenlla"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
@@ -98,7 +101,9 @@ func owns_class(id: String) -> bool:
 ## Which map a night is played on: the host decides in a game together.
 func current_map() -> String:
 	if Net.active():
-		return "village" if Net.pvp() else Net.night_map
+		if Net.pvp():
+			return Net.night_map if Net.night_map in VERSUS_MAPS else "village"
+		return Net.night_map
 	return night_map
 
 
@@ -261,7 +266,7 @@ const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 
 
 
 func zombie_pool_plan() -> Dictionary:
-	if mode != Mode.SANDBOX and current_map() in SpawnRules.MESENLLA:
+	if mode == Mode.NIGHT and current_map() in SpawnRules.MESENLLA:
 		return MESENLLA_POOLS.duplicate()
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:

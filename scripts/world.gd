@@ -168,6 +168,7 @@ var _moon_colour := Color(0.6, 0.7, 1.0)
 var _fog_now := 0.03
 var _fog_thick := 1.0
 var surveys := {} # Cartographer's peer -> SurveyNet
+var map_id := "village" # which map: village, mists, fort, mesenlla
 var now := 0.0 # game seconds: unlike the system clock, these stop during a pause
 
 
@@ -223,8 +224,9 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
+	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
 	half_size = float(map.land_half)
 	HALF_SIZE = half_size
@@ -265,6 +267,8 @@ func setup(game_mode: int) -> void:
 	prepare_forest_wood()
 	if terrain.has_islands():
 		_mists_look()
+	elif map_id == "mesenlla":
+		_mesenlla_look()
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
 		var atmosphere := MistAtmosphere.new()
 		atmosphere.name = "VillageAura" if fort == null else "FortAura"
@@ -362,6 +366,8 @@ func _map_file() -> String:
 		Game.Mode.NIGHT:
 			if Game.current_map() == "mists":
 				return "res://maps/mists.tscn"
+			if Game.current_map() == "mesenlla":
+				return "res://maps/mesenlla.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -669,6 +675,30 @@ func _build_environment() -> void:
 	_moon.directional_shadow_max_distance = 45.0
 	add_child(_moon)
 	_build_sky()
+
+
+## Mesenlla: a luminous twilight that never quite becomes night. The sky still glows rose and amber
+## in the west, the light is violet and soft, and mist drifts lilac over the meadows.
+func _mesenlla_look() -> void:
+	night_bg = Color(0.1, 0.07, 0.17)
+	night_fog_colour = Color(0.26, 0.19, 0.31)
+	night_fog = 0.011 if Game.quality > 0 else 0.014
+	day_fog = 0.004 if Game.quality > 0 else 0.008
+	night_ambient = Color(0.5, 0.45, 0.66)
+	night_sky_shows = true
+	night_moon_colour = Color(1.0, 0.72, 0.6)
+	night_moon = 0.55
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.name = "MesenllaAura"
+	atmosphere.world = self
+	atmosphere.place = MistAtmosphere.Place.MESENLLA
+	add_child(atmosphere)
+	# Islands hang high and far off: the sky has to be further away than they are.
+	_sky_root.scale = Vector3.ONE * 2.3
+	_sky_material.set_shader_parameter("dusk", 1.0)
+	_sky_material.set_shader_parameter("tint", Vector3(1.1, 0.95, 1.2))
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
 
 
 ## A violet night with nothing under it.
@@ -1668,8 +1698,7 @@ func _build_zombie_pools() -> void:
 
 func spawn_map() -> String:
 	if mode == Game.Mode.SANDBOX: return ""
-	if mode == Game.Mode.FORT: return "fort"
-	return "mists" if terrain.has_islands() else "village"
+	return map_id
 
 
 func spawn_zombie(id: String, at := Vector3.INF) -> bool:
@@ -1999,7 +2028,8 @@ func recycle_zombie(z: Zombie) -> void:
 
 
 func on_zombie_killed(z: Zombie) -> void:
-	if z.def.get("mist_boss", false): director._mist_boss_defeated = true
+	if z.is_boss():
+		director.boss_fallen(z)
 	make_noise(z.position, 6.0)
 	if Net.is_host():
 		Net.zombie_died(z, z.last_hitter)
