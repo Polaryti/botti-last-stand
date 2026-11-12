@@ -1,6 +1,7 @@
 # Changelog
 
 ## Development — Smoother Crowds
+- Store class descriptions and profession summaries scroll within the detail panel, while the preview and purchase controls stay visible.
 - Terrain and bridge checks do less repeated work in busy areas, with the same walking surfaces and approach margins.
 - Stationary enemies reuse their ground-shadow placement; moving or airborne enemies still update correctly. Terrain rebuilds refresh cached shadow results.
 - Animation distance checks retain the same detail and update rates with simpler calculations.

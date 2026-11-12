@@ -685,13 +685,22 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
 	words.add_child(_soft("Health %d. Speed %d%%." % [int(c["hp"]), int(round(float(c["speed"]) * 100.0))], 24))
+	# The preview and action stay visible; prose can grow without stretching the screen.
+	var scroll := DragScroll.new()
+	scroll.name = "ClassDescriptionScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(scroll)
+	var prose := VBoxContainer.new()
+	prose.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	prose.add_theme_constant_override("separation", 12)
+	scroll.add_child(prose)
 	var desc := _body(ClassPresentation.description(id), 25)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	detail.add_child(desc)
+	prose.add_child(desc)
 	for spec: Dictionary in AbilityData.tree(id)["specs"]:
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 12)
-		detail.add_child(line)
+		prose.add_child(line)
 		var emblem := IconView.new("spec_%s" % spec["id"], ClassDefs.color(id), 44.0)
 		emblem.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		line.add_child(emblem)
@@ -707,7 +716,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 	if id == "ranger" and not in_store and ShopDefs.PETS.any(func(p: String) -> bool: return Game.owns_item(p)):
 		var pets := HBoxContainer.new()
 		pets.add_theme_constant_override("separation", 6)
-		detail.add_child(pets)
+		prose.add_child(pets)
 		pets.add_child(_body("Pet", 23))
 		for pet: String in ShopDefs.PETS:
 			if pet == "wolf" or Game.owns_item(pet):
@@ -715,7 +724,6 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 				pets.add_child(_button(pet.capitalize(), func() -> void:
 					Game.choose_pet(chosen_pet)
 					_fill_class_detail(detail, id, mode, in_store), Vector2(120, 48), Game.pet == pet))
-	detail.add_child(_expand(true))
 	if not owned and c.get("unavailable", false):
 		var how := _body(CodexPanel.acquisition(id), 26)
 		how.add_theme_color_override("font_color", UiTheme.ASH)
