@@ -604,7 +604,16 @@ func _use_skills() -> void:
 	var kind := "stance" if p.class_id == "adept" else ("ki_blast" if p.class_id == "monk" and p.spec_id == "" else p.spec_id)
 	if p.class_id == "bandit" and p.spec_id == "":
 		kind = "into_shadows"
+	if p.class_id == "cartographer":
+		kind = "beacon"
 	match kind:
+		"beacon":
+			# A new marker where the fight is, or (for a Pathfinder) on new ground when a find is due.
+			var survey: SurveyNet = world.surveys.get(p.net_id()) if world.surveys.has(p.net_id()) else null
+			var fresh_ground := survey == null or not is_instance_valid(survey) or not survey.near_beacon(p.global_position, 9.0)
+			var find_due := p.spec_id == "pathfinder" and p.find_rest_left <= 0.0 and (p.last_find == Vector3.INF or p.last_find.distance_to(p.global_position) > CartographerKit.FIND_GAP + p.m("find_gap"))
+			if fresh_ground and ((has_target and dist < 20.0) or find_due):
+				p.use_art()
 		"into_shadows":
 			if p.invis_left <= 0.0 and p.can_vanish() and ((low and near > 0) or (has_target and dist < 8.0)):
 				p.use_art()

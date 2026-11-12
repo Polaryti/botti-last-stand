@@ -369,10 +369,49 @@ def chakram():
 for g in (greatsword, battleaxe, chakram):
     PLAIN.append(g)
 
+# Beyond the Mists: the Cartographer and the Pathfinder's finds
+AZURE = ("#9fd6ff", "#2a6fb8")
+def beacon():
+    # A survey post: a pole with a crossbar and a pennant, and a lit lamp on top.
+    return (line("#c08a52", 7, (50, 94), (50, 28)) + line("#c08a52", 5, (34, 50), (66, 50))
+        + path(("#ffe08a", "#e0a020"), "M52 30 L84 38 L52 46Z", 2.4) + circ(AZURE, 50, 20, 13) + circ("#ffffff", 46, 16, 4, 0) + rect(ROCK, 30, 88, 40, 8, 2))
+def link():
+    # Two posts and the line of light between them.
+    return (line("#9fd6ff", 5, (22, 40), (78, 40), ink=False) + line("#ffffff", 2, (22, 40), (78, 40), ink=False)
+        + line("#c08a52", 6, (22, 90), (22, 40)) + line("#c08a52", 6, (78, 90), (78, 40)) + circ(AZURE, 22, 34, 9) + circ(AZURE, 78, 34, 9))
+def waygate():
+    # A stone arch with a swirl of another world inside it.
+    return (path(ROCK, "M14 94 L14 44 C14 14 86 14 86 44 L86 94 L70 94 L70 46 C70 30 30 30 30 46 L30 94Z")
+        + path(("#e2f4ff", "#3d7fd0"), "M30 94 L30 46 C30 30 70 30 70 46 L70 94Z", 2) + curve("#ffffff", 4, "M50 82 C40 80 38 64 50 62 C60 62 60 72 52 72", ink=False))
+def machete():
+    # A broad, slightly hooked chopping blade with a wrapped grip.
+    return (path(STEEL, "M30 70 L74 8 C88 10 92 22 84 34 L44 80Z") + line("#7a859c", 2.4, (42, 66), (78, 20), ink=False)
+        + rect(DSTEEL, 26, 66, 22, 7, 2) + line("#5a3a1e", 9, (32, 74), (14, 94)) + "".join(line("#c08a52", 2.4, (a, b), (a + 6, b + 4), ink=False) for a, b in ((16, 86), (22, 80))))
+def bolas():
+    # Three weighted cords, tied in the middle.
+    return ("".join(curve("#d8c9a6", 4, "M50 50 " + d) for d in ("C40 30 30 24 20 18", "C64 36 74 26 84 20", "C50 66 52 78 52 88"))
+        + circ(ROCK, 20, 18, 11) + circ(ROCK, 84, 20, 11) + circ(ROCK, 52, 86, 11) + circ(LEATHER, 50, 50, 7))
+def lantern():
+    # A brass lantern with a warm light inside.
+    return (curve("#8f5f1e", 5, "M38 22 C38 6 62 6 62 22") + rect(BRASS, 32, 20, 36, 8, 2) + rect(("#fff6c0", "#ffb52e"), 34, 28, 32, 46, 3)
+        + line("#8f5f1e", 3, (50, 28), (50, 74), ink=False) + rect(BRASS, 28, 74, 44, 10, 2) + circ(HOT, 50, 50, 8, 0))
+def compass():
+    return circ(BRASS, 50, 50, 44) + circ("#f6efdc", 50, 50, 34, 2) + poly(RED, (50, 18), (58, 50), (42, 50)) + poly("#59627a", (50, 82), (58, 50), (42, 50)) + circ(BRASS, 50, 50, 5, 1.5)
+for g in (beacon, link, waygate, machete, bolas, lantern, compass):
+    PLAIN.append(g)
+
+def crest_cartographer():
+    # An azure map sheet, folded in three, with a route to a star.
+    return (poly(("#5aa6e8", "#163f78"), (6, 14), (36, 4), (64, 14), (94, 4), (94, 86), (64, 96), (36, 86), (6, 96))
+        + line("#0f2f58", 2, (36, 4), (36, 86), ink=False) + line("#0f2f58", 2, (64, 14), (64, 96), ink=False)
+        + curve("#fff1c8", 4, "M18 80 C30 60 44 74 52 56 C58 42 66 44 72 32", ink=False)
+        + at(76, 26, 0.3, star()) + at(18, 80, 0.16, circ(RED, 50, 50, 40)))
+CRESTS.append(crest_cartographer)
+
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
-    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430")}
+    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -416,6 +455,10 @@ SPECS = {
     "thief": ("bandit", lambda: at(44, 58, 0.66, hand()) + at(68, 30, 0.42, circ(GOLD, 50, 50, 34) + circ("none", 50, 50, 22, 2)) + at(30, 26, 0.3, dagger())),
     "mercenary": ("bandit", lambda: path(NIGHT, "M10 76 C14 30 86 30 90 76Z") + at(50, 50, 0.38, moon()) + at(30, 40, 0.14, star()) + at(70, 36, 0.12, star())),
     "highwayman": ("bandit", lambda: "".join(at(50 + dx, 56, 0.5, turn(a, dagger())) for dx, a in ((-20, -36), (-10, -18), (0, 0), (10, 18), (20, 36)))),
+    "star_reader": ("cartographer", lambda: path(NIGHT, "M12 80 L12 20 L88 20 L88 80Z", 0) + line("#cfe8ff", 3, (26, 66), (50, 30), (76, 58), (26, 66), ink=False)
+        + at(26, 66, 0.22, star()) + at(50, 30, 0.26, star()) + at(76, 58, 0.22, star())),
+    "worlds_traveler": ("cartographer", lambda: at(50, 52, 0.78, waygate()) + at(76, 24, 0.24, star())),
+    "pathfinder": ("cartographer", lambda: at(36, 58, 0.62, turn(-20, machete())) + at(68, 40, 0.5, compass())),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),
 }
 

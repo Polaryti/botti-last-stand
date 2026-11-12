@@ -18,7 +18,7 @@ const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
 const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
-	"bandit": Vector3(0.36, 0.16, 0.28)}
+	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5)}
 
@@ -95,6 +95,7 @@ static func _pieces(id: String) -> Dictionary:
 			"plague_doctor": built = _plague_doctor()
 			"artificer": built = _artificer()
 			"bandit": built = _bandit()
+			"cartographer": built = _cartographer()
 		_made[id] = built
 	return _made[id]
 
@@ -307,6 +308,36 @@ static func _bandit() -> Dictionary:
 	hips.prism(Vector3(-0.44, 0.16, 0.2), Vector3(-0.44, -0.16, 0.2), 0.08, 0.15, 7, LEATHER)
 	hips.prism(Vector3(-0.44, 0.16, 0.2), Vector3(-0.44, 0.22, 0.2), 0.06, 0.03, 7, GOLD)
 	hips.box(Vector3(0.46, 0.0, 0.14), Vector3(0.05, 0.36, 0.08), DARK_LEATHER)
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+
+
+## Cartographer: a broad traveller's hat with an azure band and a brass compass at the front, a
+## map case slung across the back, a compass on the chest strap, and a spyglass at the hip.
+static func _cartographer() -> Dictionary:
+	const AZURE := Color(0.2, 0.46, 0.78)
+	const FELT := Color(0.33, 0.25, 0.18)
+	var head := LowPoly.new()
+	head.prism(Vector3(0, 0.7, 0.02), Vector3(0, 0.8, 0.02), 0.84, 0.8, 12, FELT)
+	head.prism(Vector3(0, 0.8, 0.0), Vector3(0, 1.14, -0.02), 0.56, 0.48, 10, FELT.lightened(0.06))
+	head.prism(Vector3(0, 0.8, 0.0), Vector3(0, 0.92, 0.0), 0.575, 0.565, 10, AZURE)
+	_disc(head, Vector3(0, 0.88, 0.57), Vector3.BACK, 0.11, 0.05, BRASS, 8)
+	head.box(Vector3(0, 0.88, 0.6), Vector3(0.025, 0.12, 0.02), RED)
+	var chest := LowPoly.new()
+	# The map case, corner to corner across the back, capped in leather.
+	chest.prism(Vector3(-0.42, -0.42, -0.5), Vector3(0.38, 0.62, -0.52), 0.16, 0.16, 8, AZURE.darkened(0.2))
+	chest.prism(Vector3(-0.48, -0.5, -0.5), Vector3(-0.42, -0.42, -0.5), 0.18, 0.18, 8, LEATHER)
+	chest.prism(Vector3(0.38, 0.62, -0.52), Vector3(0.44, 0.7, -0.52), 0.18, 0.18, 8, LEATHER)
+	chest.prism(Vector3(0.44, 0.7, -0.52), Vector3(0.5, 0.78, -0.52), 0.1, 0.1, 6, Color(0.92, 0.86, 0.68))
+	# The strap that holds it, and a brass compass hung on it.
+	chest.box(Vector3(0, -0.02, 0.36), Vector3(0.12, 0.94, 0.04), DARK_LEATHER, Vector3(0, 0, 32))
+	_disc(chest, Vector3(-0.08, 0.1, 0.42), Vector3.BACK, 0.13, 0.05, BRASS, 10)
+	_disc(chest, Vector3(-0.08, 0.1, 0.45), Vector3.BACK, 0.09, 0.02, WHITE, 10)
+	chest.box(Vector3(-0.08, 0.13, 0.465), Vector3(0.02, 0.08, 0.01), RED)
+	var hips := LowPoly.new()
+	hips.prism(Vector3(0.46, 0.2, 0.1), Vector3(0.46, -0.3, 0.16), 0.06, 0.05, 8, BRASS)
+	hips.prism(Vector3(0.46, -0.3, 0.16), Vector3(0.46, -0.36, 0.17), 0.065, 0.065, 8, DARK_STEEL)
+	hips.box(Vector3(-0.44, 0.06, 0.12), Vector3(0.14, 0.3, 0.26), LEATHER)
+	hips.box(Vector3(-0.44, 0.2, 0.12), Vector3(0.16, 0.06, 0.28), DARK_LEATHER)
 	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
 
 

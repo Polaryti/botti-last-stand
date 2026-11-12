@@ -34,8 +34,9 @@ func _ready() -> void:
 	p.head.rotation.x = 0.0
 	p.set_physics_process(false)
 	p.set_process(false)
-	for weapon: String in ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword", "battleaxe", "chakram"]:
-		p.class_id = "chivalry" if weapon == "lance" else "infantry" if WeaponDefs.is_two_handed(weapon) or weapon == "chakram" else "ranger"
+	for weapon: String in ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword", "battleaxe", "chakram", "machete", "bolas"]:
+		p.class_id = "chivalry" if weapon == "lance" else "cartographer" if weapon in ["machete", "bolas"] else "infantry" if WeaponDefs.is_two_handed(weapon) or weapon == "chakram" else "ranger"
+		p.spec_id = "pathfinder" if p.class_id == "cartographer" else ""
 		p.slots = [weapon, null]
 		p.current = 0
 		p.arrows = 30
@@ -75,7 +76,7 @@ func _ready() -> void:
 	await get_tree().create_timer(0.2).timeout
 	await snap("vanguard_banner")
 	a.show_statuses(0)
-	for id: String in ["bow", "longbow", "crossbow", "flail", "scythe", "greatsword", "battleaxe", "chakram"]:
+	for id: String in ["bow", "longbow", "crossbow", "flail", "scythe", "greatsword", "battleaxe", "chakram", "machete", "bolas"]:
 		a._attack_seen = 0
 		a.apply_pose(at, 0.0, 0.0, Vector3.ZERO, 1.0, 0, 0, id, 1.0)
 		a._hand.reload_left = 0.0

@@ -258,6 +258,10 @@ func _fly(delta: float) -> void:
 			shooter.on_shot_rival(peer, fire, frost)
 			if poison.y > 0.0:
 				world.status_rival(t, Net.Status.POISON, poison.y)
+			if slow_secs > 0.0:
+				world.status_rival(t, Net.Status.SLOW, slow_secs)
+			if bleed.y > 0.0:
+				world.status_rival(t, Net.Status.BLEED, bleed.y)
 			if sparks > 0:
 				world.status_rival(t, Net.Status.STUN, 0.5)
 			if kind != Kind.AXE:

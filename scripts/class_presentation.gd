@@ -46,6 +46,10 @@ const COPY := {
 		"What the dark hides, the Bandit keeps.",
 		"Turn invisible on demand and specialize in stealing, mercenary night or knife-throwing plunder."
 	],
+	"cartographer": [
+		"Every road beyond the Mists was drawn by someone first.",
+		"Plant linked beacons that speed, mend and mark, and specialize in constellations, waygates or hidden finds."
+	],
 	"commander": [
 		"A single voice can turn the battle.",
 		"Use Command and unlock a profession-specific Last Command at level ten."

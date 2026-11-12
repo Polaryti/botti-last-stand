@@ -40,6 +40,8 @@ func _ready() -> void:
 	print("REWORK commander")
 	await _commander()
 	await _bandit()
+	print("REWORK cartographer")
+	await _cartographer()
 	print("REWORK statuses")
 	_statuses()
 	_projectile_lifecycle()
@@ -899,3 +901,117 @@ func _bandit() -> void:
 	p.on_kill(mark)
 	check(not w.pickups.is_empty() and w.pickups.back().kind in [Pickup.Kind.FOOD, Pickup.Kind.ARROWS, Pickup.Kind.POWER], "Plunder leaves something behind")
 	mark.release()
+
+
+## Beacons straight in front of the Cartographer, at the given offsets, each faced north.
+func plant_at(spots: Array) -> SurveyNet:
+	var start := p.global_position
+	for spot: Vector3 in spots:
+		p.global_position = Vector3(start.x + spot.x, w.ground_at(start + spot) + 0.05, start.z + spot.z + CartographerKit.PLANT_AHEAD)
+		p.yaw = 0.0
+		p.rotation.y = 0.0
+		CartographerKit.cast(p)
+	p.global_position = start
+	return w.surveys.get(p.net_id())
+
+
+func _cartographer() -> void:
+	var d: Dictionary = ClassDefs.ALL["cartographer"]
+	check(d["weapon"] == "spear" and ClassDefs.price("cartographer") == 880 and ClassDefs.for_sale().has("cartographer"), "the Cartographer starts with a Spear and is sold in the Store")
+	check(ClassDefs.weapon_categories("cartographer") == Array(["melee", "ranged", "exclusive"], TYPE_STRING, "", null), "Cartographer wields Melee and Ranged weapons, and the Pathfinder's own")
+	check(Game.CODES.values().has("cartographer"), "a Cartographer code exists, kept only as a hash")
+	var specs: Array = AbilityData.tree("cartographer")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["star_reader", "worlds_traveler", "pathfinder"], "Star Reader, Worlds Traveler and Pathfinder")
+	for id: String in ["crest_cartographer", "spec_star_reader", "spec_worlds_traveler", "spec_pathfinder", "beacon", "link", "waygate", "machete", "bolas", "lantern", "compass"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_throw", "bolas_wrap"]:
+		check(Sfx.NAMES.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# Linked beacons: speed near one, mending on a line, marks near one, and only three at a time.
+	pawn("cartographer")
+	check(p.art_def()["name"] == "Plant Beacon", "the Cartographer's ability is Plant Beacon")
+	p.use_art()
+	check(p._cast_kind == "cartographer", "it casts as the Cartographer")
+	await frames(90)
+	var survey: SurveyNet = w.surveys.get(p.net_id())
+	check(survey != null and survey.beacons.size() == 1, "a beacon stands in front of the Cartographer")
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	await frames(1)
+	survey = plant_at([Vector3(0, 0, 0), Vector3(12, 0, 0), Vector3(6, 0, -10)])
+	check(survey.beacons.size() == 3 and survey.links().size() == 3, "three beacons, all linked")
+	var a: Vector3 = survey.beacons[0]["at"]
+	var b: Vector3 = survey.beacons[1]["at"]
+	p.global_position = Vector3(a.x + 1.0, w.ground_at(a) + 0.05, a.z + 1.0)
+	await frames(4)
+	check(p._buffs.has("beacon_speed"), "near a beacon a friend runs faster")
+	var mid := (a + b) * 0.5
+	p.global_position = Vector3(mid.x, w.ground_at(mid) + 0.05, mid.z)
+	p.hp = 50.0
+	await frames(60)
+	check(p.hp > 50.0, "on the line between two beacons a friend mends (%.1f)" % p.hp)
+	var watched := target(a + Vector3(3, 0, 3))
+	await frames(80)
+	check(watched.reveal_left > 0.0, "an enemy near a beacon is marked")
+	watched.release()
+	plant_at([Vector3(30, 0, 30)])
+	check(survey.beacons.size() == 3 and survey.beacons[0]["at"] == b, "a fourth beacon pulls up the oldest")
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	# Star Reader: a constellation strengthens friends inside and strikes creatures with starlight.
+	pawn("cartographer", 0)
+	check(p.art_def()["name"] == "Set a Star Stone", "Star Reader sets Star Stones")
+	survey = plant_at([Vector3(-8, 0, 0), Vector3(8, 0, 0), Vector3(0, 0, -14)])
+	check(survey.kind() == "stars" and survey.triangles().size() == 1, "three linked stones hold a constellation")
+	var inside: Vector3 = (Vector3(survey.beacons[0]["at"]) + survey.beacons[1]["at"] + survey.beacons[2]["at"]) / 3.0
+	check(survey.in_constellation(inside) and not survey.in_constellation(inside + Vector3(0, 0, 30)), "and it covers the space between them")
+	p.global_position = Vector3(inside.x, w.ground_at(inside) + 0.05, inside.z)
+	var under := target(inside + Vector3(1.5, 0, 0))
+	await frames(4)
+	check(p._buffs.has("stars_melee_damage") and is_equal_approx(p.m("melee_damage"), 1.0 + CartographerKit.STAR_BONUS), "friends inside deal 20% more damage")
+	var hp0 := under.hp
+	await frames(int(SurveyNet.STAR_EVERY * 240) + 30)
+	check(under.hp < hp0, "starlight strikes creatures inside (%.0f)" % (hp0 - under.hp))
+	under.release()
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	# Worlds Traveler: step into one gate and out of the next.
+	pawn("cartographer", 1)
+	check(p.art_def()["name"] == "Raise a Waygate", "Worlds Traveler raises Waygates")
+	survey = plant_at([Vector3(0, 0, 0), Vector3(16, 0, 0)])
+	var gate_a: Vector3 = survey.beacons[0]["at"]
+	var gate_b: Vector3 = survey.beacons[1]["at"]
+	p.gate_rest_left = 0.0
+	p.global_position = Vector3(gate_a.x, w.ground_at(gate_a) + 0.05, gate_a.z)
+	await frames(3)
+	check(SurveyNet._flat(p.global_position, gate_b) < 2.5, "stepping into a Waygate comes out of the next (%.1f m)" % SurveyNet._flat(p.global_position, gate_b))
+	check(p._buffs.has("gate_speed") and p.gate_rest_left > 2.0, "with a burst of speed, and a rest before the next passage")
+	var rested := p.global_position
+	p.global_position = Vector3(gate_b.x, w.ground_at(gate_b) + 0.05, gate_b.z)
+	await frames(3)
+	check(SurveyNet._flat(p.global_position, gate_b) < 0.5, "not again until the rest is over")
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	# Pathfinder: new ground unearths finds only a Pathfinder can use.
+	pawn("cartographer", 2)
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	survey = plant_at([Vector3(0, 0, 0)])
+	var finds := w.pickups.filter(func(i: Pickup) -> bool: return i.item_id in CartographerKit.FINDS)
+	check(finds.size() == 1 and p.find_rest_left > 25.0, "a Pathfinder's beacon unearths a find, then rests")
+	plant_at([Vector3(20, 0, 0)])
+	check(w.pickups.filter(func(i: Pickup) -> bool: return i.item_id in CartographerKit.FINDS).size() == 1, "not again before the rest is over")
+	check(p.can_use("machete") and p.can_use("bolas"), "the Pathfinder can wield the Machete and the Bolas")
+	pawn("cartographer", 0)
+	check(not p.can_use("machete") and not p.can_use("bolas"), "another Cartographer cannot")
+	pawn("infantry")
+	check(not p.can_use("machete"), "nor any other class")
+	check(not WeaponDefs.lies_around("machete") and not WeaponDefs.lies_around("bolas") and not PowerDefs.pick_potion() == "lantern", "finds are never ordinary loot")
+	check(WeaponDefs.category("machete") == "exclusive" and WeaponDefs.category("bolas") == "exclusive", "the Codex calls them Exclusive Weapons")
+	pawn("cartographer", 2)
+	var pace := p.m("speed")
+	p.activate_power("lantern")
+	check(p.has_power("lantern") and (p._light == null or p._light.omni_range > 17.0), "the Wayfinder's Lantern lights the way")
+	check(is_equal_approx(CartographerKit.LANTERN_SPEED, 1.15) and is_equal_approx(p.m("speed"), pace), "and quickens the step through movement, not a skill bonus")
+	for left: SurveyNet in w.surveys.values():
+		if is_instance_valid(left):
+			left.queue_free()
+	w.surveys.clear()

@@ -1,5 +1,34 @@
 # Changelog
 
+## Development — Beyond the Mists, part 3: Cartographer
+
+### A new class: the Cartographer
+- In the Store for 880 Doubloons, or with a class code. 100 health, 105% speed. Starts with a Spear and uses melee and ranged weapons, but not Two-Handed ones.
+- Plant Beacon, every 5 seconds: a survey post in front of you. Up to three stand at a time (planting another pulls up the oldest), each for 60 seconds. Beacons within 24 m of each other are linked by a line of light.
+- Friends within 4 m of a beacon run 10% faster, friends standing on a line mend 2 health a second, and enemies within 10 m of a beacon are marked through walls for the Cartographer's side.
+- Core skills add speed, health, a fourth beacon, longer links, wider light and stronger mending.
+- A broad traveller's hat with an azure band, a map case across the back, a compass on the chest and a spyglass at the hip, with its own crest, skill icons and sounds.
+
+### Professions
+- Star Reader: beacons become Star Stones. Three stones linked to each other hold a constellation: friends inside deal 20% more damage, and every 2 seconds starlight strikes each enemy inside for 15. Skills add damage, faster starlight, protection, healing, slowing and starlight along the lines; at the top, Falling Star drops a star on the toughest enemy inside every 6 seconds (120 damage within 3 m and a 1 s stun).
+- Worlds Traveler: beacons become Waygates. You and your friends step into one and come out of the next linked gate with 30% more speed for 2 seconds, then can pass again after 3 seconds. Skills add speed, shorter rests, a blast or invisibility on arrival, healing, another gate and longer links; at the top, Rift Road throws enemies that step into a gate out of the farthest one, stunned for 2 seconds.
+- Pathfinder: a beacon planted 15 m or more from the last find unearths a Pathfinder find, once every 30 seconds. Skills add quicker and closer finds, health, speed, wider marking, food with each find, stronger finds and a longer Lantern; at the top, Lost Wonders unearths two at once.
+
+### Pathfinder finds (Pathfinder only, never ordinary loot)
+- Pathfinder's Machete: quick, wide chops that leave enemies bleeding.
+- Pathfinder's Bolas: thrown cords that slow whatever they hit for 2.5 seconds. No arrows needed.
+- Wayfinder's Lantern: for 20 seconds, marks every enemy within 30 m, lights the way further and makes you run 15% faster.
+
+### Codex
+- The Cartographer, its professions, skills and finds are in the Codex, Armory and class screen with the same stats, description and weapon tags.
+
+### Fixes
+- Knives and other shots that slow or cause bleeding now do so to rival players too, not only to creatures.
+
+### Playing together
+- Beacons, constellations and Waygates are the same on every phone; bots play the Cartographer too, and it counts on the Leaderboard.
+- Phones on this build only play with phones on the same build.
+
 ## Development — Beyond the Mists, part 2: Bandit
 
 ### A new class: the Bandit

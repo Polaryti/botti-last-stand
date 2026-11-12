@@ -2824,10 +2824,10 @@ func test_version_8() -> void:
 	ok(Game.owns_class("artificer"), "and the class is yours")
 	ok(Game.redeem_key(_code_of("artificer"))["result"] == "used", "the same code cannot be used twice")
 	Game.unlocked.clear()
-	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598 and ClassDefs.price("bandit") == 860, "the prices are set")
+	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598 and ClassDefs.price("bandit") == 860 and ClassDefs.price("cartographer") == 880, "the prices are set")
 	ok(ClassDefs.price("infantry") == 0, "the others are free")
 	var sale := ClassDefs.for_sale()
-	ok(sale.size() == 3 and sale.has("monk") and sale.has("artificer") and sale.has("bandit") and not sale.has("adept"), "the Store sells Monk, Artificer and Bandit, and not the switched-off Adept")
+	ok(sale.size() == 4 and sale.has("monk") and sale.has("artificer") and sale.has("bandit") and sale.has("cartographer") and not sale.has("adept"), "the Store sells Monk, Artificer, Bandit and Cartographer, and not the switched-off Adept")
 	Game.doubloons = 597
 	ok(not Game.buy_class("artificer") and Game.doubloons == 597, "you cannot buy what you cannot pay for")
 	Game.doubloons = 599
@@ -2861,7 +2861,7 @@ func test_version_8() -> void:
 	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
-	ok(m.panel.get_meta("list").get_child_count() == 4, "the Store opens, with its tabs and three classes")
+	ok(m.panel.get_meta("list").get_child_count() == 5, "the Store opens, with its tabs and four classes")
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await frames(2)
 	ok(m.panel.get_meta("list").get_child_count() == ClassDefs.available().size(), "the Sandbox only offers what you own")
@@ -3654,8 +3654,19 @@ func test_powers() -> void:
 	place(OPEN)
 	clear_pickups()
 	for id: String in PowerDefs.ALL:
-		w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
-		await seconds(0.25)
+		if PowerDefs.ALL[id].has("spec"):
+			# A Pathfinder find: anyone else walks past it.
+			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
+			await seconds(0.25)
+			ok(not pl.has_power(id) and w.pickups.any(func(i: Pickup) -> bool: return i.item_id == id), "%s stays on the ground for anyone but a %s" % [id, PowerDefs.ALL[id]["spec"]])
+			var was_spec := pl.spec_id
+			pl.spec_id = str(PowerDefs.ALL[id]["spec"])
+			await seconds(0.25)
+			pl.spec_id = was_spec
+			clear_pickups()
+		else:
+			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
+			await seconds(0.25)
 		ok(pl.has_power(id), "%s activates" % id)
 		var want := 20.0
 		ok(absf(float(pl.powers[id]) - want) < 1.0, "%s lasts %d s" % [id, want])

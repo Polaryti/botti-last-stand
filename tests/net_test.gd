@@ -83,7 +83,7 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer"]:
 		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
@@ -110,7 +110,7 @@ func _as_host() -> void:
 	if rules == "mists":
 		Net.set_night_map("mists")
 		ok(true, "the host picks the Mists")
-	Net.set_rules({"bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -190,12 +190,14 @@ func _as_client() -> void:
 		Net.set_my_class("commander")
 	if rules == "bandit":
 		Net.set_my_class("bandit")
+	if rules == "cartographer":
+		Net.set_my_class("cartographer")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == {"commander": "commander", "bandit": "bandit"}.get(rules, "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -254,6 +256,8 @@ func _play() -> void:
 		await _commander()
 	elif rules == "bandit":
 		await _bandit()
+	elif rules == "cartographer":
+		await _cartographer()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -1373,6 +1377,73 @@ func _bandit() -> void:
 	if host:
 		ok(pl.hp < hp_before, "the fan's knives reach this phone (%.0f)" % pl.hp)
 	await sync(207)
+
+
+
+## A Cartographer on the other phone: its beacons stand on both phones, a friend here travels through
+## its Waygates, and its starlight hurts the host's creatures.
+func _cartographer() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	pl.global_position = Vector3(base.x - 4.0, w.ground_at(base) + 0.05, base.z + 6.0) if host else Vector3(base.x, w.ground_at(base) + 0.05, base.z + 6.0)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	await wait(0.6)
+	await sync(300)
+	if not host:
+		ok(pl.class_id == "cartographer", "the client plays a Cartographer")
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 1 if step == 3 else 0)
+		ok(pl.spec_id == "worlds_traveler" and pl.art_def()["name"] == "Raise a Waygate", "and becomes a Worlds Traveler")
+		for spot: Vector3 in [base, base + Vector3(14, 0, 0)]:
+			pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z + CartographerKit.PLANT_AHEAD)
+			pl.yaw = 0.0
+			pl.rotation.y = 0.0
+			CartographerKit.cast(pl)
+		pl.global_position = Vector3(base.x + 4.0, w.ground_at(base) + 0.05, base.z + 6.0)
+	await wait(0.8)
+	await sync(301)
+	var survey: SurveyNet = w.surveys.get(Net.my_id() if not host else _other())
+	ok(survey != null and survey.beacons.size() == 2 and survey.kind() == "gates", "both Waygates stand on both phones")
+	if host:
+		var gate_a: Vector3 = survey.beacons[0]["at"]
+		pl.gate_rest_left = 0.0
+		pl.global_position = Vector3(gate_a.x, w.ground_at(gate_a) + 0.05, gate_a.z)
+		await wait(0.3)
+		ok(SurveyNet._flat(pl.global_position, survey.beacons[1]["at"]) < 2.5, "a friend on this phone steps through a Waygate and out of the other")
+	await sync(302)
+	# Star Reader: the client's stones, and the host's creature inside them.
+	if not host:
+		pl.spec_id = "star_reader"
+		for spot: Vector3 in [base + Vector3(-8, 0, -20), base + Vector3(8, 0, -20), base + Vector3(0, 0, -34)]:
+			pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z + CartographerKit.PLANT_AHEAD)
+			pl.yaw = 0.0
+			pl.rotation.y = 0.0
+			CartographerKit.cast(pl)
+		pl.global_position = Vector3(base.x + 4.0, w.ground_at(base) + 0.05, base.z + 6.0)
+	await wait(0.8)
+	await sync(303)
+	ok(survey.kind() == "stars" and survey.triangles().size() == 1, "a new profession pulls up the gates; three Star Stones hold a constellation on both phones")
+	var inside := base + Vector3(0, 0, -25)
+	var hp_before := 0.0
+	if host:
+		w.spawn_zombie("normal", inside)
+		var under: Zombie = w.zombies.back()
+		under.set_physics_process(false)
+		under.hp = 400.0
+		under.max_hp = 400.0
+		hp_before = under.hp
+	await wait(SurveyNet.STAR_EVERY * 2.0 + 1.0)
+	await sync(304)
+	if host:
+		var under: Zombie = w.zombies.back()
+		ok(under.hp < hp_before, "the other phone's starlight strikes this phone's creature (%.0f)" % (hp_before - under.hp))
+	await sync(305)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.

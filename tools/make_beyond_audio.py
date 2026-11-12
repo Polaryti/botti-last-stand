@@ -181,6 +181,90 @@ def dagger_fan():
     return out
 
 
+# --- Cartographer --------------------------------------------------------------
+
+def beacon_plant():
+    """A survey post driven into the ground: a wooden thunk, then a small two-note chime as its lamp lights."""
+    m = n(0.9)
+    thunk = lowp(noise(m), 260, 3) * env(m, 0.002, 14) * 2.0 + glide(160, 90, m) * env(m, 0.002, 10) * 0.8
+    chime = np.zeros(m)
+    for start, f in ((0.12, 1318.5), (0.24, 1975.5)):
+        k = n(0.6)
+        p = n(start)
+        q = min(k, m - p)
+        chime[p:p + q] += glass(f, 0.6, 5.0)[:q] * 0.32
+    return reverb(thunk + chime, 0.8, 0.28)
+
+
+def waygate():
+    """Stepping through a Waygate: a rising rush of air folding into a soft, bright bloom."""
+    m = n(0.9)
+    rush = sweep_filter(noise(m), 300, 3200, 0.45) * bell_env(m, 1.1)
+    bloom = (glide(392, 784, m) * 0.25 + glide(588, 1176, m) * 0.15) * env(m, 0.25, 1.6)
+    return reverb(rush + bloom, 1.0, 0.35)
+
+
+def starlight():
+    """Starlight striking: a high, clear ping with a faint shimmer after it."""
+    m = n(0.8)
+    ping = glass(2637, 0.8, 7.0) * 0.6 + glass(3520, 0.8, 9.0) * 0.3
+    shimmer = highp(noise(m), 5000) * env(m, 0.01, 6) * 0.12
+    return reverb(ping + shimmer, 0.9, 0.35)
+
+
+def falling_star():
+    """A falling star: a descending whistle, a deep impact and a ring of glassy sparks."""
+    m = n(1.6)
+    whistle = np.zeros(m)
+    k = n(0.55)
+    whistle[:k] = glide(2400, 600, k) * np.linspace(0.2, 1.0, k) * 0.45
+    hit = np.zeros(m)
+    p = n(0.55)
+    h = m - p
+    hit[p:] = lowp(noise(h), 220, 3) * env(h, 0.002, 3.0) * 3.0 + band(noise(h), 400, 3000) * env(h, 0.001, 12) * 0.8
+    sparks = np.zeros(m)
+    for start, f in ((0.6, 2093), (0.66, 2794), (0.74, 3136)):
+        q = n(start)
+        sparks[q:] += glass(f, (m - q) / SR, 4.0)[:m - q] * 0.12
+    return reverb(whistle + hit + sparks, 1.4, 0.35)
+
+
+def unearth():
+    """A Pathfinder's find: two scrapes of earth and a bright, rising sparkle."""
+    m = n(1.0)
+    dig = np.zeros(m)
+    for start in (0.0, 0.18):
+        k = n(0.16)
+        p = n(start)
+        dig[p:p + k] += band(noise(k), 600, 3000) * env(k, 0.01, 3) * 0.8
+    sparkle = np.zeros(m)
+    for i, f in enumerate((1568, 1976, 2349, 3136)):
+        p = n(0.36 + i * 0.07)
+        sparkle[p:] += glass(f, (m - p) / SR, 6.0)[:m - p] * 0.18
+    return reverb(dig + sparkle, 0.9, 0.3)
+
+
+def bolas_throw():
+    """Bolas leaving the hand: cords whirling, a low wobbling hum."""
+    m = n(0.55)
+    t = t_(m)
+    whirl = sweep_filter(noise(m), 500, 1400, 0.4) * (0.55 + 0.45 * np.sin(2 * np.pi * 14 * t)) * bell_env(m, 1.2)
+    hum = np.sin(2 * np.pi * 110 * t + 3 * np.sin(2 * np.pi * 14 * t)) * env(m, 0.05, 2) * 0.2
+    return whirl + hum
+
+
+def bolas_wrap():
+    """Bolas catching legs: a whip of cord, two stones knocking together."""
+    m = n(0.45)
+    whip = highp(sweep_filter(noise(m), 3000, 1200, 0.4), 800) * env(m, 0.002, 8) * 0.8
+    knock = np.zeros(m)
+    for start, f in ((0.06, 900), (0.12, 760)):
+        k = n(0.12)
+        p = n(start)
+        knock[p:p + k] += (band(noise(k), f * 0.7, f * 1.6) * 0.8 + np.sin(2 * np.pi * f * t_(k)) * 0.3) * env(k, 0.001, 14)
+    return whip + knock
+
+
 if __name__ == "__main__":
     os.makedirs(SND, exist_ok=True)
     save("heavy_swing", heavy_swing(), 0.6)
@@ -191,4 +275,11 @@ if __name__ == "__main__":
     save("steal", steal(), 0.65)
     save("nightfall", nightfall(), 0.75)
     save("dagger_fan", dagger_fan(), 0.6)
+    save("beacon_plant", beacon_plant(), 0.6)
+    save("waygate", waygate(), 0.6)
+    save("starlight", starlight(), 0.5)
+    save("falling_star", falling_star(), 0.8)
+    save("unearth", unearth(), 0.6)
+    save("bolas_throw", bolas_throw(), 0.55)
+    save("bolas_wrap", bolas_wrap(), 0.6)
     print("Beyond the Mists sounds written to", SND)

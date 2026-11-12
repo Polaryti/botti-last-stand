@@ -31,7 +31,7 @@ Each match build progresses to **level 10**: three early choices, one of three s
 
 ## Classes and permanent progression
 
-The standard progression includes eleven classes, available from the start, earned through play or bought in the Store (Adept is switched off for now), plus the code-only Commander. Unlocks and purchases are saved on the device; Botti Doubloons are earned in matches and spent in the in-game Store. They are not a real-money checkout implemented by this repository.
+The standard progression includes twelve classes, available from the start, earned through play or bought in the Store (Adept is switched off for now), plus the code-only Commander. Unlocks and purchases are saved on the device; Botti Doubloons are earned in matches and spent in the in-game Store. They are not a real-money checkout implemented by this repository.
 
 | Class | Normal availability | Specializations |
 | --- | --- | --- |
@@ -46,6 +46,7 @@ The standard progression includes eleven classes, available from the start, earn
 | Artificer | 598 Botti Doubloons in the Store | Pyromaniac, Mechanic, Inventor |
 | Adept | Switched off for now; owners keep it for its return | Blade Dancer, Mirror Step, Void Walker |
 | Bandit | 860 Botti Doubloons in the Store, or redeem code | Thief, Mercenary, Highwayman |
+| Cartographer | 880 Botti Doubloons in the Store, or redeem code | Star Reader, Worlds Traveler, Pathfinder |
 | Commander | Tournament prize code: “First prize in VRAIN tournaments” | Warlock, Gunner, Vanguard |
 
 Redeem codes can also unlock supported classes. Codes are stored as hashes. Commander remains a tournament-prize code unlock.
@@ -53,6 +54,8 @@ Redeem codes can also unlock supported classes. Codes are stored as hashes. Comm
 **Adept** commits to Wind, Stone or Flame for six seconds, with a visible transition and a persistent stance card. Three connected melee attacks grant +15% damage until the next switch and empower that transition. Blade Dancer converts transitions into sweeps; Mirror Step combines timed damage recovery, protection and counters; Void Walker earns a temporary invisible stance through hits in different stances.
 
 **Bandit** starts with a Dagger and turns invisible with Into the Shadows (4 s, every 12 s). Thief replaces it with Steal: appear in front of the nearest foe within 14 m (players, then bots, then creatures), turn invisible, strike, and knock a droppable weapon out of their hand. Mercenary casts Nightfall, a 6 m dome for 8 s that hides the Mercenary and friends inside (for 1.5 s after leaving too) and half-blinds enemies inside. Highwayman throws a five-knife Dagger Fan and plunders food, arrows or potions from 12% of kills. Bandits cannot wield Two-Handed weapons.
+
+**Cartographer** starts with a Spear and plants up to three beacons (one every 5 s, each standing 60 s). Beacons within 24 m are linked: friends within 4 m of a beacon run 10% faster, friends on a line heal 2 health a second, and enemies within 10 m are marked through walls. Star Reader turns three linked stones into a constellation (+20% damage for friends, starlight on enemies every 2 s). Worlds Traveler turns them into Waygates that carry friends from one to the next. Pathfinder unearths finds only a Pathfinder can use: the Machete, the Bolas and the Wayfinder's Lantern. Cartographers cannot wield Two-Handed weapons.
 
 **Commander** is limited to one human per match; bots cannot choose it. Command becomes Last Command at level 10. Warlock keeps a War Staff whose fifth attack fires empowered, piercing magic that staggers enemies, summons a Magician, then commands an enemy-only storm with a Magician beside it. Gunner keeps a Musket with a melee bayonet, summons a torch-bearing Artificer, then selects an artillery circle (with another Artificer) on the map: everyone receives a warning, followed four seconds later by five seconds of shelling across an 18 m radius. Shells leave eight-second fire zones that damage enemies without stacking. Vanguard carries an off-hand banner, rallies nearby allies and calls an Infantry, then revives eligible allies, grants buffs and calls two Infantry and a Ranger. Exclusive weapons never appear as loot and cannot be dropped.
 

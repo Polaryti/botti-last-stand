@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 42
+const PROTOCOL := 43
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -44,7 +44,8 @@ const PVP_DAMAGE := 0.55 # players hit each other less hard than they hit the un
 const KILL_POINTS := 5
 const RULE_NAMES := ["Co-op Night", "All vs All", "Teams", "Defend the Fort"]
 const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "crow", "gargoyle", "leaper", "wraith", "banshee", "mimic", "creak",
-	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf", "chakram_hit", "cleave", "vanish", "steal", "nightfall", "dagger_fan"]
+	"blast", "gallop", "hammer", "fireball", "bow", "thunk", "howl", "rooster", "bell", "wolf", "chakram_hit", "cleave", "vanish", "steal", "nightfall", "dagger_fan",
+	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_wrap"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep"]
 
@@ -1346,6 +1347,35 @@ func _disarm(peer: int, by: int, stun: bool) -> void:
 		BanditKit.be_robbed(world.player, stun)
 	elif is_host() and _bots.has(peer) and (_bots[peer] as BotPlayer).pawn:
 		BanditKit.be_robbed((_bots[peer] as BotPlayer).pawn, stun)
+
+
+## A Cartographer's beacon, so every phone has the same markers and lines.
+func beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> void:
+	_survey_beacon.rpc(owner_peer, at, cfg, yaw)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _survey_beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != owner_peer and not (sender == 1 and is_bot(owner_peer)):
+		return
+	if world and is_instance_valid(world):
+		world.plant_beacon(owner_peer, at, SurveyNet.sane(cfg), yaw)
+
+
+## What other phones only see of a Cartographer's beacons: 0 a falling star, 1 a creature thrown through a Waygate.
+func survey_fx(kind: int, at: Vector3) -> void:
+	_survey_fx.rpc(kind, at)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _survey_fx(kind: int, at: Vector3) -> void:
+	if world == null or not is_instance_valid(world):
+		return
+	if kind == 0:
+		SurveyNet.show_falling_star(world, at)
+	else:
+		world.fx_mist(at + Vector3.UP, 0.8)
 
 
 ## A Mercenary's Nightfall, so every phone can look after its own people inside it.

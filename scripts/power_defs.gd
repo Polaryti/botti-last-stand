@@ -18,6 +18,8 @@ const ALL := {
 	"ghost": {"name": "Ghost Knight", "desc": "A spirit fights at your side and draws attacks away from you.", "time": FAMILIAR_TIME, "color": Color(0.55, 0.9, 1.0), "familiar": true, "weight": 1.0},
 	"imp": {"name": "Thief Imp", "desc": "Brings you the nearest item on the map, every 4 seconds.", "time": FAMILIAR_TIME, "color": Color(0.9, 0.65, 0.2), "familiar": true, "weight": 1.0},
 	"bell_spirit": {"maps": ["village", "fort"], "name": "Bell Spirit", "desc": "Rings every 6 seconds, stunning all within 10 metres.", "time": FAMILIAR_TIME, "color": Color(1.0, 0.85, 0.45), "familiar": true, "weight": 1.0},
+	# A Pathfinder find: never random loot, and only a Pathfinder can take it.
+	"lantern": {"spec": "pathfinder", "name": "Wayfinder's Lantern", "desc": "Pathfinder only, unearthed by its beacons. Marks every enemy within 30 metres, lights the way further and makes you run 15% faster.", "time": POTION_TIME, "color": Color(1.0, 0.78, 0.36), "familiar": false, "weight": 0.0},
 	"rat": {"maps": ["village", "fort"], "name": "Plague Rat", "desc": "Leaves a trail of poison behind you.", "time": FAMILIAR_TIME, "color": Color(0.5, 0.85, 0.3), "familiar": true, "weight": 1.0},
 }
 
@@ -47,6 +49,7 @@ const RAT_INTERVAL := 1.1
 const POISON_TIME := 6.0
 const POISON_DPS := 10.0
 const BOUNCES := 2
+const LANTERN_RANGE := 30.0
 
 static var _meshes := {}
 static var _moving := {}
@@ -67,7 +70,7 @@ static func pick_weighted(table: Dictionary) -> String:
 static func pick_potion() -> String:
 	var t := {}
 	for id: String in ALL:
-		if not ALL[id]["familiar"]:
+		if not ALL[id]["familiar"] and not ALL[id].has("spec"):
 			t[id] = ALL[id]
 	return pick_weighted(t)
 
@@ -189,6 +192,18 @@ static func mesh(id: String) -> Mesh:
 			l.box(Vector3(-0.06, 0.09, 0.1), Vector3(0.07, 0.09, 0.012), Color(0.6, 0.45, 0.45))
 			l.box(Vector3(0.04, 0.03, 0.2), Vector3(0.02, 0.02, 0.01), Color(0.6, 1.0, 0.25))
 			l.box(Vector3(-0.04, 0.03, 0.2), Vector3(0.02, 0.02, 0.01), Color(0.6, 1.0, 0.25))
+		"lantern":
+			# A brass lantern with a warm flame behind its panes.
+			var brass := Color(0.78, 0.6, 0.24)
+			l.prism(Vector3(0, -0.24, 0), Vector3(0, -0.18, 0), 0.15, 0.15, 6, brass.darkened(0.2))
+			l.prism(Vector3(0, -0.18, 0), Vector3(0, 0.12, 0), 0.12, 0.12, 6, Color(1.0, 0.86, 0.5))
+			l.prism(Vector3(0, -0.12, 0), Vector3(0, 0.04, 0), 0.05, 0.03, 5, Color(1.0, 0.55, 0.15))
+			for i in 6:
+				var a := TAU * i / 6.0
+				l.box(Vector3(cos(a), 0, sin(a)) * 0.12 + Vector3(0, -0.03, 0), Vector3(0.02, 0.3, 0.02), brass)
+			l.prism(Vector3(0, 0.12, 0), Vector3(0, 0.22, 0), 0.14, 0.04, 6, brass)
+			l.prism(Vector3(-0.06, 0.22, 0), Vector3(0.06, 0.22, 0), 0.015, 0.015, 4, brass.darkened(0.3))
+			l.box(Vector3(0, 0.29, 0), Vector3(0.14, 0.02, 0.02), brass.darkened(0.3))
 		_:
 			# A potion bottle, tinted per potion.
 			var col: Color = ALL[id]["color"]

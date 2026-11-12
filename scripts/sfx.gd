@@ -7,7 +7,8 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"mimic", "pickup", "potion", "rooster", "spell", "thunder", "thunder_far", "thunk", "trap", "ui_choose", "ui_click",
 	"weapon_change", "wolf", "wraith",
 	# Beyond the Mists (tools/make_beyond_audio.py)
-	"heavy_swing", "cleave", "chakram_throw", "chakram_hit", "vanish", "steal", "nightfall", "dagger_fan"]
+	"heavy_swing", "cleave", "chakram_throw", "chakram_hit", "vanish", "steal", "nightfall", "dagger_fan",
+	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_throw", "bolas_wrap"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],

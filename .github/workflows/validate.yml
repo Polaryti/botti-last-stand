@@ -64,6 +64,8 @@ jobs:
           - suite: network
             mode: bandit
           - suite: network
+            mode: cartographer
+          - suite: network
             mode: botsffa
           - suite: network
             mode: room
@@ -140,6 +142,7 @@ jobs:
           test -f build/checks/screens/gate_cost_angle.png
           test -f build/checks/screens/together_hud.png
           test -f build/checks/screens/nightfall_outside.png
+          test -f build/checks/screens/survey_waygates.png
       - uses: actions/upload-artifact@v6
         if: always()
         with:

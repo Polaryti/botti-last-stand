@@ -2,6 +2,7 @@
   "adept": ["blade_dancer", "mirror_step", "void_walker"],
   "artificer": ["pyromaniac", "mechanic", "inventor"],
   "bandit": ["thief", "mercenary", "highwayman"],
+  "cartographer": ["star_reader", "worlds_traveler", "pathfinder"],
   "chivalry": ["lancer", "paladin", "horse_archer"],
   "commander": ["warlock", "gunner", "vanguard"],
   "heavy": ["guardian", "warpriest", "warlord"],

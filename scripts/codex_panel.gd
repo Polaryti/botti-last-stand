@@ -186,7 +186,7 @@ func _items() -> void:
 	for id: String in PowerDefs.ALL:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if not d["familiar"]:
-			_row(Icons.power(id), Color(d["color"]).darkened(0.35), "%s Potion" % d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
+			_row(Icons.power(id), Color(d["color"]).darkened(0.35), d["name"] if d.has("spec") else "%s Potion" % d["name"], d["desc"], "Base duration: %d seconds" % int(d["time"]))
 
 
 func _weapons() -> void:

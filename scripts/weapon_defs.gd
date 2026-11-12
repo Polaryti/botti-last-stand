@@ -56,6 +56,11 @@ const ALL := {
 		"knock": 2.5, "swing": "overhead", "weight": 1.0, "pos": Vector3(0.24, -0.4, -0.5), "scale": 0.55},
 	"chakram": {"maps": ["mesenlla", "bastion"], "power": 1.0, "name": "Rift Chakram", "shot": "chakram", "bounces": 3, "free_ammo": true, "desc": "A ring of mist-glass that the valley scouts throw. Ricochets on to three more enemies, and needs no arrows.", "kind": Kind.RANGED, "rate": 0.6, "range": 28.0, "speed": 30.0, "gravity": 0.0,
 		"knock": 1.0, "weight": 0.9, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
+	# Pathfinder finds: unearthed by a Pathfinder's beacons, and only a Pathfinder can use them.
+	"machete": {"only": "cartographer", "spec": "pathfinder", "power": 0.95, "name": "Pathfinder's Machete", "bleed": true, "desc": "Pathfinder only, unearthed by its beacons. Quick, wide chops that clear a path and leave enemies bleeding.", "kind": Kind.MELEE, "rate": 0.42, "range": 2.7, "cone": 115.0, "max_hits": 3,
+		"knock": 1.8, "swing": "slash", "weight": 0.0, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.46},
+	"bolas": {"only": "cartographer", "spec": "pathfinder", "power": 0.9, "name": "Pathfinder's Bolas", "shot": "bolas", "slows": 2.5, "free_ammo": true, "desc": "Pathfinder only, unearthed by its beacons. Weighted cords that tangle the legs: everything they hit is slowed for 2.5 s. No arrows needed.", "kind": Kind.RANGED, "rate": 0.7, "range": 24.0, "speed": 26.0, "gravity": 3.0,
+		"knock": 1.2, "weight": 0.0, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
 	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.1, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
 	"musket": {"only": "commander", "hidden": true, "name": "Musket", "desc": "Fire shoots; Melee thrusts the bayonet. Powder replenishes while reloading.", "kind": Kind.RANGED, "rate": 1.25, "range": 55.0, "speed": 90.0, "gravity": 0.0, "power": 2.4, "free_ammo": true, "knock": 3.0, "weight": 0.0, "pos": Vector3(0.17, -0.22, -0.4), "scale": 0.8},
 
@@ -164,6 +169,8 @@ static func mesh(id: String) -> Mesh:
 		"greatsword": m = _greatsword()
 		"battleaxe": m = _battleaxe()
 		"chakram": m = chakram_mesh()
+		"machete": m = _machete()
+		"bolas": m = bolas_mesh()
 	_meshes[id] = m
 	return m
 
@@ -198,6 +205,39 @@ static func _battleaxe() -> Mesh:
 	l.prism(Vector3(0, 0.55, -0.03), Vector3(0, 0.58, -0.22), 0.04, 0.0, 4, head)
 	l.box(Vector3(0, 0.55, 0), Vector3(0.07, 0.2, 0.07), DARK)
 	return l.commit()
+
+
+## A Pathfinder's chopping blade: wrapped grip, a short guard and a broad blade that widens to a hooked tip.
+static func _machete() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.3, 0), Vector3(0, -0.02, 0), 0.024, 0.028, 6, WOOD.darkened(0.3))
+	for y: float in [-0.26, -0.17, -0.08]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.025, 0), 0.031, 0.031, 6, LIGHT_WOOD)
+	l.box(Vector3(0, -0.01, 0), Vector3(0.12, 0.035, 0.05), DARK)
+	var blade := STEEL.darkened(0.08)
+	l.box(Vector3(0.0, 0.2, 0), Vector3(0.07, 0.4, 0.016), blade)
+	l.box(Vector3(0.012, 0.48, 0), Vector3(0.1, 0.18, 0.016), blade.lightened(0.08))
+	l.prism(Vector3(0.03, 0.57, 0), Vector3(-0.03, 0.66, 0), 0.05, 0.0, 4, blade.lightened(0.15))
+	l.box(Vector3(-0.03, 0.3, 0.01), Vector3(0.012, 0.5, 0.004), DARK)
+	return l.commit()
+
+
+## Three stones on cords, knotted together: the Pathfinder's Bolas, in the hand and in flight.
+static func bolas_mesh() -> Mesh:
+	if _meshes.has("_bolas"):
+		return _meshes["_bolas"]
+	var l := LowPoly.new()
+	var cord := Color(0.82, 0.74, 0.55)
+	var stone := Color(0.5, 0.47, 0.42)
+	l.box(Vector3.ZERO, Vector3(0.06, 0.06, 0.06), Color(0.42, 0.26, 0.14))
+	for i in 3:
+		var a := TAU * i / 3.0
+		var tip := Vector3(cos(a), 0, sin(a)) * 0.24
+		l.prism(Vector3.ZERO, tip, 0.008, 0.008, 4, cord)
+		l.prism(tip - Vector3.UP * 0.05, tip + Vector3.UP * 0.05, 0.05, 0.05, 6, stone if i else stone.lightened(0.12))
+	var m := l.commit()
+	_meshes["_bolas"] = m
+	return m
 
 
 ## A flat ring of pale mist-glass with a cyan core, three notches and a leather grip across it.

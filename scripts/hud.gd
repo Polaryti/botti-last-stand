@@ -617,8 +617,9 @@ func _draw_marks() -> void:
 	var cam := player.camera
 	var here := player.global_position
 	var raven := player.has_power("raven")
+	var lantern := player.has_power("lantern")
 	var scent := player.has_flag("scent")
-	if not raven and not scent:
+	if not raven and not scent and not lantern:
 		var any := false
 		for z in player.world.zombies:
 			if z.reveal_left > 0.0:
@@ -630,7 +631,7 @@ func _draw_marks() -> void:
 		if not z.is_alive():
 			continue
 		var d2: float = z.position.distance_squared_to(here)
-		var seen: bool = (raven and d2 < PowerDefs.RAVEN_RANGE * PowerDefs.RAVEN_RANGE) or (scent and d2 < 225.0) or z.reveal_left > 0.0
+		var seen: bool = (raven and d2 < PowerDefs.RAVEN_RANGE * PowerDefs.RAVEN_RANGE) or (lantern and d2 < PowerDefs.LANTERN_RANGE * PowerDefs.LANTERN_RANGE) or (scent and d2 < 225.0) or z.reveal_left > 0.0
 		if not seen:
 			continue
 		var top: Vector3 = z.position + Vector3.UP * (z.height + 0.35)

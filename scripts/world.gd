@@ -167,6 +167,7 @@ var _moon_now := 0.5
 var _moon_colour := Color(0.6, 0.7, 1.0)
 var _fog_now := 0.03
 var _fog_thick := 1.0
+var surveys := {} # Cartographer's peer -> SurveyNet
 var now := 0.0 # game seconds: unlike the system clock, these stop during a pause
 
 
@@ -1219,6 +1220,8 @@ func _shot_mesh(id: String) -> Mesh:
 			return WeaponDefs.mesh("javelins")
 		"chakram":
 			return WeaponDefs.chakram_mesh()
+		"bolas":
+			return WeaponDefs.bolas_mesh()
 		"stone":
 			if _stone_mesh == null:
 				var l := LowPoly.new()
@@ -1235,9 +1238,13 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 	bounce += int(d.get("bounces", 0))
 	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
-		shot.spins = str(d.get("shot", "")) == "chakram"
-		if shot.spins:
+		var kind := str(d.get("shot", ""))
+		shot.spins = kind == "chakram" or kind == "bolas"
+		if kind == "chakram":
 			shot.hit_sound = "chakram_hit"
+		elif kind == "bolas":
+			shot.hit_sound = "bolas_wrap"
+		shot.slow_secs = float(d.get("slows", 0.0))
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
@@ -1247,7 +1254,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+			Net.shot(5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
 
 
 func familiar_arrow(p: Player, target: Node3D) -> void:
@@ -1278,6 +1285,19 @@ func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: fl
 
 
 ## A Mercenary's Nightfall, on this phone.
+## A Cartographer's beacon: added to that Cartographer's own set of markers, made on first use.
+func plant_beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> SurveyNet:
+	var found: Variant = surveys.get(owner_peer)
+	var survey: SurveyNet = found if found != null and is_instance_valid(found) else null
+	if survey == null:
+		survey = SurveyNet.new(self, owner_peer)
+		add_child(survey)
+		surveys[owner_peer] = survey
+	at.y = ground_at(at)
+	survey.add(at, cfg, yaw)
+	return survey
+
+
 func spawn_nightfall(owner_peer: int, at: Vector3, radius: float, seconds: float, linger: float, bits: int) -> NightfallDome:
 	at.y = ground_at(at)
 	var dome := NightfallDome.new(self, owner_peer, at, radius, seconds, linger, bits)
@@ -1413,7 +1433,7 @@ func set_up_stands() -> void:
 						entries.append([Pickup.Kind.WEAPON, id])
 			"item":
 				for id: String in PowerDefs.ALL:
-					if not PowerDefs.ALL[id]["familiar"]:
+					if not PowerDefs.ALL[id]["familiar"] and not PowerDefs.ALL[id].has("spec"):
 						entries.append([Pickup.Kind.POWER, id])
 				for id: String in PowerDefs.FOODS:
 					entries.append([Pickup.Kind.FOOD, id])
@@ -1730,10 +1750,12 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = WeaponDefs.chakram_mesh()
 	elif mesh == 4:
 		m = WeaponDefs.mesh("dagger")
+	elif mesh == 5:
+		m = WeaponDefs.bolas_mesh()
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
-		shot.spins = mesh == 3 or mesh == 4
+		shot.spins = mesh == 3 or mesh == 4 or mesh == 5
 		if mesh == 4:
 			shot.spin_axis = Vector3.RIGHT
 		if mesh == 0 and col.g > col.r + 0.3:
@@ -2196,7 +2218,7 @@ func _scan_pickups_for(who: Player) -> void:
 					who.sfx("pickup", -5.0)
 					remove_pickup(p)
 			Pickup.Kind.POWER:
-				if distance_squared < 1.6 * 1.6:
+				if distance_squared < 1.6 * 1.6 and who.spec_id == str(PowerDefs.ALL[p.item_id].get("spec", who.spec_id)):
 					who.activate_power(p.item_id)
 					remove_pickup(p)
 			Pickup.Kind.WOOD:
@@ -2321,6 +2343,8 @@ func imp_steal(p: Player) -> void:
 		if it.kind == Pickup.Kind.WEAPON:
 			continue
 		if it.kind == Pickup.Kind.FOOD and p.hp >= p.max_hp():
+			continue
+		if it.kind == Pickup.Kind.POWER and str(PowerDefs.ALL[it.item_id].get("spec", p.spec_id)) != p.spec_id:
 			continue
 		var d := it.global_position.distance_squared_to(p.global_position)
 		if d < best_d and d > 4.0:

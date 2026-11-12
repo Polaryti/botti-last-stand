@@ -114,7 +114,9 @@ var mods := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_
 	"volley_darts": 7.0, "volley_jumps": 3.0, "flask_time": 3.0, "flask_radius": 6.0, "inv_damage": 1.0, "inv_heal": 0.0,
 	"swap_range": 9.0, "swap_burst": 50.0, "swap_radius": 4.0, "swap_decoys": 1.0, "swap_decoy_time": 5.0,
 	"shadow_time": 0.0, "steal_range": 0.0, "steal_damage": 1.0, "steal_hide": 0.0, "night_radius": 0.0, "night_time": 0.0, "night_linger": 0.0,
-	"fan_knives": 0.0, "fan_damage": 1.0, "fan_bounces": 0.0, "plunder": 0.0}
+	"fan_knives": 0.0, "fan_damage": 1.0, "fan_bounces": 0.0, "plunder": 0.0,
+	"beacons": 0.0, "link_range": 0.0, "beacon_radius": 0.0, "line_heal": 0.0, "mark_range": 0.0, "star_bonus": 0.0, "star_power": 0.0,
+	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0}
 var flags := {}
 var spec_id := ""
 var _buffs := {} # key -> {stat, val, left, stacks}
@@ -124,6 +126,9 @@ var _triggers := {} # event -> list of effect dictionaries with runtime counters
 const INVIS_LOCKOUT := 3.0
 var invis_lockout := 0.0
 var night_blind_left := 0.0 # standing in an enemy's Nightfall: the HUD darkens
+var gate_rest_left := 0.0 # just came through a Worlds Traveler's Waygate: not again until this runs out
+var find_rest_left := 0.0 # a Pathfinder's next find, in seconds
+var last_find := Vector3.INF # where the Pathfinder last unearthed something
 var invis_left := 0.0:
 	set(value):
 		if value > 0.0 and invis_left <= 0.0 and invis_lockout > 0.0:
@@ -556,6 +561,9 @@ func can_use(id: String) -> bool:
 	var exclusive: String = WeaponDefs.ALL[id].get("only", "")
 	if exclusive != "" and exclusive != class_id:
 		return false
+	var for_spec: String = WeaponDefs.ALL[id].get("spec", "")
+	if for_spec != "" and for_spec != spec_id:
+		return false
 	if class_id == "magician":
 		return id == "staff"
 	if class_id == "commander" and spec_id in ["warlock", "gunner"]:
@@ -698,9 +706,17 @@ func _equip() -> void:
 	elif d["kind"] == WeaponDefs.Kind.SPELL:
 		_vm_orb.position = Vector3(0, 0.86, 0)
 		_vm_orb.visible = true
-	if _light:
-		_light.light_energy = lerpf(1.7 if d.get("burns", false) else 0.9, 0.15, _dawn_bright)
-		_light.omni_range = 16.0 if d.get("burns", false) else 11.0
+	_refresh_light()
+
+
+## The glow you carry: a burning weapon or a Wayfinder's Lantern throws it further.
+func _refresh_light() -> void:
+	if _light == null:
+		return
+	var burning: bool = weapon_def().get("burns", false)
+	var lantern := has_power("lantern")
+	_light.light_energy = lerpf(1.7 if burning else 1.5 if lantern else 0.9, 0.15, _dawn_bright)
+	_light.omni_range = 16.0 if burning else 18.0 if lantern else 11.0
 
 
 func toggle_zoom() -> void:
@@ -1278,9 +1294,7 @@ func _act(e: Dictionary, ctx: Dictionary) -> Variant:
 
 func set_dawn_light(bright: float) -> void:
 	_dawn_bright = bright
-	if _light == null:
-		return
-	_light.light_energy = lerpf(1.7 if weapon_def().get("burns", false) else 0.9, 0.15, bright)
+	_refresh_light()
 
 
 func _refresh_shield() -> void:
@@ -1549,9 +1563,13 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 	var d: Dictionary = PowerDefs.ALL[id]
 	var time: float = d["time"]
 	time *= m("familiar_time") if d["familiar"] else m("potion_time")
+	if id == "lantern":
+		time += m("lantern_time")
 	if forced_time > 0.0:
 		time = forced_time
 	powers[id] = maxf(time, float(powers.get(id, 0.0)))
+	if id == "lantern":
+		_refresh_light()
 	if d["familiar"]:
 		sfx("chime", -2.0)
 		match id:
@@ -1702,6 +1720,8 @@ func _tick_ability_timers(delta: float) -> void:
 	invis_left = maxf(0.0, invis_left - delta)
 	invis_lockout = maxf(0.0, invis_lockout - delta)
 	night_blind_left = maxf(0.0, night_blind_left - delta)
+	gate_rest_left = maxf(0.0, gate_rest_left - delta)
+	find_rest_left = maxf(0.0, find_rest_left - delta)
 	guard_left = maxf(0.0, guard_left - delta)
 	dome_left = maxf(0.0, dome_left - delta)
 	_riposte_cd -= delta
@@ -1746,6 +1766,8 @@ func art_def() -> Dictionary:
 		return CommanderKit.art(self)
 	if class_id == "bandit":
 		return BanditKit.art(self)
+	if class_id == "cartographer":
+		return CartographerKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -1929,7 +1951,7 @@ func use_art() -> void:
 		return
 	mana -= art_cost()
 	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * m("art_cd"))
-	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -2319,6 +2341,7 @@ func _tick_mist(delta: float) -> void:
 		"stance": _change_stance()
 		"command": CommanderKit.cast(self)
 		"bandit": BanditKit.cast(self)
+		"cartographer": CartographerKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -2926,7 +2949,7 @@ func _physics_step(delta: float) -> void:
 	var dir := global_basis * Vector3(input_move.x, 0, input_move.y)
 	if _cast_kind == "sharpshooter":
 		dir = Vector3.ZERO
-	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
+	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (CartographerKit.LANTERN_SPEED if has_power("lantern") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
 	if is_riding():
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
 	if spirit_left > 0.0:
@@ -3120,7 +3143,8 @@ func _process_step(delta: float) -> void:
 	_lit_timer -= delta
 	if _lit_timer <= 0.0:
 		_lit_timer = 0.25
-		_lit = weapon_def().get("burns", false) or world.in_firelight(global_position)
+		_lit = weapon_def().get("burns", false) or has_power("lantern") or world.in_firelight(global_position)
+		_refresh_light()
 		_warm = world.beside_bonfire(global_position)
 	fog_flash = maxf(0.0, fog_flash - delta * 2.6)
 	if _warm and hp < max_hp():
@@ -3239,6 +3263,8 @@ func _start_swing(d: Dictionary) -> void:
 
 func _ranged_mult() -> float:
 	var mult := m("ranged_damage") * damage_multiplier()
+	if weapon_def().get("spec", "") == "pathfinder":
+		mult *= 1.0 + m("find_damage")
 	if is_riding():
 		mult *= m("riding_ranged")
 	if has_flag("still_aim") and Vector2(velocity.x, velocity.z).length() < 0.5:
@@ -3285,6 +3311,8 @@ func _fire_arrow(d: Dictionary) -> void:
 		_swing_keys = "throw"
 		if d["shot"] == "chakram":
 			sfx("chakram_throw", -3.0, randf_range(0.95, 1.05))
+		elif d["shot"] == "bolas":
+			sfx("bolas_throw", -3.0, randf_range(0.95, 1.05))
 		else:
 			sfx("swing", -3.0, 0.75)
 	else:
@@ -3331,6 +3359,8 @@ func _cast_bolt(d: Dictionary) -> void:
 
 func melee_stats(d: Dictionary) -> Dictionary:
 	var mult := m("melee_damage") * damage_multiplier() * _next_hit_mult
+	if d.get("spec", "") == "pathfinder":
+		mult *= 1.0 + m("find_damage")
 	if has_flag("rooted") and stone_skin >= SKIN_STRONG:
 		mult *= 1.35
 	if is_riding():

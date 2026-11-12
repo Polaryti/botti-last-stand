@@ -55,6 +55,9 @@ func _ready() -> void:
 	m.show_store("bandit")
 	await wait(0.2)
 	await snap("store_bandit")
+	m.show_store("cartographer")
+	await wait(0.2)
+	await snap("store_cartographer")
 	Game.unlocked["bandit"] = true
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await wait(0.2)
