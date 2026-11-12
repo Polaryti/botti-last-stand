@@ -112,7 +112,7 @@ func show_menu(rebuild := false) -> void:
 	_clear_ui()
 	Game.mode = Game.Mode.MENU
 	_back = _quit
-	# Coming back from another menu screen, the Mists behind it can simply stay.
+	# Coming back from another menu screen, the Valleys behind it can simply stay.
 	if rebuild or world == null or world.mode != Game.Mode.MENU:
 		_new_world(Game.Mode.MENU)
 	Sfx.ambient(true)
@@ -141,7 +141,7 @@ func show_menu(rebuild := false) -> void:
 	mark.custom_minimum_size = Vector2(590, 80)
 	mark.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	top.add_child(mark)
-	var update_title := _label("The Mists Update", 27, UiTheme.EMBER)
+	var update_title := _label("Beyond the Mists", 27, UiTheme.EMBER)
 	update_title.name = "UpdateTitle"
 	update_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(update_title)
@@ -534,39 +534,101 @@ func _button(text: String, action: Callable, min_size: Vector2, primary := false
 ## The list of classes on the left, what the chosen one is on the right.
 ## Where to spend the night.
 func show_map_picker() -> void:
-	_clear_ui()
-	_back = show_menu
-	var root := _modal("Survive the Night")
-	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 860
-	for id: String in Game.MAPS:
-		var chosen := id
-		var row := _menu_row(Game.MAPS[id]["name"], Game.MAPS[id]["desc"], func() -> void:
-			Game.night_map = chosen
-			Game.save_settings()
-			show_class_picker(Game.Mode.NIGHT))
-		row.custom_minimum_size.x = 800
-		box.add_child(row)
-	box.add_child(_button("Back", show_menu, Vector2(160, 60)))
-	panel = root
+	_show_atlas(Game.Mode.NIGHT)
 
 
 ## Which stronghold to hold.
 func show_fort_picker() -> void:
+	_show_atlas(Game.Mode.FORT)
+
+
+## Where to play, chosen on the world atlas: the places this mode can be played in are lit, the rest
+## dimmed. Tapping a place shows what it is; Play here goes on to choosing a class.
+func _show_atlas(mode: int) -> void:
 	_clear_ui()
 	_back = show_menu
-	var root := _modal("Defend the Fort")
-	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 860
-	for id: String in Game.FORT_MAPS:
+	var fort := mode == Game.Mode.FORT
+	var root := Control.new()
+	root.name = "Atlas"
+	root.theme = _theme
+	ui_layer.add_child(root)
+	_fill(root)
+	var shade := _vignette()
+	root.add_child(shade)
+	_fill(shade)
+	var margin := _screen_margin(44, 18)
+	root.add_child(margin)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 12)
+	margin.add_child(box)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 14)
+	box.add_child(top)
+	top.add_child(_button("Back", func() -> void: _back.call(), Vector2(116, 56)))
+	var head := _label("Defend the Fort" if fort else "Survive the Night", 40, UiTheme.BONE)
+	head.add_theme_font_override("font", UiTheme.title_font())
+	head.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(head)
+	var ask := _label("Where will you hold the line?" if fort else "Where will you spend the night?", 24, UiTheme.ASH)
+	ask.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(ask)
+	var panes := HBoxContainer.new()
+	panes.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panes.add_theme_constant_override("separation", 16)
+	box.add_child(panes)
+	var allowed: Array = (Game.FORT_MAPS if fort else Game.MAPS).keys()
+	var atlas := WorldAtlas.new(allowed, Game.fort_map if fort else Game.night_map)
+	atlas.name = "WorldAtlas"
+	atlas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	atlas.size_flags_stretch_ratio = 1.9
+	panes.add_child(atlas)
+	var page := PanelContainer.new()
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panes.add_child(page)
+	var detail := VBoxContainer.new()
+	detail.name = "PlaceDetail"
+	detail.add_theme_constant_override("separation", 10)
+	page.add_child(detail)
+	var show_place := func(id: String) -> void:
+		for c in detail.get_children():
+			detail.remove_child(c) # at once, so the new page's names (PlayHere) are never taken
+			c.queue_free()
+		var place: Dictionary = Places.ALL[id]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		detail.add_child(row)
+		row.add_child(IconView.new(place["icon"], (place["color"] as Color).darkened(0.55), 64.0))
+		var title := _label(place["name"], 34, UiTheme.BONE)
+		title.add_theme_font_override("font", UiTheme.title_font())
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(title)
+		if id in SpawnRules.MESENLLA:
+			var tag := ClassPresentation.map_tag({"maps": [id]})
+			tag.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			detail.add_child(tag)
+		var lore := _label(place["lore"], 23, UiTheme.ASH)
+		lore.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lore.custom_minimum_size.x = 300
+		detail.add_child(lore)
+		var plays := _label("Played in %s." % place["plays"], 20, UiTheme.BONE.darkened(0.15))
+		plays.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		plays.custom_minimum_size.x = 300
+		detail.add_child(plays)
+		detail.add_child(_expand(true))
 		var chosen := id
-		var row := _menu_row(Game.FORT_MAPS[id]["name"], Game.FORT_MAPS[id]["desc"], func() -> void:
-			Game.fort_map = chosen
+		var go := _button("Play here", func() -> void:
+			if fort:
+				Game.fort_map = chosen
+			else:
+				Game.night_map = chosen
 			Game.save_settings()
-			show_class_picker(Game.Mode.FORT))
-		row.custom_minimum_size.x = 800
-		box.add_child(row)
-	box.add_child(_button("Back", show_menu, Vector2(160, 60)))
+			show_class_picker(mode), Vector2(0, 64), true)
+		go.name = "PlayHere"
+		detail.add_child(go)
+	atlas.picked.connect(show_place)
+	show_place.call(atlas.selected)
 	panel = root
 
 
@@ -1197,32 +1259,81 @@ func start_game(mode: int) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+## Where the match is about to be played, painted across the screen, with its name, its lore, how it
+## is played and a hint for it, and the class you are bringing. Shown while the world is built.
 func _loading_screen() -> Control:
+	var where := Places.of_match(Game.mode)
+	var place: Dictionary = Places.ALL.get(where, {})
 	var root := Control.new()
+	root.name = "Loading"
 	root.theme = _theme
 	ui_layer.add_child(root)
 	_fill(root)
-	var bg := ColorRect.new()
-	bg.color = UiTheme.NIGHT.darkened(0.25)
-	root.add_child(bg)
-	_fill(bg)
-	var center := CenterContainer.new()
-	root.add_child(center)
-	_fill(center)
+	var vista := PlaceVista.new(where if where != "" else "village")
+	vista.name = "Vista"
+	root.add_child(vista)
+	_fill(vista)
+	# A darker band at the bottom, so the words read over any sky.
+	var shade := TextureRect.new()
+	shade.texture = load("res://assets/ui/menu_shade.png")
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.flip_h = true
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.modulate = Color(1, 1, 1, 0.85)
+	root.add_child(shade)
+	_fill(shade)
+	var margin := _screen_margin(64, 40)
+	root.add_child(margin)
 	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 14)
-	center.add_child(box)
-	var medal := IconView.new(ClassDefs.icon(Game.player_class), ClassDefs.color(Game.player_class), 110.0)
-	medal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(medal)
-	var title := _label("Preparing the night", 48, UiTheme.BONE)
+	box.alignment = BoxContainer.ALIGNMENT_END
+	box.add_theme_constant_override("separation", 6)
+	margin.add_child(box)
+	var mode_word := "Sandbox"
+	if Net.active():
+		mode_word = Net.RULE_NAMES[Net.rules]
+	elif Game.mode == Game.Mode.NIGHT:
+		mode_word = "Survive the Night"
+	elif Game.mode == Game.Mode.FORT:
+		mode_word = "Defend the Fort"
+	var caption := _label(mode_word, 26, UiTheme.EMBER)
+	caption.name = "Mode"
+	box.add_child(caption)
+	var title := _label(str(place.get("name", "Sandbox")), 64, UiTheme.BONE)
+	title.name = "Place"
 	title.add_theme_font_override("font", UiTheme.title_font())
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	var tip := _label(TIPS[randi() % TIPS.size()], 26, UiTheme.ASH)
-	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(tip)
+	var lore := _label(str(place.get("lore", "Try any weapon, item or class you own.")), 25, UiTheme.ASH)
+	lore.name = "Lore"
+	lore.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lore.custom_minimum_size.x = 820
+	lore.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	box.add_child(lore)
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 14
+	box.add_child(gap)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	box.add_child(row)
+	var medal := IconView.new(ClassDefs.icon(Game.player_class), ClassDefs.color(Game.player_class), 72.0)
+	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(medal)
+	var words := VBoxContainer.new()
+	words.add_theme_constant_override("separation", 0)
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(words)
+	words.add_child(_label(str(ClassDefs.ALL[Game.player_class]["name"]), 30, UiTheme.BONE))
+	var hints: Array = place.get("tips", []).duplicate()
+	if where in ["village", "fort", ""]:
+		hints.append_array(TIPS)
+	var tip := _label(str(hints[randi() % hints.size()]), 24, UiTheme.ASH)
+	tip.name = "Tip"
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip.custom_minimum_size.x = 760
+	words.add_child(tip)
+	row.add_child(_expand())
+	var preparing := _label("Preparing the night" if Game.mode != Game.Mode.SANDBOX else "Preparing the yard", 24, UiTheme.BONE)
+	preparing.size_flags_vertical = Control.SIZE_SHRINK_END
+	row.add_child(preparing)
 	return root
 
 

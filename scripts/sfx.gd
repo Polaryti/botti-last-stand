@@ -24,7 +24,7 @@ const MUSIC_SETS := {
 	"fort": ["fort_night", "fort_hunted", "fort_dawn"],
 	"mesenlla": ["mesenlla_night", "mesenlla_hunted", "mesenlla_dawn"],
 	"bastion": ["bastion_night", "bastion_hunted", "bastion_dawn"],
-	"menu": ["menu", "", ""],
+	"menu": ["menu_mesenlla", "", ""],
 }
 const MUSIC_BUS := "Music"
 const SOUND_BUS := "Sounds"

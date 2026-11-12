@@ -66,6 +66,34 @@ func _ready() -> void:
 	await wait(0.1)
 	await snap("loading")
 	loading.queue_free()
+	# The world atlas, choosing where to spend the night and where to hold the fort.
+	m.show_map_picker()
+	await wait(0.4)
+	await snap("atlas_night")
+	m.show_fort_picker()
+	await wait(0.2)
+	(m.panel.find_child("Place_bastion", true, false) as Button).pressed.emit()
+	await wait(0.4)
+	await snap("atlas_fort")
+	m.show_menu()
+	await wait(0.2)
+	# The loading screen of every place.
+	var mode_before := Game.mode
+	var night_before := Game.night_map
+	var fort_before := Game.fort_map
+	for where: Array in [[Game.Mode.NIGHT, "village"], [Game.Mode.FORT, "fort"], [Game.Mode.NIGHT, "mists"], [Game.Mode.NIGHT, "mesenlla"], [Game.Mode.FORT, "bastion"]]:
+		Game.mode = where[0]
+		if where[0] == Game.Mode.FORT:
+			Game.fort_map = where[1]
+		else:
+			Game.night_map = where[1]
+		var screen := m._loading_screen()
+		await wait(0.3)
+		await snap("loading_%s" % where[1])
+		screen.queue_free()
+	Game.mode = mode_before
+	Game.night_map = night_before
+	Game.fort_map = fort_before
 	await m.start_game(Game.Mode.NIGHT)
 	await wait(1.0)
 	await snap("night")

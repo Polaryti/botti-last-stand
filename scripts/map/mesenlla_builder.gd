@@ -34,6 +34,12 @@ static func glow_material() -> StandardMaterial3D:
 	return _glow_mat
 
 
+## Something the Map screen draws: where it is, which way it runs, and how big it is.
+static func _feature(b: MapBuilder, kind: String, size: float) -> void:
+	var along := b.xf.basis.x
+	b.w.map_features.append({"kind": kind, "at": Vector2(b.xf.origin.x, b.xf.origin.z), "dir": Vector2(along.x, along.z).normalized(), "size": size})
+
+
 static func _shine(b: MapBuilder, l: LowPoly) -> MeshInstance3D:
 	var mi := b.add(l)
 	mi.material_override = glow_material()
@@ -96,6 +102,7 @@ static func _mist(b: MapBuilder, local: Vector3, extents: Vector3, col: Color, a
 ## A lump of the mountains torn loose and hanging in the twilight: meadow on top with a few pines,
 ## raw rock beneath narrowing to a point, mist crystals glinting under it and mist falling from its edge.
 static func floating_island(b: MapBuilder, width: float) -> void:
+	_feature(b, "island", width)
 	var r := b.seeded()
 	var l := b.mesh()
 	var w := width * 0.5
@@ -187,6 +194,7 @@ static func floating_island(b: MapBuilder, width: float) -> void:
 
 ## A crack in the world: a dark, jagged fissure with a violet glow along its lips and mist rising.
 static func rift(b: MapBuilder, length: float) -> void:
+	_feature(b, "rift", length)
 	var r := b.seeded()
 	var l := b.mesh()
 	var g := b.mesh()
@@ -220,6 +228,7 @@ static func rift(b: MapBuilder, length: float) -> void:
 ## The Great Portal that led here from Mist Bastion: two weathered pillars and a lintel of carved
 ## stone, an azure swirl between them, and amber braziers either side.
 static func mist_gate(b: MapBuilder, width: float) -> void:
+	_feature(b, "portal", width)
 	var l := b.mesh()
 	var half := width * 0.5
 	var high := width * 1.15
@@ -287,6 +296,7 @@ void fragment() {
 
 ## A ring of tall runestones, their carvings lit from inside, around a flat stone.
 static func standing_stones(b: MapBuilder, radius: float) -> void:
+	_feature(b, "stones", radius)
 	var r := b.seeded()
 	var l := b.mesh()
 	var runes := b.mesh()

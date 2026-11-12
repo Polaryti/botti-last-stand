@@ -24,6 +24,7 @@ var lane_marks: Array[Dictionary] = []
 var stands: Array[Dictionary] = []
 var map_marks: Array[Dictionary] = []
 var map_roads: Array = []
+var map_features: Array[Dictionary] = []
 var indoors: Array[Rect2] = []
 var _marker_material: StandardMaterial3D
 

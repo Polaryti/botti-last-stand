@@ -175,6 +175,7 @@ static func _gate(b: MapBuilder, gate_name: String, at: Vector3, out: Vector3) -
 ## in the air round a swirl of mist; four obelisks stand round it and a pillar of mist rises from it.
 ## This is what the enemies come for: when the Fort's heart falls, the ring goes dark and falls still.
 static func great_portal(b: MapBuilder, radius: float) -> void:
+	MesenllaBuilder._feature(b, "great_portal", radius)
 	if b.w.fort == null:
 		b.w.start_fort()
 	var l := b.mesh()
@@ -247,6 +248,7 @@ static func great_portal(b: MapBuilder, radius: float) -> void:
 ## A jagged spine of rock along the piece's X axis, as tall as a house, that nothing walks over: it
 ## keeps the lanes apart. Slabs lean this way and that, cracked through with mist-glass.
 static func rock_spine(b: MapBuilder, length: float) -> void:
+	MesenllaBuilder._feature(b, "spine", length)
 	var r := b.seeded()
 	var l := LowPoly.new()
 	var glints := LowPoly.new()
@@ -283,6 +285,7 @@ static func _along_world_x(b: MapBuilder) -> bool:
 ## A waystone where Mist Soldiers step out of the mist: a tall stone with a ring of light round its
 ## top, and mist pooling at its foot.
 static func waystone(b: MapBuilder) -> void:
+	MesenllaBuilder._feature(b, "waystone", 1.0)
 	var l := b.mesh()
 	l.prism(Vector3(0, -0.3, 0), Vector3(0, 0.3, 0), 1.3, 1.1, 6, SLATE_DARK)
 	l.prism(Vector3(0, 0.3, 0), Vector3(0, 3.6, 0), 0.55, 0.38, 4, SLATE)

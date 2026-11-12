@@ -2005,19 +2005,26 @@ func test_version_15() -> void:
 	m.show_map_picker()
 	await frames(2)
 	var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
-	ok(m.panel.find_children("*", "Button", true, false).size() >= 3, "you can choose where to spend the night")
+	var night_atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
+	ok(night_atlas != null and night_atlas.allowed == Game.MAPS.keys(), "you can choose where to spend the night on the world atlas: %s" % (str(night_atlas.allowed) if night_atlas else "none"))
 	# Choosing where to hold the fort: the Fort, or Mist Bastion.
 	var saved_fort := Game.fort_map
 	var mode_before := Game.mode
 	m.show_fort_picker()
 	await frames(2)
-	var rows: Array = m.panel.find_children("*", "Button", true, false).filter(func(b: Button) -> bool:
-		return b.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == "Mist Bastion"))
-	ok(rows.size() == 1, "Defend the Fort asks where: the Fort or Mist Bastion")
-	if rows.size() == 1:
-		(rows[0] as Button).pressed.emit()
+	var atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
+	ok(atlas != null and atlas.allowed == ["fort", "bastion"], "Defend the Fort asks where, on the world atlas: the Fort or Mist Bastion")
+	if atlas:
+		var places := ["village", "fort", "mists", "mesenlla", "bastion"]
+		ok(places.all(func(id: String) -> bool: return (atlas.find_child("Place_" + id, true, false) as Button).disabled == (id not in ["fort", "bastion"])), "the atlas shows all five places, and only the strongholds can be picked")
+		(atlas.find_child("Place_bastion", true, false) as Button).pressed.emit()
 		await frames(2)
-	ok(Game.fort_map == "bastion", "and remembers Mist Bastion")
+		ok(atlas.selected == "bastion" and Game.fort_map == saved_fort and m.panel.find_child("WorldAtlas", true, false) == atlas, "tapping Mist Bastion shows it without starting anything")
+		var shown := (m.panel.find_child("PlaceDetail", true, false) as Node).find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		ok(shown.has("Mist Bastion") and shown.has(Places.ALL["bastion"]["lore"]), "and tells its story")
+		(m.panel.find_child("PlayHere", true, false) as Button).pressed.emit()
+		await frames(2)
+	ok(Game.fort_map == "bastion", "Play here remembers Mist Bastion")
 	Game.mode = Game.Mode.FORT
 	ok(Game.current_map() == "bastion", "where the next Fort is held")
 	Game.fort_map = saved_fort
@@ -3332,8 +3339,8 @@ func test_flow() -> void:
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await frames(3)
-	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.terrain.has_islands(), "menu shows the Mists")
-	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "The Mists Update", "main title names the production update")
+	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.map_id == "mesenlla", "the title screen shows the Valleys of Mesenlla")
+	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "Beyond the Mists", "main title names the production update")
 	ok(m.world.player == null and m.world.zombies.is_empty() and not m.world.director.running, "the title backdrop has no active match")
 	await m.start_game(Game.Mode.SANDBOX)
 	await seconds(3.0)

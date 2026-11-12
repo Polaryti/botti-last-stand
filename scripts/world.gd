@@ -42,6 +42,8 @@ var fort: Fort
 var wood_spots: Array[Vector3] = []
 var yard_wood_spots: Array[Vector3] = []
 var map_roads: Array = []
+## Landmarks the Map screen draws beyond the land and roads: {kind, at, dir, size}, from the map's builders.
+var map_features: Array[Dictionary] = []
 var weather: Weather
 var fog: ClosingFog
 var play_half := 110.0
@@ -362,9 +364,45 @@ func show_lightning(amount: float) -> void:
 
 
 ## A clear view of the arena sword, its moonlit terraces and the distant islands.
+## The main menu's slow tour of the Valleys of Mesenlla: from the stream up past the hamlet to the
+## Ring of Stones, over the outpost and its Great Portal, under the islands and back. Where the camera
+## is and what it looks at both follow smooth curves through these, so it never stops or jerks.
+const MENU_TOUR := [
+	[Vector3(8, 15, 62), Vector3(-4, 12, -26)],
+	[Vector3(-14, 8, 40), Vector3(-36, 3, 24)],
+	[Vector3(-50, 12, 40), Vector3(-62, 12, -12)],
+	[Vector3(-78, 21, -18), Vector3(-54, 15, -62)],
+	[Vector3(-34, 19, -50), Vector3(0, 9, -42)],
+	[Vector3(18, 14, -4), Vector3(0, 9, -42)],
+	[Vector3(48, 11, 28), Vector3(18, 22, 74)],
+]
+const MENU_LEG := 22.0 # seconds from one point of the tour to the next
+
+
 func _menu_view() -> void:
-	menu_camera.position = Vector3(cos(_orbit) * 38.0, 24.0, sin(_orbit) * 38.0)
-	menu_camera.look_at(Vector3(0, 18.0, 0))
+	if map_id != "mesenlla":
+		menu_camera.position = Vector3(cos(_orbit) * 38.0, 24.0, sin(_orbit) * 38.0)
+		menu_camera.look_at(Vector3(0, 18.0, 0))
+		return
+	var n := MENU_TOUR.size()
+	var t := fmod(_orbit / 0.05 / MENU_LEG, float(n))
+	var i := int(t)
+	var f := t - i
+	var at := _tour_point(i, f, 0)
+	var look := _tour_point(i, f, 1)
+	at.y = maxf(at.y, ground_at(at) + 6.0)
+	menu_camera.position = at
+	menu_camera.look_at(look)
+
+
+## A Catmull-Rom curve through the tour, so it passes through every point smoothly.
+func _tour_point(i: int, f: float, which: int) -> Vector3:
+	var n := MENU_TOUR.size()
+	var p0: Vector3 = MENU_TOUR[posmod(i - 1, n)][which]
+	var p1: Vector3 = MENU_TOUR[i % n][which]
+	var p2: Vector3 = MENU_TOUR[(i + 1) % n][which]
+	var p3: Vector3 = MENU_TOUR[(i + 2) % n][which]
+	return 0.5 * ((2.0 * p1) + (-p0 + p2) * f + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * f * f + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * f * f * f)
 
 
 ## Which map scene this game is on. Pressing F6 on a map in the editor overrides it.
@@ -372,7 +410,7 @@ func _map_file() -> String:
 	if Game.test_map != "":
 		return Game.test_map
 	match mode:
-		Game.Mode.MENU: return "res://maps/mists.tscn"
+		Game.Mode.MENU: return "res://maps/mesenlla.tscn"
 		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:

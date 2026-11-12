@@ -135,6 +135,8 @@ jobs:
           test -f build/checks/screens/artillery_map.png
           test -f build/checks/screens/menu.png
           test -f build/checks/screens/mists_title.png
+          test -f build/checks/screens/atlas_fort.png
+          test -f build/checks/screens/loading_bastion.png
           test -f build/checks/screens/falls_pool.png
           test -f build/checks/screens/vanguard_first_person.png
           test -f build/checks/screens/village_aura.png

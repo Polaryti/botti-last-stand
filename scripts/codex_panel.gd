@@ -248,10 +248,8 @@ func _statuses() -> void:
 	_row("status_stunned", UiTheme.EMBER, "Stunned", "An impact briefly interrupts movement until its timer ends.")
 
 func _maps() -> void:
-	_row("map_village", UiTheme.BONE, "The Village", "The first village to be overrun and razed by the zombie hordes.")
-	_row("map_fort", UiTheme.BONE, "The Fort", "The last bastion protecting the portal to The Mists.")
-	_row("map_mists", UiTheme.MIST, "The Mists", "The heart of mysterious worlds lying beyond our own.")
-	_row("map_mesenlla", Color(0.91, 0.63, 0.3), "Valleys of Mesenlla", "Fleeing a collapsed world and having conquered the heart of the Mists, new paths open to distant lands through its portals. The first leads to a mountain outpost under an endless twilight. Survive the night there, alone, together or against each other.")
-	_map_badge({"maps": ["mesenlla"]})
-	_row("map_bastion", Color(0.45, 0.85, 0.82), "Mist Bastion", "Beyond the Mists, a Great Portal turns on a mountaintop, walled in by a citadel. Defend it until dawn as the creatures of Mesenlla climb three lanes to its gates, with Mist Soldiers holding each lane, and bring down the War Wyvern when it comes for the portal.")
-	_map_badge({"maps": ["bastion"]})
+	for id: String in Places.ORDER:
+		var place: Dictionary = Places.ALL[id]
+		_row(place["icon"], place["color"], place["name"], place["lore"], "Played in %s" % place["plays"])
+		if id in SpawnRules.MESENLLA:
+			_map_badge({"maps": [id]})

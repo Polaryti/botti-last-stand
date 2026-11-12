@@ -1,5 +1,30 @@
 # Changelog
 
+## Development — Beyond the Mists, part 7: a new way in
+
+### Title screen
+- The title screen now tours the Valleys of Mesenlla at twilight: over the stream and the hamlet, past the Ring of Stones, to the outpost and its Great Portal under the floating islands.
+- A new theme plays there, on harp, strings, flutes and bells.
+
+### Choosing where to play
+- Survive the Night and Defend the Fort open a world atlas: the Village by its river, the road to the Fort, the Fort's portal to the Mists, and the portal paths from the Mists to the Valleys of Mesenlla and Mist Bastion.
+- The places you can play in that mode are lit; the others are dimmed. Tap one to read its story and what is played there, then Play here.
+
+### Loading screen
+- A painted view of where you are going: the Village's church and lit windows, the Fort's walls and portal, the Mists' islands, the Valleys' twilight outpost or Mist Bastion's turning Great Portal. Islands bob, portals glow and mist drifts while the night is prepared.
+- It names the place and the mode, tells its story, shows your class and gives a hint for that place.
+
+### The Map
+- Each land is drawn in its own colours, the lands beyond the Mists in their twilight, with their heights shown over the whole range of their mountains.
+- Floating islands are drawn overhead, with glowing rifts, rings of standing stones, portals, waystones and the rock spines between Mist Bastion's lanes.
+- On a stronghold, each gate is marked by its state (damaged, or open in red) and a ring round the portal shows how much of it is left.
+
+### Codex
+- Every map says where it is played, from the same descriptions the atlas and the loading screen use.
+
+### Fixes
+- The Fort's Map no longer shows ponds that are not there; low ground you cannot walk on is drawn darker instead.
+
 ## Development — Beyond the Mists, part 6: Mist Bastion
 
 ### A new map for Defend the Fort

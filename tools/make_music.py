@@ -23,7 +23,7 @@ BARS = 32
 LENGTH = int(round(BARS * 4 * BEAT * SR))
 OUT = "assets/music/"
 # How loud each stem ends up, as the average level in dB. The hunted stem is the loudest.
-TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5, "menu": -16.0,
+TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5,
     "mists_night": -16.0, "mists_hunted": -13.5, "mists_dawn": -14.5,
     "fort_night": -15.0, "fort_hunted": -13.5, "fort_dawn": -14.5,
     "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0,
@@ -808,7 +808,6 @@ def compose_dawn(o):
 # The game's theme as a title theme: remembered by a single violin, answered by the oboe, turned
 # to the major by the whole orchestra, then back into the night it came from, and round again.
 
-MENU_CHORDS = NIGHT_CHORDS[:16] + DAWN_CHORDS[:8] + NIGHT_CHORDS[24:]
 
 
 def sparkle(s, inst, chords, first_bar, every, vel, lo=84, hi=96):
@@ -816,70 +815,6 @@ def sparkle(s, inst, chords, first_bar, every, vel, lo=84, hi=96):
     for i in range(0, len(chords), every):
         top = tones(chords[i], lo, hi)
         s.note(inst, top[len(top) // 2], (first_bar + i - 1) * 4.0, 2.0, vel * (0.85 + 0.15 * s.rng.random()))
-
-
-def compose_menu(o):
-    s = Score("menu", 44)
-    d = o.drums
-    s.dynamics = [(1, 0.5), (8, 0.55), (9, 0.6), (16, 0.7), (17, 0.86), (24, 0.95), (25, 0.7), (32, 0.5), (33, 0.5)]
-    ch = MENU_CHORDS
-    for i, c in enumerate(ch):
-        harp_bar(s, o.harp, c, i + 1, 0.68 if i < 16 else 0.74, up_only=i % 2 == 1)
-    low_strings(s, o, ch, 1, 0.5, basses=False)
-    # I. Remembered by one violin.
-    play_pad(s, o.violas, ch[:8], 1, 2, 57, 69, 0.34)
-    s.play_line(o.solo_violin, THEME_A, 1, vel=0.72)
-    sparkle(s, o.glock, ch[:8], 1, 2, 0.5)
-    # II. The oboe answers, with voices far away.
-    s.play_line(o.oboe, THEME_B, 9, shift=-12, vel=0.7)
-    play_pad(s, o.violins, ch[8:16], 9, 3, 65, 77, 0.36)
-    choir_chords(s, o.choir, ch[8:16], 9, 0.4)
-    play_pad(s, o.horns, ch[12:16], 13, 2, 53, 65, 0.4)
-    harp_run(s, o.harp, 62.0, 2.0, 57, 88, 0.55, OVER_A)
-    d.swell(s, 64.0, 0.5, "Median")
-    # III. Morning: the theme in the major, the whole string section and the horns.
-    s.play_line(o.violins, DAWN_A, 17, shift=12, vel=0.86, players=3)
-    s.play_line(o.horns, DAWN_A, 17, vel=0.6, players=2)
-    for m, b, l in harmony_below(DAWN_A, 17, [None] * 16 + ch[16:24]):
-        s.note(o.violas, m, b, l * 1.03, 0.5, legato=True)
-    play_pad(s, o.trombones, ch[16:24], 17, 2, 46, 58, 0.44)
-    choir_chords(s, o.choir, ch[16:24], 17, 0.7, lo=62, hi=79)
-    pulse_low(s, o, ch[16:24], 17, 0.52)
-    d.crash(s, 64.0, 0.32)
-    for bar in (17, 19, 21, 23):
-        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.55)
-    sparkle(s, o.glock, ch[16:24], 17, 2, 0.45)
-    # IV. Back into the night, the flute closing it, and round again.
-    s.play_line(o.flute, THEME_B_SHORT, 25, vel=0.6, swell=True)
-    play_pad(s, o.violas, ch[24:32], 25, 2, 57, 69, 0.36)
-    choir_chords(s, o.choir, ch[24:32], 25, 0.34)
-    s.play_line(o.solo_violin, CLOSING, 29, vel=0.62)
-    d.roll(s, 33 + 12, 124.0, 8.0, 0.25, 0.1)
-    return s
-
-
-# --- The Mists ----------------------------------------------------------------------------------
-# E minor, high and far away: trembling strings, harp rising like mist, a glockenspiel for the
-# floating stones, and a solo violin. Its own theme, not the Village's.
-
-MISTS_CHORDS = ["Em", "C", "G", "D", "Em", "C", "Am", "B",
-    "C", "G", "D", "Em", "C", "G", "Am", "B",
-    "Em", "C", "G", "D", "Em", "C", "Am", "B",
-    "C", "G", "Am", "Em", "Am", "C", "Bsus", "B"]
-MISTS_DAWN_CHORDS = ["G", "Em", "C", "Am", "G", "C", "Am", "D",
-    "Em", "D", "C", "G", "Am", "C", "G", "D",
-    "G", "Em", "C", "Am", "G", "C", "Am", "D",
-    "Em", "D", "C", "G", "Am", "C", "D", "G"]
-MISTS_A = "E4:2 B4:1.5 A4:.5 | G4:2 E4:1 G4:1 | D5:2 B4:1 G4:1 | A4:3 F#4:1 | E4:2 B4:1.5 C5:.5 | E5:2 D5:1 B4:1 | C5:1.5 B4:.5 A4:2 | B4:4"
-MISTS_B = "G5:3 E5:1 | D5:2 B4:1 D5:1 | F#5:3 D5:1 | E5:2 B4:2 | G5:3 A5:1 | B5:2 A5:1 G5:1 | A5:2 G5:1 E5:1 | F#5:2 D#5:1 F#5:1"
-MISTS_B_SHORT = "G5:3 E5:1 | D5:2 B4:1 D5:1 | F#5:3 D5:1 | E5:2 B4:2"
-# The answer again near the end, bent to the last part's chords (A minor where it had D).
-MISTS_B_LATE = "G5:3 E5:1 | D5:2 B4:1 D5:1 | E5:3 C5:1 | E5:2 B4:2"
-MISTS_CLOSING = "E5:2 C5:2 | E5:1 D5:1 C5:1 B4:1 | B4:4"
-MISTS_DAWN_A = "G4:2 D5:1.5 C5:.5 | B4:2 A4:1 B4:1 | G4:2 B4:1 E5:1 | E5:3 D5:1 | G4:2 D5:1.5 E5:.5 | G5:2 F#5:1 E5:1 | E5:1.5 D5:.5 C5:2 | D5:4"
-MISTS_DAWN_B = "B5:3 G5:1 | A5:2 F#5:1 A5:1 | G5:3 E5:1 | D5:2 B4:2 | C5:3 D5:1 | E5:2 D5:1 C5:1 | D5:2 B4:1 G4:1 | A4:2 F#4:1 A4:1"
-MISTS_DAWN_C = "B5:2 D6:2 | A5:3 F#5:1 | G5:2 E5:1 G5:1 | B5:3 G5:1 | C6:2 A5:1 E5:1 | E6:2 C6:2 | D6:2 A5:1 F#5:1 | G5:4"
-OVER_B = (4, 6, 7, 9, 11, 0, 3)  # E harmonic minor, for sweeps over B
 
 
 def compose_mists_night(o):
@@ -1540,7 +1475,7 @@ def write(name, x):
         subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", path, "-c:a", "libvorbis", "-q:a", "2.6", "-map_metadata", "-1", OUT + name + ".ogg"], check=True)
 
 
-COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_dawn, "menu": compose_menu,
+COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_dawn,
     "mists_night": compose_mists_night, "mists_hunted": compose_mists_hunted, "mists_dawn": compose_mists_dawn,
     "fort_night": compose_fort_night, "fort_hunted": compose_fort_hunted, "fort_dawn": compose_fort_dawn,
     "mesenlla_night": compose_mesenlla_night, "mesenlla_hunted": compose_mesenlla_hunted, "mesenlla_dawn": compose_mesenlla_dawn,
