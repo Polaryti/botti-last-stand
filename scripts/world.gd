@@ -2341,7 +2341,7 @@ func spawn_pickup_random(kind: int, id: String) -> Pickup:
 			continue
 		# Things to find lie apart, not in heaps.
 		at += Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
-		if not grid.is_free(grid.to_cell(at)) or terrain.in_pool(at.x, at.z):
+		if not grid.is_free(grid.to_cell(at)) or terrain.in_pool(at.x, at.z) or storm_at(at) != null:
 			continue
 		var clash := false
 		for other in pickups:
