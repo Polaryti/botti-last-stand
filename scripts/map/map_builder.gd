@@ -35,6 +35,7 @@ var _ground_material: ShaderMaterial
 var _road_lines: Array[Dictionary] = []
 var _dirt_patches: Array[Dictionary] = []
 var skip_beyond := false # the menu only needs the village
+var sight := 1.0 # how far grass and other small things are drawn, as a share of the usual
 var xf := Transform3D.IDENTITY # where the piece being built stands
 var piece_scale := 1.0
 var rng := RandomNumberGenerator.new() # for looks only: phones may disagree about these
@@ -488,7 +489,7 @@ func _reeds() -> void:
 		var list: Array[Transform3D] = []
 		list.assign(chunks[key][0])
 		var node := Crops.plant(reed, list, chunks[key][1])
-		node.visibility_range_end = 50.0
+		node.visibility_range_end = 50.0 * sight
 		w.add_child(node)
 
 
@@ -985,6 +986,9 @@ func bonfire() -> void:
 		l.prism(Vector3(cos(a) * 0.72, 0.1, sin(a) * 0.72), Vector3(cos(a) * 0.08, 0.62, sin(a) * 0.08), 0.1, 0.07, 5, Color(0.17, 0.11, 0.07))
 	var at := xf.origin
 	w.add_solid(at + Vector3.UP * 0.5, Vector3(1.9, 1.0, 1.9))
+	# Nobody stands in the flames: an unseen column over the fire keeps everyone off the top of it,
+	# where nothing could reach them.
+	w.add_barrier(at + Vector3.UP * 3.0, Vector3(1.9, 4.0, 1.9))
 	w.add_glow(at + Vector3.UP * 1.0, Color(1.0, 0.6, 0.22), 4.5, 95.0)
 	_flame(at + Vector3.UP * 0.1, 1.0)
 	var light: OmniLight3D = null
@@ -1028,7 +1032,7 @@ func _flame(at: Vector3, size: float) -> void:
 	mi.position = at
 	mi.scale = Vector3.ONE * size
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.visibility_range_end = 90.0
+	mi.visibility_range_end = 90.0 * sight
 	w.add_child(mi)
 
 
@@ -1338,7 +1342,7 @@ func _garden(size: Vector2) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(groups[key][0])
 		var node := Crops.plant(kinds[key.x], list, groups[key][1], key.x != 2)
-		node.visibility_range_end = 60.0
+		node.visibility_range_end = 60.0 * sight
 		w.add_child(node)
 
 
@@ -1376,7 +1380,7 @@ func _grain(size: Vector2, barley: bool) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(chunks[k][0])
 		var node := Crops.plant(Crops.wheat(), list, chunks[k][1])
-		node.visibility_range_end = 58.0
+		node.visibility_range_end = 58.0 * sight
 		w.add_child(node)
 
 
@@ -1405,7 +1409,7 @@ func _corn(size: Vector2) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(chunks[k][0])
 		var node := Crops.plant(Crops.corn(), list, chunks[k][1], true)
-		node.visibility_range_end = 62.0
+		node.visibility_range_end = 62.0 * sight
 		w.add_child(node)
 
 
@@ -1434,11 +1438,11 @@ func _orchard(size: Vector2) -> void:
 			z += 5.0
 		x += 5.0
 	var node := Crops.plant(Crops.apple_tree(), trees, tints, true)
-	node.visibility_range_end = 90.0
+	node.visibility_range_end = 90.0 * sight
 	w.add_child(node)
 	var apples := MeshInstance3D.new()
 	apples.mesh = fallen.commit()
-	apples.visibility_range_end = 40.0
+	apples.visibility_range_end = 40.0 * sight
 	apples.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	w.add_child(apples)
 
@@ -1460,7 +1464,7 @@ func _vines(size: Vector2) -> void:
 			z += 2.0
 		x += 2.6
 	var node := Crops.plant(Crops.vine(), vines, tints, true)
-	node.visibility_range_end = 60.0
+	node.visibility_range_end = 60.0 * sight
 	w.add_child(node)
 
 
@@ -1634,6 +1638,9 @@ func forest_wall(h: float) -> void:
 			apron._tri(a, z, z + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 			apron._tri(a, z + outward * 24, a + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 	add(apron)
+	if look in SpawnRules.MESENLLA:
+		_tall_wall(h)
+		return
 	var step: float = [7.5, 5.5, 4.2][quality]
 	var depth: int = [2, 2, 3][quality]
 	for row in depth:
@@ -1647,6 +1654,26 @@ func forest_wall(h: float) -> void:
 				var file := "res://assets/nature/tree_single_A.gltf" if rng.randf() < 0.72 else "res://assets/nature/tree_single_B.gltf"
 				tree(file, rng.randf_range(5.5, 8.5), rng.randf_range(0.9, 1.15), false)
 			t += step
+
+
+## Beyond the Mists the edge of the land is lined with tall conifers: giant firs and tall pines in
+## rows from just inside the edge outwards, so the land ends in a wall of old forest.
+func _tall_wall(h: float) -> void:
+	var step: float = [8.0, 6.0, 5.0][quality]
+	var depth: int = [3, 3, 4][quality]
+	for row in depth:
+		var off := h - 2.5 + row * 4.2
+		var t := -off
+		while t <= off:
+			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
+				var p := at + Vector3(rng.randf_range(-1.4, 1.4), 0, rng.randf_range(-1.4, 1.4))
+				p.y = terrain.height(p.x, p.z)
+				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+				if rng.randf() < 0.55:
+					tree("proc:giant_fir", rng.randf_range(7.5, 10.0), rng.randf_range(0.95, 1.15), row == 0)
+				else:
+					tree("proc:tall_pine", rng.randf_range(8.0, 11.0), rng.randf_range(1.0, 1.3), row == 0)
+			t += step + (row % 2) * 0.5
 
 
 ## Grass tufts, in patches so the camera can skip those it cannot see.
@@ -1675,7 +1702,7 @@ func grass(h: float) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(patches[key][0])
 		var node := Crops.plant(tuft, list, patches[key][1])
-		node.visibility_range_end = 46.0
+		node.visibility_range_end = 46.0 * sight
 		w.add_child(node)
 
 

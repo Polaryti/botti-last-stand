@@ -30,9 +30,10 @@ func tick(z: Zombie, target: Target, delta: float) -> void:
 				z.world.spawn_zombie("lantern_wisp", at)
 	var visible := boss or (z._sees and not target.is_unseen())
 	var destination := target.global_position if visible else z._goal if z._has_goal else z.position
-	if z.world.mist_storm and z.world.mist_storm.contains(z.position) and not boss:
+	var storm := z.world.storm_at(z.position)
+	if storm and not boss:
 		visible = false
-		destination = z.world.mist_storm.escape(z.position)
+		destination = storm.escape(z.position)
 		var exit := z.world.portals.exit_from(z.position)
 		if exit != Vector3.INF:
 			z.position = exit

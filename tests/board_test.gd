@@ -247,8 +247,13 @@ func _screens() -> void:
 	await get_tree().create_timer(0.5).timeout
 	var texts := func() -> Array:
 		return m.ui_layer.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
-	check(texts.call().has("Olaf the Bold"), "the menu shows your name: %s" % str(texts.call()))
-	check(m.ui_layer.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == "Leaderboard"), "and the leaderboard")
+	check(not texts.call().has("Olaf the Bold"), "the menu no longer shows your name on a button: %s" % str(texts.call()))
+	check(m.ui_layer.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == "Leaderboard"), "but has the leaderboard")
+	m.show_settings()
+	await get_tree().process_frame
+	check(texts.call().has("Olaf the Bold"), "Settings shows your name, to change it: %s" % str(texts.call()))
+	m.show_menu()
+	await get_tree().process_frame
 	m.show_name_prompt(false)
 	await get_tree().process_frame
 	var edit: LineEdit = m.ui_layer.find_children("*", "LineEdit", true, false)[0]
@@ -286,14 +291,14 @@ func _screens() -> void:
 			break
 	check(said.has("Won, 10:05") and said.has("Fort") and said.has("Night · Village") and said.has("Just now"), "your matches on screen: %s" % str(said).left(300))
 	m._board_kind = "all"
-	# The end screen adds where the match moved you, once the board has counted it.
-	m._board_note = "+60 leaderboard points"
-	m._counted = {}
-	m._end_screen("The night is over", "You lasted 4:05.\n+60 leaderboard points")
-	m._counted = {"before": {"all": {"rank": 5}, "week": {"rank": null}}, "all": {"rank": 3}, "week": {"rank": 2}}
-	m._apply_board_note()
+	# The end screen lists the points the match earned, with no place on the board.
+	m._rewards = [{"points": true, "text": "+60 leaderboard points"}, {"coin": true, "text": "+35 Botti Doubloons"}, {"class": "bandit", "text": "Bandit unlocked!"}]
+	m._end_screen("The night is over", "You lasted 4:05.")
 	said = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
-	check(said.any(func(t: String) -> bool: return t.ends_with("+60 leaderboard points: #2 this week and #3 of all time (up 2)")), "the end screen says where the match moved you: %s" % str(said).left(300))
+	check(said.has("+60 leaderboard points") and not said.any(func(t: String) -> bool: return t.contains("#") or t.contains("this week")), "the end screen shows the points earned and no place on the board: %s" % str(said).left(300))
+	var rows := m.ui_layer.find_children("Reward?", "HBoxContainer", true, false)
+	check(rows.size() == 3 and (rows[1] as Node).get_child(0) is TextureRect and ((rows[1] as Node).get_child(0) as TextureRect).texture.resource_path.ends_with("doubloon.png"), "the doubloons earned sit beside a doubloon")
+	check(rows.size() == 3 and (rows[2] as Node).get_child(0) is IconView and ((rows[2] as Node).get_child(0) as IconView).icon == ClassDefs.icon("bandit"), "and a class unlocked beside its emblem")
 	m._clear_ui()
 	m._clear_world()
 	m.queue_free()

@@ -4,16 +4,18 @@ extends MapPiece
 ## A landmark of the lands beyond the Mists, drawn by code (scripts/map/mesenlla_builder.gd):
 ## islands of rock floating in the twilight, rifts torn open above the ground, a Great Portal, rings of
 ## standing stones, mist crystals, palisades of sharpened logs and watchtowers, waterfalls, arches of
-## mossy rock, the tents, bunting and wall hangings of a makeshift outpost, and the forest floor.
+## mossy rock, the tents, bunting and wall hangings of a makeshift outpost, the forest floor, and in
+## the south the ruins of an old hall, the mouth of an old mine and the shrines of the valley folk.
 ## A floating island is placed at its height above the ground with lift.
 
-@export_enum("floating_island", "rift", "mist_gate", "standing_stones", "crystals", "palisade", "watchtower", "lodge_fire", "waterfall", "arch", "tent", "bunting", "wall_banners", "undergrowth") var kind := "floating_island":
+@export_enum("floating_island", "rift", "mist_gate", "standing_stones", "crystals", "palisade", "watchtower", "lodge_fire", "waterfall", "arch", "tent", "bunting", "wall_banners", "undergrowth", "shrine", "ruins", "mine") var kind := "floating_island":
 	set(v):
 		kind = v
 		refresh()
 ## How big it is: an island's width, a rift's length, a ring's radius, a palisade's length, a
 ## waterfall's drop, an arch's span, a tent's width, a string of bunting's length, the width of a wall
-## hung with banners, the radius of a patch of undergrowth.
+## hung with banners, the radius of a patch of undergrowth, the radius of a ring of ruins, the width
+## of a mine's mouth.
 @export var size := 10.0:
 	set(v):
 		size = v
@@ -22,6 +24,11 @@ extends MapPiece
 @export var wide := 4.0:
 	set(v):
 		wide = v
+		refresh()
+## What a shrine gives: the stag's swiftness, the bear's strength, or the spring's healing.
+@export_enum("stag", "bear", "spring") var blessing := "stag":
+	set(v):
+		blessing = v
 		refresh()
 ## Gaps in a palisade, as "start-end, start-end" in metres along it.
 @export var openings := "":
@@ -46,6 +53,9 @@ func build(b: MapBuilder) -> void:
 		"bunting": MesenllaBuilder.bunting(b, size)
 		"wall_banners": MesenllaBuilder.wall_banners(b, size)
 		"undergrowth": MesenllaBuilder.undergrowth(b, size)
+		"shrine": MesenllaBuilder.shrine(b, blessing)
+		"ruins": MesenllaBuilder.ruins(b, size)
+		"mine": MesenllaBuilder.mine(b, size)
 
 
 func land(t: Terrain, at: Transform3D) -> void:

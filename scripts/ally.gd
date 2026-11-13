@@ -9,18 +9,18 @@ extends Target
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
 const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0,
-	"mist_infantry": 180.0, "mist_ranger": 110.0, "mist_heavy": 340.0}
+	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0}
 const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger",
 	"mist_infantry", "mist_ranger", "mist_heavy"] # new kinds go at the end: their index travels between phones
 ## Mist Bastion's garrison: who they are, what they hit for (a weapon blow is 1) and how far from
 ## their post they will go after an enemy.
 const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy"]
-const GARRISON_BLOW := {"mist_infantry": 1.0, "mist_heavy": 1.6}
+const GARRISON_BLOW := {"mist_infantry": 0.65, "mist_heavy": 1.04}
 const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2}
 const GARRISON_SIGHT := 18.0
 const GARRISON_LEASH := 16.0
 const HEAVY_GUARD := 0.3 # the Mist Heavy's tower shield takes this much off every blow
-const RANGER_SHOT := 0.9 # of a weapon blow, every 1.1 seconds
+const RANGER_SHOT := 0.585 # of a weapon blow, every 1.1 seconds
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
 const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
 const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}

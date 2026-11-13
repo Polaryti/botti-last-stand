@@ -9,6 +9,7 @@ const GRAVITY := 20.0
 const BASE_FOV := 72.0
 const BASE_ARROWS := 60
 const BURN_DPS := 5.0
+const BACK_SPEED := 0.8 # walking backwards, as a share of walking on
 const BASE_MANA := 100.0
 const MANA_REGEN := 8.0
 const BRIDGE_KNOCK := 13.0
@@ -218,6 +219,7 @@ var _rift_timer := 0.0
 var _lit := false
 var _lit_timer := 0.0
 var _warm := false
+var _scorch := 0.0 # how long you have stood right at a bonfire's stones
 var _vm_left: MeshInstance3D
 var _mist_trail := 0.0
 var fog_flash := 0.0
@@ -483,7 +485,7 @@ func has_flag(f: String) -> bool:
 ## from your own skills or from someone else (a Commander's rally), a Shield Dome over you, and a
 ## Guardian's cover while you stand near one. Each is {icon, color, left (-1 if it has no end), stacks}.
 const _BUFF_ICONS := {"speed": "boot+up", "melee_damage": "sword+up", "ranged_damage": "arrow+up", "spell_damage": "staff+up",
-	"melee_rate": "hand+clock", "ranged_rate": "arrow+clock", "damage_taken": "shield+up", "horse_speed": "horse+up"}
+	"melee_rate": "hand+clock", "ranged_rate": "arrow+clock", "damage_taken": "shield+up", "horse_speed": "horse+up", "regen": "lotus+clock"}
 
 func status_effects() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -493,14 +495,14 @@ func status_effects() -> Array[Dictionary]:
 			out.append({"icon": ("status_frozen" if is_iced else "status_stunned") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left", "night_blind_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
-		if key == "command_ranged" or key == "command_spell":
+		if key in ["command_ranged", "command_spell", "shrine_bear_ranged_damage", "shrine_bear_spell_damage"]:
 			continue
 		var b: Dictionary = _buffs[key]
 		var from_command := key.begins_with("command_")
 		out.append({"icon": _BUFF_ICONS.get(b["stat"], "star+up"), "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
 			"left": float(b["left"]), "stacks": int(b["stacks"])})
-	if world and world.mist_storm and world.mist_storm.contains(global_position):
-		var storm := world.mist_storm
+	var storm: MistStorm = world.storm_at(global_position) if world else null
+	if storm:
 		var remaining := storm.warning - storm.elapsed if storm.elapsed < storm.warning else (-1.0 if storm.finale else maxf(0, storm.warning + storm.duration - storm.elapsed))
 		out.append({"icon": "mist+clock", "color": Color(0.7, 0.4, 0.95), "left": remaining, "stacks": 1})
 	if world and has_flag("falling_star"):
@@ -931,7 +933,30 @@ func _check_low() -> void:
 
 
 ## Standing up again, in a multiplayer game.
+## A shrine's blessing (MesenllaBuilder.shrine): the stag's swiftness, the bear's strength in every
+## kind of blow, or the spring's healing, for a while.
+const BLESSING_TIME := {"stag": 30.0, "bear": 30.0, "spring": 15.0}
+const BLESSING_WORDS := {"stag": "Shrine of the Stag: swifter for 30 seconds", "bear": "Shrine of the Bear: harder blows for 30 seconds",
+	"spring": "Shrine of the Spring: healing for 15 seconds"}
+func bless(blessing: String) -> void:
+	var secs: float = BLESSING_TIME.get(blessing, 20.0)
+	match blessing:
+		"stag":
+			_buffs["shrine_stag"] = {"stat": "speed", "val": 0.25, "left": secs, "stacks": 1}
+		"bear":
+			for stat: String in ["melee_damage", "ranged_damage", "spell_damage"]:
+				_buffs["shrine_bear_" + stat] = {"stat": stat, "val": 0.25, "left": secs, "stacks": 1}
+		_:
+			_buffs["shrine_spring"] = {"stat": "regen", "val": 4.0, "left": secs, "stacks": 1}
+			heal(20.0)
+	sfx("level", -4.0)
+
+
 func respawn(at: Vector3) -> void:
+	# Never back on your feet inside a Mist Storm: just outside it instead.
+	var storm: MistStorm = world.storm_at(at) if world else null
+	if storm and storm.escape(at) != Vector3.INF:
+		at = storm.escape(at)
 	dead = false
 	hp = max_hp()
 	mana = 0.0 if class_def().get("ki", false) else max_mana()
@@ -2996,6 +3021,9 @@ func _physics_step(delta: float) -> void:
 	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (CartographerKit.LANTERN_SPEED if has_power("lantern") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
 	if is_riding():
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
+	elif input_move.y > 0.0:
+		# Backing away is slower than walking on: straight back at BACK_SPEED, less so on a slant.
+		speed *= lerpf(1.0, BACK_SPEED, input_move.normalized().y)
 	if spirit_left > 0.0:
 		speed *= SPIRIT_SPEED * (SPIRIT_SPEED if has_flag("swift_spirit") else 1.0)
 	if slowed_left > 0.0:
@@ -3191,6 +3219,15 @@ func _process_step(delta: float) -> void:
 		_lit = weapon_def().get("burns", false) or has_power("lantern") or world.in_firelight(global_position)
 		_refresh_light()
 		_warm = world.beside_bonfire(global_position)
+		# Stand at the stones too long and you catch fire, and keep burning while you stay.
+		if not dead and world.at_bonfire(global_position):
+			_scorch += 0.25
+			if _scorch >= WorldLight.SCORCH_AFTER:
+				if burn_time <= 0.0:
+					sfx("burn", -6.0)
+				ignite(ZombieDefs.BURN_SECONDS)
+		else:
+			_scorch = 0.0
 	fog_flash = maxf(0.0, fog_flash - delta * 2.6)
 	if _warm and hp < max_hp():
 		hp = minf(max_hp(), hp + WorldLight.WARMTH * delta)

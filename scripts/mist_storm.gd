@@ -1,7 +1,13 @@
 class_name MistStorm
 extends Node3D
-## One scheduled island storm. Local players own their damage; the host owns mobs and summons.
-const EVERY := 70.0
+## A Mist Storm: an island of the Mists, all the outer islands at the Regent's coming, or a place on
+## another map (the Valleys' camp once it has been shelled). Inside it, after a warning, the mist
+## burns. Several can rage at once, each its own node in World.mist_storms. Local players own their
+## damage; the host owns mobs and summons.
+const FIRST := 45.0 # the first storm of a night in the Mists
+const GAP := 12.0 # after one storm ends, the next gathers this much later
+const TWO_FROM := 300.0 # from here on, two storms can rage at once
+const STAGGER := 18.0 # the second of two does not gather at the same moment as the first
 const WARNING := 8.0
 const DURATION := 20.0
 const DPS := 6.0
@@ -11,17 +17,22 @@ var warning := WARNING
 var duration := DURATION
 var world: World
 var island := 0
+var zone_at := Vector3.INF # a storm over a place rather than an island: its middle,
+var zone_radius := 0.0 # and how far it reaches
+var zone_leave := "" # what the warning tells you to leave
 var elapsed := 0.0
-var _inside := false
 var _status: Label
 var _sound := 0.0
 var _exposure := 0.0
 var _rings: Array[MeshInstance3D] = []
 
+
+## A storm over an island of the Mists, or (final_storm) over all the outer islands at once.
 static func create(w: World, index: int, final_storm := false) -> MistStorm:
-	if w.mist_storm:
-		w.mist_storm.set_physics_process(false)
-		w.mist_storm.queue_free()
+	for other: MistStorm in w.mist_storms.duplicate():
+		# The Regent's storms take every outer island; otherwise, one storm to an island.
+		if final_storm or other.finale or other.island == index:
+			other.end_now()
 	var storm := MistStorm.new()
 	storm.finale = final_storm
 	if final_storm:
@@ -29,93 +40,137 @@ static func create(w: World, index: int, final_storm := false) -> MistStorm:
 		storm.duration = INF
 	storm.world = w
 	storm.island = index
-	w.add_child(storm)
-	w.mist_storm = storm
+	storm._join(w)
 	if not Net.is_client():
 		for link: Dictionary in w.portals.links:
 			link["open"] = true
 			link["closing"] = 0.0
 			w.portals._show(link)
 		w.portals._tell_others()
-	storm.tree_exiting.connect(func() -> void:
-		if w.mist_storm == storm:
-			w.mist_storm = null
-			w.set_fog_thickness(1.0)
-			w._sky_value = -1.0
-			w._apply_sky(w._last_dawn))
-	var canvas := CanvasLayer.new()
-	canvas.layer = 6
-	storm.add_child(canvas)
-	var panel := Control.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	canvas.add_child(panel)
-	storm._status = Label.new()
-	storm._status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	storm._status.position.y = 80.0
-	storm._status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	storm._status.add_theme_color_override("font_color", Color(0.8, 0.65, 1.0))
-	storm._status.add_theme_font_size_override("font_size", 22)
-	storm._status.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(storm._status)
 	var affected: Array[int] = []
 	if final_storm:
 		for n in range(1, MapIslands.ISLANDS.size()): affected.append(n)
 	else: affected.append(index)
 	for n: int in affected:
 		var land := MapIslands.ISLANDS[n]
-		var root := Node3D.new()
-		storm.add_child(root)
-		root.position = Vector3(land.x, land.w, land.y)
-		var material := StandardMaterial3D.new()
-		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		material.albedo_color = Color(0.5, 0.35, 0.85, 0.4)
-		for i in 3:
-			var node := MeshInstance3D.new()
-			var ring := TorusMesh.new()
-			ring.inner_radius = land.z - 0.25
-			ring.outer_radius = land.z
-			ring.rings = 64
-			ring.ring_segments = 4
-			node.mesh = ring
-			node.material_override = material
-			node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			node.position.y = i * 2.0 + 0.3
-			root.add_child(node)
-			storm._rings.append(node)
-		var cloud := CPUParticles3D.new()
-		cloud.amount = (2 if Game.quality == 0 else 4) if final_storm else (16 if Game.quality == 0 else 32)
-		cloud.lifetime = 5.0
-		cloud.preprocess = 2.0
-		cloud.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-		cloud.emission_box_extents = Vector3(land.z * 0.7, 4, land.z * 0.7)
-		cloud.direction = Vector3(1, 0, 0.5)
-		cloud.initial_velocity_min = 1.5
-		cloud.initial_velocity_max = 3.0
-		cloud.gravity = Vector3.ZERO
-		var quad := QuadMesh.new()
-		quad.size = Vector2(18, 8)
-		var mist := ShaderMaterial.new()
-		mist.shader = preload("res://assets/shaders/mist_wisp.gdshader")
-		mist.set_shader_parameter("tint", Vector3(0.4, 0.25, 0.65))
-		quad.material = mist
-		cloud.mesh = quad
-		cloud.position.y = 3.0
-		cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		root.add_child(cloud)
+		storm._ring(Vector3(land.x, land.w, land.y), land.z, final_storm)
 	if final_storm:
 		w.director.show_banner("The Veil Regent awakens — return to the arena! Outer-island storms strike in 20 seconds", 8.0)
 	else:
 		w.director.show_banner("Mist Storm gathering on %s — evacuate in 8 seconds" % NAMES[index], 8.0)
 	return storm
 
+
+## A storm that settles over a place and never lifts. The caller tells everyone why.
+static func create_zone(w: World, centre: Vector3, radius: float, leave: String, warn := WARNING) -> MistStorm:
+	var storm := MistStorm.new()
+	storm.world = w
+	storm.island = -1
+	storm.zone_at = centre
+	storm.zone_radius = radius
+	storm.zone_leave = leave
+	storm.warning = warn
+	storm.duration = INF
+	storm._join(w)
+	storm._ring(Vector3(centre.x, w.ground_at(centre), centre.z), radius, false)
+	return storm
+
+
+## Becomes one of the world's storms, with its line of words at the top of the screen.
+func _join(w: World) -> void:
+	w.add_child(self)
+	w.mist_storms.append(self)
+	tree_exiting.connect(func() -> void:
+		w.mist_storms.erase(self)
+		w.storm_air())
+
+
+## The look of a storm over a round of land: rings of mist light, and clouds rolling through.
+func _ring(at: Vector3, radius: float, quiet: bool) -> void:
+	if _status == null:
+		_make_status()
+	var root := Node3D.new()
+	add_child(root)
+	root.position = at
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(0.5, 0.35, 0.85, 0.4)
+	for i in 3:
+		var node := MeshInstance3D.new()
+		var ring := TorusMesh.new()
+		ring.inner_radius = radius - 0.25
+		ring.outer_radius = radius
+		ring.rings = 64
+		ring.ring_segments = 4
+		node.mesh = ring
+		node.material_override = material
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.position.y = i * 2.0 + 0.3
+		root.add_child(node)
+		_rings.append(node)
+	var cloud := CPUParticles3D.new()
+	cloud.amount = (2 if Game.quality == 0 else 4) if quiet else (16 if Game.quality == 0 else 32)
+	cloud.lifetime = 5.0
+	cloud.preprocess = 2.0
+	cloud.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	cloud.emission_box_extents = Vector3(radius * 0.7, 4, radius * 0.7)
+	cloud.direction = Vector3(1, 0, 0.5)
+	cloud.initial_velocity_min = 1.5
+	cloud.initial_velocity_max = 3.0
+	cloud.gravity = Vector3.ZERO
+	var quad := QuadMesh.new()
+	quad.size = Vector2(18, 8)
+	var mist := ShaderMaterial.new()
+	mist.shader = preload("res://assets/shaders/mist_wisp.gdshader")
+	mist.set_shader_parameter("tint", Vector3(0.4, 0.25, 0.65))
+	quad.material = mist
+	cloud.mesh = quad
+	cloud.position.y = 3.0
+	cloud.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(cloud)
+
+
+## The line of words at the top of the screen while you are inside.
+func _make_status() -> void:
+	var canvas := CanvasLayer.new()
+	canvas.layer = 6
+	add_child(canvas)
+	var panel := Control.new()
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(panel)
+	_status = Label.new()
+	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	_status.position.y = 80.0
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status.add_theme_color_override("font_color", Color(0.8, 0.65, 1.0))
+	_status.add_theme_font_size_override("font_size", 22)
+	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(_status)
+
 const NAMES := MapIslands.ZONE_NAMES
 
+
 func contains(at: Vector3) -> bool:
+	if zone_radius > 0.0:
+		return Vector2(at.x - zone_at.x, at.z - zone_at.z).length() <= zone_radius
 	if finale: return Vector2(at.x, at.z).length() > MapIslands.ISLANDS[0].z
 	var land := MapIslands.ISLANDS[island]
 	return world.portals != null and world.portals.island_of(at) == island and Vector2(at.x - land.x, at.z - land.y).length() <= land.z + 1.0
+
+
+## Whether the mist burns yet, or is still gathering.
+func burning() -> bool:
+	return elapsed >= warning
+
+
+## Gone at once, without waiting for its time to run out.
+func end_now() -> void:
+	set_physics_process(false)
+	world.mist_storms.erase(self)
+	queue_free()
+
 
 func _physics_process(delta: float) -> void:
 	var previous := elapsed
@@ -134,25 +189,27 @@ func _physics_process(delta: float) -> void:
 			for ally: Ally in world.allies:
 				if not ally.dead and contains(ally.global_position): ally.hurt(amount, global_position)
 	if world.player:
-		world.set_fog_thickness((1.5 if elapsed < warning else 4.0) if contains(world.player.global_position) else 1.0)
 		var inside := contains(world.player.global_position)
 		_status.visible = inside and not world.player.dead
-		if elapsed < warning: _status.text = "MIST STORM — EVACUATE • %ds" % ceili(warning - elapsed)
+		if elapsed < warning: _status.text = ("MIST STORM — LEAVE %s • %ds" % [zone_leave, ceili(warning - elapsed)]) if zone_leave != "" else "MIST STORM — EVACUATE • %ds" % ceili(warning - elapsed)
 		elif finale: _status.text = "MIST STORM • 6 HP/s — RETURN TO THE ARENA"
+		elif zone_leave != "": _status.text = "MIST STORM • 6 HP/s — LEAVE %s" % zone_leave
 		else: _status.text = "MIST STORM • 6 HP/s • %ds" % maxi(0, ceili(warning + duration - elapsed))
-
-		if inside: world._env.fog_light_color = Color(0.16, 0.1, 0.25)
-		elif _inside:
-			world._sky_value = -1.0
-			world._apply_sky(world._last_dawn)
-		_inside = inside
 	_sound -= delta
 	if _sound <= 0.0:
 		_sound = 3.5
 		if world.player and contains(world.player.global_position): Sfx.play("mist_regent", -10.0)
-	if elapsed >= warning + duration: queue_free()
+	if elapsed >= warning + duration: end_now()
 
+
+## The way out: through an open portal off the island, or straight out of a storm over a place.
 func escape(from: Vector3) -> Vector3:
+	if zone_radius > 0.0:
+		var out := Vector3(from.x - zone_at.x, 0, from.z - zone_at.z)
+		if out.length_squared() < 0.01:
+			out = Vector3.BACK
+		var to := zone_at + out.normalized() * (zone_radius + 4.0)
+		return Vector3(to.x, world.ground_at(to), to.z)
 	if finale: return world.portals.waypoint(from, Vector3(16, 10, 0))
 	var best := Vector3.INF
 	var distance := INF

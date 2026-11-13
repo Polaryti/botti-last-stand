@@ -11,6 +11,8 @@ extends Node3D
 @export var land_half := 110
 ## A wall of trees just outside that edge.
 @export var forest_wall := true
+## How thick the grass grows, as a share of the usual.
+@export var grass := 1.0
 ## How rough the land is away from the centre, in metres.
 @export var roughness := 5.5
 ## Inside this distance from the centre the land is smooth.

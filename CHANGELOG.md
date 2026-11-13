@@ -1,5 +1,37 @@
 # Changelog
 
+## Development — Beyond the Mists, second review
+
+### Fixes
+- The Changelog opens at once: the newest notes are on screen straight away and the older ones follow over the next moments, instead of the screen freezing while all of them are laid out. The class models shown in the Store and on the class screens are read and prepared while the menu first appears, so those screens no longer hitch the first time they open.
+- Nobody can climb on top of a campfire any more, where enemies could not reach them. Standing right at its stones for more than 7 seconds sets you on fire, and you keep burning while you stay.
+
+### Changes
+- No map tags when choosing where to play.
+- The Veil Regent, the Great Revenant Elemental and the War Wyvern no longer leave an Angel. Each has last words when it falls.
+- The title screen's valley has its grass and flowers again, drawn out to where its high camera can see them.
+- The Scarecrow belongs to The Village alone, and the Codex says so.
+- The Shapeshifter has 240 health (was 170) and its beast is faster (5 m/s, was 4.2). Badly hurt, it flees as a stag for 10 seconds without mending; if it is not killed by then, it comes back with all its health.
+- Walking backwards goes at 80% of walking on, less so on a slant.
+- On the world atlas Mist Bastion and the Valleys of Mesenlla have changed places. The portal from the Mists leads only to Mist Bastion, and a road runs down from it to the Valleys.
+- When there are new notes, the Changelog button glows on and off until you open it.
+- Changing your name is in Settings now, not on the main screen.
+- In The Mists, a new Mist Storm gathers 12 seconds after the last one ends (the first at 0:45), and from 5:00 two can rage at once, on different islands.
+- At the end of a match: the leaderboard points it earned, with no place on the board, and the Botti Doubloons beside a doubloon. A class unlocked is shown with its emblem.
+
+### Valleys of Mesenlla
+- The Great Falls drops straight into the river, and the fall off the east crag now comes down a cliff into the river too, instead of into the hillside.
+- Tents are solid all round, door included, and their canvas is drawn on both sides.
+- The edge of the land is lined with rows of giant firs and tall pines.
+- The south is worth the walk: the Fallen Hall (a ring of broken columns), a Hunters' Lodge and an Old Mine each keep a cache of the rarer weapons or a potion, filled again 100 seconds after it is taken. Three shrines bless whoever touches them, then rest for 2 minutes: the Stag (25% faster for 30 seconds), the Bear (25% harder blows of every kind for 30 seconds) and the Mossy Spring (20 health at once and 4 a second for 15 seconds).
+- The camp is shelled: from 2:00, every 16 seconds or so, three circles of storm or mist fall on it. At 5:00 everyone is told to get out; at 5:15 a six-second barrage comes down, the camp's watchtowers fall, and a Mist Storm settles over the camp for the rest of the night (6 damage a second, as in The Mists). Nothing rises or is left lying inside it after that, and anyone back on their feet there stands just outside it.
+
+### Mist Bastion
+- The Mist Soldiers are a third weaker (Infantry 117 health, Ranger 72, Heavy 221, and their blows and arrows a third lighter), and hold their posts closer below the gates.
+- Enemies up the lanes go for the gates and then the portal before everything: they strike only someone right in their way, never go after anyone, make no charges or special moves on the way, and do not stop to shoot at anyone further off than a few steps.
+- A rift stands at the foot of each lane, where its enemies step out.
+- More grass, and more ferns and mushrooms; tall trees line the edge of the land and the slopes beyond the outer spines.
+
 ## Development — Beyond the Mists, review fixes: the maps
 
 ### Valleys of Mesenlla
@@ -119,12 +151,12 @@
 
 ### The garrison: Mist Soldiers
 - From 0:20, and every 40 seconds while a lane has fewer than two, a Mist Soldier steps out of each lane's waystone and holds a post on that lane, fighting whatever comes near and walking back to it.
-- Mist Infantry (180 health): sword and kite shield. Mist Ranger (110 health): shoots from its post and steps back from anything that gets close. Mist Heavy (from 3:00, 340 health): battleaxe blows at 1.6 times a weapon blow that throw enemies back, and a tower shield that takes 30% off every blow.
+- Mist Infantry (117 health): sword and kite shield. Mist Ranger (72 health): shoots from its post and steps back from anything that gets close. Mist Heavy (from 3:00, 221 health): battleaxe blows just over a weapon blow that throw enemies back, and a tower shield that takes 30% off every blow.
 - They belong to no one: their kills give no one XP or leaderboard kills.
 - Each has its own gear in the Mists' colours, with glowing mist-glass, its own icon and a Codex entry.
 
 ### The War Wyvern
-- At about 8:30 the War Wyvern comes for the Great Portal, making a burning pass along a lane every 22 seconds: a line of fire that ends on the portal. Dawn waits until it falls, and it leaves an Angel familiar.
+- At about 8:30 the War Wyvern comes for the Great Portal, making a burning pass along a lane every 22 seconds: a line of fire that ends on the portal. Dawn waits until it falls.
 - Any closing circle that lands on the Great Portal damages it.
 
 ### Music and sound
@@ -152,7 +184,7 @@
 - Below lie slopes and terraces, a stream crossed by a log bridge and a ford, a hamlet, a high stone meadow with the Ring of Stones, and a crag to the east.
 - The Mists have followed you: rocky islands float above the valley, rifts glow in the ground, crystals grow beside them and mist drifts over everything under a luminous twilight sky.
 - Only the Creatures of Mesenlla roam here. Eagles circle in every 55 seconds (with a Mist Eagle once it is late), the Woodland Cavalry ride from 5:00, and a Wyvern comes down from 5:00.
-- At about 8:30 the Great Revenant Elemental rises at the Ring of Stones. Dawn waits until it falls, and it leaves an Angel familiar.
+- At about 8:30 the Great Revenant Elemental rises at the Ring of Stones. Dawn waits until it falls.
 - The Battleaxe and the Rift Chakram lie about; the Village's farm tools do not.
 
 ### Music

@@ -98,6 +98,16 @@ static func pick_random(map_id := "") -> String:
 	return "sword"
 
 
+## A find worth the trip (the caches in ruins): one of the rarer weapons that can lie about on this map.
+const RARE_WEIGHT := 1.0 # weights this low or lower mark a weapon as rare
+static func pick_rare(map_id := "") -> String:
+	var rare: Array[String] = []
+	for id: String in ALL:
+		if lies_around(id) and SpawnRules.allows(ALL[id], map_id) and float(ALL[id]["weight"]) <= RARE_WEIGHT:
+			rare.append(id)
+	return rare.pick_random() if not rare.is_empty() else pick_random(map_id)
+
+
 ## How a weapon sits in a character's hand. Poles and bows are drawn along their length, so they need
 ## a quarter turn to point where the character is looking.
 static func hand_rotation(id: String) -> Vector3:

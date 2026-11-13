@@ -423,11 +423,38 @@ static func watchtower(b: MapBuilder, high: float) -> void:
 	l.box(Vector3(0, high * 0.5, 1.75), Vector3(0.6, high, 0.06), LOG.darkened(0.2))
 	for k in int(high / 0.5):
 		l.box(Vector3(0, 0.4 + k * 0.5, 1.8), Vector3(0.6, 0.07, 0.07), LOG)
-	b.add(l)
+	var body := b.add(l)
 	var lamp := b.mesh()
 	lamp.box(Vector3(1.0, high + 1.6, 1.0), Vector3(0.3, 0.4, 0.3), AMBER)
-	_shine(b, lamp)
-	b.w.add_glow(b.xf * Vector3(1.0, high + 1.6, 1.0), AMBER, 3.0, 160.0)
+	var light := _shine(b, lamp)
+	var glow: MeshInstance3D = b.w.add_glow(b.xf * Vector3(1.0, high + 1.6, 1.0), AMBER, 3.0, 160.0)
+	if not b.is_preview:
+		# A tower can be brought down (the Valleys' camp, when it is shelled): see World.ruin_tower.
+		b.w.watchtowers.append({"at": b.xf.origin, "basis": b.xf.basis, "high": high, "parts": [body, light, glow]})
+
+
+## What is left of a watchtower brought down: its legs snapped off, beams and planks thrown about,
+## the roof lying on its side. Drawn where the tower stood, in that tower's frame.
+static func tower_ruin(high: float, seed_from: int) -> Mesh:
+	var r := RandomNumberGenerator.new()
+	r.seed = seed_from
+	var l := LowPoly.new()
+	for c: Vector2 in [Vector2(-1.3, -1.3), Vector2(1.3, -1.3), Vector2(-1.3, 1.3), Vector2(1.3, 1.3)]:
+		var top := r.randf_range(0.8, 1.9)
+		l.prism(Vector3(c.x, 0, c.y), Vector3(c.x * 0.97, top, c.y * 0.97), 0.2, 0.18, 6, LOG_DARK.darkened(0.3))
+		l.prism(Vector3(c.x * 0.97, top, c.y * 0.97), Vector3(c.x * 0.97, top + 0.25, c.y * 0.97), 0.18, 0.04, 5, Color(0.12, 0.09, 0.08))
+	for k in 7:
+		var a := r.randf() * TAU
+		var d := r.randf_range(1.5, high * 0.7)
+		var at := Vector3(cos(a) * d, 0.12, sin(a) * d)
+		var along := Vector3(cos(a + r.randf_range(-1.0, 1.0)), r.randf_range(-0.05, 0.12), sin(a + r.randf_range(-1.0, 1.0))).normalized()
+		l.prism(at - along * 1.3, at + along * 1.3, 0.13, 0.12, 5, LOG if k % 2 else LOG_DARK.darkened(0.2))
+	for k in 5:
+		var at := Vector3(r.randf_range(-3.0, 3.0), 0.05, r.randf_range(-3.0, 3.0))
+		l.box(at, Vector3(r.randf_range(1.0, 2.2), 0.08, 0.35), LOG.darkened(0.25), Vector3(r.randf_range(-6, 6), r.randf_range(0, 180), 0))
+	var roof_at := Vector3(r.randf_range(2.0, 3.5), 0.9, r.randf_range(-1.0, 1.0))
+	l.prism(roof_at, roof_at + Vector3(1.4, 0.4, 0.2), 2.4, 0.0, 4, Color(0.24, 0.22, 0.24))
+	return l.commit()
 
 
 ## A stone ring with a fire in it, where the outpost gathers: a fire that heals, like a bonfire.
@@ -591,25 +618,36 @@ static func tent(b: MapBuilder, size: float) -> void:
 	for z: float in [-deep * 0.5, deep * 0.5]:
 		l.prism(Vector3(0, 0, z), Vector3(0, high + 0.25, z), 0.06, 0.05, 5, LOG_DARK)
 	l.prism(Vector3(0, high, -deep * 0.5 - 0.1), Vector3(0, high, deep * 0.5 + 0.1), 0.05, 0.05, 5, LOG_DARK)
-	# Two sloping sheets and the back wall.
+	# Two sloping sheets and the back wall, canvas on both faces so it is never seen through.
 	for side: float in [-1.0, 1.0]:
 		var foot := Vector3(side * w, 0.05, 0)
 		var ridge := Vector3(0, high, 0)
 		var n := Vector3(side, w / high, 0).normalized()
 		var c := CANVAS if side < 0 else CANVAS_DARK
-		l._tri(foot + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, deep * 0.5), foot - n, c)
-		l._tri(foot + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, deep * 0.5), foot + Vector3(0, 0, deep * 0.5), foot - n, c)
-	l._tri(Vector3(-w, 0.05, -deep * 0.5), Vector3(w, 0.05, -deep * 0.5), Vector3(0, high, -deep * 0.5), Vector3(0, high * 0.3, 0), CANVAS_DARK)
-	# The door flaps folded back, and the red stripe of Mesenlla along the ridge.
+		_sheet(l, foot + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, deep * 0.5), foot - n, c)
+		_sheet(l, foot + Vector3(0, 0, -deep * 0.5), ridge + Vector3(0, 0, deep * 0.5), foot + Vector3(0, 0, deep * 0.5), foot - n, c)
+	_sheet(l, Vector3(-w, 0.05, -deep * 0.5), Vector3(w, 0.05, -deep * 0.5), Vector3(0, high, -deep * 0.5), Vector3(0, high * 0.3, 0), CANVAS_DARK)
+	# The door: laced shut with a darker panel, its flaps folded back at the edges, and the red stripe
+	# of Mesenlla along the ridge.
+	_sheet(l, Vector3(-w * 0.45, 0.05, deep * 0.5 - 0.02), Vector3(w * 0.45, 0.05, deep * 0.5 - 0.02), Vector3(0, high * 0.97, deep * 0.5 - 0.02), Vector3(0, high * 0.3, 0), CANVAS_DARK.darkened(0.25))
 	for side: float in [-1.0, 1.0]:
-		l._tri(Vector3(side * w, 0.05, deep * 0.5), Vector3(side * w * 0.45, high * 0.55, deep * 0.5 + 0.05), Vector3(0, high, deep * 0.5), Vector3(0, high * 0.3, deep * 0.4), CANVAS.lightened(0.08))
+		_sheet(l, Vector3(side * w, 0.05, deep * 0.5), Vector3(side * w * 0.45, high * 0.55, deep * 0.5 + 0.05), Vector3(0, high, deep * 0.5), Vector3(0, high * 0.3, deep * 0.4), CANVAS.lightened(0.08))
 	l.box(Vector3(0, high + 0.02, 0), Vector3(0.3, 0.06, deep + 0.1), CRIMSON)
 	# Guy ropes and pegs.
 	for side: float in [-1.0, 1.0]:
 		for z: float in [-deep * 0.4, deep * 0.4]:
 			l.prism(Vector3(side * w * 0.5, high * 0.5, z), Vector3(side * (w + 0.9), 0.05, z), 0.015, 0.015, 3, Color(0.75, 0.7, 0.55))
 	b.add(l)
-	b.solid(Vector3(0, high * 0.4, -deep * 0.15), Vector3(size * 0.9, high * 0.8, deep * 0.7))
+	# The whole tent stops you: its low sides as a wide block, and the higher middle under the ridge.
+	b.solid(Vector3(0, high * 0.25, 0), Vector3(size * 0.95, high * 0.5, deep))
+	b.solid(Vector3(0, high * 0.7, 0), Vector3(size * 0.5, high * 0.45, deep))
+
+
+## A triangle of canvas with both faces drawn: the one turned away from `inside`, and its back.
+static func _sheet(l: LowPoly, a: Vector3, b: Vector3, c: Vector3, inside: Vector3, col: Color) -> void:
+	l._tri(a, b, c, inside, col)
+	var middle := (a + b + c) / 3.0
+	l._tri(a, b, c, middle + (middle - inside), col.darkened(0.2))
 
 
 ## Red pennants strung on a sagging line between two poles, across the piece's X axis.
@@ -753,3 +791,119 @@ static func tree_mesh(kind: String) -> Mesh:
 			l.prism(Vector3(0, 1.2, 0), Vector3(0, 1.48, 0), 0.4, 0.12, 8, MOSS_LIGHT.darkened(0.2))
 	_tree_meshes[kind] = l.commit()
 	return _tree_meshes[kind]
+
+
+# --- The south of the Valleys: ruins, an old mine and the shrines ------------------------------------
+
+const SHRINE_GLOW := {"stag": Color(0.55, 1.0, 0.75), "bear": Color(1.0, 0.55, 0.3), "spring": Color(0.5, 0.8, 1.0)}
+
+
+## A shrine of the old valley folk: a carved stone over a basin of glowing water, with the sign of what
+## it gives (a stag's antlers, a bear's claw, a spring's drop). Touch it for its blessing; it rests a
+## while after. See World.shrines and Player.bless.
+static func shrine(b: MapBuilder, blessing: String) -> void:
+	var glow_col: Color = SHRINE_GLOW.get(blessing, MIST_GLOW)
+	var l := b.cell()
+	l.prism(Vector3(0, -0.2, 0), Vector3(0, 0.3, 0), 1.6, 1.4, 8, ROCK_DARK)
+	l.prism(Vector3(0, 0.3, 0), Vector3(0, 0.45, 0), 1.4, 1.35, 8, ROCK)
+	# The basin, and the carved stone behind it.
+	l.prism(Vector3(0, 0.45, 0.35), Vector3(0, 0.95, 0.35), 0.6, 0.75, 8, ROCK)
+	l.prism(Vector3(0, 0.45, -0.75), Vector3(0, 2.6, -0.8), 0.5, 0.36, 4, ROCK_DARK)
+	l.prism(Vector3(0, 2.6, -0.8), Vector3(0, 2.95, -0.8), 0.36, 0.0, 4, MOSS)
+	for k in 5:
+		var a := TAU * k / 5.0
+		l.prism(Vector3(cos(a) * 1.3, 0.45, sin(a) * 1.3), Vector3(cos(a) * 1.3, 0.62, sin(a) * 1.3), 0.12, 0.08, 5, Color(0.85, 0.82, 0.7))
+	b.solid(Vector3(0, 0.5, -0.2), Vector3(1.6, 1.0, 2.0))
+	var g := b.mesh()
+	g.prism(Vector3(0, 0.9, 0.35), Vector3(0, 0.97, 0.35), 0.5, 0.5, 8, glow_col)
+	var face := Vector3(0, 1.8, -0.5)
+	match blessing:
+		"stag":
+			for side: float in [-1.0, 1.0]:
+				g.prism(face, face + Vector3(side * 0.28, 0.5, 0), 0.04, 0.03, 3, glow_col)
+				g.prism(face + Vector3(side * 0.16, 0.3, 0), face + Vector3(side * 0.34, 0.36, 0), 0.03, 0.02, 3, glow_col)
+		"bear":
+			for k in 3:
+				g.prism(face + Vector3(-0.2 + k * 0.2, 0.35, 0), face + Vector3(-0.15 + k * 0.17, -0.3, 0), 0.05, 0.01, 3, glow_col)
+		_:
+			g.prism(face + Vector3(0, -0.25, 0), face + Vector3(0, 0.05, 0), 0.18, 0.18, 8, glow_col)
+			g.prism(face + Vector3(0, 0.05, 0), face + Vector3(0, 0.35, 0), 0.18, 0.0, 8, glow_col)
+	var shine := _shine(b, g)
+	var halo: MeshInstance3D = b.w.add_glow(b.xf * Vector3(0, 1.4, 0), glow_col, 3.2, 120.0)
+	_mist(b, Vector3(0, 1.1, 0.35), Vector3(0.4, 0.2, 0.4), glow_col, 5, 0.4)
+	if not b.is_preview:
+		b.w.shrines.append({"at": b.xf.origin, "blessing": blessing, "glow": [shine, halo], "ready_at": 0.0})
+
+
+## The ruins of an old hall: a floor of cracked slabs, a ring of broken columns, fallen drums of stone
+## and a lintel still standing on two of them, all of it mossed over. size is the ring's radius.
+static func ruins(b: MapBuilder, size: float) -> void:
+	var r := b.seeded()
+	var l := b.cell()
+	# The floor, slab by slab, some of it lifted or gone.
+	var step := 1.8
+	var x := -size
+	while x <= size:
+		var z := -size
+		while z <= size:
+			if Vector2(x, z).length() < size + 0.5 and r.randf() < 0.82:
+				var at := b.xf.affine_inverse() * b.on_ground(Vector3(x, 0, z))
+				l.box(at + Vector3(0, 0.06 + r.randf_range(0.0, 0.08), 0), Vector3(step - 0.12, 0.16, step - 0.12), ROCK if (int(x / step) + int(z / step)) % 2 else ROCK.darkened(0.12), Vector3(r.randf_range(-3, 3), 0, r.randf_range(-3, 3)))
+			z += step
+		x += step
+	var columns := 8
+	for k in columns:
+		var a := TAU * k / columns
+		var foot := b.xf.affine_inverse() * b.on_ground(Vector3(cos(a) * size, 0, sin(a) * size))
+		var high := 4.6 if k in [0, 1] else r.randf_range(0.8, 3.6)
+		l.prism(foot, foot + Vector3.UP * high, 0.42, 0.38, 8, ROCK)
+		l.prism(foot + Vector3.UP * high, foot + Vector3.UP * (high + 0.12), 0.38, 0.3, 8, MOSS if k % 2 else MOSS_LIGHT)
+		b.solid(foot + Vector3.UP * high * 0.5, Vector3(0.8, high, 0.8))
+		if k > 1 and r.randf() < 0.7:
+			# A drum of it fallen alongside.
+			var out := Vector3(cos(a), 0, sin(a)) * r.randf_range(1.2, 2.4) + Vector3(-sin(a), 0, cos(a)) * r.randf_range(-1.0, 1.0)
+			var lie := foot + out + Vector3.UP * 0.38
+			var along := Vector3(-sin(a + r.randf_range(-0.6, 0.6)), 0, cos(a + r.randf_range(-0.6, 0.6)))
+			l.prism(lie - along * 0.6, lie + along * 0.6, 0.38, 0.38, 8, ROCK_DARK)
+	# The lintel across the two tallest.
+	var a0 := Vector3(cos(0.0), 0, sin(0.0)) * size
+	var a1 := Vector3(cos(TAU / columns), 0, sin(TAU / columns)) * size
+	var top := maxf((b.xf.affine_inverse() * b.on_ground(a0)).y, (b.xf.affine_inverse() * b.on_ground(a1)).y) + 4.75
+	l.prism(Vector3(a0.x, top, a0.z), Vector3(a1.x, top, a1.z), 0.32, 0.32, 4, ROCK_DARK)
+	_feature(b, "ruins", size)
+
+
+## The mouth of an old mine in a slope, facing out along +Z: a frame of timbers round a dark way in,
+## rails running out of it, a tipped cart and a lantern still burning.
+static func mine(b: MapBuilder, size: float) -> void:
+	var l := b.mesh()
+	var wide := size * 0.5
+	var high := size * 0.6
+	# The dark of the way in, and the rock face round it.
+	l.box(Vector3(0, high * 0.5, -1.2), Vector3(wide * 2.0 + 0.4, high + 0.2, 0.3), Color(0.04, 0.03, 0.05))
+	for side: float in [-1.0, 1.0]:
+		l.box(Vector3(side * (wide + 2.2), high * 0.6, -1.0), Vector3(3.6, high * 1.4, 3.0), ROCK_DARK)
+	l.box(Vector3(0, high + 1.4, -1.0), Vector3(wide * 2.0 + 8.0, 2.8, 3.0), ROCK)
+	l.box(Vector3(0, high + 2.85, -1.0), Vector3(wide * 2.0 + 8.0, 0.2, 3.0), MOSS)
+	# The timber frame, in three sets going in.
+	for k in 3:
+		var z := -k * 1.4
+		for side: float in [-1.0, 1.0]:
+			l.prism(Vector3(side * wide, 0, z), Vector3(side * wide * 0.92, high, z), 0.16, 0.14, 5, LOG_DARK)
+		l.box(Vector3(0, high, z), Vector3(wide * 2.0 + 0.5, 0.26, 0.3), LOG)
+	# Rails out of the mine, and the cart that ran on them.
+	for side: float in [-0.45, 0.45]:
+		l.box(Vector3(side, 0.06, 2.5), Vector3(0.08, 0.08, 7.0), Color(0.35, 0.33, 0.33))
+	for k in 8:
+		l.box(Vector3(0, 0.03, -0.6 + k * 0.9), Vector3(1.3, 0.07, 0.22), LOG_DARK)
+	l.box(Vector3(1.8, 0.55, 4.6), Vector3(1.2, 0.8, 1.6), LOG.darkened(0.15), Vector3(0, 20, 62))
+	b.add(l)
+	b.solid(Vector3(0, high * 0.5 + 0.5, -2.6), Vector3(wide * 2.0 + 8.0, high + 4.0, 3.0))
+	for side: float in [-1.0, 1.0]:
+		b.solid(Vector3(side * (wide + 2.2), high * 0.6, -1.0), Vector3(3.6, high * 1.4, 3.0))
+	b.solid(Vector3(1.8, 0.5, 4.6), Vector3(1.4, 1.0, 1.8))
+	var lamp := b.mesh()
+	lamp.box(Vector3(-wide - 0.1, high * 0.8, 0.2), Vector3(0.28, 0.36, 0.28), AMBER)
+	_shine(b, lamp)
+	b.w.add_glow(b.xf * Vector3(-wide - 0.1, high * 0.8, 0.2), AMBER, 3.0, 150.0)
+	_feature(b, "mine", size)

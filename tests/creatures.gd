@@ -236,9 +236,132 @@ func _shapeshifter() -> void:
 	z.hp = z.max_hp * 0.2
 	await seconds(MesenllaMind.SHIFT_TIME + 0.6)
 	check(z.mesenlla_mind.form == "stag" and z.mesenlla_mind.phase == "flee", "badly hurt, it turns back into the stag and flees")
+	check(absf(z._speed - float(ZombieDefs.ALL["shapeshifter"]["speed"]) * 1.15 * Game.enemy_speed()) < 0.01, "running as fast as the stag can")
 	var low := z.hp
-	await seconds(1.0)
-	check(z.hp > low, "mending as it runs (%.0f to %.0f)" % [low, z.hp])
+	await seconds(MesenllaMind.STAG_FLEE * 0.5)
+	check(is_equal_approx(z.hp, low) and z.mesenlla_mind.phase == "flee", "it does not mend while it runs (%.0f to %.0f)" % [low, z.hp])
+	await seconds(MesenllaMind.STAG_FLEE * 0.5 + 0.2)
+	check(is_equal_approx(z.hp, z.max_hp), "not caught within %d seconds, it comes back whole (%.0f of %.0f)" % [int(MesenllaMind.STAG_FLEE), z.hp, z.max_hp])
+	await seconds(MesenllaMind.SHIFT_TIME + 0.2)
+	check(z.mesenlla_mind.form == "beast" and is_equal_approx(z._speed, MesenllaMind.BEAST_SPEED * Game.enemy_speed()), "as the beast again, faster than before (%.1f m/s)" % z._speed)
+
+
+## The south of the Valleys, the edge of the land, and the tents of the camp.
+func _mesenlla_south() -> void:
+	var names := w.map_marks.map(func(m: Dictionary) -> String: return m["name"])
+	for mark: String in ["Fallen Hall", "Hunters' Lodge", "Old Mine", "Mossy Spring"]:
+		check(names.has(mark), "the south has its %s" % mark)
+	check(w.cache_spots.size() == 3 and w.cache_spots.all(func(at: Vector3) -> bool: return at.z > 60.0), "three caches of rarer finds, all in the south")
+	w.director.elapsed = 1.0
+	w.director._cache_look = 0.0
+	w.director._tick_caches()
+	var found: Array = []
+	for at: Vector3 in w.cache_spots:
+		for it: Pickup in w.pickups:
+			if Vector2(it.global_position.x - at.x, it.global_position.z - at.z).length() < 2.0:
+				found.append(it)
+	check(found.size() == 3 and found.all(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER or float(WeaponDefs.ALL[it.item_id]["weight"]) <= WeaponDefs.RARE_WEIGHT), "each holds a rare weapon or a potion: %s" % str(found.map(func(it: Pickup) -> String: return it.item_id)))
+	for it: Pickup in found:
+		w.pickups.erase(it)
+		it.queue_free()
+	await frames(1)
+	w.director._cache_look = 0.0
+	w.director._tick_caches()
+	check(not w.pickups.any(func(it: Pickup) -> bool: return Vector2(it.global_position.x - w.cache_spots[0].x, it.global_position.z - w.cache_spots[0].z).length() < 2.0), "taken, a cache is not filled again at once")
+	w.director.elapsed += Director.CACHE_REFILL + 1.0
+	w.director._cache_look = 0.0
+	w.director._tick_caches()
+	check(w.pickups.any(func(it: Pickup) -> bool: return Vector2(it.global_position.x - w.cache_spots[0].x, it.global_position.z - w.cache_spots[0].z).length() < 2.0), "but %d seconds later it is" % int(Director.CACHE_REFILL))
+	# The shrines.
+	check(w.shrines.size() == 3 and w.shrines.map(func(sh: Dictionary) -> String: return sh["blessing"]).has("stag") and w.shrines.map(func(sh: Dictionary) -> String: return sh["blessing"]).has("bear") and w.shrines.map(func(sh: Dictionary) -> String: return sh["blessing"]).has("spring"), "three shrines: the Stag, the Bear and the Spring")
+	var stag: Dictionary = w.shrines.filter(func(sh: Dictionary) -> bool: return sh["blessing"] == "stag")[0]
+	var was_speed := p.m("speed")
+	var was_at := p.global_position
+	p.global_position = stag["at"] + Vector3(0, 0.1, 1.4)
+	w._tick_shrines()
+	check(p.m("speed") > was_speed + 0.2 and w.director.banner.contains("Stag"), "touching the Stag's shrine makes you swifter (%.2f to %.2f)" % [was_speed, p.m("speed")])
+	check(float(stag["ready_at"]) > w.now and not (stag["glow"][0] as Node3D).visible, "and it goes dark to rest")
+	var bear: Dictionary = w.shrines.filter(func(sh: Dictionary) -> bool: return sh["blessing"] == "bear")[0]
+	var was_melee := p.m("melee_damage")
+	p.global_position = bear["at"] + Vector3(0, 0.1, 1.4)
+	w._tick_shrines()
+	check(p.m("melee_damage") > was_melee + 0.2 and p.m("ranged_damage") > 1.0, "the Bear's makes every kind of blow harder")
+	var spring: Dictionary = w.shrines.filter(func(sh: Dictionary) -> bool: return sh["blessing"] == "spring")[0]
+	p.hp = p.max_hp() * 0.5
+	var low := p.hp
+	p.global_position = spring["at"] + Vector3(0, 0.1, 1.4)
+	w._tick_shrines()
+	check(p.hp >= low + 19.0 and p.m("regen") >= 4.0, "and the Spring's heals you, and goes on healing")
+	p._buffs.clear()
+	p.global_position = was_at
+	# The tents stop you, all of them.
+	var space := w.get_world_3d().direct_space_state
+	var blocked := 0
+	var tents := 0
+	for at: Vector3 in [Vector3(-14, 6, -34), Vector3(-14, 6, -26), Vector3(14, 6, -34), Vector3(15, 6, -24), Vector3(-7, 6, -19)]:
+		tents += 1
+		var ray := PhysicsRayQueryParameters3D.create(at + Vector3(0, 0.6, 0) + Vector3(3.5, 0, 0), at + Vector3(0, 0.6, 0) - Vector3(3.5, 0, 0), 1)
+		var front := PhysicsRayQueryParameters3D.create(at + Vector3(0, 0.6, 0) + Vector3(0, 0, 3.5), at + Vector3(0, 0.6, 0) - Vector3(0, 0, 3.5), 1)
+		if not space.intersect_ray(ray).is_empty() and not space.intersect_ray(front).is_empty():
+			blocked += 1
+	check(blocked == tents, "nobody walks through a tent, from the side or the door (%d of %d)" % [blocked, tents])
+	# The edge of the land is lined with tall trees.
+	var edge := w.tree_spots.filter(func(t: Vector3) -> bool: return maxf(absf(t.x), absf(t.z)) > w.play_half - 4.0)
+	check(edge.size() >= 120, "the edge of the land is lined with tall trees (%d)" % edge.size())
+
+
+## The camp is shelled from 2:00, warned at 5:00, and lost to the mist after the barrage.
+func _mesenlla_camp() -> void:
+	var d := w.director
+	d.camp = null
+	check(CampSiege.wanted(w), "the camp can be shelled here")
+	d.camp = CampSiege.new(w)
+	var siege := d.camp
+	check(siege.centre != Vector3.INF and Vector2(siege.centre.x, siege.centre.z + 32.0).length() < 4.0, "around Mesenlla Watch")
+	var seals := w.mist_seals.size()
+	siege.tick(CampSiege.STRIKES_FROM - 1.0)
+	check(w.mist_seals.size() == seals, "nothing falls before %d s" % int(CampSiege.STRIKES_FROM))
+	siege.tick(CampSiege.STRIKES_FROM)
+	check(w.mist_seals.size() == seals + CampSiege.VOLLEY, "then storm and mist fall on the camp (%d circles)" % (w.mist_seals.size() - seals))
+	check(w.mist_seals.slice(seals).all(func(m: MistSeal) -> bool: return Vector2(m.position.x - siege.centre.x, m.position.z - siege.centre.z).length() <= CampSiege.RADIUS), "and only on the camp")
+	siege.tick(CampSiege.WARN_AT)
+	check(d.banner.contains("Get out"), "at 5:00 everyone is told to get out: %s" % d.banner)
+	check(not w.camp_fallen, "the camp still stands")
+	var before := w.mist_seals.size()
+	siege.tick(CampSiege.BARRAGE_AT + 2.0)
+	check(w.mist_seals.size() - before >= int(2.0 / CampSiege.BARRAGE_EVERY), "then the barrage comes down (%d circles in 2 s)" % (w.mist_seals.size() - before))
+	siege.tick(CampSiege.BARRAGE_AT + CampSiege.BARRAGE_TIME + 0.1)
+	check(w.camp_fallen and siege.done, "and the camp falls")
+	var in_camp := w.watchtowers.filter(func(t: Dictionary) -> bool: return Vector2(t["at"].x - siege.centre.x, t["at"].z - siege.centre.z).length() <= CampSiege.RADIUS + 4.0)
+	check(in_camp.size() == 2 and in_camp.all(func(t: Dictionary) -> bool: return t.get("ruined", false) and not (t["parts"][0] as Node3D).visible), "its archer posts are brought down")
+	check(w.watchtowers.any(func(t: Dictionary) -> bool: return not t.get("ruined", false)), "and the towers elsewhere still stand")
+	var storm := w.storm_at(siege.centre)
+	check(storm != null and storm.duration == INF and w.storm_at(siege.centre + Vector3(0, 0, 40)) == null, "a Mist Storm settles over the camp for good")
+	var inside := 0
+	for i in 200:
+		var at := w._pick_spawn_point()
+		if at != Vector3.INF and w.storm_at(at) != null:
+			inside += 1
+	check(inside == 0, "nothing rises inside it")
+	var loot_inside := 0
+	for i in 60:
+		var it := w.spawn_pickup_random(Pickup.Kind.FOOD, "bread")
+		if it and w.storm_at(it.global_position) != null:
+			loot_inside += 1
+	check(loot_inside == 0, "and nothing is left lying there")
+	p.respawn(siege.centre)
+	check(w.storm_at(p.global_position) == null, "a player back on their feet stands outside it (%.0f, %.0f)" % [p.global_position.x, p.global_position.z])
+	p.hp = p.max_hp()
+	p.guard_left = 0.0
+	p.global_position = siege.centre + Vector3(0, 0.2, 0)
+	storm.elapsed = storm.warning
+	var hp := p.hp
+	storm._physics_process(1.0)
+	check(p.hp < hp - MistStorm.DPS * 0.9, "and inside it the mist burns, as in the Mists (%.1f)" % (hp - p.hp))
+	storm.end_now()
+	w.camp_fallen = false
+	p.respawn(p.global_position)
+	d.camp = null
 
 
 func _children() -> void:
@@ -393,6 +516,8 @@ func _mesenlla_map() -> void:
 			tall_trees += (mm as MultiMeshInstance3D).multimesh.instance_count
 	check(tall_trees >= 40, "the forest has its giant firs (%d)" % tall_trees)
 	check(w.get_node_or_null("Ambience") != null, "and its own air: wisps of mist, motes and falling leaves")
+	await _mesenlla_south()
+	await _mesenlla_camp()
 	for z: Zombie in w.zombies:
 		check(SpawnRules.is_mesenlla(z.def), "only creatures of Mesenlla are out (%s)" % z.type_id)
 	var foreign := 0
@@ -419,10 +544,12 @@ func _mesenlla_map() -> void:
 			boss = z
 	check(boss != null and Vector2(boss.position.x + 54.0, boss.position.z + 64.0).length() < 8.0, "at the Ring of Stones")
 	check(w.director.banner.contains("Great Revenant Elemental"), "and everyone is told")
+	var fell_at := boss.position
 	boss.take_damage(100000.0, Vector3.ZERO, 0.0, boss.centre())
 	await frames(2)
 	check(w.director._mist_boss_defeated, "when it falls, dawn can come")
-	check(w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel"), "and it leaves an Angel")
+	check(not w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel" and Vector2(i.global_position.x - fell_at.x, i.global_position.z - fell_at.z).length() < 8.0), "it leaves no Angel")
+	check(w.director.banner.contains("Stone forgets nothing"), "and says its last words: %s" % w.director.banner)
 	Game.night_map = "village"
 
 
@@ -516,6 +643,20 @@ func _bastion_map() -> void:
 	# Three rise together at each foot and jostle at first, so the middle of them is checked against
 	# the walk, and the fastest against a run.
 	var fastest: float = paces.back() if not paces.is_empty() else 0.0
+	# Gates first: someone a little way off is passed by; only someone right in the way is fought.
+	var climber: Zombie = climbers[0]
+	var keep_at := p.global_position
+	p.global_position = climber.position + Vector3(8.0, 0.2, 0)
+	check(climber._fort_plan(p, 8.0) and climber._lane_bound(8.0), "lane enemies pass by a player a few steps off and keep on for the gate")
+	p.global_position = climber.position + Vector3(1.6, 0.2, 0)
+	check(not climber._fort_plan(p, 1.6) and not climber._lane_bound(1.6), "but strike whoever stands right in their way")
+	p.global_position = keep_at
+	var feet_rifts := 0
+	for gate: Dictionary in fort.gates:
+		var foot: Vector3 = (gate["lane"] as Array)[0]
+		if w.map_features.any(func(f: Dictionary) -> bool: return f["kind"] == "rift" and (f["at"] as Vector2).distance_to(Vector2(foot.x, foot.z)) < 12.0):
+			feet_rifts += 1
+	check(feet_rifts == 3, "a rift stands at the foot of each lane, where its enemies come out (%d)" % feet_rifts)
 	check(marching == climbers.size() and middle > walk and fastest > walk * 1.3, "and come up them at a run, not stopping at the foot (%d of %d running; %.1f m/s for the middle one and %.1f m/s for the fastest, against a %.1f m/s walk)" % [marching, climbers.size(), middle, fastest, walk])
 	clear()
 	# The garrison.
@@ -534,6 +675,11 @@ func _bastion_map() -> void:
 	g.tick(Garrison.FIRST + Garrison.EVERY * 2.0)
 	check(w.allies.filter(func(a: Ally) -> bool: return a.is_garrison()).size() == 3 * Garrison.PER_LANE, "and no more than %d hold a lane" % Garrison.PER_LANE)
 	check(g.next_kind(0, 100.0) == "mist_infantry" and g.next_kind(0, Garrison.HEAVY_FROM) == "mist_heavy", "the Heavy's turn waits for 3:00")
+	check(Ally.HEALTH["mist_infantry"] < 120.0 and Ally.HEALTH["mist_ranger"] < 75.0 and Ally.HEALTH["mist_heavy"] < 225.0 and Ally.GARRISON_BLOW["mist_infantry"] < 0.7, "the Mist Soldiers are about a third weaker than they were")
+	var post_reach := [32.0, 17.0, 32.0]
+	for i in 3:
+		var gate_at: Vector3 = fort.gates[i]["at"]
+		check(Vector2(g.mark(i, "post").x - gate_at.x, g.mark(i, "post").z - gate_at.z).length() < post_reach[i], "the %s post is held close below its gate (%.0f m)" % [fort.gates[i]["name"], Vector2(g.mark(i, "post").x - gate_at.x, g.mark(i, "post").z - gate_at.z).length()])
 	var walker: Ally = soldiers[1]
 	await seconds(9.0)
 	check(walker.global_position.distance_to(walker.post) < 3.0, "a soldier walks down to its post (%.1f m off)" % walker.global_position.distance_to(walker.post))
@@ -541,7 +687,7 @@ func _bastion_map() -> void:
 	var kid := raise("child_of_woods", walker.post + Vector3(2.5, 0, 2.5))
 	kid.set_physics_process(false)
 	var xp_before := p.xp
-	await seconds(6.0)
+	await seconds(10.0)
 	check(not kid.is_alive() and kid.last_hitter == -1, "the garrison fights what comes near its post (hp %.0f, credited to %d)" % [kid.hp, kid.last_hitter])
 	check(p.xp == xp_before, "and its kills are nobody's")
 	var heavy := w.spawn_garrison("mist_heavy", 1, walker.post, walker.post)
@@ -573,10 +719,12 @@ func _bastion_map() -> void:
 		if fort.heart_hp < portal_hp:
 			break
 	check(pass_seals >= 3 and fort.heart_hp < portal_hp, "it makes a burning pass along a lane to the portal (%d circles, %.0f damage)" % [pass_seals, portal_hp - fort.heart_hp])
+	var fell_at := boss.position
 	boss.take_damage(100000.0, Vector3.ZERO, 0.0, boss.centre())
 	await frames(2)
 	check(w.director._mist_boss_defeated, "when it falls, dawn can come")
-	check(w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel"), "and it leaves an Angel")
+	check(not w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel" and Vector2(i.global_position.x - fell_at.x, i.global_position.z - fell_at.z).length() < 8.0), "it leaves no Angel")
+	check(w.director.banner.contains("the sky was never yours"), "and says its last words: %s" % w.director.banner)
 	Game.fort_map = "fort"
 	Game.mode = Game.Mode.SANDBOX
 

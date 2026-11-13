@@ -15,8 +15,8 @@ const CHARGE_SPEED := 2.7
 const CHARGE_POWER := 1.6
 const CHARGE_EVERY := 9.0
 const SHIFT_TIME := 0.8
-const STAG_FLEE := 5.0
-const STAG_HEAL := 0.04 # of its health, each second it flees
+const STAG_FLEE := 10.0 # how long it runs as a stag; not killed by then, it comes back whole
+const BEAST_SPEED := 5.0
 const SLAM_RADIUS := 4.5
 const SLAM_TELL := 1.0
 const SLAM_EVERY := 6.0
@@ -229,16 +229,18 @@ func _shapeshifter(z: Zombie, target: Target, to: Vector3, dist: float, delta: f
 		return true
 	if form == "stag":
 		if phase == "flee":
-			# Away from whoever hurt it, mending as it goes, and then back as the beast.
+			# Away from whoever hurt it, for STAG_FLEE seconds, and then back as the beast.
 			left -= delta
 			var away := -to.normalized() if dist > 0.1 else Vector3.FORWARD
 			z.velocity = away * z._speed * 1.25 * (0.5 if z._slow > 0.0 else 1.0)
 			z.move_and_slide()
 			z.position.y = z.world.ground_at(z.position)
 			z.rotation.y = lerp_angle(z.rotation.y, atan2(away.x, away.z), minf(1.0, delta * 6.0))
-			z.hp = minf(z.max_hp, z.hp + z.max_hp * STAG_HEAL * delta)
 			z._animate_custom(delta, z.velocity.length())
 			if left <= 0.0:
+				# It got away: the mist mends it whole, and the beast comes back.
+				z.hp = z.max_hp
+				z.world.fx_mist(z.centre(), 2.4)
 				_begin_shift(z, "beast")
 			return true
 		if (z._sees and dist < 7.0) or z.hp < z.max_hp:
@@ -270,7 +272,7 @@ func _set_form(z: Zombie, into: String) -> void:
 		_show(z, "m_stag")
 	else:
 		z._damage = float(d["damage"]) * Game.enemy_damage() * (1.0 + ZombieDefs.NIGHT_DAMAGE * z.hero_minute)
-		z._speed = 4.2 * Game.enemy_speed()
+		z._speed = BEAST_SPEED * Game.enemy_speed()
 		_show(z, "m_beast")
 
 

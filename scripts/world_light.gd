@@ -8,6 +8,8 @@ const BONFIRE_REACH := 6.5
 const TORCH_REACH := 3.5
 const LANTERN_REACH := 4.0
 const WARMTH := 1.5 # health per second, close to a bonfire
+const SCORCH_REACH := 2.4 # this near a bonfire's middle you are standing at its stones
+const SCORCH_AFTER := 7.0 # seconds at the stones before your clothes catch
 
 const DOME_REDUCTION := 0.6
 const BURST_FREEZE := 2.0

@@ -30,6 +30,7 @@ var finished_games := 0
 var mists_wins := 0
 var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
 var bastion_wins := 0
+var changelog_seen := "" # ChangelogPanel.signature() when the notes were last opened
 var poison_dealt := 0.0
 var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
@@ -371,6 +372,7 @@ func load_settings() -> void:
 	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
 	mesenlla_wins = maxi(0, _saved(c, "progress", "mesenlla_wins", 0))
 	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
+	changelog_seen = str(_saved(c, "progress", "changelog_seen", ""))
 	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
 	owned_items = _saved(c, "progress", "owned_items", {})
 	switched_off = _saved(c, "progress", "switched_off", {})
@@ -411,6 +413,7 @@ func save_settings() -> void:
 	c.set_value("progress", "mists_wins", mists_wins)
 	c.set_value("progress", "mesenlla_wins", mesenlla_wins)
 	c.set_value("progress", "bastion_wins", bastion_wins)
+	c.set_value("progress", "changelog_seen", changelog_seen)
 	c.set_value("progress", "poison_dealt", poison_dealt)
 	c.set_value("progress", "owned_items", owned_items)
 	c.set_value("progress", "switched_off", switched_off)

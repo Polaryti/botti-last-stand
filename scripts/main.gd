@@ -11,6 +11,8 @@ var tree_panel: TreePanel
 var _together_tab := 0
 var _run_over := false
 var _back := Callable() # what the phone's back button does on the current screen
+var _warmed := false # see _warm_up
+var _warm_models: Array[Resource] = []
 var _store_return := Callable() # where the Store's Back goes
 var _start_listed := true # online: a new game is public unless you choose private
 var updates: Updates
@@ -63,9 +65,6 @@ func _ready() -> void:
 	Net.game_over.connect(_on_net_over)
 	Net.all_ready.connect(func() -> void: _net_go = true)
 	Net.back_in_room.connect(_return_to_room)
-	Board.counted.connect(func(result: Dictionary) -> void:
-		_counted = result
-		_apply_board_note())
 	updates = Updates.new()
 	add_child(updates)
 	if Game.test_map != "":
@@ -82,6 +81,29 @@ func _quit() -> void:
 
 func _fill(c: Control) -> void:
 	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+
+## The first time a class is shown turning on its stand (the Store, choosing a class) its model has to
+## be read and its look prepared for drawing, which made those screens hitch as they opened. The
+## models are read in the background as the menu first appears and kept, and one is drawn once out of
+## sight a moment later, while nothing else is happening.
+func _warm_up() -> void:
+	if _warmed:
+		return
+	_warmed = true
+	var paths := PackedStringArray()
+	for model: String in ["clever", "magic", "beast"]:
+		var path := "res://assets/characters/%s.glb" % model
+		paths.append(path)
+		ResourceLoader.load_threaded_request(path)
+	get_tree().create_timer(1.2).timeout.connect(func() -> void:
+		for path in paths:
+			_warm_models.append(ResourceLoader.load_threaded_get(path))
+		var view := ModelView.new(Vector2(96, 96))
+		view.position = Vector2(-4000, -4000)
+		add_child(view)
+		view.show_class(Game.player_class if ClassDefs.ALL.has(Game.player_class) else "infantry")
+		get_tree().create_timer(0.4).timeout.connect(view.queue_free))
 
 
 func _clear_ui() -> void:
@@ -119,6 +141,7 @@ func show_menu(rebuild := false) -> void:
 		_new_world(Game.Mode.MENU)
 	Sfx.ambient(true)
 	Sfx.set_mood(0.0, 0.0)
+	_warm_up()
 	var root := Control.new()
 	root.theme = _theme
 	ui_layer.add_child(root)
@@ -148,7 +171,6 @@ func show_menu(rebuild := false) -> void:
 	update_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(update_title)
 	top.add_child(_expand())
-	top.add_child(_name_button())
 	top.add_child(_purse_button())
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 14
@@ -176,7 +198,15 @@ func show_menu(rebuild := false) -> void:
 		_checked_updates = true
 		updates.check()
 	foot.add_child(_button("Codex", show_codex, Vector2(132, 56)))
-	foot.add_child(_button("Changelog", show_changelog, Vector2(168, 56)))
+	var notes := _button("Changelog", show_changelog, Vector2(168, 56))
+	notes.name = "ChangelogButton"
+	foot.add_child(notes)
+	if ChangelogPanel.has_news():
+		# New notes since you last read them: the button glows on and off until you do.
+		notes.set_meta("news", true)
+		var glow := notes.create_tween().set_loops()
+		glow.tween_property(notes, "self_modulate", Color(1.0, 0.62, 0.25), 0.55).set_trans(Tween.TRANS_SINE)
+		glow.tween_property(notes, "self_modulate", Color.WHITE, 0.55).set_trans(Tween.TRANS_SINE)
 	foot.add_child(_button("Settings", show_settings, Vector2(146, 56)))
 	var version := _soft("v%s" % ProjectSettings.get_setting("application/config/version"), 20)
 	version.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -361,6 +391,22 @@ func show_settings(from_pause := false) -> void:
 		Game.brightness = v
 		PhoneScreen.apply_brightness())
 	if not from_pause:
+		# Who you are to other players and on the leaderboard.
+		var name_row := HBoxContainer.new()
+		name_row.name = "NameRow"
+		name_row.add_theme_constant_override("separation", 12)
+		box.add_child(name_row)
+		var name_title := _soft("Your name", 23)
+		name_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		name_row.add_child(name_title)
+		var rename := _button(Game.player_name, func() -> void:
+			root.queue_free()
+			show_name_prompt(false, func() -> void: show_settings()), Vector2(0, 58))
+		rename.name = "Rename"
+		rename.add_theme_font_size_override("font_size", 24)
+		rename.custom_minimum_size.x = maxf(220.0, _text_width(Game.player_name, 24) + 48.0)
+		rename.tooltip_text = "Change your name"
+		name_row.add_child(rename)
 		# Both of these only apply to a new night, so they stay out of a running game.
 		left.add_child(_soft("Difficulty", 23))
 		left.add_child(_choices(["Easy", "Normal", "Hard"], Game.difficulty, 380.0, func(i: int) -> void:
@@ -484,6 +530,7 @@ func show_codex() -> void:
 ## What changed in each version, read from CHANGELOG.md so the game and the repository always agree.
 func show_changelog() -> void:
 	_clear_ui()
+	ChangelogPanel.mark_read()
 	var c := ChangelogPanel.new()
 	c.theme = _theme
 	ui_layer.add_child(c)
@@ -607,10 +654,6 @@ func _show_atlas(mode: int) -> void:
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(title)
-		if id in SpawnRules.MESENLLA:
-			var tag := ClassPresentation.map_tag({"maps": [id]})
-			tag.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-			detail.add_child(tag)
 		var lore := _label(place["lore"], 23, UiTheme.ASH)
 		lore.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		lore.custom_minimum_size.x = 300
@@ -1218,6 +1261,7 @@ func start_game(mode: int) -> void:
 	Game.mode = mode
 	get_tree().paused = false
 	_run_over = false
+	_rewards.clear()
 	_clear_ui()
 	_back = Callable()
 	# The slow part runs in one go, so the loading screen must be drawn before it starts.
@@ -1499,13 +1543,43 @@ func _on_fort_lost() -> void:
 	_end_screen("The portal has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
 
 
+## What the match earned is listed under the end screen's words, each with its picture: doubloons
+## with a doubloon, a class unlocked with its emblem, and the leaderboard points. Returns "" so it
+## can stand where the words of the end screen are put together.
 func _earned_line(earned: int) -> String:
-	var line := "\n+%d Botti Doubloons" % earned if earned > 0 else ""
+	if earned > 0:
+		_rewards.append({"coin": true, "text": "+%d Botti Doubloons" % earned})
 	Game.note_game_finished()
 	for id: String in Game.fresh_unlocks:
-		line += "\n%s unlocked!" % ClassDefs.ALL[id]["name"]
+		_rewards.append({"class": id, "text": "%s unlocked!" % ClassDefs.ALL[id]["name"]})
 	Game.fresh_unlocks.clear()
-	return line
+	return ""
+
+
+## The rows of what the match earned, under the end screen's words.
+func _reward_rows(box: VBoxContainer) -> void:
+	for i in _rewards.size():
+		var reward: Dictionary = _rewards[i]
+		var row := HBoxContainer.new()
+		row.name = "Reward%d" % i
+		row.add_theme_constant_override("separation", 12)
+		box.add_child(row)
+		if reward.has("coin"):
+			row.add_child(_coin(40.0))
+		elif reward.has("class"):
+			var id: String = reward["class"]
+			var emblem := IconView.new(ClassDefs.icon(id), ClassDefs.color(id), 44.0)
+			emblem.name = "ClassIcon"
+			row.add_child(emblem)
+		else:
+			var star := IconView.new("star", UiTheme.STEEL, 40.0)
+			star.name = "PointsIcon"
+			row.add_child(star)
+		var words := _body(reward["text"], 26)
+		words.add_theme_font_override("font", UiTheme.bold_font())
+		words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(words)
+	_rewards.clear()
 
 
 func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
@@ -1530,6 +1604,7 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 	var l := _body(line, 26)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(l)
+	_reward_rows(box)
 	if Net.is_host():
 		box.add_child(_button("Back to the room", Net.return_to_room, Vector2(480, 72), true))
 		box.add_child(_button("Menu", show_menu, Vector2(480, 64)))
@@ -2083,8 +2158,7 @@ func _end_screen(title: String, line: String) -> void:
 	var l := _body(line, 26)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(l)
-	_end_label = l
-	_apply_board_note()
+	_reward_rows(box)
 	box.add_child(_button("Play again", func() -> void: start_game(Game.mode), Vector2(480, 72), true))
 	box.add_child(_button("Change class", func() -> void: show_class_picker(Game.mode), Vector2(480, 72)))
 	box.add_child(_button("Menu", show_menu, Vector2(480, 72)))
@@ -2146,16 +2220,6 @@ func show_command_map() -> void:
 func _asks_for_name() -> bool:
 	var scene := get_tree().current_scene
 	return scene == null or scene == self
-
-
-## Who you are, at the top of the menu. Tapping it changes your name.
-func _name_button() -> Button:
-	var b := _button(Game.player_name, func() -> void: show_name_prompt(false), Vector2(0, 64))
-	b.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	b.add_theme_font_size_override("font_size", 26)
-	b.custom_minimum_size.x = maxf(150.0, _text_width(Game.player_name, 26) + 48.0)
-	b.tooltip_text = "Change your name"
-	return b
 
 
 ## Your display name: shown to others in games together and on the leaderboard. Names are unique.
@@ -2231,41 +2295,13 @@ func _board_line(seconds: float, kills: int, won: bool) -> String:
 		mode = {Net.Rules.COOP: "coop", Net.Rules.FFA: "ffa", Net.Rules.TEAMS: "teams", Net.Rules.FORT: "fort"}.get(Net.rules, "coop")
 	var map := Game.current_map()
 	var difficulty: int = Net.difficulty if Net.active() else Game.difficulty
-	_counted = {}
 	var points := Board.record_match(seconds, kills, won, mode, map, world.player.class_id, world.player.spec_id, difficulty)
-	_board_note = "+%d leaderboard points" % points
-	return "\n" + _board_note
+	_rewards.append({"points": true, "text": "+%d leaderboard points" % points})
+	return ""
 
 
-var _board_note := "" # "+250 leaderboard points" on the current end screen
-var _end_label: Label
-var _counted := {} # what the board said about the last match
+var _rewards: Array[Dictionary] = [] # what the match earned, for the end screen
 var _prizes_checked := -1e9
-
-
-## Once the board has counted the match, the end screen also says where it moved you.
-func _apply_board_note() -> void:
-	if _counted.is_empty() or _board_note == "" or not is_instance_valid(_end_label) or not _end_label.text.contains(_board_note):
-		return
-	var moves: Array = []
-	for period: String in ["week", "all"]:
-		var now: Dictionary = _counted.get(period, {})
-		var was: Dictionary = (_counted.get("before", {}) as Dictionary).get(period, {})
-		if now.get("rank") == null:
-			continue
-		var where := "this week" if period == "week" else "of all time"
-		var rank := int(now["rank"])
-		if was.get("rank") == null:
-			moves.append("#%d %s" % [rank, where])
-		elif int(was["rank"]) > rank:
-			moves.append("#%d %s (up %d)" % [rank, where, int(was["rank"]) - rank])
-		else:
-			moves.append("#%d %s" % [rank, where])
-	if moves.is_empty():
-		return
-	var line := _board_note + ": " + " and ".join(moves)
-	_end_label.text = _end_label.text.replace(_board_note, line)
-	_board_note = line
 
 
 ## Weekly prizes: collected quietly when the menu opens, and announced when there is one.

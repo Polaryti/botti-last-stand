@@ -242,8 +242,9 @@ func _decide_goal() -> void:
 	var fog := world.fog
 	_away = false
 	_errand = "fight"
-	if world.mist_storm and world.mist_storm.contains(here):
-		_goal = world.mist_storm.escape(here)
+	var storm := world.storm_at(here)
+	if storm:
+		_goal = storm.escape(here)
 		_errand = "evacuate"
 	elif fog and not fog.contains(here, -3.0):
 		_goal = fog.centre3()

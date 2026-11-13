@@ -2,7 +2,8 @@
 class_name MapSpot
 extends MapPiece
 ## A place on the map that nobody sees in the game, but that the game uses.
-## loot: where items can appear. poi: where zombies wander to. crop: where a Scarecrow can rise, in a field.
+## loot: where items can appear. cache: where ruins keep one of the rarer finds, filled again a while
+## after it is taken. poi: where zombies wander to. crop: where a Scarecrow can rise, in a field.
 ## wood and yard_wood: where wood appears in the fort. start: where players begin, in order.
 ## rival: where players begin when they fight each other.
 ## place: a name on the map screen. weapon, item and familiar: the Sandbox's stands.
@@ -11,7 +12,7 @@ extends MapPiece
 ## lane is where the enemies sent against that gate come up from, muster where its Mist Soldiers
 ## step out of the mist, and post where they hold the lane.
 
-@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post") var kind := "loot":
+@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache") var kind := "loot":
 	set(v):
 		kind = v
 		refresh()
@@ -31,6 +32,7 @@ func build(b: MapBuilder) -> void:
 	var at := b.xf.origin
 	match kind:
 		"loot": b.w.loot_spots.append(at)
+		"cache": b.w.cache_spots.append(at)
 		"poi": b.w.pois.append(at)
 		"crop": b.w.crop_spots.append(at)
 		"wood": b.w.wood_spots.append(at)

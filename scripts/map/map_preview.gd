@@ -15,6 +15,9 @@ var church_door := Vector3.ZERO
 var perches: Array[Vector3] = []
 var pois: Array[Vector3] = []
 var loot_spots: Array[Vector3] = []
+var cache_spots: Array[Vector3] = []
+var shrines: Array[Dictionary] = []
+var watchtowers: Array[Dictionary] = []
 var crop_spots: Array[Vector3] = []
 var wood_spots: Array[Vector3] = []
 var yard_wood_spots: Array[Vector3] = []
@@ -60,8 +63,8 @@ func add_lantern_light(_l: OmniLight3D) -> void: pass
 func add_spinner(_n: Node3D, _axis: Vector3, _speed: float) -> void: pass
 
 
-func add_glow(_at: Vector3, _col: Color, _size: float, _fade_at := 0.0) -> void:
-	pass
+func add_glow(_at: Vector3, _col: Color, _size: float, _fade_at := 0.0) -> MeshInstance3D:
+	return null
 
 
 func start_fort() -> void:
@@ -72,7 +75,7 @@ func start_fort() -> void:
 func show_spot(kind: String, text: String, at: Vector3) -> void:
 	var col: Color = {"loot": Color(1.0, 0.8, 0.2), "poi": Color(0.9, 0.3, 0.3), "crop": Color(0.5, 0.8, 0.3), "wood": Color(0.7, 0.45, 0.2),
 		"yard_wood": Color(0.7, 0.45, 0.2), "start": Color(0.3, 0.9, 1.0), "rival": Color(0.9, 0.5, 1.0), "place": Color(1, 1, 1), "hill": Color(0.5, 0.75, 0.4),
-		"weapon": Color(0.9, 0.9, 1.0), "item": Color(0.5, 0.9, 0.6), "familiar": Color(0.8, 0.6, 1.0), "lane": Color(1.0, 0.25, 0.2), "muster": Color(0.45, 0.95, 0.92), "post": Color(0.3, 0.6, 1.0)}.get(kind, Color.WHITE)
+		"cache": Color(1.0, 0.55, 0.1), "weapon": Color(0.9, 0.9, 1.0), "item": Color(0.5, 0.9, 0.6), "familiar": Color(0.8, 0.6, 1.0), "lane": Color(1.0, 0.25, 0.2), "muster": Color(0.45, 0.95, 0.92), "post": Color(0.3, 0.6, 1.0)}.get(kind, Color.WHITE)
 	var m := CylinderMesh.new()
 	m.top_radius = 0.0
 	m.bottom_radius = 0.9 if kind == "hill" else 0.3

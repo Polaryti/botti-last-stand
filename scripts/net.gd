@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 47
+const PROTOCOL := 48
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -2284,6 +2284,15 @@ func _bot_ride_stop(carrier: int) -> void:
 func _clear_bot_seat(who: int, carrier: int) -> void:
 	var bot := local_player(carrier)
 	if bot and bot.passenger == who: bot.passenger = 0
+
+## The Valleys' camp falls to the mist on every phone at once.
+func camp_falls(centre: Vector3, radius: float) -> void:
+	if is_host(): _camp_falls.rpc(centre, radius)
+
+@rpc("authority", "call_local", "reliable")
+func _camp_falls(centre: Vector3, radius: float) -> void:
+	if world and is_instance_valid(world) and radius > 0.0 and radius < 60.0:
+		world.fall_camp(centre, radius)
 
 func start_mist_storm(island: int) -> void:
 	if is_host(): _mist_storm_start.rpc(island)

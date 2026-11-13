@@ -13,6 +13,7 @@ const HEIGHT := 1.8
 const LOOPS := ["Idle", "Walking_A", "Walking_C", "Running_A"]
 const ATTACK_TIME := 0.62
 const MARCH_UNTIL := 6.0 # how near its gate a zombie running up a lane slows to a walk
+const LANE_BLOCKER := 2.5 # up a lane, only someone this close is fought; everyone else is passed by
 const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its height
 ## Bodies that share another's animated model, dressed differently.
 const BODY_FILES := {"woods_child": "normal_b"}
@@ -646,7 +647,7 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		move_and_slide()
 		position.y = world.ground_at(position)
 		return
-	if _sees and dist > 1.0:
+	if _sees and dist > 1.0 and not _lane_bound(dist):
 		_ride_dir = to / dist
 		_ride_pass = dist / _speed + 0.7
 		_ride_hit = false
@@ -654,6 +655,14 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		return
 	_move(target, to, dist, delta)
 	_play("Idle")
+
+
+## On its way up a stronghold's lane, with nobody in its way: no special moves, no charges, just on
+## to the gate. A move already begun still finishes.
+func _lane_bound(dist: float) -> bool:
+	if world.fort == null or flies or not world.fort.has_lanes() or dist < LANE_BLOCKER * 2.4:
+		return false
+	return mesenlla_mind == null or mesenlla_mind.phase == ""
 
 
 ## Below 40% health the horse goes down, and whoever rode it fights on foot.
@@ -1083,15 +1092,10 @@ func _die() -> void:
 		weapon_id = ""
 		if _hand_mesh:
 			_hand_mesh.equip("")
-	if def.get("mist_boss", false):
-		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
-		world.director.show_banner("The Veil Regent falls. The mist releases an Angel", 4.0)
-	elif type_id == "great_revenant_elemental":
-		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
-		world.director.show_banner("The Great Revenant Elemental crumbles. An Angel rises from the mist", 4.0)
-	elif type_id == "war_wyvern":
-		world.spawn_pickup_at(position, Pickup.Kind.POWER, "angel")
-		world.director.show_banner("The War Wyvern falls from the sky. An Angel rises from the mist", 4.0)
+	# A boss leaves nothing behind but its last words.
+	var last_words: String = ZombieDefs.ALL[type_id].get("last_words", "")
+	if last_words != "":
+		world.director.show_banner("%s: \u201c%s\u201d" % [ZombieDefs.ALL[type_id]["name"], last_words], 6.0)
 	world.on_zombie_killed(self)
 
 
@@ -1458,10 +1462,16 @@ func _fort_plan(target: Target, dist: float) -> bool:
 	var me_inside := fort.inside(position)
 	var they_inside := fort.inside(target.global_position)
 	var they_reachable := not fort.on_wall(target.global_position) and (me_inside == they_inside or fort.any_open())
-	if _sees and they_reachable and dist < _sight:
-		return false
-	if state == State.CHASE and they_reachable and (target.global_position - position).length() < 14.0:
-		return false
+	if fort.has_lanes():
+		# Up the lanes of a stronghold, the gates and then the portal come before everything: they
+		# strike only whoever stands right in their way, and never go after anyone.
+		if they_reachable and dist < LANE_BLOCKER:
+			return false
+	else:
+		if _sees and they_reachable and dist < _sight:
+			return false
+		if state == State.CHASE and they_reachable and (target.global_position - position).length() < 14.0:
+			return false
 	state = State.INVESTIGATE
 	_direct = false
 	_hold = false
@@ -1718,8 +1728,9 @@ func _physics_process(delta: float) -> void:
 		_groan_cd = randf_range(5.0, 12.0)
 		world.sfx_at(_idle_sound(), position, -14.0)
 
-	if world.mist_storm and world.mist_storm.contains(position) and not def.get("mist_boss", false) and not mist_mind:
-		var exit := world.mist_storm.escape(position)
+	var storm := world.storm_at(position)
+	if storm and not def.get("mist_boss", false) and not mist_mind:
+		var exit := storm.escape(position)
 		if exit != Vector3.INF:
 			if not _has_goal or _goal.distance_squared_to(exit) > 1.0: _set_goal(exit)
 			state = State.INVESTIGATE
@@ -1728,7 +1739,7 @@ func _physics_process(delta: float) -> void:
 	if mist_mind:
 		mist_mind.tick(self, target, delta)
 		return
-	if mesenlla_mind and mesenlla_mind.tick(self, target, to, dist, delta):
+	if mesenlla_mind and not _lane_bound(dist) and mesenlla_mind.tick(self, target, to, dist, delta):
 		if _custom:
 			_animate_custom(delta, velocity.length())
 		return
@@ -2215,7 +2226,7 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 			var out := world.portals.exit_from(position)
 			if out != Vector3.INF:
 				position = out
-				if world.mist_storm and not world.mist_storm.contains(out):
+				if not world.mist_storms.is_empty() and world.storm_at(out) == null:
 					_clear_goal()
 					state = State.ROAM
 				_gate_wait = 2.0
@@ -2324,7 +2335,8 @@ func _combat(target: Target, dist: float, delta: float) -> void:
 	if _attack_cd > 0.0 or not _sees or _damage <= 0.0:
 		return
 	if _attack_style() == "ranged" and dist > 4.0:
-		if dist < _ranged_reach():
+		# Up a stronghold's lane they do not stop to shoot at anyone further off than the next few steps.
+		if dist < _ranged_reach() and not (_lane_bound(dist) and dist > LANE_BLOCKER * 3.2):
 			_attack_cd = 2.4 if _caster else maxf(1.5, _attack_interval())
 			if hero and hero_minute >= 4:
 				_attack_cd *= 0.7

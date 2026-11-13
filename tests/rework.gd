@@ -675,7 +675,8 @@ func _mists() -> void:
 	check(mw.count_type("lantern_wisp") == 5, "second-phase reinforcement happens only once")
 	var angels := mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size()
 	boss._die()
-	check(mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size() == angels + 1, "defeating the Regent drops an Angel familiar")
+	check(mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size() == angels, "defeating the Regent drops no Angel familiar")
+	check(mw.director.banner.contains("Veil Regent") and mw.director.banner.contains("It closes behind every one of you"), "the Regent says its last words: %s" % mw.director.banner)
 
 	mp.position = Vector3(0, 10.1, 16)
 	mp.hp = mp.max_hp()
@@ -711,6 +712,35 @@ func _mists() -> void:
 	finale._physics_process(30.0)
 	check(is_instance_valid(finale) and not finale.is_queued_for_deletion(), "finale storms persist rather than expiring after twenty seconds")
 	finale.free()
+	# The night's storms: the next gathers soon after the last ends, and later two rage at once.
+	var d := mw.director
+	var was_elapsed := d.elapsed
+	d._next_storm = MistStorm.FIRST
+	d._storm_index = 0
+	d._storms_last = 0
+	d.elapsed = MistStorm.FIRST
+	d._tick_storms()
+	check(mw.mist_storms.size() == 1 and mw.mist_storms[0].island == 0, "the first storm gathers at %d s, over the arena" % int(MistStorm.FIRST))
+	mw.mist_storms[0].end_now()
+	d.elapsed += MistStorm.WARNING + MistStorm.DURATION
+	d._tick_storms()
+	check(mw.mist_storms.is_empty() and is_equal_approx(d._next_storm, d.elapsed + MistStorm.GAP), "when it ends, the next is due %d s later" % int(MistStorm.GAP))
+	d.elapsed += MistStorm.GAP
+	d._tick_storms()
+	check(mw.mist_storms.size() == 1 and mw.mist_storms[0].island > 0, "and gathers then, over an outer island")
+	d.elapsed += MistStorm.STAGGER + 1.0
+	d._tick_storms()
+	check(mw.mist_storms.size() == 1, "before %d s only one storm rages at a time" % int(MistStorm.TWO_FROM))
+	d.elapsed = MistStorm.TWO_FROM + 1.0
+	d._next_storm = 0.0
+	d._tick_storms()
+	check(mw.mist_storms.size() == 2 and mw.mist_storms[0].island != mw.mist_storms[1].island, "later, a second storm rages at the same time, over another island")
+	mp.position = Vector3(MapIslands.ISLANDS[mw.mist_storms[1].island].x, 0, MapIslands.ISLANDS[mw.mist_storms[1].island].y)
+	check(mw.storm_at(mp.position) == mw.mist_storms[1] and mw.storm_at(Vector3(16, 10, 0)) == null, "each storm covers only its own island")
+	for raging: MistStorm in mw.mist_storms.duplicate():
+		raging.free()
+	check(mw.mist_storms.is_empty(), "storms leave the world's list as they go")
+	d.elapsed = was_elapsed
 	mp.position = Vector3(16, 10.06, 0)
 	mp.hp = mp.max_hp()
 	mp.dead = false

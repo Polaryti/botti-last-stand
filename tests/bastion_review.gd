@@ -41,6 +41,7 @@ func _ready() -> void:
 	await shot("bastion_walls", ground(0, -36, 2.0), ground(0, -50, 4.0))
 	await shot("bastion_middle_gate", ground(-2, -58, 1.7), ground(0, -44, 1.5))
 	await shot("bastion_post_camp", ground(-46, -26, 2.2), ground(-58, -34, 1.5))
+	await shot("bastion_lane_rift", ground(0, 76, 2.2), ground(0, 101, 3.0))
 	await shot("bastion_outer_wall", ground(-62, 40, 2.0), ground(-76, 30, 3.0))
 	await shot("bastion_west_gate", ground(-38, -54, 2.0), ground(-26, -62, 3.0))
 	await shot("bastion_middle_lane", ground(0, 30, 2.0), ground(0, -40, 10.0))

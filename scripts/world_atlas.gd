@@ -1,17 +1,18 @@
 class_name WorldAtlas
 extends Control
 ## The known world, drawn as a map to choose where to play: the Village in its lowland by the river,
-## the road to the Fort, the Fort's portal to the Mists, and from the heart of the Mists the new paths
-## through its portals to the twilight lands beyond, the Valleys of Mesenlla and Mist Bastion.
+## the road to the Fort, the Fort's portal to the Mists, the portal from the heart of the Mists to Mist
+## Bastion on its peak in the twilight lands beyond, and the road down from the Bastion to the Valleys
+## of Mesenlla.
 ## Each place is a medal you can tap. Places that cannot be played in the mode being chosen for are
 ## drawn dimmed and cannot be picked.
 
 signal picked(id: String)
 
 ## Where each place lies on the atlas, as a share of its width and height.
-const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.76, 0.24), "bastion": Vector2(0.84, 0.62)}
+const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.84, 0.62), "bastion": Vector2(0.76, 0.24)}
 ## Roads walk; portals open. Each link is [from, to, through a portal].
-const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "mesenlla", true], ["mists", "bastion", true], ["mesenlla", "bastion", false]]
+const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false]]
 const MEDAL := 92.0
 
 var allowed: Array = []

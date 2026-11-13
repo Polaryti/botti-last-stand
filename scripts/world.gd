@@ -32,7 +32,11 @@ static var _mist_warmed_quality := -1
 static var _warmed_quality := -1
 static var _lands := {} # the land takes a moment to work out, and it never changes
 
-var mist_storm: MistStorm
+var mist_storms: Array[MistStorm] = [] # every Mist Storm raging or gathering now
+## The newest Mist Storm, if there is one.
+var mist_storm: MistStorm:
+	get: return mist_storms.back() if not mist_storms.is_empty() else null
+var _storm_inside := false # whether whoever is looking stood in a storm last frame
 var mist_seals: Array[MistSeal] = []
 var stone_chains: Array = [] # each line of stones in the Mists, in order, by the middle of each top
 var mode: int = Game.Mode.MENU
@@ -82,6 +86,10 @@ var church_door := Vector3(0, 0, -36)
 var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
+var cache_spots: Array[Vector3] = [] # where the ruins keep better things than lie about elsewhere
+var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
+var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
+var camp_fallen := false # the Valleys' camp, shelled and lost to the mist
 const PICKUP_APART := 6.0
 const WOOD_GATE_CLEARANCE := 18.0 # forest wood: out of the gates' approaches
 const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itself
@@ -269,8 +277,13 @@ func setup(game_mode: int) -> void:
 	_build_environment()
 	var builder := MapBuilder.new(self, terrain)
 	builder.quality = Game.quality
-	builder.grass_tufts = Game.grass_count()
+	builder.grass_tufts = int(Game.grass_count() * map.grass)
 	builder.skip_beyond = mode == Game.Mode.MENU
+	# The title screen's camera flies high over the valley, so its grass and flowers are drawn much
+	# further off than a player on foot would need.
+	builder.sight = 3.0 if mode == Game.Mode.MENU else 1.0
+	if mode == Game.Mode.MENU:
+		builder.grass_tufts *= 2 # and seen from up there, thin grass looks like none
 	builder.build(map)
 	map.free()
 	if fort:
@@ -350,6 +363,86 @@ func _start_weather() -> void:
 func weather_changed() -> void:
 	_sky_value = -1.0
 	_apply_sky(_last_dawn)
+
+
+## The shrines bless whoever touches them on this phone, then rest a while, dark, before they will again.
+const SHRINE_REACH := 2.6
+const SHRINE_REST := 120.0
+func _tick_shrines() -> void:
+	for shrine: Dictionary in shrines:
+		var ready := now >= float(shrine["ready_at"])
+		for part: Variant in shrine["glow"]:
+			if part is Node3D and is_instance_valid(part):
+				(part as Node3D).visible = ready
+		if not ready or player == null or player.dead:
+			continue
+		var at: Vector3 = shrine["at"]
+		if Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length() < SHRINE_REACH and absf(player.global_position.y - at.y) < 2.5:
+			shrine["ready_at"] = now + SHRINE_REST
+			for part: Variant in shrine["glow"]:
+				if part is Node3D and is_instance_valid(part):
+					(part as Node3D).visible = false
+			player.bless(shrine["blessing"])
+			director.local_banner(Player.BLESSING_WORDS.get(shrine["blessing"], "Blessed"), 3.5)
+			fx_mist(at + Vector3.UP * 1.2, 1.4)
+
+
+## A watchtower brought down: its body and lamp gone, its stumps and wreckage left where it stood.
+func ruin_tower(tower: Dictionary) -> void:
+	for part: Variant in tower["parts"]:
+		if part is Node3D and is_instance_valid(part):
+			(part as Node3D).visible = false
+	var at: Vector3 = tower["at"]
+	var wreck := MeshInstance3D.new()
+	wreck.mesh = MesenllaBuilder.tower_ruin(float(tower["high"]), int(at.x * 31.0 + at.z * 7.0))
+	wreck.transform = Transform3D(tower["basis"], at)
+	add_child(wreck)
+	fx_blast(at + Vector3.UP * 2.0, 4.0, Color(0.85, 0.5, 1.0, 0.7))
+	fx_gore(at + Vector3.UP * 1.0, Color(0.36, 0.26, 0.18))
+	fx_mist(at + Vector3.UP * 2.0, 3.0)
+	sfx_at("boulder_impact", at, 2.0)
+	tower["ruined"] = true
+
+
+## The Valleys' camp is lost: its towers come down, and a Mist Storm settles over it for the rest of
+## the night. Nothing rises or is found there any more (see storm_at in the spawning).
+func fall_camp(centre: Vector3, radius: float) -> void:
+	if camp_fallen:
+		return
+	camp_fallen = true
+	for tower: Dictionary in watchtowers:
+		var at: Vector3 = tower["at"]
+		if not tower.get("ruined", false) and Vector2(at.x - centre.x, at.z - centre.z).length() <= radius + 4.0:
+			ruin_tower(tower)
+	MistStorm.create_zone(self, centre, radius, "THE CAMP", 4.0)
+
+
+## The Mist Storm over this spot, if any.
+func storm_at(p: Vector3) -> MistStorm:
+	for storm: MistStorm in mist_storms:
+		if storm.contains(p):
+			return storm
+	return null
+
+
+## Whether the Regent's storm is over every outer island.
+func storm_finale() -> bool:
+	return mist_storms.any(func(storm: MistStorm) -> bool: return storm.finale)
+
+
+## Thick, violet air for whoever is looking from inside a storm, and the night's own air again
+## when they step out of it or the last storm ends.
+func storm_air() -> void:
+	if player == null:
+		return
+	var here := storm_at(player.global_position)
+	set_fog_thickness((4.0 if here.burning() else 1.5) if here else 1.0)
+	if here:
+		_env.fog_light_color = Color(0.16, 0.1, 0.25)
+	elif _storm_inside:
+		_sky_value = -1.0
+		_apply_sky(_last_dawn)
+	_storm_inside = here != null
 
 
 ## Standing out in the deadly fog, you cannot see far.
@@ -561,6 +654,15 @@ func in_firelight(p: Vector3) -> bool:
 	return false
 
 
+## Right at the stones of a bonfire, close enough to be scorched.
+func at_bonfire(p: Vector3) -> bool:
+	for f: Dictionary in fires:
+		if f["heals"] and Vector2(p.x - f["at"].x, p.z - f["at"].z).length_squared() < WorldLight.SCORCH_REACH * WorldLight.SCORCH_REACH \
+				and absf(p.y - f["at"].y) < 3.0:
+			return true
+	return false
+
+
 func beside_bonfire(p: Vector3) -> bool:
 	for f: Dictionary in fires:
 		if f["heals"] and p.distance_squared_to(f["at"]) < 18.0:
@@ -701,7 +803,7 @@ func add_lantern_light(l: OmniLight3D) -> void:
 	_lanterns.append(l)
 
 
-func add_glow(at: Vector3, col: Color, size: float, fade_at := 0.0) -> void:
+func add_glow(at: Vector3, col: Color, size: float, fade_at := 0.0) -> MeshInstance3D:
 	if not _glow_material_cache.has(col):
 		var m := StandardMaterial3D.new()
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -721,6 +823,7 @@ func add_glow(at: Vector3, col: Color, size: float, fade_at := 0.0) -> void:
 	g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	g.visibility_range_end = fade_at
 	add_child(g)
+	return g
 
 
 # --- Night, fog and sky ------------------------------------------------------
@@ -906,6 +1009,10 @@ func _process(delta: float) -> void:
 	for s: Dictionary in _spinners:
 		(s["node"] as Node3D).rotate_object_local(s["axis"], float(s["speed"]) * delta)
 	_tick_fires(delta)
+	if not mist_storms.is_empty() or _storm_inside:
+		storm_air()
+	if not shrines.is_empty():
+		_tick_shrines()
 	_sky_root.position = _player_camera_position()
 	if mode == Game.Mode.MENU:
 		_orbit += delta * 0.05
@@ -2107,6 +2214,8 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 		p.y = 0.0
 		if fog and not fog.contains(p, -4.0):
 			continue
+		if storm_at(p) != null:
+			continue # nothing rises inside a Mist Storm
 		var c := grid.to_cell(p)
 		if not grid.is_free(c):
 			continue
@@ -2156,7 +2265,8 @@ func on_player_died(p: Player) -> void:
 
 ## Sunrise burns away everything still standing.
 func on_dawn() -> void:
-	if mist_storm: mist_storm.queue_free()
+	for storm: MistStorm in mist_storms.duplicate():
+		storm.end_now()
 	_dawn_done = true
 	_apply_sky(1.0)
 	for p: Player in local_players():
@@ -2187,7 +2297,7 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z):
+		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null:
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -2223,6 +2333,8 @@ func spawn_pickup_random(kind: int, id: String) -> Pickup:
 		var c := grid.to_cell(at)
 		if not grid.is_free(c) or terrain.in_water(at.x, at.z):
 			continue
+		if storm_at(at) != null:
+			continue # nothing is left lying inside a Mist Storm
 		if player and at.distance_to(player.global_position) < 4.0:
 			continue
 		if fog and not fog.contains(at, -3.0):

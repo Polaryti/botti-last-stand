@@ -49,11 +49,11 @@ func _ready() -> void:
 	Game.night_map = "village"
 	Game.pet = "wolf"
 	var plan: Array[String] = ["test_map", "test_flow", "test_weapons", "test_touch", "test_auto_jump", "test_items", "test_powers", "test_zombies", "test_night",
-		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review"]
+		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review"]
 	var groups := {
 		"core": plan.slice(0, 9), "recent": plan.slice(9, 17), "legacy": plan.slice(17, 25),
 		"classes": ["test_new_things", "test_revenant", "test_trees", "test_finals", "test_classes"],
-		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review"]}
+		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review"]}
 	var selected := "all"
 	for arg: String in args:
 		if arg.begins_with("group="):
@@ -3412,6 +3412,101 @@ func test_flow() -> void:
 	ok(m.world.pickups.size() > 0, "the Sandbox has things to pick up")
 	m.queue_free()
 	await frames(2)
+
+
+## Mario's review of Beyond the Mists, 13 November: campfires, walking backwards, the menu screens.
+func test_beyond_review() -> void:
+	await start_clean()
+	# Nobody stands on a campfire, and standing right at one too long sets you alight.
+	var fire: Dictionary = {}
+	for f: Dictionary in w.fires:
+		if f["heals"]:
+			fire = f
+			break
+	ok(not fire.is_empty(), "the Village has a bonfire")
+	if not fire.is_empty():
+		var at: Vector3 = fire["at"]
+		var q := PhysicsPointQueryParameters3D.new()
+		q.position = at + Vector3.UP * 1.6
+		q.collision_mask = Terrain.BARRIER
+		ok(not w.get_world_3d().direct_space_state.intersect_point(q).is_empty(), "an unseen column over a bonfire keeps anyone off the top of it")
+		pl.set_physics_process(true)
+		pl.guard_left = 0.0
+		pl.global_position = at + Vector3(0, 1.3, 0)
+		pl.velocity = Vector3.ZERO
+		await seconds(1.5)
+		ok(Vector2(pl.global_position.x - at.x, pl.global_position.z - at.z).length() > 0.9 or pl.global_position.y < at.y + 1.2, "dropped on top of one, you do not stay up there (%.1f m off, %.1f up)" % [Vector2(pl.global_position.x - at.x, pl.global_position.z - at.z).length(), pl.global_position.y - at.y])
+		pl.global_position = at + Vector3(1.9, 0.1, 0)
+		pl.velocity = Vector3.ZERO
+		pl.burn_time = 0.0
+		pl._scorch = 0.0
+		pl.hp = pl.max_hp()
+		await seconds(WorldLight.SCORCH_AFTER - 1.5)
+		ok(pl.burn_time <= 0.0 and w.at_bonfire(pl.global_position), "right at the stones, at first you only get warm")
+		await seconds(2.5)
+		ok(pl.burn_time > 0.0, "but after %d seconds you catch fire" % int(WorldLight.SCORCH_AFTER))
+		pl.global_position = at + Vector3(6.0, 0.1, 0)
+		await seconds(0.5)
+		ok(pl._scorch == 0.0, "step back and it starts over")
+		pl.burn_time = 0.0
+		pl.hp = pl.max_hp()
+	# Backing away is slower than walking on.
+	place(OPEN)
+	pl.set_physics_process(true)
+	pl.input_move = Vector2(0, -1)
+	await seconds(1.0)
+	var ahead := Vector2(pl.velocity.x, pl.velocity.z).length()
+	pl.input_move = Vector2(0, 1)
+	await seconds(1.0)
+	var back := Vector2(pl.velocity.x, pl.velocity.z).length()
+	pl.input_move = Vector2.ZERO
+	ok(absf(back / maxf(ahead, 0.01) - Player.BACK_SPEED) < 0.03, "walking backwards goes at %d%% of walking on (%.2f against %.2f m/s)" % [int(Player.BACK_SPEED * 100.0), back, ahead])
+	# The Scarecrow belongs to the Village.
+	ok(ZombieDefs.ALL["scarecrow"]["maps"] == ["village"] and SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "village") and not SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "mesenlla"), "the Scarecrow is the Village's alone")
+	# The world atlas: the Mists lead only to Mist Bastion, and the Valleys lie below it.
+	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion"], "on the atlas the Mists connect to the Fort and Mist Bastion only")
+	ok((WorldAtlas.SPOTS["mesenlla"] as Vector2).y > (WorldAtlas.SPOTS["bastion"] as Vector2).y, "and the Valleys of Mesenlla lie below Mist Bastion")
+	m.show_map_picker()
+	await frames(2)
+	var atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
+	(atlas.find_child("Place_mesenlla", true, false) as Button).pressed.emit()
+	await frames(2)
+	var shown: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	ok(shown.has("Valleys of Mesenlla") and not shown.any(func(t: String) -> bool: return t.begins_with("Map Exclusive")), "choosing where to play shows no map tags")
+	# Your name is changed in Settings, not on the menu.
+	m.show_menu()
+	await frames(2)
+	ok(not m.ui_layer.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.text == Game.player_name), "the menu no longer has your name on a button")
+	m.show_settings()
+	await frames(2)
+	var rename := m.ui_layer.find_child("Rename", true, false) as Button
+	ok(rename != null and rename.text == Game.player_name, "Settings has it, to change your name")
+	if rename:
+		rename.pressed.emit()
+		await frames(2)
+		ok(m.ui_layer.find_children("*", "LineEdit", true, false).any(func(e: LineEdit) -> bool: return e.text == Game.player_name), "and tapping it asks for the new one")
+	# New notes make the Changelog button glow until they are read.
+	var read := Game.changelog_seen
+	Game.changelog_seen = "older notes"
+	m.show_menu()
+	await frames(2)
+	var notes := m.ui_layer.find_child("ChangelogButton", true, false) as Button
+	ok(notes != null and notes.has_meta("news"), "new notes in the Changelog make its button glow")
+	await seconds(0.3)
+	ok(notes != null and notes.self_modulate != Color.WHITE, "and it does glow (%s)" % (str(notes.self_modulate) if notes else "-"))
+	m.show_changelog()
+	await frames(2)
+	ok(Game.changelog_seen == ChangelogPanel.signature(), "opening the Changelog reads them")
+	var lines: int = m.ui_layer.find_children("*", "Label", true, false).size()
+	await frames(30)
+	ok(m.ui_layer.find_children("*", "Label", true, false).size() > lines, "its older notes follow over the next moments, so it opens at once")
+	m.show_menu()
+	await frames(2)
+	notes = m.ui_layer.find_child("ChangelogButton", true, false) as Button
+	ok(notes != null and not notes.has_meta("news"), "after which the button stops glowing")
+	Game.changelog_seen = read
+	Game.save_settings()
+	await start_clean()
 
 
 func start_clean() -> void:

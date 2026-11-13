@@ -64,7 +64,7 @@ func _prices() -> void:
 	if not had_adept:
 		Game.unlocked.erase("adept")
 	Game.save_settings()
-	check(MistStorm.EVERY == 70.0, "scheduled Mist Storms use the new seventy-second cadence")
+	check(MistStorm.GAP <= 15.0 and MistStorm.TWO_FROM <= 360.0, "Mist Storms follow each other closely, and two can rage at once later in the night")
 func _heavy() -> void:
 	Game.owned_items["oathkeeper"] = true
 	p.spec_id = "guardian"

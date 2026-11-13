@@ -153,14 +153,16 @@ func _draw() -> void:
 		var label_at := Vector2(clampf(p.x - w * 0.5, 4.0, maxf(4.0, size.x - w - 4.0)), clampf(p.y + float(mark.get("label_offset", 0.0)), 20.0, size.y - 4.0))
 		draw_string_outline(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 4, Color(UiTheme.NIGHT, 0.8))
 		draw_string(font, label_at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.BONE)
-	if world.mist_storm:
-		var storm := world.mist_storm
-		var affected: Array[int] = []
-		if storm.finale:
-			for index in range(1, MapIslands.ISLANDS.size()): affected.append(index)
-		else: affected.append(storm.island)
-		for index in affected:
-			var land := MapIslands.ISLANDS[index]
+	for storm: MistStorm in world.mist_storms:
+		var rounds: Array[Vector3] = [] # x, z and reach of each round of land the storm covers
+		if storm.zone_radius > 0.0:
+			rounds.append(Vector3(storm.zone_at.x, storm.zone_at.z, storm.zone_radius))
+		elif storm.finale:
+			for index in range(1, MapIslands.ISLANDS.size()):
+				rounds.append(Vector3(MapIslands.ISLANDS[index].x, MapIslands.ISLANDS[index].y, MapIslands.ISLANDS[index].z))
+		else:
+			rounds.append(Vector3(MapIslands.ISLANDS[storm.island].x, MapIslands.ISLANDS[storm.island].y, MapIslands.ISLANDS[storm.island].z))
+		for land in rounds:
 			var centre := _to_map(land.x, land.y)
 			var radius := land.z / (world.terrain.half_extent * 2.0) * size.x
 			draw_circle(centre, radius, Color(0.65, 0.3, 0.9, 0.3))
@@ -197,7 +199,7 @@ func _draw() -> void:
 
 
 ## Landmarks beyond the land: islands hanging overhead (their shadow and a dashed edge), glowing
-## rifts, rings of standing stones, portals, waystones, waterfalls and arches of rock.
+## rifts, rings of standing stones, portals, waystones, waterfalls, arches of rock, ruins and mines.
 func _draw_features() -> void:
 	var scale := size.x / (world.terrain.half_extent * 2.0)
 	var pulse := 0.75 + 0.25 * sin(_t * 2.2)
@@ -240,6 +242,17 @@ func _draw_features() -> void:
 				draw_line(p - half, p + half, Color(0.48, 0.62, 0.36, 0.9), 4.0, true)
 				draw_circle(p - half, 3.5, Color(0.42, 0.4, 0.43))
 				draw_circle(p + half, 3.5, Color(0.42, 0.4, 0.43))
+			"ruins":
+				# A ring of broken columns round a floor of slabs.
+				draw_circle(p, maxf(s, 4.0), Color(0.42, 0.4, 0.43, 0.35))
+				for i in 8:
+					var a := TAU * i / 8.0
+					draw_circle(p + Vector2(cos(a), sin(a)) * maxf(s, 4.0), 1.8, Color(0.75, 0.72, 0.66))
+			"mine":
+				# A dark mouth in a timber frame.
+				var across: Vector2 = f["dir"] * maxf(s, 4.0) * 0.6
+				draw_line(p - across, p + across, Color(0.46, 0.32, 0.2), 5.0, true)
+				draw_circle(p, 3.0, Color(0.04, 0.03, 0.05))
 
 
 ## A stronghold's gates, coloured by how they stand (open gates in red), and its heart or portal.

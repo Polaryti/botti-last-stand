@@ -63,8 +63,12 @@ var _last_stand := false
 var _call_timer := 0.0
 var _far_timer := 4.0
 var _next_rider := FIRST_RIDER
-var _next_storm := MistStorm.EVERY
+var _next_storm := MistStorm.FIRST
 var _storm_index := 0
+var _storms_last := 0 # island storms raging at the last look, to notice when one ends
+var camp: CampSiege # the shelling of the Valleys' camp, on that map
+var _cache_due := {} # cache spot index -> when it may be filled again
+var _cache_look := 0.0
 var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
 var _mist_boss_defeated := false
@@ -129,6 +133,56 @@ func show_banner(text: String, seconds: float) -> void:
 	banner_time = seconds
 	if Net.is_host():
 		Net.banner(text, seconds)
+
+
+## The Mists' storms: one gathers a little after the last one ends, and from TWO_FROM on two can
+## rage at once, on different islands, the second gathering a while after the first.
+func _tick_storms() -> void:
+	var raging := world.mist_storms.filter(func(storm: MistStorm) -> bool: return not storm.finale and storm.island >= 0)
+	if raging.size() < _storms_last:
+		_next_storm = maxf(_next_storm, elapsed + MistStorm.GAP)
+	var room := (2 if elapsed >= MistStorm.TWO_FROM else 1) - raging.size()
+	if room > 0 and elapsed >= _next_storm:
+		var taken := raging.map(func(storm: MistStorm) -> int: return storm.island)
+		var free: Array[int] = []
+		for n in range(1, 9):
+			if n not in taken:
+				free.append(n)
+		var island: int = 0 if _storm_index == 0 else free.pick_random()
+		_storm_index += 1
+		if Net.active(): Net.start_mist_storm(island)
+		else: MistStorm.create(world, island)
+		_next_storm = elapsed + MistStorm.STAGGER
+	_storms_last = world.mist_storms.filter(func(storm: MistStorm) -> bool: return not storm.finale and storm.island >= 0).size()
+
+
+## The ruins' caches: each holds one of the rarer weapons or a potion, and is filled again
+## CACHE_REFILL seconds after what it held was taken. Not inside a Mist Storm.
+const CACHE_REFILL := 100.0
+func _tick_caches() -> void:
+	if elapsed < _cache_look:
+		return
+	_cache_look = elapsed + 2.0
+	for i in world.cache_spots.size():
+		var at: Vector3 = world.cache_spots[i]
+		var held := world.pickups.any(func(p: Pickup) -> bool: return is_instance_valid(p) and Vector2(p.global_position.x - at.x, p.global_position.z - at.z).length() < 2.0)
+		if held:
+			_cache_due[i] = elapsed + CACHE_REFILL
+			continue
+		if elapsed < float(_cache_due.get(i, 0.0)) or world.storm_at(at) != null:
+			continue
+		_cache_due[i] = elapsed + CACHE_REFILL
+		if randf() < 0.65:
+			var id := WeaponDefs.pick_rare(world.spawn_map())
+			world.spawn_pickup_at(at, Pickup.Kind.WEAPON, id, 12 if WeaponDefs.is_ranged(id) else 0)
+		else:
+			world.spawn_pickup_at(at, Pickup.Kind.POWER, PowerDefs.pick_potion())
+
+
+## Words for this phone's player alone.
+func local_banner(text: String, seconds: float) -> void:
+	banner = text
+	banner_time = seconds
 
 
 ## How long this match runs. In All vs All the clock counts down to the fog closing, not to dawn.
@@ -210,12 +264,15 @@ func _process(delta: float) -> void:
 	if not running:
 		return
 	elapsed += delta
-	if world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _next_storm:
-		_next_storm = elapsed + MistStorm.EVERY
-		var island := 0 if _storm_index == 0 else randi_range(1, 8)
-		_storm_index += 1
-		if Net.active(): Net.start_mist_storm(island)
-		else: MistStorm.create(world, island)
+	if world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned:
+		_tick_storms()
+	if not _follows_host and not sandbox and not world.cache_spots.is_empty():
+		_tick_caches()
+	if not _follows_host and not sandbox:
+		if camp == null and CampSiege.wanted(world):
+			camp = CampSiege.new(world)
+		if camp:
+			camp.tick(elapsed)
 	_tick_specials()
 	_tick_last_stand(delta)
 	_spawn_timer -= delta
@@ -437,7 +494,7 @@ func _spawn_roamer() -> void:
 		world.spawn_zombie(_pick_roamer())
 		return
 	# Keep pressure near explorers and replenish the least populated outer island.
-	if (world.mist_storm and world.mist_storm.finale) or (world.count_living() >= 8 and randf() < 0.5):
+	if world.storm_finale() or (world.count_living() >= 8 and randf() < 0.5):
 		world.spawn_zombie(_pick_roamer())
 		return
 	var counts := PackedInt32Array()
