@@ -872,6 +872,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		amount *= 1.05
 	if puppet:
 		# Show the hit straight away. The host has the last word on whether it killed.
+		world.damage_numbers.show_hit(get_instance_id(), hit_pos, amount, max_hp)
 		hp = maxf(hp - amount, 1.0)
 		bar_time = 2.5
 		_flash_on()
@@ -879,6 +880,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		world.sfx_at(_hurt_sound(), position, -8.0)
 		Net.hit_zombie(self, amount, from_dir, knock, hit_pos)
 		return
+	# Your side's blows (yours, your pet's, your summons') show what they took.
+	var ours := next_hitter == 0 and world.acting() == world.player
 	if next_hitter != 0:
 		last_hitter = next_hitter
 	elif Net.active():
@@ -896,6 +899,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		if away.length_squared() > 0.001 and look.dot(away.normalized()) > 0.3:
 			amount *= 0.5
 			world.sfx_at("block", position, -6.0)
+	if ours:
+		world.damage_numbers.show_hit(get_instance_id(), hit_pos, amount, max_hp)
 	hp -= amount
 	if _is_dummy:
 		hp = maxf(hp, 1.0)

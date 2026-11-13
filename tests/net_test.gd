@@ -868,6 +868,11 @@ func _coop() -> void:
 		w.drop_weapon(Vector3(6, 0, 12), "sword")
 	await wait(0.5)
 	await sync(13)
+	# The sword goes to the host and comes back; on a busy machine that can take a few frames longer.
+	for i in 30:
+		if not w.pickups.is_empty():
+			break
+		await wait(0.1)
 	for it: Pickup in w.pickups:
 		print("  on the ground: ", it.display_name(), " id ", it.net_id, " at ", it.global_position)
 	ok(w.pickups.size() == 1 and w.pickups[0].weapon_id == "sword", "a dropped weapon reaches both phones")

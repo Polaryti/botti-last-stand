@@ -67,12 +67,25 @@ func _ready() -> void:
 	Net.back_in_room.connect(_return_to_room)
 	updates = Updates.new()
 	add_child(updates)
+	var auto := AutoQuality.new(self)
+	auto.name = "AutoQuality"
+	add_child(auto)
+	auto.changed.connect(_on_auto_quality)
 	if Game.test_map != "":
 		# Someone pressed F6 on a map in the editor, so go straight to it.
 		var map := Game.test_map
 		start_game(Game.Mode.SANDBOX if map.contains("sandbox") else (Game.Mode.FORT if map.contains("fort") or map.contains("bastion") else Game.Mode.NIGHT))
 		return
 	show_menu()
+
+
+## Auto graphics picked a level (on the title screen) or stepped down (in a match). The pick takes
+## hold at once for sharpness and effects, and in full with the next world that is built.
+func _on_auto_quality(quality: int, in_match: bool) -> void:
+	if in_match:
+		if world and is_instance_valid(world):
+			world._grade()
+			world.director.local_banner("Graphics lowered to %s to keep the game smooth" % ["Low", "Medium", "High"][quality], 4.0)
 
 
 func _quit() -> void:
@@ -414,9 +427,14 @@ func show_settings(from_pause := false) -> void:
 			Game.save_settings()
 			root.queue_free()
 			show_settings()))
-		right.add_child(_soft("Graphics", 23))
-		right.add_child(_choices(["Low", "Medium", "High"], Game.quality, 380.0, func(i: int) -> void:
-			Game.quality = i
+		right.add_child(_soft("Graphics" if not Game.quality_auto else "Graphics (Auto: %s now)" % ["Low", "Medium", "High"][Game.quality], 23))
+		right.add_child(_choices(["Auto", "Low", "Medium", "High"], 0 if Game.quality_auto else Game.quality + 1, 380.0, func(i: int) -> void:
+			Game.quality_auto = i == 0
+			if i == 0:
+				Game.quality_measured = false # look again
+				Game.quality = 1
+			else:
+				Game.quality = i - 1
 			Game.apply_quality()
 			Game.save_settings()
 			show_menu(true)))

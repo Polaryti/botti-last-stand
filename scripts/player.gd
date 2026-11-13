@@ -3047,6 +3047,7 @@ func _physics_step(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta
 	input_jump = false
+	floor_snap_length = _snap_reach()
 	move_and_slide()
 	if world.portals:
 		_tick_islands(delta)
@@ -3065,6 +3066,28 @@ func _physics_step(delta: float) -> void:
 	_was_on_floor = is_on_floor()
 	_footsteps(delta)
 	_tick_riding(delta)
+
+
+## How far down to reach for the floor after a step. Keeping feet on a slope or a stair needs a long
+## reach, and that reach is a sweep of the whole body against the land, which is the most costly
+## thing a player does each step. Standing or walking on level land it finds nothing a short reach
+## would not, so there it is short.
+const SNAP_FULL := 0.55
+const SNAP_LEVEL := 0.06
+func _snap_reach() -> float:
+	var t := world.terrain
+	var here := global_position
+	var h := t.height(here.x, here.z)
+	if absf(here.y - h) > 0.04:
+		return SNAP_FULL # on a floor, a stair or a bridge, or in the air
+	var ahead := Vector2(velocity.x, velocity.z)
+	if ahead.length_squared() > 0.01:
+		ahead = ahead.normalized() * 0.5
+		if absf(t.height(here.x + ahead.x, here.z + ahead.y) - h) > 0.02:
+			return SNAP_FULL
+	elif absf(t.height(here.x + 0.5, here.z) - h) > 0.02 or absf(t.height(here.x, here.z + 0.5) - h) > 0.02:
+		return SNAP_FULL
+	return SNAP_LEVEL
 
 
 ## On the floating islands: gates to step through, and a long way down.

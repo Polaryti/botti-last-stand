@@ -35,6 +35,7 @@ var _ground_material: ShaderMaterial
 var _road_lines: Array[Dictionary] = []
 var _dirt_patches: Array[Dictionary] = []
 var skip_beyond := false # the menu only needs the village
+var _glow_cells := {} # 24 m square -> SurfaceTool of everything that glows there
 var sight := 1.0 # how far grass and other small things are drawn, as a share of the usual
 var xf := Transform3D.IDENTITY # where the piece being built stands
 var piece_scale := 1.0
@@ -143,7 +144,25 @@ func cell() -> LowPoly:
 	return l
 
 
+## Things that glow without light (runes, flames, lamps) share one mesh per 24 m square too.
+func shine(l: LowPoly) -> void:
+	var key := Vector2i(int(floor(xf.origin.x / 24.0)), int(floor(xf.origin.z / 24.0)))
+	if not _glow_cells.has(key):
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_glow_cells[key] = st
+	(_glow_cells[key] as SurfaceTool).append_from(l.commit(), 0, Transform3D.IDENTITY)
+
+
 func flush() -> void:
+	for key: Vector2i in _glow_cells:
+		var mi := MeshInstance3D.new()
+		mi.mesh = (_glow_cells[key] as SurfaceTool).commit()
+		mi.material_override = MesenllaBuilder.glow_material()
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		w.add_child(mi)
+	_glow_cells.clear()
+	w.flush_glows()
 	for path: String in _props:
 		var list: Array[Transform3D] = []
 		list.assign(_props[path])

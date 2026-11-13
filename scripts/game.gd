@@ -52,6 +52,8 @@ const WINS_FOR_CARTOGRAPHER := 3 # in each of the Valleys of Mesenlla and Mist B
 const POISON_FOR_PLAGUE := 3000
 var sensitivity := 1.0
 var quality := 1 # 0 low, 1 medium, 2 high
+var quality_auto := true # the game picks and lowers it by itself (AutoQuality)
+var quality_measured := false # whether the first pick on the title screen has been made
 var difficulty := 1 # 0 easy, 1 normal, 2 hard
 var auto_jump := true
 var vibration := true
@@ -361,6 +363,9 @@ func load_settings() -> void:
 	brightness = clampf(_saved(c, "video", "brightness", -1.0), -1.0, 1.0)
 	music_volume = clampf(_saved(c, "audio", "music", 0.8), 0.0, 1.0)
 	sound_volume = clampf(_saved(c, "audio", "sound", 1.0), 0.0, 1.0)
+	# Someone who chose their graphics before Auto existed keeps their choice.
+	quality_auto = bool(_saved(c, "video", "auto", not c.has_section_key("video", "quality")))
+	quality_measured = bool(_saved(c, "video", "measured", false))
 	quality = clampi(_saved(c, "video", "quality", 1), 0, 2)
 	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
 	player_name = str(_saved(c, "progress", "player_name", ""))
@@ -403,6 +408,8 @@ func save_settings() -> void:
 	c.set_value("audio", "music", music_volume)
 	c.set_value("audio", "sound", sound_volume)
 	c.set_value("video", "quality", quality)
+	c.set_value("video", "auto", quality_auto)
+	c.set_value("video", "measured", quality_measured)
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
 	c.set_value("progress", "unlocked", unlocked)

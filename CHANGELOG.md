@@ -1,5 +1,23 @@
 # Changelog
 
+## Development — Beyond the Mists, graphics and performance
+
+### Graphics
+- The picture is finished through a filmic curve: fires, portals and the dawn no longer burn out to flat white, and the dark has more depth. A little more contrast and colour everywhere.
+- On Medium and High, light blooms softly from whatever glows: lanterns, fires, portals, runes, crystals, mist. Low stays without it.
+- Walls, towers, cliffs and other tall things are shaded darker towards the foot, so big flat faces have depth. The shade is in the colours of the meshes and costs nothing while playing.
+- The land has wide, slow patches of deeper and paler grass instead of one flat colour.
+- The waterfalls are ropes of water falling at their own speeds, with long streaks of white, instead of a sheet with a zigzag on it.
+
+### Performance
+- Standing or walking on level land no longer makes the long reach for the floor that a slope or a stair needs. That reach was the most costly thing a player (or a bot) did each step: on the Valleys' outpost it took about 16 times as long as it does now.
+- Lanterns, crystal and brazier lights and drifts of mist far from whoever is looking are put out, and lit again as you come near: fewer than half as many lights and particle drifts are alive at once on Mist Bastion and in the Valleys.
+- Halos round lights are drawn in batches, and everything that glows (runes, flames, lamps) is merged by area, which saves draw calls on every map.
+- Graphics has an Auto setting, the default on a new install: the first time, the game watches the title screen for a few seconds and picks Low, Medium or High for the phone; in a match, if the phone stays under 38 frames a second for two looks of five seconds in a row, it steps the graphics down a level and says so. If you had chosen a setting before, it is kept.
+
+### Feel
+- Blows from your side on an enemy show the damage they took, floating up from where they landed; blows landing together are added up, and a heavy one (30% of the enemy's health or more) shows bigger and amber.
+
 ## Development — Beyond the Mists, second review
 
 ### Fixes

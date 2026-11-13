@@ -49,11 +49,11 @@ func _ready() -> void:
 	Game.night_map = "village"
 	Game.pet = "wolf"
 	var plan: Array[String] = ["test_map", "test_flow", "test_weapons", "test_touch", "test_auto_jump", "test_items", "test_powers", "test_zombies", "test_night",
-		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review"]
+		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish"]
 	var groups := {
 		"core": plan.slice(0, 9), "recent": plan.slice(9, 17), "legacy": plan.slice(17, 25),
 		"classes": ["test_new_things", "test_revenant", "test_trees", "test_finals", "test_classes"],
-		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review"]}
+		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish"]}
 	var selected := "all"
 	for arg: String in args:
 		if arg.begins_with("group="):
@@ -3506,6 +3506,141 @@ func test_beyond_review() -> void:
 	ok(notes != null and not notes.has_meta("news"), "after which the button stops glowing")
 	Game.changelog_seen = read
 	Game.save_settings()
+	await start_clean()
+
+
+## The graphics and performance pass: the finished picture, cheap floor checks, far lights put out,
+## damage numbers and Auto graphics.
+func test_polish() -> void:
+	await start_clean()
+	var env: Environment = w._env
+	ok(env.tonemap_mode == Environment.TONE_MAPPER_FILMIC and env.adjustment_enabled, "the picture goes through a filmic curve with a little more contrast and colour")
+	var was_quality := Game.quality
+	Game.quality = 0
+	w._grade()
+	ok(not env.glow_enabled, "on Low nothing blooms")
+	Game.quality = 2
+	w._grade()
+	ok(env.glow_enabled and env.get_glow_level(3) > 0.0, "on High light blooms from what glows, in more layers than on Medium")
+	Game.quality = was_quality
+	w._grade()
+	# Tall things stand in their own shade at the foot; small things do not.
+	ok(LowPoly.foot_shade(6.0) > 0.2 and LowPoly.foot_shade(1.0) == 0.0, "walls are shaded darker at the foot, small things are not")
+	var wall := LowPoly.new().box(Vector3(0, 3, 0), Vector3(4, 6, 0.4), Color(0.6, 0.6, 0.6)).commit()
+	var colours: PackedColorArray = wall.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	var verts: PackedVector3Array = wall.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var low := 1.0
+	var high := 0.0
+	for i in verts.size():
+		if verts[i].y < 0.1: low = minf(low, colours[i].r)
+		else: high = maxf(high, colours[i].r)
+	ok(low < high - 0.1, "a wall's mesh carries the shade in its colours (%.2f at the foot, %.2f at the top)" % [low, high])
+	# On level land the floor is found with a short reach; on a slope or off the ground, the long one.
+	var level := Vector3.INF
+	var slope := Vector3.INF
+	for i in 400:
+		var at := Vector3(randf_range(-60, 60), 0, randf_range(-60, 60))
+		if not w.grid.is_free(w.grid.to_cell(at)) or w.terrain.in_water(at.x, at.z):
+			continue
+		var h := w.terrain.height(at.x, at.z)
+		var tilt := maxf(maxf(absf(w.terrain.height(at.x + 0.5, at.z) - h), absf(w.terrain.height(at.x - 0.5, at.z) - h)), maxf(absf(w.terrain.height(at.x, at.z + 0.5) - h), absf(w.terrain.height(at.x, at.z - 0.5) - h)))
+		if tilt < 0.002 and level == Vector3.INF: level = at
+		if tilt > 0.08 and slope == Vector3.INF: slope = at
+	ok(level != Vector3.INF and slope != Vector3.INF, "the Village has level land and slopes to try")
+	pl.set_physics_process(false)
+	pl.input_move = Vector2.ZERO
+	place(level)
+	ok(pl._snap_reach() == Player.SNAP_LEVEL, "standing on level land, feet reach only a little way for the floor (%.2f)" % pl._snap_reach())
+	place(slope)
+	ok(pl._snap_reach() == Player.SNAP_FULL, "on a slope the full reach is used (%.2f)" % pl._snap_reach())
+	place(level)
+	pl.global_position += Vector3.UP * 1.0
+	ok(pl._snap_reach() == Player.SNAP_FULL, "and off the ground too")
+	pl.set_physics_process(true)
+	place(level)
+	await seconds(0.5)
+	ok(pl.is_on_floor() and is_equal_approx(pl.floor_snap_length, Player.SNAP_LEVEL), "walking about, the short reach still keeps you on the floor (floor %s, reach %.2f, %.3f above the land)" % [pl.is_on_floor(), pl.floor_snap_length, pl.global_position.y - w.terrain.height(pl.global_position.x, pl.global_position.z)])
+	place(OPEN)
+	await seconds(0.3)
+	# Lights and drifting particles far from whoever is looking are put out.
+	var lamp_near := OmniLight3D.new()
+	var lamp_far := OmniLight3D.new()
+	w.add_child(lamp_near)
+	w.add_child(lamp_far)
+	var eye := w._player_camera_position()
+	lamp_near.global_position = eye + Vector3(10, 0, 0)
+	lamp_far.global_position = eye + Vector3(80, 0, 0)
+	w.add_scenery(lamp_near, 48.0)
+	w.add_scenery(lamp_far, 48.0)
+	w._fire_timer = 0.0
+	w._tick_fires(1.0)
+	ok(lamp_near.visible and not lamp_far.visible, "a scenery light far from whoever is looking is put out, a near one stays lit")
+	lamp_far.queue_free()
+	lamp_near.queue_free()
+	w._scenery.resize(w._scenery.size() - 2)
+	# Halos of light are drawn in batches.
+	ok(w.find_children("*", "MultiMeshInstance3D", true, false).any(func(mm: MultiMeshInstance3D) -> bool: return mm.multimesh.mesh is QuadMesh and mm.multimesh.instance_count > 1), "the halos round lights are drawn together, not one by one")
+	# Damage numbers.
+	var z := spawn("normal", pl.global_position + Vector3(0, 0, -3))
+	z.take_damage(12.0, Vector3.FORWARD, 0.0, z.centre())
+	var shown := w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible)
+	ok(shown.size() == 1 and (shown[0] as Label3D).text == "12", "a blow on an enemy shows what it took")
+	z.take_damage(7.0, Vector3.FORWARD, 0.0, z.centre())
+	shown = w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible)
+	ok(shown.size() == 1 and (shown[0] as Label3D).text == "19", "blows landing together are added up (%s)" % (shown[0] as Label3D).text)
+	z.hp = z.max_hp
+	z.take_damage(z.max_hp * 0.5, Vector3.FORWARD, 0.0, z.centre())
+	await seconds(0.3)
+	z.take_damage(z.max_hp * 0.4, Vector3.FORWARD, 0.0, z.centre())
+	shown = w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible)
+	ok(shown.any(func(l: Label3D) -> bool: return l.font_size > 40), "a heavy blow shows bigger")
+	await seconds(0.2)
+	if z.is_alive():
+		z.hp = z.max_hp
+		z.next_hitter = -1
+		z.take_damage(5.0, Vector3.FORWARD, 0.0, z.centre())
+	ok(w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible and l.text == "5").is_empty(), "a blow that was nobody's shows nothing")
+	await seconds(DamageNumbers.LIFE + 0.2)
+	ok(w.damage_numbers.get_children().all(func(l: Label3D) -> bool: return not l.visible) and not w.damage_numbers.is_processing(), "the numbers fade and the labels rest")
+	# Auto graphics.
+	var auto := m.get_node("AutoQuality") as AutoQuality
+	var saved := [Game.quality, Game.quality_auto, Game.quality_measured]
+	ok(not AutoQuality.enabled(), "Auto graphics leaves a computer alone")
+	AutoQuality.force = true
+	Game.quality_auto = true
+	Game.quality_measured = false
+	Game.quality = 1
+	auto.take(58.0, false)
+	ok(Game.quality == 2 and Game.quality_measured, "a phone that draws the title screen fast gets High")
+	Game.quality = 1
+	auto.take(28.0, false)
+	ok(Game.quality == 0, "a slow one gets Low")
+	Game.quality = 1
+	auto.take(45.0, false)
+	ok(Game.quality == 1, "one in between stays on Medium")
+	auto._slow = 0
+	auto.take(30.0, true)
+	ok(Game.quality == 1, "in a match one slow look changes nothing")
+	auto.take(50.0, true)
+	auto.take(30.0, true)
+	ok(Game.quality == 1, "nor do slow looks with a smooth one between")
+	auto.take(30.0, true)
+	ok(Game.quality == 0 and w.director.banner.contains("Graphics lowered"), "two in a row step the graphics down, and say so: %s" % w.director.banner)
+	auto.take(20.0, true)
+	auto.take(20.0, true)
+	ok(Game.quality == 0, "and it never goes below Low")
+	Game.quality_auto = false
+	ok(not AutoQuality.enabled(), "with Graphics set by hand it does nothing")
+	AutoQuality.force = false
+	Game.quality = saved[0]
+	Game.quality_auto = saved[1]
+	Game.quality_measured = saved[2]
+	Game.apply_quality()
+	Game.save_settings()
+	w._grade()
+	m.show_settings()
+	await frames(2)
+	ok(m.ui_layer.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.text == "Auto"), "Settings offers Auto beside Low, Medium and High")
 	await start_clean()
 
 

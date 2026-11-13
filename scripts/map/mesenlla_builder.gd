@@ -20,6 +20,7 @@ const AMBER := Color(0.95, 0.66, 0.22)
 const RUNE := Color(0.55, 1.0, 0.92)
 
 static var _glow_mat: StandardMaterial3D
+static var _mist_meshes := {} # colour -> the quad every drift of mist of that colour is drawn with
 static var _portal_mat: ShaderMaterial
 
 
@@ -39,7 +40,12 @@ static func _feature(b: MapBuilder, kind: String, size: float) -> void:
 	b.w.map_features.append({"kind": kind, "at": Vector2(b.xf.origin.x, b.xf.origin.z), "dir": Vector2(along.x, along.z).normalized(), "size": size})
 
 
-static func _shine(b: MapBuilder, l: LowPoly) -> MeshInstance3D:
+## Draws a mesh glowing, unlit. Merged with whatever else glows nearby, unless `own` asks for a
+## node of its own (to switch off later), which is then returned.
+static func _shine(b: MapBuilder, l: LowPoly, own := false) -> MeshInstance3D:
+	if not own and not b.is_preview:
+		b.shine(l)
+		return null
 	var mi := b.add(l)
 	mi.material_override = glow_material()
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -57,24 +63,28 @@ static func _light(b: MapBuilder, local: Vector3, col: Color, energy: float, rea
 	light.omni_range = reach
 	light.omni_attenuation = 1.3
 	b.w.add_child(light)
+	b.w.add_scenery(light, 48.0)
 
 
 static func _mist(b: MapBuilder, local: Vector3, extents: Vector3, col: Color, amount: int, rise := 0.4) -> void:
 	if b.is_preview:
 		return
 	var p := CPUParticles3D.new()
-	var q := QuadMesh.new()
-	q.size = Vector2(1.6, 1.6)
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	m.albedo_texture = load("res://assets/sprites/glow.png")
-	m.albedo_color = Color(col, 0.3)
-	m.disable_fog = true
-	q.material = m
-	p.mesh = q
+	# One mesh and look for each colour of mist, shared by every drift of it on the map.
+	if not _mist_meshes.has(col):
+		var q := QuadMesh.new()
+		q.size = Vector2(1.6, 1.6)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		m.albedo_texture = load("res://assets/sprites/glow.png")
+		m.albedo_color = Color(col, 0.3)
+		m.disable_fog = true
+		q.material = m
+		_mist_meshes[col] = q
+	p.mesh = _mist_meshes[col]
 	p.amount = maxi(2, amount if b.quality > 0 else amount / 2)
 	p.lifetime = 5.0
 	p.preprocess = 5.0
@@ -96,6 +106,7 @@ static func _mist(b: MapBuilder, local: Vector3, extents: Vector3, col: Color, a
 	p.visibility_range_end = 110.0
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	b.w.add_child(p)
+	b.w.add_scenery(p, 70.0)
 
 
 ## A lump of the mountains torn loose and hanging in the twilight: meadow on top with a few pines,
@@ -426,8 +437,8 @@ static func watchtower(b: MapBuilder, high: float) -> void:
 	var body := b.add(l)
 	var lamp := b.mesh()
 	lamp.box(Vector3(1.0, high + 1.6, 1.0), Vector3(0.3, 0.4, 0.3), AMBER)
-	var light := _shine(b, lamp)
-	var glow: MeshInstance3D = b.w.add_glow(b.xf * Vector3(1.0, high + 1.6, 1.0), AMBER, 3.0, 160.0)
+	var light := _shine(b, lamp, true)
+	var glow: MeshInstance3D = b.w.add_glow(b.xf * Vector3(1.0, high + 1.6, 1.0), AMBER, 3.0, 160.0, true)
 	if not b.is_preview:
 		# A tower can be brought down (the Valleys' camp, when it is shelled): see World.ruin_tower.
 		b.w.watchtowers.append({"at": b.xf.origin, "basis": b.xf.basis, "high": high, "parts": [body, light, glow]})
@@ -551,13 +562,20 @@ shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, blend_mix;
 uniform vec3 water = vec3(0.62, 0.84, 0.98);
 void fragment() {
-	// Streaks of white racing down, broken into ropes of water.
+	// Ropes of water side by side, each falling at its own speed, with long soft streaks of white
+	// running down them and a shimmer across the whole sheet.
 	vec3 w = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	float lines = 0.5 + 0.5 * sin(w.x * 5.3 + sin(w.x * 1.7) * 2.0);
-	float fall = fract(w.y * 0.35 + TIME * 1.4 + lines * 0.6);
-	float streak = smoothstep(0.55, 1.0, fall) * (0.6 + 0.4 * lines);
-	ALBEDO = mix(water, vec3(1.0), streak * 0.8 + 0.2);
-	ALPHA = (0.55 + streak * 0.4) * COLOR.a;
+	float across = (w.x + w.z) * 1.7 + sin(w.y * 0.35) * 0.3 + sin((w.x + w.z) * 0.9) * 0.4;
+	float id = floor(across);
+	float rope = fract(across);
+	float seed = fract(sin(id * 12.9898) * 43758.5453);
+	float fall = fract(w.y * (0.13 + seed * 0.06) + TIME * (0.9 + seed * 0.8) + seed * 7.0);
+	float streak = smoothstep(0.0, 0.3, fall) * smoothstep(1.0, 0.5, fall);
+	float body = smoothstep(0.0, 0.22, rope) * smoothstep(1.0, 0.78, rope);
+	float fine = 0.5 + 0.5 * sin(w.y * 3.1 + TIME * 9.0 + id * 2.4);
+	float white = streak * body * (0.7 + 0.3 * fine);
+	ALBEDO = mix(water * (0.82 + 0.18 * body), vec3(1.0), white * 0.85);
+	ALPHA = (0.5 + 0.2 * body + white * 0.3) * COLOR.a;
 }
 """
 	_fall_mat = ShaderMaterial.new()
@@ -828,8 +846,8 @@ static func shrine(b: MapBuilder, blessing: String) -> void:
 		_:
 			g.prism(face + Vector3(0, -0.25, 0), face + Vector3(0, 0.05, 0), 0.18, 0.18, 8, glow_col)
 			g.prism(face + Vector3(0, 0.05, 0), face + Vector3(0, 0.35, 0), 0.18, 0.0, 8, glow_col)
-	var shine := _shine(b, g)
-	var halo: MeshInstance3D = b.w.add_glow(b.xf * Vector3(0, 1.4, 0), glow_col, 3.2, 120.0)
+	var shine := _shine(b, g, true)
+	var halo: MeshInstance3D = b.w.add_glow(b.xf * Vector3(0, 1.4, 0), glow_col, 3.2, 120.0, true)
 	_mist(b, Vector3(0, 1.1, 0.35), Vector3(0.4, 0.2, 0.4), glow_col, 5, 0.4)
 	if not b.is_preview:
 		b.w.shrines.append({"at": b.xf.origin, "blessing": blessing, "glow": [shine, halo], "ready_at": 0.0})

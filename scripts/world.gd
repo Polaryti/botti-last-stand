@@ -36,6 +36,10 @@ var mist_storms: Array[MistStorm] = [] # every Mist Storm raging or gathering no
 ## The newest Mist Storm, if there is one.
 var mist_storm: MistStorm:
 	get: return mist_storms.back() if not mist_storms.is_empty() else null
+var damage_numbers: DamageNumbers
+var _glows_open := true # halos are gathered until the map is built
+var _glow_batches := {}
+var _scenery: Array[Array] = [] # [node, where, reach squared]: see add_scenery
 var _storm_inside := false # whether whoever is looking stood in a storm last frame
 var mist_seals: Array[MistSeal] = []
 var stone_chains: Array = [] # each line of stones in the Mists, in order, by the middle of each top
@@ -285,6 +289,9 @@ func setup(game_mode: int) -> void:
 	if mode == Game.Mode.MENU:
 		builder.grass_tufts *= 2 # and seen from up there, thin grass looks like none
 	builder.build(map)
+	flush_glows()
+	damage_numbers = DamageNumbers.new()
+	add_child(damage_numbers)
 	map.free()
 	if fort:
 		for mark: Dictionary in lane_marks:
@@ -670,6 +677,13 @@ func beside_bonfire(p: Vector3) -> bool:
 	return false
 
 
+## A light or a drift of particles that is part of the scenery: only switched on while whoever is
+## looking is within reach of it. A light costs every surface it touches and particles are moved one
+## by one each frame, seen or not, so the far ones are put out.
+func add_scenery(node: Node3D, reach: float) -> void:
+	_scenery.append([node, node.global_position if node.is_inside_tree() else node.position, reach * reach])
+
+
 ## Only fires near the player cast light, because a phone can only afford a few.
 func _tick_fires(delta: float) -> void:
 	_fire_timer -= delta
@@ -679,6 +693,13 @@ func _tick_fires(delta: float) -> void:
 	var cam := _player_camera_position()
 	var t := Time.get_ticks_msec() * 0.001
 	var bright := smoothstep(0.25, 1.0, _sky_value) if _sky_value > 0.0 else 0.0
+	for item: Array in _scenery:
+		var node: Node3D = item[0]
+		var show: bool = cam.distance_squared_to(item[1]) < float(item[2])
+		if node.visible != show:
+			node.visible = show
+			if node is CPUParticles3D:
+				(node as CPUParticles3D).emitting = show
 	for f: Dictionary in fires:
 		var l: OmniLight3D = f["light"]
 		if l == null:
@@ -801,29 +822,66 @@ func add_solid(at: Vector3, size: Vector3) -> void:
 
 func add_lantern_light(l: OmniLight3D) -> void:
 	_lanterns.append(l)
+	add_scenery(l, 55.0)
 
 
-func add_glow(at: Vector3, col: Color, size: float, fade_at := 0.0) -> MeshInstance3D:
+## A soft halo of light in the air. While the map is being built, halos of one colour that fade at
+## the same distance are gathered by 48 m square and drawn together (flush_glows); one asked for
+## with `own`, or made later, is a node of its own, which is returned.
+func add_glow(at: Vector3, col: Color, size: float, fade_at := 0.0, own := false) -> MeshInstance3D:
 	if not _glow_material_cache.has(col):
 		var m := StandardMaterial3D.new()
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		m.billboard_keep_scale = true
 		m.albedo_texture = load("res://assets/sprites/glow.png")
 		m.albedo_color = Color(col, 0.75)
 		m.disable_fog = true
 		_glow_material_cache[col] = m
+	if _glows_open and not own:
+		var key := [col, fade_at, int(floor(at.x / 48.0)), int(floor(at.z / 48.0))]
+		if not _glow_batches.has(key):
+			_glow_batches[key] = []
+		(_glow_batches[key] as Array).append(Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * size), at))
+		return null
 	var q := QuadMesh.new()
-	q.size = Vector2(size, size)
 	q.material = _glow_material_cache[col]
 	var g := MeshInstance3D.new()
 	g.mesh = q
 	g.position = at
+	g.scale = Vector3.ONE * size
 	g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	g.visibility_range_end = fade_at
 	add_child(g)
 	return g
+
+
+## The halos gathered while the map was built, drawn a batch at a time.
+func flush_glows() -> void:
+	_glows_open = false
+	for key: Array in _glow_batches:
+		var list: Array = _glow_batches[key]
+		var q := QuadMesh.new()
+		q.material = _glow_material_cache[key[0]]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = q
+		mm.instance_count = list.size()
+		var middle := Vector3.ZERO
+		for t: Transform3D in list:
+			middle += t.origin / list.size()
+		for i in list.size():
+			var t: Transform3D = list[i]
+			mm.set_instance_transform(i, Transform3D(t.basis, t.origin - middle))
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.position = middle
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_end = float(key[1])
+		add_child(mmi)
+	_glow_batches.clear()
 
 
 # --- Night, fog and sky ------------------------------------------------------
@@ -835,7 +893,7 @@ func _build_environment() -> void:
 	_env.fog_enabled = true
 	_env.fog_sky_affect = 0.0
 	_env.fog_density = 0.03
-	_env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	_grade()
 	var we := WorldEnvironment.new()
 	we.environment = _env
 	add_child(we)
@@ -847,6 +905,33 @@ func _build_environment() -> void:
 	_moon.directional_shadow_max_distance = 45.0
 	add_child(_moon)
 	_build_sky()
+
+
+## How the picture is finished. A filmic curve keeps fires, portals and the dawn sky from burning out
+## to flat white and gives the dark its depth; a little more contrast and colour; and on Medium and
+## High, light blooms softly from whatever glows (cheaper on Medium: fewer, coarser layers).
+func _grade() -> void:
+	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	_env.tonemap_exposure = 1.18
+	_env.tonemap_white = 3.2
+	_env.adjustment_enabled = true
+	_env.adjustment_contrast = 1.07
+	_env.adjustment_saturation = 1.12
+	_env.glow_enabled = Game.quality > 0
+	if _env.glow_enabled:
+		_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
+		_env.glow_intensity = 0.7
+		_env.glow_strength = 0.9
+		_env.glow_bloom = 0.04
+		_env.glow_hdr_threshold = 0.6
+		_env.glow_hdr_scale = 1.6
+		for level in 7:
+			_env.set_glow_level(level, 0.0)
+		_env.set_glow_level(1, 0.7)
+		_env.set_glow_level(2, 1.0)
+		if Game.quality == 2:
+			_env.set_glow_level(3, 0.8)
+			_env.set_glow_level(4, 0.45)
 
 
 ## Mesenlla: a luminous twilight that never quite becomes night. The sky still glows rose and amber

@@ -61,10 +61,12 @@ func set_water(_m: ShaderMaterial) -> void: pass
 func add_fire(_at: Vector3, _radius: float, _light: OmniLight3D = null, _heals := false) -> void: pass
 func add_lantern_light(_l: OmniLight3D) -> void: pass
 func add_spinner(_n: Node3D, _axis: Vector3, _speed: float) -> void: pass
+func add_scenery(_node: Node3D, _reach: float) -> void: pass
 
 
-func add_glow(_at: Vector3, _col: Color, _size: float, _fade_at := 0.0) -> MeshInstance3D:
+func add_glow(_at: Vector3, _col: Color, _size: float, _fade_at := 0.0, _own := false) -> MeshInstance3D:
 	return null
+func flush_glows() -> void: pass
 
 
 func start_fort() -> void:
