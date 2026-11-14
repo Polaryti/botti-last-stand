@@ -203,12 +203,7 @@ func apply_pose(at: Vector3, yaw: float, pitch: float, vel: Vector3, sight: floa
 			Sfx.play_at("swing", global_position, world.player.global_position if world.player else global_position, -4.0)
 	if weapon != _weapon:
 		_weapon = weapon
-		_hand.equip(weapon)
-		if weapon != "":
-			_hand.scale = Vector3.ONE * float(WeaponDefs.ALL[weapon]["scale"]) * (0.8 if WeaponDefs.ALL[weapon]["kind"] == WeaponDefs.Kind.RANGED or WeaponDefs.ALL[weapon].get("swing", "") == "thrust" else 1.6) / _fit
-			_hand.rotation = WeaponDefs.hand_rotation(weapon)
-			if weapon in WeaponDefs.ALIGNED_HELD:
-				_hand.hold(self, false, WeaponDefs.held_size(weapon))
+		_hand.arm(weapon, _fit, self)
 
 	if attacked:
 		_hand.attack()
@@ -372,7 +367,10 @@ func _process(delta: float) -> void:
 		var wave := sin(world.now * (10.0 if _attack_left > 0.0 else 2.0)) * (0.18 if _attack_left > 0.0 else 0.035)
 		_banner.global_transform = Transform3D(global_basis * Basis.from_euler(Vector3(0, PI - 0.4, wave)), (_banner.get_parent() as Node3D).global_position)
 	if not dead and _attack_left <= 0.0:
-		_play("Running_A" if velocity.length_squared() > 0.5 else "Idle", maxf(0.8, velocity.length() / 5.0))
+		if _riding and not in_chariot:
+			_play("Ride") # astride, reins in hand, whatever the horse's legs are doing
+		else:
+			_play("Running_A" if velocity.length_squared() > 0.5 else "Idle", maxf(0.8, velocity.length() / 5.0))
 
 
 func is_unseen() -> bool:

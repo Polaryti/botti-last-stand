@@ -252,7 +252,11 @@ static func _setup_static() -> void:
 
 
 func _material_for(id: String, source: Material) -> ShaderMaterial:
-	var key := model_id + id
+	return _skin(model_id, id, source)
+
+
+static func _skin(model: String, id: String, source: Material) -> ShaderMaterial:
+	var key := model + id
 	if _materials.has(key):
 		return _materials[key]
 	var m := ShaderMaterial.new()
@@ -261,6 +265,47 @@ func _material_for(id: String, source: Material) -> ShaderMaterial:
 	m.set_shader_parameter("tint", ZombieDefs.def_of(id)["tint"])
 	_materials[key] = m
 	return m
+
+
+## A zombie's body for a stage away from the night (the Store's demonstrations): the same file, rotten
+## skin and red eyes as in a night, 1.8 m tall and facing -Z, its animations ready to play. Returns
+## {"node", "anim", "parts"}.
+static func show_body(model: String, id := "normal") -> Dictionary:
+	_setup_static()
+	if not _scenes.has(model):
+		_scenes[model] = load("res://assets/characters/%s.glb" % BODY_FILES.get(model, model))
+	var visual: Node3D = (_scenes[model] as PackedScene).instantiate()
+	visual.rotation.y = PI
+	var anim: AnimationPlayer = visual.find_children("*", "AnimationPlayer", true, false)[0]
+	for n: String in LOOPS:
+		if anim.has_animation(n):
+			anim.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+	var skeleton: Skeleton3D = visual.find_children("*", "Skeleton3D", true, false)[0]
+	BodyAnim.install(anim, skeleton)
+	var parts: Array[MeshInstance3D] = []
+	var high := 0.0
+	for mi in visual.find_children("*", "MeshInstance3D", true, false):
+		var part := mi as MeshInstance3D
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		part.material_override = _skin(model, id, part.mesh.surface_get_material(0))
+		high = maxf(high, part.get_aabb().end.y)
+		parts.append(part)
+	visual.scale = Vector3.ONE * HEIGHT / float(BODY_TOP.get(model, maxf(high, 0.5)))
+	var head := BoneAttachment3D.new()
+	head.bone_name = "head"
+	skeleton.add_child(head)
+	var eyes := MeshInstance3D.new()
+	eyes.mesh = _eye_mesh
+	eyes.position = Vector3(0, 0.42, 0.49)
+	eyes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	head.add_child(eyes)
+	return {"node": visual, "anim": anim, "parts": parts}
+
+
+## What a frozen creature is coloured.
+static func ice_material() -> StandardMaterial3D:
+	_setup_static()
+	return _ice_material
 
 
 func _build_visual() -> void:

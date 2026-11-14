@@ -21,6 +21,8 @@ var _checked_updates := false
 var _pause_root: Control
 var _net_go := false
 
+const ARMORY_TABS := ["Paths", "Appearance"]
+var _armory_tab := 0
 const TOGETHER_TABS := ["Same Wi-Fi", "Online"]
 const ONLINE_TAB := 1
 const TIPS := [
@@ -976,7 +978,8 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 			to_class = str(ShopDefs.ITEMS[just_bought]["class"])
 		elif ClassDefs.ALL.has(just_bought):
 			to_class = just_bought
-		var go := _button("Open the Armory", func() -> void: show_armory(to_class), Vector2(280, UiTheme.BTN), true)
+		var to_tab := 1 if section == "cosmetics" else 0
+		var go := _button("Open the Armory", func() -> void: show_armory(to_class, to_tab), Vector2(280, UiTheme.BTN), true)
 		go.name = "OpenArmory"
 		go.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		detail.add_child(go)
@@ -1102,7 +1105,9 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 
 
 ## What you own for each class, to switch on and off.
-func show_armory(focus := "") -> void:
+## `tab`: 0 the paths and their Class Upgrades, 1 the class's looks.
+func show_armory(focus := "", tab := 0) -> void:
+	_armory_tab = tab
 	_clear_ui()
 	_back = show_menu
 	var root := _two_panes("Armory", true)
@@ -1135,9 +1140,12 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	head.add_theme_constant_override("separation", 18)
 	head.size_flags_vertical = Control.SIZE_FILL
 	detail.add_child(head)
-	var view := ModelView.new(Vector2(170, 180))
-	view.show_class(id)
-	head.add_child(view)
+	# On the Appearance tab the stage below is the class's; up here, only its name and line.
+	var looks_tab := _armory_tab == 1
+	if not looks_tab:
+		var view := ModelView.new(Vector2(170, 180))
+		view.show_class(id)
+		head.add_child(view)
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override("separation", 10)
@@ -1146,10 +1154,16 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
 	words.add_child(_body(ClassPresentation.COPY[id][0], UiTheme.FS_BODY))
+	if looks_tab:
+		_armory_tabs(detail, id)
+		detail.add_child(_appearance(id))
+		_wrap_labels(detail)
+		return
 	var d: Dictionary = ClassDefs.ALL[id]
 	words.add_child(_soft("%s\nStarting weapon: %s · Starting arrows: %d" % [ClassPresentation.stats_line(id), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], UiTheme.FS_SMALL))
 	words.add_child(ClassPresentation.weapon_tags(id))
 	words.add_child(_body(ClassPresentation.COPY[id][1], UiTheme.FS_BODY))
+	_armory_tabs(detail, id)
 	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail.add_child(scroll)
@@ -1167,18 +1181,146 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 			content.add_child(_armory_spec_row(id, spec["id"], upgrades))
 		else:
 			content.add_child(_soft("No Class Upgrades available for this profession.", UiTheme.FS_SMALL))
-	var cosmetics := VBoxContainer.new()
-	cosmetics.name = "CosmeticsSection"
-	content.add_child(cosmetics)
-	cosmetics.add_child(_body("Appearance", UiTheme.FS_LEAD))
-	var skins := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["section"] == "cosmetics")
-	if skins.is_empty():
-		cosmetics.add_child(_soft("Default appearance. No other looks for this class yet.", UiTheme.FS_SMALL))
-	for item: String in skins:
-		cosmetics.add_child(_item_switch(id, item))
+	_wrap_labels(detail)
+
+
+func _armory_tabs(detail: VBoxContainer, id: String) -> void:
+	UiScreen.tabs(detail, ARMORY_TABS, _armory_tab, func(i: int) -> void:
+		_armory_tab = i
+		_fill_armory(detail, id))
+
+
+func _wrap_labels(detail: Control) -> void:
 	for label: Label in detail.find_children("*", "Label", true, false):
 		if not label.get_parent().has_meta("tag"):
 			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+
+## The Armory's Appearance tab: a stage showing a look, and beside it the class's looks (the one it
+## starts with and those from the Store's Cosmetics), each on a small stage of its own. Tapping a look
+## shows it on the big stage; a look you own is worn from here, one you do not is a tap from the Store.
+func _appearance(class_id: String) -> Control:
+	var section := VBoxContainer.new()
+	section.name = "CosmeticsSection"
+	section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	section.add_theme_constant_override("separation", 8)
+	var skins: Array = ShopDefs.for_class(class_id).filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["section"] == "cosmetics")
+	if skins.is_empty() or not ShopDefs.DEFAULT_LOOKS.has(class_id):
+		var own := ModelView.new(Vector2(220, 240))
+		own.show_class(class_id)
+		section.add_child(own)
+		section.add_child(_soft("Default appearance. No other looks for this class yet.", UiTheme.FS_BODY))
+		return section
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	section.add_child(row)
+	var stage := VBoxContainer.new()
+	stage.add_theme_constant_override("separation", 4)
+	row.add_child(stage)
+	var view := ModelView.new(Vector2(280, 270))
+	view.name = "LookStage"
+	stage.add_child(view)
+	var caption := _body("", UiTheme.FS_SMALL)
+	caption.name = "StageCaption"
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stage.add_child(caption)
+	var list := VBoxContainer.new()
+	list.name = "Looks"
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 10)
+	row.add_child(list)
+	list.add_child(_soft("Tap a look to see it on the stage.", UiTheme.FS_SMALL))
+	var looks: Array[String] = [""]
+	looks.append_array(skins)
+	var cards: Array[PanelContainer] = []
+	var show_look := func(look: String) -> void:
+		for card in cards:
+			card.add_theme_stylebox_override("panel", UiTheme.flat(UiTheme.DUSK, UiTheme.EMBER if card.get_meta("look") == look else UiTheme.STEEL, UiTheme.RADIUS_CARD, 10.0))
+			(card.get_meta("update") as Callable).call()
+		var d: Dictionary = ShopDefs.ITEMS[look] if look != "" else ShopDefs.DEFAULT_LOOKS[class_id]
+		view.show_mount(look != "" and str(d.get("skin", "")) == "stag")
+		caption.text = ("Wearing: %s" if _look_worn(class_id, look) else "Trying on: %s") % d["name"]
+	for look: String in looks:
+		var card := _look_card(class_id, look, show_look)
+		cards.append(card)
+		list.add_child(card)
+	var worn := ""
+	for look: String in looks:
+		if _look_worn(class_id, look):
+			worn = look
+	show_look.call(worn)
+	return section
+
+
+## One look: its small stage, its name and state, and the button that wears it (or finds it in the Store).
+func _look_card(class_id: String, look: String, show_look: Callable) -> PanelContainer:
+	var d: Dictionary = ShopDefs.ITEMS[look] if look != "" else ShopDefs.DEFAULT_LOOKS[class_id]
+	var card := PanelContainer.new()
+	card.name = "Look_%s" % (look if look != "" else "default")
+	card.set_meta("look", look)
+	card.add_theme_stylebox_override("panel", UiTheme.flat(UiTheme.DUSK, UiTheme.STEEL, UiTheme.RADIUS_CARD, 10.0))
+	# The whole card shows the look on the stage; its button wears or buys it.
+	var tap := Button.new()
+	tap.name = "TryOn"
+	tap.flat = true
+	tap.focus_mode = Control.FOCUS_NONE
+	card.add_child(tap)
+	tap.pressed.connect(func() -> void:
+		Sfx.play("ui_click", -5.0)
+		show_look.call(look))
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 12)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(line)
+	var thumb := ModelView.new(Vector2(120, 100))
+	thumb.show_mount(look != "" and str(d.get("skin", "")) == "stag")
+	line.add_child(thumb)
+	var words := VBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	line.add_child(words)
+	words.add_child(_body(str(d["name"]), UiTheme.FS_BODY))
+	var state := _soft("", UiTheme.FS_SMALL)
+	words.add_child(state)
+	var owned := look == "" or Game.owns_item(look)
+	var act := _button("", func() -> void: pass, Vector2(150, UiTheme.BTN_SHORT))
+	act.name = "LookButton"
+	act.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(act)
+	card.set_meta("update", func() -> void:
+		var on := _look_worn(class_id, look)
+		if not owned:
+			state.text = "%d Doubloons" % int(d["price"])
+			act.text = "In the Store"
+			UiTheme.plain(act)
+		else:
+			state.text = "Worn" if on else "Yours"
+			act.text = "Worn" if on else "Wear"
+			if on: UiTheme.selected(act)
+			else: UiTheme.plain(act)
+		UiTheme.size_button(act, UiTheme.BTN_SHORT))
+	act.pressed.connect(func() -> void:
+		if not owned:
+			show_store(look, -1, "", func() -> void: show_armory(class_id, 1))
+			return
+		# Wearing one look takes off the others of the same class.
+		for other: String in ShopDefs.ITEMS:
+			if ShopDefs.ITEMS[other]["section"] == "cosmetics" and ShopDefs.ITEMS[other]["class"] == class_id and Game.owns_item(other):
+				Game.set_item_on(other, other == look)
+		show_look.call(look))
+	return card
+
+
+## Whether this look ("" for the class's own) is the one worn.
+static func _look_worn(class_id: String, look: String) -> bool:
+	if look != "":
+		return ShopDefs.skin_on(look)
+	for other: String in ShopDefs.ITEMS:
+		if ShopDefs.ITEMS[other]["section"] == "cosmetics" and ShopDefs.ITEMS[other]["class"] == class_id and ShopDefs.skin_on(other):
+			return false
+	return true
 
 
 ## One specialization: its emblem and name, and what you have for it.

@@ -9,6 +9,7 @@ var _stage: Node3D
 var _spin: Node3D
 var _camera: Camera3D
 var _anim: AnimationPlayer
+var turning := true ## a demonstration with a direction to it is shown from one side, not turned
 
 
 func _init(size_wanted: Vector2) -> void:
@@ -44,7 +45,7 @@ func _init(size_wanted: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	if _spin and is_visible_in_tree():
+	if _spin and turning and is_visible_in_tree():
 		_spin.rotation.y += delta * TURN_SPEED
 
 
@@ -58,6 +59,7 @@ func _begin(height: float) -> Node3D:
 	if _spin:
 		_spin.queue_free()
 	_anim = null
+	turning = true
 	_spin = Node3D.new()
 	_stage.add_child(_spin)
 	# The camera's angle is measured upward, so a narrow stage has to stand further back.
@@ -101,12 +103,8 @@ func show_item(id: String) -> void:
 	if d.get("pet", false):
 		show_pet(id)
 		return
-	if d.get("skin", "") == "stag":
-		# The White Stag on its own, turning.
-		var stage := _begin(2.4)
-		var stag := MesenllaModels.stag_steed()
-		stag.rotation.y = PI * 0.75
-		stage.add_child(stag)
+	if UpgradeShowcase.shows(id):
+		_show_scene(id, d.get("section", "") != "cosmetics")
 		return
 	show_class(d["class"])
 	_camera.position *= 1.16
@@ -116,3 +114,23 @@ func show_item(id: String) -> void:
 	demonstration.configure(id, body)
 	if id == "rain_of_arrows":
 		_camera.position *= 1.35
+
+
+## A class in the saddle: on its horse, or on the White Stag. What the Armory shows when you try a look on.
+func show_mount(stag: bool) -> void:
+	_show_scene("stag_steed" if stag else "mount_horse", false)
+
+
+## One of UpgradeShowcase's scenes. `still`: seen from its own side rather than turning.
+func _show_scene(id: String, still: bool) -> void:
+	var root := _begin(UpgradeShowcase.stage_height(id))
+	turning = not still
+	# Looking down on it a little, aimed at the same middle.
+	var tilt := UpgradeShowcase.camera_tilt(id)
+	var aim := Vector3(0, _camera.position.y * 0.85, 0)
+	var back := _camera.position - aim
+	_camera.position = aim + Vector3(0, back.z * sin(tilt), back.z * cos(tilt))
+	_camera.rotation.x = -tilt
+	var scene := UpgradeShowcase.new()
+	root.add_child(scene)
+	scene.configure(id)

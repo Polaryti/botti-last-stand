@@ -684,8 +684,27 @@ func _together_store_and_dawn() -> void:
 				check(not names.has(str(ShopDefs.ITEMS[id]["name"])), "an owned %s is not for sale in %s" % [id, section])
 	m.show_armory("chivalry")
 	await frames(2)
+	check(m.panel.find_child("CosmeticsSection", true, false) == null, "the Armory opens on the paths")
+	m.show_armory("chivalry", 1)
+	await frames(2)
 	var words: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
-	check(words.has("White Stag"), "the Armory shows the White Stag among Chivalry's looks")
+	check(words.has("White Stag") and words.has("Brown Horse"), "its Appearance tab shows Chivalry's looks: the Brown Horse and the White Stag")
+	var stage_scene := func() -> String:
+		var shown: Array = (m.panel.find_child("LookStage", true, false) as Node).find_children("*", "", true, false).filter(func(n: Node) -> bool: return n is UpgradeShowcase)
+		return (shown.back() as UpgradeShowcase).item if not shown.is_empty() else ""
+	var caption := m.panel.find_child("StageCaption", true, false) as Label
+	check(caption.text == "Wearing: White Stag" and stage_scene.call() == "stag_steed", "its stage shows the look worn, the rider on the stag: %s" % caption.text)
+	(m.panel.find_child("Look_default", true, false).find_child("LookButton", true, false) as Button).pressed.emit()
+	await frames(2)
+	check(not ShopDefs.skin_on("stag_steed") and caption.text == "Wearing: Brown Horse" and stage_scene.call() == "mount_horse", "wearing the Brown Horse takes the stag off and shows the horse")
+	(m.panel.find_child("Look_stag_steed", true, false).find_child("TryOn", true, false) as Button).pressed.emit()
+	await frames(2)
+	check(not ShopDefs.skin_on("stag_steed") and caption.text == "Trying on: White Stag" and stage_scene.call() == "stag_steed", "tapping the stag tries it on without wearing it")
+	var stag_button := m.panel.find_child("Look_stag_steed", true, false).find_child("LookButton", true, false) as Button
+	check(stag_button.text == "Wear", "and its button offers to wear it")
+	stag_button.pressed.emit()
+	await frames(2)
+	check(ShopDefs.skin_on("stag_steed") and caption.text == "Wearing: White Stag" and stag_button.text == "Worn", "which puts it on")
 	# Worn, the stag is what you ride, on your phone and, by the pose, on everyone else's.
 	check(ShopDefs.skin_on("stag_steed") and p.skin_bits() == 1, "the White Stag is worn")
 	check(Net.POSE_BYTES == 41 and Net.pose_bytes(p)[40] == 1, "and sent in the pose")
@@ -702,6 +721,24 @@ func _together_store_and_dawn() -> void:
 	Game.owned_items = saved_items
 	Game.switched_off = saved_off
 	Game.doubloons = saved_doubloons
+	# Every Class Upgrade has its own demonstration on the Store's stage: the new six (and the stag) a
+	# scene of their own, the others the older demonstrations.
+	for id: String in ShopDefs.ITEMS:
+		var view := ModelView.new(Vector2(250, 270))
+		add_child(view)
+		view.show_item(id)
+		await frames(3)
+		var scenes := view.find_children("*", "", true, false).filter(func(n: Node) -> bool: return n is UpgradeShowcase or n is UpgradePreview)
+		check(scenes.size() == 1, "%s has a demonstration in the Store" % id)
+		if UpgradeShowcase.shows(id):
+			var scene := scenes[0] as UpgradeShowcase
+			check(scene != null and scene.item == id, "%s plays its own scene" % id)
+			for t: float in [0.5, 1.1, 1.6, 2.4, 3.3]:
+				scene.clock = t
+				scene._process(0.016)
+			check(view.turning == (ShopDefs.ITEMS[id]["section"] == "cosmetics"), "%s is shown from its own side" % id if view.turning == false else "%s turns on the stage" % id)
+		view.queue_free()
+	await frames(1)
 	# Play Together: Same Wi-Fi and Online, and no renaming there (Settings has that).
 	check(Main.TOGETHER_TABS == ["Same Wi-Fi", "Online"], "Play Together offers Same Wi-Fi and Online only")
 	m.show_together(0)

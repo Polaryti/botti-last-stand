@@ -54,6 +54,10 @@ const ITEMS := {
 
 
 ## Whether a skin is on: bought, and not turned off in the Armory.
+## The look a class has before any from the Store's Cosmetics, for the classes that have others.
+const DEFAULT_LOOKS := {"chivalry": {"name": "Brown Horse", "desc": "The horse every Chivalry rider starts with."}}
+
+
 static func skin_on(id: String) -> bool:
 	return ITEMS.has(id) and Game.item_active(id)
 

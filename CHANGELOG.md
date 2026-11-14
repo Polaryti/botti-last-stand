@@ -1,5 +1,25 @@
 # Changelog
 
+## Development — Beyond the Mists, on show
+
+### The Store shows the new Class Upgrades at work
+- Each of the six new Class Upgrades has a scene of its own on the Store's stage, played on a loop with the class's own body, its own weapon, and the horse, standard, skeletons and zombies of a night:
+  - Lance Charge: the Lancer gallops with the lance couched, and straw dummies are thrown aside.
+  - Consecration: the Paladin plants the standard, and the gold ring opens round it. The Paladin mends inside it, while a zombie that walks in burns and slows.
+  - Whistle: the Horse Archer whistles, and the horse comes at a gallop. The archer is up in the saddle.
+  - Grave Call: the Necromancer raises the staff, and three skeletons climb out of fresh graves. Later they fall back to dust.
+  - Frost Nova: ice runs out around the Elementalist, and two zombies close in and freeze, coloured as frozen creatures are in a night.
+  - Hall of Mirrors: a zombie swings and the Illusionist slips away in a burst of mist. The blow lands on the mirror image left behind, which shatters.
+- The White Stag in the Store shows a Chivalry rider on it, not the stag alone.
+
+### Trying on looks in the Armory
+- The Armory has two tabs for each class: Paths (its paths and Class Upgrades, as before) and Appearance.
+- Appearance shows a large stage and the class's looks, each on a small stage of its own: for Chivalry, the Brown Horse and the White Stag. Tapping a look puts it on the large stage ("Trying on"), whether you own it or not. Wear switches to it ("Wearing"), and In the Store takes you to buy it, then back.
+- After buying a cosmetic, "Open the Armory" opens on the Appearance tab.
+
+### Riders
+- Riders sit astride their horse or stag with the reins in hand, where they used to stand in the saddle or run on the spot. Other players see this in a night, and the Store and Armory show the same.
+
 ## Development — Beyond the Mists, together and apart
 
 ### Playing together
