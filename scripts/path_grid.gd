@@ -204,3 +204,50 @@ func flood(from: Vector3) -> Dictionary:
 				seen[n] = true
 				stack.append(n)
 	return seen
+
+
+## Every cell that can be walked to from any of these points: a byte a cell, row by row, 1 where it
+## can. `open` may refuse a cell the grid itself calls free (too steep, too near the edge).
+func reach_from(starts: Array[Vector3], open: Callable) -> PackedByteArray:
+	var seen := PackedByteArray()
+	seen.resize(size * size)
+	var stack: Array[Vector2i] = []
+	for from: Vector3 in starts:
+		var c := nearest_free(to_cell(from))
+		if is_free(c) and seen[c.y * size + c.x] == 0:
+			seen[c.y * size + c.x] = 1
+			stack.append(c)
+	while not stack.is_empty():
+		var c: Vector2i = stack.pop_back()
+		for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var n := c + d
+			if not astar.is_in_boundsv(n) or seen[n.y * size + n.x] != 0:
+				continue
+			if astar.is_point_solid(n) or not open.call(n):
+				seen[n.y * size + n.x] = 2 # looked at, and closed
+				continue
+			seen[n.y * size + n.x] = 1
+			stack.append(n)
+	for i in seen.size():
+		if seen[i] == 2:
+			seen[i] = 0
+	return seen
+
+
+## Ground that can be crossed but should not be: every way through this circle costs `weight` times
+## its length from now on, so whatever plans a way goes round it when there is a way round.
+func weigh_disc(centre: Vector3, radius: float, weight: float) -> void:
+	var c := to_cell(centre)
+	var r := ceili(radius)
+	for dy in range(-r, r + 1):
+		for dx in range(-r, r + 1):
+			var n := c + Vector2i(dx, dy)
+			if astar.is_in_boundsv(n) and Vector2(dx, dy).length() <= radius and not astar.is_point_solid(n):
+				astar.set_point_weight_scale(n, weight)
+	var far_r := ceili(radius / FAR_CELL)
+	var fc := Vector2i(c.x / FAR_CELL, c.y / FAR_CELL)
+	for dy in range(-far_r, far_r + 1):
+		for dx in range(-far_r, far_r + 1):
+			var n := fc + Vector2i(dx, dy)
+			if _far.is_in_boundsv(n) and Vector2(dx, dy).length() * FAR_CELL <= radius and not _far.is_point_solid(n):
+				_far.set_point_weight_scale(n, weight)

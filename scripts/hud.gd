@@ -385,22 +385,37 @@ func _draw_together(s: Vector2, centre: Vector2) -> float:
 	var ids: Array = Net.roster.keys()
 	ids.sort_custom(func(a: int, b: int) -> bool: return int(Net.roster[a]["score"]) > int(Net.roster[b]["score"]))
 	const BAR_W := 150.0
+	var versus := Net.rules != Net.Rules.COOP # a score beside each name: every rule but a night side by side
 	for peer: int in ids:
 		var info: Dictionary = Net.roster[peer]
+		var mine := peer == Net.my_id()
+		# Your own health is the big bar above. Here you only keep your line where there is a score to
+		# read beside it; fighting side by side, the list is the others.
+		if mine and not versus:
+			continue
 		var col := UiTheme.BONE
 		if Net.rules == Net.Rules.TEAMS:
 			col = Net.team_colour(int(info["team"]))
-		var line := str(info["name"])
-		if Net.rules != Net.Rules.COOP:
-			line += "  %d" % int(info["score"])
 		var state := Net.player_state(peer)
 		var out: bool = state["out"]
 		var down: bool = state["down"]
-		_text(line, Vector2(_pad, y), 19, Color(col, 0.4 if out or down else (1.0 if peer == Net.my_id() else 0.85)))
+		var faded := 0.4 if out or down else (1.0 if mine else 0.85)
+		var line := str(info["name"])
+		_text(line, Vector2(_pad, y), 19, Color(col, faded))
+		var x := _pad + font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 8.0
+		var lv := "Lv %d" % int(state["level"])
+		_text(lv, Vector2(x, y), 16, Color(UiTheme.EMBER, faded))
+		x += font.get_string_size(lv, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 10.0
+		if versus:
+			var score := "%d" % int(info["score"])
+			_text(score, Vector2(x, y), 19, Color(col, faded))
+			x += font.get_string_size(score, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 10.0
 		if Net.fog_rules():
-			var x := _pad + font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 10.0
 			for i in Net.lives_of(peer):
 				draw_texture_rect(Icons.glyph("heart"), Rect2(x + i * 19.0, y - 16.0, 18.0, 18.0), false, UiTheme.BLOOD.lightened(0.2))
+		if mine:
+			y += 26.0 # no second bar for you
+			continue
 		y += 7.0
 		var bar := Rect2(_pad, y, BAR_W, 8)
 		if out:

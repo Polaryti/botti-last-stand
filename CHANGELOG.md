@@ -1,5 +1,32 @@
 # Changelog
 
+## Development — Beyond the Mists, third review
+
+### Fixes
+- Walking up to a campfire no longer makes you jump over and over. The same goes for the river's edge and the edge of the map: what cannot be passed is no longer something to jump at.
+- Bots no longer walk to the edge of the map and stay there jumping. Nothing to find is left where nobody can walk (the strip under the forest wall, cliffs, sealed-off ground), bots leave alone anything they cannot get to, and with nothing to do they keep to the nearest person instead of to each other. A bot that has been trying to get somewhere for 6 seconds without getting two steps from where it was is put back on its way.
+- Settings scroll, so every row can be reached; your name is now the first of them.
+- Playing with others: the list of players shows each one's level, and your own health is no longer drawn a second time in it (where there is a score to read, your line stays, without the bar).
+- A gate's name over Mist Bastion and the Fort fades out as you come close to it, instead of hanging across the clock and the portal's bars.
+
+### Changes
+- Settings has a switch for damage numbers.
+- A little more bloom on Medium and High.
+- Children of the Woods (and the riders of the Woodland Cavalry) drop their weapon one time in five when they fall, not every time.
+- The Magician can pick up one-handed melee weapons again beside the Staff, and is tagged Melee and Exclusive Weapon wherever classes are described.
+
+### Mist Bastion
+- The enemies of each lane are back to fighting like anywhere else: they go for whoever they find on their lane, and no longer walk past staring at them. What they never do is leave the lane.
+- They step out at the very end of their lane, by its rift, wherever the players stand, and come up the lane's own road: every bend of it, never over the slopes beside it.
+- Each keeps to the gate of the lane it rose on. A gate fallen on another lane draws nobody across; their own gate fallen, they go through it and on to the portal, fighting whoever stands inside.
+- Mist Soldiers stand before their lane's gate and fight what comes to break it. When their gate falls they fall back through it to the portal and hold that, on the side their gate was.
+
+### Valleys of Mesenlla
+- The Hunters' Lodge stands on a dry yard. It had been set in a hollow that counted as deep water, so an unseen wall kept everyone away from it.
+- The river bridge runs with the road, straight across the river, which now runs east to west under it.
+- The Old Mine opens off a level yard cut into the rise east of the Fallen Hall, with the hill behind it, instead of standing proud on the slope.
+- Bots keep out of the camp once the warning is given and after it has fallen: they plan their ways round it, and stop at its rim rather than follow anything in.
+
 ## Development — Beyond the Mists, graphics and performance
 
 ### Graphics

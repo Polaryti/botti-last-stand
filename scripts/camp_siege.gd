@@ -52,6 +52,7 @@ func tick(elapsed: float) -> void:
 		_warned = true
 		world.director.show_banner("The mist gathers over the camp. Get out: the barrage falls in %d seconds!" % int(BARRAGE_AT - WARN_AT), 6.0)
 		world.director._sound("storm_call", 2.0)
+		world.shun_ground(centre, RADIUS + 2.0) # bots heed the warning too, and plan their ways round
 	if elapsed >= BARRAGE_AT:
 		while _barrage_next <= elapsed and _barrage_next < BARRAGE_AT + BARRAGE_TIME:
 			_strike(BARRAGE_RADIUS, BARRAGE_TELL, BARRAGE_DAMAGE)

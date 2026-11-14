@@ -369,6 +369,9 @@ func _vignette() -> TextureRect:
 	return v
 
 
+const SETTINGS_FRAME := 236.0 # the card's title, Done button, gaps and edges around the Settings rows
+
+
 func show_settings(from_pause := false) -> void:
 	var root := _modal("Settings")
 	var box: VBoxContainer = root.get_meta("box")
@@ -377,9 +380,19 @@ func show_settings(from_pause := false) -> void:
 		root.queue_free()
 		_back = _resume if from_pause else _quit
 	_back = close
+	# Everything but the title and Done scrolls, so the last rows can always be reached.
+	var scroll := DragScroll.new()
+	scroll.name = "SettingsScroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+	var inner := VBoxContainer.new()
+	inner.name = "SettingsRows"
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.add_theme_constant_override("separation", 12)
+	scroll.add_child(inner)
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 36)
-	box.add_child(columns)
+	inner.add_child(columns)
 	var left := VBoxContainer.new()
 	left.custom_minimum_size.x = 380
 	left.add_theme_constant_override("separation", 6)
@@ -400,6 +413,7 @@ func show_settings(from_pause := false) -> void:
 	right.add_child(_toggle("Steady brightness", func() -> bool: return Game.steady_brightness, func(on: bool) -> void:
 		Game.steady_brightness = on
 		PhoneScreen.apply_brightness()))
+	right.add_child(_toggle("Damage numbers", func() -> bool: return Game.damage_numbers, func(on: bool) -> void: Game.damage_numbers = on))
 	_slider(left, "Screen brightness, when steady", 0.1, 1.0, Game.brightness if Game.brightness > 0.0 else PhoneScreen.current_level(), func(v: float) -> void:
 		Game.brightness = v
 		PhoneScreen.apply_brightness())
@@ -408,7 +422,8 @@ func show_settings(from_pause := false) -> void:
 		var name_row := HBoxContainer.new()
 		name_row.name = "NameRow"
 		name_row.add_theme_constant_override("separation", 12)
-		box.add_child(name_row)
+		inner.add_child(name_row)
+		inner.move_child(name_row, 0) # first: it is who you are
 		var name_title := _soft("Your name", 23)
 		name_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		name_row.add_child(name_title)
@@ -440,7 +455,7 @@ func show_settings(from_pause := false) -> void:
 			show_menu(true)))
 		var code_row := HBoxContainer.new()
 		code_row.add_theme_constant_override("separation", 8)
-		box.add_child(code_row)
+		inner.add_child(code_row)
 		var code := LineEdit.new()
 		code.placeholder_text = "Redeem a code"
 		code.custom_minimum_size = Vector2(290, 58)
@@ -452,6 +467,9 @@ func show_settings(from_pause := false) -> void:
 		answer.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		code_row.add_child(answer)
+	# As tall as its rows where the screen has room for them, and no taller than the screen allows.
+	var room := get_viewport().get_visible_rect().size.y - SETTINGS_FRAME
+	scroll.custom_minimum_size = Vector2(800, minf(inner.get_combined_minimum_size().y, room))
 	box.add_child(_button("Done", close, Vector2(800, 60), true))
 
 

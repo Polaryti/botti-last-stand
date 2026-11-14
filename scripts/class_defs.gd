@@ -15,7 +15,7 @@ const ALL := {
 	"chivalry": {"two_handed": true, "name": "Chivalry", "weapon": "lance", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": false, "horse": true, "hidden": true, "earned": "rider",
 		"desc": "Mounted charger. Starts with a Lance. Kills call a horse to ride. No ranged weapons, unless unlocked."},
 	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 70.0, "speed": 1.0, "ranged": true, "mana": true, "hidden": true, "earned": "games",
-		"desc": "Fragile caster. Fights only with a Staff powered by refilling mana. Elements and summoned allies."},
+		"desc": "Fragile caster. Starts with a Staff powered by refilling mana, and can pick up one-handed melee weapons. Elements and summoned allies."},
 	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 7.0,
 		"no_weapons": true, "hidden": true, "earned": "mists",
 		"desc": "Dead, and not done. No weapons, only claws of Mist, which it spends with every blow."},
@@ -56,11 +56,12 @@ static func weapon_categories(id: String) -> Array[String]:
 	var d: Dictionary = ALL[id]
 	var out: Array[String] = []
 	var own := WeaponDefs.ALL.keys().any(func(w: String) -> bool: return WeaponDefs.ALL[w].get("only", "") == id) or id == "monk"
-	if id != "magician" and not d.get("no_weapons", false):
+	if not d.get("no_weapons", false):
 		out.append("melee")
 		if d.get("two_handed", false):
 			out.append("two_handed")
-		if d.get("ranged", false):
+		# The Magician's only ranged weapon is its own Staff.
+		if d.get("ranged", false) and id != "magician":
 			out.append("ranged")
 	if own:
 		out.append("exclusive")

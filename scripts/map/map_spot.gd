@@ -9,10 +9,11 @@ extends MapPiece
 ## place: a name on the map screen. weapon, item and familiar: the Sandbox's stands.
 ## dummy: a training dummy in the Sandbox.
 ## lane, muster and post, on a stronghold with lanes (Mist Bastion), each for the gate numbered gate:
-## lane is where the enemies sent against that gate come up from, muster where its Mist Soldiers
-## step out of the mist, and post where they hold the lane.
+## lane is where the enemies sent against that gate come up from, lane_way a point of the road they
+## keep to on the way up (as many as the road has bends, in any order), muster where its Mist Soldiers
+## step out of the mist, and post where they wait before the gate.
 
-@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache") var kind := "loot":
+@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way") var kind := "loot":
 	set(v):
 		kind = v
 		refresh()
@@ -41,7 +42,7 @@ func build(b: MapBuilder) -> void:
 		"rival": b.w.rival_spots.append(at)
 		"dummy": b.w.dummy_spots.append(at)
 		"place": b.w.map_marks.append({"name": text, "at": Vector2(at.x, at.z)})
-		"lane", "muster", "post": b.w.lane_marks.append({"kind": kind, "gate": gate, "at": at})
+		"lane", "lane_way", "muster", "post": b.w.lane_marks.append({"kind": kind, "gate": gate, "at": at})
 		"weapon", "item", "familiar": b.w.stands.append({"kind": kind, "at": at, "yaw": b.xf.basis.get_euler().y})
 	if b.is_preview:
 		b.w.show_spot(kind, text, at)

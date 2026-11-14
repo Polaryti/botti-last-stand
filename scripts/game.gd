@@ -57,6 +57,7 @@ var quality_measured := false # whether the first pick on the title screen has b
 var difficulty := 1 # 0 easy, 1 normal, 2 hard
 var auto_jump := true
 var vibration := true
+var damage_numbers := true # the numbers that rise from what you hit
 var steady_brightness := true # hold the screen's brightness still while playing
 var brightness := -1.0 # the level to hold, from 0 to 1. Below 0: whatever the phone was at when the game opened
 var music_volume := 0.8
@@ -359,6 +360,7 @@ func load_settings() -> void:
 		player_class = "infantry"
 	auto_jump = _saved(c, "input", "auto_jump", true)
 	vibration = _saved(c, "input", "vibration", true)
+	damage_numbers = _saved(c, "display", "damage_numbers", true)
 	steady_brightness = _saved(c, "video", "steady_brightness", true)
 	brightness = clampf(_saved(c, "video", "brightness", -1.0), -1.0, 1.0)
 	music_volume = clampf(_saved(c, "audio", "music", 0.8), 0.0, 1.0)
@@ -403,6 +405,7 @@ func save_settings() -> void:
 	c.set_value("progress", "player_class", player_class)
 	c.set_value("input", "auto_jump", auto_jump)
 	c.set_value("input", "vibration", vibration)
+	c.set_value("display", "damage_numbers", damage_numbers)
 	c.set_value("video", "steady_brightness", steady_brightness)
 	c.set_value("video", "brightness", brightness)
 	c.set_value("audio", "music", music_volume)

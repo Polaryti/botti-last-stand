@@ -19,6 +19,10 @@ const GARRISON_BLOW := {"mist_infantry": 0.65, "mist_heavy": 1.04}
 const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2}
 const GARRISON_SIGHT := 18.0
 const GARRISON_LEASH := 16.0
+const GARRISON_GATE_OUT := 4.0 # metres before its gate that a Mist Soldier stands
+const GARRISON_PORTAL_OUT := 5.0 # and from the portal, once its gate has fallen
+const GARRISON_ABREAST := 1.7 # between soldiers side by side
+const GARRISON_RANGER_ROOM := 6.0 # how far from its place a Mist Ranger backs away from what comes at it
 const HEAVY_GUARD := 0.3 # the Mist Heavy's tower shield takes this much off every blow
 const RANGER_SHOT := 0.585 # of a weapon blow, every 1.1 seconds
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
@@ -50,6 +54,7 @@ var guarded := 0.0
 ## For a Mist Soldier: the lane it holds (its gate's number) and where on it.
 var lane := -1
 var post := Vector3.INF
+var fell_back := false # a Mist Soldier whose gate has fallen: it holds the portal from then on
 
 var _visual: Node3D
 var _anim: AnimationPlayer
@@ -121,6 +126,7 @@ func activate(seconds: float) -> void:
 	master = null
 	lane = -1
 	post = Vector3.INF
+	fell_back = false
 	_found_at = -100.0
 	dead = false
 	hp = HEALTH[kind]
@@ -434,10 +440,17 @@ func _tick_own(delta: float) -> void:
 func _tick_garrison(delta: float) -> void:
 	if _foe and not _foe.is_alive():
 		_foe = null
+	var home := _garrison_home()
+	var fort := world.fort
+	# On its way in through a fallen gate it fights only what is on top of it.
+	var falling_back := fell_back and fort != null and not fort.inside(position)
 	if _think <= 0.0:
 		_think = 0.25
-		_foe = world.nearest_zombie(global_position + Vector3.UP, GARRISON_SIGHT, true)
-		if _foe and post != Vector3.INF and _foe.position.distance_to(post) > GARRISON_LEASH + 4.0:
+		_foe = world.nearest_zombie(global_position + Vector3.UP, 3.0 if falling_back else GARRISON_SIGHT, true)
+		if _foe and home != Vector3.INF and _foe.position.distance_to(home) > GARRISON_LEASH + 4.0:
+			_foe = null
+		# Before its gate it fights what comes up the lane; at the portal, what has got inside.
+		if _foe and fort and not falling_back and fort.inside(_foe.position) != fell_back and not _foe.flies:
 			_foe = null
 	var heavy := kind == "mist_heavy"
 	var dir := Vector3.ZERO
@@ -452,8 +465,8 @@ func _tick_garrison(delta: float) -> void:
 				_attack_left = 0.35
 				_current = ""
 				_play("2H_Ranged_Shoot", 1.5)
-			var home := post if post != Vector3.INF else position
-			if to.length() < 5.0 and position.distance_to(home) < GARRISON_LEASH:
+			var stand := home if home != Vector3.INF else position
+			if to.length() < 5.0 and position.distance_to(stand) < GARRISON_RANGER_ROOM and (fort == null or fort.inside(position - to.normalized()) == fort.inside(position)):
 				dir = -to.normalized()
 		else:
 			var reach := ATTACK_RANGE + (0.5 if heavy else 0.0)
@@ -470,8 +483,8 @@ func _tick_garrison(delta: float) -> void:
 				world.sfx_at("clang", position, -9.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 9.0))
-	elif post != Vector3.INF:
-		var to := post - position
+	elif home != Vector3.INF:
+		var to := _garrison_step(home) - position
 		to.y = 0.0
 		if to.length() > 1.5:
 			dir = to.normalized()
@@ -483,6 +496,42 @@ func _tick_garrison(delta: float) -> void:
 	position.y = world.ground_at(position)
 	if _attack_left <= 0.0:
 		_play("Running_A" if dir != Vector3.ZERO else "Idle")
+
+
+## Where a Mist Soldier's duty is right now. While its lane's gate stands: on the ground before the
+## gate, where whatever comes up the lane to break it has to get past. Once that gate has fallen: by
+## the portal, on the side the fallen gate is, and there it stays even if the gate is mended.
+func _garrison_home() -> Vector3:
+	var fort := world.fort
+	if fort == null or lane < 0 or lane >= fort.gates.size():
+		return post
+	var g: Dictionary = fort.gates[lane]
+	var out: Vector3 = g["dir"]
+	var side := out.cross(Vector3.UP) * (float(net_index % 3) - 1.0) * GARRISON_ABREAST
+	if not g["closed"]:
+		fell_back = true
+	if fell_back:
+		var towards := (g["at"] as Vector3) - fort.heart_at
+		towards.y = 0.0
+		return fort.heart_at + towards.normalized() * GARRISON_PORTAL_OUT + side
+	return (g["at"] as Vector3) + out * (GARRISON_GATE_OUT + (1.6 if kind == "mist_ranger" else 0.0)) + side
+
+
+## The next spot to walk to on the way home. Falling back from before a fallen gate, that is first
+## the mouth of the gateway and then the far side of it: a straight line would meet the wall.
+func _garrison_step(home: Vector3) -> Vector3:
+	var fort := world.fort
+	if not fell_back or fort == null or fort.inside(position):
+		return home
+	var g: Dictionary = fort.gates[lane]
+	var out: Vector3 = g["dir"]
+	var from: Vector3 = position - (g["at"] as Vector3)
+	from.y = 0.0
+	var along := from.dot(out)
+	var aside := (from - out * along).length()
+	if aside > 1.0 and along > -1.0:
+		return (g["at"] as Vector3) + out * maxf(2.0, minf(along, 4.0))
+	return (g["at"] as Vector3) - out * (Fort.WALL_T * 0.5 + 2.5)
 
 
 ## Now and then a bite turns something up: food, or a few arrows. Never twice in quick succession.

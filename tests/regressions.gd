@@ -37,7 +37,7 @@ func _ready() -> void:
 
 func _test_packets() -> void:
 	var packet := PackedByteArray()
-	packet.resize(39)
+	packet.resize(Net.POSE_BYTES)
 	check(Net.valid_pose(packet), "a complete pose with no weapon is accepted")
 	packet[34] = 255
 	check(not Net.valid_pose(packet), "an unknown weapon index is rejected")
@@ -47,9 +47,9 @@ func _test_packets() -> void:
 			packet.encode_float(offset, bad)
 			check(not Net.valid_pose(packet), "non-finite pose value at byte %d is rejected" % offset)
 		packet.encode_float(offset, 0.0)
-	packet.resize(38)
+	packet.resize(Net.POSE_BYTES - 1)
 	check(not Net.valid_pose(packet), "a truncated pose is rejected")
-	packet.resize(40)
+	packet.resize(Net.POSE_BYTES + 1)
 	check(not Net.valid_pose(packet), "an oversized pose is rejected")
 	var old_class := Game.player_class
 	Net.set_my_class("not_a_class")

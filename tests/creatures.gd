@@ -252,6 +252,22 @@ func _mesenlla_south() -> void:
 	for mark: String in ["Fallen Hall", "Hunters' Lodge", "Old Mine", "Mossy Spring"]:
 		check(names.has(mark), "the south has its %s" % mark)
 	check(w.cache_spots.size() == 3 and w.cache_spots.all(func(at: Vector3) -> bool: return at.z > 60.0), "three caches of rarer finds, all in the south")
+	# The lodge stands on dry ground and can be walked into; the mine is cut into its slope; the
+	# bridge runs with the road, straight across a river that runs east to west under it.
+	var lodge := Vector3(-40, 0, 90)
+	check(w.terrain.height(lodge.x, lodge.z) > 0.3 and not w.terrain.in_water(lodge.x, lodge.z), "the Hunters' Lodge stands on dry ground (%.1f)" % w.terrain.height(lodge.x, lodge.z))
+	var lodge_ways := 0
+	for from: Vector3 in [Vector3(-40, 0, 97), Vector3(-30, 0, 90), Vector3(-50, 0, 90), Vector3(-40, 0, 80)]:
+		if w.in_reach(from) and w.terrain.is_walkable(from.x, from.z):
+			lodge_ways += 1
+	check(lodge_ways == 4 and w.in_reach(lodge + Vector3(0, 0, 1.0)), "it can be walked up to from every side, and into (%d of 4 sides)" % lodge_ways)
+	var wet := PhysicsRayQueryParameters3D.create(Vector3(-40, 3.0, 104), Vector3(-40, 3.0, 94), Terrain.BARRIER)
+	check(w.get_world_3d().direct_space_state.intersect_ray(wet).is_empty(), "nothing unseen stands between the south and its door")
+	var yard := Vector3(68, 0, 86)
+	check(absf(w.ground_at(yard) - 6.0) < 0.2 and absf(w.ground_at(Vector3(74, 0, 86)) - 6.0) < 0.3 and w.ground_at(Vector3(82, 0, 86)) > 10.0, "the Old Mine opens off a level yard, with the hill rising behind it (%.1f, %.1f, %.1f)" % [w.ground_at(yard), w.ground_at(Vector3(74, 0, 86)), w.ground_at(Vector3(82, 0, 86))])
+	check(w.in_reach(yard), "and its yard can be walked to")
+	check(w.terrain.on_deck(-8.0, 54.0) and w.terrain.on_deck(-8.0, 59.0) and w.terrain.on_deck(-8.0, 64.0) and not w.terrain.on_deck(-14.0, 59.0), "the bridge runs north to south with the road")
+	check(w.terrain.in_water(-14.0, 59.4) and w.terrain.in_water(-1.0, 57.6) and not w.terrain.in_water(-8.0, 51.0) and not w.terrain.in_water(-8.0, 67.0), "over a river that runs east to west under it")
 	w.director.elapsed = 1.0
 	w.director._cache_look = 0.0
 	w.director._tick_caches()
@@ -332,6 +348,7 @@ func _mesenlla_camp() -> void:
 	check(w.mist_seals.size() - before >= int(2.0 / CampSiege.BARRAGE_EVERY), "then the barrage comes down (%d circles in 2 s)" % (w.mist_seals.size() - before))
 	siege.tick(CampSiege.BARRAGE_AT + CampSiege.BARRAGE_TIME + 0.1)
 	check(w.camp_fallen and siege.done, "and the camp falls")
+	check(w.ground_shunned(siege.centre) and w.grid.astar.get_point_weight_scale(w.grid.to_cell(siege.centre)) > 5.0, "from then on ways are planned round it, and bots keep off it")
 	var in_camp := w.watchtowers.filter(func(t: Dictionary) -> bool: return Vector2(t["at"].x - siege.centre.x, t["at"].z - siege.centre.z).length() <= CampSiege.RADIUS + 4.0)
 	check(in_camp.size() == 2 and in_camp.all(func(t: Dictionary) -> bool: return t.get("ruined", false) and not (t["parts"][0] as Node3D).visible), "its archer posts are brought down")
 	check(w.watchtowers.any(func(t: Dictionary) -> bool: return not t.get("ruined", false)), "and the towers elsewhere still stand")
@@ -369,10 +386,13 @@ func _children() -> void:
 	var kid := raise("child_of_woods", at + Vector3(0, 0, -12))
 	check(kid.weapon_id in ZombieDefs.ALL["child_of_woods"]["weapons"], "a Child of the Woods carries a weapon it found (%s)" % kid.weapon_id)
 	check(kid.model_id == "woods_child" and not kid._custom, "on an animated body of its own")
-	var held := kid.weapon_id
 	kid.take_damage(10000.0, Vector3.ZERO, 0.0, kid.centre())
-	await seconds(0.2)
-	check(not WeaponDefs.lies_around(held) or w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == held), "and drops it when it falls")
+	var let_go := 0
+	for n in 4000:
+		if Zombie.lets_go(ZombieDefs.ALL["child_of_woods"]):
+			let_go += 1
+	check(let_go > 640 and let_go < 960, "and one in five drops it when it falls (%d of 4000)" % let_go)
+	check(Zombie.lets_go(ZombieDefs.ALL["clever"]) and is_equal_approx(ZombieDefs.ALL["woodland_cavalry"]["weapon_drop"], 0.2), "others still always do; the riders are Children too")
 	var rider := raise("woodland_cavalry", at + Vector3(0, 0, -14))
 	check(rider._mounted and rider._horse_node.visible and (rider._horse_node.material_override as ShaderMaterial).get_shader_parameter("belly") != null, "Woodland Cavalry ride bears")
 	check(rider.weapon_id == "spear", "with spears")
@@ -619,10 +639,22 @@ func _bastion_map() -> void:
 			var z: Zombie = w.zombies.back()
 			counts[z.fort_gate] += 1
 			var foot: Vector3 = (fort.gates[z.fort_gate]["lane"] as Array)[0]
-			if Vector2(z.position.x - foot.x, z.position.z - foot.z).length() < 12.0:
+			# Behind the foot, between it and the rift: never further up the lane than the foot itself.
+			if Vector2(z.position.x - foot.x, z.position.z - foot.z).length() < 10.0 and z.position.z > foot.z - 0.5:
 				near_foot += 1
 	check(counts == [3, 3, 3], "each gate gets its share of them: %s" % str(counts))
-	check(near_foot == 9, "and they rise at the foot of that gate's lane (%d of 9)" % near_foot)
+	check(near_foot == 9, "and they rise at the very end of that gate's lane (%d of 9)" % near_foot)
+	# Even with someone standing at a lane's foot: there is nowhere else on a lane to come from.
+	w.player.global_position = (fort.gates[2]["lane"] as Array)[0] + Vector3(0, 0.3, -6)
+	var east_before := w.zombies.size()
+	var rose_east := 0
+	for i in 3:
+		if w.spawn_zombie("child_of_woods"):
+			var z: Zombie = w.zombies.back()
+			if z.fort_gate == fort.lane_at(z.position):
+				rose_east += 1
+	check(rose_east == 3 and w.zombies.size() == east_before + 3, "nobody rises on one lane to walk to another, wherever the players stand (%d of 3)" % rose_east)
+	w.player.global_position = fort.heart_at + Vector3(0, 0.1, 6)
 	check(fort.has_lanes(), "the Bastion's enemies come up long lanes")
 	# How far they come over a few seconds, not how fast one is going at one moment: a step can
 	# always pause on a bump or a neighbour.
@@ -643,13 +675,42 @@ func _bastion_map() -> void:
 	# Three rise together at each foot and jostle at first, so the middle of them is checked against
 	# the walk, and the fastest against a run.
 	var fastest: float = paces.back() if not paces.is_empty() else 0.0
-	# Gates first: someone a little way off is passed by; only someone right in the way is fought.
-	var climber: Zombie = climbers[0]
+	# On its lane a zombie fights like anywhere else, but never leaves the lane for anyone.
+	var climber: Zombie = climbers.filter(func(z: Zombie) -> bool: return z.fort_gate == 1)[0]
 	var keep_at := p.global_position
-	p.global_position = climber.position + Vector3(8.0, 0.2, 0)
-	check(climber._fort_plan(p, 8.0) and climber._lane_bound(8.0), "lane enemies pass by a player a few steps off and keep on for the gate")
-	p.global_position = climber.position + Vector3(1.6, 0.2, 0)
-	check(not climber._fort_plan(p, 1.6) and not climber._lane_bound(1.6), "but strike whoever stands right in their way")
+	climber._sees = true
+	p.global_position = climber.position + Vector3(3.0, 0.2, -5.0)
+	check(not climber._fort_plan(p, 5.8), "a lane enemy goes for a player it sees on its lane")
+	p.global_position = Vector3(-46.0, w.ground_at(Vector3(-46, 0, climber.position.z)) + 0.2, climber.position.z)
+	check(climber._fort_plan(p, 46.0) and fort.lane_at(p.global_position) == 0, "but not for one on another lane: it keeps on for its gate")
+	p.global_position = fort.heart_at + Vector3(0, 0.1, 6)
+	check(climber._fort_plan(p, 99.0), "nor for one inside the walls")
+	# The road, not the slopes: the spot it aims for is always on its lane's road, a little ahead.
+	var off_road := 0.0
+	var behind := 0
+	for z: Zombie in climbers:
+		var aim := fort.lane_ahead(z.fort_gate, z.position, Zombie.LANE_AHEAD)
+		off_road = maxf(off_road, fort.off_lane(z.fort_gate, aim))
+		off_road = maxf(off_road, fort.off_lane(z.fort_gate, z.position) - 3.5)
+		if aim.z > z.position.z + 0.5:
+			behind += 1
+	check(off_road < 0.1 and behind == 0, "they keep to the road of their lane on the way up (%.1f m off it, %d aiming back)" % [off_road, behind])
+	for gate: Dictionary in fort.gates:
+		var way: Array[Vector3] = gate["way"]
+		check(way.size() >= 8 and way[0] == (gate["lane"] as Array)[0] and way.back().distance_to(gate["at"]) < 3.0, "the %s lane's road runs from its foot to its gate (%d points)" % [gate["name"], way.size()])
+	# A gate that falls on another lane changes nothing for it; its own gate fallen is its way in.
+	fort.hit_gate(fort.gates[0], 99999.0, fort.gates[0]["at"])
+	check(fort.gate_for(climber)["i"] == 1 and climber.fort_gate == 1, "a gate fallen on another lane draws nobody off theirs")
+	var west_one: Zombie = climbers.filter(func(z: Zombie) -> bool: return z.fort_gate == 0)[0]
+	var west_front := fort.gate_front(fort.gates[0], west_one.position)
+	west_one.position = west_front + Vector3(-1.0, 0, 0)
+	west_one._fort_plan(p, 99.0)
+	check(west_one._has_goal and fort.inside(west_one._goal), "through its own fallen gate, into the walls")
+	west_one.position = (fort.gates[0]["at"] as Vector3) + Vector3(4.0, 0, 0)
+	p.global_position = Vector3(46, w.ground_at(Vector3(46, 0, 0)) + 0.2, 0)
+	west_one._fort_plan(p, 99.0)
+	check(west_one._goal.distance_to(fort.heart_at) < 3.0, "and from there on to the portal")
+	fort.repair(0, 99999.0)
 	p.global_position = keep_at
 	var feet_rifts := 0
 	for gate: Dictionary in fort.gates:
@@ -667,7 +728,7 @@ func _bastion_map() -> void:
 	g.tick(Garrison.FIRST)
 	var soldiers := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison())
 	check(soldiers.size() == 3 and soldiers.all(func(a: Ally) -> bool: return a.kind == "mist_infantry") and soldiers.map(func(a: Ally) -> int: return a.lane) == [0, 1, 2], "then a Mist Infantry for each lane")
-	check(soldiers.all(func(a: Ally) -> bool: return a.global_position.distance_to(g.mark(a.lane, "muster")) < 2.5 and a.post == g.mark(a.lane, "post")), "stepping out of its lane's waystone, to hold its post")
+	check(soldiers.all(func(a: Ally) -> bool: return a.global_position.distance_to(g.mark(a.lane, "muster")) < 2.5), "stepping out of its lane's waystone")
 	check(w.director.banner.contains("Mist Soldiers"), "and everyone is told")
 	g.tick(Garrison.FIRST + Garrison.EVERY)
 	var second := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and a.kind == "mist_ranger")
@@ -676,20 +737,34 @@ func _bastion_map() -> void:
 	check(w.allies.filter(func(a: Ally) -> bool: return a.is_garrison()).size() == 3 * Garrison.PER_LANE, "and no more than %d hold a lane" % Garrison.PER_LANE)
 	check(g.next_kind(0, 100.0) == "mist_infantry" and g.next_kind(0, Garrison.HEAVY_FROM) == "mist_heavy", "the Heavy's turn waits for 3:00")
 	check(Ally.HEALTH["mist_infantry"] < 120.0 and Ally.HEALTH["mist_ranger"] < 75.0 and Ally.HEALTH["mist_heavy"] < 225.0 and Ally.GARRISON_BLOW["mist_infantry"] < 0.7, "the Mist Soldiers are about a third weaker than they were")
-	var post_reach := [32.0, 17.0, 32.0]
-	for i in 3:
-		var gate_at: Vector3 = fort.gates[i]["at"]
-		check(Vector2(g.mark(i, "post").x - gate_at.x, g.mark(i, "post").z - gate_at.z).length() < post_reach[i], "the %s post is held close below its gate (%.0f m)" % [fort.gates[i]["name"], Vector2(g.mark(i, "post").x - gate_at.x, g.mark(i, "post").z - gate_at.z).length()])
+	# They stand before their gate, and fight what comes to break it.
 	var walker: Ally = soldiers[1]
+	var mid_gate: Dictionary = fort.gates[1]
+	var mid_front := fort.gate_front(mid_gate, (mid_gate["at"] as Vector3) + (mid_gate["dir"] as Vector3) * 5.0)
 	await seconds(9.0)
-	check(walker.global_position.distance_to(walker.post) < 3.0, "a soldier walks down to its post (%.1f m off)" % walker.global_position.distance_to(walker.post))
-	# They fight what comes near, and nobody is credited with what they kill.
-	var kid := raise("child_of_woods", walker.post + Vector3(2.5, 0, 2.5))
+	for a: Ally in soldiers:
+		var their_gate: Dictionary = fort.gates[a.lane]
+		var off := Vector2(a.global_position.x - (their_gate["at"] as Vector3).x, a.global_position.z - (their_gate["at"] as Vector3).z).length()
+		check(off < 8.0 and not fort.inside(a.global_position), "the %s lane's soldier stands before its gate (%.1f m from it)" % [their_gate["name"], off])
+	var kid := raise("child_of_woods", mid_front + Vector3(0.6, 0, 0))
 	kid.set_physics_process(false)
 	var xp_before := p.xp
 	await seconds(10.0)
-	check(not kid.is_alive() and kid.last_hitter == -1, "the garrison fights what comes near its post (hp %.0f, credited to %d)" % [kid.hp, kid.last_hitter])
+	check(not kid.is_alive() and kid.last_hitter == -1, "the garrison fights what comes to break its gate (hp %.0f, credited to %d)" % [kid.hp, kid.last_hitter])
 	check(p.xp == xp_before, "and its kills are nobody's")
+	# Its gate fallen, it falls back through the gateway to the portal, and holds that.
+	fort.hit_gate(mid_gate, 99999.0, mid_gate["at"])
+	await seconds(9.0)
+	var mid_guard := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and a.lane == 1 and not a.dead)
+	var at_portal := mid_guard.filter(func(a: Ally) -> bool: return a.fell_back and fort.inside(a.global_position) and a.global_position.distance_to(fort.heart_at) < 9.0).size()
+	check(not mid_guard.is_empty() and at_portal == mid_guard.size(), "with their gate fallen, its soldiers fall back to the portal (%d of %d there)" % [at_portal, mid_guard.size()])
+	var others := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and a.lane != 1 and not a.dead)
+	check(others.all(func(a: Ally) -> bool: return not a.fell_back and not fort.inside(a.global_position)), "while the other lanes' soldiers stay before their own gates")
+	var raider := raise("child_of_woods", fort.heart_at + Vector3(0, 0, 3.0))
+	raider.set_physics_process(false)
+	await seconds(10.0)
+	check(not raider.is_alive(), "and there they fight what has got inside (hp %.0f)" % raider.hp)
+	fort.repair(1, 99999.0)
 	var heavy := w.spawn_garrison("mist_heavy", 1, walker.post, walker.post)
 	var hp_full := heavy.hp
 	heavy.hurt(100.0, heavy.global_position)

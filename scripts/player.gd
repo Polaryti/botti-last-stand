@@ -576,7 +576,8 @@ func can_use(id: String) -> bool:
 	if for_spec != "" and for_spec != spec_id:
 		return false
 	if class_id == "magician":
-		return id == "staff"
+		# The Staff, and any one-handed melee weapon; no bows, guns or thrown things.
+		return id == "staff" or (WeaponDefs.ALL[id]["kind"] == WeaponDefs.Kind.MELEE and not WeaponDefs.is_two_handed(id) and id != "bo")
 	if class_id == "commander" and spec_id in ["warlock", "gunner"]:
 		return id == ("war_staff" if spec_id == "warlock" else "musket")
 	if class_def().get("no_weapons", false):
@@ -3171,10 +3172,12 @@ func _should_auto_jump(dir: Vector3) -> bool:
 	# Stairs and slopes are walked up, not jumped at.
 	if (ahead["normal"] as Vector3).y > 0.5:
 		return false
-	var high := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.25, from + Vector3.UP * 1.25 + flat * (reach + 0.35), 1 | Terrain.WINDOW)
+	# What bodies cannot pass counts as much as what can be seen: the unseen column over a bonfire, the
+	# river's edge and the edge of the map are nothing to jump at, however low the thing in front is.
+	var high := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.25, from + Vector3.UP * 1.25 + flat * (reach + 0.35), 1 | Terrain.WINDOW | Terrain.BARRIER)
 	if not space.intersect_ray(high).is_empty():
 		return false
-	var overhead := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.7, from + Vector3.UP * 2.9, 1)
+	var overhead := PhysicsRayQueryParameters3D.create(from + Vector3.UP * 1.7, from + Vector3.UP * 2.9, 1 | Terrain.BARRIER)
 	return space.intersect_ray(overhead).is_empty()
 
 

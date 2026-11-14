@@ -44,7 +44,7 @@ func _ready() -> void:
 
 ## amount taken from `who` (its instance id) at `at`; full is its whole health.
 func show_hit(who: int, at: Vector3, amount: float, full: float) -> void:
-	if amount < 0.5 or amount >= 5000.0:
+	if amount < 0.5 or amount >= 5000.0 or not Game.damage_numbers:
 		return
 	var slot := -1
 	for i in MAX:

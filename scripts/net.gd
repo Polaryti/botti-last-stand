@@ -21,7 +21,8 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 48
+const PROTOCOL := 49
+const POSE_BYTES := 40 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -1276,7 +1277,7 @@ func note_bot_fell(peer: int, by_peer: int) -> void:
 ## what is happening to them. The same for a person's phone and for a bot on the host.
 func pose_bytes(p: Player) -> PackedByteArray:
 	var b := PackedByteArray()
-	b.resize(39)
+	b.resize(POSE_BYTES)
 	b.encode_float(0, p.global_position.x)
 	b.encode_float(4, p.global_position.y)
 	b.encode_float(8, p.global_position.z)
@@ -1295,6 +1296,7 @@ func pose_bytes(p: Player) -> PackedByteArray:
 	b[36] = clampi(int(p.m("cover") * 100.0), 0, 90)
 	b[37] = clampi(int(p.m("cover_radius")), 0, 255)
 	b[38] = p.status_bits()
+	b[39] = clampi(p.level, 1, 255)
 	return b
 
 
@@ -1307,12 +1309,13 @@ func _apply_pose(a: Avatar, b: PackedByteArray) -> void:
 	a.cover_pct = b[36] / 100.0
 	a.cover_radius = float(b[37])
 	a.show_statuses(b[38])
+	a.level = maxi(1, b[39])
 
 
 ## Validate before touching an avatar: truncated packets, unknown weapon indices and NaN/Inf
 ## transforms must never reach physics or the renderer. The wire format remains unchanged.
 func valid_pose(b: PackedByteArray) -> bool:
-	if b.size() != 39 or b[34] > _weapon_ids.size():
+	if b.size() != POSE_BYTES or b[34] > _weapon_ids.size():
 		return false
 	for offset in range(0, 32, 4):
 		if not is_finite(b.decode_float(offset)):
@@ -2046,15 +2049,15 @@ func player_state(peer: int) -> Dictionary:
 	if peer == my_id():
 		var me := world.player if world else null
 		if me == null:
-			return {"hp": 1.0, "down": false, "out": out, "back_in": -1.0}
-		return {"hp": clampf(me.hp / me.max_hp(), 0.0, 1.0), "down": me.dead, "out": out, "back_in": _respawn_left}
+			return {"hp": 1.0, "down": false, "out": out, "back_in": -1.0, "level": 1}
+		return {"hp": clampf(me.hp / me.max_hp(), 0.0, 1.0), "down": me.dead, "out": out, "back_in": _respawn_left, "level": me.level}
 	var a: Avatar = _avatars.get(peer)
 	if a == null:
-		return {"hp": 1.0, "down": false, "out": out, "back_in": -1.0}
+		return {"hp": 1.0, "down": false, "out": out, "back_in": -1.0, "level": 1}
 	var back := -1.0
 	if a.dead and not out and a.world:
 		back = maxf(0.0, (FOG_RESPAWN if fog_rules() else RESPAWN_TIME) - (a.world.now - a.down_since))
-	return {"hp": a.hp_fraction, "down": a.dead, "out": out, "back_in": back}
+	return {"hp": a.hp_fraction, "down": a.dead, "out": out, "back_in": back, "level": a.level}
 
 
 ## The results, as the host sees them.

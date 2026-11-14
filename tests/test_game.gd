@@ -49,11 +49,11 @@ func _ready() -> void:
 	Game.night_map = "village"
 	Game.pet = "wolf"
 	var plan: Array[String] = ["test_map", "test_flow", "test_weapons", "test_touch", "test_auto_jump", "test_items", "test_powers", "test_zombies", "test_night",
-		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish"]
+		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish", "test_third_review"]
 	var groups := {
 		"core": plan.slice(0, 9), "recent": plan.slice(9, 17), "legacy": plan.slice(17, 25),
 		"classes": ["test_new_things", "test_revenant", "test_trees", "test_finals", "test_classes"],
-		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish"]}
+		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish", "test_third_review"]}
 	var selected := "all"
 	for arg: String in args:
 		if arg.begins_with("group="):
@@ -3509,6 +3509,102 @@ func test_beyond_review() -> void:
 	await start_clean()
 
 
+## Mario's third review of Beyond the Mists: campfires nobody hops at, Settings that scroll, a switch
+## for damage numbers, levels in the list of players, and ground that cannot be reached left alone.
+func test_third_review() -> void:
+	await start_clean()
+	# Walking at a campfire is not a reason to jump: what is over it cannot be jumped onto.
+	var fire: Dictionary = {}
+	for f: Dictionary in w.fires:
+		if f["heals"]:
+			fire = f
+			break
+	if not fire.is_empty():
+		var at: Vector3 = fire["at"]
+		var hops := 0
+		for a in 8:
+			var from := Vector3(cos(a * TAU / 8.0), 0, sin(a * TAU / 8.0))
+			pl.global_position = at + from * 1.75 + Vector3.UP * 0.1
+			pl.velocity = Vector3.ZERO
+			await frames(2)
+			if pl._should_auto_jump(-from):
+				hops += 1
+		ok(hops == 0, "nobody jumps at a campfire they walk up to (%d of 8 sides)" % hops)
+	# The edge of the map is nothing to jump at either, whatever stands low in front of it.
+	pl.global_position = Vector3(0, 0.3, 0)
+	ok(Terrain.BARRIER != 1, "what cannot be passed is told apart from what can be seen")
+	# Settings scroll, down to the last row; your name is the first.
+	m.show_settings()
+	await frames(3)
+	var scroll := m.ui_layer.find_child("SettingsScroll", true, false) as ScrollContainer
+	var rows := m.ui_layer.find_child("SettingsRows", true, false) as Control
+	ok(scroll != null and rows != null and scroll.is_ancestor_of(rows), "the Settings rows are in a scrolling list")
+	if scroll and rows:
+		var view := m.get_viewport().get_visible_rect().size
+		ok(scroll.get_global_rect().end.y <= view.y and scroll.size.y >= 200.0, "that fits on the screen (%.0f px tall, ending at %.0f of %.0f)" % [scroll.size.y, scroll.get_global_rect().end.y, view.y])
+		var last := rows.get_child(rows.get_child_count() - 1) as Control
+		scroll.scroll_vertical = int(rows.size.y)
+		scroll.set("_pos", rows.size.y)
+		await frames(3)
+		ok(scroll.get_global_rect().grow(1.0).encloses(last.get_global_rect()), "and scrolls down to its last row (%s in %s)" % [last.get_global_rect(), scroll.get_global_rect()])
+		var rename := m.ui_layer.find_child("Rename", true, false) as Button
+		ok(rename != null and scroll.is_ancestor_of(rename) and rows.get_child(0).is_ancestor_of(rename), "your name is the first of them")
+		var done: Array = m.ui_layer.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "Done")
+		ok(done.size() == 1 and not scroll.is_ancestor_of(done[0]), "Done stays in reach below the list")
+	var texts: Array = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	texts.append_array(m.ui_layer.find_children("*", "CheckButton", true, false).map(func(b: CheckButton) -> String: return b.text))
+	ok(texts.has("Damage numbers"), "Settings has a switch for damage numbers")
+	# Switched off, nothing rises from what you hit.
+	var numbers := w.damage_numbers
+	var showing := func() -> int: return numbers._labels.filter(func(l: Label3D) -> bool: return l.visible).size()
+	Game.damage_numbers = false
+	numbers.show_hit(7001, pl.global_position + Vector3(0, 1, -3), 25.0, 100.0)
+	ok(showing.call() == 0, "damage numbers switched off: none shown")
+	Game.damage_numbers = true
+	numbers.show_hit(7001, pl.global_position + Vector3(0, 1, -3), 25.0, 100.0)
+	ok(showing.call() == 1, "switched on: shown again")
+	Game.damage_numbers = false
+	Game.save_settings()
+	Game.damage_numbers = true
+	Game.load_settings()
+	ok(not Game.damage_numbers, "the switch is kept")
+	Game.damage_numbers = true
+	Game.save_settings()
+	# Everyone's level travels with where they are.
+	pl.level = 7
+	var pose := Net.pose_bytes(pl)
+	ok(pose.size() == Net.POSE_BYTES and pose[39] == 7 and Net.valid_pose(pose), "a player's level is part of what every phone hears of them")
+	var ghost := Avatar.new(w, 4242, {"name": "Ghost", "team": 0, "class": "infantry"})
+	w.add_child(ghost)
+	Net._apply_pose(ghost, pose)
+	ok(ghost.level == 7, "and their figure on other phones knows it")
+	ghost.queue_free()
+	pl.level = 1
+	# Ground nobody can walk to: nothing is left there.
+	var corner := Vector3(w.half_size - 2.0, 0, w.half_size - 2.0)
+	ok(w.in_reach(pl.global_position) and not w.in_reach(corner), "the edge of the map is out of reach; where the players stand is not")
+	var stray := 0
+	var made := 0
+	for i in 60:
+		var item := w.spawn_pickup_random(Pickup.Kind.FOOD, "apple")
+		if item:
+			made += 1
+			if not w.in_reach(item.global_position):
+				stray += 1
+	ok(made > 20 and stray == 0, "nothing to find is left out of reach (%d of %d)" % [stray, made])
+	# Ground to keep off: ways are planned round it, and the nearest way off it is straight out.
+	var middle := Vector3(40, 0, 40)
+	ok(not w.ground_shunned(middle), "open ground is not shunned")
+	w.shun_ground(middle, 10.0)
+	ok(w.ground_shunned(middle + Vector3(6, 0, 0)) and not w.ground_shunned(middle + Vector3(12, 0, 0)), "a circle to keep off covers what is inside it")
+	var off := w.off_shunned(middle + Vector3(6, 0, 0))
+	ok(not w.ground_shunned(off) and off.x > middle.x + 10.0 and absf(off.z - middle.z) < 0.5, "the way off it is straight out from its middle")
+	ok(w.grid.astar.get_point_weight_scale(w.grid.to_cell(middle)) > 5.0 and is_equal_approx(w.grid.astar.get_point_weight_scale(w.grid.to_cell(middle + Vector3(20, 0, 0))), 1.0), "and ways planned through it cost many times their length")
+	w.shunned.clear()
+	w.grid.weigh_disc(middle, 12.0, 1.0)
+	await start_clean()
+
+
 ## The graphics and performance pass: the finished picture, cheap floor checks, far lights put out,
 ## damage numbers and Auto graphics.
 func test_polish() -> void:
@@ -4737,7 +4833,10 @@ func test_classes() -> void:
 	await seconds(0.3)
 	pl.take_nearby_weapon()
 	await frames(2)
-	ok(pl.weapon_id() == "staff" and not pl.slots.has("sword") and not pl.can_use("sword"), "the Magician refuses a ground weapon and keeps only the staff")
+	ok(pl.slots.has("sword") and pl.slots.has("staff") and pl.can_use("sword") and not pl.can_use("bow"), "the Magician picks up a melee weapon beside the staff, but no bow")
+	pl.slots = ["staff", null]
+	pl.current = 0
+	pl._equip()
 	clear_pickups()
 
 	# Chivalry and the horse.

@@ -11,6 +11,7 @@ var peer := 0
 var team := 0
 var display := ""
 var hp_fraction := 1.0
+var level := 1 # as their own phone last said
 var down_since := -1.0 # world.now when this player fell, for the countdown beside their name
 var _target := Vector3.ZERO
 var _yaw := 0.0

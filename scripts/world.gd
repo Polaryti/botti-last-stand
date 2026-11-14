@@ -9,6 +9,12 @@ signal fort_lost
 
 static var HALF_SIZE := 110.0 # default for legacy callers; each world keeps its own extent
 var half_size := 110.0
+const LANE_SPAWN_BACK := 4.5 # metres behind a lane's foot, towards its rift, where its enemies step out
+const LANE_SPAWN_SPREAD := 4.0
+const REACH_EDGE := 5 # metres from the edge of the map that count as out of reach: the forest wall stands there
+var _reach := PackedByteArray() # see in_reach
+const SHUN_WEIGHT := 12.0 # how much longer a way through shunned ground counts than one round it
+var shunned: Array[Vector3] = [] # circles to keep off: x, z, radius (see shun_ground)
 const PATHS_PER_FRAME := 1
 const SKY_EVERY := 0.15
 const BELL_GAP := 0.5
@@ -297,6 +303,9 @@ func setup(game_mode: int) -> void:
 		for mark: Dictionary in lane_marks:
 			if mark["kind"] == "lane":
 				fort.add_lane(int(mark["gate"]), mark["at"])
+			elif mark["kind"] == "lane_way":
+				fort.add_lane_way(int(mark["gate"]), mark["at"])
+		fort.lay_ways()
 	grid.astar.update()
 	grid.build_far_grid()
 	prepare_forest_wood()
@@ -422,6 +431,63 @@ func fall_camp(centre: Vector3, radius: float) -> void:
 		if not tower.get("ruined", false) and Vector2(at.x - centre.x, at.z - centre.z).length() <= radius + 4.0:
 			ruin_tower(tower)
 	MistStorm.create_zone(self, centre, radius, "THE CAMP", 4.0)
+	shun_ground(centre, radius + 2.0)
+
+
+## Whether this spot can be walked to from where the players are: not beyond the edge of the map or
+## what closes it, not up a cliff, not sealed in. Things to find are only left in reach, and bots only
+## go for what is. Worked out once, the first time it is asked. The islands of the Mists are joined
+## by their gates rather than by ground, and keep to their own marked spots instead.
+func in_reach(at: Vector3) -> bool:
+	if terrain.has_islands():
+		return true
+	if _reach.is_empty():
+		var starts: Array[Vector3] = []
+		for t: Target in players:
+			if is_instance_valid(t):
+				starts.append(t.global_position)
+		if fort:
+			starts.append(fort.outside_point()) # the gates are shut, but both sides are in the night
+		if starts.is_empty():
+			return true # nobody is here yet to walk from
+		var edge := REACH_EDGE
+		var side := grid.size
+		var half := grid.half
+		_reach = grid.reach_from(starts, func(c: Vector2i) -> bool:
+			return c.x >= edge and c.y >= edge and c.x < side - edge and c.y < side - edge and terrain.is_walkable(c.x + 0.5 - half, c.y + 0.5 - half))
+		if _reach.count(1) < 400:
+			_reach.fill(1) # the start itself was on a ledge: better everything than nothing
+	var cell := grid.to_cell(at)
+	return _reach[cell.y * grid.size + cell.x] == 1
+
+
+## Ground nobody should cross from now on (a Mist Storm that never lifts): ways are planned round it.
+func shun_ground(centre: Vector3, radius: float) -> void:
+	if shunned.any(func(z: Vector3) -> bool: return Vector2(z.x - centre.x, z.y - centre.z).length() < 1.0):
+		return
+	shunned.append(Vector3(centre.x, centre.z, radius))
+	grid.weigh_disc(centre, radius, SHUN_WEIGHT)
+
+
+## Whether this spot is on ground to keep off: under a Mist Storm, or where one is about to settle.
+func ground_shunned(p: Vector3) -> bool:
+	for z: Vector3 in shunned:
+		if Vector2(p.x - z.x, p.z - z.y).length() <= z.z:
+			return true
+	return storm_at(p) != null
+
+
+## The nearest spot off shunned ground, going straight out from the middle of it.
+func off_shunned(p: Vector3) -> Vector3:
+	for z: Vector3 in shunned:
+		var out := Vector2(p.x - z.x, p.z - z.y)
+		if out.length() <= z.z:
+			if out.length() < 0.1:
+				out = Vector2(0, 1)
+			var to := Vector2(z.x, z.y) + out.normalized() * (z.z + 4.0)
+			return Vector3(to.x, ground_at(Vector3(to.x, 0, to.y)), to.y)
+	var storm := storm_at(p)
+	return storm.escape(p) if storm else p
 
 
 ## The Mist Storm over this spot, if any.
@@ -920,9 +986,9 @@ func _grade() -> void:
 	_env.glow_enabled = Game.quality > 0
 	if _env.glow_enabled:
 		_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
-		_env.glow_intensity = 0.7
+		_env.glow_intensity = 0.85
 		_env.glow_strength = 0.9
-		_env.glow_bloom = 0.04
+		_env.glow_bloom = 0.06
 		_env.glow_hdr_threshold = 0.6
 		_env.glow_hdr_scale = 1.6
 		for level in 7:
@@ -2015,6 +2081,8 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	var minute := director.minute() if director else 0
 	z.spawn(id, at, minute)
 	z.fort_gate = gate
+	if fort and fort.has_lanes():
+		z.fort_gate = fort.lane_at(at) # wherever it rose, that lane is its own from now on
 	z.fort_shortcut = randf() < 0.25
 	if Net.is_host() and not _warming:
 		Net.zombie_spawned(z, id, z.position, minute)
@@ -2276,6 +2344,7 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 	var best_score := -INF
 	for i in 16:
 		var p: Vector3
+		var lane_spawn := false
 		if players.is_empty():
 			p = Vector3(randf_range(-half_size + 2, half_size - 2), 0, randf_range(-half_size + 2, half_size - 2))
 		else:
@@ -2283,12 +2352,16 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 			p = random_player_position() + Vector3(cos(a), 0, sin(a)) * randf_range(28.0, 62.0)
 			if fort and not fort.region.is_empty() and not fort.gates.is_empty():
 				# A stronghold with lanes: up from the foot of the lane to its gate (any lane, if it has none).
-				var lane: Array = fort.gates[fort_gate if fort_gate >= 0 else randi() % fort.gates.size()]["lane"]
+				# They step out at the very end of it, between its foot and the rift behind, wherever
+				# the players are: there is nowhere else on a lane to come from.
+				var lane_gate := fort_gate if fort_gate >= 0 else randi() % fort.gates.size()
+				var lane: Array = fort.gates[lane_gate]["lane"]
 				if lane.is_empty():
 					continue
 				var foot: Vector3 = lane.pick_random()
 				var b := randf() * TAU
-				p = foot + Vector3(cos(b), 0, sin(b)) * randf_range(0.0, 9.0)
+				p = foot + fort.lane_back(lane_gate) * LANE_SPAWN_BACK + Vector3(cos(b), 0, sin(b)) * randf_range(0.0, LANE_SPAWN_SPREAD)
+				lane_spawn = true
 			elif fort:
 				if fort_gate >= 0:
 					var d: Vector3 = fort.gates[fort_gate]["dir"]
@@ -2314,7 +2387,7 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 			near = minf(near, to.length())
 			if to.normalized().dot(pl.look_direction()) > 0.4:
 				seen = true
-		if near < 26.0:
+		if near < 26.0 and not lane_spawn:
 			continue
 		var score := -near * 0.2 + (0.0 if seen else 20.0)
 		if score > best_score:
@@ -2382,7 +2455,7 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null:
+		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null and in_reach(at):
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -2426,8 +2499,8 @@ func spawn_pickup_random(kind: int, id: String) -> Pickup:
 			continue
 		# Things to find lie apart, not in heaps.
 		at += Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
-		if not grid.is_free(grid.to_cell(at)) or terrain.in_pool(at.x, at.z) or storm_at(at) != null:
-			continue
+		if not grid.is_free(grid.to_cell(at)) or terrain.in_pool(at.x, at.z) or storm_at(at) != null or not in_reach(at):
+			continue # nor where nobody could walk to it
 		var clash := false
 		for other in pickups:
 			if Vector2(other.global_position.x - at.x, other.global_position.z - at.z).length() < PICKUP_APART:

@@ -446,7 +446,8 @@ func _codex_and_concealment() -> void:
 	var was := p.class_id
 	p.class_id = "magician"
 	for id: String in WeaponDefs.ALL:
-		check(p.can_use(id) == (id == "staff"), "Magician only accepts the wand: " + id)
+		var one_handed_melee: bool = WeaponDefs.ALL[id]["kind"] == WeaponDefs.Kind.MELEE and not WeaponDefs.is_two_handed(id) and id != "bo" and WeaponDefs.ALL[id].get("only", "") == "" and WeaponDefs.ALL[id].get("spec", "") == ""
+		check(p.can_use(id) == (id == "staff" or one_handed_melee), "Magician accepts its Staff and one-handed melee weapons only: " + id)
 	p.class_id = was
 	p.invis_left = 4.0
 	p.input_fire = false
@@ -474,7 +475,7 @@ func _beyond_weapons() -> void:
 		check(WeaponDefs.category(id) == "two_handed", "%s is a Two-Handed weapon" % id)
 	check(WeaponDefs.category("sword") == "melee" and WeaponDefs.category("chakram") == "ranged" and WeaponDefs.category("lance") == "exclusive" and WeaponDefs.category("bo") == "exclusive", "the other groups")
 	var expect := {"infantry": ["melee", "two_handed", "ranged"], "ranger": ["melee", "ranged"], "heavy": ["melee"], "chivalry": ["melee", "two_handed", "exclusive"],
-		"magician": ["exclusive"], "revenant": ["exclusive"], "monk": ["melee", "two_handed", "ranged", "exclusive"], "adept": ["melee", "two_handed"],
+		"magician": ["melee", "exclusive"], "revenant": ["exclusive"], "monk": ["melee", "two_handed", "ranged", "exclusive"], "adept": ["melee", "two_handed"],
 		"plague_doctor": ["melee", "ranged", "exclusive"], "artificer": ["melee", "two_handed", "ranged"], "commander": ["melee", "two_handed", "ranged", "exclusive"]}
 	for id: String in expect:
 		check(ClassDefs.weapon_categories(id) == Array(expect[id], TYPE_STRING, "", null), "%s wields %s (got %s)" % [id, str(expect[id]), str(ClassDefs.weapon_categories(id))])
@@ -488,7 +489,7 @@ func _beyond_weapons() -> void:
 	p.setup_class("ranger")
 	check(p.can_use("chakram") and p.can_use("bow"), "ranged rules are unchanged")
 	p.setup_class("magician")
-	check(not p.can_use("greatsword") and p.can_use("staff"), "the Magician still holds only its Staff")
+	check(not p.can_use("greatsword") and not p.can_use("bow") and p.can_use("staff") and p.can_use("sword"), "the Magician holds its Staff and one-handed melee weapons, nothing two-handed or ranged")
 	# Where they are found.
 	check(SpawnRules.allows(WeaponDefs.ALL["greatsword"], "village") and SpawnRules.allows(WeaponDefs.ALL["greatsword"], "mists") and SpawnRules.allows(WeaponDefs.ALL["greatsword"], "mesenlla"), "the Greatsword lies on every map")
 	for id: String in ["battleaxe", "chakram"]:

@@ -33,6 +33,8 @@ const DIRS: Array[Vector3] = [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0,
 var world: World
 var gates: Array[Dictionary] = []
 var heart_hp := HEART_HP
+const SIGN_GONE := 9.0 # metres from a gate at which its name is gone
+const SIGN_FULL := 15.0 # and at which it is all there
 var heart_at := Vector3.ZERO
 var _heart_mesh: Node3D
 var _repair_timer := 0.0
@@ -74,7 +76,7 @@ func add_gate_at(gate_name: String, at: Vector3, dir: Vector3, node: Node3D, row
 	body.add_child(cs)
 	world.add_child(body)
 	gates.append({"i": i, "name": gate_name, "short": gate_name.left(1).to_upper(), "at": at, "dir": dir, "size": size, "hp": GATE_HP, "closed": true,
-		"node": node, "rows": rows, "shape": cs, "lane": [] as Array[Vector3]})
+		"node": node, "rows": rows, "shape": cs, "lane": [] as Array[Vector3], "way": [] as Array[Vector3]})
 	world.grid.set_box(at, size, true)
 	var sign_board := Label3D.new()
 	sign_board.text = gate_name.to_upper()
@@ -86,6 +88,7 @@ func add_gate_at(gate_name: String, at: Vector3, dir: Vector3, node: Node3D, row
 	# Above the wall and a little outside it, so the battlements never stand in front of it.
 	sign_board.position = at + dir * (WALL_T * 0.5 + 0.6) + Vector3.UP * (WALL_H + 1.5)
 	world.add_child(sign_board)
+	gates.back()["sign"] = sign_board
 	# How much wood the gate needs, painted flat on the wall above the gateway on both sides. A label
 	# that turns to face the camera would swing into the wall when seen from the side.
 	var requirement := _wall_label("GateWood%d" % i, at + dir * (WALL_T * 0.5 + 0.06), dir)
@@ -117,6 +120,97 @@ func has_lanes() -> bool:
 func add_lane(gate: int, foot: Vector3) -> void:
 	if gate >= 0 and gate < gates.size():
 		(gates[gate]["lane"] as Array[Vector3]).append(foot)
+
+
+## A point of the road up a gate's lane, in any order: lay_ways puts them in line.
+func add_lane_way(gate: int, at: Vector3) -> void:
+	if gate >= 0 and gate < gates.size():
+		(gates[gate]["way"] as Array[Vector3]).append(at)
+
+
+## Called once the map is built. Each lane's road becomes one line, from its foot up to the ground
+## before its gate: every point follows the nearest one not yet used. A lane the map gave no road
+## is a straight line from foot to gate.
+func lay_ways() -> void:
+	for g in gates:
+		var feet: Array[Vector3] = g["lane"]
+		if feet.is_empty():
+			continue
+		var loose: Array[Vector3] = (g["way"] as Array[Vector3]).duplicate()
+		var line: Array[Vector3] = [feet[0]]
+		while not loose.is_empty():
+			var last: Vector3 = line.back()
+			var next := 0
+			for i in loose.size():
+				if loose[i].distance_squared_to(last) < loose[next].distance_squared_to(last):
+					next = i
+			line.append(loose[next])
+			loose.remove_at(next)
+		line.append((g["at"] as Vector3) + (g["dir"] as Vector3) * (WALL_T * 0.5 + 0.9))
+		g["way"] = line
+
+
+## Which lane a spot outside the walls is on: the gate whose road passes nearest. -1 without lanes.
+func lane_at(p: Vector3) -> int:
+	var best := -1
+	var nearest := INF
+	for g in gates:
+		var d := _way_spot(g["way"], p)["off"] as float
+		if d < nearest:
+			nearest = d
+			best = g["i"]
+	return best
+
+
+## How far a spot is from a lane's road, to the side.
+func off_lane(gate: int, p: Vector3) -> float:
+	return _way_spot(gates[gate]["way"], p)["off"]
+
+
+## Where someone on a lane goes next to keep to its road: the spot on the road `ahead` metres on
+## from where they are beside it, towards the gate (never further than the ground before the gate).
+func lane_ahead(gate: int, from: Vector3, ahead := 9.0) -> Vector3:
+	var way: Array[Vector3] = gates[gate]["way"]
+	if way.size() < 2:
+		return gate_front(gates[gate], from)
+	var spot := _way_spot(way, from)
+	var i: int = spot["i"]
+	var at: Vector3 = spot["at"]
+	var left := ahead
+	while i < way.size() - 1:
+		var end := way[i + 1]
+		var d := Vector2(end.x - at.x, end.z - at.z).length()
+		if d >= left:
+			return at.lerp(end, left / maxf(d, 0.001))
+		left -= d
+		at = end
+		i += 1
+	return way.back()
+
+
+## The way a lane runs at its foot, pointing away from the gate: where its enemies come from.
+func lane_back(gate: int) -> Vector3:
+	var way: Array[Vector3] = gates[gate]["way"]
+	if way.size() < 2:
+		return gates[gate]["dir"]
+	var back := way[0] - way[1]
+	back.y = 0.0
+	return back.normalized()
+
+
+## The spot on a road nearest to p: "at", the stretch it is on "i", and how far p is from it "off".
+func _way_spot(way: Array[Vector3], p: Vector3) -> Dictionary:
+	var out := {"at": p, "i": 0, "off": INF}
+	var flat := Vector2(p.x, p.z)
+	for i in way.size() - 1:
+		var a := Vector2(way[i].x, way[i].z)
+		var b := Vector2(way[i + 1].x, way[i + 1].z)
+		var near := Geometry2D.get_closest_point_to_segment(flat, a, b)
+		var d := flat.distance_to(near)
+		if d < float(out["off"]):
+			var t := 0.0 if a.is_equal_approx(b) else a.distance_to(near) / a.distance_to(b)
+			out = {"at": way[i].lerp(way[i + 1], t), "i": i, "off": d}
+	return out
 
 
 func _wall_label(label_name: String, at: Vector3, facing: Vector3) -> Label3D:
@@ -188,6 +282,8 @@ func gate_for(z: Zombie) -> Dictionary:
 	if z.fort_gate < 0 or z.fort_gate >= gates.size():
 		z.fort_gate = gate_nearest(z.position)["i"]
 	var g: Dictionary = gates[z.fort_gate]
+	if has_lanes():
+		return g # up a lane, its own gate and no other, whatever has happened elsewhere
 	if g["closed"] and z.fort_shortcut and any_open():
 		var near := gate_nearest(z.position)
 		if not near["closed"]:
@@ -326,6 +422,7 @@ func damaged_gate_near(p: Vector3) -> int:
 func _process(delta: float) -> void:
 	_banner_left -= delta
 	_tick_repair(delta)
+	_fade_signs(delta)
 	if Net.is_client():
 		return
 	if Net.is_host():
@@ -339,6 +436,27 @@ func _process(delta: float) -> void:
 	for g in gates:
 		if not g["closed"] and float(g["hp"]) >= GATE_HP * CLOSES_AT and not _doorway_busy(g):
 			_set_closed(g, true)
+
+
+## A gate's name stands high over it to be read from down its lane. Right under it the name only
+## hangs across the top of the screen, behind the clock and the portal's bars, so it fades out for
+## whoever comes close and back in as they leave.
+func _fade_signs(delta: float) -> void:
+	var viewer := world.player
+	if viewer == null:
+		return
+	for g in gates:
+		var board: Label3D = g.get("sign")
+		if board == null:
+			continue
+		var at: Vector3 = g["at"]
+		var d := Vector2(viewer.global_position.x - at.x, viewer.global_position.z - at.z).length()
+		var want := clampf((d - SIGN_GONE) / (SIGN_FULL - SIGN_GONE), 0.0, 1.0)
+		var now := move_toward(board.modulate.a, want, delta * 3.0)
+		if not is_equal_approx(now, board.modulate.a):
+			board.modulate.a = now
+			board.outline_modulate.a = now
+			board.visible = now > 0.01
 
 
 func _tick_repair(delta: float) -> void:

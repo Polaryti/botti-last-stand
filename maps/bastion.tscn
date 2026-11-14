@@ -490,6 +490,54 @@ script = ExtResource("7_s")
 kind = "lane"
 gate = 0
 
+[node name="WestWay1" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -30, 0, -62.0)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
+[node name="WestWay2" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -38, 0, -62.0)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
+[node name="WestWay3" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -46, 0, -52)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
+[node name="WestWay4" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -50, 0, -34)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
+[node name="WestWay5" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -50, 0, -12)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
+[node name="WestWay6" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -46, 0, 14)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
+[node name="WestWay7" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -48, 0, 40)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
+[node name="WestWay8" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -46, 0, 66)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 0
+
 [node name="WestRift" type="Node3D" parent="Garrison"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -46, 0, 101)
 script = ExtResource("8_s")
@@ -556,6 +604,54 @@ script = ExtResource("7_s")
 kind = "lane"
 gate = 1
 
+[node name="MiddleWay1" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, -44)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
+[node name="MiddleWay2" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, -38)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
+[node name="MiddleWay3" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, -26)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
+[node name="MiddleWay4" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, -6, 0, -10)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
+[node name="MiddleWay5" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 6, 0, 8)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
+[node name="MiddleWay6" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 26)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
+[node name="MiddleWay7" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 46)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
+[node name="MiddleWay8" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 70)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 1
+
 [node name="MiddleRift" type="Node3D" parent="Garrison"]
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 0, 0, 101)
 script = ExtResource("8_s")
@@ -620,6 +716,54 @@ gate = 2
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 46, 0, 92)
 script = ExtResource("7_s")
 kind = "lane"
+gate = 2
+
+[node name="EastWay1" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 30, 0, -62.0)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 2
+
+[node name="EastWay2" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 38, 0, -62.0)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 2
+
+[node name="EastWay3" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 46, 0, -52)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 2
+
+[node name="EastWay4" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 50, 0, -34)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 2
+
+[node name="EastWay5" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 50, 0, -12)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 2
+
+[node name="EastWay6" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 46, 0, 14)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 2
+
+[node name="EastWay7" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 48, 0, 40)
+script = ExtResource("7_s")
+kind = "lane_way"
+gate = 2
+
+[node name="EastWay8" type="Node3D" parent="Garrison"]
+transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 46, 0, 66)
+script = ExtResource("7_s")
+kind = "lane_way"
 gate = 2
 
 [node name="EastRift" type="Node3D" parent="Garrison"]

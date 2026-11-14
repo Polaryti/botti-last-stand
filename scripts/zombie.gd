@@ -13,7 +13,9 @@ const HEIGHT := 1.8
 const LOOPS := ["Idle", "Walking_A", "Walking_C", "Running_A"]
 const ATTACK_TIME := 0.62
 const MARCH_UNTIL := 6.0 # how near its gate a zombie running up a lane slows to a walk
-const LANE_BLOCKER := 2.5 # up a lane, only someone this close is fought; everyone else is passed by
+const LANE_AHEAD := 6.0 # up a lane, how far along its road a zombie aims: near enough never to leave it
+const LANE_REACH := 7.0 # how far to the side of that road someone may stand and still be gone after
+const LANE_ENGAGE := 12.0 # and how near they must be: until then the way to them is the road itself
 const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its height
 ## Bodies that share another's animated model, dressed differently.
 const BODY_FILES := {"woods_child": "normal_b"}
@@ -647,7 +649,7 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		move_and_slide()
 		position.y = world.ground_at(position)
 		return
-	if _sees and dist > 1.0 and not _lane_bound(dist):
+	if _sees and dist > 1.0:
 		_ride_dir = to / dist
 		_ride_pass = dist / _speed + 0.7
 		_ride_hit = false
@@ -655,14 +657,6 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		return
 	_move(target, to, dist, delta)
 	_play("Idle")
-
-
-## On its way up a stronghold's lane, with nobody in its way: no special moves, no charges, just on
-## to the gate. A move already begun still finishes.
-func _lane_bound(dist: float) -> bool:
-	if world.fort == null or flies or not world.fort.has_lanes() or dist < LANE_BLOCKER * 2.4:
-		return false
-	return mesenlla_mind == null or mesenlla_mind.phase == ""
 
 
 ## Below 40% health the horse goes down, and whoever rode it fights on foot.
@@ -1088,12 +1082,19 @@ func _stop_flames() -> void:
 		_flames.emitting = false
 
 
+## Whether a creature of this kind lets go of its weapon as it falls. Most always do; the Children of
+## the Woods only one time in five ("weapon_drop").
+static func lets_go(of: Dictionary) -> bool:
+	return randf() < float(of.get("weapon_drop", 1.0))
+
+
 func _die() -> void:
 	if mesenlla_mind:
 		mesenlla_mind.on_death(self)
 	_show_death()
 	if weapon_id != "":
-		world.drop_weapon(position + Vector3(0, 0, 0.5), weapon_id)
+		if lets_go(def):
+			world.drop_weapon(position + Vector3(0, 0, 0.5), weapon_id)
 		weapon_id = ""
 		if _hand_mesh:
 			_hand_mesh.equip("")
@@ -1468,15 +1469,11 @@ func _fort_plan(target: Target, dist: float) -> bool:
 	var they_inside := fort.inside(target.global_position)
 	var they_reachable := not fort.on_wall(target.global_position) and (me_inside == they_inside or fort.any_open())
 	if fort.has_lanes():
-		# Up the lanes of a stronghold, the gates and then the portal come before everything: they
-		# strike only whoever stands right in their way, and never go after anyone.
-		if they_reachable and dist < LANE_BLOCKER:
-			return false
-	else:
-		if _sees and they_reachable and dist < _sight:
-			return false
-		if state == State.CHASE and they_reachable and (target.global_position - position).length() < 14.0:
-			return false
+		return _lane_plan(target, dist, me_inside, they_inside)
+	if _sees and they_reachable and dist < _sight:
+		return false
+	if state == State.CHASE and they_reachable and (target.global_position - position).length() < 14.0:
+		return false
 	state = State.INVESTIGATE
 	_direct = false
 	_hold = false
@@ -1484,18 +1481,59 @@ func _fort_plan(target: Target, dist: float) -> bool:
 	if me_inside or phases or not g["closed"]:
 		var heart := fort.heart_at + (position - fort.heart_at).normalized() * 2.2
 		_fort_goal(heart)
-		_marching = fort.has_lanes() and Vector2(position.x - heart.x, position.z - heart.z).length() > MARCH_UNTIL
 		if Vector2(position.x - fort.heart_at.x, position.z - fort.heart_at.z).length() < 3.8:
 			_hold = true
 			_fort_strike(-1, fort.heart_at)
 		return true
 	var front := fort.gate_front(g, position)
 	_fort_goal(front)
-	# Up a long lane they come at a run, and only slow to a walk for the last few steps to the gate.
-	_marching = fort.has_lanes() and Vector2(position.x - front.x, position.z - front.z).length() > MARCH_UNTIL
 	if Vector2(position.x - front.x, position.z - front.z).length() < 1.6:
 		_hold = true
 		_fort_strike(g["i"], g["at"])
+	return true
+
+
+## Up a stronghold's lane (Mist Bastion). A zombie keeps to the road of the lane it rose on, all the
+## way to that lane's gate and no other: it fights whoever it finds on its lane like anywhere else,
+## breaks its gate, and once the gate is down goes through it for the portal, fighting whoever stands
+## inside. A gate fallen on another lane changes nothing for it.
+func _lane_plan(target: Target, dist: float, me_inside: bool, they_inside: bool) -> bool:
+	var fort := world.fort
+	var g := fort.gate_for(self)
+	var gate: int = g["i"]
+	var afoot := not fort.on_wall(target.global_position)
+	# Who it can get at without leaving its lane: inside, anyone inside; outside, anyone on its lane.
+	var mine := afoot and they_inside if me_inside else afoot and not they_inside and fort.off_lane(gate, target.global_position) < LANE_REACH
+	if mine and dist < LANE_ENGAGE and (_sees or state == State.CHASE):
+		return false # the ordinary fight
+	state = State.INVESTIGATE
+	_direct = false
+	_hold = false
+	if me_inside or phases:
+		var heart := fort.heart_at + (position - fort.heart_at).normalized() * 2.2
+		_fort_goal(heart)
+		_marching = Vector2(position.x - heart.x, position.z - heart.z).length() > MARCH_UNTIL
+		if Vector2(position.x - fort.heart_at.x, position.z - fort.heart_at.z).length() < 3.8:
+			_hold = true
+			_fort_strike(-1, fort.heart_at)
+		return true
+	var front := fort.gate_front(g, position)
+	var to_front := Vector2(position.x - front.x, position.z - front.z).length()
+	if to_front > LANE_AHEAD:
+		# Still on the way: the next stretch of the road, never straight for the gate over the slopes.
+		_fort_goal(fort.lane_ahead(gate, position, LANE_AHEAD))
+		_marching = true
+		return true
+	if not g["closed"]:
+		# Its gate is down: straight through the gateway. Once inside, the portal.
+		_fort_goal((g["at"] as Vector3) - (g["dir"] as Vector3) * (Fort.WALL_T * 0.5 + 1.6))
+		_marching = false
+		return true
+	_fort_goal(front)
+	_marching = to_front > MARCH_UNTIL
+	if to_front < 1.6:
+		_hold = true
+		_fort_strike(gate, g["at"])
 	return true
 
 
@@ -1744,7 +1782,7 @@ func _physics_process(delta: float) -> void:
 	if mist_mind:
 		mist_mind.tick(self, target, delta)
 		return
-	if mesenlla_mind and not _lane_bound(dist) and mesenlla_mind.tick(self, target, to, dist, delta):
+	if mesenlla_mind and mesenlla_mind.tick(self, target, to, dist, delta):
 		if _custom:
 			_animate_custom(delta, velocity.length())
 		return
@@ -2341,7 +2379,7 @@ func _combat(target: Target, dist: float, delta: float) -> void:
 		return
 	if _attack_style() == "ranged" and dist > 4.0:
 		# Up a stronghold's lane they do not stop to shoot at anyone further off than the next few steps.
-		if dist < _ranged_reach() and not (_lane_bound(dist) and dist > LANE_BLOCKER * 3.2):
+		if dist < _ranged_reach():
 			_attack_cd = 2.4 if _caster else maxf(1.5, _attack_interval())
 			if hero and hero_minute >= 4:
 				_attack_cd *= 0.7

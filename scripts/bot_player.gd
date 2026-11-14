@@ -47,6 +47,13 @@ var _aim_error := Vector2.ZERO
 var _hold_fire := 0.0
 var _attacks_seen := 0
 var _stuck_for := 0.0
+const NOWHERE_STEP := 2.0 # metres from where it was that count as having got somewhere
+const NOWHERE_AFTER := 6.0 # seconds of trying without getting that far before it is caught for sure
+var _anchor := Vector3.ZERO
+var _nowhere := 0.0
+const GIVE_UP_AFTER := 3.5 # seconds caught on the way to something lying about before leaving it
+const GIVE_UP_FOR := 45.0
+var _given_up := {} # pickup -> world.now until which it is left alone
 var _stuck_check := 0.0
 var _last_spot := Vector3.ZERO
 var _raining := -1.0 # aiming a Rain of Arrows: how long until it lets go
@@ -242,9 +249,8 @@ func _decide_goal() -> void:
 	var fog := world.fog
 	_away = false
 	_errand = "fight"
-	var storm := world.storm_at(here)
-	if storm:
-		_goal = storm.escape(here)
+	if world.ground_shunned(here):
+		_goal = world.off_shunned(here)
 		_errand = "evacuate"
 	elif fog and not fog.contains(here, -3.0):
 		_goal = fog.centre3()
@@ -281,11 +287,20 @@ func _decide_goal() -> void:
 		_goal = _explore
 		_errand = "explore"
 	else:
-		var friend := _nearest_friend()
+		var friend := _leader()
 		_errand = "follow"
 		_has_goal = friend != null and friend.global_position.distance_to(here) > FOLLOW_AT
 		if friend:
 			_goal = friend.global_position
+	if not _has_goal or _errand == "evacuate" or world.terrain.has_islands():
+		return
+	# Nothing is worth walking into a Mist Storm for: as far as its rim, and no further. And a spot
+	# to run to that nobody could reach (off the map, up a cliff) is no spot to run to.
+	if world.ground_shunned(_goal):
+		_goal = world.off_shunned(_goal)
+		_has_goal = Vector2(_goal.x - here.x, _goal.z - here.z).length() > 1.5
+	elif _away and not world.in_reach(_goal):
+		_has_goal = false
 
 
 ## Too hurt to carry on with this fight.
@@ -314,6 +329,8 @@ func _wanted_item() -> Pickup:
 		var woodland_errand := p.kind == Pickup.Kind.WOOD and world.fort != null and pawn.wood < 6 and _gate_to_mend() != Vector3.INF
 		if d > float(_smart["items"]) and not woodland_errand:
 			continue
+		if _given_up.get(p.get_instance_id(), 0.0) > world.now or not world.in_reach(p.global_position) or world.ground_shunned(p.global_position):
+			continue # it tried and could not get there, or nobody could, or it lies in a storm
 		var worth := _worth(p)
 		if worth <= 0.0 or (busy and not (hurt_badly and p.kind == Pickup.Kind.FOOD)):
 			continue
@@ -374,6 +391,28 @@ func _nearest_friend() -> Node3D:
 			best_d = d
 			best = t
 	return best
+
+
+## Who to keep close to when there is nothing else to do: the nearest person, however far, before any
+## bot. With no person standing, bots fall in behind the first of them, and that one stays where it
+## is: two bots keeping each other company would wander off together and never come back.
+func _leader() -> Node3D:
+	var person: Node3D = null
+	var person_d := INF
+	var first: Node3D = null
+	var first_peer := peer
+	for t: Target in world.friends_near(pawn.global_position, INF):
+		var who := world.peer_of(t)
+		if Net.is_bot(who):
+			if who < first_peer:
+				first_peer = who
+				first = t
+			continue
+		var d := t.global_position.distance_to(pawn.global_position)
+		if d < person_d:
+			person_d = d
+			person = t
+	return person if person else first
 
 
 func _target_alive() -> bool:
@@ -554,17 +593,55 @@ func _check_stuck(delta: float, moving: bool) -> void:
 	var here := pawn.global_position
 	var moved := Vector2(here.x - _last_spot.x, here.z - _last_spot.z).length()
 	_last_spot = here
-	if not moving or moved > 0.6 or pawn._is_moved_by_mist():
+	# Jumping at a slope or sliding along a wall moves a body without getting it anywhere. So besides
+	# the last half second, count how long it has been trying to go somewhere and is still within a
+	# couple of steps of the same spot (a fight at arm's length is not going anywhere on purpose).
+	var brawling := _target_alive() and _target.global_position.distance_to(here) < 6.0
+	if not moving or brawling or pawn._is_moved_by_mist() or Vector2(here.x - _anchor.x, here.z - _anchor.z).length() > NOWHERE_STEP:
+		_anchor = here
+		_nowhere = 0.0
+	else:
+		_nowhere += 0.5
+	var caught := _nowhere >= NOWHERE_AFTER
+	if not caught and (not moving or moved > 0.6 or pawn._is_moved_by_mist()):
 		_stuck_for = 0.0
 		return
-	_stuck_for += 0.5
+	_stuck_for = maxf(_stuck_for + 0.5, 5.0 if caught else 0.0)
+	if caught:
+		_anchor = here
+		_nowhere = 0.0
 	if _stuck_for >= 1.0:
 		pawn.input_jump = true
 	if _stuck_for >= 2.0:
 		_no_shortcut = 3.0
 		_repath = 0.0
-	if _stuck_for >= 5.0 and _path_at < _path.size():
-		var spot := _path[_path_at]
+	if _stuck_for >= GIVE_UP_AFTER and _errand == "item" and is_instance_valid(_item):
+		# Whatever it was after is not worth this: leave it be for a while.
+		_given_up[_item.get_instance_id()] = world.now + GIVE_UP_FOR
+		_item = null
+		_stuck_for = 0.0
+		_think = 0.0
+		return
+	if _stuck_for >= 5.0:
+		var spot := here
+		if _path_at < _path.size():
+			# On along its way: the next point, or (caught for good, where the next one may be in the
+			# same trap) the first one after it on ground that can be walked to.
+			var hop := _path_at
+			if caught:
+				hop = mini(_path_at + 2, _path.size() - 1)
+				while hop < _path.size() - 1 and not world.in_reach(_path[hop]):
+					hop += 1
+			_path_at = hop
+			spot = _path[hop]
+		else:
+			# No way planned at all: it stands on or in something. Down onto the nearest open ground.
+			var cell := world.grid.to_cell(here)
+			var free := world.grid.nearest_free(cell)
+			if free == cell:
+				free = world.grid.nearest_free(cell + Vector2i(randi_range(-2, 2), randi_range(-2, 2)))
+			spot = world.grid.to_world(free)
+			_explore = Vector3.INF # and somewhere else to go, if it was only wandering
 		pawn.global_position = Vector3(spot.x, world.ground_at(spot) + 0.1, spot.z)
 		pawn.velocity = Vector3.ZERO
 		_stuck_for = 0.0
