@@ -21,7 +21,7 @@ var zone_at := Vector3.INF # a storm over a place rather than an island: its mid
 var zone_radius := 0.0 # and how far it reaches
 var zone_leave := "" # what the warning tells you to leave
 var elapsed := 0.0
-var _status: Label
+var hud_line := "" # what the HUD says while you stand in this storm; empty when you do not
 var _sound := 0.0
 var _exposure := 0.0
 var _rings: Array[MeshInstance3D] = []
@@ -87,8 +87,6 @@ func _join(w: World) -> void:
 
 ## The look of a storm over a round of land: rings of mist light, and clouds rolling through.
 func _ring(at: Vector3, radius: float, quiet: bool) -> void:
-	if _status == null:
-		_make_status()
 	var root := Node3D.new()
 	add_child(root)
 	root.position = at
@@ -132,23 +130,6 @@ func _ring(at: Vector3, radius: float, quiet: bool) -> void:
 
 
 ## The line of words at the top of the screen while you are inside.
-func _make_status() -> void:
-	var canvas := CanvasLayer.new()
-	canvas.layer = 6
-	add_child(canvas)
-	var panel := Control.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	canvas.add_child(panel)
-	_status = Label.new()
-	_status.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_status.position.y = 80.0
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_status.add_theme_color_override("font_color", Color(0.8, 0.65, 1.0))
-	_status.add_theme_font_size_override("font_size", 22)
-	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(_status)
-
 const NAMES := MapIslands.ZONE_NAMES
 
 
@@ -190,11 +171,11 @@ func _physics_process(delta: float) -> void:
 				if not ally.dead and contains(ally.global_position): ally.hurt(amount, global_position)
 	if world.player:
 		var inside := contains(world.player.global_position)
-		_status.visible = inside and not world.player.dead
-		if elapsed < warning: _status.text = ("MIST STORM — LEAVE %s • %ds" % [zone_leave, ceili(warning - elapsed)]) if zone_leave != "" else "MIST STORM — EVACUATE • %ds" % ceili(warning - elapsed)
-		elif finale: _status.text = "MIST STORM • 6 HP/s — RETURN TO THE ARENA"
-		elif zone_leave != "": _status.text = "MIST STORM • 6 HP/s — LEAVE %s" % zone_leave
-		else: _status.text = "MIST STORM • 6 HP/s • %ds" % maxi(0, ceili(warning + duration - elapsed))
+		if not inside or world.player.dead: hud_line = ""
+		elif elapsed < warning: hud_line = ("Mist Storm in %d s: leave %s" % [ceili(warning - elapsed), zone_leave.capitalize()]) if zone_leave != "" else "Mist Storm in %d s: get out" % ceili(warning - elapsed)
+		elif finale: hud_line = "Mist Storm, 6 HP/s: back to the arena"
+		elif zone_leave != "": hud_line = "Mist Storm, 6 HP/s: leave %s" % zone_leave.capitalize()
+		else: hud_line = "Mist Storm, 6 HP/s: %d s left" % maxi(0, ceili(warning + duration - elapsed))
 	_sound -= delta
 	if _sound <= 0.0:
 		_sound = 3.5

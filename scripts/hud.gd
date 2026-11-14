@@ -15,6 +15,13 @@ const COL_BG := Color(0.05, 0.05, 0.07, 0.72)
 const COL_LINE := Color(1, 1, 1, 0.7)
 const COL_FIRE := Color(0.62, 0.13, 0.09, 0.8)
 const COL_ACCENT := Color(1.0, 0.78, 0.3)
+# The HUD's own text scale: a few sizes, each for one kind of thing.
+const HUD_CLOCK := 32 # the time left
+const HUD_TEXT := 20 # names, chips, the weapon you hold
+const HUD_SMALL := 17 # numbers on bars and icons, labels under buttons
+const HUD_TOAST := 28 # a word for what just happened, in the middle
+const CHIP_H := 30.0
+const BACKING := Color(0.04, 0.05, 0.08, 0.55) # behind anything that sits on the world
 ## Dropping a weapon takes a held press, so a thumb passing over the button never throws one away.
 const DROP_HOLD := 0.5
 
@@ -34,9 +41,12 @@ var _joy_finger := -1
 var _pad := 24.0
 var _crosshair: Texture2D
 var _status_bottom := 110.0
+var _centre_y := 64.0 # how far down the middle column (clock, chips, stance, Fort) has got this frame
+var _backing := UiTheme.flat(BACKING, Color.TRANSPARENT, 12, 0.0)
 var _track := UiTheme.flat(Color(UiTheme.NIGHT, 0.72), Color.TRANSPARENT, 5, 0.0)
 var _fill := UiTheme.flat(Color.WHITE, Color.TRANSPARENT, 5, 0.0)
 var _capsule := UiTheme.flat(Color(UiTheme.NIGHT, 0.6), Color.TRANSPARENT, 10, 0.0)
+var _capsule_soft := UiTheme.flat(BACKING, Color.TRANSPARENT, 15, 0.0)
 var _was_dead := false
 var _drop_held := 0.0 # how long the drop button has been held, or -1 once it has dropped
 
@@ -297,13 +307,14 @@ func _draw() -> void:
 	if player.is_unseen():
 		draw_rect(Rect2(Vector2.ZERO, s), Color(0.2, 0.12, 0.5, 0.16))
 	_draw_status(s)
+	_draw_chips(s)
 	if player.class_id == "adept":
 		_draw_stance(s)
 	_draw_fog(s, centre)
 	if player.frozen_left > 0.0:
 		if player.is_iced:
 			draw_rect(Rect2(Vector2.ZERO, s), Color(0.6, 0.85, 1.0, 0.24))
-		_centered("Frozen" if player.is_iced else "Stunned", Vector2(centre.x, s.y * 0.62), 34, UiTheme.MIST)
+		_centered("Frozen" if player.is_iced else "Stunned", Vector2(centre.x, s.y * 0.62), HUD_TOAST + 6, UiTheme.MIST)
 	# Down the left side, each below the last, so nothing lands on anything else.
 	var left_y := _status_bottom
 	if Net.in_game:
@@ -314,9 +325,9 @@ func _draw() -> void:
 	_draw_weapon(s)
 	_draw_controls()
 	if player.toast_time > 0.0:
-		_centered(player.toast, Vector2(centre.x, s.y * 0.38), 30, Color(UiTheme.MOSS if "DODGE" in player.toast else (UiTheme.EMBER if "Backstab" in player.toast or "Riposte" in player.toast else UiTheme.BONE), minf(1.0, player.toast_time * 2.0)))
+		_centered(player.toast, Vector2(centre.x, s.y * 0.38), HUD_TOAST, Color(UiTheme.MOSS if "DODGE" in player.toast else (UiTheme.EMBER if "Backstab" in player.toast or "Riposte" in player.toast else UiTheme.BONE), minf(1.0, player.toast_time * 2.0)))
 	if director and director.banner_time > 0.0:
-		_banner_text(director.banner, Vector2(centre.x, 328.0 if player.class_id == "adept" and player.world.fort else s.y * 0.32), minf(1.0, director.banner_time))
+		_banner_text(director.banner, Vector2(centre.x, maxf(s.y * 0.32, _centre_y + 40.0)), minf(1.0, director.banner_time))
 
 
 func _bar(r: Rect2, f: float, col: Color) -> void:
@@ -327,30 +338,42 @@ func _bar(r: Rect2, f: float, col: Color) -> void:
 		draw_style_box(_fill, Rect2(r.position, Vector2(maxf(r.size.x * part, minf(r.size.y, r.size.x)), r.size.y)))
 
 
-## The portal, the gates, and how much wood you carry.
+## The portal, the gates and the wood you carry, in one panel under the clock, with the dial that
+## says which way each gate lies beside them.
 func _draw_fort(s: Vector2, centre: Vector2) -> void:
 	var fort := player.world.fort
-	var w := 260.0
-	var top := 194.0 if player.class_id == "adept" else 122.0
-	_bar(Rect2(centre.x - w * 0.5, top, w, 12), fort.heart_hp / Fort.HEART_HP, Color(0.9, 0.3, 0.24))
-	_centered("Portal", Vector2(centre.x - w * 0.5 - 36, top + 6), 18, UiTheme.BONE)
+	const BAR_W := 250.0
+	const DIAL := 50.0 # the dial's radius, ring included
+	var w := 14.0 + BAR_W + 18.0 + DIAL * 2.0 + 12.0
+	var h := 108.0
+	var top := _centre_y + 6.0
+	var x0 := centre.x - w * 0.5
+	draw_style_box(_backing, Rect2(x0, top, w, h))
+	var x := x0 + 14.0
+	var heart := fort.heart_hp / Fort.HEART_HP
+	_text("Portal", Vector2(x, top + 22), HUD_SMALL, UiTheme.BONE)
+	var pct := "%d%%" % ceili(heart * 100.0)
+	_text(pct, Vector2(x + BAR_W - font.get_string_size(pct, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_SMALL).x, top + 22), HUD_SMALL, UiTheme.BONE if heart > 0.35 else UiTheme.BLOOD.lightened(0.3))
+	_bar(Rect2(x, top + 28, BAR_W, 12), heart, Color(0.9, 0.3, 0.24))
 	var gate_count := maxi(1, fort.gates.size())
-	var gate_w := (w - 6.0 * (gate_count - 1)) / gate_count
+	var gate_w := (BAR_W - 6.0 * (gate_count - 1)) / gate_count
 	for i in fort.gates.size():
 		var g: Dictionary = fort.gates[i]
-		var r := Rect2(centre.x - w * 0.5 + i * (gate_w + 6.0), top + 20, gate_w, 9)
+		var r := Rect2(x + i * (gate_w + 6.0), top + 50, gate_w, 9)
 		_bar(r, float(g["hp"]) / Fort.GATE_HP, Color(0.72, 0.5, 0.26) if g["closed"] else Color(0.8, 0.2, 0.15))
-		_centered(str(g["short"]), r.get_center() + Vector2(0, 16), 15, UiTheme.BONE)
+		_centered(str(g["short"]), r.get_center() + Vector2(0, 17), HUD_SMALL, UiTheme.BONE if g["closed"] else UiTheme.BLOOD.lightened(0.3))
 	const WOOD_COL := Color(0.92, 0.72, 0.42)
-	_centered("Wood %d of %d" % [player.wood, Fort.WOOD_MAX], Vector2(centre.x, top + 60), 20, WOOD_COL)
-	_draw_gate_compass(fort, Vector2(centre.x + w * 0.5 + 66.0, top + 26.0))
+	draw_texture_rect(Icons.glyph("log"), Rect2(x, top + 80, 20, 20), false, WOOD_COL)
+	_text("Wood %d of %d" % [player.wood, Fort.WOOD_MAX], Vector2(x + 26, top + 97), HUD_SMALL, WOOD_COL)
+	_draw_gate_compass(fort, Vector2(x0 + w - 12.0 - DIAL, top + h * 0.5))
+	_centre_y = top + h
 
 
 ## Which way each gate lies from where you stand. The top of the dial is the way you are looking.
 func _draw_gate_compass(fort: Fort, at: Vector2) -> void:
-	const RADIUS := 36.0
-	draw_circle(at, RADIUS + 16.0, Color(0.05, 0.06, 0.09, 0.62))
-	draw_arc(at, RADIUS + 16.0, 0.0, TAU, 32, Color(0.92, 0.72, 0.42, 0.7), 2.0, true)
+	const RADIUS := 34.0
+	draw_circle(at, RADIUS + 14.0, Color(0.05, 0.06, 0.09, 0.62))
+	draw_arc(at, RADIUS + 14.0, 0.0, TAU, 32, Color(0.92, 0.72, 0.42, 0.7), 2.0, true)
 	draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7), at + Vector2(-5, 5), at + Vector2(5, 5)]), UiTheme.BONE)
 	for g: Dictionary in fort.gates:
 		var to: Vector3 = (g["at"] as Vector3) - player.global_position
@@ -361,7 +384,7 @@ func _draw_gate_compass(fort: Fort, at: Vector2) -> void:
 			col = Color(1.0, 0.3, 0.22)
 		elif fort.wood_needed(g) > 0:
 			col = Color(0.95, 0.65, 0.25)
-		_centered(str(g["short"]), at + dir * RADIUS + Vector2(0, 7), 20, col)
+		_centered(str(g["short"]), at + dir * RADIUS, HUD_TEXT, col)
 
 
 ## All vs All: what the fog is doing, and the way back if you are out in it.
@@ -369,8 +392,6 @@ func _draw_fog(s: Vector2, centre: Vector2) -> void:
 	var fog := player.world.fog
 	if fog == null:
 		return
-	var t := director.elapsed if director else 0.0
-	_centered("The fog is closing" if ClosingFog.is_closing(t) else "The fog holds", Vector2(centre.x, 124.0), 18, UiTheme.MIST)
 	if player.dead or fog.contains(player.global_position):
 		return
 	draw_rect(Rect2(Vector2.ZERO, s), Color(0.45, 0.62, 0.56, 0.22))
@@ -378,57 +399,64 @@ func _draw_fog(s: Vector2, centre: Vector2) -> void:
 	_sensor_arrow(centre, (Vector3(fog.centre.x, 0.0, fog.centre.y) - player.global_position).normalized() * 5.0, UiTheme.MOSS)
 
 
-## Who else is out there: each player's name, health and, when they are down, how long until they
-## are back. In a fight, the score. If you are down, your own countdown in the middle.
+## Who else is out there, in a panel under your own: each player's name and level, their health and,
+## when they are down, how long until they are back. In a fight, the score. If you are down, your own
+## countdown in the middle.
 func _draw_together(s: Vector2, centre: Vector2) -> float:
-	var y := _status_bottom + 18.0
 	var ids: Array = Net.roster.keys()
 	ids.sort_custom(func(a: int, b: int) -> bool: return int(Net.roster[a]["score"]) > int(Net.roster[b]["score"]))
 	const BAR_W := 150.0
+	const W := 300.0
 	var versus := Net.rules != Net.Rules.COOP # a score beside each name: every rule but a night side by side
-	for peer: int in ids:
+	# Your own health is the big bar above. Here you only keep your line where there is a score to read
+	# beside it; fighting side by side, the list is the others.
+	var shown := ids.filter(func(peer: int) -> bool: return versus or peer != Net.my_id())
+	var top := _status_bottom + 6.0
+	var y := top + 26.0
+	if not shown.is_empty():
+		var height := 12.0
+		for peer: int in shown:
+			height += 30.0 if peer == Net.my_id() else 44.0
+		draw_style_box(_backing, Rect2(_pad - 10.0, top, W, height))
+	for peer: int in shown:
 		var info: Dictionary = Net.roster[peer]
 		var mine := peer == Net.my_id()
-		# Your own health is the big bar above. Here you only keep your line where there is a score to
-		# read beside it; fighting side by side, the list is the others.
-		if mine and not versus:
-			continue
 		var col := UiTheme.BONE
 		if Net.rules == Net.Rules.TEAMS:
 			col = Net.team_colour(int(info["team"]))
 		var state := Net.player_state(peer)
 		var out: bool = state["out"]
 		var down: bool = state["down"]
-		var faded := 0.4 if out or down else (1.0 if mine else 0.85)
+		var faded := 0.45 if out or down else 1.0
 		var line := str(info["name"])
-		_text(line, Vector2(_pad, y), 19, Color(col, faded))
-		var x := _pad + font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 8.0
+		_text(line, Vector2(_pad, y), HUD_TEXT, Color(col, faded))
+		var x := _pad + font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_TEXT).x + 8.0
 		var lv := "Lv %d" % int(state["level"])
-		_text(lv, Vector2(x, y), 16, Color(UiTheme.EMBER, faded))
-		x += font.get_string_size(lv, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 10.0
+		_text(lv, Vector2(x, y), HUD_SMALL, Color(UiTheme.EMBER, faded))
+		x += font.get_string_size(lv, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_SMALL).x + 10.0
 		if versus:
 			var score := "%d" % int(info["score"])
-			_text(score, Vector2(x, y), 19, Color(col, faded))
-			x += font.get_string_size(score, HORIZONTAL_ALIGNMENT_LEFT, -1, 19).x + 10.0
+			# The score at the right edge of the panel, where scores line up under each other.
+			_text(score, Vector2(_pad - 10.0 + W - 14.0 - font.get_string_size(score, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_TEXT).x, y), HUD_TEXT, Color(col, faded))
 		if Net.fog_rules():
 			for i in Net.lives_of(peer):
-				draw_texture_rect(Icons.glyph("heart"), Rect2(x + i * 19.0, y - 16.0, 18.0, 18.0), false, UiTheme.BLOOD.lightened(0.2))
+				draw_texture_rect(Icons.glyph("heart"), Rect2(x + i * 19.0, y - 15.0, 17.0, 17.0), false, UiTheme.BLOOD.lightened(0.2))
 		if mine:
-			y += 26.0 # no second bar for you
+			y += 30.0 # no second bar for you
 			continue
-		y += 7.0
+		y += 6.0
 		var bar := Rect2(_pad, y, BAR_W, 8)
 		if out:
 			_bar(bar, 0.0, UiTheme.ASH)
-			_text("Out", Vector2(_pad + BAR_W + 8, y + 9), 16, UiTheme.ASH)
+			_text("Out", Vector2(_pad + BAR_W + 8, y + 9), HUD_SMALL, UiTheme.ASH)
 		elif down:
 			_bar(bar, 0.0, UiTheme.ASH)
 			var back: float = state["back_in"]
-			_text("Down, back in %d s" % ceili(back) if back >= 0.0 else "Down", Vector2(_pad + BAR_W + 8, y + 9), 16, UiTheme.BLOOD.lightened(0.3))
+			_text("Back in %d s" % ceili(back) if back >= 0.0 else "Down", Vector2(_pad + BAR_W + 8, y + 9), HUD_SMALL, UiTheme.BLOOD.lightened(0.3))
 		else:
 			var f: float = state["hp"]
 			_bar(bar, f, UiTheme.MOSS.darkened(0.15) if f > 0.35 else UiTheme.BLOOD)
-		y += 30.0
+		y += 38.0
 	if player.dead:
 		var wait := Net.respawn_seconds()
 		if Net.is_out():
@@ -437,59 +465,110 @@ func _draw_together(s: Vector2, centre: Vector2) -> float:
 			_banner_text("Back in %d" % ceili(wait), Vector2(centre.x, s.y * 0.3), 1.0)
 		var who := Net.watching_name()
 		if who != "":
-			_centered("Watching %s. Tap to change." % who, Vector2(centre.x, s.y * 0.88), 26, UiTheme.BONE)
-	return y + 4.0
+			_chip("Watching %s. Tap to change." % who, "eye", UiTheme.BONE, Vector2(centre.x, s.y * 0.88), true)
+	return (y - 26.0 + 14.0) if not shown.is_empty() else top
 
 
+## You, top left, on one panel: the crest of your class, your health with its number, how far to the
+## next level, and mana or Ki when your class has them. Under it, small chips: kills, and your mount.
 func _draw_status(s: Vector2) -> void:
 	var cls := player.class_id
-	Icons.draw(self, Rect2(_pad, 14, 58, 58), ClassDefs.icon(cls), ClassDefs.color(cls))
-	var x := _pad + 68.0
+	const BAR_W := 230.0
+	var has_mana: bool = player.class_def().get("mana", false)
+	var card := Rect2(_pad - 10.0, 8.0, 10.0 + 54.0 + 10.0 + BAR_W + 12.0, 80.0 if has_mana else 64.0)
+	draw_style_box(_backing, card)
+	Icons.draw(self, Rect2(_pad, 14, 52, 52), ClassDefs.icon(cls), ClassDefs.color(cls))
+	var x := _pad + 64.0
 	var f := clampf(player.hp / player.max_hp(), 0.0, 1.0)
 	var hp_col := UiTheme.MOSS.darkened(0.15) if f > 0.35 else UiTheme.BLOOD
 	if player.burn_time > 0.0:
 		hp_col = UiTheme.EMBER.darkened(0.1)
-	_bar(Rect2(x, 16, 240, 22), f, hp_col)
-	_text("%d" % ceil(player.hp), Vector2(x + 9, 34), 18, Color.WHITE)
+	_bar(Rect2(x, 16, BAR_W, 22), f, hp_col)
+	_text("%d" % ceil(player.hp), Vector2(x + 9, 34), HUD_SMALL, Color.WHITE)
 	var xp_f := 1.0
 	if player.level < ClassDefs.MAX_LEVEL:
 		xp_f = float(player.xp) / float(player.xp_needed())
-	_bar(Rect2(x, 42, 240, 7), xp_f, UiTheme.EMBER)
-	var y := 66.0
-	if player.class_def().get("mana", false):
-		var mana_rect := Rect2(x, 53, 240, 16)
-		_bar(mana_rect, player.mana / maxf(player.max_mana(), 1.0), KI_COLOUR if player.class_def().get("ki", false) else UiTheme.MIST)
-		_text("%d" % int(player.mana), Vector2(x + 9, 67), 14, Color.WHITE)
-		y = 84.0
-	y = maxf(y, 82.0)
+	_bar(Rect2(x, 43, BAR_W, 7), xp_f, UiTheme.EMBER)
+	if has_mana:
+		_bar(Rect2(x, 56, BAR_W, 16), player.mana / maxf(player.max_mana(), 1.0), KI_COLOUR if player.class_def().get("ki", false) else UiTheme.MIST)
+		_text("%d" % int(player.mana), Vector2(x + 9, 70), HUD_SMALL - 2, Color.WHITE)
+	var y := card.end.y + 6.0
+	var cx := _pad - 10.0
 	if Game.is_night() and director:
 		_clock(s, Game.clock(director.night_left()))
-		_text("%d kills" % player.kills, Vector2(_pad, y + 18), 21, UiTheme.BONE)
-		y += 28.0
-		var hunting := player.world.count_hunting()
-		var label := "Hunted" if hunting > 0 else "Unseen"
-		if player.invis_left > 0.0:
-			label = "Invisible"
-		var col := UiTheme.BLOOD.lightened(0.25) if hunting > 0 and player.invis_left <= 0.0 else UiTheme.MOSS
-		_centered(label, Vector2(s.x * 0.5, 80), 20, col)
-		if player.is_lit():
-			_centered("In the light", Vector2(s.x * 0.5, 102), 18, UiTheme.EMBER)
+		cx += _chip("%d kills" % player.kills, "skull", UiTheme.BONE, Vector2(cx, y)) + 6.0
 	elif Game.mode == Game.Mode.SANDBOX:
 		_clock(s, "Sandbox")
-	_draw_way_of_fighting(s)
 	if player.is_riding():
-		_text("%s %d" % [player.mount_name(), ceil(player.riding_left)], Vector2(_pad, y + 18), 20, UiTheme.EMBER)
-		y += 26.0
+		_chip("%s %d" % [player.mount_name(), ceil(player.riding_left)], "horse", UiTheme.EMBER, Vector2(cx, y))
 	elif player.has_mount():
-		_text("%s %d/%d" % [player.mount_name(), player.horse_progress, player.horses_needed()], Vector2(_pad, y + 18), 20, UiTheme.EMBER if player.horse_ready() else UiTheme.BONE)
-		y += 26.0
-	_status_bottom = y + 16.0
+		_chip("%s %d/%d" % [player.mount_name(), player.horse_progress, player.horses_needed()], "horse", UiTheme.EMBER if player.horse_ready() else UiTheme.BONE, Vector2(cx, y))
+	_status_bottom = y + CHIP_H
+
+
+## A small rounded label sitting on the world: an icon and a few words. Drawn from its left edge (or
+## its middle, if centred); returns how wide it was.
+func _chip(t: String, icon: String, col: Color, at: Vector2, centred := false) -> float:
+	var tw := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_TEXT - 2).x
+	var w := 10.0 + (22.0 if icon != "" else 0.0) + tw + 12.0
+	var x := at.x - w * 0.5 if centred else at.x
+	var r := Rect2(x, at.y, w, CHIP_H)
+	draw_style_box(_capsule_soft, r)
+	var tx := x + 10.0
+	if icon != "":
+		draw_texture_rect(Icons.glyph(icon), Rect2(tx, at.y + 5.0, 20.0, 20.0), false, col)
+		tx += 26.0
+	_text(t, Vector2(tx, at.y + 21.0), HUD_TEXT - 2, col)
+	return w
+
+
+## Under the clock, in one row: whether anything is hunting you, whether you stand in the light, what
+## your way of fighting is doing, and the Mist Storm you are in. Each with its own icon.
+func _draw_chips(s: Vector2) -> void:
+	var chips: Array[Array] = [] # [words, icon, colour]
+	if Game.is_night() and director:
+		var hunting := player.world.count_hunting()
+		if player.invis_left > 0.0:
+			chips.append(["Invisible", "eye_closed", UiTheme.MIST])
+		elif hunting > 0:
+			chips.append(["Hunted", "eye", UiTheme.BLOOD.lightened(0.3)])
+		else:
+			chips.append(["Unseen", "eye_closed", UiTheme.MOSS])
+		if player.is_lit():
+			chips.append(["In the light", "sun", UiTheme.EMBER])
+	if player.spirit_left > 0.0:
+		chips.append(["Your spirit walks: %d s" % ceili(player.spirit_left), "ghost", Color(0.7, 0.95, 1.0)])
+		draw_rect(Rect2(Vector2.ZERO, s), Color(0.5, 0.9, 1.0, 0.12))
+	elif player.void_left > 0.0:
+		chips.append(["Void stance: %d s" % ceili(player.void_left), "moon", Player.STANCE_COLOURS["void"].lightened(0.3)])
+	elif player.stone_skin > 0.0:
+		chips.append(["Stone Skin %d%%" % roundi(player.stone_skin * 100.0), "mountain", Player.STANCE_COLOURS["stone"]])
+	var fog := player.world.fog
+	if fog != null:
+		chips.append(["The fog is closing" if ClosingFog.is_closing(director.elapsed if director else 0.0) else "The fog holds", "mist", UiTheme.MIST])
+	for storm: MistStorm in player.world.mist_storms:
+		if is_instance_valid(storm) and storm.hud_line != "":
+			chips.append([storm.hud_line, "storm", Color(0.85, 0.7, 1.0)])
+	_centre_y = 64.0
+	if chips.is_empty():
+		return
+	var widths: Array[float] = []
+	var total := 0.0
+	for c: Array in chips:
+		var w := 10.0 + 22.0 + font.get_string_size(c[0], HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_TEXT - 2).x + 12.0
+		widths.append(w)
+		total += w + 6.0
+	var x := s.x * 0.5 - (total - 6.0) * 0.5
+	for i in chips.size():
+		_chip(chips[i][0], chips[i][1], chips[i][2], Vector2(x, 68.0))
+		x += widths[i] + 6.0
+	_centre_y = 68.0 + CHIP_H
 
 
 func _clock(s: Vector2, t: String) -> void:
-	var fs := 32
+	var fs := HUD_CLOCK
 	var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_style_box(_capsule, Rect2(s.x * 0.5 - w * 0.5 - 18, 12, w + 36, 48))
+	draw_style_box(_backing, Rect2(s.x * 0.5 - w * 0.5 - 18, 12, w + 36, 48))
 	draw_string(font, Vector2(s.x * 0.5 - w * 0.5, 47), t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, UiTheme.BONE)
 
 
@@ -500,7 +579,7 @@ func _draw_powers(top: float) -> void:
 		var d: Dictionary = PowerDefs.ALL[id]
 		var left: float = player.powers[id]
 		Icons.draw(self, Rect2(x, y, 46, 46), Icons.power(id), d["color"])
-		var fs := 18
+		var fs := HUD_SMALL
 		var t := "%d" % ceil(left)
 		var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		_text(t, Vector2(x + 23 - w * 0.5, y + 60), fs, UiTheme.BONE)
@@ -514,10 +593,10 @@ func _draw_powers(top: float) -> void:
 		var left: float = e["left"]
 		if left >= 0.0:
 			var t := "%d" % ceil(left)
-			var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
-			_text(t, Vector2(x + 23 - w * 0.5, y + 60), 18, UiTheme.BONE)
+			var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_SMALL).x
+			_text(t, Vector2(x + 23 - w * 0.5, y + 60), HUD_SMALL, UiTheme.BONE)
 		if int(e["stacks"]) > 1:
-			_text("x%d" % int(e["stacks"]), Vector2(x + 30, y + 14), 15, UiTheme.EMBER)
+			_text("x%d" % int(e["stacks"]), Vector2(x + 30, y + 14), HUD_SMALL - 2, UiTheme.EMBER)
 		x += 52.0
 		if x > _pad + 260.0:
 			x = _pad
@@ -591,7 +670,7 @@ func _draw_item_name() -> void:
 	if p.kind == Pickup.Kind.WEAPON and not player.can_use(p.weapon_id):
 		text += " (not for your class)"
 		col = Color(0.75, 0.72, 0.68, 0.8)
-	_centered(text, at, 22, col)
+	_centered(text, at, HUD_TEXT, col)
 
 
 ## A small health bar over anything just hit, and over a Fallen Hero that is hunting you.
@@ -610,7 +689,7 @@ func _draw_enemy_bars() -> void:
 		draw_rect(r.grow(2.0), Color(0, 0, 0, 0.7))
 		draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(z.hp / z.max_hp, 0.0, 1.0), r.size.y)), Color(0.72, 0.13, 0.1) if not z.hero else Color(0.72, 0.28, 0.72))
 		if z.hero:
-			_centered(z.display_name(), at + Vector2(0, -16.0), 20, Color(1.0, 0.84, 0.95))
+			_centered(z.display_name(), at + Vector2(0, -16.0), HUD_TEXT, Color(1.0, 0.84, 0.95))
 	# Other players and bots: their health for a moment after a hit, red for foes and green for friends.
 	for t: Target in player.world.players:
 		if not is_instance_valid(t) or not t is Avatar:
@@ -672,38 +751,44 @@ func _sensor_arrow(centre: Vector2, to: Vector3, col: Color) -> void:
 	draw_colored_polygon(pts, Color(col, clampf(1.3 - dist / PowerDefs.SENSOR_RANGE, 0.35, 1.0)))
 
 
-## What the Monk's path and the Adept's stance are doing right now.
-func _draw_way_of_fighting(s: Vector2) -> void:
-	var y := 150.0
-	if player.spirit_left > 0.0:
-		_centered("Your spirit walks: %d s" % ceili(player.spirit_left), Vector2(s.x * 0.5, y), 24, Color(0.7, 0.95, 1.0))
-		draw_rect(Rect2(Vector2.ZERO, s), Color(0.5, 0.9, 1.0, 0.12))
-	elif player.void_left > 0.0:
-		_centered("Void stance: %d s" % ceili(player.void_left), Vector2(s.x * 0.5, y), 24, Player.STANCE_COLOURS["void"].lightened(0.3))
-	elif player.stone_skin > 0.0:
-		_centered("Stone Skin %d%%" % roundi(player.stone_skin * 100.0), Vector2(s.x * 0.5, y), 22, Player.STANCE_COLOURS["stone"])
-
-
+## What you hold, and what it has left to throw or cast, on a chip at the bottom just left of the
+## fighting buttons, under the swap button: where the thumb that uses it already is.
 func _draw_weapon(s: Vector2) -> void:
 	var d := player.weapon_def()
 	if d.is_empty():
 		return
-	var y := s.y - 26.0
-	var x := s.x * 0.33
-	_text(str(d["name"]), Vector2(x, y - 30), 24, UiTheme.BONE)
+	var name_text := str(d["name"])
+	var extra := ""
+	var extra_col := UiTheme.BONE
 	if d["kind"] == WeaponDefs.Kind.SPELL:
-		_text("%d mana" % int(player.mana), Vector2(x, y), 22, UiTheme.MIST)
+		extra = "%d mana" % int(player.mana)
+		extra_col = UiTheme.MIST
 	elif player.has_burst():
-		_text("%d mist" % int(player.mana), Vector2(x, y), 22, UiTheme.MIST)
+		extra = "%d mist" % int(player.mana)
+		extra_col = UiTheme.MIST
 	elif player.class_def().get("ki", false):
-		_text("%d Ki" % int(player.mana), Vector2(x, y), 22, KI_COLOUR)
+		extra = "%d Ki" % int(player.mana)
+		extra_col = KI_COLOUR
 	elif WeaponDefs.own_ammo(player.weapon_id()) > 0:
 		var throws := player.ammo_of(player.weapon_id())
-		_text("%d throws" % throws, Vector2(x, y), 22, UiTheme.BONE if throws > 0 else UiTheme.BLOOD.lightened(0.25))
+		extra = "%d throws" % throws
+		extra_col = UiTheme.BONE if throws > 0 else UiTheme.BLOOD.lightened(0.25)
 	elif WeaponDefs.uses_arrows(d):
-		_text("%d arrows" % player.arrows, Vector2(x, y), 22, UiTheme.BONE if player.arrows > 0 else UiTheme.BLOOD.lightened(0.25))
+		extra = "%d arrows" % player.arrows
+		extra_col = UiTheme.BONE if player.arrows > 0 else UiTheme.BLOOD.lightened(0.25)
 	elif player.arrows > 0:
-		_text("%d arrows" % player.arrows, Vector2(x, y), 18, Color(UiTheme.BONE, 0.65))
+		extra = "%d arrows" % player.arrows
+		extra_col = Color(UiTheme.BONE, 0.65)
+	var name_w := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_TEXT).x
+	var extra_w := font.get_string_size(extra, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_SMALL).x if extra != "" else 0.0
+	var w := 14.0 + name_w + (10.0 + extra_w if extra != "" else 0.0) + 14.0
+	var fire: Dictionary = _buttons["fire"]
+	var right := (fire["pos"] as Vector2).x - float(fire["r"]) - 14.0
+	var r := Rect2(right - w, s.y - 20.0 - CHIP_H, w, CHIP_H)
+	draw_style_box(_capsule_soft, r)
+	_text(name_text, Vector2(r.position.x + 14.0, r.position.y + 21.0), HUD_TEXT, UiTheme.BONE)
+	if extra != "":
+		_text(extra, Vector2(r.position.x + 14.0 + name_w + 10.0, r.position.y + 21.0), HUD_SMALL, extra_col)
 
 
 func _draw_controls() -> void:
@@ -756,13 +841,13 @@ func _draw_controls() -> void:
 		if id == "drop" and held and _drop_held >= 0.0:
 			draw_arc(pos, r - 4.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(_drop_held / DROP_HOLD, 0.0, 1.0), 32, UiTheme.EMBER, 7.0)
 		if id == "drop":
-			_centered("Hold to drop", pos + Vector2(0, r + 14), 17, UiTheme.BONE)
+			_centered("Hold to drop", pos + Vector2(0, r + 14), HUD_SMALL, UiTheme.BONE)
 		if id == "take" and player.nearby_weapon:
-			_centered(player.nearby_weapon.display_name(), pos + Vector2(0, -r - 18), 26, UiTheme.BONE)
+			_chip(player.nearby_weapon.display_name(), "grab", UiTheme.BONE, pos + Vector2(0, -r - 18 - CHIP_H), true)
 		if id == "art" and player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
-			_centered("Too far to link", pos + Vector2(0, -r - 14), 18, UNLINKED.lightened(0.3))
+			_centered("Too far to link", pos + Vector2(0, -r - 14), HUD_SMALL, UNLINKED.lightened(0.3))
 		elif id == "art" and player.art_label() != "":
-			_centered(player.art_label(), pos + Vector2(0, -r - 14), 18, UiTheme.BONE)
+			_centered(player.art_label(), pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE)
 		if id == "burst" or id == "art":
 			var left: float = player.burst_cd_left if id == "burst" else player.art_cd_left
 			if id == "art" and player.spirit_left > 0.0:
@@ -770,14 +855,14 @@ func _draw_controls() -> void:
 			var total: float = player.m("burst_cd") if id == "burst" else maxf(float(player.art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
 			if left > 0.0:
 				draw_arc(pos, r - 5.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(left / total, 0.0, 1.0), 28, Color(0, 0, 0, 0.7), 9.0)
-				_centered("%d" % ceili(left), pos, 26, Color.WHITE)
+				_centered("%d" % ceili(left), pos, HUD_TOAST - 2, Color.WHITE)
 			var cost: float = player.burst_cost() if id == "burst" else player.art_cost()
 			if cost > 0.0:
-				_centered("%d" % int(cost), pos + Vector2(0, r + 12), 18, UiTheme.MIST)
+				_centered("%d" % int(cost), pos + Vector2(0, r + 12), HUD_SMALL, UiTheme.MIST)
 		if id == "tree":
 			# Always marked out from the other buttons, with the level under it.
 			draw_arc(pos, r + 2.0, 0.0, TAU, 40, Color(UiTheme.EMBER, 0.9), 3.0)
-			_centered("Skills  Lv %d" % player.level, pos + Vector2(0, r + 16), 19, UiTheme.EMBER if player.points > 0 else UiTheme.BONE)
+			_centered("Skills  Lv %d" % player.level, pos + Vector2(0, r + 16), HUD_SMALL, UiTheme.EMBER if player.points > 0 else UiTheme.BONE)
 			if player.points > 0:
 				_draw_points_badge(pos + Vector2(r * 0.74, -r * 0.62), player.points)
 
@@ -794,7 +879,7 @@ func _draw_points_call(pos: Vector2, r: float) -> void:
 func _draw_points_badge(at: Vector2, points: int) -> void:
 	draw_circle(at, 17.0, Color(0.05, 0.04, 0.05, 0.9))
 	draw_circle(at, 15.0, UiTheme.BLOOD.lightened(0.15))
-	_centered("%d" % points, at + Vector2(0, 1), 22, Color.WHITE)
+	_centered("%d" % points, at + Vector2(0, 1), HUD_TEXT, Color.WHITE)
 
 
 func _button_glyph(id: String) -> String:
@@ -820,14 +905,15 @@ func _button_glyph(id: String) -> String:
 
 
 func _draw_stance(s: Vector2) -> void:
-	var at := Vector2(s.x * 0.5, 135)
+	var at := Vector2(s.x * 0.5, _centre_y + 32.0)
 	var tint: Color = Player.STANCE_COLOURS[player.stance]
-	draw_style_box(_capsule, Rect2(at - Vector2(158, 26), Vector2(316, 74)))
+	draw_style_box(_backing, Rect2(at - Vector2(158, 26), Vector2(316, 74)))
 	Icons.draw(self, Rect2(at - Vector2(146, 19), Vector2(38, 38)), str(Player.STANCE_ICONS[player.stance]), tint)
-	_centered("%s STANCE" % str(Player.STANCE_NAMES[player.stance]).to_upper(), at + Vector2(14, 0), 23, tint)
+	_centered("%s stance" % str(Player.STANCE_NAMES[player.stance]), at + Vector2(14, 0), HUD_TEXT + 2, tint)
 	var detail: String = {"wind": "Speed / echo strikes", "stone": "Protection / knockback", "flame": "Burning strikes / exposed", "void": "Invisible / double damage"}[player.stance]
 	if player.stance_hits >= 3:
 		detail = "+15% damage / transition ready"
-	_centered(detail, at + Vector2(0, 27), 18, UiTheme.BONE)
+	_centered(detail, at + Vector2(0, 27), HUD_SMALL, UiTheme.BONE)
 	for i in 3:
 		draw_circle(at + Vector2(130 + i * 9, -17), 3.0, tint if player.stance_hits > i else UiTheme.ASH.darkened(0.5))
+	_centre_y = at.y + 52.0

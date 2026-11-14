@@ -14,40 +14,11 @@ var _next := -1
 
 
 func build() -> void:
-	var shade := TextureRect.new()
-	shade.texture = load("res://assets/ui/vignette.png")
-	shade.stretch_mode = TextureRect.STRETCH_SCALE
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(shade)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var margin := MarginContainer.new()
-	UiTheme.fit_safe_area(margin, 56, 16)
-	add_child(margin)
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var page := PanelContainer.new()
-	margin.add_child(page)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	page.add_child(box)
-	var top := HBoxContainer.new()
-	box.add_child(top)
-	var head := Label.new()
-	head.text = "Changelog"
-	head.add_theme_font_override("font", UiTheme.title_font())
-	head.add_theme_font_size_override("font_size", 38)
-	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(head)
-	var close := Button.new()
-	close.text = "Close"
-	close.custom_minimum_size = Vector2(130, 54)
-	close.add_theme_font_size_override("font_size", 24)
-	close.pressed.connect(func() -> void:
-		Sfx.play("ui_click", -4.0)
-		closed.emit())
-	top.add_child(close)
+	var parts := UiScreen.frame(self, "Changelog", func() -> void: closed.emit(), "What changed in each version, newest first.")
+	var page := UiScreen.page(parts["box"])
 	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(scroll)
+	page.add_child(scroll)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 4)
@@ -125,11 +96,11 @@ func _add_line(list: VBoxContainer, entry: Dictionary) -> void:
 			gap.custom_minimum_size.y = 12
 			list.add_child(gap)
 			l.add_theme_font_override("font", UiTheme.title_font())
-			l.add_theme_font_size_override("font_size", 30)
+			l.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 			list.add_child(l)
 		"part":
 			l.add_theme_font_override("font", UiTheme.bold_font())
-			l.add_theme_font_size_override("font_size", 23)
+			l.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 			l.add_theme_color_override("font_color", UiTheme.EMBER)
 			list.add_child(l)
 		_:
@@ -139,9 +110,9 @@ func _add_line(list: VBoxContainer, entry: Dictionary) -> void:
 			list.add_child(row)
 			var dot := Label.new()
 			dot.text = "•"
-			dot.add_theme_font_size_override("font_size", 22)
+			dot.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 			dot.add_theme_color_override("font_color", UiTheme.ASH)
 			dot.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 			row.add_child(dot)
-			l.add_theme_font_size_override("font_size", 23)
+			l.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 			row.add_child(l)

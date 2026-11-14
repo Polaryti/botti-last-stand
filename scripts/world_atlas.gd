@@ -51,7 +51,7 @@ func _ready() -> void:
 		label.text = place["name"]
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.add_theme_font_override("font", UiTheme.bold_font())
-		label.add_theme_font_size_override("font_size", 21)
+		label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 		label.add_theme_color_override("font_color", UiTheme.BONE if id in allowed else UiTheme.ASH.darkened(0.25))
 		label.add_theme_color_override("font_outline_color", Color(UiTheme.NIGHT, 0.9))
 		label.add_theme_constant_override("outline_size", 6)

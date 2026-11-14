@@ -61,16 +61,26 @@ func build() -> void:
 func _build_header() -> Control:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", 12)
+	# The way back first, on the left, as on every other screen.
+	var close := Button.new()
+	close.name = "BackButton"
+	close.text = "Back"
+	close.custom_minimum_size.x = 116
+	UiTheme.size_button(close, UiTheme.BTN)
+	close.pressed.connect(func() -> void:
+		Sfx.play("ui_click", -4.0)
+		closed.emit())
+	top.add_child(close)
 	var icon := IconView.new(ClassDefs.icon(player.class_id), ClassDefs.color(player.class_id), 46.0)
 	top.add_child(icon)
 	_class_name = Label.new()
 	_class_name.add_theme_font_override("font", UiTheme.title_font())
-	_class_name.add_theme_font_size_override("font_size", 28)
+	_class_name.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	top.add_child(_class_name)
 	top.add_child(_spacer(12.0))
 	_level = Label.new()
 	_level.add_theme_font_override("font", UiTheme.bold_font())
-	_level.add_theme_font_size_override("font_size", 24)
+	_level.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_level.add_theme_color_override("font_color", UiTheme.BONE)
 	top.add_child(_level)
 	_xp = XpBar.new()
@@ -80,18 +90,10 @@ func _build_header() -> Control:
 	top.add_child(_xp)
 	_points = Label.new()
 	_points.add_theme_font_override("font", UiTheme.bold_font())
-	_points.add_theme_font_size_override("font_size", 24)
+	_points.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	_points.add_theme_color_override("font_color", UiTheme.EMBER)
 	_points.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(_points)
-	var close := Button.new()
-	close.text = "Close"
-	close.custom_minimum_size = Vector2(140, 50)
-	close.add_theme_font_size_override("font_size", 24)
-	close.pressed.connect(func() -> void:
-		Sfx.play("ui_click", -4.0)
-		closed.emit())
-	top.add_child(close)
 	return top
 
 
@@ -208,7 +210,7 @@ func _title(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_override("font", UiTheme.title_font())
-	l.add_theme_font_size_override("font_size", 26)
+	l.add_theme_font_size_override("font_size", UiTheme.FS_LEAD)
 	l.add_theme_color_override("font_color", UiTheme.EMBER)
 	return l
 
@@ -267,12 +269,12 @@ func _card(step: int, index: int, a: Dictionary, col: Color, count: int, text_w 
 	var name_label := Label.new()
 	name_label.text = a["name"]
 	name_label.add_theme_font_override("font", UiTheme.bold_font())
-	name_label.add_theme_font_size_override("font_size", 30 if count < 3 else 27)
+	name_label.add_theme_font_size_override("font_size", UiTheme.FS_HEAD if count < 3 else UiTheme.FS_LEAD)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(name_label)
 	var desc := Label.new()
 	desc.text = a["desc"]
-	desc.add_theme_font_size_override("font_size", 25 if count < 3 else 22)
+	desc.add_theme_font_size_override("font_size", UiTheme.FS_LEAD if count < 3 else UiTheme.FS_BODY)
 	desc.add_theme_color_override("font_color", UiTheme.BONE)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(desc)
@@ -293,7 +295,7 @@ func _show_waiting(step: int, total: int) -> void:
 		_zone.add_child(_title("Every ability taken"))
 	var l := Label.new()
 	l.text = line
-	l.add_theme_font_size_override("font_size", 25)
+	l.add_theme_font_size_override("font_size", UiTheme.FS_LEAD)
 	l.add_theme_color_override("font_color", UiTheme.ASH)
 	_zone.add_child(l)
 
@@ -316,11 +318,11 @@ func _show_reading() -> void:
 	var name_label := Label.new()
 	name_label.text = a["name"]
 	name_label.add_theme_font_override("font", UiTheme.bold_font())
-	name_label.add_theme_font_size_override("font_size", 34)
+	name_label.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	text.add_child(name_label)
 	var desc := Label.new()
 	desc.text = a["desc"]
-	desc.add_theme_font_size_override("font_size", 27)
+	desc.add_theme_font_size_override("font_size", UiTheme.FS_LEAD)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(desc)
 	# Room for the words: the width left beside the picture and the buttons, and the height left
@@ -328,7 +330,7 @@ func _show_reading() -> void:
 	_fit_pair(name_label, desc, _zone_width() - 120.0 - 18.0 * 2.0 - 190.0, ZONE_HIGH - 34.0, [34, 30, 26], range(27, 15, -1))
 	var state := Label.new()
 	state.text = _state_words(_reading)
-	state.add_theme_font_size_override("font_size", 23)
+	state.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	state.add_theme_color_override("font_color", UiTheme.EMBER)
 	text.add_child(state)
 	var buttons := VBoxContainer.new()
@@ -339,13 +341,15 @@ func _show_reading() -> void:
 		var taking := _reading
 		var unlock := Button.new()
 		unlock.text = "Unlock"
-		unlock.custom_minimum_size = Vector2(190, 72)
+		unlock.custom_minimum_size.x = 190
+		UiTheme.size_button(unlock, UiTheme.BTN_TALL)
 		UiTheme.primary(unlock)
 		unlock.pressed.connect(func() -> void: choose(taking.step, taking.spec if taking.spec >= 0 and taking.step == Player.CORE_STEPS else taking.option))
 		buttons.add_child(unlock)
 	var back := Button.new()
 	back.text = "Your choice" if player.points > 0 else "OK"
-	back.custom_minimum_size = Vector2(190, 64)
+	back.custom_minimum_size.x = 190
+	UiTheme.size_button(back, UiTheme.BTN_TALL)
 	back.pressed.connect(func() -> void: read(null))
 	buttons.add_child(back)
 

@@ -14,6 +14,30 @@ const MIST := Color("6fb6d6") # mana and mist
 const MOSS := Color("7fc08a") # safe
 const TWILIGHT := Color("a880ff") # the lands beyond the Mists
 
+# The type scale. Every piece of text on a menu screen uses one of these sizes, nothing in between.
+const FS_TITLE := 40 # the name of a screen (title font), and the ways to play on the title screen
+const FS_HEAD := 30 # the name of a thing on a page: a class, a place, a card's title
+const FS_LEAD := 26 # a line that matters: the result of a night, a heading inside a page
+const FS_BODY := 23 # what is read: descriptions, labels over controls
+const FS_SMALL := 20 # notes, numbers beside things, tabs in a long row
+const FS_TINY := 17 # the least of it: version, fine print
+
+# Buttons come in three heights, each with its own size of words.
+const BTN_SHORT := 52 # tabs and choices in a row
+const BTN := 60 # an ordinary button
+const BTN_TALL := 72 # the one big thing to do on a screen or card
+const FS_BTN_SHORT := 21
+const FS_BTN := 24
+const FS_BTN_TALL := 26
+
+# Space between things, and round the edge of a screen.
+const GAP := 12
+const GAP_SMALL := 8
+const EDGE_X := 44
+const EDGE_Y := 18
+const RADIUS := 8 # buttons, chips, rows
+const RADIUS_CARD := 12 # cards and pages
+
 static var _title: Font
 static var _bold: Font
 
@@ -50,7 +74,12 @@ static func make() -> Theme:
 	t.set_stylebox("hover", "Button", flat(Color(DUSK, 0.94), STEEL))
 	t.set_stylebox("pressed", "Button", flat(Color(EMBER, 0.24), EMBER))
 	t.set_stylebox("disabled", "Button", flat(Color(DUSK, 0.5), Color(STEEL, 0.5)))
-	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
+	# Only seen when moving between buttons with keys or a pad; a finger never leaves it behind.
+	var focus := flat(Color.TRANSPARENT, Color(EMBER, 0.85), RADIUS + 2, 0.0, 2)
+	focus.draw_center = false
+	focus.set_expand_margin_all(3.0)
+	t.set_stylebox("focus", "Button", focus)
+	t.set_stylebox("focus", "LineEdit", StyleBoxEmpty.new())
 	t.set_color("font_color", "Button", BONE)
 	t.set_color("font_hover_color", "Button", BONE)
 	t.set_color("font_pressed_color", "Button", BONE)
@@ -58,7 +87,10 @@ static func make() -> Theme:
 	t.set_color("font_hover_pressed_color", "Button", BONE)
 	t.set_color("font_disabled_color", "Button", Color(ASH, 0.55))
 	t.set_color("font_color", "Label", BONE)
-	var panel := flat(Color(NIGHT, 0.96), STEEL, 12, 26.0)
+	t.set_font_size("font_size", "Button", FS_BTN)
+	t.set_font_size("font_size", "LineEdit", FS_BTN)
+	t.set_font_size("font_size", "Label", FS_BODY)
+	var panel := flat(Color(NIGHT, 0.96), STEEL, RADIUS_CARD, 26.0)
 	panel.shadow_color = Color(0, 0, 0, 0.45)
 	panel.shadow_size = 24
 	t.set_stylebox("panel", "PanelContainer", panel)
@@ -103,10 +135,37 @@ static func primary(b: Button) -> void:
 	b.add_theme_color_override("font_disabled_color", Color(BONE, 0.8))
 
 
-## An option that is on, in a row of options.
+## An option that is on, in a row of options (tabs, choices, the chosen row of a list).
 static func selected(b: Button) -> void:
 	for state: String in ["normal", "hover", "pressed"]:
 		b.add_theme_stylebox_override(state, flat(Color(EMBER, 0.22), EMBER))
+	for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(state, EMBER.lightened(0.35))
+
+
+## One of the three button heights, with the size of words that goes with it: whatever height a
+## screen asks for is taken to the nearest of them.
+static func size_button(b: Button, height: float) -> void:
+	var h := BTN_SHORT if height < 56.0 else (BTN if height <= 66.0 else BTN_TALL)
+	b.custom_minimum_size.y = h
+	b.add_theme_font_size_override("font_size", FS_BTN_SHORT if h == BTN_SHORT else (FS_BTN if h == BTN else FS_BTN_TALL))
+
+
+## Every button gives a little under the finger and springs back, so a tap is felt before anything
+## happens. Buttons drawn by hand (the HUD's) do the same in their own drawing.
+static func give(b: BaseButton) -> void:
+	if b.has_meta("gives"):
+		return
+	b.set_meta("gives", true)
+	b.button_down.connect(func() -> void:
+		if b.disabled:
+			return
+		b.pivot_offset = b.size * 0.5
+		var t := b.create_tween()
+		t.tween_property(b, "scale", Vector2.ONE * 0.96, 0.05).set_trans(Tween.TRANS_QUAD))
+	b.button_up.connect(func() -> void:
+		var t := b.create_tween()
+		t.tween_property(b, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
 
 
 ## Back to how the theme draws it.

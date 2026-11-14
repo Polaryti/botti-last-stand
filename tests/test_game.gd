@@ -1128,7 +1128,7 @@ func test_version_20_1() -> void:
 	m.show_menu()
 	await frames(3)
 	texts = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
-	ok(texts.any(func(t: String) -> bool: return t.begins_with("Version 9.0.0 is out")), "the menu says a new version is out")
+	ok(texts.any(func(t: String) -> bool: return t.begins_with("Version 9.0.0 is out")), "the menu says a new version is out (%s, %s, %s)" % [up.state, texts, m._update_box.get_child_count() if is_instance_valid(m._update_box) else -1])
 	up.state = Updates.State.NONE
 	m._fill_update_box()
 	# The menu looks again when a match ends, and not when coming back from another menu screen.
@@ -2948,7 +2948,7 @@ func test_version_8() -> void:
 	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
-	ok(m.panel.get_meta("list").get_child_count() == 5, "the Store opens, with its tabs and four classes")
+	ok(m.panel.get_meta("list").get_child_count() == 4 and (m.panel.find_child("Tabs", true, false) as Container).get_child_count() == ShopDefs.SECTIONS.size(), "the Store opens, with its tabs under its bar and four classes")
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await frames(2)
 	ok(m.panel.get_meta("list").get_child_count() == ClassDefs.available().size(), "the Sandbox only offers what you own")
@@ -3543,14 +3543,13 @@ func test_third_review() -> void:
 		var view := m.get_viewport().get_visible_rect().size
 		ok(scroll.get_global_rect().end.y <= view.y and scroll.size.y >= 200.0, "that fits on the screen (%.0f px tall, ending at %.0f of %.0f)" % [scroll.size.y, scroll.get_global_rect().end.y, view.y])
 		var last := rows.get_child(rows.get_child_count() - 1) as Control
-		scroll.scroll_vertical = int(rows.size.y)
-		scroll.set("_pos", rows.size.y)
+		(scroll as DragScroll).scroll_to(rows.size.y)
 		await frames(3)
 		ok(scroll.get_global_rect().grow(1.0).encloses(last.get_global_rect()), "and scrolls down to its last row (%s in %s)" % [last.get_global_rect(), scroll.get_global_rect()])
 		var rename := m.ui_layer.find_child("Rename", true, false) as Button
 		ok(rename != null and scroll.is_ancestor_of(rename) and rows.get_child(0).is_ancestor_of(rename), "your name is the first of them")
-		var done: Array = m.ui_layer.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "Done")
-		ok(done.size() == 1 and not scroll.is_ancestor_of(done[0]), "Done stays in reach below the list")
+		var back := m.ui_layer.find_child("BackButton", true, false) as Button
+		ok(back != null and back.text == "Back" and not scroll.is_ancestor_of(back) and back.get_global_rect().position.y < scroll.get_global_rect().position.y, "the way back stays in reach above the list")
 	var texts: Array = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
 	texts.append_array(m.ui_layer.find_children("*", "CheckButton", true, false).map(func(b: CheckButton) -> String: return b.text))
 	ok(texts.has("Damage numbers"), "Settings has a switch for damage numbers")
@@ -5743,8 +5742,9 @@ func test_review() -> void:
 	await _press_toggle("Vibration")
 	ok(Game.vibration == vibration, "and back")
 	var village: World = m.world
-	await _press("Done")
+	await _press("Back")
 	ok(m.world == village and m._back == Callable(m, "_quit"), "leaving Settings keeps the village behind the menu")
+	ok(m.ui_layer.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.is_visible_in_tree() and b.name == "ChangelogButton"), "and the title menu shows again under it")
 	# Class cards start a game of that class, with a loading screen in between.
 	m.show_class_picker(Game.Mode.NIGHT)
 	await frames(2)

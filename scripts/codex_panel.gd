@@ -9,56 +9,22 @@ const TABS := ["Classes", "Weapons", "Items", "Familiars", "Enemies", "Status Ef
 var _list: VBoxContainer
 var _scroll: DragScroll
 var _tabs: Array[Button] = []
+var _tab_row: HFlowContainer
 
 
 func build() -> void:
-	var shade := TextureRect.new()
-	shade.texture = load("res://assets/ui/vignette.png")
-	shade.stretch_mode = TextureRect.STRETCH_SCALE
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(shade)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var margin := MarginContainer.new()
-	UiTheme.fit_safe_area(margin, 40, 16)
-	add_child(margin)
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var panel := PanelContainer.new()
-	margin.add_child(panel)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 8)
-	panel.add_child(box)
-	var top := HFlowContainer.new()
-	top.add_theme_constant_override("separation", 8)
-	box.add_child(top)
-	for i in TABS.size():
-		var tab := Button.new()
-		tab.text = TABS[i]
-		tab.toggle_mode = false
-		tab.custom_minimum_size = Vector2(110, 52)
-		tab.add_theme_font_size_override("font_size", 20)
-		var index := i
-		tab.pressed.connect(func() -> void:
-			Sfx.play("ui_click", -5.0)
-			show_tab(index))
-		top.add_child(tab)
-		_tabs.append(tab)
-	var gap := Control.new()
-	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(gap)
-	var close := Button.new()
-	close.text = "Close"
-	close.custom_minimum_size = Vector2(120, 52)
-	close.add_theme_font_size_override("font_size", 20)
-	close.pressed.connect(func() -> void:
-		Sfx.play("ui_click", -4.0)
-		closed.emit())
-	top.add_child(close)
+	var parts := UiScreen.frame(self, "Codex", func() -> void: closed.emit(), "Everything known of the night.")
+	var box: VBoxContainer = parts["box"]
+	_tab_row = UiScreen.tabs(box, TABS, 0, show_tab)
+	for b: Button in _tab_row.get_children():
+		_tabs.append(b)
+	var page := UiScreen.page(box)
 	_scroll = DragScroll.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(_scroll)
+	page.add_child(_scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_list.add_theme_constant_override("separation", 10)
+	_list.add_theme_constant_override("separation", UiTheme.GAP)
 	_scroll.add_child(_list)
 	show_tab(0)
 
@@ -66,10 +32,7 @@ func build() -> void:
 func show_tab(index: int) -> void:
 	for c in _list.get_children():
 		c.queue_free()
-	for i in _tabs.size():
-		UiTheme.plain(_tabs[i])
-		if i == index:
-			UiTheme.selected(_tabs[i])
+	UiScreen.mark_tab(_tab_row, index)
 	_scroll.scroll_to(0)
 	match index:
 		0: _classes()
@@ -95,19 +58,20 @@ func _row(icon: String, color: Color, title: String, text: String, note := "") -
 	var head := Label.new()
 	head.text = title
 	head.add_theme_font_override("font", UiTheme.title_font())
-	head.add_theme_font_size_override("font_size", 27)
+	head.add_theme_font_size_override("font_size", UiTheme.FS_LEAD)
 	head.add_theme_color_override("font_color", UiTheme.BONE)
 	words.add_child(head)
 	var body := Label.new()
 	body.text = text
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.add_theme_font_size_override("font_size", 22)
+	body.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	body.add_theme_color_override("font_color", UiTheme.ASH)
 	words.add_child(body)
 	if note != "":
 		var extra := Label.new()
 		extra.text = note
-		extra.add_theme_font_size_override("font_size", 20)
+		extra.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		extra.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 		extra.add_theme_color_override("font_color", UiTheme.EMBER)
 		words.add_child(extra)
 
@@ -170,7 +134,7 @@ func _section(title: String) -> void:
 	var label := Label.new()
 	label.text = title.to_upper()
 	label.add_theme_font_override("font", UiTheme.bold_font())
-	label.add_theme_font_size_override("font_size", 24)
+	label.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	label.add_theme_color_override("font_color", UiTheme.EMBER)
 	_list.add_child(label)
 

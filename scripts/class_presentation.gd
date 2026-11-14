@@ -87,7 +87,7 @@ static func tag(text: String, style: String) -> PanelContainer:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_override("font", UiTheme.bold_font())
-	label.add_theme_font_size_override("font_size", 19)
+	label.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
 	label.add_theme_color_override("font_color", colors[2])
 	badge.add_child(label)
 	return badge

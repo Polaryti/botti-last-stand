@@ -1,5 +1,23 @@
 # Changelog
 
+## Development — Beyond the Mists, a cleaner look
+
+### Screens
+- Every screen is laid out the same way: Back at the top left, the screen's name beside it with a line about it, your Doubloons at the top right where they matter, tabs right under the bar when the screen has pages, and the page itself below. Settings, Play Together, the game room, the Codex, the Changelog, the Leaderboard, the Map, the Sandbox and the artillery map are full screens now instead of cards of different sizes. Only Pause, the end of a night and typing your name are still small cards.
+- The game room's settings each have their name in a column: Game, Place, Difficulty, Bots. The chosen one is marked the same way as a chosen tab everywhere else, and Start the night is the one big button.
+- Settings are grouped under You, Game, Sound, Controls and Screen, and their switches are real switches.
+- One set of text sizes and three button heights across all screens; long pages in the Store and on the class screens scroll instead of being cut off.
+- Every button gives a little under your finger and springs back.
+
+### In a match
+- Your health, level progress and mana sit together on one panel at the top left, with your kills (and your mount) on small chips under it.
+- Under the clock, chips with icons: Hunted, Unseen or Invisible, In the light, the fog in All vs All, the Monk's and Adept's states, and the Mist Storm you are standing in (which used to be a line of capitals across the screen).
+- The Fort's portal, gates, wood and the gate dial are on one panel under the clock.
+- Playing with others, the list of players has its own panel, with the scores lined up on the right.
+- The weapon you hold and what it has left are on a chip by the attack button.
+- One set of text sizes for the whole HUD.
+- When a night ends, any screen left open over it (the Map, Settings) closes first.
+
 ## Development — Beyond the Mists, third review
 
 ### Fixes
