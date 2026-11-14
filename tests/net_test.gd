@@ -876,6 +876,9 @@ func _coop() -> void:
 	for it: Pickup in w.pickups:
 		print("  on the ground: ", it.display_name(), " id ", it.net_id, " at ", it.global_position)
 	ok(w.pickups.size() == 1 and w.pickups[0].weapon_id == "sword", "a dropped weapon reaches both phones")
+	# The host clears the sword away next, so it waits for this phone to have looked: whoever reaches a
+	# meeting point first leaves it a little later, and the host's clearing could beat the look.
+	await _looked("sword")
 	# Effects a player puts on a zombie reach the host.
 	if host:
 		for it: Pickup in w.pickups.duplicate():
@@ -895,7 +898,8 @@ func _coop() -> void:
 		ok(w.zombies[0].burn_time > 0.0, "so does setting it on fire")
 		ok(w.zombies[0].state == Zombie.State.INVESTIGATE or w.zombies[0]._has_goal, "and so does noise")
 	else:
-		ok(w.zombies[0].burn_time > 0.0, "and I can see it burning")
+		ok(not w.zombies.is_empty() and w.zombies[0].burn_time > 0.0, "and I can see it burning")
+	await _looked("burning")
 	await _clear_zombies_on_host()
 	# A summon is seen by the others, and enemies on the host can hurt it.
 	await sync(40)
@@ -1644,6 +1648,17 @@ func _bastion() -> void:
 	ok(saw_fire[0], "its fire comes down on the Great Portal on this phone")
 	ok(f.heart_hp < portal_hp, "and the portal's wound reaches this phone (%.0f)" % (portal_hp - f.heart_hp))
 	await sync(416)
+
+
+## The client has checked what it was looking at, and says so; the host waits for that word before it
+## changes what the client was looking at.
+func _looked(what: String) -> void:
+	if host:
+		await until(func() -> bool: return _told == "looked " + what, 5.0)
+		if _told != "looked " + what:
+			ok(false, "the other phone finished looking at the %s" % what)
+	else:
+		told.rpc("looked " + what)
 
 
 func until(condition: Callable, timeout: float) -> void:
