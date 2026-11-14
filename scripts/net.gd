@@ -21,8 +21,8 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 49
-const POSE_BYTES := 40 # one player's pose on the wire: see pose_bytes
+const PROTOCOL := 50
+const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
@@ -49,7 +49,7 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_wrap",
 	"bear_roar", "bear_maul", "eagle_cry", "shapeshift", "quake_warning", "earth_slam", "mist_blink", "storm_call", "fire_warning",
 	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter", "mist_muster", "portal_wound",
-	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death"]
+	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death", "dawn_mists", "dawn_valleys", "dawn_bastion"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1218,6 +1218,7 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.TAUNT: z.taunted_by(Vector3(a, 0.0, b))
 		Zombie.Effect.PULL: z.pull_to(Vector3(a, 0.0, b))
 		Zombie.Effect.DISARM: z.disarm(a > 0.5)
+		Zombie.Effect.FLINCH: z.flinch(a)
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -1297,6 +1298,7 @@ func pose_bytes(p: Player) -> PackedByteArray:
 	b[37] = clampi(int(p.m("cover_radius")), 0, 255)
 	b[38] = p.status_bits()
 	b[39] = clampi(p.level, 1, 255)
+	b[40] = p.skin_bits()
 	return b
 
 
@@ -1310,6 +1312,7 @@ func _apply_pose(a: Avatar, b: PackedByteArray) -> void:
 	a.cover_radius = float(b[37])
 	a.show_statuses(b[38])
 	a.level = maxi(1, b[39])
+	a.set_skin(b[40])
 
 
 ## Validate before touching an avatar: truncated packets, unknown weapon indices and NaN/Inf
@@ -1427,6 +1430,17 @@ func _survey_fx(kind: int, at: Vector3) -> void:
 		SurveyNet.show_falling_star(world, at)
 	else:
 		world.fx_mist(at + Vector3.UP, 0.8)
+
+
+## A Paladin's Consecration, made on every phone.
+func consecrate(owner_peer: int, at: Vector3, radius: float, seconds: float) -> void:
+	_consecrate.rpc(owner_peer, at, radius, seconds)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _consecrate(owner_peer: int, at: Vector3, radius: float, seconds: float) -> void:
+	if world and is_instance_valid(world):
+		world.spawn_consecration(owner_peer, at, radius, seconds)
 
 
 ## A Mercenary's Nightfall, so every phone can look after its own people inside it.
@@ -2230,13 +2244,13 @@ func _apply_rally_player(p: Player, last: bool) -> void:
 			_stop_watching()
 	if p.dead:
 		return
-	var duration := 8.0 if last else 6.0
-	p._act({"do": "buff", "key": "command_speed", "stat": "speed", "val": 0.25, "secs": duration}, {})
+	var duration := CommanderKit.LAST_RALLY_TIME if last else CommanderKit.RALLY_TIME
+	p._act({"do": "buff", "key": "command_speed", "stat": "speed", "val": CommanderKit.RALLY_SPEED, "secs": duration}, {})
 	if last:
 		p.heal(35.0)
 		p.guard_left = maxf(p.guard_left, 2.0)
-		p._act({"do": "buff", "key": "command_melee", "stat": "melee_damage", "val": 0.2, "secs": duration}, {})
-		p._act({"do": "buff", "key": "command_ranged", "stat": "ranged_damage", "val": 0.2, "secs": duration}, {})
+		p._act({"do": "buff", "key": "command_melee", "stat": "melee_damage", "val": CommanderKit.LAST_RALLY_DAMAGE, "secs": duration}, {})
+		p._act({"do": "buff", "key": "command_ranged", "stat": "ranged_damage", "val": CommanderKit.LAST_RALLY_DAMAGE, "secs": duration}, {})
 		p._act({"do": "buff", "key": "command_spell", "stat": "spell_damage", "val": 0.2, "secs": duration}, {})
 	p.say("Last Command!" if last else "Forward!")
 

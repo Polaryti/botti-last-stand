@@ -238,12 +238,12 @@ func _tend(p: Player) -> void:
 		if p.can_vanish():
 			p.invis_left = maxf(p.invis_left, linger)
 		if has("night_heal") and p.hp < p.max_hp():
-			p.heal(2.0 * get_physics_process_delta_time())
+			p.mended_by_friend(AbilityNumbers.NIGHT_HEAL * get_physics_process_delta_time())
 		if has("night_guard") and p.net_id() != owner_peer:
-			p._act({"do": "buff", "key": "night_guard", "stat": "damage_taken", "val": -0.2, "secs": 0.3}, {})
+			p._act({"do": "buff", "key": "night_guard", "stat": "damage_taken", "val": -AbilityNumbers.NIGHT_GUARD, "secs": 0.3}, {})
 		if has("night_damage") and p.net_id() == owner_peer:
-			p._act({"do": "buff", "key": "night_damage", "stat": "melee_damage", "val": 0.25, "secs": 0.3}, {})
-			p._act({"do": "buff", "key": "night_damage_ranged", "stat": "ranged_damage", "val": 0.25, "secs": 0.3}, {})
+			p._act({"do": "buff", "key": "night_damage", "stat": "melee_damage", "val": AbilityNumbers.NIGHT_DAMAGE, "secs": 0.3}, {})
+			p._act({"do": "buff", "key": "night_damage_ranged", "stat": "ranged_damage", "val": AbilityNumbers.NIGHT_DAMAGE, "secs": 0.3}, {})
 	else:
 		p.night_blind_left = 0.3
 

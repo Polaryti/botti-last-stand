@@ -6,7 +6,12 @@ const COMMAND_CD := 24.0
 const TRAINED_COMMAND_CD := COMMAND_CD * 0.8
 const LAST_CD := 60.0
 const RALLY_RADIUS := 12.0
+const RALLY_SPEED := 0.25 # Command: friends nearby run this much faster
+const RALLY_TIME := 6.0
+const LAST_RALLY_TIME := 8.0
+const LAST_RALLY_DAMAGE := 0.2
 const STORM_RADIUS := 11.0
+const STORM_TIME := 8.0 # the Warlock's Last Command storm
 const BARRAGE_RADIUS := 18.0
 const BARRAGE_DELAY := 4.0
 const BARRAGE_TIME := 5.0
@@ -59,7 +64,7 @@ static func cast(p: Player) -> void:
 	elif p.spec_id == "gunner":
 		p.world.spawn_ally("artificer", p.global_position + Vector3(2, 0, 0), 16.0 * p.m("ally_time"))
 	else:
-		var radius := 16.0 if p.has_flag("banner_reach") else RALLY_RADIUS
+		var radius := AbilityNumbers.BANNER_REACH if p.has_flag("banner_reach") else RALLY_RADIUS
 		Net.command_rally(p.net_id(), radius, last, p.world)
 		if last:
 			# Two Infantry and a Ranger.
@@ -69,8 +74,8 @@ static func cast(p: Player) -> void:
 		else:
 			p.world.spawn_ally("infantry", p.global_position + Vector3(2, 0, 0), 16.0 * p.m("ally_time"))
 	if p.has_flag("rally_recovery"):
-		var radius := 16.0 if p.has_flag("banner_reach") else RALLY_RADIUS
-		p.heal(20.0)
+		var radius := AbilityNumbers.BANNER_REACH if p.has_flag("banner_reach") else RALLY_RADIUS
+		p.heal(AbilityNumbers.RALLY_HEAL)
 		for ally: Ally in p.world.allies:
 			if not ally.dead and ally.master == p and ally.remote_owner == 0 and ally.global_position.distance_to(p.global_position) <= radius:
 				ally.hp = minf(ally.hp + 20.0, float(Ally.HEALTH[ally.kind]) * p.m("ally_hp"))

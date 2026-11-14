@@ -21,8 +21,8 @@ var _checked_updates := false
 var _pause_root: Control
 var _net_go := false
 
-const TOGETHER_TABS := ["Same Wi-Fi", "Hotspot", "Online"]
-const ONLINE_TAB := 2
+const TOGETHER_TABS := ["Same Wi-Fi", "Online"]
+const ONLINE_TAB := 1
 const TIPS := [
 	"Push the stick halfway to walk quietly.",
 	"Zombies see you much less in tall wheat.",
@@ -33,7 +33,7 @@ const TIPS := [
 	"Fire hurts a Wraith twice as much.",
 	"Fallen Heroes grow stronger every minute, and drop their weapon.",
 	"The night does not wait: open the tree somewhere safe.",
-	"The bell strikes once for each minute gone, and draws zombies to the church.",
+	"In The Village, the bell strikes once for each minute gone, and draws zombies to the church.",
 	"Beasts track by scent. Hiding only delays them.",
 	"A chime means a familiar has appeared close by. Look for its light.",
 	"In the last two minutes, everything comes for you. Save your strength.",
@@ -925,14 +925,14 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 			return
 		if Game.buy_class(id):
 			Sfx.play("level", -3.0)
-			show_store(id, mode))
+			show_store("", mode, "classes", Callable(), id))
 	row.add_child(buy)
 
 
 ## Everything for sale, by section. What you pick turns slowly beside its description.
 ## back_to: where Back goes, when the Store was opened from somewhere other than the menu or a class.
 ## Moving around inside the Store keeps it.
-func show_store(focus := "", from_mode := -1, section := "", back_to := Callable()) -> void:
+func show_store(focus := "", from_mode := -1, section := "", back_to := Callable(), just_bought := "") -> void:
 	_clear_ui()
 	if back_to.is_valid():
 		_store_return = back_to
@@ -952,7 +952,36 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 	var keys: Array = ShopDefs.SECTIONS.keys()
 	var tabs := UiScreen.tabs(root.get_meta("box"), keys.map(func(k: String) -> String: return ShopDefs.SECTIONS[k]), keys.find(section), func(i: int) -> void: show_store("", from_mode, keys[i], here))
 	tabs.get_parent().move_child(tabs, 1)
-	var ids: Array[String] = ClassDefs.for_sale() if section == "classes" else ShopDefs.in_section(section)
+	# What you own is not for sale any more: it leaves the list, and lives in the Armory.
+	var ids: Array[String] = []
+	ids.assign((ClassDefs.for_sale() if section == "classes" else ShopDefs.in_section(section)).filter(func(id: String) -> bool:
+		return not (Game.owns_class(id) if section == "classes" else Game.owns_item(id))))
+	if just_bought != "":
+		var name_of: String = ClassDefs.ALL[just_bought]["name"] if ClassDefs.ALL.has(just_bought) else ShopDefs.ITEMS[just_bought]["name"]
+		var bought := _body("Bought: %s. It is yours now, in the Armory." % name_of, UiTheme.FS_BODY)
+		bought.name = "JustBought"
+		bought.add_theme_color_override("font_color", UiTheme.MOSS)
+		list.add_child(bought)
+		bought.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if ids.is_empty():
+		var none := _soft("You own everything here.", UiTheme.FS_BODY)
+		none.name = "NothingLeft"
+		list.add_child(none)
+		# The other pane says where it all went, and takes you there.
+		var gone := _body("Everything in %s is yours. Equip it, or take it off, in the Armory." % ShopDefs.SECTIONS.get(section, "Classes"), UiTheme.FS_LEAD)
+		gone.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.add_child(gone)
+		var to_class := ""
+		if ShopDefs.ITEMS.has(just_bought):
+			to_class = str(ShopDefs.ITEMS[just_bought]["class"])
+		elif ClassDefs.ALL.has(just_bought):
+			to_class = just_bought
+		var go := _button("Open the Armory", func() -> void: show_armory(to_class), Vector2(280, UiTheme.BTN), true)
+		go.name = "OpenArmory"
+		go.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		detail.add_child(go)
+		panel = root
+		return
 	var rows := {}
 	var pick := func(id: String) -> void:
 		for other: String in rows:
@@ -1029,7 +1058,8 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	var owner_row := HBoxContainer.new()
 	owner_row.add_theme_constant_override("separation", 10)
 	owner_row.add_child(IconView.new(ClassDefs.icon(d["class"]), ClassDefs.color(d["class"]), 46.0))
-	owner_row.add_child(IconView.new("spec_%s" % d["spec"], ClassDefs.color(d["class"]), 46.0))
+	if d["spec"] != "":
+		owner_row.add_child(IconView.new("spec_%s" % d["spec"], ClassDefs.color(d["class"]), 46.0))
 	var owner_words := _soft(ShopDefs.whose(id), UiTheme.FS_BODY)
 	owner_words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	owner_row.add_child(owner_words)
@@ -1067,7 +1097,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 			return
 		if Game.buy_item(id):
 			Sfx.play("level", -3.0)
-			show_store(id, from_mode, "", _store_return))
+			show_store("", from_mode, str(ShopDefs.ITEMS[id]["section"]), _store_return, id))
 	row.add_child(buy)
 
 
@@ -1141,7 +1171,11 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	cosmetics.name = "CosmeticsSection"
 	content.add_child(cosmetics)
 	cosmetics.add_child(_body("Appearance", UiTheme.FS_LEAD))
-	cosmetics.add_child(_soft("Default appearance. No additional skins available yet.", UiTheme.FS_SMALL))
+	var skins := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["section"] == "cosmetics")
+	if skins.is_empty():
+		cosmetics.add_child(_soft("Default appearance. No other looks for this class yet.", UiTheme.FS_SMALL))
+	for item: String in skins:
+		cosmetics.add_child(_item_switch(id, item))
 	for label: Label in detail.find_children("*", "Label", true, false):
 		if not label.get_parent().has_meta("tag"):
 			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1163,29 +1197,38 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 		column.add_child(_pet_row())
 		return row
 	for item: String in items:
-		var d: Dictionary = ShopDefs.ITEMS[item]
-		var line := HBoxContainer.new()
-		line.add_theme_constant_override("separation", 12)
-		column.add_child(line)
-		var description := _soft(d["desc"], UiTheme.FS_SMALL)
-		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		column.add_child(description)
-		var name_label := _soft(d["name"], UiTheme.FS_BODY)
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		line.add_child(name_label)
-		if not Game.owns_item(item):
-			line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, UiTheme.BTN_SHORT)))
-			continue
-		var on := Game.item_active(item)
-		var toggle := _choice("Equipped" if on else "Not equipped", func() -> void: pass, Vector2(190, UiTheme.BTN_SHORT), on)
-		line.add_child(toggle)
-		toggle.pressed.connect(func() -> void:
-			Game.set_item_on(item, not Game.item_active(item))
-			var active := Game.item_active(item)
-			toggle.text = "Equipped" if active else "Not equipped"
-			if active: UiTheme.selected(toggle)
-			else: UiTheme.plain(toggle))
+		column.add_child(_item_switch(class_id, item))
 	return row
+
+
+## One item's name and what it does, with Equipped / Not equipped when you own it, or the way to the
+## Store when you do not.
+func _item_switch(class_id: String, item: String) -> Control:
+	var d: Dictionary = ShopDefs.ITEMS[item]
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 12)
+	column.add_child(line)
+	var name_label := _soft(d["name"], UiTheme.FS_BODY)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(name_label)
+	var description := _soft(d["desc"], UiTheme.FS_SMALL)
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(description)
+	if not Game.owns_item(item):
+		line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, UiTheme.BTN_SHORT)))
+		return column
+	var on := Game.item_active(item)
+	var toggle := _choice("Equipped" if on else "Not equipped", func() -> void: pass, Vector2(190, UiTheme.BTN_SHORT), on)
+	line.add_child(toggle)
+	toggle.pressed.connect(func() -> void:
+		Game.set_item_on(item, not Game.item_active(item))
+		var active := Game.item_active(item)
+		toggle.text = "Equipped" if active else "Not equipped"
+		if active: UiTheme.selected(toggle)
+		else: UiTheme.plain(toggle))
+	return column
 
 
 static func _spec_name(class_id: String, spec: String) -> String:
@@ -1772,16 +1815,19 @@ func show_sandbox_menu() -> void:
 ## The four ways to play together, and what each one needs.
 func show_together(tab := -1) -> void:
 	if tab >= 0:
-		_together_tab = tab
+		_together_tab = clampi(tab, 0, TOGETHER_TABS.size() - 1)
 	_clear_ui()
 	_back = show_menu
 	var root := _screen("Play Together", show_menu, "Up to four phones, nearby or online.")
+	# Who you play as is shown, not changed, here: the name is changed in Settings.
 	var right: HBoxContainer = root.get_meta("right")
 	var playing := _soft("Playing as", UiTheme.FS_BODY)
 	playing.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	right.add_child(playing)
-	var who := _button(Game.player_name, func() -> void: show_name_prompt(false, func() -> void: show_together()), Vector2(maxf(160.0, _text_width(Game.player_name, UiTheme.FS_BTN) + 48.0), UiTheme.BTN))
-	who.tooltip_text = "Change your name"
+	var who := _label(Game.player_name, UiTheme.FS_LEAD, UiTheme.BONE)
+	who.name = "PlayingAs"
+	who.add_theme_font_override("font", UiTheme.bold_font())
+	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	right.add_child(who)
 	UiScreen.tabs(root.get_meta("box"), TOGETHER_TABS, _together_tab, func(i: int) -> void: show_together(i))
 	var page := UiScreen.page(root.get_meta("box"))
@@ -1797,7 +1843,7 @@ func show_together(tab := -1) -> void:
 	var top := HBoxContainer.new()
 	top.add_theme_constant_override("separation", UiTheme.GAP)
 	box.add_child(top)
-	var about := _body(["Everyone on the same Wi-Fi network.", "One phone shares its connection; the others join it.", "Over the internet, from almost any network, mobile data included."][_together_tab], UiTheme.FS_LEAD)
+	var about := _body(["Everyone on the same Wi-Fi network.", "Over the internet, from almost any network, mobile data included."][_together_tab], UiTheme.FS_LEAD)
 	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	about.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	about.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -1815,12 +1861,7 @@ func show_together(tab := -1) -> void:
 	match _together_tab:
 		0:
 			_nearby_games(box, root)
-		1:
-			var steps := _soft("1. On one phone, turn on the hotspot in its settings.\n2. Connect the others to that hotspot's Wi-Fi. If a phone warns there is no internet, stay connected.\n3. Start a game on the hotspot phone, and it appears on the others.\nIf a phone keeps getting dropped, turn off its mobile data.", UiTheme.FS_BODY)
-			steps.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			box.add_child(steps)
-			_nearby_games(box, root)
-		2:
+		ONLINE_TAB:
 			_online_tab(box)
 
 

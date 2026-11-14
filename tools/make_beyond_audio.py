@@ -729,6 +729,76 @@ def portal_wound():
     return reverb(crack + hum, 1.3, 0.35)
 
 
+def dawn_mists():
+    """The Mists sense the dawn: many faint voices drawing one long breath through the fog, rising
+    together, and a cold glassy shimmer as the grey starts to thin."""
+    m = n(3.2)
+    t = t_(m)
+    voices = np.zeros(m)
+    for i, f in enumerate((174.6, 207.7, 261.6, 311.1)):
+        drift = 1 + 0.01 * np.sin(2 * np.pi * (0.3 + i * 0.11) * t)
+        rise = np.linspace(1.0, 1.12, m)
+        tone = np.sin(2 * np.pi * np.cumsum(f * drift * rise) / SR) + 0.35 * np.sin(2 * np.pi * np.cumsum(2 * f * drift * rise) / SR)
+        voices += tone * (0.6 + 0.4 * np.sin(2 * np.pi * (0.7 + i * 0.2) * t)) * 0.2
+    breath = sweep_filter(noise(m), 500, 1800, 0.5) * 0.5
+    shimmer = np.zeros(m)
+    p = n(1.6)
+    k = m - p
+    shimmer[p:] = glass(1568.0, k / SR, 2.5)[:k] * 0.25
+    return reverb((voices + breath) * bell_env(m, 0.8) + shimmer, 2.2, 0.45)
+
+
+def dawn_valleys():
+    """The Valleys sense the dawn: hunting horns calling across the hills, answered from further off,
+    over a low rumble of the wild things stirring."""
+    m = n(3.4)
+    t = t_(m)
+    def horn(f0, f1, start, sec, vol):
+        out = np.zeros(m)
+        p = n(start)
+        k = min(n(sec), m - p)
+        tt = t_(k)
+        f = np.linspace(f0, f1, k) * (1 + 0.008 * np.sin(2 * np.pi * 5 * tt))
+        tone = sum(np.sin(2 * np.pi * np.cumsum(f * h) / SR) / h ** 1.2 for h in range(1, 8))
+        out[p:p + k] = lowp(tone, 1800) * env(k, 0.12, 1.0) * vol
+        return out
+    calls = horn(220.0, 233.1, 0.0, 1.2, 0.45) + horn(293.7, 293.7, 1.0, 0.9, 0.4) + horn(196.0, 207.7, 1.9, 1.4, 0.25)
+    rumble = lowp(noise(m), 90, 3) * bell_env(m, 1.0) * 1.2
+    return reverb(calls + rumble, 2.4, 0.5)
+
+
+def dawn_bastion():
+    """The Mist host senses the dawn at the Bastion: war drums beating faster under a long, low war
+    horn, and a cry of mist rising behind them."""
+    m = n(3.4)
+    t = t_(m)
+    drums = np.zeros(m)
+    beat = 0.0
+    gap = 0.42
+    while beat < 3.0:
+        p = n(beat)
+        k = min(n(0.35), m - p)
+        drums[p:p + k] += lowp(noise(k), 160, 3)[:k] * np.exp(-t_(k) * 14) * 2.2 + glide(95, 55, k)[:k] * np.exp(-t_(k) * 10) * 0.8
+        beat += gap
+        gap = max(0.17, gap * 0.86)
+    k = n(2.6)
+    tt = t_(k)
+    f = 98.0 * (1 + 0.01 * np.sin(2 * np.pi * 4.5 * tt))
+    tone = sum(np.sin(2 * np.pi * np.cumsum(f * h) / SR) / h ** 1.1 for h in range(1, 9))
+    war_horn = np.zeros(m)
+    p = n(0.5)
+    war_horn[p:p + k] = lowp(tone, 1200)[:m - p] * env(k, 0.2, 0.8)[:m - p] * 0.4
+    cry = sweep_filter(noise(m), 600, 2400, 0.5) * np.linspace(0, 1, m) ** 2 * 0.35
+    return reverb(drums + war_horn + cry, 1.8, 0.4)
+
+
+if __name__ == "__main__" and os.environ.get("ONLY"):
+    # ONLY=a,b remakes just those sounds (the others are left exactly as they are).
+    for name in os.environ["ONLY"].split(","):
+        save(name, globals()[name](), 0.7)
+    raise SystemExit
+
+
 if __name__ == "__main__":
     os.makedirs(SND, exist_ok=True)
     save("heavy_swing", heavy_swing(), 0.6)
@@ -754,6 +824,6 @@ if __name__ == "__main__":
                        ("wing_flap", 0.6), ("wyvern_hurt", 0.6), ("wyvern_death", 0.8), ("stag_call", 0.6), ("stag_hurt", 0.55), ("beast_growl", 0.7),
                        ("shapeshifter_death", 0.75), ("stone_hit", 0.55), ("stone_crumble", 0.8), ("revenant_death", 0.85),
                        ("mist_hurt", 0.5), ("mist_dissipate", 0.6), ("storm_hurt", 0.5), ("storm_burst", 0.8), ("woods_hurt", 0.5),
-                       ("woods_death", 0.55)):
+                       ("woods_death", 0.55), ("dawn_mists", 0.7), ("dawn_valleys", 0.7), ("dawn_bastion", 0.7)):
         save(name, globals()[name](), gain)
     print("Beyond the Mists sounds written to", SND)

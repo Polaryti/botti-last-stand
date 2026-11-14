@@ -12,6 +12,8 @@ var team := 0
 var display := ""
 var hp_fraction := 1.0
 var level := 1 # as their own phone last said
+var skin := 0 # Player.skin_bits: bit 0, the White Stag
+var _stag: Node3D
 var down_since := -1.0 # world.now when this player fell, for the countdown beside their name
 var _target := Vector3.ZERO
 var _yaw := 0.0
@@ -110,6 +112,12 @@ func _build_body(model: String) -> void:
 	_play("Idle")
 
 
+func set_skin(bits: int) -> void:
+	if bits != skin:
+		skin = bits
+		_show_seat()
+
+
 ## Riding: the horse under them if it is theirs, and either way they sit higher.
 func _show_seat() -> void:
 	var up := _riding or _seated
@@ -119,7 +127,12 @@ func _show_seat() -> void:
 		_horse.scale = Vector3.ONE * HorseModel.RIDDEN_SIZE
 		add_child(_horse)
 	if _horse:
-		_horse.visible = _riding and not in_chariot and not _watched
+		_horse.visible = _riding and not in_chariot and not _watched and skin & 1 == 0
+	if _riding and not in_chariot and skin & 1 and _stag == null:
+		_stag = MesenllaModels.stag_steed(HorseModel.RIDDEN_SIZE)
+		add_child(_stag)
+	if _stag:
+		_stag.visible = _riding and not in_chariot and not _watched and skin & 1 != 0
 	if _riding and in_chariot and _chariot == null:
 		_chariot = ChariotModel.new()
 		add_child(_chariot)
@@ -353,6 +366,8 @@ func _process(delta: float) -> void:
 		_chariot.roll(velocity.length() * delta)
 	if _horse and _horse.visible:
 		HorseModel.set_gait(_horse, clampf(velocity.length() / 8.0, 0.0, 1.0))
+	if _stag and _stag.visible:
+		MesenllaModels.steed_gait(_stag, clampf(velocity.length() / 8.0, 0.0, 1.0))
 	if _banner and _banner.visible:
 		var wave := sin(world.now * (10.0 if _attack_left > 0.0 else 2.0)) * (0.18 if _attack_left > 0.0 else 0.035)
 		_banner.global_transform = Transform3D(global_basis * Basis.from_euler(Vector3(0, PI - 0.4, wave)), (_banner.get_parent() as Node3D).global_position)

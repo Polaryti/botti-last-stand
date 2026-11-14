@@ -1334,14 +1334,14 @@ func _bandit() -> void:
 		pl.grant_all_points()
 		for step in 4:
 			pl.choose_ability(step, 0)
-		ok(pl.spec_id == "thief" and pl.art_def()["name"] == "Steal", "and becomes a Thief")
+		ok(pl.spec_id == "thief" and pl.path_art_def()["name"] == "Steal", "and becomes a Thief")
 	await wait(0.6)
 	await sync(201)
 	var hp_before := pl.hp
 	if not host:
 		ok(BanditKit.steal_target(pl) == _avatar(), "Steal goes for the other player")
-		pl.art_cd_left = 0.0
-		pl.use_art()
+		pl.path_art_cd_left = 0.0
+		pl.use_path_art()
 	await wait(1.0)
 	await sync(202)
 	if host:
@@ -1353,8 +1353,8 @@ func _bandit() -> void:
 		ok(pl.invis_left > 0.0, "and turns invisible")
 		# The Sword fell at the Thief's feet, and a free hand picks it up.
 		ok(pl.slots.has("sword"), "the Thief walks off with the other player's Sword")
-		pl.art_cd_left = 0.0
-		pl.use_art()
+		pl.path_art_cd_left = 0.0
+		pl.use_path_art()
 	await wait(1.0)
 	await sync(203)
 	if host:
@@ -1364,9 +1364,9 @@ func _bandit() -> void:
 		pl.spec_id = "mercenary"
 		pl.invis_left = 0.0
 		pl.invis_lockout = 0.0
-		pl.art_cd_left = 0.0
-		ok(pl.art_def()["name"] == "Nightfall", "a Mercenary casts Nightfall")
-		pl.use_art()
+		pl.path_art_cd_left = 0.0
+		ok(pl.path_art_def()["name"] == "Nightfall", "a Mercenary casts Nightfall")
+		pl.use_path_art()
 	await wait(1.0)
 	await sync(204)
 	ok(w.get_children().filter(func(n: Node) -> bool: return n is NightfallDome).size() == 1, "the dome of night is on both phones")
@@ -1383,7 +1383,7 @@ func _bandit() -> void:
 	hp_before = pl.hp
 	if not host:
 		pl.spec_id = "highwayman"
-		pl.art_cd_left = 0.0
+		pl.path_art_cd_left = 0.0
 		var them := _avatar().global_position
 		pl.global_position = them + Vector3(6, 0, 0)
 		var to := them - pl.global_position
@@ -1392,8 +1392,8 @@ func _bandit() -> void:
 		pl.pitch = 0.0
 		pl.head.rotation.x = 0.0
 		await wait(0.2)
-		ok(pl.art_def()["name"] == "Dagger Fan", "a Highwayman throws a Dagger Fan")
-		pl.use_art()
+		ok(pl.path_art_def()["name"] == "Dagger Fan", "a Highwayman throws a Dagger Fan")
+		pl.use_path_art()
 	await wait(1.2)
 	await sync(206)
 	if host:
@@ -1423,10 +1423,10 @@ func _bandit() -> void:
 		pl.flags.erase("steal_keep")
 		pl.invis_left = 0.0
 		pl.invis_lockout = 0.0
-		pl.art_cd_left = 0.0
+		pl.path_art_cd_left = 0.0
 		pl.global_position = den + Vector3(0, w.ground_at(den) + 0.05, 7.0)
 		await wait(0.2)
-		pl.use_art()
+		pl.use_path_art()
 	await wait(1.5)
 	await sync(209)
 	var after: Array = armed_ones.call()

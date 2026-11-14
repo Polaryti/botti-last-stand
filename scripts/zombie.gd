@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM } # new ones go at the end: the number travels
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -1009,6 +1009,21 @@ func _show_awake() -> void:
 		world.sfx_at("gargoyle", position, -2.0)
 
 
+## Caught off guard: whatever blow it was winding up comes to nothing, and it cannot start another for
+## a moment. It still moves and sees. (A Thief appearing in front of it with a blade, for one.)
+func flinch(seconds: float) -> void:
+	if not is_alive():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.FLINCH, seconds)
+		return
+	if mesenlla_mind:
+		mesenlla_mind.interrupt(self)
+	_attack_left = 0.0
+	_attack_hit_pending = false
+	_attack_cd = maxf(_attack_cd, seconds)
+
+
 func stun(seconds: float) -> void:
 	if not is_alive():
 		return
@@ -1139,6 +1154,8 @@ func net_die() -> void:
 
 
 func _show_death() -> void:
+	if world and not is_boss():
+		world.note_fall(position)
 	if model_id == "veil_regent":
 		(_visual.get_node("RegentHealth") as Label3D).visible = false
 	_dying = 2.2

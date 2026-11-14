@@ -1117,6 +1117,11 @@ func test_version_20_1() -> void:
 	# Updates.
 	ok(Updates.is_newer("v0.20.2", "0.20.1") and Updates.is_newer("0.21.0", "0.20.9") and not Updates.is_newer("v0.20.1", "0.20.1") and not Updates.is_newer("0.19.9", "0.20.1"), "versions compare the right way")
 	var up: Updates = m.updates
+	# The real check of GitHub may still be on its way: dropped, so it cannot land between the forced
+	# releases below and the menu (it did, now and then, and said nothing newer was out).
+	if up._http:
+		up._http.queue_free()
+		up._http = null
 	var apk := {"name": "botti-last-stand-9.0.0.apk", "browser_download_url": "https://github.com/Polaryti/botti-last-stand/releases/download/v9.0.0/botti-last-stand-9.0.0.apk", "size": 1000}
 	up.apply_release({"tag_name": "v9.0.0", "draft": false, "prerelease": false, "html_url": "https://example.invalid/r", "assets": [apk]})
 	ok(up.state == Updates.State.AVAILABLE and up.latest == "9.0.0", "a newer version with its app is offered")
@@ -2078,9 +2083,11 @@ func test_version_15() -> void:
 	ok(Net._listener == null, "Play Together is on screen before it starts looking for games")
 	await get_tree().create_timer(0.3).timeout
 	ok(Net._listener != null, "then it looks for games nearby")
-	m.show_together(1)
+	m.show_together(0)
 	await get_tree().create_timer(0.3).timeout
-	ok(Net._listener != null and Net._searchers == 1, "and keeps looking on the next tab (%d)" % Net._searchers)
+	ok(Net._listener != null and Net._searchers == 1, "and keeps looking when the screen is built again (%d)" % Net._searchers)
+	ok(Main.TOGETHER_TABS == ["Same Wi-Fi", "Online"], "only Same Wi-Fi and Online are offered")
+	ok(m.panel.find_child("Rename", true, false) == null and not m.panel.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.text == Game.player_name), "and your name is shown, not changed, here")
 	m.show_menu()
 	await frames(3)
 	ok(Net._listener == null and Net._searchers == 0, "until you leave")
@@ -2531,7 +2538,7 @@ func test_version_11() -> void:
 		var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 		for title: String in Main.TOGETHER_TABS:
 			ok(names.has(title), "the %s way is on offer" % title)
-		ok(not names.has("Hotspot?"), "with no Hotspot? button")
+		ok(not names.has("Hotspot?") and not names.has("Hotspot"), "with no Hotspot button")
 		ok(names.has("Back"), "and a way back")
 	m.show_together(0)
 	await frames(2)
@@ -2948,7 +2955,8 @@ func test_version_8() -> void:
 	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
-	ok(m.panel.get_meta("list").get_child_count() == 4 and (m.panel.find_child("Tabs", true, false) as Container).get_child_count() == ShopDefs.SECTIONS.size(), "the Store opens, with its tabs under its bar and four classes")
+	var unowned := ClassDefs.for_sale().filter(func(c: String) -> bool: return not Game.owns_class(c)).size()
+	ok(m.panel.get_meta("list").get_child_count() == maxi(unowned, 1) and (m.panel.find_child("Tabs", true, false) as Container).get_child_count() == ShopDefs.SECTIONS.size(), "the Store opens, with its tabs under its bar and the classes not yet owned (%d)" % unowned)
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await frames(2)
 	ok(m.panel.get_meta("list").get_child_count() == ClassDefs.available().size(), "the Sandbox only offers what you own")

@@ -40,6 +40,8 @@ func _ready() -> void:
 	print("REWORK commander")
 	await _commander()
 	await _bandit()
+	print("REWORK upgrades")
+	await _new_upgrades()
 	print("REWORK cartographer")
 	await _cartographer()
 	print("REWORK walls")
@@ -852,7 +854,8 @@ func _bandit() -> void:
 	p.invis_lockout = 0.0
 	# Steal: in front of the nearest foe, invisible, a blow, and the weapon on the ground.
 	pawn("bandit", 0)
-	check(p.art_def()["name"] == "Steal", "Thief replaces it with Steal")
+	check(p.art_def()["name"] == "Into the Shadows" and p.path_art_def()["name"] == "Steal", "a Thief keeps Into the Shadows and gets Steal on a second button")
+	check(p.has_path_art() and not p.path_art_has_use(), "with nobody near, Steal has nothing to do")
 	w.spawn_zombie("clever", p.global_position + Vector3(0, 0, -10))
 	var victim: Zombie = w.zombies.back()
 	victim.set_physics_process(false)
@@ -860,36 +863,38 @@ func _bandit() -> void:
 	victim.max_hp = 1000.0
 	victim.weapon_id = "sword"
 	victim.rotation.y = 0.0
+	check(p.path_art_has_use(), "with a foe in reach, Steal can be used")
 	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
-	BanditKit.cast(p)
+	BanditKit.cast_path(p)
 	check(p.global_position.distance_to(victim.position) < 2.2, "the Thief appears beside its target (%.1f m)" % p.global_position.distance_to(victim.position))
 	var look := -p.global_basis.z
 	check(look.dot((victim.position - p.global_position).normalized()) > 0.8, "facing it")
 	check(p.invis_left > 2.0 and victim.hp < 1000.0, "invisible, and the blow lands")
+	check(victim._attack_cd >= BanditKit.STEAL_FLINCH - 0.01 and not victim._attack_hit_pending, "and the target, caught off guard, cannot strike back at once")
 	p.mods["shadow_time"] = 0.0
 	p.invis_left = 0.0
 	p.invis_lockout = 0.0
 	victim.weapon_id = ""
-	BanditKit.cast(p)
+	BanditKit.cast_path(p)
 	var hidden_for := p.invis_left
 	p.invis_left = 0.0
 	p.invis_lockout = 0.0
 	p.mods["shadow_time"] = 2.0
-	BanditKit.cast(p)
+	BanditKit.cast_path(p)
 	check(is_equal_approx(p.invis_left, hidden_for + 2.0), "Long Shadows keeps a Thief hidden 2 s longer after a Steal (%.1f, was %.1f)" % [p.invis_left, hidden_for])
 	p.mods["shadow_time"] = 0.0
 	p.invis_left = 0.0
 	p.invis_lockout = 0.0
 	check(victim.weapon_id == "" and w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "sword"), "the stolen Sword lies on the ground")
 	victim.weapon_id = "lance"
-	BanditKit.cast(p)
+	BanditKit.cast_path(p)
 	check(victim.weapon_id == "lance", "a class weapon cannot be stolen")
 	victim.weapon_id = "spear"
 	p.flags["steal_keep"] = true
 	p.invis_left = 0.0
 	p.invis_lockout = 0.0
 	p.slots = ["dagger", null]
-	BanditKit.cast(p)
+	BanditKit.cast_path(p)
 	check(p.slots.has("spear") and victim.weapon_id == "", "Fence puts the stolen weapon in the Thief's empty hand")
 	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
 	victim.weapon_id = "mace"
@@ -897,7 +902,7 @@ func _bandit() -> void:
 	p.current = 1
 	p.invis_left = 0.0
 	p.invis_lockout = 0.0
-	BanditKit.cast(p)
+	BanditKit.cast_path(p)
 	check(p.weapon_id() == "mace" and p.slots.has("dagger") and not p.slots.has("spear"), "with both hands full, Fence swaps the stolen Mace for the Spear held")
 	check(w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "spear"), "and the Spear drops")
 	# Grand Larceny: every armed foe round the target is struck and disarmed too.
@@ -915,17 +920,17 @@ func _bandit() -> void:
 		crowd.append(other)
 	p.invis_left = 0.0
 	p.invis_lockout = 0.0
-	p.art_cd_left = 0.0
-	BanditKit.cast(p)
+	p.path_art_cd_left = 0.0
+	BanditKit.cast_path(p)
 	check(victim.weapon_id == "", "Grand Larceny disarms the target")
 	check(crowd.all(func(o: Zombie) -> bool: return o.weapon_id == "" and o.hp < 1000.0), "and strikes and disarms every armed foe within 4 m of it: %s" % str(crowd.map(func(o: Zombie) -> String: return "%s %.0f %.1f m" % [o.weapon_id, o.hp, o.position.distance_to(victim.position)])))
 	for o in crowd: o.release()
 	p.flags.erase("steal_all")
 	victim.release()
 	# Steal goes for nothing when nothing is near.
-	p.art_cd_left = 0.0
-	BanditKit.cast(p)
-	check(p.art_cd_left <= 0.5, "nothing to steal from costs no cooldown")
+	p.path_art_cd_left = 0.0
+	BanditKit.cast_path(p)
+	check(p.path_art_cd_left <= 0.5, "nothing to steal from costs no cooldown")
 	# A robbed player keeps a class weapon or a last weapon, and drops anything else.
 	pawn("ranger")
 	p.slots = ["bow", "sword"]
@@ -937,9 +942,9 @@ func _bandit() -> void:
 	check(p.weapon_id() == "bow", "but never the last one")
 	# Nightfall: friends inside vanish and stay hidden a moment, creatures inside barely see.
 	pawn("bandit", 1)
-	check(p.art_def()["name"] == "Nightfall", "Mercenary replaces it with Nightfall")
+	check(p.art_def()["name"] == "Into the Shadows" and p.path_art_def()["name"] == "Nightfall", "a Mercenary keeps Into the Shadows and gets Nightfall")
 	var near := target(p.global_position + Vector3(4, 0, 0))
-	BanditKit.cast(p)
+	BanditKit.cast_path(p)
 	var dome: NightfallDome = w.find_children("Nightfall", "NightfallDome", false, false).back() if not w.find_children("Nightfall", "NightfallDome", false, false).is_empty() else null
 	check(dome != null and is_equal_approx(dome.radius, BanditKit.NIGHT_RADIUS), "a dome of night rises")
 	await frames(4)
@@ -952,7 +957,7 @@ func _bandit() -> void:
 	near.release()
 	# The Highwayman's Dagger Fan, and Plunder.
 	pawn("bandit", 2)
-	check(p.art_def()["name"] == "Dagger Fan", "Highwayman replaces it with Dagger Fan")
+	check(p.art_def()["name"] == "Into the Shadows" and p.path_art_def()["name"] == "Dagger Fan", "a Highwayman keeps Into the Shadows and gets Dagger Fan")
 	var before := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size()
 	BanditKit.dagger_fan(p)
 	var thrown := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() - before
@@ -981,6 +986,97 @@ func _bandit() -> void:
 	p.on_kill(mark)
 	check(not w.pickups.is_empty() and w.pickups.back().kind in [Pickup.Kind.FOOD, Pickup.Kind.ARROWS, Pickup.Kind.POWER], "Plunder leaves something behind")
 	mark.release()
+
+
+## The Class Upgrades of the Cavalry and the Magician, one for each path.
+func _new_upgrades() -> void:
+	var owned_before: Dictionary = Game.owned_items.duplicate()
+	for id: String in ["lance_charge", "consecration", "whistle", "grave_call", "frost_nova", "hall_of_mirrors"]:
+		Game.owned_items[id] = true
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		check(d["section"] == "upgrades" and d["class"] in ["chivalry", "magician"] and int(d["price"]) >= 240 and int(d["price"]) <= 280, "%s is a Class Upgrade at the usual price" % id)
+		check(Icons.exists(str(d["icon"]).split("+")[0]) and (not d.has("art") or Icons.exists(str(d["art"]["icon"]))), "%s has its icons" % id)
+	check(["lancer", "paladin", "horse_archer", "necromancer", "elementalist", "illusionist"].all(func(spec: String) -> bool:
+		return ShopDefs.ITEMS.values().any(func(i: Dictionary) -> bool: return i.get("spec", "") == spec)), "every Cavalry and Magician path has an upgrade")
+	# Lance Charge: ten metres on, and what is in the way is struck and thrown aside.
+	pawn("chivalry", 0)
+	check(p.art_def()["name"] == "Lance Charge", "a Lancer with the upgrade has Lance Charge")
+	p.rotation.y = 0.0
+	p.yaw = 0.0
+	var start := p.global_position
+	var in_way := target(start + Vector3(0, 0, -4))
+	var aside := target(start + Vector3(6, 0, -4))
+	p.use_art()
+	await frames(150)
+	var went := Vector2(p.global_position.x - start.x, p.global_position.z - start.z).length()
+	check(went > UpgradeKit.CHARGE_REACH * 0.6 and went < UpgradeKit.CHARGE_REACH + 1.5, "Lance Charge carries the Lancer about 10 m (%.1f)" % went)
+	check(in_way.hp < in_way.max_hp - UpgradeKit.CHARGE_DAMAGE * 0.9, "it strikes what is in the way (%.0f)" % (in_way.max_hp - in_way.hp))
+	check(is_equal_approx(aside.hp, aside.max_hp), "and nothing off to the side")
+	check(p.art_cd_left > 10.0, "then rests (%.0f s)" % p.art_cd_left)
+	in_way.release()
+	aside.release()
+	# Consecration: friends heal inside, enemies burn.
+	pawn("chivalry", 1)
+	check(p.art_def()["name"] == "Consecration", "a Paladin with the upgrade has Consecration")
+	var burnt := target(p.global_position + Vector3(3, 0, 0))
+	p.hp = p.max_hp() * 0.5
+	UpgradeKit.consecrate(p)
+	await frames(400)
+	check(p.hp > p.max_hp() * 0.5 + 4.0 and p.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "heart+hand"), "the Paladin heals inside it, and the status bar says a friend is mending (%.0f)" % p.hp)
+	check(burnt.burn_time > 0.0, "an enemy inside burns")
+	for c: Node in w.get_children():
+		if c is Consecration:
+			c.queue_free()
+	burnt.release()
+	# Whistle: the horse at once.
+	pawn("chivalry", 2)
+	p.horse_progress = 0
+	check(p.art_def()["name"] == "Whistle" and not p.horse_ready(), "a Horse Archer with Whistle, and no horse yet")
+	UpgradeKit.whistle(p)
+	check(p.is_riding(), "Whistle brings the horse at once")
+	check(not UpgradeKit.whistle_has_use(p), "and there is no calling a second while riding")
+	p.dismount()
+	# Grave Call: the fallen nearby rise.
+	pawn("magician", 0)
+	check(p.art_def()["name"] == "Grave Call", "a Necromancer with the upgrade has Grave Call")
+	p.mana = p.max_mana()
+	p.art_cd_left = 0.0
+	UpgradeKit.grave_call(p)
+	check(p.art_cd_left == 0.0, "with nobody fallen, Grave Call costs nothing")
+	for k in 4:
+		var fallen := target(p.global_position + Vector3(2 + k, 0, 2))
+		fallen.take_damage(100000.0, Vector3.ZERO, 0.0, fallen.centre())
+	await frames(4)
+	var before := w.allies.size()
+	UpgradeKit.grave_call(p)
+	check(w.allies.size() - before == UpgradeKit.GRAVE_RAISED, "three of the four fallen rise as skeletons (%d)" % (w.allies.size() - before))
+	check(UpgradeKit.graves(p).size() == 1, "and those graves are spent")
+	# Frost Nova: everything near freezes.
+	pawn("magician", 1)
+	check(p.art_def()["name"] == "Frost Nova", "an Elementalist with the upgrade has Frost Nova")
+	var cold := target(p.global_position + Vector3(4, 0, 0))
+	var far := target(p.global_position + Vector3(12, 0, 0))
+	UpgradeKit.frost_nova(p)
+	check(cold._stun > 1.5 and cold.hp < cold.max_hp and is_equal_approx(far.hp, far.max_hp), "Frost Nova freezes and hurts what is within 6 m, and nothing further")
+	cold.release()
+	far.release()
+	# Hall of Mirrors: a big hit swaps the Illusionist away, once every 30 s.
+	pawn("magician", 2)
+	check(p.art_def()["name"] == "Mirror Swap", "an Illusionist keeps Mirror Swap on the button")
+	var hp := p.hp
+	var was_at := p.global_position
+	p.hurt(p.max_hp() * 0.5, p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(p.hp, hp) and p.mirror_hall_left > 25.0, "a hit of half its health misses: Hall of Mirrors")
+	check(w.allies.any(func(a: Ally) -> bool: return a.kind == "decoy"), "and a decoy is left behind (moved %.1f m)" % p.global_position.distance_to(was_at))
+	p.guard_left = 0.0
+	p.hurt(p.max_hp() * 0.5, p.global_position + Vector3(0, 0, -1))
+	check(p.hp < hp, "the next one within 30 s lands")
+	p.hp = p.max_hp()
+	p.guard_left = 0.0
+	p.mirror_hall_left = 0.0
+	p.hurt(p.max_hp() * 0.1, p.global_position + Vector3(0, 0, -1))
+	check(p.mirror_hall_left == 0.0, "and a small hit is never swapped away")
+	Game.owned_items = owned_before
 
 
 ## Beacons straight in front of the Cartographer, at the given offsets, each faced north.

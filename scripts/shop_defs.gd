@@ -3,7 +3,7 @@ class_name ShopDefs
 ## is three or four good nights. An upgrade works only on its own path, and can be switched off in
 ## the Armory. Pets are for the Beastmaster, and one is chosen at a time.
 
-const SECTIONS := {"classes": "Classes", "upgrades": "Class upgrades"}
+const SECTIONS := {"classes": "Classes", "upgrades": "Class upgrades", "cosmetics": "Cosmetics"}
 const PETS := ["wolf", "raven", "snake", "fox"]
 
 const ITEMS := {
@@ -25,6 +25,25 @@ const ITEMS := {
 	"shadow_shroud": {"name": "Shadow Shroud", "section": "upgrades", "class": "infantry", "spec": "shadow", "price": 240, "icon": "shroud", "model": "dagger",
 		"desc": "Every 8 kills, an ability makes you Invisible for 3 s. Nothing can see you, even right next to it.",
 		"art": {"name": "Shadow Shroud", "cost": 0.0, "cast": 0.0, "cd": 0.0, "icon": "eye_closed"}},
+	"lance_charge": {"name": "Lance Charge", "section": "upgrades", "class": "chivalry", "spec": "lancer", "price": 260, "icon": "lance", "model": "lance",
+		"desc": "An ability: dash 10 m forward with your lance couched, on foot or riding. Everything in the way takes 55 damage and is thrown aside. Ready again after 16 s.",
+		"art": {"name": "Lance Charge", "cost": 0.0, "cast": 0.0, "cd": 16.0, "icon": "lance"}},
+	"consecration": {"name": "Consecration", "section": "upgrades", "class": "chivalry", "spec": "paladin", "price": 280, "icon": "sun", "model": "lance",
+		"desc": "An ability: plant a holy standard for 8 s. Friends within 6 m heal 4 health a second; enemies inside burn and are slowed. Ready again after 30 s.",
+		"art": {"name": "Consecration", "cost": 0.0, "cast": 0.3, "cd": 30.0, "icon": "banner", "anim": "Stance"}},
+	"whistle": {"name": "Whistle", "section": "upgrades", "class": "chivalry", "spec": "horse_archer", "price": 240, "icon": "horse", "model": "bow",
+		"desc": "An ability: whistle, and your horse comes at once, without kills. Ready again after 90 s.",
+		"art": {"name": "Whistle", "cost": 0.0, "cast": 0.1, "cd": 90.0, "icon": "horseshoe"}},
+	"grave_call": {"name": "Grave Call", "section": "upgrades", "class": "magician", "spec": "necromancer", "price": 260, "icon": "bones", "model": "staff",
+		"desc": "An ability: up to 3 enemies that fell within 12 m in the last 10 s rise as skeletons and fight for you for 15 s. Costs 30 mana; ready again after 25 s.",
+		"art": {"name": "Grave Call", "cost": 30.0, "cast": 0.4, "cd": 25.0, "icon": "skull", "anim": "Stance"}},
+	"frost_nova": {"name": "Frost Nova", "section": "upgrades", "class": "magician", "spec": "elementalist", "price": 260, "icon": "snow", "model": "staff",
+		"desc": "An ability: every enemy within 6 m takes 25 damage and is frozen for 2 s. Costs 35 mana; ready again after 20 s.",
+		"art": {"name": "Frost Nova", "cost": 35.0, "cast": 0.2, "cd": 20.0, "icon": "snow"}},
+	"hall_of_mirrors": {"name": "Hall of Mirrors", "section": "upgrades", "class": "magician", "spec": "illusionist", "price": 280, "icon": "mirror", "model": "staff",
+		"desc": "A hit that would take a quarter of your health or more misses: you swap away as Mirror Swap does, and a decoy stays where you stood. Once every 30 s."},
+	"stag_steed": {"name": "White Stag", "section": "cosmetics", "class": "chivalry", "spec": "", "price": 400, "icon": "antlers", "skin": "stag",
+		"desc": "Your horse comes as a white stag of the Valleys, the shape the Shapeshifter takes, antlers and all. It rides exactly as the horse does; only its look changes, for you and everyone you play with."},
 	"raven": {"name": "Raven", "section": "upgrades", "class": "ranger", "spec": "beastmaster", "price": 150, "icon": "raven", "pet": true,
 		"desc": "Attacks from the air, where few can reach it. It is frail, and bites a little softer than a wolf."},
 	"snake": {"name": "Snake", "section": "upgrades", "class": "ranger", "spec": "beastmaster", "price": 180, "icon": "snake", "pet": true,
@@ -32,6 +51,11 @@ const ITEMS := {
 	"fox": {"name": "Fox", "section": "upgrades", "class": "ranger", "spec": "beastmaster", "price": 150, "icon": "fox", "pet": true,
 		"desc": "Quick, with a softer bite. Now and then it digs up some food for you."},
 }
+
+
+## Whether a skin is on: bought, and not turned off in the Armory.
+static func skin_on(id: String) -> bool:
+	return ITEMS.has(id) and Game.item_active(id)
 
 
 ## The item that gives a path its ability button.
@@ -67,6 +91,8 @@ static func spec_name(id: String) -> String:
 ## "Ranger, Sharpshooter", or "Ranger, Beastmaster pet".
 static func whose(id: String) -> String:
 	var d: Dictionary = ITEMS[id]
+	if d["spec"] == "":
+		return "%s, every path" % ClassDefs.ALL[d["class"]]["name"]
 	return "%s, %s%s" % [ClassDefs.ALL[d["class"]]["name"], spec_name(id), " pet" if d.get("pet", false) else ""]
 
 

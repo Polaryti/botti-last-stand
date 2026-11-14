@@ -36,6 +36,8 @@ func _ready() -> void:
 	_music_and_polish()
 	await _after_0212()
 	await _beyond_weapons()
+	await _together_store_and_dawn()
+	_text_audit()
 	Net.leave()
 	w.queue_free()
 	await frames(2)
@@ -430,7 +432,8 @@ func _ui_initialization() -> void:
 		p.set(entry["field"], 2.5)
 		var found := false
 		for effect: Dictionary in p.status_effects():
-			if is_equal_approx(float(effect["left"]), 2.5): found = true
+			# Being mended lasts as long as the mending, so it shows no count, only that it is happening.
+			if is_equal_approx(float(effect["left"]), 2.5) or (entry["field"] == "friend_heal_left" and effect["icon"] == entry["icon"] and effect["left"] < 0.0): found = true
 		check(found, "temporary status exposes a duration: " + entry["name"])
 		p.set(entry["field"], 0.0)
 	w._warmed_quality = -1
@@ -640,3 +643,138 @@ func _tag_texts(root: Node) -> Array:
 	if rows.is_empty():
 		return []
 	return (rows[0] as Node).find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+
+
+## Play Together, the multiplayer HUD, the Store's Cosmetics, the Bandit's second button and how a night
+## opens and ends.
+func _together_store_and_dawn() -> void:
+	var m := Main.new()
+	add_child(m)
+	await frames(2)
+	# The Store sells only what you do not own; what you buy is named once, then lives in the Armory.
+	var saved_items := Game.owned_items.duplicate()
+	var saved_off := Game.switched_off.duplicate()
+	var saved_doubloons := Game.doubloons
+	Game.owned_items.erase("stag_steed")
+	check(ShopDefs.SECTIONS.has("cosmetics") and ShopDefs.in_section("cosmetics") == Array(["stag_steed"], TYPE_STRING, "", null), "the Store has a Cosmetics tab, with the White Stag in it")
+	check(int(ShopDefs.ITEMS["stag_steed"]["price"]) == 400 and ShopDefs.whose("stag_steed") == "Chivalry, every path", "the White Stag costs 400 Doubloons and is for every Chivalry path")
+	m.show_store("", -1, "cosmetics")
+	await frames(2)
+	var list: VBoxContainer = m.panel.get_meta("list")
+	check(list.get_child_count() == 1 and m.panel.find_child("NothingLeft", true, false) == null, "with it unbought, the Cosmetics tab lists it")
+	Game.doubloons = 399
+	check(not Game.buy_item("stag_steed"), "399 Doubloons do not buy it")
+	Game.doubloons = 400
+	check(Game.buy_item("stag_steed") and Game.doubloons == 0, "400 do")
+	m.show_store("", -1, "cosmetics", Callable(), "stag_steed")
+	await frames(2)
+	var bought := m.panel.find_child("JustBought", true, false) as Label
+	check(bought != null and bought.text.contains("White Stag") and bought.text.contains("Armory"), "the Store says what was bought and where it went: %s" % (bought.text if bought else "nothing"))
+	check(m.panel.find_child("NothingLeft", true, false) != null, "and, the tab now empty, that you own everything in it")
+	check(m.panel.find_child("OpenArmory", true, false) != null, "with a way to the Armory")
+	m.show_store("", -1, "cosmetics")
+	await frames(2)
+	check(m.panel.find_child("JustBought", true, false) == null, "the purchase line is shown once, not every time")
+	for section: String in ShopDefs.SECTIONS:
+		m.show_store("", -1, section)
+		await frames(1)
+		var names: Array = (m.panel.get_meta("list") as Node).find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		for id: String in ShopDefs.in_section(section):
+			if Game.owns_item(id):
+				check(not names.has(str(ShopDefs.ITEMS[id]["name"])), "an owned %s is not for sale in %s" % [id, section])
+	m.show_armory("chivalry")
+	await frames(2)
+	var words: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(words.has("White Stag"), "the Armory shows the White Stag among Chivalry's looks")
+	# Worn, the stag is what you ride, on your phone and, by the pose, on everyone else's.
+	check(ShopDefs.skin_on("stag_steed") and p.skin_bits() == 1, "the White Stag is worn")
+	check(Net.POSE_BYTES == 41 and Net.pose_bytes(p)[40] == 1, "and sent in the pose")
+	var a := Avatar.new(w, 901, {"name": "Rider", "class": "chivalry", "team": 0})
+	w.add_child(a)
+	a._riding = true
+	a.set_skin(1)
+	check(a._stag != null and a._stag.visible and (a._horse == null or not a._horse.visible), "another phone shows a rider on the stag, not the horse")
+	a.set_skin(0)
+	check(not a._stag.visible and a._horse != null and a._horse.visible, "and the horse when it is not worn")
+	a.queue_free()
+	Game.set_item_on("stag_steed", false)
+	check(p.skin_bits() == 0, "taken off in the Armory, the horse is back")
+	Game.owned_items = saved_items
+	Game.switched_off = saved_off
+	Game.doubloons = saved_doubloons
+	# Play Together: Same Wi-Fi and Online, and no renaming there (Settings has that).
+	check(Main.TOGETHER_TABS == ["Same Wi-Fi", "Online"], "Play Together offers Same Wi-Fi and Online only")
+	m.show_together(0)
+	await frames(2)
+	check(m.panel.find_child("Rename", true, false) == null and m.panel.find_child("PlayingAs", true, false) != null, "and shows who you play as, without a way to change it there")
+	m.queue_free()
+	await frames(2)
+	# The Bandit: tougher, Into the Shadows always, the path's ability on a button of its own.
+	check(float(ClassDefs.ALL["bandit"]["hp"]) == 110.0, "the Bandit has 110 health")
+	var cls := p.class_id
+	var was_spec := p.spec_id
+	var was_chosen = p.chosen.duplicate()
+	var was_level := p.level
+	p.spec_id = ""
+	p.chosen.clear()
+	p.level = 5
+	p.setup_class("bandit")
+	check(p.has_art() and str(p.art_def().get("name", "")) == "Into the Shadows" and not p.has_path_art(), "before a path, the Bandit has Into the Shadows alone")
+	p.points = 10
+	for step in Player.CORE_STEPS:
+		p.choose_ability(step, 0)
+	p.choose_ability(Player.CORE_STEPS, (AbilityData.tree("bandit")["specs"] as Array).map(func(d: Dictionary) -> String: return d["id"]).find("thief"))
+	check(p.spec_id == "thief" and str(p.art_def().get("name", "")) == "Into the Shadows" and str(p.path_art_def().get("name", "")) == "Steal", "a Thief keeps Into the Shadows and has Steal beside it")
+	var hud := Hud.new()
+	add_child(hud)
+	hud.player = p
+	hud.size = Vector2(1280, 720)
+	hud._layout()
+	check(hud._button_visible("path_art") and hud._button_visible("art"), "both abilities have a button")
+	var b1: Vector2 = hud._buttons["path_art"]["pos"]
+	for other: String in hud._buttons:
+		if other != "path_art":
+			var o: Dictionary = hud._buttons[other]
+			check(b1.distance_to(o["pos"]) >= float(hud._buttons["path_art"]["r"]) + float(o["r"]), "the second ability button does not cover %s" % other)
+	for z: Zombie in w.zombies.duplicate(): z.release()
+	check(not p.path_art_has_use(), "with no one in reach, Steal's button stays grey and says so")
+	w.spawn_zombie("normal", p.global_position + Vector3(0, 0, -2.0))
+	var target: Zombie = w.zombies.back()
+	check(p.path_art_has_use(), "with someone in reach, it lights up")
+	target.release()
+	hud.queue_free()
+	p.spec_id = was_spec
+	p.chosen = was_chosen
+	p.level = was_level
+	p.setup_class(cls)
+	# A friend's mending shows on your status row.
+	p.hp = p.max_hp() * 0.5
+	p.mended_by_friend(4.0)
+	check(p.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "heart+hand"), "a friend's mending shows as a status")
+	p._tick_ability_timers(1.0)
+	p.friend_heal_left = maxf(0.0, p.friend_heal_left - 1.0)
+	check(not p.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "heart+hand"), "and goes once the mending stops")
+	# How a night opens, and how it says dawn is near.
+	check(w.director.opening_line() == "Survive until the dawn", "the night opens with: Survive until the dawn")
+	var was := w.map_id
+	w.map_id = "bastion"
+	check(w.director.opening_line() == "Defend the Great Portal until the dawn", "the Bastion's: Defend the Great Portal until the dawn")
+	for map_id: String in ["mists", "mesenlla", "bastion"]:
+		var sound: String = Director.DAWN_SOUNDS[map_id]
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s has its own sound for dawn coming: %s" % [map_id, sound])
+	w.map_id = "mists"
+	w.director._bell_timer = 0.0
+	var minute := w.director._bell_minute
+	w.director._process(0.1)
+	check(w.director._bell_minute == minute, "no bell rings outside The Village")
+	w.map_id = was
+	# Weapons only one map has lie around a little more often.
+	check(WeaponDefs.EXCLUSIVE_BOOST > 1.0 and is_equal_approx(WeaponDefs.spawn_weight("battleaxe"), float(WeaponDefs.ALL["battleaxe"]["weight"]) * WeaponDefs.EXCLUSIVE_BOOST) and is_equal_approx(WeaponDefs.spawn_weight("sword"), float(WeaponDefs.ALL["sword"]["weight"])), "a map's own weapons are weighted %.2f times" % WeaponDefs.EXCLUSIVE_BOOST)
+
+
+## What every class, path, ability and Class Upgrade says, against what the game does (tests/text_audit.gd).
+func _text_audit() -> void:
+	var problems: Array[String] = (load("res://tests/text_audit.gd").new() as RefCounted).run()
+	for problem in problems:
+		check(false, problem)
+	check(problems.is_empty(), "every number on a class, path, ability and Class Upgrade is the game's own (%d wrong)" % problems.size())

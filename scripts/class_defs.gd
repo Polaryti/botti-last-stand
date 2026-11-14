@@ -27,7 +27,7 @@ const ALL := {
 		"desc": "The beaked mask has seen it all. Starts with a Blowgun and 32 darts. Takes 10% less damage. Cures friends, spreads sickness, or commands the rats."},
 	"artificer": {"two_handed": true, "name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 598,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
-	"bandit": {"name": "Bandit", "weapon": "dagger", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "hidden": true, "price": 860,
+	"bandit": {"name": "Bandit", "weapon": "dagger", "arrows": 0, "hp": 110.0, "speed": 1.1, "ranged": true, "hidden": true, "price": 860,
 		"desc": "Lives off the road and the dark. Starts with a Dagger, and Into the Shadows turns it invisible. Uses melee and ranged weapons."},
 	"cartographer": {"name": "Cartographer", "weapon": "spear", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": true, "hidden": true, "earned": "beyond",
 		"desc": "Maps the way through. Starts with a Spear and plants up to three linked beacons: friends near one run faster, friends on the lines between them mend, and enemies near one are marked. Uses melee and ranged weapons."},

@@ -20,7 +20,7 @@ const COPY := {
 	],
 	"magician": [
 		"Old magic still burns in mortal hands.",
-		"Wield only a mana-powered staff and master spells or summons."
+		"Cast with a mana-powered staff, take up a one-handed blade when it counts, and master spells or summons."
 	],
 	"revenant": [
 		"Death has left a debt unpaid.",
@@ -44,7 +44,7 @@ const COPY := {
 	],
 	"bandit": [
 		"What the dark hides, the Bandit keeps.",
-		"Turn invisible on demand and specialize in stealing, mercenary night or knife-throwing plunder."
+		"Turn invisible on demand, and add a second ability by path: stealing, mercenary night or knife-throwing plunder."
 	],
 	"cartographer": [
 		"Every road beyond the Mists was drawn by someone first.",

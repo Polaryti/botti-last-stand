@@ -95,6 +95,8 @@ func _layout() -> void:
 		"horse": {"pos": Vector2(right - 372, bottom - 130), "r": 58.0},
 		"burst": {"pos": Vector2(right - 372, bottom - 110), "r": 60.0},
 		"art": {"pos": Vector2(right - 352, bottom - 260), "r": 56.0},
+		# A path's own ability beside the class's (the Bandit's Steal, Nightfall or Dagger Fan).
+		"path_art": {"pos": Vector2(right - 470, bottom - 190), "r": 52.0},
 	}
 
 
@@ -118,6 +120,8 @@ func _button_visible(id: String) -> bool:
 			return player.has_burst()
 		"art":
 			return player.has_art()
+		"path_art":
+			return player.has_path_art()
 		"sandbox":
 			return Game.mode == Game.Mode.SANDBOX
 	return true
@@ -172,6 +176,7 @@ func _touch_down(index: int, at: Vector2) -> void:
 			"tree": tree_requested.emit()
 			"sandbox": sandbox_requested.emit()
 			"burst": player.use_burst()
+			"path_art": player.use_path_art()
 			"art":
 				if player.art_is_held():
 					player.art_aim()
@@ -338,43 +343,43 @@ func _bar(r: Rect2, f: float, col: Color) -> void:
 		draw_style_box(_fill, Rect2(r.position, Vector2(maxf(r.size.x * part, minf(r.size.y, r.size.x)), r.size.y)))
 
 
-## The portal, the gates and the wood you carry, in one panel under the clock, with the dial that
+## The portal, the gates and the wood you carry, on a small panel under the clock, with the dial that
 ## says which way each gate lies beside them.
 func _draw_fort(s: Vector2, centre: Vector2) -> void:
 	var fort := player.world.fort
-	const BAR_W := 250.0
-	const DIAL := 50.0 # the dial's radius, ring included
-	var w := 14.0 + BAR_W + 18.0 + DIAL * 2.0 + 12.0
-	var h := 108.0
-	var top := _centre_y + 6.0
+	const BAR_W := 170.0
+	const DIAL := 34.0 # the dial's radius, ring included
+	const FS := HUD_SMALL - 2
+	var w := 10.0 + BAR_W + 12.0 + DIAL * 2.0 + 8.0
+	var h := 78.0
+	var top := _centre_y + 4.0
 	var x0 := centre.x - w * 0.5
 	draw_style_box(_backing, Rect2(x0, top, w, h))
-	var x := x0 + 14.0
+	var x := x0 + 10.0
 	var heart := fort.heart_hp / Fort.HEART_HP
-	_text("Portal", Vector2(x, top + 22), HUD_SMALL, UiTheme.BONE)
+	_text("Portal", Vector2(x, top + 17), FS, UiTheme.BONE)
 	var pct := "%d%%" % ceili(heart * 100.0)
-	_text(pct, Vector2(x + BAR_W - font.get_string_size(pct, HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_SMALL).x, top + 22), HUD_SMALL, UiTheme.BONE if heart > 0.35 else UiTheme.BLOOD.lightened(0.3))
-	_bar(Rect2(x, top + 28, BAR_W, 12), heart, Color(0.9, 0.3, 0.24))
+	_text(pct, Vector2(x + BAR_W - font.get_string_size(pct, HORIZONTAL_ALIGNMENT_LEFT, -1, FS).x, top + 17), FS, UiTheme.BONE if heart > 0.35 else UiTheme.BLOOD.lightened(0.3))
+	_bar(Rect2(x, top + 22, BAR_W, 8), heart, Color(0.9, 0.3, 0.24))
 	var gate_count := maxi(1, fort.gates.size())
-	var gate_w := (BAR_W - 6.0 * (gate_count - 1)) / gate_count
+	var gate_w := (BAR_W - 5.0 * (gate_count - 1)) / gate_count
 	for i in fort.gates.size():
 		var g: Dictionary = fort.gates[i]
-		var r := Rect2(x + i * (gate_w + 6.0), top + 50, gate_w, 9)
+		var r := Rect2(x + i * (gate_w + 5.0), top + 36, gate_w, 6)
 		_bar(r, float(g["hp"]) / Fort.GATE_HP, Color(0.72, 0.5, 0.26) if g["closed"] else Color(0.8, 0.2, 0.15))
-		_centered(str(g["short"]), r.get_center() + Vector2(0, 17), HUD_SMALL, UiTheme.BONE if g["closed"] else UiTheme.BLOOD.lightened(0.3))
+		_centered(str(g["short"]), r.get_center() + Vector2(0, 13), FS, UiTheme.BONE if g["closed"] else UiTheme.BLOOD.lightened(0.3))
 	const WOOD_COL := Color(0.92, 0.72, 0.42)
-	draw_texture_rect(Icons.glyph("log"), Rect2(x, top + 80, 20, 20), false, WOOD_COL)
-	_text("Wood %d of %d" % [player.wood, Fort.WOOD_MAX], Vector2(x + 26, top + 97), HUD_SMALL, WOOD_COL)
-	_draw_gate_compass(fort, Vector2(x0 + w - 12.0 - DIAL, top + h * 0.5))
+	draw_texture_rect(Icons.glyph("log"), Rect2(x, top + 58, 15, 15), false, WOOD_COL)
+	_text("Wood %d of %d" % [player.wood, Fort.WOOD_MAX], Vector2(x + 20, top + 71), FS, WOOD_COL)
+	_draw_gate_compass(fort, Vector2(x0 + w - 8.0 - DIAL, top + h * 0.5), DIAL - 10.0)
 	_centre_y = top + h
 
 
 ## Which way each gate lies from where you stand. The top of the dial is the way you are looking.
-func _draw_gate_compass(fort: Fort, at: Vector2) -> void:
-	const RADIUS := 34.0
-	draw_circle(at, RADIUS + 14.0, Color(0.05, 0.06, 0.09, 0.62))
-	draw_arc(at, RADIUS + 14.0, 0.0, TAU, 32, Color(0.92, 0.72, 0.42, 0.7), 2.0, true)
-	draw_colored_polygon(PackedVector2Array([at + Vector2(0, -7), at + Vector2(-5, 5), at + Vector2(5, 5)]), UiTheme.BONE)
+func _draw_gate_compass(fort: Fort, at: Vector2, radius := 34.0) -> void:
+	draw_circle(at, radius + 10.0, Color(0.05, 0.06, 0.09, 0.62))
+	draw_arc(at, radius + 10.0, 0.0, TAU, 32, Color(0.92, 0.72, 0.42, 0.7), 2.0, true)
+	draw_colored_polygon(PackedVector2Array([at + Vector2(0, -5), at + Vector2(-4, 4), at + Vector2(4, 4)]), UiTheme.BONE)
 	for g: Dictionary in fort.gates:
 		var to: Vector3 = (g["at"] as Vector3) - player.global_position
 		var local := Vector3(to.x, 0.0, to.z).rotated(Vector3.UP, -player.rotation.y)
@@ -384,7 +389,7 @@ func _draw_gate_compass(fort: Fort, at: Vector2) -> void:
 			col = Color(1.0, 0.3, 0.22)
 		elif fort.wood_needed(g) > 0:
 			col = Color(0.95, 0.65, 0.25)
-		_centered(str(g["short"]), at + dir * RADIUS, HUD_TEXT, col)
+		_centered(str(g["short"]), at + dir * radius, HUD_SMALL, col)
 
 
 ## All vs All: what the fog is doing, and the way back if you are out in it.
@@ -407,20 +412,20 @@ func _draw_together(s: Vector2, centre: Vector2) -> float:
 	ids.sort_custom(func(a: int, b: int) -> bool: return int(Net.roster[a]["score"]) > int(Net.roster[b]["score"]))
 	const BAR_W := 150.0
 	const W := 300.0
-	var versus := Net.rules != Net.Rules.COOP # a score beside each name: every rule but a night side by side
-	# Your own health is the big bar above. Here you only keep your line where there is a score to read
-	# beside it; fighting side by side, the list is the others.
-	var shown := ids.filter(func(peer: int) -> bool: return versus or peer != Net.my_id())
+	# A score beside each name where players fight each other; side by side (a night together, the
+	# Fort) nobody's kills are counted out loud.
+	var versus := Net.pvp()
+	# You are the panel above, so the list is only the others.
+	var shown := ids.filter(func(peer: int) -> bool: return peer != Net.my_id())
 	var top := _status_bottom + 6.0
 	var y := top + 26.0
 	if not shown.is_empty():
 		var height := 12.0
 		for peer: int in shown:
-			height += 30.0 if peer == Net.my_id() else 44.0
+			height += 44.0
 		draw_style_box(_backing, Rect2(_pad - 10.0, top, W, height))
 	for peer: int in shown:
 		var info: Dictionary = Net.roster[peer]
-		var mine := peer == Net.my_id()
 		var col := UiTheme.BONE
 		if Net.rules == Net.Rules.TEAMS:
 			col = Net.team_colour(int(info["team"]))
@@ -441,9 +446,6 @@ func _draw_together(s: Vector2, centre: Vector2) -> float:
 		if Net.fog_rules():
 			for i in Net.lives_of(peer):
 				draw_texture_rect(Icons.glyph("heart"), Rect2(x + i * 19.0, y - 15.0, 17.0, 17.0), false, UiTheme.BLOOD.lightened(0.2))
-		if mine:
-			y += 30.0 # no second bar for you
-			continue
 		y += 6.0
 		var bar := Rect2(_pad, y, BAR_W, 8)
 		if out:
@@ -727,7 +729,7 @@ func _draw_marks() -> void:
 		if not z.is_alive():
 			continue
 		var d2: float = z.position.distance_squared_to(here)
-		var seen: bool = (raven and d2 < PowerDefs.RAVEN_RANGE * PowerDefs.RAVEN_RANGE) or (lantern and d2 < PowerDefs.LANTERN_RANGE * PowerDefs.LANTERN_RANGE) or (scent and d2 < 225.0) or z.reveal_left > 0.0
+		var seen: bool = (raven and d2 < PowerDefs.RAVEN_RANGE * PowerDefs.RAVEN_RANGE) or (lantern and d2 < PowerDefs.LANTERN_RANGE * PowerDefs.LANTERN_RANGE) or (scent and d2 < AbilityNumbers.SCENT_REACH * AbilityNumbers.SCENT_REACH) or z.reveal_left > 0.0
 		if not seen:
 			continue
 		var top: Vector3 = z.position + Vector3.UP * (z.height + 0.35)
@@ -791,6 +793,9 @@ func _draw_weapon(s: Vector2) -> void:
 		_text(extra, Vector2(r.position.x + 14.0 + name_w + 10.0, r.position.y + 21.0), HUD_SMALL, extra_col)
 
 
+var _path_art_useful := true
+
+
 func _draw_controls() -> void:
 	if player.dead:
 		pass
@@ -802,6 +807,7 @@ func _draw_controls() -> void:
 		var hint := Vector2(_pad + JOY_R + 22, size.y - JOY_R - 48)
 		draw_arc(hint, JOY_R, 0.0, TAU, 40, Color(1, 1, 1, 0.2), 3.0)
 		draw_circle(hint, 36.0, Color(1, 1, 1, 0.12))
+	_path_art_useful = player.has_path_art() and player.path_art_has_use()
 	for id: String in _buttons:
 		if not _button_visible(id) or (player.dead and id != "pause" and id != "tree"):
 			continue
@@ -817,6 +823,9 @@ func _draw_controls() -> void:
 			"horse": tint = UiTheme.EMBER
 			"burst":
 				tint = UiTheme.MIST if player.burst_cd_left <= 0.0 and player.mana >= player.burst_cost() else Color(0.6, 0.6, 0.6)
+			"path_art":
+				# Lit only when it would do something now: a Steal with nobody in reach stays grey.
+				tint = UiTheme.MIST if player.path_art_cd_left <= 0.0 and _path_art_useful else Color(0.6, 0.6, 0.6)
 			"art":
 				tint = UiTheme.MIST if player.art_cd_left <= 0.0 and player.mana >= player.art_cost() else Color(0.6, 0.6, 0.6)
 				if player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
@@ -848,6 +857,20 @@ func _draw_controls() -> void:
 			_centered("Too far to link", pos + Vector2(0, -r - 14), HUD_SMALL, UNLINKED.lightened(0.3))
 		elif id == "art" and player.art_label() != "":
 			_centered(player.art_label(), pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE)
+		if id == "path_art":
+			var ready := player.path_art_cd_left <= 0.0
+			if ready and _path_art_useful and player.spec_id == "thief":
+				# Someone is in reach: a ring of the class's colour says Steal will find them.
+				var pulse := 0.55 + sin(Time.get_ticks_msec() * 0.009) * 0.35
+				draw_arc(pos, r + 5.0, 0.0, TAU, 40, Color(UiTheme.EMBER, pulse), 4.0)
+			var word := str(player.path_art_def().get("name", ""))
+			if ready and not _path_art_useful:
+				word = "No one in reach"
+			_centered(word, pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE if _path_art_useful or not ready else UiTheme.ASH)
+			if not ready:
+				var total := maxf(float(player.path_art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
+				draw_arc(pos, r - 5.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(player.path_art_cd_left / total, 0.0, 1.0), 28, Color(0, 0, 0, 0.7), 9.0)
+				_centered("%d" % ceili(player.path_art_cd_left), pos, HUD_TOAST - 2, Color.WHITE)
 		if id == "burst" or id == "art":
 			var left: float = player.burst_cd_left if id == "burst" else player.art_cd_left
 			if id == "art" and player.spirit_left > 0.0:
@@ -901,6 +924,7 @@ func _button_glyph(id: String) -> String:
 			return "chariot" if player.mount_kind() == "chariot" else "horse"
 		"burst": return "burst"
 		"art": return player.art_glyph()
+		"path_art": return str(player.path_art_def().get("icon", "mist"))
 	return "plus"
 
 

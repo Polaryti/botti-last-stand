@@ -9,6 +9,7 @@ signal fort_lost
 
 static var HALF_SIZE := 110.0 # default for legacy callers; each world keeps its own extent
 var half_size := 110.0
+var _falls: Array[Dictionary] = [] # see note_fall
 const LANE_SPAWN_BACK := 4.5 # metres behind a lane's foot, towards its rift, where its enemies step out
 const LANE_SPAWN_SPREAD := 4.0
 const REACH_EDGE := 5 # metres from the edge of the map that count as out of reach: the forest wall stands there
@@ -1646,7 +1647,7 @@ func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: fl
 	if bleed:
 		shot.bleed = Vector2(8.0, 4.0)
 	if slows:
-		shot.slow_secs = 2.0
+		shot.slow_secs = AbilityNumbers.FAN_SLOW
 	if close:
 		shot.close_from = at
 	if Net.active():
@@ -1672,6 +1673,37 @@ func refresh_survey(owner_peer: int, cfg: Dictionary) -> void:
 	var found: Variant = surveys.get(owner_peer)
 	if found != null and is_instance_valid(found):
 		(found as SurveyNet).refresh(cfg)
+
+
+## A Paladin's Consecration. Every phone makes its own and looks after its own people inside it.
+func spawn_consecration(owner_peer: int, at: Vector3, radius: float, seconds: float) -> Consecration:
+	at.y = ground_at(at)
+	var c := Consecration.new(self, owner_peer, at, radius, seconds)
+	add_child(c)
+	sfx_at("chime", at, -2.0)
+	return c
+
+
+## Where enemies fell lately (for a Necromancer's Grave Call), on every phone.
+func note_fall(at: Vector3) -> void:
+	_falls.append({"at": at, "t": now})
+	if _falls.size() > 40:
+		_falls.pop_front()
+
+
+func recent_falls(seconds: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for f: Dictionary in _falls:
+		if now - float(f["t"]) <= seconds:
+			out.append(f)
+	return out
+
+
+## A grave once raised is not raised again.
+func forget_fall(at: Vector3) -> void:
+	for i in range(_falls.size() - 1, -1, -1):
+		if (_falls[i]["at"] as Vector3).distance_to(at) < 0.05:
+			_falls.remove_at(i)
 
 
 func spawn_nightfall(owner_peer: int, at: Vector3, radius: float, seconds: float, linger: float, bits: int) -> NightfallDome:
@@ -3022,7 +3054,7 @@ func _spring_trap(i: int, z: Zombie, at: Vector3) -> void:
 	z.stun(2.0 + p.m("trap_stun"))
 	z.take_damage(p.m("trap_damage"), Vector3.UP, 0.0, z.centre())
 	if p.has_flag("trap_bleed"):
-		z.add_dot(16.0, 4.0, true)
+		z.add_dot(AbilityNumbers.TRAP_BLEED, AbilityNumbers.TRAP_BLEED_TIME, true)
 	if p.has_flag("trap_fire"):
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if p.has_flag("trap_blast"):

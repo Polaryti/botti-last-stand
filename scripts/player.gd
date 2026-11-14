@@ -99,7 +99,8 @@ var level := 1
 var xp := 0
 var points := 0
 var chosen := {} # step index -> ability id
-var mods := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_cone": 0.0, "melee_hits": 0.0,
+## Every modifier at its starting value; the tree, items and buffs move them from here.
+const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_cone": 0.0, "melee_hits": 0.0,
 	"knock": 1.0, "ranged_damage": 1.0, "ranged_rate": 1.0, "ranged_power": 1.0, "speed": 1.0, "max_hp": 0.0,
 	"damage_taken": 1.0, "ki_gain": 1.0, "noise": 1.0, "sight": 1.0, "arrow_save": 0.0, "max_arrows": 0.0, "pierce": 0.0, "bounces": 0.0,
 	"shield": 0.0, "thorns": 0.0, "mana": 0.0, "mana_regen": 1.0, "spell_damage": 1.0, "spell_rate": 1.0, "spell_cost": 1.0,
@@ -119,6 +120,7 @@ var mods := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, "melee_
 	"fan_knives": 0.0, "fan_damage": 1.0, "fan_bounces": 0.0, "plunder": 0.0,
 	"beacons": 0.0, "link_range": 0.0, "beacon_radius": 0.0, "line_heal": 0.0, "mark_range": 0.0, "star_bonus": 0.0, "star_power": 0.0,
 	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0}
+var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
 var _buffs := {} # key -> {stat, val, left, stacks}
@@ -127,6 +129,12 @@ var _triggers := {} # event -> list of effect dictionaries with runtime counters
 ## runs out nothing can make you invisible again (an invisibility still running can be lengthened).
 const INVIS_LOCKOUT := 3.0
 var invis_lockout := 0.0
+var charge_left := 0.0 # Lance Charge under way (UpgradeKit)
+var charge_dir := Vector3.FORWARD
+var charge_hit := {}
+var mirror_hall_left := 0.0 # until Hall of Mirrors can swap a hit away again
+var path_art_cd_left := 0.0 # the second ability button (has_path_art)
+var friend_heal_left := 0.0 # a moment longer than a friend's mending has gone on: the status bar shows it
 var night_blind_left := 0.0 # standing in an enemy's Nightfall: the HUD darkens
 var gate_rest_left := 0.0 # just came through a Worlds Traveler's Waygate: not again until this runs out
 var find_rest_left := 0.0 # a Pathfinder's next find, in seconds
@@ -491,7 +499,9 @@ func status_effects() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for entry: Dictionary in StatusCatalog.TIMED:
 		var remaining := float(get(entry["field"]))
-		if remaining > 0 and remaining < 900:
+		if remaining > 0 and remaining < 900 and entry["field"] == "friend_heal_left":
+			out.append({"icon": entry["icon"], "color": UiTheme.MOSS, "left": -1.0, "stacks": 1}) # for as long as it goes on: no count
+		elif remaining > 0 and remaining < 900:
 			out.append({"icon": ("status_frozen" if is_iced else "status_stunned") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left", "night_blind_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
@@ -649,6 +659,14 @@ func heal(amount: float) -> void:
 	heal_flash = 1.0
 
 
+## Mending that comes from someone on your side (a Cartographer's lines, a Mercenary's Night Watch, a
+## Paladin's Consecration): it heals, and the status bar says someone is at it.
+func mended_by_friend(amount: float) -> void:
+	if hp < max_hp():
+		friend_heal_left = 0.6
+	heal(amount)
+
+
 func say(text: String) -> void:
 	toast = text
 	toast_time = 2.0
@@ -794,8 +812,8 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		say("◆ DODGE")
 		return
 	if has_flag("perfect_riposte") and _riposte_cd <= 0.0:
-		_riposte_cd = 8.0
-		world.stun_around(global_position, 6.0, 1.5)
+		_riposte_cd = AbilityNumbers.RIPOSTE_EVERY
+		world.stun_around(global_position, AbilityNumbers.RIPOSTE_REACH, AbilityNumbers.RIPOSTE_STUN)
 		sfx("block", 0.0)
 		say("Perfect Riposte!")
 		return
@@ -818,6 +836,8 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		if has_item("oathkeeper") and amount > 0.0:
 			oath_reserve = minf(20.0, oath_reserve + 4.0)
 		fire("block", {"attacker": attacker})
+	if UpgradeKit.mirror_dodges(self, dmg):
+		return
 	if has_flag("mana_shield") and mana > 0.0:
 		var drained := minf(mana, dmg * 0.5)
 		mana -= drained
@@ -825,10 +845,10 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if stone_skin > 0.0:
 		dmg *= 1.0 - stone_skin
 		if attacker and has_flag("recoil") and stone_skin >= SKIN_STRONG:
-			attacker.take_damage(15.0, attacker.position - global_position, 1.0, attacker.centre())
+			attacker.take_damage(AbilityNumbers.RECOIL_DAMAGE, attacker.position - global_position, 1.0, attacker.centre())
 	if has_flag("mirror_step"):
 		_last_hit = dmg
-		_last_hit_left = 1.5 if has_flag("long_mirror") else MIRROR_WINDOW
+		_last_hit_left = AbilityNumbers.LONG_MIRROR if has_flag("long_mirror") else MIRROR_WINDOW
 	if attacker and m("thorns") > 0.0:
 		attacker.take_damage(m("thorns"), attacker.position - global_position, 1.0, attacker.centre())
 	hp -= dmg
@@ -924,8 +944,11 @@ func _on_fatal() -> void:
 	_kill()
 
 
+const LOW_HEALTH := 0.3 # "under 30% health": what the "low" triggers wait for
+
+
 func _check_low() -> void:
-	if hp < max_hp() * 0.3:
+	if hp < max_hp() * LOW_HEALTH:
 		if _low_armed:
 			_low_armed = false
 			fire("low", {})
@@ -1390,8 +1413,8 @@ func _on_kill(z: Zombie) -> void:
 	if z.poison_left > 0.0 and has_flag("plague_burst"):
 		world.drop_poison(z.position)
 	if z.poison_left > 0.0 and has_flag("black_death"):
-		world.fx_ring(z.position, 6.0, Color(0.5, 0.95, 0.25))
-		for near: Zombie in world.zombies_near(z.position, 6.0, 8):
+		world.fx_ring(z.position, AbilityNumbers.BLACK_DEATH_REACH, Color(0.5, 0.95, 0.25))
+		for near: Zombie in world.zombies_near(z.position, AbilityNumbers.BLACK_DEATH_REACH, 8):
 			near.add_dot(14.0, 5.0)
 			_note_poison(70.0)
 	if has_item("shadow_shroud"):
@@ -1406,10 +1429,10 @@ func _on_kill(z: Zombie) -> void:
 		heal(float(class_def()["kill_heal"]))
 	if void_left > 0.0:
 		if has_flag("hungry_void"):
-			heal(12.0)
-		if has_flag("walker_between") and _void_extensions < 6:
+			heal(AbilityNumbers.HUNGRY_VOID)
+		if has_flag("walker_between") and _void_extensions < AbilityNumbers.WALKER_BETWEEN_MAX:
 			_void_extensions += 1
-			void_left += 1.0
+			void_left += AbilityNumbers.WALKER_BETWEEN
 			invis_left = maxf(invis_left, void_left)
 	add_arrows(int(class_def().get("kill_arrows", 0)))
 	if m("plunder") > 0.0:
@@ -1417,7 +1440,7 @@ func _on_kill(z: Zombie) -> void:
 	fire("kill", {"z": z})
 	if _assassin_kill:
 		_assassin_kill = false
-		invis_left = maxf(invis_left, 3.0)
+		invis_left = maxf(invis_left, AbilityNumbers.ASSASSIN_HIDE)
 	if has_mount() and not is_riding():
 		horse_progress = mini(horses_needed(), horse_progress + 1)
 		if horse_progress == horses_needed():
@@ -1425,12 +1448,12 @@ func _on_kill(z: Zombie) -> void:
 	if has_flag("bomb_refund"):
 		art_cd_left = maxf(0.0, art_cd_left - 0.5)
 	if is_riding() and (has_flag("ride_on_kill") or has_flag("war_horse")):
-		riding_left += 1.0
+		riding_left += AbilityNumbers.RUN_DOWN_TIME
 
 
 func on_ally_kill() -> void:
 	if has_flag("bond"):
-		heal(5.0)
+		heal(AbilityNumbers.BOND_HEAL)
 
 
 ## Crits, backstabs and other per-target rules for anything the player deals.
@@ -1450,8 +1473,8 @@ func modify_damage(z: Zombie, base: float) -> float:
 		dmg *= 1.0 + m("backstab")
 		fire("backstab", {"z": z})
 		say("✦ Backstab")
-	if has_flag("pack_tactics") and world.ally_near(z.position, 5.0):
-		dmg *= 1.3
+	if has_flag("pack_tactics") and world.ally_near(z.position, AbilityNumbers.PACK_REACH):
+		dmg *= AbilityNumbers.PACK_TACTICS
 	return dmg
 
 
@@ -1469,7 +1492,7 @@ func mount() -> void:
 	if not horse_ready():
 		return
 	horse_progress = 0
-	_sacred_cd = 60.0
+	_sacred_cd = AbilityNumbers.SACRED_STEED_REST
 	_trampled.clear()
 	if mount_kind() == "chariot":
 		riding_left = CHARIOT_TIME + m("horse_time")
@@ -1502,9 +1525,23 @@ func dismount() -> void:
 		fire("dismount", {})
 
 
+## What a rider's look adds to its pose: bit 0, the White Stag in place of the horse.
+func skin_bits() -> int:
+	return 1 if bot_peer == 0 and ShopDefs.skin_on("stag_steed") else 0
+
+
 func _build_horse() -> void:
 	_horse = Node3D.new()
 	add_child(_horse)
+	if skin_bits() & 1:
+		# The White Stag: the Shapeshifter's stag where the horse would be. Its legs swing as the horse's do.
+		var stag := MesenllaModels.stag_steed()
+		_horse.add_child(stag)
+		for mi: MeshInstance3D in stag.find_children("*", "MeshInstance3D", true, false):
+			mi.layers = 2
+		for leg: Node3D in stag.get_meta("legs"):
+			_horse_legs.append(leg)
+		return
 	var coat := Color(0.3, 0.19, 0.12)
 	var mane := Color(0.1, 0.07, 0.06)
 	var cloth := Color(0.55, 0.13, 0.12)
@@ -1789,6 +1826,7 @@ func _tick_ability_timers(delta: float) -> void:
 	_tick_triggers(delta)
 	invis_left = maxf(0.0, invis_left - delta)
 	invis_lockout = maxf(0.0, invis_lockout - delta)
+	friend_heal_left = maxf(0.0, friend_heal_left - delta)
 	night_blind_left = maxf(0.0, night_blind_left - delta)
 	gate_rest_left = maxf(0.0, gate_rest_left - delta)
 	find_rest_left = maxf(0.0, find_rest_left - delta)
@@ -1825,6 +1863,36 @@ func _tick_ability_timers(delta: float) -> void:
 ## The second ability of a path. Most belong to the Revenant, one to the Guardian.
 func has_art() -> bool:
 	return not art_def().is_empty()
+
+
+## A second ability button, for a class whose path adds an ability beside its own (the Bandit's).
+func has_path_art() -> bool:
+	return not path_art_def().is_empty()
+
+
+func path_art_def() -> Dictionary:
+	if class_id == "bandit":
+		return BanditKit.path_art(self)
+	return {}
+
+
+## Whether the path's ability would do anything if used now (Steal needs someone in reach).
+func path_art_has_use() -> bool:
+	if spec_id == "thief":
+		return BanditKit.steal_target(self) != null
+	return true
+
+
+func use_path_art() -> void:
+	var d := path_art_def()
+	if d.is_empty() or _cast_kind != "" or _is_moved_by_mist() or path_art_cd_left > 0.0 or frozen_left > 0.0 or spirit_left > 0.0:
+		return
+	path_art_cd_left = maxf(0.5, float(d["cd"]) * m("art_cd"))
+	_cast_kind = "bandit_path"
+	_cast_left = float(d["cast"])
+	_cast_anim(str(d.get("anim", "")))
+	sfx("spell", -5.0, 1.3)
+	world.fx_ring(global_position, 2.2, ClassDefs.color(class_id).lightened(0.4))
 
 
 func has_burst() -> bool:
@@ -2020,7 +2088,8 @@ func use_art() -> void:
 		command_target_requested.emit()
 		return
 	mana -= art_cost()
-	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * m("art_cd"))
+	# The Bandit's paths sharpen their own ability (on the second button), not Into the Shadows.
+	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * (1.0 if class_id == "bandit" else m("art_cd")))
 	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
@@ -2051,7 +2120,7 @@ func _tick_monk(delta: float) -> void:
 		guard_left = maxf(guard_left, 0.15)
 		if has_flag("haunting"):
 			for z: Zombie in world.zombies_near(global_position, 2.0, 8):
-				z.slow(3.0)
+				z.slow(AbilityNumbers.HAUNTING_SLOW)
 		if spirit_left <= 0.0:
 			_come_back()
 	if has_flag("iron_mountain"):
@@ -2106,7 +2175,7 @@ func _sweep(radius: float, power: float, stun_secs := 0.0, col := Color(0.95, 0.
 
 
 func _bo_sweep() -> void:
-	_sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), 1.0, 0.8 if has_flag("stun_sweep") else 0.0)
+	_sweep(SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0), 1.0, AbilityNumbers.STUN_SWEEP if has_flag("stun_sweep") else 0.0)
 
 
 func _ki_blast() -> void:
@@ -2129,18 +2198,18 @@ func _ki_blast() -> void:
 
 func _pole_vault() -> void:
 	_vaulting = true
-	_start_leap(VAULT_REACH * (1.5 if has_flag("high_vault") else 1.0))
+	_start_leap(VAULT_REACH * (AbilityNumbers.HIGH_VAULT if has_flag("high_vault") else 1.0))
 
 
 func _vault_landing() -> void:
 	_vaulting = false
 	var crushing := has_flag("crushing")
-	_sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), VAULT_POWER * (2.0 if crushing else 1.0), 1.5 if crushing else (0.8 if has_flag("stun_sweep") else 0.0))
+	_sweep(SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0), VAULT_POWER * (AbilityNumbers.CRUSHING_POWER if crushing else 1.0), AbilityNumbers.CRUSHING_STUN if crushing else (AbilityNumbers.STUN_SWEEP if has_flag("stun_sweep") else 0.0))
 
 
 ## The body stays and draws everything. The spirit walks away from it.
 func _leave_body() -> void:
-	spirit_left = SPIRIT_TIME + (2.0 if has_flag("longer_journey") else 0.0)
+	spirit_left = SPIRIT_TIME + (AbilityNumbers.LONGER_JOURNEY if has_flag("longer_journey") else 0.0)
 	_spirit_home = global_position
 	_spirit_taken = 0.0
 	world.spawn_ally("body", global_position, spirit_left + 1.0)
@@ -2170,7 +2239,7 @@ func _come_back() -> void:
 	velocity = Vector3.ZERO
 	_vm_root.visible = true
 	_equip()
-	heal(SPIRIT_HEAL + _spirit_taken + (20.0 if has_flag("mended") else 0.0))
+	heal(SPIRIT_HEAL + _spirit_taken + (AbilityNumbers.MENDED_HEAL if has_flag("mended") else 0.0))
 	_fog_at(global_position + Vector3.UP, 1.4)
 	fog_flash = 0.6
 	guard_left = maxf(guard_left, 0.3)
@@ -2178,19 +2247,19 @@ func _come_back() -> void:
 	if has_flag("spirit_strike"):
 		_next_hit_mult = 3.0
 	if has_flag("enlightened"):
-		const REACH := 6.0
-		var dmg := 80.0 * damage_multiplier()
+		const REACH := AbilityNumbers.ENLIGHTENED_REACH
+		var dmg := AbilityNumbers.ENLIGHTENED_DAMAGE * damage_multiplier()
 		world.fx_blast(global_position + Vector3.UP, REACH * 0.7, Color(0.7, 0.95, 1.0, 0.45))
 		world.fx_ring(global_position, REACH, Color(0.7, 0.95, 1.0))
 		if Net.active():
 			Net.blast_fx(global_position + Vector3.UP, REACH * 0.7, Color(0.7, 0.95, 1.0, 0.45))
 		for z: Zombie in world.zombies_near(global_position, REACH, 16):
 			z.take_damage(dmg, z.position - global_position, 3.0, z.centre())
-			z.stun(1.5)
+			z.stun(AbilityNumbers.ENLIGHTENED_STUN)
 			on_hit(false)
 		for r: Target in world.rivals_near(global_position, REACH):
 			world.hit_rival(r, dmg, global_position)
-			world.status_rival(r, Net.Status.STUN, 1.5)
+			world.status_rival(r, Net.Status.STUN, AbilityNumbers.ENLIGHTENED_STUN)
 
 
 func _mountain_stomp() -> void:
@@ -2209,12 +2278,12 @@ func _mountain_stomp() -> void:
 		if built >= 0.5:
 			z.stun(0.8)
 		if has_flag("aftershock"):
-			z.slow(3.0)
+			z.slow(AbilityNumbers.AFTERSHOCK_SLOW)
 		on_hit(false)
 	for r: Target in world.rivals_near(global_position, radius):
 		world.hit_rival(r, dmg, global_position)
 		if has_flag("aftershock"):
-			world.status_rival(r, Net.Status.SLOW, 3.0)
+			world.status_rival(r, Net.Status.SLOW, AbilityNumbers.AFTERSHOCK_SLOW)
 	stone_skin = 0.0
 	_skin_step = 0
 	_still_for = 0.0
@@ -2228,7 +2297,7 @@ func _mountain_stomp() -> void:
 
 func _enter_stance(next: String) -> void:
 	if _stance_mastered:
-		mods["melee_damage"] -= 0.15
+		mods["melee_damage"] -= AbilityNumbers.STANCE_MASTERY
 		_stance_mastered = false
 	stance_hits = 0
 	if stance != "":
@@ -2246,16 +2315,16 @@ func _void_is_ready() -> bool:
 
 
 func _change_stance() -> void:
-	_transition_power = 1.6 if stance_hits >= 3 else 1.0
+	_transition_power = AbilityNumbers.DANCE_POWER if stance_hits >= 3 else 1.0
 	stance_hits = 0
 	var next: String = STANCES[(STANCES.find(stance) + 1) % STANCES.size()]
 	if _void_is_ready():
 		next = "void"
 		_void_hits = {}
 		_void_extensions = 0
-		void_left = VOID_TIME + (2.0 if has_flag("deeper_void") else 0.0)
+		void_left = VOID_TIME + (AbilityNumbers.DEEPER_VOID if has_flag("deeper_void") else 0.0)
 		invis_left = maxf(invis_left, void_left)
-		heal(15.0)
+		heal(AbilityNumbers.VOID_HEAL)
 		_fog_at(global_position + Vector3.UP, 1.5)
 		sfx("wraith", -4.0, 0.8)
 	elif void_left > 0.0:
@@ -2267,8 +2336,8 @@ func _change_stance() -> void:
 	sfx("weapon_change", -3.0, 0.8)
 	say("%s stance" % STANCE_NAMES[next])
 	if has_flag("mirror_step"):
-		mirror_guard_left = 1.2 + (0.6 if _transition_power > 1.0 else 0.0)
-		_next_hit_mult = maxf(_next_hit_mult, 1.5)
+		mirror_guard_left = AbilityNumbers.MIRROR_GUARD_LONG if _transition_power > 1.0 else AbilityNumbers.MIRROR_GUARD_TIME
+		_next_hit_mult = maxf(_next_hit_mult, AbilityNumbers.MIRROR_NEXT_BLOW)
 		_undo_hit()
 	if has_flag("blade_dancer"):
 		_dance_sweep()
@@ -2277,11 +2346,11 @@ func _change_stance() -> void:
 
 
 func _dance_sweep() -> void:
-	var hits := _sweep(SWEEP_REACH + (1.5 if has_flag("wide_sweep") else 0.0), (1.5 if has_flag("whirl") else 1.0) * _transition_power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
+	var hits := _sweep(SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0), (AbilityNumbers.WHIRL if has_flag("whirl") else 1.0) * _transition_power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
 	if hits <= 0:
 		return
 	if hp < max_hp():
-		heal(minf(10.0, 2.0 * hits))
+		heal(minf(AbilityNumbers.DANCE_HEAL_MAX, AbilityNumbers.DANCE_HEAL_EACH * hits))
 	if has_flag("stance_echo"):
 		for z: Zombie in world.zombies_near(global_position, SWEEP_REACH + 1.5, 16):
 			if stance == "wind":
@@ -2289,9 +2358,9 @@ func _dance_sweep() -> void:
 			elif stance == "flame":
 				z.ignite(ZombieDefs.BURN_SECONDS)
 	if has_flag("flowing_health"):
-		heal(6.0)
+		heal(AbilityNumbers.FLOWING_HEAL)
 	if has_flag("dance_on"):
-		_act({"do": "buff", "key": "dance_on", "stat": "melee_rate", "val": 0.15, "secs": 4.0, "max": 3}, {})
+		_act({"do": "buff", "key": "dance_on", "stat": "melee_rate", "val": AbilityNumbers.DANCE_ON, "secs": AbilityNumbers.DANCE_ON_TIME, "max": AbilityNumbers.DANCE_ON_STACKS}, {})
 
 
 ## Mirror Step: the hit that just landed never happened.
@@ -2300,7 +2369,7 @@ func _undo_hit() -> void:
 		return
 	var taken := _last_hit
 	_last_hit_left = 0.0
-	heal(taken + 10.0 + (10.0 if has_flag("still_reflection") else 0.0))
+	heal(taken + AbilityNumbers.UNDO_HEAL + (AbilityNumbers.STILL_REFLECTION if has_flag("still_reflection") else 0.0))
 	hurt_flash = 0.0
 	_fog_at(global_position + Vector3.UP, 1.1)
 	say("Stepped aside")
@@ -2308,11 +2377,11 @@ func _undo_hit() -> void:
 	if has_flag("counterstep"):
 		_next_hit_mult = 2.0
 	if has_flag("blinding_step"):
-		world.stun_around(global_position, 4.0, 1.0)
+		world.stun_around(global_position, AbilityNumbers.BLINDING_STEP_REACH, AbilityNumbers.BLINDING_STEP_STUN)
 	if has_flag("patient_blade"):
-		_act({"do": "buff", "key": "patient_blade", "stat": "melee_damage", "val": 0.25, "secs": 4.0}, {})
+		_act({"do": "buff", "key": "patient_blade", "stat": "melee_damage", "val": AbilityNumbers.PATIENT_BLADE, "secs": AbilityNumbers.PATIENT_BLADE_TIME}, {})
 	if has_flag("perfect_reflection"):
-		const REACH := 5.0
+		const REACH := AbilityNumbers.PERFECT_REFLECTION_REACH
 		world.fx_ring(global_position, REACH, Color(0.7, 0.85, 1.0))
 		for z: Zombie in world.zombies_near(global_position, REACH, 16):
 			z.take_damage(taken * 3.0, z.position - global_position, 3.0, z.centre())
@@ -2323,7 +2392,7 @@ func _undo_hit() -> void:
 
 func _left_void() -> void:
 	if has_flag("aftermath"):
-		world.stun_around(global_position, 6.0, 1.5)
+		world.stun_around(global_position, AbilityNumbers.AFTERMATH_REACH, AbilityNumbers.AFTERMATH_STUN)
 	invis_left = 0.0
 
 
@@ -2363,16 +2432,16 @@ func _echo_blow() -> void:
 
 func _healing_tonic() -> void:
 	const FRIEND_REACH := 8.0
-	var strong := 15.0 if has_flag("strong_tonic") else 0.0
-	var untouchable := 2.0 if has_flag("miracle_cure") else 0.0
-	heal(30.0 + strong)
+	var strong := AbilityNumbers.STRONG_TONIC if has_flag("strong_tonic") else 0.0
+	var untouchable := AbilityNumbers.MIRACLE_CURE if has_flag("miracle_cure") else 0.0
+	heal(AbilityNumbers.TONIC_HEAL + strong)
 	guard_left = maxf(guard_left, untouchable)
 	poison_left = 0.0
 	bleed_left = 0.0
 	world.fx_ring(global_position, FRIEND_REACH, Color(0.4, 0.95, 0.5))
 	sfx("eat", -2.0, 0.8)
 	for t: Target in world.friends_near(global_position, FRIEND_REACH):
-		Net.guard_peer(world.peer_of(t), untouchable, 25.0 + strong)
+		Net.guard_peer(world.peer_of(t), untouchable, AbilityNumbers.TONIC_FRIEND_HEAL + strong)
 
 
 func cast_progress() -> float:
@@ -2380,12 +2449,14 @@ func cast_progress() -> float:
 
 
 func _is_moved_by_mist() -> bool:
-	return _leap_t >= 0.0 or not _rift_targets.is_empty()
+	return _leap_t >= 0.0 or not _rift_targets.is_empty() or charge_left > 0.0
 
 
 func _tick_mist(delta: float) -> void:
 	burst_cd_left = maxf(0.0, burst_cd_left - delta)
 	art_cd_left = maxf(0.0, art_cd_left - delta)
+	path_art_cd_left = maxf(0.0, path_art_cd_left - delta)
+	mirror_hall_left = maxf(0.0, mirror_hall_left - delta)
 	if _cast_kind == "":
 		return
 	if _cast_kind == "sharpshooter":
@@ -2395,6 +2466,10 @@ func _tick_mist(delta: float) -> void:
 		return
 	var what := _cast_kind
 	_cast_kind = ""
+	# The Class Upgrades of the Cavalry and the Magician have abilities of their own.
+	var item := ShopDefs.art_item(what)
+	if item != "" and has_item(item) and UpgradeKit.cast(self, what):
+		return
 	match what:
 		"burst": mist_burst_at(global_position + Vector3.UP, 1.0)
 		"leaper": _start_leap()
@@ -2411,6 +2486,7 @@ func _tick_mist(delta: float) -> void:
 		"stance": _change_stance()
 		"command": CommanderKit.cast(self)
 		"bandit": BanditKit.cast(self)
+		"bandit_path": BanditKit.cast_path(self)
 		"cartographer": CartographerKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
@@ -2456,7 +2532,7 @@ func raise_dome() -> void:
 	world.fx_dome(global_position + Vector3.UP * 0.5, r, secs)
 	sfx("block", 0.0, 0.7, 0.1)
 	dome_left = maxf(dome_left, secs)
-	var healing := (30.0 if has_flag("aegis") else 0.0) + oath_reserve
+	var healing := (AbilityNumbers.AEGIS_HEAL if has_flag("aegis") else 0.0) + oath_reserve
 	oath_reserve = 0.0
 	if healing > 0.0:
 		HeavyArts.heal_party(self, global_position, r, healing)
@@ -2515,13 +2591,13 @@ func bomb_burst(at: Vector3) -> void:
 			z.take_damage(dmg, z.position - at, 5.0, z.centre())
 			z.ignite(ZombieDefs.BURN_SECONDS)
 			if has_flag("bomb_stun"):
-				z.stun(1.5)
+				z.stun(AbilityNumbers.BOMB_STUN)
 			on_hit(false)
 	for r: Target in world.rivals_near(at, radius):
 		world.hit_rival(r, dmg, at)
 		world.status_rival(r, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 		if has_flag("bomb_stun"):
-			world.status_rival(r, Net.Status.STUN, 1.5)
+			world.status_rival(r, Net.Status.STUN, AbilityNumbers.BOMB_STUN)
 	var patch := minf(radius * 0.6, 3.6)
 	world.drop_poison(at, true, m("bomb_fire"), patch)
 	if Net.active():
@@ -2534,7 +2610,7 @@ func bomb_burst(at: Vector3) -> void:
 ## The Pyromaniac's last step: every bomb throws off bomblets, and nobody knows what each will do.
 func _scatter_bomblets(at: Vector3) -> void:
 	var kinds: Array = WorldLight.BOMBLET_COLOURS.keys()
-	for i in 6:
+	for i in AbilityNumbers.BOMBLETS:
 		var kind: String = kinds[randi() % kinds.size()]
 		var a := randf() * TAU
 		var vel := Vector3(cos(a), randf_range(0.9, 1.4), sin(a)).normalized() * randf_range(8.0, 12.0)
@@ -2757,13 +2833,13 @@ func _mirror_swap() -> void:
 	guard_left = maxf(guard_left, 0.3)
 	sfx("wraith", -8.0, 1.7, 0.2)
 	if has_flag("swap_fade"):
-		invis_left = maxf(invis_left, 2.5)
+		invis_left = maxf(invis_left, AbilityNumbers.FADE_TIME)
 	if has_flag("swap_forget"):
-		world.forget_around(to, 10.0)
+		world.forget_around(to, AbilityNumbers.DAZZLE_REACH)
 	if has_flag("swap_legion"):
-		for i in 3:
-			var a := TAU * i / 3.0 + rotation.y
-			world.spawn_ally("mirror", to + Vector3(sin(a), 0, cos(a)) * 1.8, 8.0 * m("ally_time"))
+		for i in AbilityNumbers.LEGION_IMAGES:
+			var a := TAU * i / float(AbilityNumbers.LEGION_IMAGES) + rotation.y
+			world.spawn_ally("mirror", to + Vector3(sin(a), 0, cos(a)) * 1.8, AbilityNumbers.LEGION_TIME * m("ally_time"))
 	_noise(4.0)
 
 
@@ -2779,12 +2855,12 @@ func decoy_burst(at: Vector3) -> void:
 	for z: Zombie in world.zombies_near(at, radius, 16):
 		z.take_damage(dmg, z.position - at, 3.0, z.centre())
 		if has_flag("swap_stun"):
-			z.stun(1.5)
+			z.stun(AbilityNumbers.BURST_STUN)
 		on_hit(false)
 	for r: Target in world.rivals_near(at, radius):
 		world.hit_rival(r, dmg, at)
 		if has_flag("swap_stun"):
-			world.status_rival(r, Net.Status.STUN, 1.5)
+			world.status_rival(r, Net.Status.STUN, AbilityNumbers.BURST_STUN)
 
 
 ## A hit a friend's Guardian took for them.
@@ -2869,9 +2945,9 @@ func _tick_leap(delta: float) -> void:
 		_fog_at(global_position + Vector3.UP * 0.4, 1.9)
 		fog_flash = 1.0
 		if has_flag("art_leaper") and hp < max_hp():
-			heal(15.0 if has_flag("leap_mend") else 5.0)
+			heal(AbilityNumbers.LEAP_MEND_HEAL if has_flag("leap_mend") else AbilityNumbers.LEAP_HEAL)
 		if has_flag("leap_mend"):
-			mana = minf(max_mana(), mana + 8.0)
+			mana = minf(max_mana(), mana + AbilityNumbers.LEAP_MEND_MIST)
 		var hit := m("leap_damage")
 		var stuns := has_flag("leap_stun")
 		var freezes := has_flag("leap_freeze")
@@ -2955,9 +3031,9 @@ func _tick_rift(delta: float) -> void:
 			z.freeze(0.8)
 	on_hit(false)
 	if has_flag("rift_mist"):
-		mana = minf(max_mana(), mana + 6.0)
+		mana = minf(max_mana(), mana + AbilityNumbers.RIFT_MIST)
 	if has_flag("rift_feast") and hp < max_hp():
-		heal(5.0)
+		heal(AbilityNumbers.RIFT_FEAST_HEAL)
 	_swing_side = not _swing_side
 	_swing_keys = WeaponAnim.keys_for("claw", _swing_side)
 	_swing_time = 0.2
@@ -2977,7 +3053,7 @@ func damage_multiplier() -> float:
 	if void_left > 0.0:
 		mult *= 2.0
 	if has_flag("rage"):
-		mult *= 1.0 + 0.6 * (1.0 - clampf(hp / max_hp(), 0.0, 1.0))
+		mult *= 1.0 + AbilityNumbers.RAGE_MAX * (1.0 - clampf(hp / max_hp(), 0.0, 1.0))
 	return mult
 
 
@@ -3012,6 +3088,10 @@ func _physics_step(delta: float) -> void:
 		return
 	if _leap_t >= 0.0:
 		_tick_leap(delta)
+		return
+	if charge_left > 0.0:
+		UpgradeKit.tick_charge(self, delta)
+		_tick_riding(delta)
 		return
 	if not _rift_targets.is_empty():
 		_tick_rift(delta)
@@ -3284,8 +3364,8 @@ func attack_interval(d: Dictionary) -> float:
 		rate /= m("melee_rate")
 		if d.get("momentum", false):
 			rate /= 1.0 + _flail_stacks * 0.35
-		if has_flag("blood_frenzy") and hp < max_hp() * 0.5:
-			rate /= 1.5
+		if has_flag("blood_frenzy") and hp < max_hp() * AbilityNumbers.FRENZY_BELOW:
+			rate /= AbilityNumbers.FRENZY_RATE
 	elif d["kind"] == WeaponDefs.Kind.SPELL:
 		rate /= m("spell_rate")
 	else:
@@ -3381,7 +3461,7 @@ func _ranged_mult() -> float:
 	if is_riding():
 		mult *= m("riding_ranged")
 	if has_flag("still_aim") and Vector2(velocity.x, velocity.z).length() < 0.5:
-		mult *= 1.5
+		mult *= AbilityNumbers.STILL_AIM
 	return mult
 
 
@@ -3404,11 +3484,11 @@ func _fire_arrow(d: Dictionary) -> void:
 	var max_range: float = float(d["range"]) * power
 	var dmg := WeaponDefs.DAMAGE * float(d.get("power", 1.0)) * _ranged_mult()
 	_shot_count += 1
-	if has_flag("overdraw") and _shot_count % 3 == 0:
-		dmg *= 2.0
+	if has_flag("overdraw") and _shot_count % AbilityNumbers.OVERDRAW_EVERY == 0:
+		dmg *= AbilityNumbers.OVERDRAW_POWER
 	if has_flag("killing_shot") and _kill_shot_cd <= 0.0:
-		_kill_shot_cd = 6.0
-		dmg = 300.0
+		_kill_shot_cd = AbilityNumbers.KILLING_SHOT_EVERY
+		dmg = AbilityNumbers.KILLING_SHOT_DAMAGE
 		say("Killing Shot!")
 	world.spawn_player_arrow(self, start, dir * speed + Vector3.UP * 0.5, float(d["gravity"]), max_range, float(d["knock"]), dmg)
 	if has_flag("twin_shot"):
@@ -3457,7 +3537,7 @@ func _cast_bolt(d: Dictionary) -> void:
 	var dir := world.assist_aim(camera.global_position, -camera.global_basis.z, float(d["range"]))
 	var start := camera.global_position + dir * 0.6 + camera.global_basis.x * 0.12 + Vector3.DOWN * 0.02
 	_shot_count += 1
-	var meteor := has_flag("meteor") and _shot_count % 4 == 0
+	var meteor := has_flag("meteor") and _shot_count % AbilityNumbers.METEOR_EVERY == 0
 	var dmg := WeaponDefs.DAMAGE * m("spell_damage") * damage_multiplier() * (1.8 if weapon_id() == "war_staff" else 1.0)
 	var element := ""
 	if has_flag("elements"):
@@ -3475,7 +3555,7 @@ func melee_stats(d: Dictionary) -> Dictionary:
 	if d.get("spec", "") == "pathfinder":
 		mult *= 1.0 + m("find_damage")
 	if has_flag("rooted") and stone_skin >= SKIN_STRONG:
-		mult *= 1.35
+		mult *= AbilityNumbers.ROOTED
 	if is_riding():
 		mult *= m("riding_damage") * (2.0 if has_flag("couched") else 1.0)
 	if d.get("charge", false) and (is_riding() or Vector2(velocity.x, velocity.z).length() > WALK_SPEED * 0.8):
@@ -3522,7 +3602,7 @@ func _do_melee_hit() -> void:
 	if class_id == "adept" and hits > 0 and d != BASH and STANCES.has(stance):
 		stance_hits = mini(3, stance_hits + 1)
 		if stance_hits == 3 and not _stance_mastered:
-			mods["melee_damage"] += 0.15
+			mods["melee_damage"] += AbilityNumbers.STANCE_MASTERY
 			_stance_mastered = true
 	if stance == "wind" and hits > 0 and d != BASH:
 		_echo_left = ECHO_AFTER
@@ -3540,13 +3620,13 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if has_flag("void_walker") and STANCES.has(stance):
 		_void_hits[stance] = true
-	if has_flag("execution") and z.is_alive() and z.hp < z.max_hp * 0.3:
+	if has_flag("execution") and z.is_alive() and z.hp < z.max_hp * AbilityNumbers.EXECUTE_BELOW:
 		z.take_damage(9999.0, Vector3.FORWARD, 0.0, z.centre())
 		return
-	if has_flag("blood_frenzy") and hp < max_hp() * 0.5:
-		hp = minf(max_hp(), hp + 3.0)
+	if has_flag("blood_frenzy") and hp < max_hp() * AbilityNumbers.FRENZY_BELOW:
+		hp = minf(max_hp(), hp + AbilityNumbers.FRENZY_HEAL)
 	if weapon_id() == "musket" and has_flag("bayonet_stagger"):
-		z.stun(0.6)
+		z.stun(AbilityNumbers.BAYONET_STAGGER)
 	if d.get("burns", false):
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if d.has("stun"):
@@ -3733,6 +3813,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F: mount()
 			KEY_R: use_burst()
 			KEY_T: use_art()
+			KEY_G: use_path_art()
 			KEY_V: use_bayonet()
 			KEY_SPACE: input_jump = true
 

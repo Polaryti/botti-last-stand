@@ -67,7 +67,7 @@ func _physics_process(delta: float) -> void:
 	var authority := not Net.active() or Net.is_host()
 	if kind == "warlock":
 		var source := source_target()
-		if source == null or source.dead or elapsed >= 8.0:
+		if source == null or source.dead or elapsed >= CommanderKit.STORM_TIME:
 			queue_free()
 			return
 		global_position = source.global_position

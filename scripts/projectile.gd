@@ -374,8 +374,8 @@ func _burst_here(at: Vector3) -> void:
 func _hit_zombie(z: Zombie, at: Vector3) -> void:
 	var head := z.headshot_at(at.y)
 	var amount := damage * (2.0 if head and sharp else 1.0)
-	if close_from != Vector3.INF and close_from.distance_to(at) <= 6.0:
-		amount *= 1.5
+	if close_from != Vector3.INF and close_from.distance_to(at) <= AbilityNumbers.FAN_CLOSE_REACH:
+		amount *= AbilityNumbers.FAN_CLOSE
 	var shooter := _owner()
 	if from_player and shooter:
 		amount = shooter.modify_damage(z, amount)

@@ -1,5 +1,42 @@
 # Changelog
 
+## Development — Beyond the Mists, together and apart
+
+### Playing together
+- Play Together has two tabs: Same Wi-Fi and Online. The Hotspot tab is gone (a phone's hotspot is still a Wi-Fi network, so Same Wi-Fi covers it), and so is changing your name there: it shows who you play as, and Settings is where you change it.
+- In a night together or in the Fort, the list of players no longer counts anyone's kills; scores are shown only where players fight each other. Your own line is never in the list: you are the panel above it.
+- The Fort's panel (portal, gates, wood, the gate dial) is smaller.
+- When a friend is healing you (a Cartographer's beacon line, a Night Watch, a Consecration, a Survey net), a heart-and-hand icon shows on your status row for as long as it lasts.
+- Network protocol 50: older builds cannot join newer ones.
+
+### The Bandit
+- Into the Shadows stays on every path. Steal, Nightfall or Dagger Fan comes as a second ability with a button of its own (G on a keyboard), so choosing a path no longer takes Into the Shadows away.
+- Steal's button lights up, with a ring round it, when someone is in reach; with nobody in reach it stays grey and says so.
+- Whatever Steal strikes cannot strike back for 1.2 s. Teleporting in, the Thief no longer always takes a hit.
+- 110 health, from 95.
+
+### Class Upgrades for Chivalry and the Magician
+- Lance Charge (Lancer, 260 Doubloons): dash 10 m with the lance couched; everything in the way takes 55 damage and is thrown aside. Every 16 s.
+- Consecration (Paladin, 280): a holy standard for 8 s. Friends within 6 m heal 4 health a second; enemies inside burn and are slowed. Every 30 s.
+- Whistle (Horse Archer, 240): your horse comes at once, without kills. Every 90 s.
+- Grave Call (Necromancer, 260): up to 3 enemies that fell within 12 m in the last 10 s rise as skeletons for 15 s. 30 mana, every 25 s; with nothing to raise, nothing is spent.
+- Frost Nova (Elementalist, 260): every enemy within 6 m takes 25 damage and is frozen for 2 s. 35 mana, every 20 s.
+- Hall of Mirrors (Illusionist, 280): a hit that would take a quarter of your health or more misses, and you swap away as Mirror Swap does. Once every 30 s.
+- Bots on those paths use them too.
+
+### Store
+- What you own is no longer for sale: bought classes and items leave the Store's lists and live in the Armory. The Store says once what you just bought and where it went; a tab with nothing left says so, with a button to the Armory.
+- A new Cosmetics tab, with one thing in it: the White Stag (Chivalry, 400 Doubloons). Your horse comes as the Shapeshifter's stag, for you and for everyone you play with. It rides as the horse does. Put it on or take it off in the Armory.
+
+### Nights
+- A night opens with what it asks of you and nothing more: "Survive until the dawn", or "Defend the fort until the dawn" and "Defend the Great Portal until the dawn". No more word of a boss.
+- The bell tolls the minutes only in The Village, where the church is.
+- "They sense the dawn" comes with a sound of its own outside The Village and the Fort: in The Mists, faint voices drawing one long breath through the fog; in the Valleys of Mesenlla, hunting horns calling across the hills; at Mist Bastion, war drums beating faster under a low war horn. The wolf's howl stays in The Village and the Fort.
+- Weapons found on one map only lie around a little more often there (weighted 1.35 times).
+
+### What the game says
+- Every number on a class, path, ability and Class Upgrade, as the Store, the Armory, the Codex and the class screens show it, is checked against the value the game uses, and the checks run with every build. Where a text and the game disagreed, the text was put right. The Bandit's line says it gets a second ability by path, and the bell tip names The Village.
+
 ## Development — Beyond the Mists, a cleaner look
 
 ### Screens
@@ -13,7 +50,7 @@
 - Your health, level progress and mana sit together on one panel at the top left, with your kills (and your mount) on small chips under it.
 - Under the clock, chips with icons: Hunted, Unseen or Invisible, In the light, the fog in All vs All, the Monk's and Adept's states, and the Mist Storm you are standing in (which used to be a line of capitals across the screen).
 - The Fort's portal, gates, wood and the gate dial are on one panel under the clock.
-- Playing with others, the list of players has its own panel, with the scores lined up on the right.
+- Playing with others, the list of players has its own panel.
 - The weapon you hold and what it has left are on a chip by the attack button.
 - One set of text sizes for the whole HUD.
 - When a night ends, any screen left open over it (the Map, Settings) closes first.

@@ -401,7 +401,7 @@ func _tick_own(delta: float) -> void:
 			if not _foe.is_alive() and player:
 				player.on_ally_kill()
 			elif BEASTS.has(kind) and player and player.has_flag("wolf_stun"):
-				_foe.stun(0.7)
+				_foe.stun(AbilityNumbers.SAVAGE_BITE_STUN)
 			if _foe.is_alive() and kind == "snake" and randf() < SNAKE_POISON:
 				_foe.add_dot(10.0, 4.0)
 				if player == world.player:

@@ -8,6 +8,7 @@ const STEAL_RANGE := 14.0
 const STEAL_DAMAGE := 40.0
 const STEAL_HIDE := 2.5
 const STEAL_SPLASH := 4.0
+const STEAL_FLINCH := 1.2 # what Steal strikes cannot strike back for this long: the Thief is there first
 const NIGHT_RADIUS := 6.0
 const NIGHT_TIME := 8.0
 const NIGHT_LINGER := 1.5
@@ -26,11 +27,21 @@ const ARTS := {
 }
 
 
-static func art(p: Player) -> Dictionary:
-	return ARTS.get(p.spec_id, ARTS[""])
+## Into the Shadows, on the Bandit's ability button whatever its path.
+static func art(_p: Player) -> Dictionary:
+	return ARTS[""]
+
+
+## The path's own ability, on a second button beside it: Steal, Nightfall or Dagger Fan.
+static func path_art(p: Player) -> Dictionary:
+	return ARTS.get(p.spec_id, {}) if p.spec_id != "" else {}
 
 
 static func cast(p: Player) -> void:
+	into_shadows(p)
+
+
+static func cast_path(p: Player) -> void:
 	match p.spec_id:
 		"thief": steal(p)
 		"mercenary": nightfall(p)
@@ -40,7 +51,6 @@ static func cast(p: Player) -> void:
 				p.get_tree().create_timer(0.35).timeout.connect(func() -> void:
 					if is_instance_valid(p) and not p.dead:
 						dagger_fan(p))
-		_: into_shadows(p)
 
 
 # --- Into the Shadows ----------------------------------------------------------
@@ -92,7 +102,7 @@ static func steal(p: Player) -> void:
 	var t := steal_target(p)
 	if t == null:
 		p.say("Nothing to steal from")
-		p.art_cd_left = 0.5
+		p.path_art_cd_left = 0.5
 		return
 	var from := p.global_position
 	var there: Vector3 = t.global_position
@@ -122,7 +132,7 @@ static func steal(p: Player) -> void:
 	for victim in targets:
 		_rob(p, victim, dmg, victim == t)
 	if p.has_flag("steal_dash"):
-		p._act({"do": "buff", "key": "steal_dash", "stat": "speed", "val": 0.35, "secs": 3.0}, {})
+		p._act({"do": "buff", "key": "steal_dash", "stat": "speed", "val": AbilityNumbers.SLIP_AWAY, "secs": AbilityNumbers.SLIP_AWAY_TIME}, {})
 	p._noise(3.0)
 
 
@@ -133,10 +143,12 @@ static func _rob(p: Player, victim: Node3D, dmg: float, main_target := true) -> 
 	var was := p.world.begin_act(p)
 	if victim is Zombie:
 		var z := victim as Zombie
+		# Caught off guard first, so the blow it was winding up never lands on the Thief that appeared.
+		z.flinch(STEAL_FLINCH)
 		z.take_damage(p.modify_damage(z, dmg), z.position - p.global_position, 1.5, z.centre())
 		p.on_hit(false)
 		if p.has_flag("steal_stun"):
-			z.stun(1.5)
+			z.stun(AbilityNumbers.STEAL_STUN)
 		var keep := main_target and p.has_flag("steal_keep") and z.weapon_id != "" and WeaponDefs.lies_around(z.weapon_id) \
 			and p.can_use(z.weapon_id) and not p.carries(z.weapon_id) and (p.has_empty_slot() or p.can_drop_weapon())
 		var taken := z.disarm(not keep)

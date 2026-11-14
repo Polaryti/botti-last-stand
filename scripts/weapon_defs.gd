@@ -83,16 +83,24 @@ static func lies_around(id: String) -> bool:
 	return not d.is_empty() and not d.get("hidden", false) and not d.has("only") and float(d.get("weight", 0.0)) > 0.0
 
 
+## How often a weapon turns up, against the others. A map's own weapons (those with "maps") turn up
+## a little more often than their weight alone says, so each land's weapons are met on it.
+const EXCLUSIVE_BOOST := 1.35
+static func spawn_weight(id: String) -> float:
+	var d: Dictionary = ALL[id]
+	return float(d["weight"]) * (EXCLUSIVE_BOOST if d.has("maps") else 1.0)
+
+
 static func pick_random(map_id := "") -> String:
 	var total := 0.0
 	for id: String in ALL:
 		if lies_around(id) and SpawnRules.allows(ALL[id], map_id):
-			total += float(ALL[id]["weight"])
+			total += spawn_weight(id)
 	var r := randf() * total
 	for id: String in ALL:
 		if not lies_around(id) or not SpawnRules.allows(ALL[id], map_id):
 			continue
-		r -= float(ALL[id]["weight"])
+		r -= spawn_weight(id)
 		if r <= 0.0:
 			return id
 	return "sword"

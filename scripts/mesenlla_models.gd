@@ -487,6 +487,29 @@ static func _eagle_parts(root: Node3D, misty: bool) -> void:
 		root.set_meta("wing_l" if side < 0 else "wing_r", wing)
 
 
+## The Shapeshifter's white stag as a Cavalry rider's steed (the White Stag cosmetic): facing -Z like
+## the horse, sized so its back is where the horse's saddle is. scale_to: the horse's own size.
+static func stag_steed(scale_to := 1.0) -> Node3D:
+	var root := Node3D.new()
+	root.name = "StagSteed"
+	var holder := _pivot(root, Vector3.ZERO, "Stag")
+	_quadruped(holder, "stag", _stag_look())
+	holder.rotation.y = PI
+	holder.scale = Vector3.ONE * 1.12 * scale_to
+	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.set_meta("legs", ["LegFL", "LegFR", "LegBL", "LegBR"].map(func(n: String) -> Node3D: return root.find_child(n, true, false) as Node3D))
+	return root
+
+
+## The stag steed's legs swinging, faster and wider the faster it goes (gait 0..1).
+static func steed_gait(root: Node3D, gait: float) -> void:
+	var t := Time.get_ticks_msec() * 0.016
+	var legs: Array = root.get_meta("legs", [])
+	for i in legs.size():
+		(legs[i] as Node3D).rotation.x = sin(t + (0.0 if i % 3 == 0 else PI)) * 0.7 * clampf(gait, 0.05, 1.0)
+
+
 ## Returns the model. Named nodes and meta are what animate() moves.
 static func build(id: String) -> Node3D:
 	var root := Node3D.new()

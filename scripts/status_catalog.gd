@@ -21,6 +21,12 @@ const TIMED := [
 		"desc": "Hides you from ordinary enemies until the timer ends or you attack. Some foes can see through it. Afterwards you cannot turn invisible again for 3 seconds."
 	},
 	{
+		"field": "friend_heal_left",
+		"name": "Mended",
+		"icon": "heart+hand",
+		"desc": "Someone on your side is healing you right now: a Cartographer's beacon line, a Mercenary's Night Watch or a Paladin's Consecration."
+	},
+	{
 		"field": "invis_lockout",
 		"name": "Revealed",
 		"icon": "eye+clock",

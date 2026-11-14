@@ -544,8 +544,8 @@ static func _commander() -> Dictionary:
 	]}
 
 
-## The Bandit vanishes before it does anything else. Into the Shadows is its ability from the start;
-## each path replaces it with something of its own (BanditKit), and the tree sharpens that.
+## The Bandit vanishes before it does anything else. Into the Shadows is its ability from the start and
+## stays; each path adds something of its own on a second button (BanditKit), and the tree sharpens that.
 static func _bandit() -> Dictionary:
 	var plum := Color(0.48, 0.23, 0.36)
 	return {"core": [
@@ -557,7 +557,7 @@ static func _bandit() -> Dictionary:
 		a("slippery", "Slippery", "15% chance to avoid any hit", "boot+eye_closed", {"dodge": 0.15})],
 	], "specs": [
 		_spec("thief", "Thief", "Takes what others are holding, and is gone before they notice.", plum,
-			a("thief_entry", "Thief", "Steal replaces Into the Shadows: appear in front of the nearest foe within 14 m, turn invisible, strike, and knock their weapon to the ground", "hand+dagger", {}, [], "art_steal"),
+			a("thief_entry", "Thief", "Unlocks Steal, a second ability beside Into the Shadows: appear in front of the nearest foe within 14 m, turn invisible, strike, and knock their weapon to the ground", "hand+dagger", {}, [], "art_steal"),
 			[[a("long_reach", "Long Reach", "Steal reaches 6 m further", "hand+up", {"steal_range": 6.0}),
 			a("nimble", "Nimble", "Steal comes back 25% sooner", "hand+clock", {"art_cd": -0.25})],
 			[a("heavy_hand", "Heavy Hand", "Steal strikes 60% harder", "hand+up", {"steal_damage": 0.6}),
@@ -568,7 +568,7 @@ static func _bandit() -> Dictionary:
 			a("fence", "Fence", "A weapon stolen from a creature goes straight to your hand, even when both are full: the one you hold drops", "hand+plus", {}, [], "steal_keep")]],
 			a("grand_larceny", "Grand Larceny", "Steal also strikes and disarms every foe within 4 m of its target", "hand+crown", {}, [], "steal_all")),
 		_spec("mercenary", "Mercenary", "Sells the night: friends inside it disappear, foes inside it go half blind.", plum,
-			a("mercenary_entry", "Mercenary", "Nightfall replaces Into the Shadows: a dome of night for 8 s. You and friends inside are invisible, and stay so 1.5 s after leaving; enemies inside barely see", "moon+shield", {}, [], "art_nightfall"),
+			a("mercenary_entry", "Mercenary", "Unlocks Nightfall, a second ability beside Into the Shadows: a dome of night for 8 s. You and friends inside are invisible, and stay so 1.5 s after leaving; enemies inside barely see", "moon+shield", {}, [], "art_nightfall"),
 			[[a("wide_night", "Wide Night", "The dome is 2 m wider", "moon+up", {"night_radius": 2.0}),
 			a("long_night", "Long Night", "The dome lasts 3 s longer", "moon+clock", {"night_time": 3.0})],
 			[a("paid_in_full", "Paid in Full", "+25% damage while inside your dome", "sword+moon", {}, [], "night_damage"),
@@ -579,7 +579,7 @@ static func _bandit() -> Dictionary:
 			a("cover_of_dark", "Cover of Dark", "Invisibility lingers 2 s longer after leaving the dome", "eye_closed+moon", {"night_linger": 2.0})]],
 			a("endless_night", "Endless Night", "Your dome follows you, and lasts 4 s longer", "moon+crown", {"night_time": 4.0}, [], "night_follow")),
 		_spec("highwayman", "Highwayman", "Stops the road with a fan of knives, and keeps what falls.", plum,
-			a("highwayman_entry", "Highwayman", "Dagger Fan replaces Into the Shadows: throw five knives in a fan. Plunder: 12% of your kills leave food, arrows or a potion", "dagger+burst", {"plunder": 0.12}, [], "art_fan"),
+			a("highwayman_entry", "Highwayman", "Unlocks Dagger Fan, a second ability beside Into the Shadows: throw five knives in a fan. Plunder: 12% of your kills leave food, arrows or a potion", "dagger+burst", {"plunder": 0.12}, [], "art_fan"),
 			[[a("more_blades", "More Blades", "Two more knives in each fan", "dagger+plus", {"fan_knives": 2.0}),
 			a("honed", "Honed", "Knives hit 30% harder", "dagger+up", {"fan_damage": 0.3})],
 			[a("serrated", "Serrated", "Knives make enemies bleed", "drop+dagger", {}, [], "fan_bleed"),

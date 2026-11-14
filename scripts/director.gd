@@ -22,6 +22,8 @@ const MAX_HARRIERS := 3
 const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
+## What each land sounds like when the dead sense the dawn. The Village and the Fort keep the wolf.
+const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion"}
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0
@@ -116,16 +118,20 @@ func begin(with_zombies: bool) -> void:
 		_spawn_timer = 0.0
 		for i in target_population():
 			_spawn_roamer()
-		var opening := "Survive until dawn"
-		if world.map_id == "bastion":
-			opening = "Hold the Great Portal until dawn and bring down the War Wyvern"
-		elif world.fort:
-			opening = "Hold the fort until dawn"
-		elif requires_regent():
-			opening = "Survive ten minutes and defeat the %s" % ("Great Revenant Elemental" if world.map_id == "mesenlla" else "Veil Regent")
-		elif Net.fog_rules():
-			opening = "Three lives. Last one standing"
-		show_banner(opening, 4.0)
+		show_banner(opening_line(), 4.0)
+
+
+## What the night asks of you, as it begins: to live until the dawn, or to keep something standing
+## until then. Whatever else the night holds (a boss, a barrage) is not given away here.
+func opening_line() -> String:
+	var opening := "Survive until the dawn"
+	if world.map_id == "bastion":
+		opening = "Defend the Great Portal until the dawn"
+	elif world.fort:
+		opening = "Defend the fort until the dawn"
+	elif Net.fog_rules():
+		opening = "Three lives. Last one standing"
+	return opening
 
 
 func show_banner(text: String, seconds: float) -> void:
@@ -241,8 +247,9 @@ func _process(delta: float) -> void:
 		return
 	if _waiting or _won or _everyone_down():
 		return
+	# The church bell tolls the minutes, and there is a church only in The Village.
 	_bell_timer -= delta
-	if _bell_timer <= 0.0:
+	if _bell_timer <= 0.0 and world.map_id == "village":
 		_bell_timer = 60.0
 		_bell_minute += 1
 		world.ring_bell(_bell_minute)
@@ -346,7 +353,7 @@ func _tick_last_stand(delta: float) -> void:
 			_last_stand = true
 			_call_timer = 2.0
 			show_banner("They sense the dawn...", 4.0)
-			_sound("howl", -1.0, 0.8)
+			_sound(DAWN_SOUNDS.get(world.map_id, "howl"), -1.0, 0.8 if not DAWN_SOUNDS.has(world.map_id) else 1.0)
 		return
 	_call_timer -= delta
 	if _call_timer <= 0.0 and world.player:

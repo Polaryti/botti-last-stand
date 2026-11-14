@@ -101,6 +101,13 @@ func show_item(id: String) -> void:
 	if d.get("pet", false):
 		show_pet(id)
 		return
+	if d.get("skin", "") == "stag":
+		# The White Stag on its own, turning.
+		var stage := _begin(2.4)
+		var stag := MesenllaModels.stag_steed()
+		stag.rotation.y = PI * 0.75
+		stage.add_child(stag)
+		return
 	show_class(d["class"])
 	_camera.position *= 1.16
 	var body := _spin.get_child(0) as Node3D

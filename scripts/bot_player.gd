@@ -654,6 +654,31 @@ func _enemies_within(radius: float) -> int:
 	return n + world.rivals_near(pawn.global_position, radius).size()
 
 
+## A Bandit bot: Into the Shadows when hurt or closing in, and its path's ability on the second button.
+func _bandit_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "":
+		return
+	var low := p.hp < p.max_hp() * 0.4
+	var near := _enemies_within(4.5)
+	if p.has_path_art() and p.path_art_cd_left <= 0.0:
+		match p.spec_id:
+			"thief":
+				if has_target and dist < BanditKit.STEAL_RANGE + p.m("steal_range") and p.path_art_has_use():
+					p.use_path_art()
+					return
+			"mercenary":
+				if near >= 2 or (low and near > 0):
+					p.use_path_art()
+					return
+			"highwayman":
+				if has_target and dist < 15.0:
+					_face(_target_point(), false)
+					p.use_path_art()
+					return
+	if p.art_cd_left <= 0.0 and p.invis_left <= 0.0 and p.can_vanish() and ((low and near > 0) or (has_target and dist < 8.0)):
+		p.use_art()
+
+
 ## The same buttons a person has, pressed when they would help.
 func _use_skills() -> void:
 	var p := pawn
@@ -667,6 +692,9 @@ func _use_skills() -> void:
 	if p.has_burst() and p.burst_cd_left <= 0.0 and p.mana >= p.burst_cost() and _enemies_within(p.m("burst_radius")) >= (1 if p.hp < p.max_hp() * 0.5 else 2):
 		p.use_burst()
 		return
+	if p.class_id == "bandit":
+		_bandit_skills(p, has_target, dist)
+		return
 	if not p.has_art() or p.art_cd_left > 0.0 or p._cast_kind != "" or p.aiming_art:
 		return
 	if p.spirit_left > 0.0:
@@ -679,8 +707,6 @@ func _use_skills() -> void:
 	var low := p.hp < p.max_hp() * 0.4
 	var near := _enemies_within(4.5)
 	var kind := "stance" if p.class_id == "adept" else ("ki_blast" if p.class_id == "monk" and p.spec_id == "" else p.spec_id)
-	if p.class_id == "bandit" and p.spec_id == "":
-		kind = "into_shadows"
 	if p.class_id == "cartographer":
 		kind = "beacon"
 	match kind:
@@ -691,18 +717,21 @@ func _use_skills() -> void:
 			var find_due := p.spec_id == "pathfinder" and p.find_rest_left <= 0.0 and (p.last_find == Vector3.INF or p.last_find.distance_to(p.global_position) > CartographerKit.FIND_GAP + p.m("find_gap"))
 			if fresh_ground and ((has_target and dist < 20.0) or find_due):
 				p.use_art()
-		"into_shadows":
-			if p.invis_left <= 0.0 and p.can_vanish() and ((low and near > 0) or (has_target and dist < 8.0)):
+		"lancer":
+			if has_target and dist < UpgradeKit.CHARGE_REACH - 1.0:
+				_face(_target_point(), false)
 				p.use_art()
-		"thief":
-			if has_target and dist < BanditKit.STEAL_RANGE + p.m("steal_range") and BanditKit.steal_target(p) != null:
-				p.use_art()
-		"mercenary":
+		"paladin":
 			if near >= 2 or (low and near > 0):
 				p.use_art()
-		"highwayman":
-			if has_target and dist < 15.0:
-				_face(_target_point(), false)
+		"horse_archer":
+			if has_target and dist < 25.0 and UpgradeKit.whistle_has_use(p):
+				p.use_art()
+		"necromancer":
+			if not UpgradeKit.graves(p).is_empty():
+				p.use_art()
+		"elementalist":
+			if near >= 2 or (low and near > 0):
 				p.use_art()
 		"ki_blast":
 			if near >= 2 or (near >= 1 and p.hp < p.max_hp() * 0.7):

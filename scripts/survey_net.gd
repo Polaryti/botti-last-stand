@@ -213,7 +213,7 @@ func _tend(p: Player, delta: float) -> void:
 	if near_beacon(here, float(cfg.get("radius", CartographerKit.RADIUS))):
 		p._act({"do": "buff", "key": "beacon_speed", "stat": "speed", "val": CartographerKit.SPEED, "secs": 0.3}, {})
 	if p.hp < p.max_hp() and on_line(here):
-		p.heal(float(cfg.get("heal", CartographerKit.LINE_HEAL)) * delta)
+		p.mended_by_friend(float(cfg.get("heal", CartographerKit.LINE_HEAL)) * delta)
 	match kind():
 		"stars":
 			if in_constellation(here):
@@ -223,7 +223,7 @@ func _tend(p: Player, delta: float) -> void:
 				if has("stars_guard"):
 					p._act({"do": "buff", "key": "stars_guard", "stat": "damage_taken", "val": -STAR_GUARD, "secs": 0.3}, {})
 				if has("stars_heal") and p.hp < p.max_hp():
-					p.heal(STAR_HEAL * delta)
+					p.mended_by_friend(STAR_HEAL * delta)
 		"gates":
 			_gate(p)
 
@@ -506,7 +506,7 @@ func _travel(p: Player, j: int) -> void:
 	p._act({"do": "buff", "key": "gate_speed", "stat": "speed", "val": float(cfg.get("gate_speed", CartographerKit.GATE_SPEED)), "secs": 2.0}, {})
 	var mend := float(cfg.get("gate_heal", 0.0))
 	if mend > 0.0:
-		p.heal(mend)
+		p.mended_by_friend(mend)
 	if has("gate_hide") and p.can_vanish():
 		p.invis_left = maxf(p.invis_left, GATE_HIDE)
 	world.fx_mist(from + Vector3.UP, 0.8)
