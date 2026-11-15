@@ -166,7 +166,7 @@ static func facts() -> Dictionary:
 		"item:grave_call": [float(UpgradeKit.GRAVE_RAISED), UpgradeKit.GRAVE_REACH, UpgradeKit.GRAVE_RECENT, UpgradeKit.GRAVE_TIME],
 		"item:frost_nova": [UpgradeKit.NOVA_RADIUS, UpgradeKit.NOVA_DAMAGE, UpgradeKit.NOVA_FREEZE],
 		"item:hall_of_mirrors": [UpgradeKit.MIRROR_REST],
-		"item:mist_reinforcements": [pct(Garrison.REINFORCED - 1.0)] + range(1, ShopDefs.MAP_LEVELS + 1).map(func(n: int) -> float: return float(n)),
+		"item:mist_reinforcements": [pct(Garrison.REINFORCED - 1.0), Ally.PERCH_REACH] + range(1, ShopDefs.MAP_LEVELS + 1).map(func(n: int) -> float: return float(n)),
 		"item:wild_hunt": [UpgradeKit.HUNT_TIME, UpgradeKit.HUNT_EVERY, UpgradeKit.HUNT_REACH],
 		"item:mist_wake": [PathUpgrades.MIST_WAKE_RADIUS * 2.0, PathUpgrades.MIST_WAKE_TIME, PathUpgrades.MIST_WAKE_DPS],
 		"item:torn_rifts": [PathUpgrades.TORN_RIFT_DAMAGE, PathUpgrades.TORN_RIFT_RADIUS],

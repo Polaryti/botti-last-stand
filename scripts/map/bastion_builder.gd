@@ -113,6 +113,7 @@ static func _wall(b: MapBuilder, l: LowPoly, runes: LowPoly, a: Vector2, c: Vect
 		var size := _sized(along_x, 1.1, 0.84, 0.4)
 		l.box(at, size, SLATE_DARK.lightened(0.08))
 		b.w.add_collider(b.xf * at, size)
+		b.w.fort.merlons.append(b.xf * _on(along_x, m, line, top))
 		m += 2.3
 
 

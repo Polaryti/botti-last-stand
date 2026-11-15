@@ -1825,16 +1825,26 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 ## `kind`: "fire" sets what it hits burning, "poison" poisons it (Mist Reinforcements, Level 3).
 const GARRISON_POISON := Vector2(6.0, 5.0) # damage per second, and seconds
 
-func garrison_arrow(from: Vector3, target: Vector3, dmg: float, kind := "") -> void:
-	var vel := (target - from).normalized() * 40.0
-	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(""), from, vel, 0.0, 30.0, dmg, 1.0, kind == "fire")
+## A Mist Soldier's arrow, from its bow ("bow", "longbow" or "crossbow": its speed and reach are that
+## weapon's; a Crossbow bolt flies faster and flatter than a player's, down from the walls).
+func garrison_arrow(from: Vector3, target: Vector3, dmg: float, kind := "", weapon := "bow") -> void:
+	var speed := 40.0
+	var reach := 30.0
+	if weapon == "longbow":
+		speed = float(WeaponDefs.ALL["longbow"]["speed"])
+		reach = Ally.PERCH_REACH + 6.0
+	elif weapon == "crossbow":
+		speed = 34.0
+		reach = Ally.PERCH_CLOSE + 8.0
+	var vel := (target - from).normalized() * speed
+	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(""), from, vel, 0.0, reach, dmg, 1.0, kind == "fire")
 	if shot:
 		shot.garrison = true
 		if kind == "poison":
 			shot.poison = GARRISON_POISON
 		if Net.active():
-			Net.shot(0, from, vel, 0.0, 30.0, kind == "fire", Color(0.2, 0.9, 0.1) if kind == "poison" else Color.WHITE)
-	sfx_at("bow", from, -9.0)
+			Net.shot(0, from, vel, 0.0, reach, kind == "fire", Color(0.2, 0.9, 0.1) if kind == "poison" else Color.WHITE)
+	sfx_at("crossbow" if weapon == "crossbow" else "bow", from, -9.0)
 
 
 func mirror_bolt(from: Vector3, target: Vector3) -> void:
@@ -2874,7 +2884,7 @@ func net_remote_allies(peer: int, b: PackedByteArray) -> void:
 		var a: Ally = _remote_allies.get(key)
 		var pos := Vector3(b.decode_s16(at + 2), b.decode_s16(at + 4), b.decode_s16(at + 6)) * 0.01
 		if a == null:
-			var kind: String = Ally.KINDS[clampi(b.decode_u8(at + 1) & 127, 0, Ally.KINDS.size() - 1)]
+			var kind: String = Ally.KINDS[clampi(b.decode_u8(at + 1) & 31, 0, Ally.KINDS.size() - 1)]
 			var spare: Array = _spare_allies.get(kind, [])
 			if spare.is_empty():
 				a = Ally.new(self, kind)
@@ -2888,6 +2898,7 @@ func net_remote_allies(peer: int, b: PackedByteArray) -> void:
 			allies.append(a)
 			_remote_allies[key] = a
 		a.net_biting = (b.decode_u8(at + 1) & 128) != 0
+		a.net_hand = clampi((b.decode_u8(at + 1) >> 5) & 3, 0, Ally.HANDS.size() - 1)
 		a.net_target = pos
 		a.net_yaw = b.decode_u8(at + 8) / 255.0 * TAU
 		at += 9

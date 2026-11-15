@@ -336,7 +336,7 @@ func _build_visual() -> void:
 		_visual = MistModels.build(model_id) if model_id in MistModels.KINDS else MesenllaModels.build(model_id) if model_id in MesenllaModels.KINDS else EnemyModels.build(model_id)
 		add_child(_visual)
 		# A creature of Mesenlla is built of parts on pivots: all of them flash when struck.
-		var deep := model_id in MesenllaModels.KINDS
+		var deep := model_id in MesenllaModels.KINDS or model_id == "crow" # (a Carrion Crow is a posed bird)
 		for mi in _visual.find_children("*", "MeshInstance3D", deep, false):
 			_parts.append(mi as MeshInstance3D)
 			(mi as MeshInstance3D).set_meta("mist_rest", (mi as MeshInstance3D).transform)
@@ -471,7 +471,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	if model_id in MistModels.KINDS:
 		for part in _parts:
 			part.transform = part.get_meta("mist_rest", Transform3D.IDENTITY)
-	if model_id in MesenllaModels.KINDS:
+	if model_id in MesenllaModels.KINDS or model_id == "crow":
 		# Back on its feet after the last time this body fell.
 		MesenllaModels.reset_pose(_visual)
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
@@ -1303,7 +1303,8 @@ func _show_death() -> void:
 	elif type_id == "fallen_revenant":
 		_dying = 1.6
 		world.fx_mist(centre(), 2.0)
-	elif model_id in MesenllaModels.KINDS:
+	elif model_id in MesenllaModels.KINDS or model_id == "crow":
+		# (A Carrion Crow falls out of the air like any other bird.)
 		_dying = MesenllaModels.death_time(model_id)
 		_death_total = _dying
 		MesenllaModels.begin_death(self, _visual)
@@ -1977,7 +1978,7 @@ func _physics_process(delta: float) -> void:
 		var floor_y := world.ground_at(position)
 		if position.y > floor_y:
 			position.y = maxf(floor_y, position.y - 14.0 * delta) # flyers and leapers fall out of the air
-		if model_id in MesenllaModels.KINDS:
+		if model_id in MesenllaModels.KINDS or model_id == "crow":
 			MesenllaModels.animate_death(self, _visual, _death_total - _dying, delta)
 		elif _mounted and _horse_node:
 			# A rider and its mount go down together: the horse or bear rolls onto its side, the
@@ -2545,8 +2546,10 @@ func _animate_custom(delta: float, moving: float) -> void:
 		return
 	_phase += delta * (9.0 if moving > 0.0 else 0.0)
 	match model_id:
-		"crow", "gargoyle", "harrier":
-			var rate := 3.2 if model_id == "crow" else (0.6 if model_id == "harrier" else 1.0)
+		"crow":
+			(_visual.get_meta("bird") as BirdRig).drive(self, delta)
+		"gargoyle", "harrier":
+			var rate := 0.6 if model_id == "harrier" else 1.0
 			var f := sin(_phase * rate) * 0.7
 			(_visual.get_meta("wing_l") as Node3D).rotation.z = f
 			(_visual.get_meta("wing_r") as Node3D).rotation.z = -f

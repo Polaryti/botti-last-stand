@@ -965,6 +965,53 @@ func _maps_weather_and_balance() -> void:
 	check(is_equal_approx(first.hp, float(Ally.HEALTH["mist_ranger"]) * Garrison.REINFORCED), "with 15% more health")
 	first._physics_process(0.5)
 	check(first.global_position.distance_to(first.perch) < 0.05, "and stays up there")
+	# Its two bows: the Long Bow for what comes up the lane, the Crossbow for what is at the gate.
+	check(first.hand == "longbow" and first._back_mesh != null and first._back_mesh.visible and first._back_mesh.mesh == WeaponDefs.mesh("crossbow"), "it holds a Long Bow, with a Crossbow slung on its back")
+	var gate: Dictionary = bw.fort.gates[first.lane]
+	var out: Vector3 = gate["dir"]
+	for z: Zombie in bw.zombies.duplicate():
+		z.release()
+	var foot := (gate["at"] as Vector3) + out * 2.5
+	check(bw.spawn_zombie("child_of_woods", Vector3(foot.x, 0, foot.z)), "a Child of the Woods comes to the gate")
+	var breaker: Zombie = bw.zombies.back()
+	breaker.set_physics_process(false)
+	breaker.position = Vector3(foot.x, bw.ground_at(foot), foot.z)
+	first._think = 0.0
+	first._cooldown = 0.0
+	var before := bw._projectiles.filter(func(pr: Projectile) -> bool: return pr.active and pr.garrison).size()
+	first._tick_perch(0.016)
+	var bolts := bw._projectiles.filter(func(pr: Projectile) -> bool: return pr.active and pr.garrison)
+	check(first.hand == "crossbow" and first._back_mesh.mesh == WeaponDefs.mesh("longbow"), "what is at the foot of its gate gets the Crossbow (%s)" % first.hand)
+	check(bolts.size() == before + 1 and is_equal_approx(first._cooldown, Ally.CROSSBOW_EVERY), "shot down at it, every %.2f s" % Ally.CROSSBOW_EVERY)
+	var lean := first._lean_point()
+	check(Vector2(lean.x - first.perch.x, lean.z - first.perch.z).dot(Vector2(out.x, out.z)) > 1.0, "leaning out over the parapet to do it")
+	var outer := Vector2((gate["at"] as Vector3).x, (gate["at"] as Vector3).z).dot(Vector2(out.x, out.z)) + Fort.WALL_T * 0.5
+	check(Vector2(lean.x, lean.z).dot(Vector2(out.x, out.z)) > outer and bw.has_line_of_sight(lean, breaker.centre()), "its bolts start past the wall's outer face, where no merlon is in the way")
+	check(bw.fort.merlons.size() > 20 and bw.fort.merlons.all(func(m: Vector3) -> bool: return Vector2(m.x - first.perch.x, m.z - first.perch.z).length() > Fort.MERLON_W * 0.5 + 0.05 or absf(m.y - first.perch.y) > 1.5), "it stands in a gap between the merlons, not behind one")
+	check(first._current == "CrossbowDown" and first._anim.has_animation("CrossbowDown"), "aiming down over the wall (%s)" % first._current)
+	for i in 20:
+		first._tick_perch(0.016)
+	check(first._lean_to >= Ally.LEAN_MIN and first._lean_to <= Ally.LEAN_TILT and first._visual.rotation.x > 0.1, "bent out over the parapet as far as the shot needs (%.2f rad)" % first._visual.rotation.x)
+	var hp0 := breaker.hp
+	for i in 40:
+		await frames(1)
+	check(breaker.hp < hp0, "and the bolt strikes it (%.0f)" % (hp0 - breaker.hp))
+	breaker.release()
+	var lane_at := (gate["at"] as Vector3) + out * 28.0
+	check(bw.spawn_zombie("child_of_woods", Vector3(lane_at.x, 0, lane_at.z)), "another comes up the lane")
+	var walker_far: Zombie = bw.zombies.back()
+	walker_far.set_physics_process(false)
+	walker_far.position = Vector3(lane_at.x, bw.ground_at(lane_at), lane_at.z)
+	first._think = 0.0
+	first._cooldown = 0.0
+	first._tick_perch(0.016)
+	check(first._foe == walker_far and first.hand == "longbow" and is_equal_approx(first._cooldown, Ally.LONGBOW_EVERY), "what comes up the lane, %d m out, gets the Long Bow" % int(first.global_position.distance_to(walker_far.position)))
+	for i in 30:
+		first._tick_perch(0.016)
+	check(is_zero_approx(first._visual.rotation.x) and is_zero_approx(first._visual.position.z), "standing up straight again to draw it")
+	check(Ally.PERCH_REACH > Ally.GARRISON_SIGHT + 6.0, "which reaches further than its old bow (%d m)" % int(Ally.PERCH_REACH))
+	walker_far.release()
+	check(Ally.HANDS.size() <= 4 and Ally.KINDS.size() <= 32, "what it holds goes to the other phones with it")
 	check(bw.garrison.on_lane(0) == 0, "the gate's Ranger is extra: the lane still musters its own guard")
 	bw.garrison.tick(Garrison.FIRST)
 	var walker: Ally = bw.allies.filter(func(a: Ally) -> bool: return a.perch == Vector3.INF and a.is_garrison()).back()
@@ -1220,7 +1267,7 @@ func _wilds_of_mesenlla() -> void:
 	Game.choose_pet(saved_pet)
 	await frames(2)
 	# The crow moves: wings beat as it hovers, it flies in beats and glides, and it drops on what it strikes.
-	var crow := RavenRig.new()
+	var crow := BirdRig.new("crow")
 	add_child(crow)
 	crow.set_process(false)
 	var lifts: Array[float] = []
@@ -1248,7 +1295,7 @@ func _wilds_of_mesenlla() -> void:
 	var lowest := 0.0
 	var talons := 9.0
 	var peck := 0.0
-	for i in int(RavenRig.STRIKE_TIME * 60.0) + 30:
+	for i in int(BirdRig.STRIKE_TIME * 60.0) + 30:
 		crow.advance(1.0 / 60.0)
 		lowest = minf(lowest, crow.body.position.y)
 		talons = minf(talons, crow.feet.rotation.x)
@@ -1257,6 +1304,48 @@ func _wilds_of_mesenlla() -> void:
 	check(talons < -0.8 and peck > 0.6, "throws its talons forward and pecks")
 	check(not crow.striking() and crow.body.position.y > -0.2, "and climbs back to where it was")
 	crow.queue_free()
+	# Every bird is of the same rig: the Carrion Crow, the Eagle and the Mist Eagle, and the Raven familiar.
+	for kind: String in ["carrion", "eagle", "mist_eagle"]:
+		var made: Node3D = EnemyModels.build("crow") if kind == "carrion" else MesenllaModels.build(kind)
+		var bird := made.get_meta("bird") as BirdRig
+		check(bird != null and bird.kind == kind and made.get_meta("wing_l") == bird.shoulders[1], "the %s is a posed bird" % kind)
+		made.free()
+	var eagle := BirdRig.new("eagle")
+	add_child(eagle)
+	eagle.set_process(false)
+	check(eagle.scale.x > 1.4 and BirdRig.KINDS["eagle"]["flight"] < BirdRig.KINDS["crow"]["flight"], "an eagle is bigger, with slower beats than a crow's")
+	eagle.moving = true
+	var soared := 0
+	for i in 240:
+		eagle.advance(1.0 / 60.0)
+		if absf(eagle.shoulders[0].rotation.z - 0.14) < 0.05: soared += 1
+	check(soared > 60, "and soars longer between them (%d of 240 frames)" % soared)
+	# A dive: swept back and folded, then near the ground the talons forward, and a rake as it pulls up.
+	eagle.stoop(true)
+	eagle.steep = 1.0
+	eagle.low = 12.0
+	for i in 30: eagle.advance(1.0 / 60.0)
+	check(eagle.shoulders[0].rotation.y > 0.8 and eagle.elbows[0].rotation.y > 1.0 and eagle.body.rotation.x > 0.7, "diving, it sweeps its wings back and folds them, head down the line of its fall")
+	eagle.low = 0.8
+	for i in 20: eagle.advance(1.0 / 60.0)
+	check(eagle.feet.rotation.x < -0.5, "near the ground its talons come forward")
+	eagle.stoop(false)
+	eagle.advance(1.0 / 60.0)
+	check(eagle._flare > 0.0 and eagle.feet.rotation.x < 0.0, "and it rakes as it pulls up")
+	eagle.restart()
+	eagle.screeching = true
+	for i in 30: eagle.advance(1.0 / 60.0)
+	check(eagle.jaw.rotation.x > 0.3 and eagle.head.rotation.x > 0.5, "before a dive it hangs screeching, head out at its prey")
+	eagle.queue_free()
+	p.activate_power("raven")
+	var familiar := p._familiars["raven"] as Node3D
+	var mini: BirdRig = familiar.get_child(0) as BirdRig
+	check(mini != null and mini.find_children("*", "MeshInstance3D", true, false).all(func(mi: MeshInstance3D) -> bool: return mi.layers == 2), "the Raven familiar is a little bird in view of your hands")
+	var flap := mini.shoulders[0].rotation.z
+	await frames(10)
+	check(not is_equal_approx(flap, mini.shoulders[0].rotation.z), "beating its wings")
+	p.powers["raven"] = 0.0
+	p._tick_powers(0.016)
 	# In the game: the Beastmaster's raven strikes when it bites.
 	w.spawn_ally("raven", p.global_position + Vector3(3, 0, 0), 20.0)
 	var raven: Ally = w.allies.back()
@@ -1341,7 +1430,7 @@ func _mesenlla_finds() -> void:
 	p._tick_powers(PowerDefs.STONE_INTERVAL + 0.1)
 	check(p.stone_ward, "until the ward rises again, %d seconds later" % int(PowerDefs.STONE_INTERVAL))
 	check(p.readiness().any(func(r: Dictionary) -> bool: return r["key"] == "stone_ward" and r["primed"]), "and you can see that it is up")
-	p.powers.erase("stone_sprite")
+	p.powers["stone_sprite"] = 0.0
 	p._tick_powers(0.016)
 	# The Mistberry Draught: mist where you walk; in it you are hidden and you mend.
 	p.hp = p.max_hp() - 40.0

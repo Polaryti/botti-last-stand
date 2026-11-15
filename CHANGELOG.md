@@ -10,6 +10,19 @@
 - **Bears in fur.** The Bear and the Mist Bear are shaggy now: a coat of tufts over the hump, the back and the belly, a ruff at the neck, long fur down the legs, and strands of fur drawn through every face; the Mist Bear's coat shines with mist at its edges. A jaw that opens, paws that flex. They amble with their weight rolling over the hump and the head swinging low, breathe and lift their noses to the wind while they stand, gallop in bounds, rear up roaring with their forepaws spread before the maul, bring both paws crashing down as they lunge and bite, and hook one paw round, left and right in turn, for an ordinary blow. The Mist Bear rakes the ground with a forepaw and snorts before it charges, instead of rearing. The bear the Woodland Cavalry ride has the fur too.
 - **The Shapeshifter's other shapes.** Close by or hurt, the white stag now takes one of four fighting shapes, and a different one every 12 seconds: the clawed beast; a Mist Wolf (fast; crouches and lunges, and howls to make every creature within 12 m move 35% faster for 6 s); a Great Owl (circles 4.5 m up, out of a blade's reach, then hangs screeching and dives talons first); or a Tusked Boar (paws the ground and snorts, then charges and knocks you down for 0.8 s). Each has its own body, its own way of moving and its own sounds. Badly hurt, it still turns back into the stag and flees.
 
+### Birds
+- Every bird now flies on one shared rig: the Carrion Crow, the Eagle, the Mist Eagle and the Beastmaster's Raven.
+- They beat, glide and bank into turns, hang screeching before a dive, and stoop with their wings folded.
+- Near the ground they throw their talons forward, rake, and climb away.
+- Eagles are larger, beat slower and soar longer, with a hooked bill and feathered legs. The Mist Eagle is spectral with glowing eyes; the Carrion Crow is ragged.
+- When you call the pack, the Raven stoops as it marks the enemies around you. The Raven familiar now beats its wings beside you.
+
+### Mist Bastion gate archers
+- Each Mist Ranger on a gate now carries a Long Bow and a Crossbow.
+- Long Bow: whatever comes up the lane, out to 40 m (1.7× a Mist Ranger's arrow, every 1.8 s).
+- Crossbow: whatever is at the foot of its gate, within 9 m. It leans out between the merlons and shoots down (0.55× an arrow, every 0.55 s).
+- The Rangers stand in the gaps between the merlons, and the Store's scene shows both bows.
+
 ### Bosses' words
 - Every boss now says something as it enters, on its entrance card, and something as it falls. The Veil Regent has an entrance card of its own, in violet, with its own bells, slow down through D minor to a low D over the gong. A boss added later gets its card the same way.
 - A banner that comes while a boss's card is showing waits until the card has gone.

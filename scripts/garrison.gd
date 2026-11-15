@@ -18,7 +18,8 @@ const NAMES := {"mist_infantry": "Mist Infantry", "mist_ranger": "Mist Ranger", 
 const REINFORCED := 1.15
 const REINFORCEMENTS := "mist_reinforcements"
 const GATE_ARCHERS := 2
-const ARCHERS_APART := 2.6 # metres between the two Rangers on a gate, along its wall
+const ARCHERS_APART := 2.6 # metres between the two Rangers on a gate, along its wall, before each
+## steps into the gap between merlons nearest it (Fort.crenel_near)
 const ARCHER_ARROWS := ["fire", "poison"] # Level 3: what each of a gate's two Rangers shoots
 const PORTAL_HEAVIES := 3
 const PORTAL_RING := 4.5 # how far from the portal they stand
@@ -100,8 +101,8 @@ func tick(elapsed: float) -> void:
 		world.director.show_banner("Mist Soldiers step out of the waystones to hold the lanes", 3.5)
 
 
-## Mist Reinforcements: Mist Rangers on top of every gate, there all night, shooting down the lane;
-## from Level 4, Mist Heavies around the portal as well.
+## Mist Reinforcements: Mist Rangers on top of every gate, there all night, with a Long Bow for the lane
+## and a Crossbow for the foot of the gate; from Level 4, Mist Heavies around the portal as well.
 func _man_the_gates() -> void:
 	var archers := GATE_ARCHERS if level >= 2 else 1
 	for gate in world.fort.gates.size():
@@ -109,11 +110,16 @@ func _man_the_gates() -> void:
 		var out: Vector3 = g["dir"]
 		var along := out.cross(Vector3.UP).normalized()
 		var top: Vector3 = (g["at"] as Vector3) + Vector3.UP * Fort.WALL_H - out * 0.2
+		var stood: Array[Vector3] = []
 		for i in archers:
-			var spot := top + along * ARCHERS_APART * (float(i) - float(archers - 1) * 0.5)
+			# Each stands in a gap between the merlons, so it can lean out through it.
+			var spot := world.fort.crenel_near(top + along * ARCHERS_APART * (float(i) - float(archers - 1) * 0.5), along, stood)
+			stood.append(spot)
 			var a := world.spawn_garrison("mist_ranger", gate, spot, spot)
 			a.perch = spot
+			a.perch_out = out
 			a.global_position = spot
+			a.arm("longbow")
 			a.arrow_kind = ARCHER_ARROWS[i] if level >= 3 else ""
 			world.fx_blast(spot + Vector3.UP, 1.2, Color(0.45, 0.95, 0.92, 0.6))
 	if level >= 4:

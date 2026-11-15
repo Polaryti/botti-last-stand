@@ -49,6 +49,33 @@ var region := PackedVector2Array()
 var floor_y := 0.0
 ## Small doors only players fit through: {at: on the wall's line, out: which way is outside}.
 var doors: Array[Dictionary] = []
+## The merlons along the top of the walls (world positions of their centres, at the walk's height),
+## so whoever stands on the wall to shoot can stand in a gap between two of them.
+var merlons: Array[Vector3] = []
+const MERLON_W := 1.1 # along the wall
+
+
+## The middle of the gap between merlons nearest `spot` on the wall top running along `along`, or
+## `spot` itself on a wall without merlons. Gaps in `taken` are skipped.
+func crenel_near(spot: Vector3, along: Vector3, taken: Array[Vector3] = []) -> Vector3:
+	var on_line: Array[float] = []
+	for m in merlons:
+		var d := m - spot
+		if absf(d.y) < 1.5 and absf(d.dot(along.cross(Vector3.UP))) < WALL_T and absf(d.dot(along)) < 8.0:
+			on_line.append(d.dot(along))
+	if on_line.size() < 2:
+		return spot
+	on_line.sort()
+	var best := spot
+	var best_d := INF
+	for k in on_line.size() - 1:
+		if on_line[k + 1] - on_line[k] < MERLON_W + 0.6:
+			continue
+		var gap := spot + along * (on_line[k] + on_line[k + 1]) * 0.5
+		if absf((on_line[k] + on_line[k + 1]) * 0.5) < best_d and not taken.any(func(t: Vector3) -> bool: return t.distance_to(gap) < 0.5):
+			best = gap
+			best_d = absf((on_line[k] + on_line[k + 1]) * 0.5)
+	return best
 
 
 func _init(owner_world: World) -> void:

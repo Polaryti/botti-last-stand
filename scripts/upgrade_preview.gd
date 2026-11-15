@@ -21,7 +21,7 @@ func configure(id: String, body: Node3D = null) -> void:
 		pet_root.position.y = 0.6 if id == "raven" else 0
 		pet = Ally.build_beast_model(id, pet_root)
 		if pet.has("raven"):
-			(pet["raven"] as RavenRig).dive = 0.4 # it stays in the frame
+			(pet["raven"] as BirdRig).dive = 0.4 # it stays in the frame
 		return
 	var definition: Dictionary = ShopDefs.ITEMS[id]
 	weapon = MeshInstance3D.new()
@@ -50,7 +50,7 @@ func configure(id: String, body: Node3D = null) -> void:
 ## The crow shows all it does, over and over: it hovers and looks about, flies a few beats and a glide,
 ## then drops on something below and climbs back.
 const RAVEN_SHOW := 6.0
-func _show_raven(rig: RavenRig) -> void:
+func _show_raven(rig: BirdRig) -> void:
 	var at := fmod(clock, RAVEN_SHOW)
 	rig.moving = at >= 2.4 and at < 4.6
 	var round_now := int(clock / RAVEN_SHOW)

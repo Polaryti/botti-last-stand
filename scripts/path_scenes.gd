@@ -1240,7 +1240,7 @@ static func _build_reinforcements(s: UpgradeShowcase) -> void:
 	piece.position = _sp(s, GATE_RANGER)
 	piece.rotation.y = -s.rotation.y
 	s._parts["wall"] = piece
-	var ranger := _person_at(s, "mist_ranger", "bow", GATE_RANGER, Vector2(0, 2))
+	var ranger := _person_at(s, "mist_ranger", "longbow", GATE_RANGER, Vector2(0, 2))
 	(ranger["holder"] as Node3D).position += Vector3.UP * WALL_TOP
 	s._person = ranger
 	var guards: Array[Dictionary] = []
@@ -1262,9 +1262,15 @@ static func _build_reinforcements(s: UpgradeShowcase) -> void:
 	s._parts["muster"] = s._puff(MIST_GREEN, 7)
 
 
+## When the Ranger on the gate shoots: the Long Bow while they come up the lane, then the Crossbow,
+## leaning out over the parapet, once they are at the foot of the gate.
+const GATE_SHOTS := [0.4, 1.0, 1.65, 2.2, 2.75, 3.3]
+const GATE_CLOSE := 1.4 # from here on, the foes are at the gate
+const GATE_LEAN := 0.4
+const GATE_ARROW := 0.3 # how long an arrow, and a bolt, take to get there
+const GATE_BOLT := 0.2
+
 static func _reinforcements(s: UpgradeShowcase, t: float) -> void:
-	const EVERY := 1.1
-	const FIRST := 0.4
 	var ranger: Dictionary = s._person
 	var rh: Node3D = ranger["holder"]
 	var top := rh.position
@@ -1273,20 +1279,40 @@ static func _reinforcements(s: UpgradeShowcase, t: float) -> void:
 	s._show_puff(s._parts["muster"], t, 0.6, 0.6)
 	(s._parts["muster"] as Node3D).position = top + Vector3.UP
 	var foes: Array = s._parts["foes"]
-	var shot := int(floor((t - FIRST) / EVERY))
+	var shot := -1
+	for n in GATE_SHOTS.size():
+		if t >= GATE_SHOTS[n]:
+			shot = n
+	var close := t >= GATE_CLOSE
 	var aim: Vector3 = (foes[maxi(shot, 0) % foes.size()]["holder"] as Node3D).position
 	rh.rotation.y = lerp_angle(rh.rotation.y, UpgradeShowcase._facing(top, aim), 0.2)
-	s._play(ranger["anim"], "2H_Ranged_Shoot" if t > FIRST and fmod(t - FIRST, EVERY) < 0.4 else "Idle", 1.5)
+	var hand: WeaponVisual = ranger["hand"]
+	var held := "crossbow" if close else "longbow"
+	if hand.weapon != held:
+		hand.arm(held, (ranger["node"] as Node3D).scale.x, rh)
+	(ranger["node"] as Node3D).rotation.x = GATE_LEAN * UpgradeShowcase._window(t, GATE_CLOSE, GATE_CLOSE + 0.25)
+	var since := t - float(GATE_SHOTS[maxi(shot, 0)])
+	if close:
+		if shot >= 0 and since < 0.05:
+			s._played.erase(ranger["anim"]) # the kick, bolt by bolt
+		s._play(ranger["anim"], "CrossbowDown", 1.0)
+	else:
+		s._play(ranger["anim"], "2H_Ranged_Shoot" if shot >= 0 and since < 0.4 else "Idle", 1.5)
 	var arrows: Array = s._parts["arrows"]
+	var forward := Vector3(-sin(rh.rotation.y), 0.0, -cos(rh.rotation.y))
 	for i in arrows.size():
 		var n := shot - i
 		var bar: MeshInstance3D = arrows[i]
-		var k := (t - FIRST - n * EVERY) / 0.3
-		if n < 0 or k > 1.0 or t > 3.4:
+		if n < 0:
+			bar.visible = false
+			continue
+		var bolt := float(GATE_SHOTS[n]) >= GATE_CLOSE
+		var k := (t - float(GATE_SHOTS[n])) / (GATE_BOLT if bolt else GATE_ARROW)
+		if k > 1.0 or t > 3.6:
 			bar.visible = false
 			continue
 		var target: Vector3 = (foes[n % foes.size()]["holder"] as Node3D).position + Vector3.UP * 1.1
-		var bow := top + Vector3.UP * 1.3
+		var bow := top + (forward * 0.55 + Vector3.UP * 1.05 if bolt else Vector3.UP * 1.3)
 		_lay(bar, bow.lerp(target, maxf(0.0, k - 0.3)), bow.lerp(target, k))
 	for i in foes.size():
 		var z: Dictionary = foes[i]
@@ -1294,12 +1320,12 @@ static func _reinforcements(s: UpgradeShowcase, t: float) -> void:
 		var home := _sp(s, z["home"])
 		var guard_at := (s._parts["guards"][i]["holder"] as Node3D).position
 		var stand := guard_at + (home - guard_at).normalized() * 0.9
-		zh.position = home.lerp(stand, UpgradeShowcase._window(t, 0.0, 1.4))
+		zh.position = home.lerp(stand, UpgradeShowcase._window(t, 0.0, GATE_CLOSE))
 		zh.rotation.y = UpgradeShowcase._facing(zh.position, guard_at)
-		s._play(z["anim"], "Walking_A" if t < 1.4 else "1H_Melee_Attack_Chop", 1.0)
-		for n in 4:
+		s._play(z["anim"], "Walking_A" if t < GATE_CLOSE else "1H_Melee_Attack_Chop", 1.0)
+		for n in GATE_SHOTS.size():
 			if n % foes.size() == i:
-				_struck(s, z, t, FIRST + n * EVERY + 0.3)
+				_struck(s, z, t, float(GATE_SHOTS[n]) + (GATE_BOLT if float(GATE_SHOTS[n]) >= GATE_CLOSE else GATE_ARROW))
 	# The soldiers before the gate fight, the mist about them a little brighter: stronger, and harder to put down.
 	var guards: Array = s._parts["guards"]
 	var motes: Array = s._parts["motes"]

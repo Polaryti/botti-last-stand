@@ -607,29 +607,9 @@ static func rider_cycle(i: int, now: float) -> float:
 	return fmod(now + i * BodyAnim.RIDE_SHOT * 0.5, BodyAnim.RIDE_SHOT)
 
 
+## The Eagle and the Mist Eagle are birds of the shared rig (BirdRig "eagle", "mist_eagle").
 static func _eagle_parts(root: Node3D, misty: bool) -> void:
-	var body_col := Color(0.62, 0.86, 0.9) if misty else Color(0.35, 0.24, 0.14)
-	var head_col := Color(0.88, 0.98, 1.0) if misty else Color(0.94, 0.93, 0.88)
-	var body := _part(root, _mesh("eagle_body_%s" % misty, func(l: LowPoly) -> void:
-		l.prism(Vector3(0, 0, -0.32), Vector3(0, 0.02, 0.28), 0.1, 0.17, 6, body_col)
-		l.prism(Vector3(0, 0.06, 0.28), Vector3(0, 0.1, 0.48), 0.13, 0.11, 6, head_col)
-		l.prism(Vector3(0, 0.08, 0.48), Vector3(0, 0.0, 0.64), 0.06, 0.0, 4, Color(1.0, 0.78, 0.2))
-		for x: float in [-0.08, 0.08]:
-			l.box(Vector3(x, 0.15, 0.48), Vector3(0.03, 0.03, 0.02), Color(0.45, 0.95, 1.0) if misty else BLACK)
-		l.box(Vector3(0, -0.02, -0.52), Vector3(0.3, 0.03, 0.32), head_col if not misty else body_col)
-		for x: float in [-0.06, 0.06]:
-			l.prism(Vector3(x, -0.12, 0.05), Vector3(x, -0.24, 0.12), 0.025, 0.02, 4, Color(1.0, 0.78, 0.2))))
-	if misty:
-		body.material_override = ghost_material()
-	for side: float in [-1.0, 1.0]:
-		var wing := _part(root, _mesh("eagle_wing_%s_%s" % [misty, side], func(l: LowPoly) -> void:
-			l.box(Vector3(side * 0.42, 0, 0), Vector3(0.84, 0.03, 0.36), body_col)
-			l.box(Vector3(side * 0.98, -0.02, -0.04), Vector3(0.42, 0.025, 0.3), body_col.darkened(0.2))
-			for f in 4:
-				l.box(Vector3(side * (1.22 + f * 0.02), -0.02, -0.14 + f * 0.08), Vector3(0.24, 0.02, 0.05), body_col.darkened(0.3))), Vector3(side * 0.08, 0.04, 0))
-		if misty:
-			wing.material_override = ghost_material()
-		root.set_meta("wing_l" if side < 0 else "wing_r", wing)
+	EnemyModels._bird(root, "mist_eagle" if misty else "eagle")
 
 
 ## The Shapeshifter's white stag as a Cavalry rider's steed (the White Stag cosmetic): facing -Z like
@@ -798,11 +778,7 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 			if z.world.player and was > rig._beat and float(rig._env.get("amp", 0.0)) > 0.3:
 				Sfx.play_at("wing_flap", z.position, z.world.player.global_position, -9.0 if z.model_id == "war_wyvern" else -13.0)
 		"eagle", "mist_eagle":
-			var beat := sin(t * 6.0) * 0.85
-			if z.is_warning():
-				beat = -1.1 # wings folded for the stoop
-			(root.get_meta("wing_l") as Node3D).rotation.z = beat
-			(root.get_meta("wing_r") as Node3D).rotation.z = -beat
+			(root.get_meta("bird") as BirdRig).drive(z, delta)
 		"shapeshifter":
 			_animate_shifter(z, root, delta, speed, state, t)
 		"earth_elemental", "great_revenant_elemental":
@@ -1388,6 +1364,8 @@ static func reset_pose(root: Node3D) -> void:
 		orbit.visible = false
 	if root.has_meta("rig"):
 		(root.get_meta("rig") as WyvernRig).restart()
+	if root.has_meta("bird"):
+		(root.get_meta("bird") as BirdRig).restart()
 
 
 ## How long each kind takes to die before the body is gone.
@@ -1461,7 +1439,7 @@ static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> vo
 				"Boar": _fall_quadruped(root.get_node("Boar") as Node3D, k, side, 0.3)
 				_: _fall_quadruped(root.get_node("Stag") as Node3D, k, side, 0.32)
 			root.position.y = -sink * 1.2
-		"eagle", "mist_eagle", "wyvern", "war_wyvern":
+		"eagle", "mist_eagle", "wyvern", "war_wyvern", "crow":
 			_fall_flyer(z, root, k, delta, side)
 			root.position.y -= sink * delta * 1.6
 		"earth_elemental", "great_revenant_elemental":
@@ -1547,6 +1525,8 @@ static func _fall_flyer(z: Zombie, root: Node3D, k: float, delta: float, side: f
 	var body := root.get_node_or_null("Body") as Node3D
 	if root.has_meta("rig"):
 		body = (root.get_meta("rig") as WyvernRig).body
+	elif root.has_meta("bird"):
+		body = (root.get_meta("bird") as BirdRig).body
 	var big := z.model_id.ends_with("wyvern")
 	if not landed:
 		wing_l.rotation.z = flail
@@ -1562,7 +1542,7 @@ static func _fall_flyer(z: Zombie, root: Node3D, k: float, delta: float, side: f
 		root.rotation.z = lerpf(root.rotation.z if body == null else 0.0, side * (1.2 if body else 1.5), lie)
 		if body:
 			body.rotation.x = lerpf(0.8, 0.0, lie)
-			root.position.y = lerpf(0.0, 0.35 * body.scale.y, lie)
+			root.position.y = lerpf(0.0, (0.08 * (root.get_meta("bird") as BirdRig).scale.y) if root.has_meta("bird") else 0.35 * body.scale.y, lie)
 		wing_l.rotation.z = lerpf(wing_l.rotation.z, 0.2 if side > 0 else -1.3, lie)
 		wing_r.rotation.z = lerpf(wing_r.rotation.z, 1.3 if side > 0 else -0.2, lie)
 		if big and since < delta * 1.5:

@@ -1965,14 +1965,25 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 				world.spawn_ally("ghost", global_position - global_basis.z * 1.5, time)
 				world.end_act(previous)
 		if not _familiars.has(id):
-			var mi := MeshInstance3D.new()
-			mi.mesh = PowerDefs.mesh(id)
-			mi.material_override = PowerDefs.familiar_material(id)
-			mi.scale = Vector3.ONE * 0.22
-			mi.layers = 2
-			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			camera.add_child(mi)
-			_familiars[id] = mi
+			var shown: Node3D
+			if id == "raven":
+				# The Raven is a bird of the shared rig, hovering in view on its wingbeats.
+				shown = Node3D.new()
+				var bird := BirdRig.new("crow")
+				bird.rotation.y = PI * 0.8
+				bird.scale = Vector3.ONE * 0.32
+				shown.add_child(bird)
+				bird.set_layers(2)
+			else:
+				var mi := MeshInstance3D.new()
+				mi.mesh = PowerDefs.mesh(id)
+				mi.material_override = PowerDefs.familiar_material(id)
+				mi.scale = Vector3.ONE * 0.22
+				mi.layers = 2
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				shown = mi
+			camera.add_child(shown)
+			_familiars[id] = shown
 			_arrange_familiars()
 	else:
 		sfx("potion", -2.0)
@@ -2151,6 +2162,9 @@ func _pack_call() -> bool:
 				return false
 			world.fx_ring(here, 15.0, Color(0.45, 0.4, 0.75))
 			sfx("crow", -2.0)
+			for a: Ally in world.allies:
+				if a._raven and a.master == self and not a.dead:
+					a._raven.strike() # it dives at the nearest of them
 		"snake":
 			var bitten := world.zombies_near(here, 9.0, 24)
 			for z: Zombie in bitten:

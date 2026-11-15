@@ -81,6 +81,13 @@ const POSES := {
 		[0.35, {"r": [Vector3(-0.45, 0.75, 0.45), Vector3(-0.2, 0.95, 0.2)], "l": [Vector3(0.45, 0.75, 0.45), Vector3(0.2, 0.95, 0.2)], "chest": Vector3(-0.2, 0.0, 0.0)}],
 		[0.9, {"r": [Vector3(-0.45, 0.75, 0.45), Vector3(-0.2, 0.95, 0.2)], "l": [Vector3(0.45, 0.75, 0.45), Vector3(0.2, 0.95, 0.2)], "chest": Vector3(-0.2, 0.0, 0.0)}],
 		[1.2, {}]],
+	# On top of a gate, leaning out over the parapet: a Crossbow in the right hand aimed down at the
+	# foot of the gate, the left steadying it; it kicks as the bolt goes and comes back to the aim.
+	"CrossbowDown": [0.55,
+		[0.0, CROSS_AIM],
+		[CROSSBOW_KICK, CROSS_KICK],
+		[0.26, CROSS_AIM],
+		[0.55, CROSS_AIM]],
 	"Vault": [0.5,
 		[0.0, {}],
 		[0.16, {"r": [Vector3(-0.2, 0.9, 0.4), Vector3(0.0, 0.8, 0.6)], "l": [Vector3(0.2, 0.9, 0.4), Vector3(0.0, 0.8, 0.6)], "leg_r": [Vector3(-0.1, -0.5, 0.85), Vector3(-0.1, -0.9, -0.3)], "chest": Vector3(-0.3, 0.0, 0.0)}],
@@ -95,6 +102,10 @@ const RIDE_BOW := [Vector3(-0.15, 0.2, 1.0), Vector3(-0.05, 0.15, 1.0)]
 const RIDE_AIM := {"r": RIDE_BOW, "l": [Vector3(0.45, 0.1, 0.9), Vector3(-0.3, 0.1, 0.95)], "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(-0.05, -0.25, 0.0), "drop": 0.08}
 const RIDE_REINS := {"r": [Vector3(-0.2, -0.6, 0.75), Vector3(0.15, -0.15, 0.98)], "l": [Vector3(0.2, -0.6, 0.75), Vector3(-0.15, -0.15, 0.98)], "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(0.06, 0.0, 0.0), "drop": 0.08}
 const RIDE_COUCHED := {"r": [Vector3(-0.3, -0.85, 0.42), Vector3(-0.04, -0.02, 1.0)], "l": [Vector3(0.2, -0.6, 0.75), Vector3(-0.15, -0.15, 0.98)], "wrist": ALONG, "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(0.28, 0.0, 0.0), "drop": 0.08}
+## The Crossbow over the parapet: both arms forward and down, the chest bent over the wall.
+const CROSS_AIM := {"r": [Vector3(-0.2, -0.42, 0.88), Vector3(-0.04, -0.45, 0.89)], "l": [Vector3(0.45, -0.55, 0.7), Vector3(-0.55, -0.35, 0.76)], "chest": Vector3(0.22, -0.08, 0.0), "drop": 0.05}
+const CROSS_KICK := {"r": [Vector3(-0.2, -0.22, 0.95), Vector3(-0.04, -0.12, 0.99)], "l": [Vector3(0.45, -0.45, 0.77), Vector3(-0.55, -0.15, 0.82)], "chest": Vector3(0.12, -0.08, 0.0), "drop": 0.05}
+const CROSSBOW_KICK := 0.07
 const RIDE_SHOT := 2.4
 const RIDE_LOOSE := 0.5 # when in the cycle the arrow leaves the string
 

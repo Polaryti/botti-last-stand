@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 54
+const PROTOCOL := 55
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -1057,7 +1057,8 @@ func _send_allies() -> void:
 	var at := 0
 	for a in mine:
 		b.encode_u8(at, a.net_index)
-		b.encode_u8(at + 1, Ally.KINDS.find(a.kind) | (128 if a._attack_left > 0.0 else 0))
+		# Kind (up to 31), what a Mist Ranger holds (Ally.HANDS), and whether it is striking.
+		b.encode_u8(at + 1, Ally.KINDS.find(a.kind) | (maxi(0, Ally.HANDS.find(a.hand)) << 5) | (128 if a._attack_left > 0.0 else 0))
 		b.encode_s16(at + 2, int(a.position.x * 100.0))
 		b.encode_s16(at + 4, int(a.position.y * 100.0))
 		b.encode_s16(at + 6, int(a.position.z * 100.0))
