@@ -9,6 +9,12 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 DEV_PACKAGE = "com.botti.laststand.dev"
+DEV_ICONS = {
+    "launcher_icons/main_192x192": "res://assets/ui/dev/icon.png",
+    "launcher_icons/adaptive_foreground_432x432": "res://assets/ui/dev/icon_foreground.png",
+    "launcher_icons/adaptive_background_432x432": "res://assets/ui/dev/icon_background.png",
+    "launcher_icons/adaptive_monochrome_432x432": "res://assets/ui/dev/icon_monochrome.png",
+}
 
 
 def section(text: str, name: str) -> re.Match:
@@ -46,6 +52,8 @@ def prepare(root: Path, build_number: int, commit: str) -> dict:
     apk_name = f"botti-last-stand-{tag}.apk"
     code = 100_000 + build_number
     project = setting(project, "application", "config/name", json.dumps("Botti's Last Stand Dev"))
+    # The Dev build's icon carries a DEV band (tools/make_launcher.py draws both).
+    project = setting(project, "application", "config/icon", json.dumps(DEV_ICONS["launcher_icons/main_192x192"]))
     project = setting(project, "application", "config/version", json.dumps(version))
     if not re.search(r"^\[botti\]$", project, re.M):
         project = project.rstrip() + "\n\n[botti]\n\n"
@@ -63,6 +71,7 @@ def prepare(root: Path, build_number: int, commit: str) -> dict:
         "package/name": json.dumps("Botti's Last Stand Dev"),
         "version/code": str(code), "version/name": json.dumps(version),
         "permissions/custom_permissions": 'PackedStringArray("android.permission.REQUEST_INSTALL_PACKAGES")',
+        **{key: json.dumps(path) for key, path in DEV_ICONS.items()},
     }.items():
         dev = setting(dev, f"preset.{dev_index}.options", key, value)
     if dev_index in indices:

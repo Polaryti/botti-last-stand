@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
-"""Draws the launcher icon (plain, adaptive and themed) and the boot splash. All original.
-The picture is the village bell in front of the moon, lit from below by a fire you cannot see.
-The splash is the twilight of the lands beyond the Mists under the wordmark, so run tools/make_ui.py
-first if that changed.
-Run from the project root."""
+"""Draws the launcher icon (plain, adaptive and themed), its Dev build variant, and the boot splash.
+All original. Run from the project root.
+
+The icon follows the game's latest expansion. Each expansion is a theme in THEMES (a backdrop and the
+bell's metal and light); EDITION names the one in use. To brand a new expansion, add its theme and set
+EDITION, then run this again: icon.png, assets/ui/icon_*.png and the Dev build's assets/ui/dev/icon_*.png
+are all remade from it. The Dev build (tools/prepare_dev_build.py) uses the dev files: the same icon
+with a DEV band across it, so it is never mistaken for the real game on a phone with both installed.
+
+  valleys           0.1 to 0.21: the village bell before the moon, lit from below by a fire.
+  beyond_the_mists  0.22: the bell before the Great Portal's violet ring, lit from below by the teal
+                    light of the Mists, over the peaks beyond them and their low mist.
+
+The splash is the twilight of the lands beyond the Mists under the wordmark, so run
+tools/make_ui.py first if that changed."""
+import os, sys
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -96,17 +107,21 @@ def bell_mask(size):
     return mask, top, height
 
 
-def bell(size):
-    """Dark metal, warmer towards the lip where the fire reaches it, with a thin line of moonlight."""
+BELL_FIRE = {"dark": (0.070, 0.088, 0.125), "warm": (0.74, 0.40, 0.12), "hot": (0.98, 0.70, 0.30), "rim": (0.86, 0.80, 0.66)}
+
+
+def bell(size, metal=BELL_FIRE):
+    """Dark metal, lighter towards the lip where the light from below reaches it, with a thin rim of
+    light from above. `metal` gives its colours: dark, warm (the light from below), hot, rim."""
     mask, top, height = bell_mask(size)
     n = size * SS
     m = np.asarray(mask, dtype=float) / 255.0
     yy, xx = np.mgrid[0:n, 0:n]
     v = np.clip((yy - top) / height, -0.3, 1.25)
     u = (xx - n / 2) / (height * 0.56)
-    dark = np.array([0.070, 0.088, 0.125])
-    warm = np.array([0.74, 0.40, 0.12])
-    hot = np.array([0.98, 0.70, 0.30])
+    dark = np.array(metal["dark"])
+    warm = np.array(metal["warm"])
+    hot = np.array(metal["hot"])
     heat = np.clip((v - 0.42) / 0.62, 0, 1) ** 1.6
     # The light comes from below and in front, so it fades towards the edges of the round metal.
     heat = heat * np.clip(1.08 - np.abs(u) ** 2.2 * 0.75, 0, 1)
@@ -115,7 +130,7 @@ def bell(size):
     # Moonlight just inside the outline, strongest on the upper part.
     blur = np.asarray(mask.filter(ImageFilter.GaussianBlur(height * 0.012)), dtype=float) / 255.0
     rim = np.clip((1.0 - blur) * m * 2.2, 0, 1) * np.clip(1.0 - v * 0.6, 0.25, 1)
-    rgb = rgb * (1 - rim[..., None] * 0.75) + np.array([0.86, 0.80, 0.66])[None, None] * rim[..., None] * 0.75
+    rgb = rgb * (1 - rim[..., None] * 0.75) + np.array(metal["rim"])[None, None] * rim[..., None] * 0.75
     arr = np.dstack([np.clip(rgb, 0, 1), m])
     im = Image.fromarray(np.uint8(arr * 255 + 0.5), "RGBA")
     return im.resize((size, size), Image.LANCZOS)
@@ -130,21 +145,133 @@ def rounded(im, radius):
     return out
 
 
-def icons():
-    # Adaptive icons crop to the middle two thirds, so the bell and the moon stay inside that.
-    sky(432, 432, (0.5, 0.455), 0.235).save("assets/ui/icon_background.png")
+def valleys_backdrop(w, h, adaptive):
+    """The village night: the moon behind the bell, stars, two rows of firs."""
+    if adaptive:
+        return sky(w, h, (0.5, 0.455), 0.235)
+    return sky(w, h, (0.5, 0.44), 0.325)
+
+
+def mists_backdrop(w, h, adaptive, seed=22):
+    """Beyond the Mists: a violet dusk, the Great Portal's ring turning behind the bell (violet, its
+    heart going teal), the peaks beyond the Mists below, the low mist over them and its teal lights."""
+    rng = np.random.default_rng(seed)
+    cy = 0.455 if adaptive else 0.44
+    radius = 0.235 if adaptive else 0.33
+    yy, xx = np.mgrid[0:h, 0:w]
+    v = (yy / h)[..., None]
+    rgb = np.array([0.055, 0.035, 0.13]) * (1 - v ** 1.2) + np.array([0.24, 0.13, 0.33]) * v ** 1.2
+    dx, dy = xx / w - 0.5, yy / h - cy
+    dist = np.hypot(dx, dy)
+    ang = np.arctan2(dy, dx)
+    rr = dist / radius
+    # Its glow on the dusk around it.
+    rgb = rgb + np.exp(-((rr - 1.0) / 0.55) ** 2)[..., None] * np.array([0.22, 0.12, 0.36]) * 0.8
+    # Inside: arms of light turning in, violet at the rim, teal at the heart.
+    swirl = 0.5 + 0.5 * np.sin(ang * 3.0 + np.log(np.maximum(rr, 0.02)) * 5.5)
+    inside = np.clip(1.0 - rr, 0, 1)
+    heart = np.array([0.30, 0.85, 0.85]) * (1 - rr[..., None]) ** 2 + np.array([0.42, 0.25, 0.70]) * (1 - (1 - rr[..., None]) ** 2)
+    body = np.array([0.10, 0.06, 0.22]) + heart * (0.35 + 0.9 * swirl[..., None] ** 1.5)
+    mix = np.clip((1.0 - rr) * 6.0, 0, 1)[..., None] * (rr < 1.0)[..., None]
+    rgb = rgb * (1 - mix) + body * mix
+    # The ring itself: bright violet edged in white-teal.
+    ring = np.exp(-((rr - 1.0) / 0.045) ** 2)[..., None]
+    rgb = rgb * (1 - ring * 0.85) + np.array([0.78, 0.66, 1.0]) * ring
+    rgb = rgb + np.exp(-((rr - 0.94) / 0.02) ** 2)[..., None] * np.array([0.35, 0.8, 0.8]) * 0.45
+    im = Image.fromarray(np.uint8(np.clip(rgb, 0, 1) * 255 + 0.5)).convert("RGBA")
+    draw = ImageDraw.Draw(im)
+    for _ in range(int(w * h / 3800)):
+        x, y = rng.uniform(0, w), rng.uniform(0, h * 0.55)
+        if np.hypot(x / w - 0.5, y / h - cy) < radius * 1.15:
+            continue
+        r = rng.uniform(0.35, 1.0) * h / 700
+        a = int(rng.uniform(90, 210))
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(235, 225, 255, a))
+    # The peaks beyond the Mists, and mist lying over them.
+    for k, (base, tall, tone) in enumerate(((0.8, 0.12, (52, 34, 74)), (0.9, 0.1, (24, 15, 38)))):
+        layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        ImageDraw.Draw(layer).polygon(_ridge(w, h, rng, base, tall), fill=tone + (255,))
+        im.alpha_composite(layer)
+        mist = np.exp(-((yy / h - (base + 0.02)) / 0.035) ** 2) * (0.42 - 0.12 * k)
+        haze = np.zeros((h, w, 4), dtype=np.uint8)
+        haze[..., :3] = (200, 175, 235)
+        haze[..., 3] = np.uint8(np.clip(mist, 0, 1) * 255)
+        im.alpha_composite(Image.fromarray(haze, "RGBA"))
+    # Teal lights drifting in the mist.
+    lights = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ld = ImageDraw.Draw(lights)
+    for _ in range(9):
+        x, y = rng.uniform(0.06, 0.94) * w, rng.uniform(0.66, 0.9) * h
+        r = rng.uniform(0.006, 0.013) * h
+        ld.ellipse((x - r, y - r, x + r, y + r), fill=(120, 245, 235, 230))
+    im.alpha_composite(lights.filter(ImageFilter.GaussianBlur(h * 0.006)))
+    im.alpha_composite(lights)
+    return im
+
+
+THEMES = {
+    "valleys": {"backdrop": valleys_backdrop, "metal": BELL_FIRE},
+    "beyond_the_mists": {"backdrop": mists_backdrop,
+        "metal": {"dark": (0.065, 0.055, 0.12), "warm": (0.22, 0.62, 0.68), "hot": (0.62, 0.98, 0.94), "rim": (0.80, 0.70, 1.0)}},
+}
+EDITION = "beyond_the_mists"
+
+DEV_BAND = (242, 168, 58)    # amber: the Dev build's band
+DEV_INK = (30, 18, 10)
+
+
+def dev_band(im, centre_y, width_share, height_share, mono=False):
+    """A band across the picture with DEV on it, tilted a little, inside the part every launcher shows.
+    `mono`: for the themed icon, which is one flat shape: a white band with the letters cut through
+    the whole icon."""
+    w, h = im.size
+    big = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0))
+    letters = Image.new("L", big.size, 0)
+    d = ImageDraw.Draw(big)
+    bw, bh = w * SS * width_share, h * SS * height_share
+    cx, cy = w * SS / 2, h * SS * centre_y
+    d.rounded_rectangle((cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2), bh * 0.22,
+        fill=(255, 255, 255, 255) if mono else DEV_BAND + (255,), outline=None if mono else (20, 12, 8, 255), width=int(bh * 0.06))
+    font = ImageFont.truetype("assets/fonts/FiraSans-Bold.ttf", int(bh * 0.74))
+    box = d.textbbox((0, 0), "DEV", font=font)
+    at = (cx - (box[2] - box[0]) / 2 - box[0], cy - (box[3] - box[1]) / 2 - box[1])
+    if mono:
+        ImageDraw.Draw(letters).text(at, "DEV", font=font, fill=255)
+    else:
+        d.text(at, "DEV", font=font, fill=DEV_INK + (255,))
+    big = big.rotate(-8, resample=Image.BICUBIC, center=(cx, cy))
+    out = im.copy()
+    out.alpha_composite(big.resize((w, h), Image.LANCZOS))
+    if mono:
+        cut = np.asarray(letters.rotate(-8, resample=Image.BICUBIC, center=(cx, cy)).resize((w, h), Image.LANCZOS)).astype(np.int32)
+        arr = np.asarray(out).copy()
+        arr[..., 3] = np.clip(arr[..., 3].astype(np.int32) - cut, 0, 255).astype(np.uint8)
+        out = Image.fromarray(arr, "RGBA")
+    return out
+
+
+def icons(edition=EDITION):
+    theme = THEMES[edition]
+    os.makedirs("assets/ui/dev", exist_ok=True)
+    # Adaptive icons crop to the middle two thirds, so the bell and the ring stay inside that.
+    background = theme["backdrop"](432, 432, True)
+    background.convert("RGB").save("assets/ui/icon_background.png")
+    background.convert("RGB").save("assets/ui/dev/icon_background.png")
     fg = Image.new("RGBA", (432, 432), (0, 0, 0, 0))
-    b = bell(292)
-    fg.alpha_composite(b, ((432 - 292) // 2, (432 - 292) // 2))
+    fg.alpha_composite(bell(292, theme["metal"]), ((432 - 292) // 2, (432 - 292) // 2))
     fg.save("assets/ui/icon_foreground.png")
+    dev_band(fg, 0.7, 0.5, 0.12).save("assets/ui/dev/icon_foreground.png")
     # Themed icons on newer Android: one flat shape.
     mono = np.zeros((432, 432, 4), dtype=np.uint8)
     mono[..., :3] = 255
     mono[..., 3] = np.asarray(fg)[..., 3]
-    Image.fromarray(mono, "RGBA").save("assets/ui/icon_monochrome.png")
-    plain = sky(512, 512, (0.5, 0.44), 0.325).convert("RGBA")
-    plain.alpha_composite(bell(480), (16, 2))
+    mono_im = Image.fromarray(mono, "RGBA")
+    mono_im.save("assets/ui/icon_monochrome.png")
+    dev_band(mono_im, 0.7, 0.5, 0.12, mono=True).save("assets/ui/dev/icon_monochrome.png")
+    plain = theme["backdrop"](512, 512, False).convert("RGBA")
+    plain.alpha_composite(bell(480, theme["metal"]), (16, 2))
     rounded(plain, 96).save("icon.png")
+    rounded(dev_band(plain, 0.74, 0.62, 0.15), 96).save("assets/ui/dev/icon.png")
 
 
 # The splash belongs to Beyond the Mists: twilight over the mountains past the Mists, not the village night.
@@ -269,6 +396,6 @@ def splash():
 
 
 if __name__ == "__main__":
-    icons()
+    icons(sys.argv[1] if len(sys.argv) > 1 else EDITION)
     splash()
     print("launcher icons and splash done")

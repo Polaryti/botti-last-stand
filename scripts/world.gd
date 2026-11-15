@@ -30,6 +30,7 @@ static var _shadow_mesh: QuadMesh
 static var _arrow_mesh: Mesh
 static var _stone_mesh: Mesh
 static var _pellet_mesh: Mesh
+static var _keg_mesh: Mesh
 var _ember_spark_mat: StandardMaterial3D
 static var _fireball_mesh: Mesh
 static var _bolt_mesh: ArrayMesh
@@ -1264,6 +1265,25 @@ func local_players() -> Array[Player]:
 	return out
 
 
+## Healing this phone's player gave to `peer` (a friend, or a bot): a green number over them. Not
+## for the player themselves: they see their own bar fill.
+func show_heal_on_peer(peer: int, amount: float) -> void:
+	if player == null or peer == player.net_id():
+		return
+	var body: Node3D = Net.avatar(peer)
+	if body == null:
+		body = Net.local_player(peer)
+	if body == null or not is_instance_valid(body) or body == player:
+		return
+	damage_numbers.show_heal(body.get_instance_id(), body.global_position + Vector3.UP * 2.1, amount)
+
+
+## Healing for one of the player's own summons.
+func show_heal_on(body: Node3D, amount: float) -> void:
+	if body and is_instance_valid(body):
+		damage_numbers.show_heal(body.get_instance_id(), body.global_position + Vector3.UP * 1.6, amount)
+
+
 func peer_of(t: Target) -> int:
 	if t is Avatar:
 		return (t as Avatar).peer
@@ -1614,6 +1634,18 @@ func _shot_mesh(id: String) -> Mesh:
 				l.box(Vector3.ZERO, Vector3(0.09, 0.09, 0.09), Color(0.5, 0.5, 0.48))
 				_stone_mesh = l.commit()
 			return _stone_mesh
+		"keg":
+			# The Great Keg: a powder keg, staves, iron hoops, and its burning fuse on top.
+			if _keg_mesh == null:
+				var l := LowPoly.new()
+				l.prism(Vector3(0, -0.13, 0), Vector3(0, 0.13, 0), 0.1, 0.1, 8, Color(0.46, 0.28, 0.13))
+				l.prism(Vector3(0, -0.06, 0), Vector3(0, 0.06, 0), 0.12, 0.12, 8, Color(0.5, 0.31, 0.15))
+				for y: float in [-0.1, 0.1]:
+					l.prism(Vector3(0, y - 0.012, 0), Vector3(0, y + 0.012, 0), 0.115, 0.115, 8, Color(0.22, 0.2, 0.2))
+				l.prism(Vector3(0, 0.13, 0), Vector3(0.03, 0.22, 0), 0.012, 0.01, 4, Color(0.3, 0.25, 0.18))
+				l.box(Vector3(0.035, 0.235, 0), Vector3(0.035, 0.035, 0.035), Color(1.0, 0.75, 0.25))
+				_keg_mesh = l.commit()
+			return _keg_mesh
 		"pellet":
 			# Grapeshot: a lump of hot iron, a little star of two crossed cubes glowing like a coal.
 			if _pellet_mesh == null:
@@ -1949,8 +1981,9 @@ func sandbox_clear() -> void:
 
 
 ## Something thrown by hand, that does its work where it lands.
-func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burning := false, size := 1.0) -> Projectile:
-	var shot := _launch(Projectile.Kind.BOLT, _orb_mesh(col), at, vel, 14.0, 70.0, 0.0, 0.0, burning)
+## `look`: "keg" throws the Great Keg's keg instead of a ball.
+func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burning := false, size := 1.0, look := "") -> Projectile:
+	var shot := _launch(Projectile.Kind.BOLT, _shot_mesh("keg") if look == "keg" else _orb_mesh(col), at, vel, 14.0, 70.0, 0.0, 0.0, burning)
 	if shot == null:
 		burst.call(at + vel * 0.5)
 		return null
@@ -1959,8 +1992,10 @@ func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burnin
 	shot.blast_radius = 0.01
 	shot.on_burst = burst
 	shot.scale = Vector3.ONE * size
+	if look == "keg":
+		shot.spins = true
 	if Net.active():
-		Net.shot(2, at, vel, 14.0, 70.0, burning, col)
+		Net.shot(7 if look == "keg" else 2, at, vel, 14.0, 70.0, burning, col)
 	return shot
 
 
@@ -2083,6 +2118,7 @@ func burn_tick(z: Zombie) -> void:
 	if z.phases:
 		mult *= 2.0
 	z.next_hitter = z.last_hitter
+	z.dot_kind = "fire"
 	z.take_damage(6.0 * mult, Vector3.ZERO, 0.0, z.centre())
 	if who and who == player:
 		player.hit_marker = maxf(player.hit_marker, 0.35)
@@ -2234,10 +2270,12 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = WeaponDefs.bolas_mesh()
 	elif mesh == 6:
 		m = _shot_mesh("pellet")
+	elif mesh == 7:
+		m = _shot_mesh("keg")
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
-		shot.spins = mesh == 3 or mesh == 4 or mesh == 5
+		shot.spins = mesh == 3 or mesh == 4 or mesh == 5 or mesh == 7
 		if mesh == 4:
 			shot.spin_axis = Vector3.RIGHT
 		if mesh == 0 and col.g > col.r + 0.3:

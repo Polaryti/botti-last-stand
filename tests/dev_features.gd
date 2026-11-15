@@ -38,6 +38,7 @@ func _ready() -> void:
 	await _beyond_weapons()
 	await _together_store_and_dawn()
 	await _maps_weather_and_balance()
+	await _feedback_and_numbers()
 	_text_audit()
 	Net.leave()
 	w.queue_free()
@@ -773,6 +774,33 @@ func _together_store_and_dawn() -> void:
 	a.queue_free()
 	Game.set_item_on("stag_steed", false)
 	check(p.skin_bits() == 0, "taken off in the Armory, the horse is back")
+	# The menu's look for games: Play Together glows for a game to join, red for a match to watch.
+	m.show_menu()
+	await frames(2)
+	var together := m.panel.find_child("PlayTogether", true, false) as Button
+	check(together != null and Net._listener != null, "the menu looks on the Wi-Fi for games each time it shows")
+	var line_of := func() -> String: return (together.find_child("Line", true, false) as Label).text
+	Net.rooms = {"10.0.0.7": {"name": "Ana", "players": 1, "rules": 0, "version_ok": true, "live": false, "watchable": false, "watchers": 0, "map": "village", "seen": 0.0}}
+	Net.rooms_changed.emit()
+	check(together.get_meta("open", false) and not together.get_meta("live", false) and together.has_meta("glow") and line_of.call() == "A game is open to join.", "a game open to join: it glows: '%s'" % line_of.call())
+	Net.rooms["10.0.0.8"] = {"name": "Bo", "players": 2, "rules": 0, "version_ok": true, "live": true, "watchable": true, "watchers": 1, "map": "mists", "seen": 0.0}
+	Net.rooms_changed.emit()
+	check(together.get_meta("open", false) and together.get_meta("live", false) and line_of.call().contains("watch"), "and a match to watch as well: both glows, one after the other")
+	Net.rooms.erase("10.0.0.7")
+	Net.rooms_changed.emit()
+	check(not together.get_meta("open", false) and together.get_meta("live", false) and line_of.call() == "A match is live: watch it.", "only a match to watch: the red glow")
+	Net.rooms["10.0.0.8"]["version_ok"] = false
+	Net.rooms_changed.emit()
+	check(not together.get_meta("live", false) and not together.has_meta("glow"), "a game this version cannot reach does not count")
+	Net.rooms.clear()
+	m.show_together(0)
+	await frames(2)
+	Net.rooms = {"10.0.0.8": {"name": "Bo", "players": 2, "rules": 0, "version_ok": true, "live": true, "watchable": true, "watchers": 1, "map": "mists", "seen": 0.0}}
+	Net.rooms_changed.emit()
+	await frames(1)
+	var watch_rows: Array = m.panel.find_children("WatchRow", "Button", true, false)
+	check(watch_rows.size() == 1 and (watch_rows[0] as Button).text.contains("Watch Bo's match") and (watch_rows[0] as Button).text.contains("1 watching"), "Play Together lists the match under its own heading, to watch")
+	Net.rooms.clear()
 	# The Armory's Map Upgrades: every level written out, and a switch for each one you own.
 	Game.owned_items["mist_reinforcements"] = true
 	Game.switched_off.erase("mist_reinforcements")
@@ -1042,6 +1070,117 @@ func _maps_weather_and_balance() -> void:
 
 
 ## What every class, path, ability and Class Upgrade says, against what the game does (tests/text_audit.gd).
+## Special attacks shown before they happen; damage over time and healing as numbers.
+func _feedback_and_numbers() -> void:
+	var cls := p.class_id
+	var saved_items := Game.owned_items.duplicate()
+	var saved_off := Game.switched_off.duplicate()
+	var entry_of := func(key: String) -> Dictionary:
+		for r: Dictionary in p.readiness():
+			if r["key"] == key:
+				return r
+		return {}
+	# The Great Keg: counted over the ability button, glowing when the keg is next, a keg in the air.
+	p.setup_class("artificer")
+	p.spec_id = "pyromaniac"
+	Game.owned_items["great_keg"] = true
+	Game.switched_off.erase("great_keg")
+	p.bombs_thrown = 0
+	var keg: Dictionary = entry_of.call("great_keg")
+	check(not keg.is_empty() and keg["button"] == "art" and keg["need"] == PathUpgrades.GREAT_KEG_EVERY and keg["have"] == 0 and not keg["primed"], "the Great Keg counts its throws over the ability button")
+	p.bombs_thrown = PathUpgrades.GREAT_KEG_EVERY - 1
+	keg = entry_of.call("great_keg")
+	check(keg["primed"] and keg["have"] == PathUpgrades.GREAT_KEG_EVERY - 1, "and is shown primed before the throw that is the keg")
+	p.toast = ""
+	p._throw_bombs()
+	var kegs := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.mesh == w._shot_mesh("keg"))
+	check(kegs.size() == 1 and p.toast == "", "the keg flies as a keg, with no word after it (toast '%s')" % p.toast)
+	check(not (entry_of.call("great_keg") as Dictionary)["primed"], "and the count starts again")
+	# Grapeshot: counted under the crosshair, and the musket glows while it is loaded.
+	p.setup_class("commander")
+	p.spec_id = "gunner"
+	Game.owned_items["grapeshot"] = true
+	Game.switched_off.erase("grapeshot")
+	p.slots = ["musket", null]
+	p.current = 0
+	p._equip()
+	p.musket_shots = PathUpgrades.GRAPESHOT_EVERY - 1
+	p._primed_wait = 0.0
+	p._tick_primed_glow(0.016)
+	check((entry_of.call("grapeshot") as Dictionary).get("primed", false) and p.weapon_glows() and p._vm_mesh.material_overlay != null, "loaded Grapeshot: its mark glows, and so does the musket")
+	p.musket_shots = 0
+	p._primed_wait = 0.0
+	p._tick_primed_glow(0.016)
+	check(not p.weapon_glows() and p._vm_mesh.material_overlay == null, "and the glow goes once it has gone off")
+	# Killing Shot: armed, then resting.
+	p.setup_class("ranger")
+	p.slots = ["bow", null]
+	p.current = 0
+	p._equip()
+	p.flags["killing_shot"] = true
+	p._kill_shot_cd = 0.0
+	check((entry_of.call("killing_shot") as Dictionary).get("primed", false), "Killing Shot shows armed before the shot")
+	p._kill_shot_cd = 3.0
+	check(not (entry_of.call("killing_shot") as Dictionary).get("primed", true), "and not while it rests")
+	# A passive counted on hits (Cleaver): its own name and icon, from the skill tree.
+	p.setup_class("infantry")
+	p.slots = ["sword", null]
+	p.current = 0
+	p._equip()
+	var cleaver := Player._find_ability(AbilityData.tree("infantry"), "cleaver")
+	p._apply_ability(cleaver)
+	var counted: Dictionary = entry_of.call("nth_cleaver")
+	check(not counted.is_empty() and counted["name"] == cleaver["name"] and counted["icon"] == cleaver["icon"] and counted["need"] == 4, "Cleaver counts its hits under the crosshair: %s" % str(counted))
+	for i in 3:
+		p.fire("hit", {})
+	check((entry_of.call("nth_cleaver") as Dictionary)["primed"], "and is primed for the fourth")
+	for key: String in ["grapeshot", "great_keg", "killing_shot"]:
+		var look: Dictionary = {"grapeshot": {"icon": ShopDefs.ITEMS["grapeshot"]["icon"]}, "great_keg": {"icon": ShopDefs.ITEMS["great_keg"]["icon"]}, "killing_shot": {"icon": "arrow+crown"}}[key]
+		for glyph: String in str(look["icon"]).split("+"):
+			check(Icons.exists(glyph), "%s's sign exists: %s" % [key, glyph])
+	# Damage over time: numbers in its colour, for the one who put it on.
+	w.spawn_zombie("normal", p.global_position + Vector3(0, 0, -4))
+	var z: Zombie = w.zombies.back()
+	z.set_physics_process(false)
+	z.max_hp = 5000.0
+	z.hp = 5000.0
+	z.last_hitter = 0
+	var numbers := w.damage_numbers
+	var shown := func(color: Color) -> bool:
+		return numbers._labels.any(func(l: Label3D) -> bool: return l.visible and l.modulate.is_equal_approx(color))
+	z.add_dot(20.0, 2.0)
+	for i in 30:
+		z._tick_dot(0.016)
+	check(shown.call(DamageNumbers.DOT_COLORS["poison"]), "poison ticks float up in green")
+	z.add_dot(20.0, 2.0, true)
+	z.poison_left = 0.0
+	for i in 30:
+		z._tick_dot(0.016)
+	check(shown.call(DamageNumbers.DOT_COLORS["bleed"]), "bleeding in red")
+	z.ignite(2.0)
+	w.burn_tick(z)
+	check(shown.call(DamageNumbers.DOT_COLORS["fire"]), "fire in orange")
+	z.release()
+	# Healing: green numbers over a summon you mend.
+	p.setup_class("commander")
+	w.spawn_ally("infantry", p.global_position + Vector3(2, 0, 0), 30.0)
+	var friend: Ally = w.allies.back()
+	friend.hp = 10.0
+	HeavyArts.mend_summons(w, p.net_id(), friend.global_position, 3.0, 25.0)
+	check(numbers._labels.any(func(l: Label3D) -> bool: return l.visible and l.text == "+25" and l.modulate.is_equal_approx(DamageNumbers.HEAL_COLOR)), "mending a summon shows +25 in green")
+	# Mending from a friend's field is counted for that friend.
+	p.hp = p.max_hp() - 30.0
+	p.mended_by_friend(12.0, 77)
+	check(is_equal_approx(float(p._mended_by.get(77, 0.0)), 12.0), "a friend's field's mending is told to that friend")
+	p.mended_by_friend(50.0, 77)
+	check(is_equal_approx(float(p._mended_by.get(77, 0.0)), 30.0), "only what it really healed")
+	p._mended_by.clear()
+	Game.owned_items = saved_items
+	Game.switched_off = saved_off
+	p.setup_class(cls)
+	await frames(1)
+
+
 func _text_audit() -> void:
 	var problems: Array[String] = (load("res://tests/text_audit.gd").new() as RefCounted).run()
 	for problem in problems:

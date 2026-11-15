@@ -95,6 +95,12 @@ func _ready() -> void:
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await wait(0.3)
+	if rules == "spectate":
+		if host:
+			await _spectate_host()
+		else:
+			await _spectate_client()
+		return
 	if host:
 		await _as_host()
 	else:
@@ -1591,7 +1597,7 @@ func _mesenlla() -> void:
 	await sync(408)
 	var bosses := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "great_revenant_elemental")
 	ok(bosses.size() == 1 and (bosses[0]._visual.get_node("BossHealth") as Label3D).text.begins_with("GREAT REVENANT ELEMENTAL"), "the Great Revenant Elemental stands on both phones, its name over it")
-	ok(w.director.banner.contains("Great Revenant Elemental"), "and both are told")
+	ok(w.director.boss_card == "great_revenant_elemental" and w.director.boss_card_time > 0.0, "and both see its entrance card")
 	await sync(409)
 
 
@@ -1707,3 +1713,137 @@ func _bot_mounts() -> void:
 		bot.spec_id = original_spec
 		bot.set_physics_process(true)
 	pl.set_physics_process(true)
+
+
+# --- Spectator Mode ----------------------------------------------------------
+
+## The host plays a night with a bot. A second phone, not in it, finds it on the Wi-Fi as a match to
+## watch, comes in as a spectator part-way, sees what was already there and what happens after, and
+## is sent off when the host takes everyone back to the room.
+func _spectate_host() -> void:
+	m.show_together()
+	await wait(0.2)
+	ok(Net.host_game() == OK, "a game can be started")
+	print("NET_TEST_HOST_READY")
+	m.show_lobby()
+	await wait(0.2)
+	ok(m.ui_layer.find_child("AllowSpectators", true, false) != null, "the host has a switch for spectators")
+	_press("Not allowed")
+	await wait(0.1)
+	ok(not Net.allow_spectators, "and can turn them away")
+	_press("Allowed")
+	await wait(0.1)
+	ok(Net.allow_spectators, "or let them watch")
+	Net.set_bots(1)
+	await wait(0.3)
+	Net.start_match()
+	var t := 0.0
+	while (m.world == null or m.world.mode == Game.Mode.MENU or not m._net_go) and t < 80.0:
+		await wait(0.1)
+		t += 0.1
+	w = m.world
+	ok(w != null and m._net_go, "the match is under way")
+	w.player.guard_left = 999.0
+	# Some already here before anyone watches.
+	for i in 3:
+		w.spawn_zombie("normal", w.player.global_position + Vector3(6.0 + i * 2.0, 0.0, 8.0))
+	ok(Net._beacon != null, "the match still tells the Wi-Fi it is there, to watch")
+	t = 0.0
+	while Net.spectators.is_empty() and t < 80.0:
+		await wait(0.1)
+		t += 0.1
+	ok(Net.spectators.size() == 1 and Net.roster.size() == 2, "a spectator came in, and is not a player (%d watching, %d playing)" % [Net.spectators.size(), Net.roster.size()])
+	ok(not w.players.any(func(x: Target) -> bool: return x is Avatar and not Net.roster.has((x as Avatar).peer)), "nobody new walks about in the match")
+	# Held still for the count: no more coming, none falling to the bot.
+	w.director.running = false
+	for z: Zombie in w.zombies:
+		if z.active and z.is_alive():
+			z.max_hp = 100000.0
+			z.hp = 100000.0
+	await wait(0.3)
+	await sync(1)
+	var alive := w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	told.rpc(",".join(PackedStringArray(alive.map(func(z: Zombie) -> String: return "%d:%s" % [z.net_id, z.type_id]))))
+	await sync(2)
+	w.spawn_zombie("normal", w.player.global_position + Vector3(-6.0, 0.0, 8.0))
+	await wait(0.5)
+	alive = w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	told.rpc(str(alive.size()))
+	await sync(3)
+	await sync(4)
+	Net.return_to_room()
+	t = 0.0
+	while not Net.spectators.is_empty() and t < 10.0:
+		await wait(0.1)
+		t += 0.1
+	await wait(1.5)
+	ok(Net.spectators.is_empty(), "back to the room, the spectator is sent off")
+	finish()
+
+
+func _spectate_client() -> void:
+	var t := 0.0
+	Net.start_search()
+	var address := ""
+	while address == "" and t < 80.0:
+		for a: String in Net.rooms:
+			if Net.rooms[a].get("watchable", false):
+				address = a
+		await wait(0.1)
+		t += 0.1
+	ok(address != "", "the match under way shows on the Wi-Fi as one to watch")
+	ok(address == "" or (Net.rooms[address]["live"] and int(Net.rooms[address]["watchers"]) == 0), "live, nobody watching yet")
+	Net.stop_search()
+	m.show_together()
+	await wait(0.2)
+	m._watch(address if address != "" else "127.0.0.1")
+	t = 0.0
+	while (m.spectator == null or not is_instance_valid(m.spectator)) and t < 80.0:
+		await wait(0.1)
+		t += 0.1
+	ok(m.spectator != null and Net.spectating, "this phone watches the match")
+	w = m.world
+	ok(not Net.roster.has(Net.my_id()) and Net.roster.size() == 2, "it is not in the roster: the host and the bot are")
+	ok(Net.roster.keys().all(func(p: int) -> bool: return Net.avatar(p) != null), "both players are seen")
+	ok(w.player.dead and not w.player.visible and w.player.camera.current and w.player.camera.top_level, "nobody of its own: an unseen body, its camera the broadcast's")
+	ok(m.hud != null and not m.hud.visible and m.spectator.find_child("PlayerCards", true, false) != null, "the broadcast's screen, not a player's controls")
+	await sync(1)
+	await wait(0.5)
+	var theirs := Array(_told.split(",", false))
+	var alive := w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	var mine := alive.map(func(z: Zombie) -> String: return "%d:%s" % [z.net_id, z.type_id])
+	var missing := theirs.filter(func(k: String) -> bool: return not mine.has(k))
+	ok(theirs.size() > 0 and missing.is_empty(), "the enemies already there are caught up: %d here, %d on the host, missing %s, extra %s" % [mine.size(), theirs.size(), str(missing), str(mine.filter(func(k: String) -> bool: return not theirs.has(k)))])
+	await wait(1.5)
+	var view: SpectatorView = m.spectator
+	ok(view.focus != 0 and Net.roster.has(view.focus), "the director follows a player (%d)" % view.focus)
+	var target := Net.avatar(view.focus)
+	ok(target != null and view.cam.global_position.distance_to(target.global_position) < 45.0, "the camera is on them (%.1f m)" % (view.cam.global_position.distance_to(target.global_position) if target else -1.0))
+	view.set_lock(1)
+	ok(view.lock == 1 and view.focus == 1, "tapping the host's card keeps the camera on the host")
+	view.set_lock(0)
+	ok(view.lock == 0, "Auto gives it back to the director")
+	for kind: int in [SpectatorView.Shot.AERIAL, SpectatorView.Shot.WIDE, SpectatorView.Shot.CHASE, SpectatorView.Shot.EYES]:
+		view._choose(1, kind, true)
+		await wait(0.4)
+		var goal: Array = view._goal(0.0)
+		ok((goal[0] as Vector3).is_finite() and view.cam.global_position.is_finite(), "%s: the camera has somewhere to be" % SpectatorView.SHOT_NAMES[kind])
+		if shots != "":
+			await snap("spectate_%d" % kind)
+	ok(Net.avatar(1)._watched, "through someone's eyes, their own body is out of the way")
+	view._choose(1, SpectatorView.Shot.AERIAL)
+	ok(not Net.avatar(1)._watched, "and back when the shot changes")
+	await sync(2)
+	await sync(3)
+	await wait(0.5)
+	alive = w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	ok(alive.size() == int(_told), "what comes after arrives as it does for players: %d here, %s on the host" % [alive.size(), _told])
+	await sync(4)
+	t = 0.0
+	while Net.active() and t < 20.0:
+		await wait(0.1)
+		t += 0.1
+	ok(not Net.active() and not Net.spectating, "when the host goes back to the room, watching ends")
+	await wait(0.5)
+	ok(m.world != null and m.world.mode == Game.Mode.MENU, "and it is back at the menu")
+	finish()

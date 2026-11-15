@@ -15,8 +15,10 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death",
 	# Each land senses the dawn in its own voice (the last two minutes)
 	"dawn_mists", "dawn_valleys", "dawn_bastion",
-	# The Commander's battle cry, with its bells
-	"command"]
+	# The Commander's battle cry
+	"command",
+	# The bosses of Beyond the Mists enter to the soundtrack's bells (tools/make_boss_bells.py)
+	"boss_bells_revenant", "boss_bells_wyvern"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],

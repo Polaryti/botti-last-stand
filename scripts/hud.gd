@@ -251,15 +251,77 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
+## A boss of Beyond the Mists entering: the screen's edges take its colour, a band darkens across the
+## upper third, its name comes in large and closing up letter by letter in its colour and glow, the
+## line under it, and every stroke of its bells flashes the glow and the band's edges.
+static func draw_boss_card(ci: CanvasItem, title: Font, s: Vector2, kind: String, t: float, left: float) -> void:
+	var card: Dictionary = Director.BOSS_CARDS[kind]
+	var col: Color = card["color"]
+	var glow: Color = card["glow"]
+	var a := clampf(t / 0.35, 0.0, 1.0) * clampf(left / 1.0, 0.0, 1.0)
+	var strike := 0.0
+	for at: float in card["strikes"]:
+		if t >= at:
+			strike = maxf(strike, exp(-(t - at) * 4.0))
+	# The edges of the screen in its colour, swelling with each bell.
+	var edge := Color(glow, (0.22 + strike * 0.25) * a)
+	for i in 6:
+		var k := float(i) / 6.0
+		var inset := 6.0 + k * 70.0
+		ci.draw_rect(Rect2(Vector2.ZERO, s).grow(-inset), Color(edge, edge.a * (1.0 - k) * 0.35), false, 14.0)
+	# The band.
+	var mid := s.y * 0.3
+	var band_h := 170.0
+	var clear := Color(0.02, 0.02, 0.05, 0.0)
+	var dark := Color(0.02, 0.02, 0.05, 0.62 * a)
+	var top_y := mid - band_h * 0.5
+	ci.draw_polygon(PackedVector2Array([Vector2(0, top_y), Vector2(s.x, top_y), Vector2(s.x, mid), Vector2(0, mid)]), PackedColorArray([clear, clear, dark, dark]))
+	ci.draw_polygon(PackedVector2Array([Vector2(0, mid), Vector2(s.x, mid), Vector2(s.x, mid + band_h * 0.5), Vector2(0, mid + band_h * 0.5)]), PackedColorArray([dark, dark, clear, clear]))
+	var reach := s.x * 0.5 * clampf(t / 0.6, 0.0, 1.0)
+	for y_line: float in [mid - band_h * 0.42, mid + band_h * 0.42]:
+		ci.draw_line(Vector2(s.x * 0.5 - reach, y_line), Vector2(s.x * 0.5 + reach, y_line), Color(col, (0.55 + strike * 0.45) * a), 2.0 + strike * 2.0, true)
+	# The name, its letters closing up as it arrives.
+	var name_text: String = str(card["name"]).to_upper()
+	var fs := 76
+	var spread := 26.0 * (1.0 - clampf(t / 0.9, 0.0, 1.0))
+	var plain_w := title.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var full_w := plain_w + spread * float(name_text.length() - 1)
+	if full_w > s.x - 80.0:
+		fs = maxi(28, int(fs * (s.x - 80.0) / full_w))
+		plain_w = title.get_string_size(name_text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		full_w = plain_w + spread * float(name_text.length() - 1)
+	var x := s.x * 0.5 - full_w * 0.5
+	var base_y := mid + fs * 0.18
+	for i in name_text.length():
+		var ch := name_text[i]
+		var at := Vector2(x, base_y)
+		ci.draw_string_outline(title, at, ch, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 22, Color(glow, (0.35 + strike * 0.4) * a))
+		ci.draw_string_outline(title, at, ch, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 8, Color(0, 0, 0, 0.75 * a))
+		ci.draw_string(title, at, ch, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(col.lerp(Color.WHITE, strike * 0.35), a))
+		x += title.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + spread
+	var line_a := a * clampf((t - 0.5) / 0.5, 0.0, 1.0)
+	var line: String = card["line"]
+	var lfs := 32
+	var lw := title.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs).x
+	var lat := Vector2(s.x * 0.5 - lw * 0.5, mid + band_h * 0.34)
+	ci.draw_string_outline(title, lat, line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, lfs, 6, Color(0, 0, 0, 0.7 * line_a))
+	ci.draw_string(title, lat, line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, lfs, Color(UiTheme.BONE, line_a))
+
+
 func _banner_text(t: String, centre: Vector2, a: float) -> void:
+	draw_banner(self, title, t, centre, a, size.x)
+
+
+## A line across the screen in the title face (the night's banners), shrunk to fit `width`.
+static func draw_banner(ci: CanvasItem, title: Font, t: String, centre: Vector2, a: float, width: float) -> void:
 	var fs := 46
 	var full_width := title.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	if full_width > size.x - 100.0:
-		fs = maxi(18, int(fs * (size.x - 100.0) / full_width))
+	if full_width > width - 100.0:
+		fs = maxi(18, int(fs * (width - 100.0) / full_width))
 	var w := title.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var at := centre - Vector2(w * 0.5, -fs * 0.32)
-	draw_string_outline(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 7, Color(0, 0, 0, 0.6 * a))
-	draw_string(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(UiTheme.BONE, a))
+	ci.draw_string_outline(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, 7, Color(0, 0, 0, 0.6 * a))
+	ci.draw_string(title, at, t, HORIZONTAL_ALIGNMENT_LEFT, -1.0, fs, Color(UiTheme.BONE, a))
 
 
 func _text(t: String, at: Vector2, fs: int, col: Color) -> void:
@@ -303,7 +365,7 @@ func _draw() -> void:
 			draw_line(centre + pair * 10.0, centre + pair * 22.0, col, 3.0)
 	if player.has_power("sensor"):
 		_draw_sensor(centre)
-	_draw_grapeshot(centre)
+	_draw_readiness(centre)
 	_draw_marks()
 	_draw_item_name()
 	_draw_enemy_bars()
@@ -332,6 +394,8 @@ func _draw() -> void:
 	_draw_controls()
 	if player.toast_time > 0.0:
 		_centered(player.toast, Vector2(centre.x, s.y * 0.38), HUD_TOAST, Color(UiTheme.MOSS if "DODGE" in player.toast else (UiTheme.EMBER if "Backstab" in player.toast or "Riposte" in player.toast else UiTheme.BONE), minf(1.0, player.toast_time * 2.0)))
+	if director and director.boss_card_time > 0.0 and Director.BOSS_CARDS.has(director.boss_card):
+		draw_boss_card(self, title, s, director.boss_card, Director.BOSS_CARD_TIME - director.boss_card_time, director.boss_card_time)
 	if director and director.banner_time > 0.0:
 		_banner_text(director.banner, Vector2(centre.x, maxf(s.y * 0.32, _centre_y + 40.0)), minf(1.0, director.banner_time))
 
@@ -757,12 +821,27 @@ func _sensor_arrow(centre: Vector2, to: Vector3, col: Color) -> void:
 
 ## What you hold, and what it has left to throw or cast, on a chip at the bottom just left of the
 ## fighting buttons, under the swap button: where the thumb that uses it already is.
-## The Gunner's Grapeshot, without a word: under the crosshair one mark for each musket shot towards
-## it, the last glowing while it is loaded; when it goes off, a burst of ember round the crosshair,
-## fanning out like the pellets.
+## Special attacks, before they happen (Player.readiness): under the crosshair, a row for each
+## thing counting up to its special use (a mark per use, the last glowing when the next one is it) or
+## armed and waiting (its icon lit), and a ring round the crosshair while the next attack is
+## special. When Grapeshot goes off, a burst of ember round the crosshair, fanning like its pellets.
 const GRAPESHOT_EMBER := Color(1.0, 0.6, 0.22)
+const READY_ROWS := 3
 
-func _draw_grapeshot(centre: Vector2) -> void:
+var _ready_cache: Array[Dictionary] = []
+var _ready_wait := 0.0
+
+
+## The player's readiness, looked up a few times a second rather than every frame.
+func _readiness() -> Array[Dictionary]:
+	_ready_wait -= get_process_delta_time()
+	if _ready_wait <= 0.0:
+		_ready_wait = 0.1
+		_ready_cache = player.readiness()
+	return _ready_cache
+
+
+func _draw_readiness(centre: Vector2) -> void:
 	if player.grapeshot_flash > 0.0:
 		var f := player.grapeshot_flash
 		var grow := 1.0 - f
@@ -773,24 +852,74 @@ func _draw_grapeshot(centre: Vector2) -> void:
 			var ray := Vector2.UP.rotated(cone * k)
 			var from := 30.0 + grow * 30.0
 			draw_line(centre + ray * from, centre + ray * (from + 18.0 * f + 6.0), Color(GRAPESHOT_EMBER, f), 4.0, true)
-	if player.weapon_id() != "musket" or not player.has_item("grapeshot"):
-		return
-	var every := PathUpgrades.GRAPESHOT_EVERY
-	var done := player.musket_shots % every
-	var loaded := PathUpgrades.grapeshot_in(player) == 0
 	var pulse := 0.6 + sin(Time.get_ticks_msec() * 0.012) * 0.4
-	for i in every:
-		var at := centre + Vector2((float(i) - float(every - 1) * 0.5) * 14.0, 34.0)
-		var last := i == every - 1
-		if last and loaded:
-			draw_circle(at, 6.5, Color(GRAPESHOT_EMBER, pulse))
-			draw_arc(at, 9.5, 0.0, TAU, 20, Color(GRAPESHOT_EMBER, pulse * 0.7), 2.0, true)
-		elif i < done:
-			draw_circle(at, 4.5, Color(UiTheme.BONE, 0.9))
-		else:
-			draw_arc(at, 4.5, 0.0, TAU, 16, Color(UiTheme.BONE, 0.55), 1.5, true)
-	if loaded:
-		draw_arc(centre, 24.0, 0.0, TAU, 40, Color(GRAPESHOT_EMBER, pulse * 0.5), 2.0, true)
+	var y := 34.0
+	var rows := 0
+	for r: Dictionary in _readiness():
+		if r["button"] == "art" or rows >= READY_ROWS:
+			continue
+		var col: Color = r["color"]
+		var lit: bool = r["primed"] or r["active"]
+		var row_at := centre + Vector2(0.0, y)
+		var need: int = r["need"]
+		var width := 22.0 + (float(need) * 14.0 if need > 0 else 0.0)
+		var x := row_at.x - width * 0.5
+		var icon_rect := Rect2(Vector2(x, row_at.y - 9.0), Vector2(18, 18))
+		if lit:
+			draw_circle(icon_rect.get_center(), 13.0, Color(col, 0.28 * pulse))
+		draw_texture_rect(Icons.glyph(str(r["icon"]).split("+")[0]), icon_rect, false, Color(col if lit else UiTheme.BONE, 1.0 if lit else 0.6))
+		for i in need:
+			var at := Vector2(x + 30.0 + float(i) * 14.0, row_at.y)
+			var last := i == need - 1
+			if last and r["primed"]:
+				draw_circle(at, 6.5, Color(col, pulse))
+				draw_arc(at, 9.5, 0.0, TAU, 20, Color(col, pulse * 0.7), 2.0, true)
+			elif i < int(r["have"]) or (r["active"] and need > 0 and i < int(r["have"])):
+				draw_circle(at, 4.5, Color(col.lerp(UiTheme.BONE, 0.5), 0.95))
+			else:
+				draw_arc(at, 4.5, 0.0, TAU, 16, Color(UiTheme.BONE, 0.55), 1.5, true)
+		y += 24.0
+		rows += 1
+	var primed := _primed_on("fire")
+	if not primed.is_empty():
+		draw_arc(centre, 24.0, 0.0, TAU, 40, Color(primed["color"], pulse * 0.6), 2.5, true)
+
+
+## The first thing primed on a button ("fire" or "art"), or {}.
+func _primed_on(button: String) -> Dictionary:
+	for r: Dictionary in _readiness():
+		if r["button"] == button and r["primed"]:
+			return r
+	return {}
+
+
+## A button whose next use is special: a ring of that thing's colour round it, pulsing, and its icon
+## on a badge at the corner. A counter on the art button counts its uses above it.
+func _draw_button_readiness(id: String, pos: Vector2, r: float) -> void:
+	var pulse := 0.6 + sin(Time.get_ticks_msec() * 0.01) * 0.4
+	if id == "art":
+		var counted: Array = _readiness().filter(func(e: Dictionary) -> bool: return e["button"] == "art" and int(e["need"]) > 0)
+		if not counted.is_empty():
+			var e: Dictionary = counted[0]
+			var need: int = e["need"]
+			for i in need:
+				var at := pos + Vector2((float(i) - float(need - 1) * 0.5) * 14.0, -r - 36.0)
+				if i == need - 1 and e["primed"]:
+					draw_circle(at, 6.5, Color(e["color"], pulse))
+				elif i < int(e["have"]):
+					draw_circle(at, 4.5, Color(UiTheme.BONE, 0.95))
+				else:
+					draw_arc(at, 4.5, 0.0, TAU, 16, Color(UiTheme.BONE, 0.55), 1.5, true)
+	var primed := _primed_on(id)
+	if primed.is_empty():
+		return
+	var col: Color = primed["color"]
+	for k in 2:
+		draw_arc(pos, r + 4.0 + float(k) * 5.0, 0.0, TAU, 48, Color(col, pulse * (0.85 - float(k) * 0.4)), 4.0 - float(k) * 1.5, true)
+	var badge := pos + Vector2(-r * 0.74, -r * 0.62)
+	draw_circle(badge, 17.0, Color(0.05, 0.04, 0.05, 0.9))
+	draw_circle(badge, 15.0, col.darkened(0.25))
+	draw_texture_rect(Icons.glyph(str(primed["icon"]).split("+")[0]), Rect2(badge - Vector2(10, 10), Vector2(20, 20)), false, Color.WHITE)
 
 
 func _draw_weapon(s: Vector2) -> void:
@@ -885,6 +1014,8 @@ func _draw_controls() -> void:
 		var inset := r * 0.42
 		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color.WHITE)
 		draw_texture_rect(_ring, rect, false, Color(1, 1, 1, 0.6) if not held else UiTheme.EMBER)
+		if id == "fire" or id == "art":
+			_draw_button_readiness(id, pos, r)
 		if id == "drop" and held and _drop_held >= 0.0:
 			draw_arc(pos, r - 4.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(_drop_held / DROP_HOLD, 0.0, 1.0), 32, UiTheme.EMBER, 7.0)
 		if id == "drop":

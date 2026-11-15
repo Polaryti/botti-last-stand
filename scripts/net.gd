@@ -21,7 +21,8 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 52
+const MAX_SPECTATORS := 4 # watching a match: on top of the players
+const PROTOCOL := 53
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -49,7 +50,8 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_wrap",
 	"bear_roar", "bear_maul", "eagle_cry", "shapeshift", "quake_warning", "earth_slam", "mist_blink", "storm_call", "fire_warning",
 	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter", "mist_muster", "portal_wound",
-	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death", "dawn_mists", "dawn_valleys", "dawn_bastion"]
+	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death", "dawn_mists", "dawn_valleys", "dawn_bastion",
+	"boss_bells_revenant", "boss_bells_wyvern"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -72,6 +74,11 @@ var _connect_wait := 0.0
 var rules: int = Rules.COOP
 var difficulty := 1
 var spectate_cam: Camera3D
+## Spectator Mode. On a spectator's phone: it watches a match it is not in (not in the roster, no body
+## in the world). On the host: who is watching, and whether anyone may.
+var spectating := false
+var spectators := {} # host: peer id -> {name}
+var allow_spectators := true
 var _watching := 0
 var roster := {} # peer id -> {name, class, team, score, deaths}
 var rooms := {} # address -> {name, players, rules, seen}
@@ -261,7 +268,7 @@ func avatar(peer: int) -> Avatar:
 
 
 func is_foe(peer: int) -> bool:
-	if not pvp():
+	if not pvp() or spectating:
 		return false
 	if rules == Rules.TEAMS:
 		# Someone who has just left can still have a message on its way.
@@ -279,12 +286,12 @@ func host_game() -> Error:
 	PhoneNet.use_default()
 	PhoneNet.hold_wifi()
 	var e := ENetMultiplayerPeer.new()
-	var err := e.create_server(PORT, MAX_PLAYERS - 1)
+	var err := e.create_server(PORT, MAX_PLAYERS - 1 + MAX_SPECTATORS)
 	if err != OK:
 		# Right after moving from Wi-Fi to mobile data, the phone can still be tied to the old network.
 		PhoneNet.use_active()
 		e = ENetMultiplayerPeer.new()
-		err = e.create_server(PORT, MAX_PLAYERS - 1)
+		err = e.create_server(PORT, MAX_PLAYERS - 1 + MAX_SPECTATORS)
 	if err != OK:
 		PhoneNet.use_default()
 		return err
@@ -316,6 +323,22 @@ func join_game(address: String) -> Error:
 	_over = false
 	set_process(true)
 	return OK
+
+
+## Watching a match on the Wi-Fi: the same way in as a player, then asks to watch instead of to play.
+func watch_game(address: String) -> Error:
+	var err := join_game(address)
+	if err == OK:
+		spectating = true
+	return err
+
+
+## Watching an online match, found in the list or by its code.
+func watch_online(code: String) -> String:
+	var problem := await join_online(code)
+	if problem == "":
+		spectating = true
+	return problem
 
 
 ## Online. These return why it failed, or "" if all is well. A listed game shows in everyone's list
@@ -447,6 +470,8 @@ func leave(reason := "") -> void:
 	_respawn_left = -1.0
 	_command_ready.clear()
 	_over = false
+	spectating = false
+	spectators.clear()
 	set_physics_process(false)
 	set_process(_listener != null)
 	if was_active and reason != "":
@@ -459,6 +484,9 @@ func _my_entry(team: int) -> Dictionary:
 
 func _on_connected() -> void:
 	_connect_wait = 0.0
+	if spectating:
+		_hello_spectator.rpc_id(1, protocol_version(), Game.player_name)
+		return
 	_hello.rpc_id(1, protocol_version(), Game.player_name, Game.player_class, Game.map_upgrades_on())
 
 
@@ -484,6 +512,11 @@ func _on_peer_connected(id: int) -> void:
 func _on_peer_disconnected(id: int) -> void:
 	if not is_host():
 		_remove_peer(id)
+		return
+	if spectators.has(id):
+		spectators.erase(id)
+		_room_dirty = true
+		lobby_changed.emit()
 		return
 	roster.erase(id)
 	_loaded.erase(id)
@@ -536,6 +569,101 @@ func _hello(protocol: int, player_name: String, cls: String, maps: Array = []) -
 			known.append(m)
 	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0, "lives": LIVES, "maps": known}
 	_share_lobby()
+
+
+## Someone asks to watch the match under way.
+@rpc("any_peer", "reliable")
+func _hello_spectator(protocol: int, watcher_name: String) -> void:
+	if not is_host():
+		return
+	var id := multiplayer.get_remote_sender_id()
+	if protocol != protocol_version():
+		_refused.rpc_id(id, "That phone has a different version of the game.")
+		return
+	if not in_game or _over or started_loading:
+		_refused.rpc_id(id, "That match is not being played right now. Try again in a moment.")
+		return
+	if not allow_spectators:
+		_refused.rpc_id(id, "That host is not taking spectators.")
+		return
+	if spectators.size() >= MAX_SPECTATORS or roster.has(id) or spectators.has(id):
+		_refused.rpc_id(id, "%d people are already watching that match." % MAX_SPECTATORS)
+		return
+	spectators[id] = {"name": watcher_name.substr(0, 16)}
+	_room_dirty = true
+	lobby_changed.emit()
+	_spectate_begin.rpc_id(id, rules, Game.quality, Game.difficulty, roster, weather, fog_centre, night_map, fort_map)
+
+
+## The host lets this phone watch: it builds the match's world as a player would, with nobody in it of
+## its own.
+@rpc("authority", "reliable")
+func _spectate_begin(new_rules: int, quality: int, new_difficulty: int, new_roster: Dictionary, tonight: int, fog_at: Vector2, new_map: String, new_fort_map: String) -> void:
+	spectating = true
+	rules = new_rules
+	roster = new_roster
+	weather = tonight
+	fog_centre = fog_at
+	night_map = new_map
+	fort_map = new_fort_map if Game.FORT_MAPS.has(new_fort_map) else "fort"
+	forced_quality = quality
+	Game.difficulty = new_difficulty
+	last_winner = 0
+	_started_with = roster.size()
+	in_game = true
+	started_loading = true
+	_loaded.clear()
+	_over = false
+	game_started.emit()
+
+
+## A spectator's world is built: what is already happening, then the match.
+@rpc("any_peer", "reliable")
+func _spectator_loaded() -> void:
+	var id := multiplayer.get_remote_sender_id()
+	if not is_host() or not spectators.has(id) or world == null or not is_instance_valid(world):
+		return
+	for z: Zombie in world.zombies:
+		if not z.active or not z.is_alive() or z.net_id < 0:
+			continue
+		_z_spawn.rpc_id(id, z.net_id, z.type_id, z.position, z.hero_minute)
+		if z.weapon_id != "":
+			_z_weapon.rpc_id(id, z.net_id, z.weapon_id)
+		if not z.dormant:
+			_z_woke.rpc_id(id, z.net_id)
+	for item: Pickup in world.pickups:
+		if is_instance_valid(item) and item.net_id > 0:
+			_item_spawn.rpc_id(id, item.net_id, item.kind, item.item_id, item.bonus_arrows, item.global_position)
+	if world.fort:
+		_fort_state.rpc_id(id, world.fort._state())
+	if world.portals:
+		_portals.rpc_id(id, world.portals.state_bits())
+	_spectate_now.rpc_id(id, world.director.elapsed, world.director._mist_boss_spawned, world.director._mist_boss_defeated)
+	_go.rpc_id(id)
+
+
+@rpc("authority", "reliable")
+func _spectate_now(elapsed: float, boss_spawned: bool, boss_defeated: bool) -> void:
+	if world and is_instance_valid(world):
+		world.director.elapsed = elapsed
+		world.director._mist_boss_spawned = boss_spawned
+		world.director._mist_boss_defeated = boss_defeated
+
+
+## The host's switch: whether the match can be watched.
+func set_allow_spectators(on: bool) -> void:
+	if not is_host():
+		return
+	allow_spectators = on
+	if in_game:
+		multiplayer.multiplayer_peer.refuse_new_connections = not on
+	_room_dirty = true
+	lobby_changed.emit()
+
+
+## Whether this phone's match can be watched now (the host's answer).
+func watchable_here() -> bool:
+	return is_host() and in_game and allow_spectators and spectators.size() < MAX_SPECTATORS
 
 
 func _smaller_team() -> int:
@@ -645,7 +773,10 @@ func _start_beacon() -> void:
 
 
 func _beacon_text() -> PackedByteArray:
-	return JSON.stringify({"g": "botti-last-stand", "v": protocol_version(), "n": Game.player_name, "p": roster.size(), "r": rules}).to_utf8_buffer()
+	# "live": a match under way, which can be watched while "a" (spectators allowed) and "w" (how
+	# many watch) leave room.
+	return JSON.stringify({"g": "botti-last-stand", "v": protocol_version(), "n": Game.player_name, "p": roster.size(), "r": rules,
+		"live": 1 if in_game else 0, "a": 1 if allow_spectators else 0, "w": spectators.size(), "m": fort_map if rules == Rules.FORT else night_map}).to_utf8_buffer()
 
 
 func _answer_questions() -> void:
@@ -712,6 +843,17 @@ func stop_search() -> void:
 		set_process(false)
 
 
+## Stops a search this caller started, keeping the games it found in the list (the menu's look).
+func stop_search_keep_rooms_counted() -> void:
+	_searchers = maxi(0, _searchers - 1)
+	if _searchers > 0:
+		return
+	stop_search_keep_rooms()
+	if not active():
+		PhoneNet.use_default()
+		set_process(false)
+
+
 func stop_search_keep_rooms() -> void:
 	if _listener:
 		_listener.close()
@@ -729,7 +871,9 @@ func _read_beacons(delta: float) -> void:
 		var d: Dictionary = parsed
 		if not rooms.has(from):
 			changed = true
-		rooms[from] = {"name": str(d.get("n", "?")), "players": int(d.get("p", 1)), "rules": int(d.get("r", 0)), "version_ok": int(d.get("v", 0)) == protocol_version(), "seen": 0.0}
+		var live := int(d.get("live", 0)) == 1
+		rooms[from] = {"name": str(d.get("n", "?")), "players": int(d.get("p", 1)), "rules": int(d.get("r", 0)), "version_ok": int(d.get("v", 0)) == protocol_version(), "seen": 0.0,
+			"live": live, "watchable": live and int(d.get("a", 0)) == 1 and int(d.get("w", 0)) < MAX_SPECTATORS, "watchers": int(d.get("w", 0)), "map": str(d.get("m", ""))}
 	for a: String in rooms.keys():
 		rooms[a]["seen"] = float(rooms[a]["seen"]) + delta
 		if float(rooms[a]["seen"]) > 4.0:
@@ -751,13 +895,13 @@ func _process(delta: float) -> void:
 		if _ask_timer <= 0.0:
 			_ask_timer = ASK_EVERY
 			_ask_around()
-	if is_host() and _beacon and not in_game:
+	if is_host() and _beacon and (not in_game or allow_spectators):
 		_answer_questions()
 		_beacon_timer -= delta
 		if _beacon_timer <= 0.0 and use_beacons:
 			_beacon_timer = BEACON_EVERY
 			_send_beacon()
-	if in_game and world and is_instance_valid(world):
+	if in_game and world and is_instance_valid(world) and not spectating:
 		_tick_respawn(delta)
 	_tick_room(delta)
 
@@ -767,15 +911,17 @@ func _process(delta: float) -> void:
 func start_match() -> void:
 	if not is_host() or not can_start():
 		return
-	multiplayer.multiplayer_peer.refuse_new_connections = true
+	# Spectators may still come in once it has begun, if the host lets them; players never.
+	multiplayer.multiplayer_peer.refuse_new_connections = not allow_spectators
 	if roster.has(1):
 		roster[1]["maps"] = Game.map_upgrades_on() # what the host has now, not when it opened the lobby
-	if _beacon:
-		_beacon.close()
-		_beacon = null
-	if _answer:
-		_answer.close()
-		_answer = null
+	if not allow_spectators:
+		if _beacon:
+			_beacon.close()
+			_beacon = null
+		if _answer:
+			_answer.close()
+			_answer = null
 	var tonight := Weather.roll(Game.current_map())
 	var fog_at := Vector2(randf_range(-22.0, 22.0), randf_range(-22.0, 22.0))
 	# Off the list of games waiting for players.
@@ -826,6 +972,9 @@ func attach(w: World) -> void:
 
 ## Called once the phone has built the map and loaded its shaders.
 func report_loaded() -> void:
+	if spectating:
+		_spectator_loaded.rpc_id(1)
+		return
 	if is_host():
 		_loaded[1] = true
 		_check_loaded()
@@ -862,7 +1011,7 @@ func _go() -> void:
 # --- Every tick --------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
-	if world == null or not is_instance_valid(world) or world.player == null:
+	if world == null or not is_instance_valid(world) or world.player == null or spectating:
 		return
 	_pose_timer -= delta
 	if _pose_timer <= 0.0:
@@ -1687,6 +1836,47 @@ func _banner(text: String, seconds: float) -> void:
 		world.director.show_banner(text, seconds)
 
 
+## A tick of damage over time, shown on the phone of whoever put it on (the host runs the ticks).
+func dot_number(peer: int, zombie_net_id: int, amount: float, kind: String) -> void:
+	_dot_number.rpc_id(peer, zombie_net_id, amount, DamageNumbers.KINDS.find(kind))
+
+
+@rpc("authority", "unreliable")
+func _dot_number(zombie_net_id: int, amount: float, kind: int) -> void:
+	if world == null or not is_instance_valid(world) or kind < 1 or kind > 3:
+		return
+	var z: Zombie = world.zombie_by_id(zombie_net_id)
+	if z and z.is_alive():
+		world.damage_numbers.show_dot(z.get_instance_id(), z.centre() + Vector3.UP * 0.5, clampf(amount, 0.0, 999.0), DamageNumbers.KINDS[kind])
+
+
+## Someone's mending field healed `healed` (a person or a bot) by `amount`: the healer sees it.
+func healed_by(healer: int, healed: int, amount: float) -> void:
+	if healer == my_id():
+		if world: world.show_heal_on_peer(healed, amount)
+		return
+	if is_bot(healer):
+		return
+	_healed_by_you.rpc_id(healer, healed, amount)
+
+
+@rpc("any_peer", "unreliable")
+func _healed_by_you(healed: int, amount: float) -> void:
+	if world and is_instance_valid(world):
+		world.show_heal_on_peer(healed, clampf(amount, 0.0, 999.0))
+
+
+## A boss of Beyond the Mists enters: every phone shows its card and rings its bells.
+func boss_entrance(kind: String) -> void:
+	_boss_entrance.rpc(kind)
+
+
+@rpc("authority", "reliable")
+func _boss_entrance(kind: String) -> void:
+	if world and is_instance_valid(world) and Director.BOSS_CARDS.has(kind):
+		world.director.show_boss_card(kind)
+
+
 func send_fort(state: PackedByteArray) -> void:
 	_fort_state.rpc(state)
 
@@ -1957,6 +2147,8 @@ func _share(amount: float) -> void:
 
 ## A friend's Apothecary: a moment nobody can hurt you, and some health back.
 func guard_peer(peer: int, seconds: float, healing: float) -> void:
+	if healing > 0.0 and multiplayer.get_remote_sender_id() == 0 and world and is_instance_valid(world) and world.acting() == world.player:
+		world.show_heal_on_peer(peer, healing) # the one who heals sees how much (a relay for a bot does not)
 	if is_bot(peer):
 		if is_host():
 			_guard_player(local_player(peer), seconds, healing)
@@ -2079,12 +2271,18 @@ func _ride_end() -> void:
 func return_to_room() -> void:
 	if not is_host():
 		return
+	for watcher: int in spectators.keys():
+		_refused.rpc_id(watcher, "The match is over. Thanks for watching!")
+	spectators.clear()
 	_back_to_room.rpc()
 	_back_to_room()
 
 
 @rpc("authority", "reliable")
 func _back_to_room() -> void:
+	if spectating:
+		leave("The match is over. Thanks for watching!")
+		return
 	in_game = false
 	started_loading = false
 	_over = false
@@ -2104,7 +2302,7 @@ func _back_to_room() -> void:
 		roster[p]["lives"] = LIVES
 	if is_host():
 		multiplayer.multiplayer_peer.refuse_new_connections = false
-		if way == Way.LOCAL:
+		if way == Way.LOCAL and _beacon == null:
 			_start_beacon()
 		_share_lobby()
 	back_in_room.emit()

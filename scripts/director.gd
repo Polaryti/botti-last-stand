@@ -134,6 +134,31 @@ func opening_line() -> String:
 	return opening
 
 
+## The bosses of Beyond the Mists enter with a card of their own instead of an ordinary banner: their
+## name large in their colour, the line under it, and the soundtrack's bells (tools/make_boss_bells.py).
+const BOSS_CARDS := {
+	MESENLLA_BOSS: {"name": "Great Revenant Elemental", "line": "rises at the Ring of Stones", "color": Color(0.45, 0.95, 0.88), "glow": Color(0.15, 0.55, 0.62), "bells": "boss_bells_revenant", "strikes": [0.0, 0.55, 1.1, 1.75]},
+	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
+}
+const BOSS_CARD_TIME := 5.5
+var boss_card := "" # the boss whose card shows, while boss_card_time lasts
+var boss_card_time := 0.0
+
+
+func boss_entrance(kind: String) -> void:
+	show_boss_card(kind)
+	if Net.is_host():
+		Net.boss_entrance(kind)
+
+
+## Shows the card and rings the bells on this phone (each phone rings its own: they carry no position).
+func show_boss_card(kind: String) -> void:
+	boss_card = kind
+	boss_card_time = BOSS_CARD_TIME
+	banner_time = 0.0
+	Sfx.play(str(BOSS_CARDS[kind]["bells"]), 0.0, 1.0, 1.0)
+
+
 func show_banner(text: String, seconds: float) -> void:
 	banner = text
 	banner_time = seconds
@@ -238,6 +263,7 @@ func stock(kind: int) -> void:
 
 func _process(delta: float) -> void:
 	banner_time = maxf(0.0, banner_time - delta)
+	boss_card_time = maxf(0.0, boss_card_time - delta)
 	if sandbox:
 		world.tick_stands(delta)
 		return
@@ -399,14 +425,14 @@ func _raise_mesenlla_boss() -> void:
 	if world.map_id == "bastion":
 		if world.spawn_zombie(BASTION_BOSS, spot):
 			_mist_boss_spawned = true
-			show_banner("The War Wyvern comes for the Great Portal", 4.0)
+			boss_entrance(BASTION_BOSS)
 			_sound("wyvern_roar", 4.0)
 		return
 	if world.spawn_zombie(MESENLLA_BOSS, spot):
 		_mist_boss_spawned = true
 		CommandField.visual_impact(world, spot, 10.0, true)
 		if Net.is_host(): Net.command_impact_visual(spot, 10.0, true)
-		show_banner("The Great Revenant Elemental rises at the Ring of Stones", 4.0)
+		boss_entrance(MESENLLA_BOSS)
 		_sound("revenant_roar", 2.0)
 
 

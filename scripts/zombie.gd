@@ -137,6 +137,7 @@ var _custom := false
 var _dot_pending := 0.0
 var _dot_wait := 0.25
 var _poison_dps := 0.0
+var dot_kind := "" # set just before a damage-over-time tick's take_damage: "poison", "bleed", "fire"
 var _bleed_dps := 0.0
 var poison_left := 0.0
 var bleed_left := 0.0
@@ -856,6 +857,16 @@ func mark(mult: float, seconds: float) -> void:
 	_mark_time = seconds
 
 
+## A tick of poison, bleeding or fire shows, in its colour, to whoever put it on: here when that is
+## this phone's player (or no one in particular, alone), else on that person's phone.
+func _show_dot(amount: float, kind: String) -> void:
+	var by := last_hitter
+	if not Net.active() or by == 0 or by == Net.my_id():
+		world.damage_numbers.show_dot(get_instance_id(), centre() + Vector3.UP * 0.5, amount, kind)
+	elif Net.is_host() and not Net.is_bot(by) and net_id >= 0:
+		Net.dot_number(by, net_id, amount, kind)
+
+
 ## Poison also makes it take 5% more from everything. Bleeding also slows it by 10%.
 func add_dot(dps: float, seconds: float, bleeding := false) -> void:
 	if puppet:
@@ -930,6 +941,8 @@ func show_debuffs(poisoned: bool, bleeding: bool) -> void:
 # --- Damage ------------------------------------------------------------------
 
 func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector3) -> void:
+	var dot := dot_kind
+	dot_kind = ""
 	if not is_alive():
 		return
 	if poison_left > 0.0:
@@ -963,7 +976,9 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		if away.length_squared() > 0.001 and look.dot(away.normalized()) > 0.3:
 			amount *= 0.5
 			world.sfx_at("block", position, -6.0)
-	if ours:
+	if dot != "":
+		_show_dot(amount, dot)
+	elif ours:
 		world.damage_numbers.show_hit(get_instance_id(), hit_pos, amount, max_hp)
 	hp -= amount
 	if _is_dummy:
@@ -1167,18 +1182,20 @@ func _stop_flames() -> void:
 		_flames.emitting = false
 
 
-## Whether a creature of this kind lets go of its weapon as it falls. Most always do; the Children of
-## the Woods half the time ("weapon_drop").
+## Whether a creature of this kind lets go of its weapon as it falls ("weapon_drop"; most always do).
 static func lets_go(of: Dictionary) -> bool:
 	return randf() < float(of.get("weapon_drop", 1.0))
 
 
-## What a creature leaves as it falls: "weapon", "arrows" (the Children of the Woods, when they keep
-## their weapon: "arrows_else"), or "" for nothing.
+## What a creature leaves as it falls: "weapon", "arrows", "food", or "" for nothing. A kind with a
+## "loot" table (the Children of the Woods) leaves something only "loot_chance" of the time, then any
+## entry of the table as likely as the others.
 static func loot(of: Dictionary) -> String:
-	if lets_go(of):
-		return "weapon"
-	return "arrows" if of.get("arrows_else", false) else ""
+	if of.has("loot"):
+		if randf() >= float(of.get("loot_chance", 1.0)):
+			return ""
+		return str((of["loot"] as Array).pick_random())
+	return "weapon" if lets_go(of) else ""
 
 
 func _die() -> void:
@@ -1189,6 +1206,7 @@ func _die() -> void:
 		match loot(def):
 			"weapon": world.drop_weapon(position + Vector3(0, 0, 0.5), weapon_id)
 			"arrows": world.spawn_pickup_at(position + Vector3(0, 0, 0.5), Pickup.Kind.ARROWS, "arrows")
+			"food": world.spawn_pickup_at(position + Vector3(0, 0, 0.5), Pickup.Kind.FOOD, PowerDefs.pick_weighted(PowerDefs.FOODS))
 		weapon_id = ""
 		if _hand_mesh:
 			_hand_mesh.equip("")
@@ -1948,6 +1966,7 @@ func _tick_dot(delta: float) -> void:
 	if _dot_pending > 0.0 and (_dot_wait <= 0.0 or maxf(poison_left, bleed_left) <= delta):
 		next_hitter = last_hitter
 		var previous_flinch := _hurt_stun
+		dot_kind = "poison" if _poison_dps * float(poison_left > 0.0) >= _bleed_dps * float(bleed_left > 0.0) else "bleed"
 		take_damage(_dot_pending, Vector3.ZERO, 0.0, centre())
 		_hurt_stun = previous_flinch
 		_dot_pending = 0.0

@@ -199,7 +199,7 @@ func _tend(p: Player) -> void:
 		"healing_mist":
 			if friend:
 				if p.hp < p.max_hp():
-					p.mended_by_friend(PathUpgrades.HEALING_MIST_HEAL * STEP)
+					p.mended_by_friend(PathUpgrades.HEALING_MIST_HEAL * STEP, owner_peer)
 				p.cure()
 		"mist_wake", "censer":
 			if not friend:

@@ -83,7 +83,10 @@ static func cast(p: Player) -> void:
 		p.heal(AbilityNumbers.RALLY_HEAL)
 		for ally: Ally in p.world.allies:
 			if not ally.dead and ally.master == p and ally.remote_owner == 0 and ally.global_position.distance_to(p.global_position) <= radius:
+				var before := ally.hp
 				ally.hp = minf(ally.hp + 20.0, float(Ally.HEALTH[ally.kind]) * p.m("ally_hp"))
+				if p == p.world.player:
+					p.world.show_heal_on(ally, ally.hp - before)
 		if Net.active():
 			for friend: Target in p.world.friends_near(p.global_position, radius):
 				Net.guard_peer(p.world.peer_of(friend), 0.0, 20.0)

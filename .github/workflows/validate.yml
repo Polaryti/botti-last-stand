@@ -77,6 +77,8 @@ jobs:
             mode: room
           - suite: network
             mode: chariot
+          - suite: network
+            mode: spectate
     steps:
       - uses: actions/checkout@v5
       - name: Install the project's Godot version

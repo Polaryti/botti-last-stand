@@ -1182,10 +1182,16 @@ func test_version_20_1() -> void:
 	e._ieos = fake
 	e._user = "me"
 	fake.rooms = [{"owner": "aaaa", "attrs": {"CODE": "ABC234", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Mara", "RULES": "1", "MAP": "village", "PLAYERS": "2"}},
-		{"owner": "bbbb", "attrs": {"CODE": "XYZ789", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Full", "RULES": "0", "MAP": "mists", "PLAYERS": str(Net.MAX_PLAYERS)}}]
+		{"owner": "bbbb", "attrs": {"CODE": "XYZ789", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Full", "RULES": "0", "MAP": "mists", "PLAYERS": str(Net.MAX_PLAYERS)}},
+		{"owner": "cccc", "attrs": {"CODE": "LIV234", "PUBLIC": "1", "OPEN": "0", "LIVE": "1", "WATCHERS": "1", "VER": str(Net.PROTOCOL), "HOST": "Bo", "RULES": "0", "MAP": "mists", "PLAYERS": "4"}},
+		{"owner": "dddd", "attrs": {"CODE": "SHUT23", "PUBLIC": "1", "OPEN": "0", "LIVE": "0", "WATCHERS": "0", "VER": str(Net.PROTOCOL), "HOST": "Shut", "RULES": "0", "MAP": "mists", "PLAYERS": "2"}},
+		{"owner": "eeee", "attrs": {"CODE": "BUSY23", "PUBLIC": "1", "OPEN": "0", "LIVE": "1", "WATCHERS": str(Net.MAX_SPECTATORS), "VER": str(Net.PROTOCOL), "HOST": "Busy", "RULES": "0", "MAP": "mists", "PLAYERS": "2"}}]
 	var listed: Array[Dictionary] = await e.list_rooms()
-	ok(listed.size() == 1 and listed[0]["name"] == "Mara" and listed[0]["host"] == "aaaa" and int(listed[0]["players"]) == 2 and int(listed[0]["rules"]) == 1, "public games are read from the search, and full ones are left out (%s)" % str(listed))
-	ok(fake.searched.get("PUBLIC") == "1" and fake.searched.get("OPEN") == "1" and fake.searched.get("VER") == str(Net.PROTOCOL), "the search asks only for public games waiting, of this version")
+	var waiting := listed.filter(func(r: Dictionary) -> bool: return r["waiting"])
+	var live := listed.filter(func(r: Dictionary) -> bool: return r["live"])
+	ok(waiting.size() == 1 and waiting[0]["name"] == "Mara" and waiting[0]["host"] == "aaaa" and int(waiting[0]["players"]) == 2 and int(waiting[0]["rules"]) == 1, "public games are read from the search, and full ones are left out (%s)" % str(listed))
+	ok(live.size() == 1 and live[0]["name"] == "Bo" and int(live[0]["watchers"]) == 1 and listed.size() == 2, "matches under way are listed to watch, unless closed to spectators or already watched by %d" % Net.MAX_SPECTATORS)
+	ok(fake.searched.get("PUBLIC") == "1" and not fake.searched.has("OPEN") and fake.searched.get("VER") == str(Net.PROTOCOL), "the search asks for public games of this version, waiting or under way")
 	var code: String = await e.open_room(false)
 	ok(code.length() == EpicNet.CODE_LENGTH and fake.written.get("PUBLIC") == "0" and fake.written.get("CODE") == code and fake.written.get("OPEN") == "1", "a private room keeps its code but stays off the list")
 	ok(await e.update_room(EpicNet.room_card(true, false)) and fake.written.get("OPEN") == "0" and fake.written.get("PUBLIC") == "1", "and a room can go public, and leave the list when its night starts")
@@ -2090,7 +2096,9 @@ func test_version_15() -> void:
 	ok(m.panel.find_child("Rename", true, false) == null and not m.panel.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.text == Game.player_name), "and your name is shown, not changed, here")
 	m.show_menu()
 	await frames(3)
-	ok(Net._listener == null and Net._searchers == 0, "until you leave")
+	ok(Net._searchers == 1, "until you leave: then only the menu's own short look goes on (%d)" % Net._searchers)
+	await get_tree().create_timer(Main.SCOUT_TIME + 0.5).timeout
+	ok(Net._listener == null and Net._searchers == 0, "and stops after a few seconds")
 	Game.mode = Game.Mode.FORT
 	ok(Game.current_map() == "bastion", "where the next Fort is held")
 	Game.fort_map = saved_fort

@@ -2,6 +2,29 @@
 
 ## Development — Beyond the Mists, upgrades for every path
 
+### Spectator Mode
+- Watch a match that is under way, like a broadcast. Matches on the same Wi-Fi and public online matches show under "Matches to watch" in Play Together; a private match can be watched with its code.
+- The camera follows the fighting on its own: high above a player, circling; wide over a fight; close behind them; or through their eyes. It glides from one shot to the next and goes where the action is: enemies close, health falling, a boss.
+- Tap a player's card to keep the camera on them, and Auto to give it back. LIVE, the match, its clock, each player's health and score, the night's banners and boss entrances are all on screen.
+- Up to 4 people can watch, on top of the players. The host can turn spectators off in the game room.
+- On the main menu, Play Together glows when there is a game to join (as Changelog does) and glows red when there is a match to watch. When there are both, it shows both, one after the other.
+
+### Seeing it coming
+- Special attacks show before they happen. Under the crosshair, a row of marks counts each one up (Grapeshot, Overdraw, Meteor, Arcane Surge, the Battleaxe's cleave, the Bo's sweep, Cleaver, Smite, Aftershock, Earthbreaker), and the last one glows when the next attack is the special one. Killing Shot, Death from the Dark (an unaware enemy within reach), Spirit Strike, Counterstep, Mirror Step and Perfect Riposte light up while they are ready. Stance Mastery and Momentum fill as they build, and the next Elementalist bolt shows its element.
+- While the next attack is special, the fire button has a ring and a badge in its colour, and the weapon in your hands glows.
+- The Great Keg is counted above the ability button, which glows before the keg is thrown. The keg flies as a powder keg with a lit fuse, and lands with a shock ring, burning powder and the ground shaking. "Great Keg!", "Killing Shot!" and "Cleave!" no longer pop up after the fact.
+- Dragon Spin and Wild Hunt show with their time left among your effects.
+
+### Numbers
+- Poison, bleeding and fire on enemies float up as numbers in green, red and orange, for whoever put them on.
+- Healing your friends or your summons shows green "+" numbers over them: Last Rites, Rally Recovery, the Healing Tonic, and the mending of Consecration, Night Watch, Healing Mist and a Cartographer's lines.
+
+### Bosses
+- The Great Revenant Elemental and the War Wyvern enter with a card of their own: the name large in teal or ember, the screen edged in its colour, and the tubular bells of the Beyond the Mists soundtrack tolling.
+
+### App icon
+- A new icon for Beyond the Mists: the bell before the Great Portal's violet ring, over the peaks beyond the Mists. The Dev build's icon has a DEV band across it.
+
 ### Store and Armory
 - After you buy something, the Store goes back to the top of its list.
 - Class Upgrades and cosmetics of a class you don't own are locked: shown last in their tab, with no Buy button, and a way to the class (or how to earn it).
@@ -15,7 +38,7 @@
 
 ### Enemies
 - The Fallen Revenant is a Revenant to look at, with the class's own gear, its Spectral Claws and its swing, and a named health bar like the Fallen Heroes. Its mist leap and life drain are unchanged.
-- Children of the Woods, on foot or riding, leave either their weapon or a bundle of arrows when they fall, each half the time.
+- Children of the Woods, on foot or riding, leave something one time in five when they fall: their weapon, a bundle of arrows or food, a third each.
 - On Mist Bastion, enemies walking up their lane look ahead, not at someone they only see beside it. They turn to whoever they strike or shoot.
 
 ### New Class Upgrades
@@ -63,7 +86,7 @@ Every path of the Revenant, the Monk, the Plague Doctor, the Artificer and the C
 - The Mists have no rain or storms.
 - About one night in ten in the Valleys of Mesenlla and on Mist Bastion is windy: pale streaks of wind and tumbling leaves blow past wherever you are, with a breeze to hear. The Sandbox can turn it on too.
 - Tents have sloping sides as steep as their canvas, so neither players nor creatures can climb on top of them any more.
-- Network protocol 52: older builds cannot join newer ones.
+- Network protocol 53: older builds cannot join newer ones.
 
 ## Development — Beyond the Mists, on show
 

@@ -14,7 +14,10 @@ static func mend_summons(w: World, owner: int, at: Vector3, radius: float, heali
 		if ally.dead or ally.remote_owner != 0 or ally.global_position.distance_to(at) > radius: continue
 		if Net.active() and ally.master and Net.bots_foes(owner, ally.master.net_id()): continue
 		var cap := float(Ally.HEALTH[ally.kind]) * (ally.master.m("ally_hp") if ally.master else 1.0)
+		var before := ally.hp
 		ally.hp = minf(cap, ally.hp + healing)
+		if ally.master and ally.master == w.player:
+			w.show_heal_on(ally, ally.hp - before)
 
 static func heal_party(p: Player, at: Vector3, radius: float, healing: float) -> void:
 	var w := p.world

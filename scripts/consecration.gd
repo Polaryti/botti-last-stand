@@ -186,7 +186,7 @@ func _tend(p: Player, step: float) -> void:
 		return
 	if is_friend(p):
 		if p.hp < p.max_hp():
-			p.mended_by_friend(UpgradeKit.CONSECRATE_HEAL * step)
+			p.mended_by_friend(UpgradeKit.CONSECRATE_HEAL * step, owner_peer)
 	else:
 		p.apply_status(Net.Status.BURN, 1.0)
 		p.apply_status(Net.Status.SLOW, 0.5)

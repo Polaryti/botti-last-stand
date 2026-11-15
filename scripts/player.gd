@@ -187,6 +187,8 @@ var ward_hp := 0.0 # Shield Wall: harm still to be stopped
 var ward_left := 0.0
 var bombs_thrown := 0 # for the Great Keg
 var musket_shots := 0 # for Grapeshot
+var _mended_by := {} # friend's net id -> healing their fields gave since the last report
+var _mended_wait := 0.0
 var grapeshot_flash := 0.0 # 1 when Grapeshot has just gone off, fading: the HUD's burst round the crosshair
 var hunt_left := 0.0 # Wild Hunt under way
 var hunt_timer := 0.0
@@ -541,6 +543,162 @@ func status_effects() -> Array[Dictionary]:
 	return out
 
 
+## What is building up to a special attack, or ready and waiting to make the next one special, for
+## the HUD to show before it happens (a counter under the crosshair, a glow on the button and on the
+## weapon). Each is {key, name, icon, color, button ("fire", "art" or "" for no button), need (how
+## many to count to, 0 when it is not counted), have, primed (the next use is the special one, or it
+## is armed and waiting), active (an empowered state in effect now)}.
+func readiness() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var col := ClassDefs.color(class_id)
+	var d := weapon_def()
+	var kind: int = d.get("kind", -1) if not d.is_empty() else -1
+	var wid := weapon_id()
+	var every := func(key: String, look: Dictionary, button: String, need: int, have: int) -> void:
+		out.append({"key": key, "name": look["name"], "icon": look["icon"], "color": look.get("color", col), "button": button,
+			"need": need, "have": have, "primed": have == need - 1, "active": false})
+	var armed := func(key: String, look: Dictionary, button: String, ready: bool, active := false) -> void:
+		out.append({"key": key, "name": look["name"], "icon": look["icon"], "color": look.get("color", col), "button": button,
+			"need": 0, "have": 0, "primed": ready, "active": active})
+	# Counted to: the Nth use is the special one.
+	if wid == "musket" and has_item("grapeshot"):
+		every.call("grapeshot", _item_look("grapeshot", UiTheme.EMBER), "fire", PathUpgrades.GRAPESHOT_EVERY, musket_shots % PathUpgrades.GRAPESHOT_EVERY)
+	if kind == WeaponDefs.Kind.RANGED and has_flag("overdraw"):
+		every.call("overdraw", _ability_look("overdraw"), "fire", AbilityNumbers.OVERDRAW_EVERY, _shot_count % AbilityNumbers.OVERDRAW_EVERY)
+	if kind == WeaponDefs.Kind.SPELL and has_flag("meteor"):
+		every.call("meteor", _ability_look("meteor"), "fire", AbilityNumbers.METEOR_EVERY, _shot_count % AbilityNumbers.METEOR_EVERY)
+	if wid == "war_staff":
+		var surge := PathUpgrades.bolt_every(self)
+		var look := _item_look("arcane_surge", ClassDefs.color("magician")) if has_item("arcane_surge") else {"name": "Staff Bolt", "icon": "staff+bolt"}
+		every.call("war_staff", look, "fire", surge, _war_attacks % surge)
+	if int(d.get("cleave", 0)) > 0:
+		var n := int(d["cleave"])
+		every.call("cleave", {"name": "Cleave", "icon": "axe+up", "color": Color(0.95, 0.75, 0.5)}, "fire", n, (_cleave_count % n) if _cleave_idle < 2.0 else 0)
+	if has_flag("bo_master") and d.get("swing", "") == "bo":
+		var n := 2 if has_flag("hundred_hands") else 3
+		every.call("bo_sweep", _ability_look("bo_master"), "fire", n, _bo_hits % n)
+	for event: String in ["hit", "melee_swing"]:
+		for e: Dictionary in _triggers.get(event, []):
+			if e.has("nth") and kind == WeaponDefs.Kind.MELEE:
+				every.call("nth_" + str(e.get("from", event)), {"name": e.get("from_name", ""), "icon": e.get("from_icon", "star+up")}, "fire", int(e["nth"]), int(e["count"]) % int(e["nth"]))
+	if spec_id == "pyromaniac" and has_item("great_keg"):
+		every.call("great_keg", _item_look("great_keg", UiTheme.EMBER), "art", PathUpgrades.GREAT_KEG_EVERY, bombs_thrown % PathUpgrades.GREAT_KEG_EVERY)
+	# Armed and waiting for the next one.
+	if kind == WeaponDefs.Kind.RANGED and has_flag("killing_shot"):
+		armed.call("killing_shot", _ability_look("killing_shot"), "fire", _kill_shot_cd <= 0.0)
+	if _next_hit_mult > 1.0 and kind == WeaponDefs.Kind.MELEE:
+		var source := "spirit_strike" if _next_hit_mult >= 3.0 else ("counterstep" if has_flag("counterstep") else "mirror_step")
+		var look := _ability_look(source)
+		look["name"] = "%s: next blow ×%s" % [look["name"], str(snappedf(_next_hit_mult, 0.1)).trim_suffix(".0")]
+		armed.call("next_blow", look, "fire", true)
+	if has_flag("assassin") and kind == WeaponDefs.Kind.MELEE and world:
+		armed.call("assassin", _ability_look("death_dark"), "fire", _unaware_in_reach(float(d.get("range", 2.0)) + 0.5))
+	if has_flag("perfect_riposte"):
+		armed.call("riposte", _ability_look("perfect_riposte"), "", _riposte_cd <= 0.0)
+	if has_flag("elements") and kind == WeaponDefs.Kind.SPELL:
+		var next: String = ["fire", "frost", "storm"][(_shot_count + 1) % 3]
+		var look: Dictionary = {"fire": {"name": "Next bolt: fire", "icon": "flame", "color": Color(1.0, 0.5, 0.15)}, "frost": {"name": "Next bolt: frost", "icon": "snow", "color": Color(0.55, 0.85, 1.0)}, "storm": {"name": "Next bolt: lightning", "icon": "bolt", "color": Color(0.85, 0.8, 1.0)}}[next]
+		armed.call("element", look, "", false)
+	# Built up, and in effect while it lasts.
+	if class_id == "adept" and STANCES.has(stance):
+		out.append({"key": "stance_mastery", "name": "Stance Mastery", "icon": "lotus+up", "color": col, "button": "",
+			"need": 3, "have": stance_hits, "primed": false, "active": _stance_mastered})
+	if d.get("momentum", false) and _flail_stacks > 0:
+		out.append({"key": "momentum", "name": "Momentum", "icon": "flail+up", "color": Color(0.95, 0.75, 0.5), "button": "",
+			"need": 3, "have": _flail_stacks, "primed": false, "active": true})
+	return out
+
+
+## Spectator Mode: this phone's player is nobody. It stays out of the match (down, unseen, not
+## touched by anything), keeps no hands in view, and its camera, freed from its body, is the broadcast
+## camera (SpectatorView moves it, and the body with it so sound and detail follow the view).
+func make_spectator() -> void:
+	dead = true
+	visible = false
+	collision_layer = 0
+	collision_mask = 0
+	process_mode = Node.PROCESS_MODE_DISABLED
+	if _vm_root:
+		_vm_root.visible = false
+	camera.top_level = true
+	camera.current = true
+
+
+## While the next attack is a special one, the weapon in your hands glows in its colour.
+var _primed_color := Color.TRANSPARENT
+var _primed_wait := 0.0
+var _primed_glow: StandardMaterial3D
+
+func _tick_primed_glow(delta: float) -> void:
+	if is_bot() or _vm_mesh == null:
+		return
+	_primed_wait -= delta
+	if _primed_wait <= 0.0:
+		_primed_wait = 0.1
+		_primed_color = Color.TRANSPARENT
+		for r: Dictionary in readiness():
+			if r["button"] == "fire" and r["primed"]:
+				_primed_color = r["color"]
+				break
+	if _primed_color.a <= 0.0:
+		_vm_mesh.material_overlay = null
+		return
+	if _primed_glow == null:
+		_primed_glow = StandardMaterial3D.new()
+		_primed_glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_primed_glow.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_primed_glow.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_primed_glow.disable_fog = true
+	_primed_glow.albedo_color = Color(_primed_color, 0.13 + sin(Time.get_ticks_msec() * 0.01) * 0.07)
+	_vm_mesh.material_overlay = _primed_glow
+
+
+## Whether the weapon in your hands glows now (the next attack is a special one).
+func weapon_glows() -> bool:
+	return _primed_color.a > 0.0
+
+
+## Death from the Dark: an enemy that has not noticed you, close enough in front to strike.
+func _unaware_in_reach(reach: float) -> bool:
+	var forward := -global_basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	for z: Zombie in world.zombies_near(global_position, reach, 8):
+		if z.is_unaware() and z.type_id != "beast" and not z.hero:
+			var to := z.position - global_position
+			to.y = 0.0
+			if to.length() < 0.3 or forward.dot(to.normalized()) > 0.5:
+				return true
+	return false
+
+
+## The name and icon of one of this class's abilities, as its skill tree shows them.
+func _ability_look(id: String) -> Dictionary:
+	var found := _find_ability(AbilityData.tree(class_id), id)
+	return {"name": str(found.get("name", id.capitalize())), "icon": str(found.get("icon", "star+up")) if str(found.get("icon", "")) != "" else "star+up"}
+
+
+static func _find_ability(node: Variant, id: String) -> Dictionary:
+	if node is Dictionary:
+		if (node as Dictionary).get("id", "") == id and (node as Dictionary).has("desc"):
+			return node
+		for v: Variant in (node as Dictionary).values():
+			var found := _find_ability(v, id)
+			if not found.is_empty():
+				return found
+	elif node is Array:
+		for v: Variant in node:
+			var found := _find_ability(v, id)
+			if not found.is_empty():
+				return found
+	return {}
+
+
+## A Class Upgrade's name and icon, as the Store shows them.
+func _item_look(id: String, color: Color) -> Dictionary:
+	return {"name": ShopDefs.ITEMS[id]["name"], "icon": ShopDefs.ITEMS[id]["icon"], "color": color}
+
+
 ## Whether something can make you invisible now: not within INVIS_LOCKOUT of the last time you were.
 func can_vanish() -> bool:
 	return invis_left > 0.0 or invis_lockout <= 0.0
@@ -708,10 +866,28 @@ func cure() -> void:
 	burn_time = 0.0
 
 
-func mended_by_friend(amount: float) -> void:
+## `by`: the friend whose field it is (their net id), who sees what it gave as green numbers.
+func mended_by_friend(amount: float, by := 0) -> void:
+	var gained := minf(amount, max_hp() - hp)
 	if hp < max_hp():
 		friend_heal_left = 0.6
 	heal(amount)
+	if by != 0 and by != net_id() and gained > 0.0:
+		_mended_by[by] = float(_mended_by.get(by, 0.0)) + gained
+
+
+## Every half second, the healing friends' fields gave goes to their phones to show.
+func _report_mending(delta: float) -> void:
+	if _mended_by.is_empty():
+		return
+	_mended_wait -= delta
+	if _mended_wait > 0.0:
+		return
+	_mended_wait = 0.5
+	for by: int in _mended_by:
+		if float(_mended_by[by]) >= 0.5:
+			Net.healed_by(by, net_id(), float(_mended_by[by]))
+	_mended_by.clear()
 
 
 func say(text: String) -> void:
@@ -1244,6 +1420,9 @@ func _apply_ability(a: Dictionary) -> void:
 		var entry := e.duplicate()
 		entry["cd_left"] = 0.0
 		entry["count"] = 0
+		entry["from"] = a["id"] # for the HUD's counters
+		entry["from_name"] = a["name"]
+		entry["from_icon"] = a["icon"] if str(a["icon"]) != "" else "star+up"
 		entry["timer"] = 1.0 if e.get("soon", false) else float(e.get("secs_every", 0.0))
 		if e["when"] == "take":
 			_act(entry, {})
@@ -2658,8 +2837,8 @@ func _throw_bombs() -> void:
 	var n := int(m("bomb_count"))
 	if PathUpgrades.next_is_keg(self):
 		# Great Keg: one great keg instead, twice the reach and damage.
-		world.spawn_thrown(_throw_start(), _throw_velocity(15.0 * m("bomb_throw")), Color(0.42, 0.26, 0.12), func(at: Vector3) -> void: bomb_burst(at, PathUpgrades.GREAT_KEG_POWER), true, 2.0)
-		say("Great Keg!")
+		# No word after the throw: the HUD showed it was coming (the counter over the button, its glow).
+		world.spawn_thrown(_throw_start(), _throw_velocity(15.0 * m("bomb_throw")), Color(0.42, 0.26, 0.12), func(at: Vector3) -> void: bomb_burst(at, PathUpgrades.GREAT_KEG_POWER), true, 2.4, "keg")
 		n = 0
 	for i in n:
 		var spread := 0.0 if n == 1 else (float(i) / (n - 1) - 0.5) * 0.3
@@ -2674,6 +2853,16 @@ func bomb_burst(at: Vector3, power := 1.0) -> void:
 	var col := Color(1.0, 0.55, 0.15, 0.55)
 	world.fx_blast(at, radius * 0.8, col)
 	sfx("blast", -2.0, 1.0, 0.1)
+	if power > 1.0:
+		# The Great Keg: a shock ring as wide as its reach, burning powder thrown all round, the ground
+		# shaking and a deeper boom under the blast.
+		world.fx_ring(at, radius, Color(1.0, 0.42, 0.1))
+		for i in 10:
+			var ray := Vector3(sin(TAU * i / 10.0), 0.35, cos(TAU * i / 10.0)).normalized()
+			world.fx_spark(at + Vector3.UP * 0.3, at + Vector3.UP * 0.3 + ray * radius * randf_range(0.7, 1.0), true)
+		sfx("boulder_impact", -1.0, 0.7)
+		if global_position.distance_to(at) < radius * 3.0:
+			_shake = maxf(_shake, 0.45)
 	world.make_noise(at, 16.0)
 	for z: Zombie in world.zombies.duplicate():
 		if z.is_alive() and z.centre().distance_to(at) <= radius:
@@ -3395,6 +3584,8 @@ func _process_step(delta: float) -> void:
 	hurt_dir_time = maxf(0.0, hurt_dir_time - delta * 1.4)
 	level_flash = maxf(0.0, level_flash - delta * 1.2)
 	grapeshot_flash = maxf(0.0, grapeshot_flash - delta * 2.0)
+	_report_mending(delta)
+	_tick_primed_glow(delta)
 	hit_marker = maxf(0.0, hit_marker - delta * 4.0)
 	toast_time = maxf(0.0, toast_time - delta)
 	_cooldown -= delta
@@ -3595,8 +3786,7 @@ func _fire_arrow(d: Dictionary) -> void:
 		dmg *= AbilityNumbers.OVERDRAW_POWER
 	if has_flag("killing_shot") and _kill_shot_cd <= 0.0:
 		_kill_shot_cd = AbilityNumbers.KILLING_SHOT_EVERY
-		dmg = AbilityNumbers.KILLING_SHOT_DAMAGE
-		say("Killing Shot!")
+		dmg = AbilityNumbers.KILLING_SHOT_DAMAGE # the HUD showed it armed before the shot
 	if weapon_id() == "musket" and PathUpgrades.grapeshot(self, start, dir, d):
 		_kick = 1.0
 		sfx("blast", -5.0, 1.5, 0.05)
@@ -3699,7 +3889,6 @@ func _do_melee_hit() -> void:
 		if _cleave_count % int(d["cleave"]) == 0:
 			stats["damage"] *= 2.0
 			stats["knock"] *= 1.8
-			say("Cleave!")
 			world.fx_blast(global_position + Vector3.UP * 0.3 - global_basis.z * 1.6, 1.4, Color(0.95, 0.75, 0.5, 0.45))
 			sfx("cleave", -1.0, randf_range(0.95, 1.05))
 	var hits := world.melee_hit(self, d, stats)

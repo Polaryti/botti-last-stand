@@ -63,6 +63,18 @@ const TIMED := [
 		"desc": "Faster attacks and critical strikes."
 	},
 	{
+		"field": "spin_left",
+		"name": "Dragon Spin",
+		"icon": "spiral",
+		"desc": "A Bo Master's Dragon Spin under way: the Bo whirls round you, striking everything close."
+	},
+	{
+		"field": "hunt_left",
+		"name": "Wild Hunt",
+		"icon": "bow+horse",
+		"desc": "A Horse Archer's Wild Hunt under way: arrows loosed on their own at whatever is near, from the saddle."
+	},
+	{
 		"field": "rage_left",
 		"name": "Undying Rage",
 		"icon": "flame",

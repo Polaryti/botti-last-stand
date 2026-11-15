@@ -42,13 +42,59 @@ func _ready() -> void:
 	set_process(false)
 
 
+## Damage over time, in its status's colour, and healing, green with a plus: these join numbers of
+## their own kind on the same one for a little longer, so a poison shows as a steady few numbers.
+const DOT_COLORS := {"poison": Color(0.5, 0.95, 0.32), "bleed": Color(0.95, 0.22, 0.18), "fire": Color(1.0, 0.56, 0.16)}
+const HEAL_COLOR := Color(0.42, 1.0, 0.55)
+const SLOW_MERGE := 0.45
+const KINDS := ["", "poison", "bleed", "fire", "heal"]
+
+
 ## amount taken from `who` (its instance id) at `at`; full is its whole health.
 func show_hit(who: int, at: Vector3, amount: float, full: float) -> void:
-	if amount < 0.5 or amount >= 5000.0 or not Game.damage_numbers:
+	var slot := _slot(who * 8, at, amount, MERGE)
+	if slot < 0:
 		return
+	var l := _labels[slot]
+	var heavy := _sum[slot] >= full * HEAVY
+	l.text = str(roundi(_sum[slot]))
+	l.modulate = Color(1.0, 0.72, 0.25) if heavy else Color(1, 1, 1)
+	l.font_size = 54 if heavy else 40
+	set_process(true)
+
+
+## Damage over time on `who`: "poison", "bleed" or "fire", tinted, smaller than a blow's.
+func show_dot(who: int, at: Vector3, amount: float, kind: String) -> void:
+	var slot := _slot(who * 8 + KINDS.find(kind), at + Vector3.UP * 0.15, amount, SLOW_MERGE)
+	if slot < 0:
+		return
+	var l := _labels[slot]
+	l.text = str(maxi(1, roundi(_sum[slot])))
+	l.modulate = DOT_COLORS.get(kind, Color.WHITE)
+	l.font_size = 34
+	set_process(true)
+
+
+## Healing given to `who` (a friend, one of your summons): green, "+12".
+func show_heal(who: int, at: Vector3, amount: float) -> void:
+	var slot := _slot(who * 8 + KINDS.find("heal"), at, amount, SLOW_MERGE)
+	if slot < 0:
+		return
+	var l := _labels[slot]
+	l.text = "+%d" % maxi(1, roundi(_sum[slot]))
+	l.modulate = HEAL_COLOR
+	l.font_size = 40
+	set_process(true)
+
+
+## The label for `key` (an owner and a kind): the one still joining it within `merge`, else the next
+## of the pool. -1 when nothing should show.
+func _slot(key: int, at: Vector3, amount: float, merge: float) -> int:
+	if amount < 0.5 or amount >= 5000.0 or not Game.damage_numbers:
+		return -1
 	var slot := -1
 	for i in MAX:
-		if _owner[i] == who and _age[i] < MERGE:
+		if _owner[i] == key and _age[i] < merge:
 			slot = i
 			break
 	if slot < 0:
@@ -58,16 +104,11 @@ func show_hit(who: int, at: Vector3, amount: float, full: float) -> void:
 		_age[slot] = 0.0
 		# A little to one side or the other, so numbers in a row do not sit on top of each other.
 		_from[slot] = at + Vector3(randf_range(-0.25, 0.25), 0.25, randf_range(-0.25, 0.25))
-		_owner[slot] = who
+		_owner[slot] = key
 	_sum[slot] += amount
-	var l := _labels[slot]
-	var heavy := _sum[slot] >= full * HEAVY
-	l.text = str(roundi(_sum[slot]))
-	l.modulate = Color(1.0, 0.72, 0.25) if heavy else Color(1, 1, 1)
-	l.font_size = 54 if heavy else 40
-	l.position = _from[slot]
-	l.visible = true
-	set_process(true)
+	_labels[slot].position = _from[slot]
+	_labels[slot].visible = true
+	return slot
 
 
 func _process(delta: float) -> void:

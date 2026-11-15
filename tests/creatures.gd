@@ -400,22 +400,23 @@ func _children() -> void:
 	check(kid.weapon_id in ZombieDefs.ALL["child_of_woods"]["weapons"], "a Child of the Woods carries a weapon it found (%s)" % kid.weapon_id)
 	check(kid.model_id == "woods_child" and not kid._custom, "on an animated body of its own")
 	kid.take_damage(10000.0, Vector3.ZERO, 0.0, kid.centre())
-	var left := {"weapon": 0, "arrows": 0, "": 0}
-	for n in 4000:
+	var left := {"weapon": 0, "arrows": 0, "food": 0, "": 0}
+	for n in 6000:
 		left[Zombie.loot(ZombieDefs.ALL["child_of_woods"])] += 1
-	check(left["weapon"] > 1800 and left["weapon"] < 2200 and left["weapon"] + left["arrows"] == 4000, "falling, it leaves its weapon half the time and arrows the other half (%d weapons, %d arrows of 4000)" % [left["weapon"], left["arrows"]])
-	check(Zombie.loot(ZombieDefs.ALL["clever"]) == "weapon" and is_equal_approx(ZombieDefs.ALL["woodland_cavalry"]["weapon_drop"], 0.5) and ZombieDefs.ALL["woodland_cavalry"].get("arrows_else", false), "others still always drop their weapon; the riders are Children too")
-	var arrows_before := w.count_pickups(Pickup.Kind.ARROWS)
-	var weapons_before := w.pickups.filter(func(q: Pickup) -> bool: return q.kind == Pickup.Kind.WEAPON).size()
+	var dropped: int = left["weapon"] + left["arrows"] + left["food"]
+	check(dropped > 1080 and dropped < 1320, "falling, it leaves something one time in five (%d of 6000)" % dropped)
+	check([left["weapon"], left["arrows"], left["food"]].all(func(n: int) -> bool: return absf(float(n) / float(dropped) - 1.0 / 3.0) < 0.06), "and that is its weapon, arrows or food, a third each (%d, %d, %d)" % [left["weapon"], left["arrows"], left["food"]])
+	check(Zombie.loot(ZombieDefs.ALL["clever"]) == "weapon" and ZombieDefs.ALL["woodland_cavalry"]["loot"] == ZombieDefs.ALL["child_of_woods"]["loot"] and is_equal_approx(ZombieDefs.ALL["woodland_cavalry"]["loot_chance"], 0.2), "others still always drop their weapon; the riders are Children too")
+	var count_of := func(kind: Pickup.Kind) -> int: return w.pickups.filter(func(q: Pickup) -> bool: return q.kind == kind).size()
+	var before := [count_of.call(Pickup.Kind.WEAPON), count_of.call(Pickup.Kind.ARROWS), count_of.call(Pickup.Kind.FOOD)]
 	seed(20261115) # the same falls every run
-	for n in 8:
-		var child := raise("child_of_woods", at + Vector3(n * 1.5 - 6.0, 0, -18))
+	for n in 30:
+		var child := raise("child_of_woods", at + Vector3((n % 10) * 1.5 - 7.0, 0, -18 - (n / 10) * 1.5))
 		child.take_damage(10000.0, Vector3.ZERO, 0.0, child.centre())
 		child.release() # its body back to the pool for the next one; what it left stays
 	randomize()
-	var new_arrows := w.count_pickups(Pickup.Kind.ARROWS) - arrows_before
-	var new_weapons := w.pickups.filter(func(q: Pickup) -> bool: return q.kind == Pickup.Kind.WEAPON).size() - weapons_before
-	check(new_arrows + new_weapons == 8 and new_arrows > 0 and new_weapons > 0, "eight Children fallen leave eight things: %d weapons, %d bundles of arrows" % [new_weapons, new_arrows])
+	var after := [count_of.call(Pickup.Kind.WEAPON) - before[0], count_of.call(Pickup.Kind.ARROWS) - before[1], count_of.call(Pickup.Kind.FOOD) - before[2]]
+	check(after[0] + after[1] + after[2] > 0 and after[0] + after[1] + after[2] < 15, "thirty Children fallen leave a few things on the ground: %s weapons, arrows, food" % str(after))
 	var rider := raise("woodland_cavalry", at + Vector3(0, 0, -14))
 	check(rider._mounted and rider._horse_node.visible and (rider._horse_node.material_override as ShaderMaterial).get_shader_parameter("belly") != null, "Woodland Cavalry ride bears")
 	check(rider.weapon_id == "spear", "with spears")
@@ -586,7 +587,11 @@ func _mesenlla_map() -> void:
 		if z.type_id == "great_revenant_elemental":
 			boss = z
 	check(boss != null and Vector2(boss.position.x + 54.0, boss.position.z + 64.0).length() < 8.0, "at the Ring of Stones")
-	check(w.director.banner.contains("Great Revenant Elemental"), "and everyone is told")
+	check(w.director.boss_card == "great_revenant_elemental" and w.director.boss_card_time > 0.0 and w.director.banner_time == 0.0, "and everyone is told by its entrance card, not an ordinary banner")
+	for kind: String in Director.BOSS_CARDS:
+		var card: Dictionary = Director.BOSS_CARDS[kind]
+		check(ZombieDefs.ALL[kind]["name"] == card["name"] and Sfx.NAMES.has(card["bells"]) and Net.SOUNDS.has(card["bells"]) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % card["bells"]), "%s: its card has its name and its bells" % kind)
+		check(card["color"] != (Director.BOSS_CARDS.values().filter(func(c: Dictionary) -> bool: return c != card)[0] as Dictionary)["color"], "%s: a colour of its own" % kind)
 	var fell_at := boss.position
 	boss.take_damage(100000.0, Vector3.ZERO, 0.0, boss.centre())
 	await frames(2)
@@ -838,7 +843,7 @@ func _bastion_map() -> void:
 	for z: Zombie in w.zombies:
 		if z.type_id == "war_wyvern":
 			boss = z
-	check(boss != null and w.director.banner.contains("War Wyvern"), "the War Wyvern comes for the Great Portal")
+	check(boss != null and w.director.boss_card == "war_wyvern" and w.director.boss_card_time > 0.0, "the War Wyvern comes for the Great Portal, with its own entrance card")
 	p.global_position = Vector3(-60, w.ground_at(Vector3(-60, 0, 60)), 60)
 	portal_hp = fort.heart_hp
 	boss.mesenlla_mind._pass_left = 0.0

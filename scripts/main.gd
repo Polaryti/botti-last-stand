@@ -4,6 +4,7 @@ extends Node
 
 var world: World
 var hud: Hud
+var spectator: SpectatorView # Spectator Mode: the broadcast over a match this phone only watches
 var ui_layer: CanvasLayer
 var panel: Control
 var _theme: Theme
@@ -26,6 +27,7 @@ const ARMORY_MAPS := "maps" # the Armory's Map Upgrades row, beside the classes
 var _armory_tab := 0
 const TOGETHER_TABS := ["Same Wi-Fi", "Online"]
 const ONLINE_TAB := 1
+const SPECTATE_RED := Color(0.92, 0.24, 0.2) # a match to watch: its rows, the Play Together glow, the LIVE mark
 const TIPS := [
 	"Push the stick halfway to walk quietly.",
 	"Zombies see you much less in tall wheat.",
@@ -131,6 +133,7 @@ func _clear_ui() -> void:
 		c.queue_free()
 	panel = null
 	hud = null
+	spectator = null
 	tree_panel = null
 
 
@@ -197,7 +200,10 @@ func show_menu(rebuild := false) -> void:
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
 	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal.", func() -> void: show_fort_picker()))
-	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
+	var together := _menu_row("Play Together", "Up to four phones, nearby or online.", show_together)
+	together.name = "PlayTogether"
+	box.add_child(together)
+	_scout_sessions(together)
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Leaderboard", "The top players of all time, and of this week.", func() -> void: show_leaderboard()))
 	box.add_child(_menu_row("Sandbox", "Try any weapon, item or class you own.", func() -> void: show_class_picker(Game.Mode.SANDBOX)))
@@ -236,6 +242,79 @@ func show_menu(rebuild := false) -> void:
 		show_name_prompt(true)
 	elif _asks_for_name():
 		_collect_prizes()
+
+
+## Each time the menu shows, a look for games: on the Wi-Fi for a few seconds, and online. Play
+## Together then glows as Changelog does when a game is open to join, glows red when a match can be
+## watched, and does both, one after the other, when there are both.
+const SCOUT_TIME := 6.0
+const JOIN_GLOW := Color(1.0, 0.62, 0.25)
+
+func _scout_sessions(row: Button) -> void:
+	var found := {"open": false, "live": false}
+	var look := func() -> void:
+		if not is_instance_valid(row):
+			return
+		var open := false
+		var live := false
+		for info: Dictionary in Net.rooms.values():
+			if not info.get("version_ok", false):
+				continue
+			if info.get("watchable", false):
+				live = true
+			elif not info.get("live", false) and int(info.get("players", 1)) < Net.MAX_PLAYERS:
+				open = true
+		for room: Dictionary in Net.public_rooms:
+			if room.get("live", false):
+				live = true
+			elif room.get("waiting", true):
+				open = true
+		if open != found["open"] or live != found["live"]:
+			found["open"] = open
+			found["live"] = live
+			_show_sessions(row, open, live)
+	Net.rooms_changed.connect(look)
+	Net.public_rooms_changed.connect(look)
+	var searching := [true]
+	Net.public_rooms.clear() # what was found before is not what is open now
+	Net.start_search()
+	if EpicNet.available():
+		Net.look_for_rooms()
+	var stop := func() -> void:
+		if searching[0]:
+			searching[0] = false
+			Net.stop_search_keep_rooms_counted()
+	get_tree().create_timer(SCOUT_TIME).timeout.connect(stop)
+	row.tree_exiting.connect(func() -> void:
+		stop.call()
+		if Net.rooms_changed.is_connected(look):
+			Net.rooms_changed.disconnect(look)
+		if Net.public_rooms_changed.is_connected(look):
+			Net.public_rooms_changed.disconnect(look))
+	look.call()
+
+
+func _show_sessions(row: Button, open: bool, live: bool) -> void:
+	row.set_meta("open", open)
+	row.set_meta("live", live)
+	var title := row.find_child("Title", true, false) as Label
+	var line := row.find_child("Line", true, false) as Label
+	if row.has_meta("glow"):
+		(row.get_meta("glow") as Tween).kill()
+		row.remove_meta("glow")
+	title.self_modulate = Color.WHITE
+	if not open and not live:
+		line.text = "Up to four phones, nearby or online."
+		return
+	line.text = "A game is open to join, and a match to watch." if open and live else ("A game is open to join." if open else "A match is live: watch it.")
+	var glow := title.create_tween().set_loops()
+	if open:
+		glow.tween_property(title, "self_modulate", JOIN_GLOW, 0.55).set_trans(Tween.TRANS_SINE)
+		glow.tween_property(title, "self_modulate", Color.WHITE, 0.55).set_trans(Tween.TRANS_SINE)
+	if live:
+		glow.tween_property(title, "self_modulate", SPECTATE_RED.lightened(0.15), 0.55).set_trans(Tween.TRANS_SINE)
+		glow.tween_property(title, "self_modulate", Color.WHITE, 0.55).set_trans(Tween.TRANS_SINE)
+	row.set_meta("glow", glow)
 
 
 ## A new version on the game's page: on Android, one tap fetches it and Android asks to install it.
@@ -317,10 +396,12 @@ func _menu_row(title: String, line: String, action: Callable, first := false) ->
 	b.add_child(words)
 	words.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 	var head := _label(title, UiTheme.FS_TITLE, UiTheme.EMBER if first else UiTheme.BONE)
+	head.name = "Title"
 	head.add_theme_font_override("font", UiTheme.bold_font())
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(head)
 	var sub := _soft(line, UiTheme.FS_BODY)
+	sub.name = "Line"
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(sub)
 	b.pressed.connect(func() -> void: Sfx.play("ui_click", -3.0))
@@ -1673,6 +1754,9 @@ func start_game(mode: int) -> void:
 		if world != current or not Net.active():
 			return
 	loading.queue_free()
+	if Net.spectating:
+		_start_spectating()
+		return
 	hud.visible = true
 	_back = show_pause
 	if mode == Game.Mode.SANDBOX:
@@ -2008,10 +2092,32 @@ func _reward_rows(box: VBoxContainer) -> void:
 	_rewards.clear()
 
 
+## Spectator Mode: the broadcast instead of the player's view and its controls.
+func _start_spectating() -> void:
+	hud.visible = false
+	spectator = SpectatorView.new(world)
+	spectator.theme = _theme
+	ui_layer.add_child(spectator)
+	_fill(spectator)
+	spectator.leave_requested.connect(show_menu)
+	_back = show_menu
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
 func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 	if _run_over or world == null:
 		return
 	_run_over = true
+	if Net.spectating:
+		# Watching earns nothing: the result, and the way out.
+		_back = show_menu
+		var end := _modal(title)
+		var end_box: VBoxContainer = end.get_meta("box")
+		var said := _body(line, UiTheme.FS_LEAD)
+		said.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		end_box.add_child(said)
+		end_box.add_child(_button("Menu", show_menu, Vector2(480, UiTheme.BTN_TALL), true))
+		return
 	var won := reached_dawn or Net.last_winner == Net.my_id()
 	if reached_dawn:
 		Game.note_mists_win()
@@ -2205,11 +2311,17 @@ func _nearby_games(box: VBoxContainer, root: Control) -> void:
 			return
 		for c in rooms.get_children():
 			c.queue_free()
-		if Net.rooms.is_empty():
+		var open := Net.rooms.keys().filter(func(a: String) -> bool: return not Net.rooms[a].get("live", false))
+		var live := Net.rooms.keys().filter(func(a: String) -> bool: return Net.rooms[a].get("watchable", false))
+		if open.is_empty():
 			rooms.add_child(_body("Looking...", UiTheme.FS_BODY))
-		for address: String in Net.rooms:
+		for address: String in open:
 			var info: Dictionary = Net.rooms[address]
 			rooms.add_child(_button("%s's game: %s, %d of %d players" % [info["name"], Net.RULE_NAMES[int(info["rules"])], info["players"], Net.MAX_PLAYERS], func() -> void: _join(address), Vector2(0, UiTheme.BTN)))
+		if not live.is_empty():
+			_section(rooms, "Matches to watch")
+		for address: String in live:
+			rooms.add_child(_live_row(Net.rooms[address], func() -> void: _watch(address)))
 	Net.rooms_changed.connect(fill)
 	# The screen shows at once; the search (which reaches into the phone's Wi-Fi settings and opens a
 	# socket, and can take a moment) starts just after it is on screen.
@@ -2281,6 +2393,12 @@ func _online_tab(box: VBoxContainer) -> void:
 	join.add_child(_button("Join", func() -> void:
 		if code_edit.text.strip_edges() != "":
 			_join_online(code_edit.text), Vector2(140, UiTheme.BTN)))
+	# A private match under way can be watched by whoever has its code.
+	var watch_code := _button("Watch", func() -> void:
+		if code_edit.text.strip_edges() != "":
+			_watch_online(code_edit.text), Vector2(140, UiTheme.BTN))
+	watch_code.name = "WatchByCode"
+	join.add_child(watch_code)
 	_public_games(box)
 
 
@@ -2304,13 +2422,20 @@ func _public_games(box: VBoxContainer) -> void:
 		for c in rows.get_children():
 			rows.remove_child(c)
 			c.queue_free()
-		if Net.public_rooms.is_empty():
+		var waiting := Net.public_rooms.filter(func(room: Dictionary) -> bool: return room.get("waiting", true))
+		var live := Net.public_rooms.filter(func(room: Dictionary) -> bool: return room.get("live", false))
+		if waiting.is_empty():
 			var empty := "Looking..." if Net.looking_up else ("Could not look: %s" % Net.lookup_problem if Net.lookup_problem != "" else "No public games right now. Start one, or join a friend's with a code.")
 			var l := _soft(empty, UiTheme.FS_BODY)
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			rows.add_child(l)
-		for room: Dictionary in Net.public_rooms:
+		for room: Dictionary in waiting:
 			rows.add_child(_public_room_row(room))
+		if not live.is_empty():
+			_section(rows, "Matches to watch")
+		for room: Dictionary in live:
+			var host := str(room["host"])
+			rows.add_child(_live_row(room, func() -> void: _watch_online(host)))
 	Net.public_rooms_changed.connect(fill)
 	var timer := Timer.new()
 	timer.wait_time = 6.0
@@ -2377,6 +2502,50 @@ func _join(address: String) -> void:
 		show_lobby()
 	else:
 		_on_net_left("That address does not look right.")
+
+
+## A match under way, in a list: who hosts it, what and where, how many watch, and the way in.
+func _live_row(room: Dictionary, watch: Callable) -> Button:
+	var map_id := str(room.get("map", ""))
+	var place: String = Places.ALL.get(map_id, {}).get("name", "") if map_id != "" else ""
+	var rules: String = Net.RULE_NAMES[clampi(int(room["rules"]), 0, Net.RULE_NAMES.size() - 1)]
+	var what := rules if place == "" else "%s, %s" % [rules, place]
+	var b := _button("Watch %s's match: %s. %d watching" % [room["name"], what, int(room.get("watchers", 0))], watch, Vector2(0, UiTheme.BTN))
+	b.name = "WatchRow"
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.add_theme_color_override("font_color", SPECTATE_RED.lightened(0.35))
+	return b
+
+
+func _watch(address: String) -> void:
+	if Net.watch_game(address) == OK:
+		_watch_wait()
+	else:
+		_on_net_left("That address does not look right.")
+
+
+func _watch_online(code: String) -> void:
+	_online_wait()
+	var problem := await Net.watch_online(code)
+	if problem != "":
+		_on_online_failed(problem)
+	else:
+		_watch_wait()
+
+
+## Joining a match to watch it: a moment while the host says yes and the world is built.
+func _watch_wait() -> void:
+	_clear_ui()
+	_back = func() -> void:
+		Net.leave()
+		show_together()
+	var root := _modal("Spectator Mode")
+	var box: VBoxContainer = root.get_meta("box")
+	box.custom_minimum_size.x = 600
+	box.add_child(_body("Joining the match to watch it...", UiTheme.FS_HEAD))
+	box.add_child(_button("Cancel", func() -> void:
+		Net.leave()
+		show_together(), Vector2(240, UiTheme.BTN)))
 
 
 ## Who is here, and what the game will be.
@@ -2468,6 +2637,16 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		for n in Net.MAX_PLAYERS - Net.humans() + 1:
 			var wanted := n
 			bots_row.add_child(_choice(str(n), func() -> void: Net.set_bots(wanted), Vector2(72, UiTheme.BTN_SHORT), Net.bot_count() == n))
+		var watch_row := _setting_row(body, "Spectators")
+		var allow := _choice("Allowed", func() -> void: Net.set_allow_spectators(true), Vector2(150, UiTheme.BTN_SHORT), Net.allow_spectators)
+		allow.name = "AllowSpectators"
+		watch_row.add_child(allow)
+		var refuse := _choice("Not allowed", func() -> void: Net.set_allow_spectators(false), Vector2(180, UiTheme.BTN_SHORT), not Net.allow_spectators)
+		refuse.name = "RefuseSpectators"
+		watch_row.add_child(refuse)
+		var watch_says := _soft("Up to %d more can watch once it starts." % Net.MAX_SPECTATORS if Net.allow_spectators else "Nobody can watch this match.", UiTheme.FS_SMALL)
+		watch_says.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		watch_row.add_child(watch_says)
 	else:
 		body.add_child(_body("Game: %s, %s. The host starts when everyone is ready." % [Net.RULE_NAMES[Net.rules], ["Easy", "Normal", "Hard"][Net.difficulty]], UiTheme.FS_BODY))
 	if Net.rules == Net.Rules.FFA:
