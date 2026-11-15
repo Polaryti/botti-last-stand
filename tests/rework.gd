@@ -553,12 +553,25 @@ func _mists() -> void:
 		approaches.append([outside, inside])
 	approaches.append([Vector3(11, 0, 0), Vector3(3, 0, 0)])
 	approaches.append([Vector3(19, 0, 124), Vector3(12, 0, 124)])
-	for approach: Array in approaches:
+	# Each body a Zombie can rise in (the spawn picks one at random): every one of them must get through.
+	var bodies: Array = ZombieDefs.ALL["normal"]["models"]
+	for run in approaches.size() * bodies.size():
+		var approach: Array = approaches[run / bodies.size()]
+		var body: String = bodies[run % bodies.size()]
 		var outside: Vector3 = approach[0]
 		var inside: Vector3 = approach[1]
 		outside.y = mw.ground_at(outside)
-		mw.spawn_zombie("normal", outside)
-		var walker: Zombie = mw.zombies.back()
+		var walker: Zombie = null
+		for attempt in 24:
+			mw.spawn_zombie("normal", outside)
+			var risen: Zombie = mw.zombies.back()
+			if risen.model_id == body:
+				walker = risen
+				break
+			risen.release()
+		if walker == null:
+			check(false, "a Zombie rises as %s" % body)
+			continue
 		walker.set_physics_process(false)
 		walker.state = Zombie.State.CHASE
 		walker._sees = true
@@ -578,7 +591,15 @@ func _mists() -> void:
 				if to.length() < 1.8: break
 				walker._move(mp, to, to.length(), 0.016)
 				await frames(1)
-			check(Vector2(walker.position.x - goal.x, walker.position.z - goal.z).length() < 2.0, "physical mob from %s reaches goal %s (ended %s)" % [outside, goal, walker.position])
+			var reached := Vector2(walker.position.x - goal.x, walker.position.z - goal.z).length() < 2.0
+			var blocker := ""
+			if not reached:
+				# What stopped it, for whoever reads the failure.
+				var ray := PhysicsRayQueryParameters3D.create(walker.centre(), Vector3(goal.x, walker.centre().y, goal.z))
+				ray.exclude = [walker.get_rid()]
+				var hit := mw.get_world_3d().direct_space_state.intersect_ray(ray)
+				blocker = " blocked by %s at %s" % [str((hit["collider"] as Node).get_path()) if hit.has("collider") and hit["collider"] is Node else "nothing", str(hit.get("position", "-"))]
+			check(reached, "physical mob (%s) from %s reaches goal %s (ended %s, blocked %.1f s)%s" % [body, outside, goal, walker.position, walker._blocked_timer, blocker])
 		walker.release()
 	mp.position = Vector3(0, 10.06, 16)
 	check(mw.night_bg.get_luminance() < 0.06 and mw.night_moon <= 0.35 and mw.night_sky_shows, "Mists uses a moonlit night palette with stars")
