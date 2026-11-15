@@ -22,13 +22,13 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 53
+const PROTOCOL := 54
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
-enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH }
-enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED }
+enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH }
+enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT }
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
 const SNAPSHOT_EVERY := 0.08
@@ -51,11 +51,13 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"bear_roar", "bear_maul", "eagle_cry", "shapeshift", "quake_warning", "earth_slam", "mist_blink", "storm_call", "fire_warning",
 	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter", "mist_muster", "portal_wound",
 	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death", "dawn_mists", "dawn_valleys", "dawn_bastion",
-	"boss_bells_revenant", "boss_bells_wyvern"]
+	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent",
+	"frost_warning", "frost_burst", "owl_screech", "boar_snort"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
-	"m_swipe", "m_rear", "m_charge", "m_slam", "m_cast", "m_breath", "m_throw", "m_blink", "m_stag", "m_beast", "m_shift"]
+	"m_swipe", "m_rear", "m_charge", "m_slam", "m_cast", "m_breath", "m_throw", "m_blink", "m_stag", "m_beast", "m_shift",
+	"m_paw", "m_wolf", "m_bite", "m_lunge", "m_howl", "m_owl", "m_dive", "m_boar", "m_gore"]
 
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
@@ -629,6 +631,10 @@ func _spectator_loaded() -> void:
 		_z_spawn.rpc_id(id, z.net_id, z.type_id, z.position, z.hero_minute)
 		if z.weapon_id != "":
 			_z_weapon.rpc_id(id, z.net_id, z.weapon_id)
+		if z.element != "":
+			_z_element.rpc_id(id, z.net_id, z.element)
+		if z.carrier and z.carrier.net_id >= 0:
+			_z_mount.rpc_id(id, z.net_id, z.carrier.net_id, z.seat)
 		if not z.dormant:
 			_z_woke.rpc_id(id, z.net_id)
 	for item: Pickup in world.pickups:
@@ -1103,6 +1109,7 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 		Fx.POISON_PATCH: world.drop_poison(a, false, b.x, b.y, true, by)
 		Fx.SPARK: world.fx_spark(a, b)
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
+		Fx.MIST_PATCH: world.drop_mist_patch(a, b.x, true)
 
 
 func set_night_map(id: String) -> void:
@@ -1322,6 +1329,46 @@ func _z_weapon(net_id: int, weapon: String) -> void:
 			z.net_weapon(weapon)
 
 
+## A wyvern's element (Zombie.element), chosen on the host as it rose.
+func zombie_element(z: Zombie) -> void:
+	_z_element.rpc(z.net_id, z.element)
+
+
+@rpc("authority", "reliable")
+func _z_element(net_id: int, element: String) -> void:
+	if world and is_instance_valid(world):
+		var z: Zombie = world.zombie_by_id(net_id)
+		if z and z.active and WyvernRig.LOOKS.has(element):
+			z.set_element(element)
+
+
+## Caught by an Antler Charm: the vines show on every phone.
+func zombie_rooted(z: Zombie, seconds: float) -> void:
+	_z_rooted.rpc(z.net_id, seconds)
+
+
+@rpc("authority", "reliable")
+func _z_rooted(net_id: int, seconds: float) -> void:
+	if world and is_instance_valid(world):
+		var z: Zombie = world.zombie_by_id(net_id)
+		if z and z.active:
+			z.show_roots(seconds)
+
+
+## A War Wyvern's rider, sat in its saddle.
+func zombie_mount(rider: Zombie, wyvern: Zombie, seat: int) -> void:
+	_z_mount.rpc(rider.net_id, wyvern.net_id, seat)
+
+
+@rpc("authority", "reliable")
+func _z_mount(rider_id: int, wyvern_id: int, seat: int) -> void:
+	if world and is_instance_valid(world):
+		var rider: Zombie = world.zombie_by_id(rider_id)
+		var wyvern: Zombie = world.zombie_by_id(wyvern_id)
+		if rider and rider.active and wyvern and wyvern.active and wyvern._visual.has_meta("rig"):
+			rider.mount_on(wyvern, seat)
+
+
 func zombie_woke(z: Zombie) -> void:
 	_z_woke.rpc(z.net_id)
 
@@ -1375,6 +1422,7 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.PULL: z.pull_to(Vector3(a, 0.0, b))
 		Zombie.Effect.DISARM: z.disarm(a > 0.5)
 		Zombie.Effect.FLINCH: z.flinch(a)
+		Zombie.Effect.ROOT: z.root(a)
 
 
 func noise(at: Vector3, radius: float) -> void:

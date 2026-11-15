@@ -9,7 +9,7 @@ var w: World
 var p: Player
 
 const KINDS := ["bear", "mist_bear", "eagle", "mist_eagle", "shapeshifter", "child_of_woods", "woodland_cavalry", "earth_elemental",
-	"mist_elemental", "storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern"]
+	"mist_elemental", "storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "wyvern_rider"]
 
 
 func check(condition: bool, description: String) -> void:
@@ -122,7 +122,7 @@ func clear() -> void:
 func raise(id: String, at: Vector3) -> Zombie:
 	var spot := w.grid.to_world(w.grid.nearest_free(w.grid.to_cell(at)))
 	check(w.spawn_zombie(id, Vector3(spot.x, 0, spot.z)), "%s can be raised" % id)
-	var z: Zombie = w.zombies.back()
+	var z: Zombie = w.zombies.filter(func(o: Zombie) -> bool: return o.type_id == id).back() # (a War Wyvern's riders rise after it)
 	var look := p.global_position - z.position
 	z.rotation.y = atan2(look.x, look.z)
 	z._start_chase(p.global_position)
@@ -152,7 +152,7 @@ func _entries() -> void:
 		for part: String in str(d["icon"]).split("+"):
 			check(Icons.exists(part), "%s icon part %s" % [id, part])
 		check(Sfx.NAMES.has(Zombie.MESENLLA_VOICES.get(id, "")), "%s has a voice" % id)
-	for state: String in ["m_swipe", "m_rear", "m_charge", "m_slam", "m_cast", "m_breath", "m_throw", "m_blink", "m_stag", "m_beast", "m_shift"]:
+	for state: String in ["m_swipe", "m_rear", "m_charge", "m_slam", "m_cast", "m_breath", "m_throw", "m_blink", "m_stag", "m_beast", "m_shift", "m_paw"]:
 		check(Net.ANIMS.has(state), "%s reaches other phones" % state)
 	check(Net.ANIMS.size() <= 64, "the state still fits its six bits")
 	for sound: String in ["quake_warning", "earth_slam", "storm_call", "fire_warning", "fire_breath", "boulder_throw", "boulder_impact", "revenant_roar", "bear_maul"]:
@@ -188,6 +188,14 @@ func _bear() -> void:
 		MesenllaModels.animate(z, z._visual, 0.05, z._speed)
 		swings.append(leg.rotation.x)
 	check(swings.max() - swings.min() > 0.3, "walking, its legs swing (%.2f)" % (swings.max() - swings.min()))
+	var sole := z._visual.get_node("Rig/Hind/Torso/LegFL/Knee/Paw") as Node3D
+	var turned := 0.0
+	for i in 30:
+		MesenllaModels.animate(z, z._visual, 0.03, z._speed)
+		turned = maxf(turned, sole.rotation.x)
+	check(turned > 0.4, "each paw turns its sole back as it lifts (%.2f)" % turned)
+	check(z._parts.filter(func(mi: MeshInstance3D) -> bool: return mi.get_meta("own_material", null) == MesenllaModels.fur_material(false)).size() >= 10, "in a coat of fur")
+	check(z._visual.get_node_or_null("Rig/Hind/Torso/Head/Jaw") != null, "with a jaw that opens")
 	# A hit flashes every part of it, and each part gets its own look back after.
 	var eyes: Array = z._parts.filter(func(mi: MeshInstance3D) -> bool: return mi.get_meta("own_material", null) == MesenllaModels.glow_material())
 	check(z._parts.size() > 8 and eyes.size() >= 1, "all its parts flash when struck (%d)" % z._parts.size())
@@ -197,7 +205,9 @@ func _bear() -> void:
 	var hp0 := p.hp
 	check(await until_state(z, "m_rear", 6.0), "a bear close by rears up first")
 	check(z.is_warning(), "and that is its tell")
-	await seconds(MesenllaMind.MAUL_TELL + 0.3)
+	await seconds(MesenllaMind.MAUL_TELL * 0.6)
+	check((z._visual.get_node("Rig/Hind") as Node3D).rotation.x < -0.8 and (z._visual.get_node("Rig/Hind/Torso/Head/Jaw") as Node3D).rotation.x > 0.4, "up on its hind legs, roaring")
+	await seconds(MesenllaMind.MAUL_TELL * 0.4 + 0.3)
 	check(p.hp < hp0 - z._damage * 1.5, "then the maul lands hard (%.0f)" % (hp0 - p.hp))
 	# A stun stops a rearing bear.
 	z.mesenlla_mind.cooldown = 0.0
@@ -212,7 +222,13 @@ func _mist_bear() -> void:
 	var z := raise("mist_bear", at + Vector3(0, 0, -11))
 	z.mesenlla_mind.cooldown_b = 0.0
 	var hp0 := p.hp
-	check(await until_state(z, "m_rear", 6.0), "a Mist Bear paws the ground before a charge")
+	check(await until_state(z, "m_paw", 6.0), "a Mist Bear paws the ground before a charge")
+	var paw := z._visual.get_node("Rig/Hind/Torso/LegFR") as Node3D
+	var rakes := []
+	for i in 12:
+		await seconds(0.05)
+		rakes.append(paw.rotation.x)
+	check(rakes.max() - rakes.min() > 0.5 and (z._visual.get_node("Rig/Hind/Torso/Head") as Node3D).rotation.x > 0.25, "head down, raking the ground with a forepaw (%.2f)" % (rakes.max() - rakes.min()))
 	var charged := await until_state(z, "m_charge", 3.0)
 	if not charged:
 		print("DEBUG mist bear: state=%s phase=%s left=%.2f dist=%.1f" % [z._current_anim, z.mesenlla_mind.phase, z.mesenlla_mind.left, z.position.distance_to(p.global_position)])
@@ -225,25 +241,97 @@ func _mist_bear() -> void:
 func _shapeshifter() -> void:
 	var at := arena()
 	var z := raise("shapeshifter", at + Vector3(0, 0, -16))
+	var mind := z.mesenlla_mind
 	check(z._current_anim == "m_stag" and z._damage == 0.0, "the Shapeshifter starts as a harmless stag")
 	check((z._visual.get_node("Stag") as Node3D).visible and not (z._visual.get_node("Beast") as Node3D).visible, "and looks like one")
 	z.position = Vector3(at.x, w.ground_at(at), at.z - 5.0)
 	check(await until_state(z, "m_shift", 4.0), "close by, it changes shape")
 	await seconds(MesenllaMind.SHIFT_TIME + 0.2)
-	check(z.mesenlla_mind.form == "beast" and z._damage > 0.0, "into a beast that can hurt you")
+	var first := mind.form
+	check(first in MesenllaMind.FIGHTING_FORMS and z._damage > 0.0, "into one that can hurt you (%s)" % first)
 	await seconds(0.2)
-	check((z._visual.get_node("Beast") as Node3D).visible, "and looks like one")
+	var node_of := {"beast": "Beast", "wolf": "Wolf", "owl": "Owl", "boar": "Boar"}
+	check((z._visual.get_node(node_of[first]) as Node3D).visible and not (z._visual.get_node("Stag") as Node3D).visible, "and looks like it")
+	# Every FORM_TIME seconds it takes another shape: each looks its own, moves at its own pace.
+	var seen := {first: true}
+	for i in 12:
+		mind._form_left = 0.0
+		await seconds(MesenllaMind.SHIFT_TIME + 0.35)
+		var now: String = mind.form
+		check(now != "stag" and is_equal_approx(z._speed, float(MesenllaMind.FORM_SPEED[now]) * Game.enemy_speed()) and (z._visual.get_node(node_of[now]) as Node3D).visible, "as the %s it moves at its own pace and looks like one" % MesenllaMind.FORM_NAMES[now])
+		seen[now] = true
+		if seen.size() == 4:
+			break
+	check(seen.size() == 4, "beast, wolf, owl and boar in turn (%s)" % str(seen.keys()))
+	# The Mist Wolf howls and the creatures round it are hastened; then it lunges.
+	z.hp = z.max_hp
+	mind._begin_shift(z, "wolf")
+	await seconds(MesenllaMind.SHIFT_TIME + 0.1)
+	var friend := raise("bear", z.position + Vector3(3, 0, 0))
+	friend.set_physics_process(false)
+	mind.cooldown_b = 0.0
+	mind._form_left = 60.0
+	z.position = Vector3(at.x, w.ground_at(at), at.z - 6.0)
+	check(await until_state(z, "m_howl", 3.0), "the Mist Wolf howls")
+	await seconds(MesenllaMind.HOWL_TIME + 0.1)
+	check(friend.haste_left > 0.0 and friend._desired_speed() > 0.0, "and the creatures near it are hastened")
+	var calm := friend._speed
+	friend.state = Zombie.State.CHASE
+	check(friend._desired_speed() > calm * 1.2, "faster than they were (%.1f, was %.1f)" % [friend._desired_speed(), calm])
+	friend.release()
+	mind.cooldown = 0.0
+	z.position = Vector3(at.x, w.ground_at(at), at.z - 6.0)
+	var hp0 := p.hp
+	check(await until_state(z, "m_lunge", 3.0) and z.is_warning(), "it crouches before it lunges")
+	await seconds(MesenllaMind.LUNGE_TELL + MesenllaMind.LUNGE_TIME + 0.1)
+	check(p.hp < hp0, "and the lunge lands (%.0f)" % (hp0 - p.hp))
+	# The Great Owl takes to the air and dives.
+	p.hp = p.max_hp()
+	mind._begin_shift(z, "owl")
+	await seconds(MesenllaMind.SHIFT_TIME + 0.1)
+	mind._form_left = 60.0
+	mind.cooldown = 99.0
+	await seconds(1.5)
+	check(z.position.y - w.ground_at(z.position) > MesenllaMind.OWL_HEIGHT * 0.6, "the Great Owl circles high, out of reach (%.1f m)" % (z.position.y - w.ground_at(z.position)))
+	mind.cooldown = 0.0
+	hp0 = p.hp
+	check(await until_state(z, "m_owl", 0.1) and await until_state(z, "m_dive", 4.0), "then screeches and dives")
+	await seconds(1.4)
+	check(p.hp < hp0, "talons first (%.0f)" % (hp0 - p.hp))
+	# The Tusked Boar paws the ground, charges and knocks you down.
+	p.hp = p.max_hp()
+	p.frozen_left = 0.0
+	p._status_immune = 0.0
+	mind._begin_shift(z, "boar")
+	await seconds(MesenllaMind.SHIFT_TIME + 0.1)
+	mind._form_left = 60.0
+	mind.cooldown_b = 0.0
+	z.position = Vector3(at.x, w.ground_at(at), at.z - 10.0)
+	check(await until_state(z, "m_paw", 3.0), "the Tusked Boar paws the ground")
+	check(await until_state(z, "m_charge", 2.0), "and charges")
+	hp0 = p.hp
+	var knocked := false
+	for i in 20:
+		await seconds(0.05)
+		knocked = knocked or p.frozen_left > 0.0
+	check(p.hp < hp0 and knocked, "knocking you down (%.0f)" % (hp0 - p.hp))
+	p.frozen_left = 0.0
+	# Badly hurt, back to the stag, and away.
 	z.hp = z.max_hp * 0.2
 	await seconds(MesenllaMind.SHIFT_TIME + 0.6)
-	check(z.mesenlla_mind.form == "stag" and z.mesenlla_mind.phase == "flee", "badly hurt, it turns back into the stag and flees")
+	check(mind.form == "stag" and mind.phase == "flee", "badly hurt, it turns back into the stag and flees")
 	check(absf(z._speed - float(ZombieDefs.ALL["shapeshifter"]["speed"]) * 1.15 * Game.enemy_speed()) < 0.01, "running as fast as the stag can")
 	var low := z.hp
 	await seconds(MesenllaMind.STAG_FLEE * 0.5)
-	check(is_equal_approx(z.hp, low) and z.mesenlla_mind.phase == "flee", "it does not mend while it runs (%.0f to %.0f)" % [low, z.hp])
+	check(is_equal_approx(z.hp, low) and mind.phase == "flee", "it does not mend while it runs (%.0f to %.0f)" % [low, z.hp])
 	await seconds(MesenllaMind.STAG_FLEE * 0.5 + 0.2)
 	check(is_equal_approx(z.hp, z.max_hp), "not caught within %d seconds, it comes back whole (%.0f of %.0f)" % [int(MesenllaMind.STAG_FLEE), z.hp, z.max_hp])
 	await seconds(MesenllaMind.SHIFT_TIME + 0.2)
-	check(z.mesenlla_mind.form == "beast" and is_equal_approx(z._speed, MesenllaMind.BEAST_SPEED * Game.enemy_speed()), "as the beast again, faster than before (%.1f m/s)" % z._speed)
+	check(mind.form in MesenllaMind.FIGHTING_FORMS, "and fights again (%s)" % mind.form)
+	check(str(ZombieDefs.ALL["shapeshifter"]["desc"]).contains("every %d seconds" % int(MesenllaMind.FORM_TIME)), "the Codex says how often it changes shape")
+	for state: String in ["m_wolf", "m_bite", "m_lunge", "m_howl", "m_owl", "m_dive", "m_boar", "m_gore"]:
+		check(Net.ANIMS.has(state), "%s reaches other phones" % state)
+	z.release()
 
 
 ## The south of the Valleys, the edge of the land, and the tents of the camp.
@@ -480,29 +568,72 @@ func _flyers() -> void:
 	check(seals(MistSeal.Style.MIST).size() == 1, "a Mist Eagle's stoop leaves a ring of mist")
 	clear()
 	var wyvern := raise("wyvern", at + Vector3(0, 0, -14))
+	check(wyvern.element in ["fire", "ice", "storm"] and (wyvern._visual.get_meta("rig") as WyvernRig).element == wyvern.element, "a wyvern rises as Fire, Ice or Storm, and looks it (%s)" % wyvern.element)
+	var kinds := {}
+	for i in 60:
+		var e: String = ZombieDefs.ALL["wyvern"]["elements"].pick_random()
+		kinds[e] = true
+	check(kinds.size() == 3, "each of the three as likely")
+	wyvern.set_element("fire")
 	wyvern.mesenlla_mind.cooldown = 0.0
 	check(await until_state(wyvern, "m_breath", 5.0), "a wyvern hovers and breathes")
-	check(seals(MistSeal.Style.FIRE).size() == 1, "and fire is coming down in an orange ring")
+	check(seals(MistSeal.Style.FIRE).size() == 1, "a Fire wyvern's fire is coming down in an orange ring")
 	var hp0 := p.hp
 	await seconds(MesenllaMind.BREATH_TELL + 0.3)
 	check(p.hp < hp0 and p.burn_time > 0.0, "staying in it burns")
+	await seconds(0.5)
+	p.burn_time = 0.0
+	clear()
+	wyvern = raise("wyvern", at + Vector3(0, 0, -14))
+	wyvern.set_element("ice")
+	wyvern.mesenlla_mind.cooldown = 0.0
+	check(await until_state(wyvern, "m_breath", 5.0) and seals(MistSeal.Style.FROST).size() == 1, "an Ice wyvern breathes frost")
+	p.frozen_left = 0.0
+	p._status_immune = 0.0
+	await seconds(MesenllaMind.BREATH_TELL + 0.3)
+	check(p.is_iced and p.slowed_left > 0.0, "which freezes you, and slows you after")
+	p.frozen_left = 0.0
+	p.slowed_left = 0.0
+	wyvern.mesenlla_mind.on_dive(wyvern)
+	check(seals(MistSeal.Style.FROST).any(func(m: MistSeal) -> bool: return is_equal_approx(m.radius, MesenllaMind.DIVE_BURST_RADIUS)), "and where it dives, its frost bursts")
+	clear()
+	wyvern = raise("wyvern", at + Vector3(0, 0, -14))
+	wyvern.set_element("storm")
+	wyvern.mesenlla_mind.cooldown = 0.0
+	check(await until_state(wyvern, "m_breath", 5.0) and seals(MistSeal.Style.STORM).size() == 1, "a Storm wyvern calls lightning down")
+	await seconds(1.6)
+	p.frozen_left = 0.0
 	clear()
 	var war := raise("war_wyvern", at + Vector3(0, 0, -18))
+	war.set_element("fire")
 	war.mesenlla_mind.cooldown = 0.0
 	check(await until_state(war, "m_breath", 5.0), "the War Wyvern breathes too")
 	check(seals(MistSeal.Style.FIRE).size() == 4, "along a line of four rings")
-	# Two Children of the Woods ride it with bows and shoot in turn.
-	var riders: Array = war._visual.get_meta("riders", [])
-	check(riders.size() == 2, "two Children of the Woods ride the War Wyvern")
+	# Two Children of the Woods ride it with bows and shoot in turn, each a creature of its own.
+	var riders: Array = w.zombies.filter(func(r: Zombie) -> bool: return r.carrier == war)
+	check(riders.size() == 2 and riders.all(func(r: Zombie) -> bool: return r.type_id == "wyvern_rider" and r.weapon_id == "bow"), "two Children of the Woods ride the War Wyvern")
+	await frames(2)
+	var seat := (war._visual.get_meta("rig") as WyvernRig).body.get_node("Seat0") as Node3D
+	check((riders[0] as Zombie).global_position.distance_to(seat.global_position) < 0.05, "in its saddle")
 	var shots := func() -> int: return w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.kind == Projectile.Kind.ENEMY_ARROW).size()
 	var shot_most := 0
 	for i in 40:
 		await seconds(0.1)
 		shot_most = maxi(shot_most, shots.call())
 	check(shot_most >= 1, "and their arrows fly at whoever is in range (%d in the air at most)" % shot_most)
+	var first := riders[0] as Zombie
+	var second := riders[1] as Zombie
+	var war_hp := war.hp
+	first.take_damage(first.hp + 1.0, Vector3.ZERO, 0.0, first.centre())
+	check(not first.is_alive() and second.is_alive() and is_equal_approx(war.hp, war_hp), "one can be shot out of the saddle on its own")
+	var fell_from := first.position.y
+	await seconds(0.4)
+	check(first.position.y < fell_from - 1.0, "and falls")
 	war.hp = war.max_hp * 0.45
 	await seconds(0.3)
 	check(w.count_type("eagle") >= 2, "and below half health it calls eagles")
+	war.take_damage(war.hp + 1.0, Vector3.ZERO, 0.0, war.centre())
+	check(not second.is_alive(), "when the War Wyvern falls, its rider falls with it")
 
 
 func _revenant() -> void:
@@ -591,11 +722,19 @@ func _mesenlla_map() -> void:
 	for kind: String in Director.BOSS_CARDS:
 		var card: Dictionary = Director.BOSS_CARDS[kind]
 		check(ZombieDefs.ALL[kind]["name"] == card["name"] and Sfx.NAMES.has(card["bells"]) and Net.SOUNDS.has(card["bells"]) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % card["bells"]), "%s: its card has its name and its bells" % kind)
-		check(card["color"] != (Director.BOSS_CARDS.values().filter(func(c: Dictionary) -> bool: return c != card)[0] as Dictionary)["color"], "%s: a colour of its own" % kind)
+		check(Director.BOSS_CARDS.values().filter(func(c: Dictionary) -> bool: return c["color"] == card["color"]).size() == 1, "%s: a colour of its own" % kind)
+	# Every boss, the Veil Regent of the Mists too, and any boss to come: an entrance card with what it
+	# says as it comes, and what it says as it falls.
+	for id: String in ZombieDefs.ALL:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		if d.get("mist_boss", false) or d.get("mesenlla_boss", false):
+			check(Director.BOSS_CARDS.has(id), "%s enters with a card" % id)
+			check(str(d.get("first_words", "")).length() > 12 and str(d.get("last_words", "")).length() > 12, "%s speaks as it comes and as it falls" % id)
 	var fell_at := boss.position
 	boss.take_damage(100000.0, Vector3.ZERO, 0.0, boss.centre())
 	await frames(2)
 	check(w.director._mist_boss_defeated, "when it falls, dawn can come")
+	check(w.director.banner.contains(str(ZombieDefs.ALL["great_revenant_elemental"]["last_words"])) and w.director.banner.begins_with("Great Revenant Elemental: \u201c"), "and it says its last words: %s" % w.director.banner)
 	check(not w.pickups.any(func(i: Pickup) -> bool: return i.item_id == "angel" and Vector2(i.global_position.x - fell_at.x, i.global_position.z - fell_at.z).length() < 8.0), "it leaves no Angel")
 	check(w.director.banner.contains("Stone forgets nothing"), "and says its last words: %s" % w.director.banner)
 	Game.night_map = "village"
@@ -846,6 +985,8 @@ func _bastion_map() -> void:
 	check(boss != null and w.director.boss_card == "war_wyvern" and w.director.boss_card_time > 0.0, "the War Wyvern comes for the Great Portal, with its own entrance card")
 	p.global_position = Vector3(-60, w.ground_at(Vector3(-60, 0, 60)), 60)
 	portal_hp = fort.heart_hp
+	check(w.zombies.filter(func(r: Zombie) -> bool: return r.carrier == boss).size() == 2, "its two riders with it, though the Children of the Woods were many tonight")
+	boss.set_element("fire")
 	boss.mesenlla_mind._pass_left = 0.0
 	var pass_seals := 0
 	for i in 60:

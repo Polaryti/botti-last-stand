@@ -314,6 +314,16 @@ var _thunder_timer := 0.0
 var _imp_timer := 0.0
 var _bell_timer := 0.0
 var _rat_timer := 0.0
+## The Stone Sprite's ward: up, waiting for the next hit; or down, and rising again in _stone_timer.
+var stone_ward := false
+var _stone_timer := 0.0
+var _ward_stones: Node3D
+## The Mistberry Draught's trail: where each patch of mist lies, and until when (x, y, z, until).
+var _mistberry: Array[Vector4] = []
+var _mist_timer := 0.0
+var in_mist := false # standing in your own mist: unseen, and mending
+## Rooted to the ground by another player's Antler Charm: you can fight, but not move.
+var rooted_left := 0.0
 
 
 func _init(owner_world: World, as_bot := 0) -> void:
@@ -595,6 +605,8 @@ func readiness() -> Array[Dictionary]:
 		armed.call("assassin", _ability_look("death_dark"), "fire", _unaware_in_reach(float(d.get("range", 2.0)) + 0.5))
 	if has_flag("perfect_riposte"):
 		armed.call("riposte", _ability_look("perfect_riposte"), "", _riposte_cd <= 0.0)
+	if has_power("stone_sprite"):
+		armed.call("stone_ward", {"name": "Stone Ward", "icon": "boulder", "color": PowerDefs.ALL["stone_sprite"]["color"]}, "", stone_ward)
 	if has_flag("elements") and kind == WeaponDefs.Kind.SPELL:
 		var next: String = ["fire", "frost", "storm"][(_shot_count + 1) % 3]
 		var look: Dictionary = {"fire": {"name": "Next bolt: fire", "icon": "flame", "color": Color(1.0, 0.5, 0.15)}, "frost": {"name": "Next bolt: frost", "icon": "snow", "color": Color(0.55, 0.85, 1.0)}, "storm": {"name": "Next bolt: lightning", "icon": "bolt", "color": Color(0.85, 0.8, 1.0)}}[next]
@@ -1058,6 +1070,9 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		sfx("block", 0.0)
 		say("Perfect Riposte!")
 		return
+	if stone_ward:
+		_ward_breaks(attacker)
+		return
 	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0)
 	if Net.active():
 		# A Guardian nearby takes part of it.
@@ -1176,6 +1191,9 @@ func apply_status(kind: int, seconds: float) -> void:
 				say("Bleeding")
 		Net.Status.BURN:
 			ignite(secs)
+		Net.Status.ROOT:
+			rooted_left = maxf(rooted_left, secs)
+			say("Rooted!")
 
 
 ## The deadly fog: no armour or dodge helps against it, though a moment of invincibility does.
@@ -1243,6 +1261,7 @@ func respawn(at: Vector3) -> void:
 	bleed_left = 0.0
 	frozen_left = 0.0
 	slowed_left = 0.0
+	rooted_left = 0.0
 	_status_immune = 0.0
 	guard_left = 2.5
 	last_foe = 0
@@ -1263,7 +1282,7 @@ func respawn(at: Vector3) -> void:
 
 
 func is_unseen() -> bool:
-	return invis_left > 0.0 or spirit_left > 0.0
+	return invis_left > 0.0 or spirit_left > 0.0 or in_mist
 
 
 ## Firelight shows you to everything out in the dark, and so does a torch in your hand.
@@ -1940,6 +1959,7 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 			"imp": _imp_timer = 0.3
 			"bell_spirit": _bell_timer = 1.0
 			"rat": _rat_timer = 0.0
+			"stone_sprite": _raise_ward()
 			"ghost":
 				var previous := world.begin_act(self)
 				world.spawn_ally("ghost", global_position - global_basis.z * 1.5, time)
@@ -1956,6 +1976,8 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 			_arrange_familiars()
 	else:
 		sfx("potion", -2.0)
+		if id == "mistberry_draught":
+			_mist_timer = 0.0
 	say(str(d["name"]) + "!")
 
 
@@ -2017,7 +2039,102 @@ func _tick_powers(delta: float) -> void:
 		if _rat_timer <= 0.0:
 			_rat_timer = PowerDefs.RAT_INTERVAL
 			world.drop_poison(global_position)
+	_tick_stone_sprite(delta)
+	_tick_mistberry(delta)
 	_tick_ability_timers(delta)
+
+
+## The Stone Sprite: a ward of stones circles you until something hits you; then it rises again
+## PowerDefs.STONE_INTERVAL seconds later.
+func _tick_stone_sprite(delta: float) -> void:
+	if not has_power("stone_sprite"):
+		if stone_ward:
+			stone_ward = false
+			_show_ward(false)
+		return
+	if not stone_ward:
+		_stone_timer -= delta
+		if _stone_timer <= 0.0:
+			_raise_ward()
+	elif _ward_stones:
+		_ward_stones.rotation.y += delta * 2.2
+
+
+func _raise_ward() -> void:
+	stone_ward = true
+	_show_ward(true)
+	sfx("stone_grind", -8.0, 1.3)
+
+
+## Stones circling you at the waist while the ward is up.
+func _show_ward(on: bool) -> void:
+	if _ward_stones == null:
+		_ward_stones = Node3D.new()
+		_ward_stones.name = "StoneWard"
+		add_child(_ward_stones)
+		_ward_stones.position.y = 0.9
+		for i in 5:
+			var mi := MeshInstance3D.new()
+			mi.mesh = PowerDefs.ward_stone_mesh()
+			var a := TAU * i / 5.0
+			mi.position = Vector3(cos(a) * 0.75, sin(a * 2.0) * 0.12, sin(a) * 0.75)
+			mi.rotation = Vector3(a, a * 2.0, 0.0)
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_ward_stones.add_child(mi)
+	_ward_stones.visible = on
+
+
+## The ward takes the blow. Whoever struck is thrown back and staggers.
+func _ward_breaks(attacker: Zombie) -> void:
+	stone_ward = false
+	_stone_timer = PowerDefs.STONE_INTERVAL
+	_show_ward(false)
+	sfx("stone_hit", 0.0)
+	say("Stone Ward!")
+	var at := global_position + Vector3.UP
+	world.fx_blast(at, 1.6, Color(0.6, 0.62, 0.55, 0.6))
+	if Net.active():
+		Net.blast_fx(at, 1.6, Color(0.6, 0.62, 0.55, 0.6))
+	if attacker and attacker.is_alive():
+		var away := attacker.position - global_position
+		away.y = 0.0
+		attacker.take_damage(0.0, away.normalized(), PowerDefs.STONE_KNOCK, attacker.centre())
+		attacker.stun(PowerDefs.STONE_STAGGER)
+
+
+## The Mistberry Draught: a patch of mist where you walk every PowerDefs.MIST_TRAIL_EVERY seconds;
+## standing in one, you are hidden and you mend.
+func _tick_mistberry(delta: float) -> void:
+	var now := world.now
+	while not _mistberry.is_empty() and _mistberry[0].w <= now:
+		_mistberry.pop_front()
+	if has_power("mistberry_draught"):
+		_mist_timer -= delta
+		if _mist_timer <= 0.0:
+			_mist_timer = PowerDefs.MIST_TRAIL_EVERY
+			var here := global_position
+			_mistberry.append(Vector4(here.x, here.y, here.z, now + PowerDefs.MIST_TRAIL_LIFE))
+			world.drop_mist_patch(here, PowerDefs.MIST_TRAIL_LIFE)
+	var was := in_mist
+	in_mist = false
+	for patch: Vector4 in _mistberry:
+		var at := Vector3(patch.x, patch.y, patch.z)
+		if Vector2(at.x - global_position.x, at.z - global_position.z).length() <= PowerDefs.MIST_TRAIL_RADIUS and absf(at.y - global_position.y) < 2.0:
+			in_mist = true
+			break
+	if in_mist and not dead and hp < max_hp():
+		hp = minf(max_hp(), hp + PowerDefs.MISTBERRY_HEAL * delta)
+	if in_mist and not was:
+		# Whatever was hunting you loses you in the mist.
+		for z: Zombie in world.zombies_near(global_position, 30.0, 32):
+			if z.state == Zombie.State.CHASE and world.nearest_target(z.position) == self:
+				z.forget()
+
+
+## The Antler Charm: what you hit is rooted to the ground (Zombie.root), and so is another player.
+func _antler_root(z: Zombie) -> void:
+	if has_power("antler_charm") and z.is_alive():
+		z.root(PowerDefs.ANTLER_ROOT)
 
 
 ## The Pack's call, every 20 s. What it does depends on the beast: a wolf's howl stuns all around,
@@ -3364,6 +3481,7 @@ func _physics_step(delta: float) -> void:
 		head.position.y = lerp(head.position.y, 0.3, delta * 4.0)
 		return
 	slowed_left = maxf(0.0, slowed_left - delta)
+	rooted_left = maxf(0.0, rooted_left - delta)
 	_status_immune = maxf(0.0, _status_immune - delta)
 	if frozen_left > 0.0:
 		frozen_left -= delta
@@ -3403,6 +3521,8 @@ func _physics_step(delta: float) -> void:
 		speed *= SPIRIT_SPEED * (SPIRIT_SPEED if has_flag("swift_spirit") else 1.0)
 	if slowed_left > 0.0:
 		speed *= 0.6
+	if rooted_left > 0.0:
+		speed = 0.0
 	if bleed_left > 0.0:
 		speed *= BLEED_SPEED
 	var wading := world.terrain.in_water(global_position.x, global_position.z)
@@ -3941,6 +4061,7 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		if facing.dot(global_position - z.position) < 0.0:
 			z.take_damage(melee_stats(d)["damage"], Vector3.ZERO, 0.0, z.centre())
 			say("Backstab!")
+	_antler_root(z)
 	fire("hit", {"z": z})
 
 
@@ -3957,6 +4078,8 @@ func on_melee_rival(peer: int, d: Dictionary) -> void:
 		status_on(peer, Net.Status.STUN, float(d["stun"]))
 	if d.get("bleed", false):
 		status_on(peer, Net.Status.BLEED, 3.0)
+	if has_power("antler_charm"):
+		status_on(peer, Net.Status.ROOT, PowerDefs.ANTLER_ROOT)
 	fire("hit", {"rival": peer})
 
 
@@ -3967,12 +4090,15 @@ func on_shot_rival(peer: int, fire_shot: bool, frost_shot: bool) -> void:
 		status_on(peer, Net.Status.BURN, ZombieDefs.BURN_SECONDS)
 	if frost_shot:
 		status_on(peer, Net.Status.SLOW, ZombieDefs.BURN_SECONDS)
+	if has_power("antler_charm"):
+		status_on(peer, Net.Status.ROOT, PowerDefs.ANTLER_ROOT)
 	fire("shot", {"rival": peer})
 
 
 ## Rules for arrows and bolts that reach a zombie.
 func on_shot_connect(z: Zombie) -> void:
 	gain_ki(KI_PER_SHOT)
+	_antler_root(z)
 	fire("shot", {"z": z})
 
 

@@ -3,6 +3,12 @@ extends RefCounted
 ## Timed player states shared by the status bar and Codex.
 const TIMED := [
 	{
+		"field": "rooted_left",
+		"name": "Rooted",
+		"icon": "antlers",
+		"desc": "Vines from an Antler Charm hold you where you stand: you can still fight, but cannot move until they let go."
+	},
+	{
 		"field": "ward_left",
 		"name": "Shield Wall",
 		"icon": "shield_round+up",

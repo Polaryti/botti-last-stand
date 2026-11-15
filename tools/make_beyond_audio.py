@@ -634,6 +634,62 @@ def fire_warning():
     return roar
 
 
+def frost_warning():
+    """Frost gathering on the ground (an Ice wyvern's breath to come): a cold, rising hiss with glassy
+    crystals ticking as they form, and a thin high ring swelling under it."""
+    m = n(1.1)
+    hiss = sweep_filter(noise(m), 2500, 7000, 0.5) * np.linspace(0.1, 0.8, m)
+    ring = glass(1760, 1.1, 1.5)[:m] * np.linspace(0.0, 0.35, m)
+    ticks = np.zeros(m)
+    for i in range(45):
+        p = n(rng.random() * 1.05)
+        g = glass(2400 + rng.random() * 2200, 0.05, 40.0)
+        q = min(len(g), m - p)
+        ticks[p:p + q] += g[:q] * rng.random() * 0.35 * (p / m + 0.3)
+    return reverb(hiss + ring + ticks, 0.7, 0.3)
+
+
+def frost_burst():
+    """Frost coming down: a cold blast of air and ice shattering across the ground."""
+    m = n(1.4)
+    tt = t_(m)
+    blast = band(noise(m), 600, 6000) * np.exp(-tt * 5.0) * 1.1 + lowp(noise(m), 300, 2) * np.exp(-tt * 6.0) * 0.8
+    shards = np.zeros(m)
+    for i in range(70):
+        p = n(rng.random() * 0.6 * rng.random())
+        g = glass(1800 + rng.random() * 3500, 0.12, 22.0)
+        q = min(len(g), m - p)
+        shards[p:p + q] += g[:q] * rng.random() * 0.5
+    return reverb(blast + shards, 1.0, 0.3)
+
+
+def owl_screech():
+    """The Great Owl before it strikes: a long, rasping barn-owl shriek, breathy and harsh, falling at
+    the end."""
+    m = n(1.0)
+    tt = t_(m)
+    f = curve(m, (0.0, 2600), (0.3, 3100), (0.8, 2700), (1.0, 2100))
+    rasp = band(noise(m), 1800, 6000) * (0.7 + 0.3 * np.sin(2 * np.pi * 38 * tt))
+    tone = np.sin(2 * np.pi * np.cumsum(f) / SR) * 0.25
+    return reverb((rasp + tone) * env(m, 0.06, 1.2), 0.8, 0.3)
+
+
+def boar_snort():
+    """The Tusked Boar pawing the ground: two hard snorts through the nose and a deep, rattling grunt."""
+    m = n(0.9)
+    out = np.zeros(m)
+    for at in (0.0, 0.22):
+        k = n(0.14)
+        p = n(at)
+        out[p:p + k] += band(noise(k), 300, 2400) * env(k, 0.005, 2.0) * 1.2
+    k = n(0.45)
+    p = n(0.42)
+    tt = t_(k)
+    grunt = np.sign(np.sin(2 * np.pi * 70 * tt)) * 0.4 * (0.6 + 0.4 * np.sin(2 * np.pi * 22 * tt))
+    out[p:p + k] += lowp(grunt + noise(k) * 0.3, 900) * env(k, 0.02, 1.4)
+    return reverb(out, 0.4, 0.2)
+
+
 def fire_breath():
     """Fire coming down: a wide roar of flame and crackling."""
     m = n(1.3)
@@ -875,7 +931,7 @@ if __name__ == "__main__":
                        ("wing_flap", 0.6), ("wyvern_hurt", 0.6), ("wyvern_death", 0.8), ("stag_call", 0.6), ("stag_hurt", 0.55), ("beast_growl", 0.7),
                        ("shapeshifter_death", 0.75), ("stone_hit", 0.55), ("stone_crumble", 0.8), ("revenant_death", 0.85),
                        ("mist_hurt", 0.5), ("mist_dissipate", 0.6), ("storm_hurt", 0.5), ("storm_burst", 0.8), ("woods_hurt", 0.5),
-                       ("woods_death", 0.55), ("dawn_mists", 0.7), ("dawn_valleys", 0.7), ("dawn_bastion", 0.7), ("command", 0.8)):
+                       ("woods_death", 0.55), ("frost_warning", 0.55), ("frost_burst", 0.75), ("owl_screech", 0.6), ("boar_snort", 0.7), ("dawn_mists", 0.7), ("dawn_valleys", 0.7), ("dawn_bastion", 0.7), ("command", 0.8)):
         save(name, globals()[name](), gain)
     for name in LOOPS:
         write(SND + name + ".ogg", globals()[name](), 0.6, loop=True)

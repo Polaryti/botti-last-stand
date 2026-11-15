@@ -353,6 +353,8 @@ func _mists() -> void:
 		(w.zombies.back() as Zombie).set_physics_process(false)
 	await until(func() -> bool: return w.count_type("veil_regent") == 1, 4.0)
 	ok(w.count_type("veil_regent") == 1, "one scheduled Veil Regent appears on both phones")
+	await until(func() -> bool: return w.director.boss_card == "veil_regent", 2.0)
+	ok(w.director.boss_card == "veil_regent", "and both see its entrance card")
 	await until(func() -> bool: return w.mist_storm != null and w.mist_storm.finale, 4.0)
 	ok(w.mist_storm != null and w.mist_storm.finale and w.mist_storm.contains(Vector3(0, 40, -122)) and not w.mist_storm.contains(Vector3(16, 10, 0)), "boss arrival replicates outer-island storms with a safe arena")
 	await sync(19)

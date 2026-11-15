@@ -1653,8 +1653,12 @@ func _pet_row() -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	var row := HBoxContainer.new()
+	row.name = "PetChoices"
 	row.add_theme_constant_override("separation", 6)
 	box.add_child(row)
+	var shown := ModelView.new(Vector2(200, 130))
+	shown.name = "PetStage"
+	var buttons := {}
 	for pet: String in ShopDefs.PETS:
 		var owned := pet == "wolf" or Game.owns_item(pet)
 		var chosen := pet
@@ -1663,14 +1667,21 @@ func _pet_row() -> Control:
 			if not owned:
 				show_store(chosen, -1, "", func() -> void: show_armory("ranger"))
 				return
+			# Chosen here, in place: the page stays where it was scrolled to, and only the stage
+			# and the buttons change.
 			Game.choose_pet(chosen)
-			if panel:
-				show_armory("ranger"), Vector2(0, UiTheme.BTN_SHORT), Game.pet == pet)
+			for other: String in buttons:
+				if other == chosen:
+					UiTheme.selected(buttons[other])
+				else:
+					UiTheme.plain(buttons[other])
+			shown.show_pet(chosen), Vector2(0, UiTheme.BTN_SHORT), Game.pet == pet)
+		b.name = "Pet_" + pet
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if not owned:
 			b.modulate = Color(1, 1, 1, 0.55)
+		buttons[pet] = b
 		row.add_child(b)
-	var shown := ModelView.new(Vector2(200, 130))
 	shown.show_pet(Game.pet)
 	box.add_child(shown)
 	return box

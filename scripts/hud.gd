@@ -306,6 +306,21 @@ static func draw_boss_card(ci: CanvasItem, title: Font, s: Vector2, kind: String
 	var lat := Vector2(s.x * 0.5 - lw * 0.5, mid + band_h * 0.34)
 	ci.draw_string_outline(title, lat, line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, lfs, 6, Color(0, 0, 0, 0.7 * line_a))
 	ci.draw_string(title, lat, line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, lfs, Color(UiTheme.BONE, line_a))
+	# What it says as it comes, under the band, after its bells have begun.
+	var words: String = ZombieDefs.ALL.get(kind, {}).get("first_words", "")
+	if words == "":
+		return
+	var quote := "\u201c%s\u201d" % words
+	var quote_a := a * clampf((t - 1.4) / 0.6, 0.0, 1.0)
+	var qfs := 34
+	var qw := title.get_string_size(quote, HORIZONTAL_ALIGNMENT_LEFT, -1, qfs).x
+	if qw > s.x - 80.0:
+		qfs = maxi(18, int(qfs * (s.x - 80.0) / qw))
+		qw = title.get_string_size(quote, HORIZONTAL_ALIGNMENT_LEFT, -1, qfs).x
+	var qat := Vector2(s.x * 0.5 - qw * 0.5, mid + band_h * 0.5 + qfs * 1.3)
+	ci.draw_rect(Rect2(qat.x - 24.0, qat.y - qfs * 1.05, qw + 48.0, qfs * 1.55), Color(0.02, 0.02, 0.05, 0.5 * quote_a))
+	ci.draw_string_outline(title, qat, quote, HORIZONTAL_ALIGNMENT_LEFT, -1.0, qfs, 6, Color(0, 0, 0, 0.75 * quote_a))
+	ci.draw_string(title, qat, quote, HORIZONTAL_ALIGNMENT_LEFT, -1.0, qfs, Color(col.lerp(UiTheme.BONE, 0.55), quote_a))
 
 
 func _banner_text(t: String, centre: Vector2, a: float) -> void:
@@ -396,7 +411,7 @@ func _draw() -> void:
 		_centered(player.toast, Vector2(centre.x, s.y * 0.38), HUD_TOAST, Color(UiTheme.MOSS if "DODGE" in player.toast else (UiTheme.EMBER if "Backstab" in player.toast or "Riposte" in player.toast else UiTheme.BONE), minf(1.0, player.toast_time * 2.0)))
 	if director and director.boss_card_time > 0.0 and Director.BOSS_CARDS.has(director.boss_card):
 		draw_boss_card(self, title, s, director.boss_card, Director.BOSS_CARD_TIME - director.boss_card_time, director.boss_card_time)
-	if director and director.banner_time > 0.0:
+	elif director and director.banner_time > 0.0:
 		_banner_text(director.banner, Vector2(centre.x, maxf(s.y * 0.32, _centre_y + 40.0)), minf(1.0, director.banner_time))
 
 

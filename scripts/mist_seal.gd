@@ -2,17 +2,21 @@ class_name MistSeal
 extends Node3D
 ## A ground-following, one-hit warning. Each phone hurts only its locally owned targets.
 ## The style says what lands when it closes: mist that slows (the Mists), a quake that stuns, a bolt
-## of lightning, a gout of fire, or a boulder thrown from whoever cast it (Mesenlla).
+## of lightning, a gout of fire, a blast of frost that freezes and then slows (an Ice wyvern), or a boulder
+## thrown from whoever cast it (Mesenlla).
 const LIMIT := 16
 ## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
 const PORTAL_SHARE := 1.5
-enum Style { MIST, QUAKE, STORM, FIRE, BOULDER }
+enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST }
+const FROST_FREEZE := 0.6
+const FROST_SLOW := 2.0
 const LOOKS := {
 	Style.MIST: [Color(0.2, 0.8, 1.0), Color(0.85, 0.4, 1.0)],
 	Style.QUAKE: [Color(0.95, 0.86, 0.32), Color(1.0, 0.6, 0.12)],
 	Style.STORM: [Color(0.75, 0.85, 1.0), Color(1.0, 1.0, 0.75)],
 	Style.FIRE: [Color(1.0, 0.42, 0.1), Color(0.9, 0.08, 0.04)],
 	Style.BOULDER: [Color(0.78, 0.76, 0.72), Color(0.66, 0.36, 0.22)],
+	Style.FROST: [Color(0.55, 0.9, 1.0), Color(0.9, 0.98, 1.0)],
 }
 var style := 0
 var _boulder: MeshInstance3D
@@ -56,7 +60,7 @@ static func create(w: World, at: Vector3, reach: float, eye: float, delay: float
 	w.mist_seals.append(seal)
 	seal.tree_exiting.connect(func() -> void: w.mist_seals.erase(seal))
 	seal._build()
-	w.sfx_at(["mist_warning", "quake_warning", "storm_call", "fire_warning", "boulder_throw"][seal.style], at, 0.0)
+	w.sfx_at(["mist_warning", "quake_warning", "storm_call", "fire_warning", "boulder_throw", "frost_warning"][seal.style], at, 0.0)
 	if seal.style == Style.BOULDER:
 		seal._throw()
 	return seal
@@ -142,12 +146,14 @@ func strike() -> void:
 			world.fx_mist(position + Vector3.UP, radius * 0.5)
 		Style.STORM:
 			world.flash_bolt(position)
+		Style.FROST:
+			world.fx_mist(position + Vector3.UP * 0.6, radius * 0.4)
 		Style.QUAKE, Style.BOULDER:
 			world.fx_gore(position + Vector3.UP * 0.4, Color(0.42, 0.36, 0.3))
 			if _boulder:
 				_boulder.visible = false
 	if world.player:
-		Sfx.play_at(["mist_burst", "earth_slam", "thunder", "fire_breath", "boulder_impact"][style], position, world.player.global_position, 0.0)
+		Sfx.play_at(["mist_burst", "earth_slam", "thunder", "fire_breath", "boulder_impact", "frost_burst"][style], position, world.player.global_position, 0.0)
 	var source := world.zombie_by_id(source_id)
 	var targets: Array = world.players.duplicate()
 	if not Net.active() or Net.is_host():
@@ -165,6 +171,9 @@ func strike() -> void:
 					p.velocity += Vector3(p.global_position.x - position.x, 0, p.global_position.z - position.z).normalized() * 6.0 + Vector3.UP * 4.0
 				Style.STORM: p.apply_status(Net.Status.STUN, 0.5)
 				Style.FIRE: p.ignite(3.0)
+				Style.FROST:
+					p.apply_status(Net.Status.FREEZE, FROST_FREEZE)
+					p.apply_status(Net.Status.SLOW, FROST_SLOW)
 		elif style == Style.FIRE:
 			target.ignite(3.0)
 	# What falls on a stronghold's portal hurts it, as surely as claws do. The host decides.

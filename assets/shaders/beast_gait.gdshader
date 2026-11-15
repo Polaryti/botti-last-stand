@@ -9,8 +9,16 @@ uniform float belly = 0.7;
 uniform float stride = 0.45;
 uniform float neck_z = -0.7;
 uniform float mist = 0.0;
+uniform float fur = 0.0; // 1: a coat of fur (fur.gdshaderinc), for the bear the Children of the Woods ride
+
+#include "res://assets/shaders/fur.gdshaderinc"
+
+varying vec3 rest_pos;
+varying vec3 rest_normal;
 
 void vertex() {
+	rest_pos = VERTEX;
+	rest_normal = NORMAL;
 	vec3 world = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	float seed = world.x * 0.31 + world.z * 0.27;
 	float leg = clamp(belly - VERTEX.y, 0.0, belly);
@@ -28,6 +36,11 @@ void vertex() {
 void fragment() {
 	ALBEDO = COLOR.rgb;
 	ROUGHNESS = 1.0;
+	if (fur > 0.0) {
+		ALBEDO *= mix(1.0, mix(0.6, 1.22, fur_strands(rest_pos, rest_normal, 44.0)), fur);
+		RIM = 0.45 * fur;
+		RIM_TINT = 0.6;
+	}
 	if (mist > 0.0) {
 		float rim = 1.0 - abs(dot(NORMAL, VIEW));
 		ALBEDO = mix(ALBEDO, vec3(0.7, 0.95, 1.0), rim * mist * 0.7);

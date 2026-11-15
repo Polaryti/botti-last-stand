@@ -2188,7 +2188,7 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	models.shuffle()
 	var pool: Array = []
 	for m: String in models:
-		if _pools.has(m) and not (_pools[m] as Array).is_empty():
+		if _pools.has(m) and (_pools[m] as Array).size() > _kept_back(m, id):
 			pool = _pools[m]
 			break
 	if pool.is_empty():
@@ -2205,16 +2205,45 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	zombies.append(z)
 	var minute := director.minute() if director else 0
 	z.spawn(id, at, minute)
+	if z.is_boss() and director and not _warming and not Net.is_client():
+		director.boss_entrance(id) # every boss enters with its card (Director.BOSS_CARDS)
 	z.fort_gate = gate
 	if fort and fort.has_lanes():
 		z.fort_gate = fort.lane_at(at) # wherever it rose, that lane is its own from now on
 	z.fort_shortcut = randf() < 0.25
+	if z.def.has("elements") and not _warming:
+		# Fire, Ice or Storm, a third each.
+		var elements: Array = z.def["elements"]
+		z.set_element(str(elements[randi() % elements.size()]))
 	if Net.is_host() and not _warming:
 		Net.zombie_spawned(z, id, z.position, minute)
 		if z.def.has("weapons"):
 			# It picked its weapon at random here; every phone shows the same one.
 			Net.zombie_weapon(z)
+		if z.element != "":
+			Net.zombie_element(z)
+	if z.def.has("riders") and not _warming:
+		_seat_riders(z)
 	return true
+
+
+## The War Wyvern's riders, each a creature of its own (wyvern_rider), in its saddle.
+func _seat_riders(wyvern: Zombie) -> void:
+	for i in int(wyvern.def["riders"]):
+		if not spawn_zombie("wyvern_rider", wyvern.position):
+			return
+		var rider: Zombie = zombies.back()
+		rider.mount_on(wyvern, i)
+		if Net.is_host():
+			Net.zombie_mount(rider, wyvern, i)
+
+
+## Bodies of a kind held back for something still to come: on a map the War Wyvern can still attack,
+## two Children of the Woods for its riders.
+func _kept_back(model: String, id: String) -> int:
+	if model == "woods_child" and id != "wyvern_rider" and map_id == "bastion" and director and not director._mist_boss_spawned:
+		return int(ZombieDefs.ALL["war_wyvern"]["riders"])
+	return 0
 
 
 func zombie_by_id(id: int) -> Zombie:
@@ -2504,8 +2533,8 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 		if storm_at(p) != null:
 			continue # nothing rises inside a Mist Storm
 		var c := grid.to_cell(p)
-		if not grid.is_free(c):
-			continue
+		if not grid.is_free(c) or storm_at(grid.to_world(c)) != null:
+			continue # (the middle of its cell, where it really rises, can be over a storm's edge)
 		var near := INF
 		var seen := false
 		for pl in players:
@@ -2972,6 +3001,54 @@ func _dress_puddle(pd: MeshInstance3D, seed_from: int) -> void:
 
 ## shown_only: another player's patch, sent over. It looks the same here, and hurts whoever on this
 ## phone is on the other side from by. Your own patches go out to the others the same way.
+## A patch of the Mistberry Draught's mist (PowerDefs.MIST_TRAIL_RADIUS across, for `life` seconds):
+## pale mist welling up off the ground. Only a look: what it does is the drinker's (Player._tick_mistberry).
+var _mist_patches: Array[CPUParticles3D] = []
+var _next_mist_patch := 0
+const MIST_PATCHES := 16
+
+
+func drop_mist_patch(at: Vector3, life: float, shown_only := false) -> void:
+	if _mist_patches.is_empty():
+		var ramp := Gradient.new()
+		ramp.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+		ramp.colors = PackedColorArray([Color(0.75, 0.88, 1.0, 0.0), Color(0.78, 0.9, 1.0, 0.55), Color(0.8, 0.92, 1.0, 0.0)])
+		for i in MIST_PATCHES:
+			var p := CPUParticles3D.new()
+			p.mesh = WyvernRig.puff_mesh()
+			p.amount = 8
+			p.lifetime = 1.6
+			p.local_coords = false
+			p.emitting = false
+			p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+			p.emission_sphere_radius = PowerDefs.MIST_TRAIL_RADIUS * 0.6
+			p.direction = Vector3.UP
+			p.spread = 40.0
+			p.gravity = Vector3(0, 0.25, 0)
+			p.initial_velocity_min = 0.1
+			p.initial_velocity_max = 0.35
+			p.scale_amount_min = 2.2
+			p.scale_amount_max = 3.2
+			p.color_ramp = ramp
+			p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(p)
+			p.set_meta("until", -1.0)
+			_mist_patches.append(p)
+	var patch := _mist_patches[_next_mist_patch]
+	_next_mist_patch = (_next_mist_patch + 1) % MIST_PATCHES
+	patch.global_position = Vector3(at.x, ground_at(at) + 0.3, at.z)
+	patch.emitting = true
+	patch.set_meta("until", now + life)
+	if not shown_only and not _warming and Net.active():
+		Net.world_fx(Net.Fx.MIST_PATCH, at, Vector3(life, PowerDefs.MIST_TRAIL_RADIUS, 0))
+
+
+func _tick_mist_patches() -> void:
+	for p: CPUParticles3D in _mist_patches:
+		if p.emitting and now >= float(p.get_meta("until", -1.0)):
+			p.emitting = false
+
+
 func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false, by := 0) -> void:
 	var m := _puddles[_next_puddle]
 	var life := seconds if seconds > 0.0 else PowerDefs.POISON_TIME
@@ -2997,6 +3074,7 @@ func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, sho
 
 
 func _tick_poison(delta: float) -> void:
+	_tick_mist_patches()
 	_poison_tick -= delta
 	var tick := _poison_tick <= 0.0
 	if tick:

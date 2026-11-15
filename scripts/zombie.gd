@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH } # new ones go at the end: the number travels
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -170,6 +170,21 @@ var _dive_aim := Vector3.ZERO
 var net_warning := false
 var _frozen := 0.0
 var _mounted := false
+## A wyvern's element ("fire", "ice" or "storm"; ZombieDefs "elements"), chosen as it rises.
+var element := ""
+## Hastened by a Mist Wolf's howl: this many seconds left of moving HASTE times as fast.
+var haste_left := 0.0
+const HASTE := 1.35
+## Held by an Antler Charm's vines: it can strike what is in reach, but cannot move. A boss is held
+## half as long; nothing can be caught again until ANTLER_AGAIN after it was caught; fliers are not.
+var root_left := 0.0
+var _root_again := -100.0
+var _vines: MeshInstance3D
+static var _vine_mesh: Mesh
+## A War Wyvern's rider (wyvern_rider): the wyvern it rides, and which of its seats.
+var carrier: Zombie
+var seat := -1
+var _loose_was := 0.0
 var _is_dummy := false
 var _dummy_log: Array = []
 var _dummy_last := 0.0
@@ -445,6 +460,14 @@ func _set_enabled(on: bool) -> void:
 
 func spawn(id: String, at: Vector3, minute := 0) -> void:
 	type_id = id
+	element = ""
+	haste_left = 0.0
+	root_left = 0.0
+	_root_again = -100.0
+	if _vines:
+		_vines.visible = false
+	carrier = null
+	seat = -1
 	if model_id in MistModels.KINDS:
 		for part in _parts:
 			part.transform = part.get_meta("mist_rest", Transform3D.IDENTITY)
@@ -1010,17 +1033,17 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 
 
 ## The voices of Mesenlla: for an alert, an idle sound, and a death.
-const MESENLLA_VOICES := {"bear": "bear_roar", "mist_bear": "bear_roar", "eagle": "eagle_cry", "mist_eagle": "eagle_cry",
+const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", "mist_bear": "bear_roar", "eagle": "eagle_cry", "mist_eagle": "eagle_cry",
 	"shapeshifter": "shapeshift", "child_of_woods": "woods_chatter", "woodland_cavalry": "woods_chatter", "earth_elemental": "stone_grind",
 	"mist_elemental": "mist_blink", "storm_elemental": "storm_call", "wyvern": "wyvern_roar", "great_revenant_elemental": "stone_grind",
 	"war_wyvern": "wyvern_roar"}
 
 
 ## How each of them sounds when struck, and when it dies.
-const MESENLLA_HURT := {"bear": "bear_hurt", "mist_bear": "bear_hurt", "eagle": "eagle_hurt", "mist_eagle": "eagle_hurt",
+const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist_bear": "bear_hurt", "eagle": "eagle_hurt", "mist_eagle": "eagle_hurt",
 	"child_of_woods": "woods_hurt", "woodland_cavalry": "woods_hurt", "earth_elemental": "stone_hit", "great_revenant_elemental": "stone_hit",
 	"mist_elemental": "mist_hurt", "storm_elemental": "storm_hurt", "wyvern": "wyvern_hurt", "war_wyvern": "wyvern_hurt"}
-const MESENLLA_DEATHS := {"bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
+const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
 	"war_wyvern": "wyvern_death"}
@@ -1210,6 +1233,12 @@ func _die() -> void:
 		weapon_id = ""
 		if _hand_mesh:
 			_hand_mesh.equip("")
+	# Its riders go down with it, and whoever brought it down brought them down too.
+	for rider: Zombie in world.zombies.duplicate():
+		if rider.carrier == self and rider.is_alive():
+			rider.carrier = null
+			rider.next_hitter = last_hitter if last_hitter != 0 else -1
+			rider.take_damage(rider.hp + 1.0, Vector3.ZERO, 0.0, rider.centre())
 	# A boss leaves nothing behind but its last words.
 	var last_words: String = ZombieDefs.ALL[type_id].get("last_words", "")
 	if last_words != "":
@@ -1253,6 +1282,7 @@ func net_die() -> void:
 func _show_death() -> void:
 	if world and not is_boss():
 		world.note_fall(position)
+	carrier = null # a rider shot from the saddle falls
 	if model_id == "veil_regent":
 		(_visual.get_node("RegentHealth") as Label3D).visible = false
 	_dying = 2.2
@@ -1287,6 +1317,146 @@ func _show_death() -> void:
 		world.sfx_at(_death_sound(), position, -6.0)
 
 
+## Caught by an Antler Charm's vines (PowerDefs.ANTLER_ROOT).
+func root(seconds: float) -> void:
+	if not is_alive() or flies or carrier:
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.ROOT, seconds)
+		return
+	if world.now < _root_again:
+		return
+	if is_boss():
+		seconds *= 0.5
+	root_left = seconds
+	_root_again = world.now + PowerDefs.ANTLER_AGAIN
+	velocity = Vector3.ZERO
+	# A charge or a lunge ends where the vines catch it.
+	if mesenlla_mind and mesenlla_mind.phase in ["charge", "leap"]:
+		mesenlla_mind.interrupt(self)
+	show_roots(seconds)
+	if Net.is_host():
+		Net.zombie_rooted(self, seconds)
+
+
+## Vines wound round its legs, growing out of the ground, while it is held.
+func show_roots(seconds: float) -> void:
+	if seconds <= 0.0:
+		if _vines:
+			_vines.visible = false
+		return
+	if _vine_mesh == null:
+		var l := LowPoly.new()
+		var vine := Color(0.28, 0.45, 0.18)
+		for i in 7:
+			var a := TAU * i / 7.0
+			var r := 0.42
+			var pts: Array[Vector3] = []
+			for k in 5:
+				var b := a + k * 0.7
+				pts.append(Vector3(cos(b) * r * (1.0 - k * 0.12), k * 0.22, sin(b) * r * (1.0 - k * 0.12)))
+			for k in 4:
+				l.prism(pts[k], pts[k + 1], 0.045 - k * 0.008, 0.04 - k * 0.008, 4, vine.lightened(0.05 * (i % 2)))
+			l.box(pts[2] + Vector3(0.03, 0.02, 0), Vector3(0.12, 0.02, 0.07), Color(0.36, 0.62, 0.24), Vector3(0, a * 57.0, 25))
+		_vine_mesh = l.commit()
+	if _vines == null:
+		_vines = MeshInstance3D.new()
+		_vines.mesh = _vine_mesh
+		_vines.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_vines)
+	var girth := maxf(1.0, _capsule.radius / 0.36)
+	_vines.scale = Vector3(girth, maxf(0.8, height / 1.8), girth)
+	_vines.visible = true
+	root_left = maxf(root_left, seconds) if puppet else root_left
+
+
+## A Mist Wolf's howl: it moves faster for a while.
+func hasten(seconds: float) -> void:
+	haste_left = maxf(haste_left, seconds)
+
+
+## Fire, Ice or Storm (a wyvern): how it looks, and what it breathes.
+func set_element(e: String) -> void:
+	element = e
+	if _visual.has_meta("rig"):
+		(_visual.get_meta("rig") as WyvernRig).set_element(e)
+
+
+## Sat in a War Wyvern's saddle, at this seat. It goes where the wyvern goes.
+func mount_on(wyvern: Zombie, which: int) -> void:
+	carrier = wyvern
+	seat = which
+	dormant = false
+	collision_mask = 0
+	_shadow.visible = false
+	_loose_was = MesenllaModels.rider_cycle(seat, world.now)
+	_current_anim = ""
+	_play("RideShoot", 1.0, 0.0)
+	_sit()
+
+
+## The wyvern's seat, in the world.
+func _sit() -> void:
+	var rig := carrier._visual.get_meta("rig", null) as WyvernRig
+	var spot := rig.body.get_node_or_null("Seat%d" % seat) as Node3D if rig else null
+	global_position = spot.global_position if spot else carrier.global_position + Vector3.UP
+	_net_pos = global_position
+
+
+## A rider in the saddle: carried, turning towards whoever is nearest, drawing and loosing in time with
+## the world's clock (MesenllaModels.rider_cycle), so every phone shows the same. Its arrows are the
+## host's. It can be struck, burnt, poisoned, stunned and frozen like any other; while stunned or
+## frozen it does not shoot.
+const RIDER_RANGE := 34.0
+const RIDER_DAMAGE := 0.35 # of its wyvern's blow
+
+
+func _tick_carried(delta: float) -> void:
+	if not is_instance_valid(carrier) or not carrier.active or not carrier.is_alive():
+		carrier = null
+		return
+	_sit()
+	reveal_left -= delta
+	bar_time -= delta
+	_tick_flash(delta)
+	var aim := Vector3.INF
+	var p := world.nearest_player(position)
+	if p:
+		aim = p.global_position
+	var yaw := carrier.rotation.y
+	if aim != Vector3.INF:
+		var look := aim - position
+		yaw += clampf(wrapf(atan2(look.x, look.z) - carrier.rotation.y, -PI, PI), -1.3, 1.3)
+	rotation.y = lerp_angle(rotation.y, yaw, minf(1.0, delta * 8.0))
+	var cycle := MesenllaModels.rider_cycle(seat, world.now)
+	if _anim and _frozen <= 0.0:
+		if _anim.current_animation != "RideShoot":
+			_anim.play("RideShoot")
+		_anim.seek(cycle, true)
+		_anim_accum = 0.0
+	var loosed := _loose_was < BodyAnim.RIDE_LOOSE and cycle >= BodyAnim.RIDE_LOOSE
+	_loose_was = cycle
+	if puppet:
+		return
+	if _frozen > 0.0:
+		_frozen -= delta
+		if _frozen <= 0.0:
+			_show_frozen(0.0)
+	if _stun > 0.0:
+		_stun -= delta
+		if _stun <= 0.0:
+			_show_stun(false)
+	_tick_burn(delta)
+	_tick_dot(delta)
+	if not is_alive() or not loosed or _stun > 0.0 or _frozen > 0.0 or p == null or p.dead:
+		return
+	var from := position + Vector3.UP * height * 0.75
+	var at := p.eye_position() - Vector3.UP * 0.3
+	if from.distance_to(at) > RIDER_RANGE or not world.has_line_of_sight(from, at):
+		return
+	world.spawn_enemy_arrow(from, at + p.velocity * from.distance_to(at) / 26.0, carrier._damage * RIDER_DAMAGE, RIDER_RANGE, false, def["name"])
+
+
 func release() -> void:
 	if not active:
 		return
@@ -1309,6 +1479,12 @@ func anim_speed() -> float:
 
 func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_name: String, speed: float) -> void:
 	if _dying > 0.0:
+		return
+	if carrier:
+		# In the saddle: where it is and what it does are the wyvern's and its bow's.
+		hp = maxf(1.0, hp_fraction * max_hp)
+		_show_stun(flags & 16 != 0)
+		_show_frozen(0.25 if flags & 32 != 0 else 0.0)
 		return
 	if position.distance_to(at) > 12.0:
 		position = at
@@ -1353,6 +1529,10 @@ func _puppet_tick(delta: float) -> void:
 	reveal_left -= delta
 	bar_time -= delta
 	_tick_flash(delta)
+	if root_left > 0.0:
+		root_left -= delta
+		if root_left <= 0.0:
+			show_roots(0.0)
 	if _mounted:
 		HorseModel.set_gait(_horse_node, clampf(was.distance_to(position) / maxf(delta, 0.001) / 7.0, 0.0, 1.0))
 	if _custom and not dormant:
@@ -1812,6 +1992,9 @@ func _physics_process(delta: float) -> void:
 		if _dying <= 0.0:
 			release()
 		return
+	if carrier:
+		_tick_carried(delta)
+		return
 	if puppet:
 		_puppet_tick(delta)
 		return
@@ -1862,6 +2045,11 @@ func _physics_process(delta: float) -> void:
 	_attack_cd -= delta
 	_hurt_stun -= delta
 	_slow -= delta
+	haste_left = maxf(0.0, haste_left - delta)
+	if root_left > 0.0:
+		root_left -= delta
+		if root_left <= 0.0:
+			show_roots(0.0)
 	blind_left = maxf(0.0, blind_left - delta)
 	_tick_flash(delta)
 	if _airborne:
@@ -2277,7 +2465,7 @@ func _tick_hero(target: Target, dist: float, delta: float) -> void:
 func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 	var high: float = def["fly_height"]
 	_orbit += delta * 1.1
-	var speed := _speed * (0.5 if _slow > 0.0 else 1.0)
+	var speed := _speed * (0.5 if _slow > 0.0 else 1.0) * (HASTE if haste_left > 0.0 else 1.0)
 	if type_id == "crow":
 		_flock_left -= delta
 		if _flock_left <= 0.0 and _dive <= 0.0:
@@ -2373,7 +2561,7 @@ func _animate_custom(delta: float, moving: float) -> void:
 
 
 func _desired_speed() -> float:
-	if _hold or _attack_left > 0.0 or _hurt_stun > 0.0:
+	if _hold or _attack_left > 0.0 or _hurt_stun > 0.0 or root_left > 0.0:
 		return 0.0
 	var mult := 0.5 if _slow > 0.0 else 1.0
 	if not flies and world.terrain.in_water(position.x, position.z):
@@ -2382,6 +2570,8 @@ func _desired_speed() -> float:
 		mult *= Player.BLEED_SPEED
 	if _charges and _special_left > 0.0:
 		mult *= 2.6
+	if haste_left > 0.0:
+		mult *= HASTE
 	if _marching:
 		return _speed * mult
 	match state:

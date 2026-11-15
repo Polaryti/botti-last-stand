@@ -134,13 +134,16 @@ func opening_line() -> String:
 	return opening
 
 
-## The bosses of Beyond the Mists enter with a card of their own instead of an ordinary banner: their
-## name large in their colour, the line under it, and the soundtrack's bells (tools/make_boss_bells.py).
+## Every boss enters with a card of its own instead of an ordinary banner: its name large in its
+## colour, where it comes, what it says as it comes (its "first_words"), and the soundtrack's bells
+## (tools/make_boss_bells.py). As it falls it says its "last_words". World.spawn_zombie shows the card
+## for any boss, so a boss added later only needs its card here and its words in ZombieDefs.
 const BOSS_CARDS := {
+	"veil_regent": {"name": "Veil Regent", "line": "wakes on its throne in the Mists", "color": Color(0.78, 0.62, 1.0), "glow": Color(0.36, 0.16, 0.62), "bells": "boss_bells_regent", "strikes": [0.0, 0.7, 1.4, 2.2, 2.6]},
 	MESENLLA_BOSS: {"name": "Great Revenant Elemental", "line": "rises at the Ring of Stones", "color": Color(0.45, 0.95, 0.88), "glow": Color(0.15, 0.55, 0.62), "bells": "boss_bells_revenant", "strikes": [0.0, 0.55, 1.1, 1.75]},
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
 }
-const BOSS_CARD_TIME := 5.5
+const BOSS_CARD_TIME := 7.0 # long enough to read what it says
 var boss_card := "" # the boss whose card shows, while boss_card_time lasts
 var boss_card_time := 0.0
 
@@ -161,7 +164,8 @@ func show_boss_card(kind: String) -> void:
 
 func show_banner(text: String, seconds: float) -> void:
 	banner = text
-	banner_time = seconds
+	# Over a boss's card it waits its turn, and then shows for as long as it would have.
+	banner_time = seconds + boss_card_time
 	if Net.is_host():
 		Net.banner(text, seconds)
 
@@ -207,7 +211,7 @@ func _tick_caches() -> void:
 			var id := WeaponDefs.pick_rare(world.spawn_map())
 			world.spawn_pickup_at(at, Pickup.Kind.WEAPON, id, 12 if WeaponDefs.is_ranged(id) else 0)
 		else:
-			world.spawn_pickup_at(at, Pickup.Kind.POWER, PowerDefs.pick_potion())
+			world.spawn_pickup_at(at, Pickup.Kind.POWER, PowerDefs.pick_potion(world.spawn_map()))
 
 
 ## Words for this phone's player alone.
@@ -258,7 +262,7 @@ func stock(kind: int) -> void:
 		Pickup.Kind.WEAPON: world.spawn_pickup_random(kind, WeaponDefs.pick_random(world.spawn_map()))
 		Pickup.Kind.FOOD: world.spawn_pickup_random(kind, PowerDefs.pick_weighted(PowerDefs.FOODS))
 		Pickup.Kind.ARROWS: world.spawn_pickup_random(kind, "arrows")
-		Pickup.Kind.POWER: world.spawn_pickup_random(kind, PowerDefs.pick_potion())
+		Pickup.Kind.POWER: world.spawn_pickup_random(kind, PowerDefs.pick_potion(world.spawn_map()))
 
 
 func _process(delta: float) -> void:
@@ -425,14 +429,12 @@ func _raise_mesenlla_boss() -> void:
 	if world.map_id == "bastion":
 		if world.spawn_zombie(BASTION_BOSS, spot):
 			_mist_boss_spawned = true
-			boss_entrance(BASTION_BOSS)
 			_sound("wyvern_roar", 4.0)
 		return
 	if world.spawn_zombie(MESENLLA_BOSS, spot):
 		_mist_boss_spawned = true
 		CommandField.visual_impact(world, spot, 10.0, true)
 		if Net.is_host(): Net.command_impact_visual(spot, 10.0, true)
-		boss_entrance(MESENLLA_BOSS)
 		_sound("revenant_roar", 2.0)
 
 

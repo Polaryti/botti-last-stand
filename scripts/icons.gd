@@ -62,4 +62,5 @@ static func weapon(id: String) -> String:
 static func power(id: String) -> String:
 	return {"speed": "boot", "sensor": "eye", "fire_arrows": "flame+arrow", "bounce_arrows": "swap+arrow", "angel": "wings",
 		"daemon": "tooth", "archer": "bow", "thunder": "bolt", "raven": "raven", "ghost": "ghost", "imp": "grab",
-		"bell_spirit": "bell", "rat": "rat", "lantern": "lantern"}.get(id, "potion")
+		"bell_spirit": "bell", "rat": "rat", "lantern": "lantern", "stone_sprite": "boulder", "mistberry_draught": "potion+mist",
+		"antler_charm": "antlers"}.get(id, "potion")

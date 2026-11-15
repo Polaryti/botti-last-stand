@@ -221,4 +221,4 @@ static func plunder(p: Player, at: Vector3) -> void:
 	elif roll < 0.8:
 		p.world.spawn_pickup_at(at, Pickup.Kind.ARROWS, "arrows", PLUNDER_ARROWS)
 	else:
-		p.world.spawn_pickup_at(at, Pickup.Kind.POWER, PowerDefs.pick_potion())
+		p.world.spawn_pickup_at(at, Pickup.Kind.POWER, PowerDefs.pick_potion(p.world.spawn_map()))

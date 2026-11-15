@@ -75,6 +75,9 @@ var _run := 0.0
 var _head: Node3D
 var _tail: Node3D
 var _idle_time := 0.0
+var _raven: RavenRig
+var _was_striking := false
+var _last_yaw := 0.0
 
 
 func _init(owner_world: World, ally_kind: String) -> void:
@@ -124,6 +127,7 @@ func _init(owner_world: World, ally_kind: String) -> void:
 func activate(seconds: float) -> void:
 	guarded = 0.0
 	net_biting = false
+	_was_striking = false
 	if _snake: _snake.reset_pose()
 	life = seconds
 	remote_owner = 0
@@ -170,6 +174,7 @@ func _build_beast(root: Node3D) -> void:
 	_tail = made["tail"]
 	_legs.assign(made["legs"])
 	_snake = made.get("snake")
+	_raven = made.get("raven")
 
 
 static func _part(root: Node3D, mesh: Mesh, at: Vector3) -> MeshInstance3D:
@@ -215,19 +220,9 @@ static func _four_legs_model(beast: String, root: Node3D) -> Dictionary:
 
 
 static func _raven_model(root: Node3D) -> Dictionary:
-	var ink := Color(0.1, 0.1, 0.14)
-	if not _beast_parts.has("raven"):
-		_beast_parts["raven"] = {
-			"body": LowPoly.new().box(Vector3(0, 0, 0), Vector3(0.2, 0.2, 0.5), ink).commit(),
-			"head": LowPoly.new().box(Vector3(0, 0, 0), Vector3(0.16, 0.16, 0.16), ink.lightened(0.08)).prism(Vector3(0, 0, 0.08), Vector3(0, -0.03, 0.26), 0.04, 0.0, 4, Color(0.75, 0.62, 0.2)).commit(),
-			"tail": LowPoly.new().box(Vector3(0, 0, -0.15), Vector3(0.18, 0.03, 0.3), ink).commit(),
-			"wing": LowPoly.new().box(Vector3(0.28, 0, 0), Vector3(0.56, 0.03, 0.3), ink.lightened(0.05)).commit()}
-	var parts: Dictionary = _beast_parts["raven"]
-	_part(root, parts["body"], Vector3.ZERO)
-	_part(root, parts["wing"], Vector3(0.08, 0.05, 0))
-	var left := _part(root, parts["wing"], Vector3(-0.08, 0.05, 0))
-	left.rotation.y = PI
-	return {"head": _part(root, parts["head"], Vector3(0, 0.08, 0.3)), "tail": _part(root, parts["tail"], Vector3(0, 0, -0.25)), "legs": [] as Array[Node3D]}
+	var rig := RavenRig.new()
+	root.add_child(rig)
+	return {"head": rig.head, "tail": rig.tail, "legs": [] as Array[Node3D], "raven": rig}
 
 
 static func _snake_model(root: Node3D) -> Dictionary:
@@ -608,8 +603,17 @@ func _forage() -> void:
 		world.spawn_pickup_at(spot, Pickup.Kind.ARROWS, "arrows")
 
 
-## Legs, a bounce in its stride, a tail that never quite stops, and a lunge when it bites.
+## Legs, a bounce in its stride, a tail that never quite stops, and a lunge when it bites. The crow
+## (RavenRig) and the snake (SnakeBody) move themselves: they are told whether it moves and when it strikes.
 func _move_wolf(delta: float, moving: bool) -> void:
+	if _raven:
+		_raven.moving = moving
+		_raven.turn = wrapf(rotation.y - _last_yaw, -PI, PI) / maxf(delta, 0.001)
+		_last_yaw = rotation.y
+		if _attack_left > 0.0 and not _was_striking:
+			_raven.strike()
+		_was_striking = _attack_left > 0.0
+		return
 	if _snake:
 		_snake.moving = moving
 		_snake.biting = _attack_left > 0.0

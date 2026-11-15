@@ -16,7 +16,6 @@ const CHARGE_POWER := 1.6
 const CHARGE_EVERY := 9.0
 const SHIFT_TIME := 0.8
 const STAG_FLEE := 10.0 # how long it runs as a stag; not killed by then, it comes back whole
-const BEAST_SPEED := 5.0
 const SLAM_RADIUS := 4.5
 const SLAM_TELL := 1.0
 const SLAM_EVERY := 6.0
@@ -105,7 +104,7 @@ func after(z: Zombie) -> void:
 	if phase != "":
 		return
 	if kind == "shapeshifter":
-		_show(z, ("m_swipe" if z._attack_left > 0.0 else "m_beast") if form == "beast" else "m_stag")
+		_show(z, FORM_STATES[form][1 if z._attack_left > 0.0 and form != "stag" else 0])
 		return
 	if kind == "great_revenant_elemental" and enraged:
 		_show(z, "m_slam" if z._attack_left > 0.0 else "m_beast")
@@ -117,6 +116,9 @@ func after(z: Zombie) -> void:
 func on_dive(z: Zombie) -> void:
 	if kind == "mist_eagle":
 		MistSeal.cast(z, _ground(z, z.position), 2.4, 0.7, z._damage * 0.6, 0.0, MistSeal.Style.MIST)
+	elif kind == "wyvern" or kind == "war_wyvern":
+		# Its element bursts where it struck, a moment later: step out of it.
+		MistSeal.cast(z, _ground(z, z.position), DIVE_BURST_RADIUS * (1.4 if kind == "war_wyvern" else 1.0), DIVE_BURST_DELAY, z._damage * DIVE_BURST_POWER, 0.0, element_style(z.element))
 
 
 func on_death(z: Zombie) -> void:
@@ -165,7 +167,7 @@ func _mist_bear(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		phase = "paw"
 		left = CHARGE_TELL
 		cooldown_b = CHARGE_EVERY
-		_show(z, "m_rear", true)
+		_show(z, "m_paw", true)
 		z.world.sfx_at("bear_roar", z.position, 2.0)
 	if phase == "paw":
 		left -= delta
@@ -218,10 +220,47 @@ func _hit_wall(z: Zombie) -> bool:
 
 # --- Shapeshifter ----------------------------------------------------------------------
 
+## The Shapeshifter's fighting shapes. Close by or hurt, the white stag takes one of them at random, and
+## every FORM_TIME seconds another: the clawed beast (walks up and strikes); the Mist Wolf (fast; lunges,
+## and howls to hasten the creatures around it); the Great Owl (takes to the air, and dives with its
+## talons); the Tusked Boar (paws the ground and charges, knocking you down).
+const FIGHTING_FORMS := ["beast", "wolf", "owl", "boar"]
+const FORM_NAMES := {"stag": "White Stag", "beast": "Beast", "wolf": "Mist Wolf", "owl": "Great Owl", "boar": "Tusked Boar"}
+const FORM_TIME := 12.0
+const FORM_SPEED := {"beast": 5.0, "wolf": 6.6, "owl": 6.0, "boar": 5.4}
+## What each shape shows going about, and striking (Zombie._current_anim).
+const FORM_STATES := {"stag": ["m_stag", "m_stag"], "beast": ["m_beast", "m_swipe"], "wolf": ["m_wolf", "m_bite"], "owl": ["m_owl", "m_dive"], "boar": ["m_boar", "m_gore"]}
+const LUNGE_TELL := 0.45
+const LUNGE_TIME := 0.4
+const LUNGE_SPEED := 15.0
+const LUNGE_POWER := 1.3
+const LUNGE_EVERY := 5.0
+const LUNGE_RANGE := Vector2(3.0, 8.0)
+const HOWL_TIME := 0.9
+const HOWL_EVERY := 14.0
+const HOWL_REACH := 12.0
+const HOWL_HASTE_TIME := 6.0
+const OWL_HEIGHT := 4.5
+const OWL_TELL := 0.6
+const OWL_DIVE_SPEED := 13.0
+const OWL_POWER := 1.2
+const OWL_EVERY := 3.5
+const GORE_TELL := 0.7
+const GORE_SPEED := 2.8 # times its own, charging
+const GORE_POWER := 1.4
+const GORE_EVERY := 7.0
+const GORE_KNOCKDOWN := 0.8
+var _form_left := 0.0
+var _orbit := 0.0
+
+
 func _shapeshifter(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> bool:
 	if phase == "shift":
 		left -= delta
 		z.velocity = Vector3.ZERO
+		# Out of the air, if it was the owl.
+		var ground := z.world.ground_at(z.position)
+		z.position.y = maxf(ground, z.position.y - 6.0 * delta)
 		if left <= 0.0:
 			phase = "flee" if form == "stag" and fled_once and z.hp < z.max_hp else ""
 			left = STAG_FLEE
@@ -229,7 +268,7 @@ func _shapeshifter(z: Zombie, target: Target, to: Vector3, dist: float, delta: f
 		return true
 	if form == "stag":
 		if phase == "flee":
-			# Away from whoever hurt it, for STAG_FLEE seconds, and then back as the beast.
+			# Away from whoever hurt it, for STAG_FLEE seconds, and then back in a fighting shape.
 			left -= delta
 			var away := -to.normalized() if dist > 0.1 else Vector3.FORWARD
 			z.velocity = away * z._speed * 1.25 * (0.5 if z._slow > 0.0 else 1.0)
@@ -238,18 +277,204 @@ func _shapeshifter(z: Zombie, target: Target, to: Vector3, dist: float, delta: f
 			z.rotation.y = lerp_angle(z.rotation.y, atan2(away.x, away.z), minf(1.0, delta * 6.0))
 			z._animate_custom(delta, z.velocity.length())
 			if left <= 0.0:
-				# It got away: the mist mends it whole, and the beast comes back.
+				# It got away: the mist mends it whole, and it comes back to fight.
 				z.hp = z.max_hp
 				z.world.fx_mist(z.centre(), 2.4)
-				_begin_shift(z, "beast")
+				_begin_shift(z, _next_form())
 			return true
 		if (z._sees and dist < 7.0) or z.hp < z.max_hp:
-			_begin_shift(z, "beast")
+			_begin_shift(z, _next_form())
 			return true
 		return false
 	if not fled_once and z.hp < z.max_hp * 0.3:
 		fled_once = true
 		_begin_shift(z, "stag")
+		return true
+	_form_left -= delta
+	if phase == "" and _form_left <= 0.0:
+		_begin_shift(z, _next_form())
+		return true
+	match form:
+		"wolf": return _wolf(z, target, dist, delta)
+		"owl": return _owl(z, target, dist, delta)
+		"boar": return _boar(z, target, dist, delta)
+	return false
+
+
+## Any fighting shape but the one it is in.
+func _next_form() -> String:
+	var choices: Array = FIGHTING_FORMS.filter(func(f: String) -> bool: return f != form)
+	return str(choices.pick_random())
+
+
+## The Mist Wolf: a crouch, then a lunge that covers the ground between you in a moment; and a howl
+## that hastens every creature near it.
+func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
+	if phase == "":
+		if cooldown_b <= 0.0 and z._sees and dist < HOWL_REACH:
+			phase = "howl"
+			left = HOWL_TIME
+			cooldown_b = HOWL_EVERY
+			_show(z, "m_howl", true)
+			z.world.sfx_at("howl", z.position, 2.0)
+		elif cooldown <= 0.0 and z._sees and dist > LUNGE_RANGE.x and dist < LUNGE_RANGE.y and z.world.has_line_of_sight(z.centre(), target.global_position + Vector3.UP):
+			phase = "crouch"
+			left = LUNGE_TELL
+			cooldown = LUNGE_EVERY
+			_show(z, "m_lunge", true)
+			z.world.sfx_at("beast_growl", z.position, -2.0)
+	match phase:
+		"howl":
+			left -= delta
+			z.velocity = Vector3.ZERO
+			_face(z, target.global_position, delta, 4.0)
+			if left <= 0.0:
+				var hastened := 0
+				for other: Zombie in z.world.zombies:
+					if other != z and other.is_alive() and other.position.distance_to(z.position) <= HOWL_REACH:
+						other.hasten(HOWL_HASTE_TIME)
+						hastened += 1
+				z.world.fx_blast(z.centre(), HOWL_REACH, Color(0.45, 0.95, 0.92, 0.35))
+				if Net.is_host():
+					Net.blast_fx(z.centre(), HOWL_REACH, Color(0.45, 0.95, 0.92, 0.35))
+				phase = ""
+				_show(z, "m_wolf")
+			z._animate_custom(delta, 0.0)
+			return true
+		"crouch":
+			left -= delta
+			z.velocity = Vector3.ZERO
+			_face(z, target.global_position, delta, 12.0)
+			if left <= 0.0:
+				phase = "leap"
+				heading = target.global_position - z.position
+				heading.y = 0.0
+				heading = heading.normalized()
+				left = LUNGE_TIME
+				struck = false
+				_show(z, "m_lunge")
+			z._animate_custom(delta, 0.0)
+			return true
+		"leap":
+			left -= delta
+			z.velocity = heading * LUNGE_SPEED * (0.5 if z._slow > 0.0 else 1.0)
+			z.move_and_slide()
+			z.position.y = z.world.ground_at(z.position)
+			var flat := target.global_position - z.position
+			flat.y = 0.0
+			if not struck and flat.length() < 1.7 and absf(target.global_position.y - z.position.y) < 2.0:
+				struck = true
+				target.hurt(z._damage * LUNGE_POWER, z.position, z)
+				z.world.sfx_at("wolf", z.position, 0.0)
+			if left <= 0.0 or _hit_wall(z):
+				phase = ""
+				_show(z, "m_wolf")
+				z.velocity = Vector3.ZERO
+			z._animate_custom(delta, LUNGE_SPEED)
+			return true
+	return false
+
+
+## The Great Owl: it circles above you, out of reach of a blade; it hangs for a moment and screeches,
+## then falls on you talons first, and climbs back up.
+func _owl(z: Zombie, target: Target, dist: float, delta: float) -> bool:
+	var ground := z.world.ground_at(z.position)
+	var speed := z._speed * (0.5 if z._slow > 0.0 else 1.0)
+	match phase:
+		"hang":
+			left -= delta
+			_face(z, target.global_position, delta, 10.0)
+			if left <= 0.0:
+				phase = "dive"
+				left = 1.4
+				aim = target.global_position + Vector3.UP * 1.1 + target.velocity * 0.25
+				_show(z, "m_dive")
+		"dive":
+			left -= delta
+			var to_aim := aim - (z.position + Vector3.UP * 1.0)
+			z.position += to_aim.normalized() * minf(to_aim.length(), OWL_DIVE_SPEED * (0.5 if z._slow > 0.0 else 1.0) * delta)
+			_face(z, aim, delta, 8.0)
+			if to_aim.length() < 0.6 or left <= 0.0:
+				if (target.global_position + Vector3.UP).distance_to(z.position + Vector3.UP) < 1.8 and z.world.has_line_of_sight(z.centre(), target.global_position + Vector3.UP):
+					target.hurt(z._damage * OWL_POWER, z.position, z)
+					z.world.sfx_at("claw_swipe", z.position, 0.0)
+				phase = "climb"
+				left = 1.0
+				cooldown = OWL_EVERY
+				_show(z, "m_owl")
+		"climb":
+			left -= delta
+			z.position.y = minf(z.position.y + 5.0 * delta, ground + OWL_HEIGHT)
+			if left <= 0.0:
+				phase = ""
+		_:
+			# Round and round above you.
+			_orbit += delta * 0.9
+			var over := target.global_position + Vector3(cos(_orbit) * 5.0, OWL_HEIGHT, sin(_orbit) * 5.0)
+			var drift := over - z.position
+			z.position += drift.normalized() * minf(drift.length(), speed * delta)
+			var flat := Vector3(drift.x, 0, drift.z)
+			if flat.length() > 0.2:
+				z.rotation.y = lerp_angle(z.rotation.y, atan2(flat.x, flat.z), minf(1.0, delta * 5.0))
+			if cooldown <= 0.0 and z._sees and dist < 20.0 and z.position.y - ground > OWL_HEIGHT * 0.6 and z.world.has_line_of_sight(z.centre(), target.global_position + Vector3.UP):
+				phase = "hang"
+				left = OWL_TELL
+				_show(z, "m_owl", true)
+				z.world.sfx_at("owl_screech", z.position, 2.0)
+	z.position.y = maxf(z.position.y, ground + 0.3)
+	z._animate_custom(delta, speed)
+	return true
+
+
+## The Tusked Boar: it paws the ground and snorts, then charges in a straight line; what it hits is
+## knocked down.
+func _boar(z: Zombie, target: Target, dist: float, delta: float) -> bool:
+	if phase == "" and cooldown_b <= 0.0 and z._sees and dist > 5.0 and dist < 16.0 and z.world.has_line_of_sight(z.centre(), target.global_position + Vector3.UP):
+		phase = "paw"
+		left = GORE_TELL
+		cooldown_b = GORE_EVERY
+		_show(z, "m_paw", true)
+		z.world.sfx_at("boar_snort", z.position, 2.0)
+	if phase == "paw":
+		left -= delta
+		_face(z, target.global_position, delta, 10.0)
+		z.velocity = Vector3.ZERO
+		_trail -= delta
+		if _trail <= 0.0:
+			_trail = 0.25
+			z.world.fx_gore(z.position + Vector3(0, 0.2, 0) + Vector3(sin(z.rotation.y), 0, cos(z.rotation.y)) * 0.6, Color(0.42, 0.36, 0.3))
+		if left <= 0.0:
+			phase = "charge"
+			heading = target.global_position - z.position
+			heading.y = 0.0
+			heading = heading.normalized()
+			left = minf(1.6, (dist + 4.0) / (z._speed * GORE_SPEED))
+			struck = false
+			_show(z, "m_charge")
+		z._animate_custom(delta, 0.0)
+		return true
+	if phase == "charge":
+		left -= delta
+		z.velocity = heading * z._speed * GORE_SPEED * (0.5 if z._slow > 0.0 else 1.0)
+		z.rotation.y = atan2(heading.x, heading.z)
+		z.move_and_slide()
+		z.position.y = z.world.ground_at(z.position)
+		var flat := target.global_position - z.position
+		flat.y = 0.0
+		if not struck and flat.length() < 1.8 and absf(target.global_position.y - z.position.y) < 2.0:
+			struck = true
+			target.hurt(z._damage * GORE_POWER, z.position, z)
+			z.world.sfx_at("bear_maul", z.position, 0.0)
+			if target is Player:
+				var p := target as Player
+				p.apply_status(Net.Status.STUN, GORE_KNOCKDOWN)
+				p.velocity += heading * 7.0 + Vector3.UP * 3.0
+				p.say("Knocked down!")
+		if left <= 0.0 or _hit_wall(z):
+			phase = ""
+			_show(z, "m_boar")
+			z.velocity = Vector3.ZERO
+		z._animate_custom(delta, z.velocity.length())
 		return true
 	return false
 
@@ -263,17 +488,22 @@ func _begin_shift(z: Zombie, into: String) -> void:
 	z.world.sfx_at("shapeshift", z.position, 0.0)
 
 
-## The stag cannot fight; the beast is slower but strikes hard.
+## The stag cannot fight; each other shape strikes as hard as the beast, at its own pace.
 func _set_form(z: Zombie, into: String) -> void:
 	var d: Dictionary = z.def
+	_form_left = FORM_TIME
+	z.collision_mask = 0 if into == "owl" else (1 | Terrain.BARRIER | Terrain.ENEMY_ONLY)
 	if into == "stag":
 		z._damage = 0.0
 		z._speed = float(d["speed"]) * 1.15 * Game.enemy_speed()
-		_show(z, "m_stag")
 	else:
 		z._damage = float(d["damage"]) * Game.enemy_damage() * (1.0 + ZombieDefs.NIGHT_DAMAGE * z.hero_minute)
-		z._speed = BEAST_SPEED * Game.enemy_speed()
-		_show(z, "m_beast")
+		z._speed = float(FORM_SPEED[into]) * Game.enemy_speed()
+		cooldown = 1.5
+		cooldown_b = 2.5
+	if into != "owl":
+		z.position.y = z.world.ground_at(z.position)
+	_show(z, FORM_STATES[into][0])
 
 
 ## A stun cuts a special move short, tell and all; a change of shape still finishes.
@@ -281,11 +511,12 @@ func interrupt(z: Zombie) -> void:
 	if phase == "" or phase == "shift" or phase == "flee":
 		return
 	phase = ""
-	_show(z, "m_beast" if kind == "shapeshifter" and form == "beast" else "m_stag" if kind == "shapeshifter" else "")
+	_show(z, FORM_STATES[form][0] if kind == "shapeshifter" else "")
 
 
 func start(z: Zombie) -> void:
 	if kind == "shapeshifter":
+		form = "stag"
 		_set_form(z, "stag")
 
 
@@ -380,37 +611,24 @@ func _storm(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 
 # --- Wyverns -------------------------------------------------------------------------------
 
-## The War Wyvern's two riders loose an arrow each, in turn, at whoever is nearest within bow range,
-## when their draw (MesenllaModels.rider_cycle) reaches the loose.
-const RIDER_RANGE := 34.0
-const RIDER_DAMAGE := 0.35 # of the wyvern's own blow
-var _rider_was := [0.0, 0.0]
+## What a wyvern of each element breathes, and what bursts where it dives (MistSeal.Style).
+static func element_style(element: String) -> int:
+	match element:
+		"ice": return MistSeal.Style.FROST
+		"storm": return MistSeal.Style.STORM
+	return MistSeal.Style.FIRE
 
 
-func _rider_shots(z: Zombie) -> void:
-	var riders: Array = z._visual.get_meta("riders", [])
-	for i in riders.size():
-		var cycle := MesenllaModels.rider_cycle(i, z.world.now)
-		var crossed: bool = float(_rider_was[i]) < BodyAnim.RIDE_LOOSE and cycle >= BodyAnim.RIDE_LOOSE
-		_rider_was[i] = cycle
-		if not crossed:
-			continue
-		var rider := riders[i] as Node3D
-		var from := rider.global_position + Vector3.UP * 0.6
-		var p := z.world.nearest_player(from)
-		if p == null or p.dead or from.distance_to(p.global_position) > RIDER_RANGE:
-			continue
-		var at := p.eye_position() - Vector3.UP * 0.3
-		if not z.world.has_line_of_sight(from, at):
-			continue
-		z.world.spawn_enemy_arrow(from, at + p.velocity * from.distance_to(at) / 26.0, z._damage * RIDER_DAMAGE, RIDER_RANGE, false, "War Wyvern rider")
+const DIVE_BURST_RADIUS := 2.0
+const DIVE_BURST_DELAY := 0.5
+const DIVE_BURST_POWER := 0.5 # of its blow
 
 
-## Hover, breathe, and fire comes down in rings along the ground: one under you, more for the War Wyvern.
+## Hover, breathe, and its element comes down in rings along the ground: one under you, more for the
+## War Wyvern. (Its riders are creatures of their own: wyvern_rider, in Zombie._tick_carried.)
 func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 	var war := kind == "war_wyvern"
-	if war:
-		_rider_shots(z)
+	var style := element_style(z.element)
 	if war and not called and z.hp < z.max_hp * 0.5:
 		called = true
 		z.world.director.show_banner("The War Wyvern calls the eagles of the peaks", 3.0)
@@ -442,7 +660,7 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			var along := Vector3(flat.x, 0.0, flat.y).normalized() if flat.length() > 0.5 else Vector3.FORWARD
 			# A line of fire that ends on the portal, coming from where the wyvern came.
 			for i in 4:
-				MistSeal.cast(z, _ground(z, fort.heart_at - along * (3 - i) * BREATH_RADIUS * 1.6), BREATH_RADIUS * 1.15, BREATH_TELL + i * 0.15, z._damage, 0.0, MistSeal.Style.FIRE)
+				MistSeal.cast(z, _ground(z, fort.heart_at - along * (3 - i) * BREATH_RADIUS * 1.6), BREATH_RADIUS * 1.15, BREATH_TELL + i * 0.15, z._damage, 0.0, style)
 		z._animate_custom(delta, 1.0)
 		return true
 	if phase == "" and cooldown <= 0.0 and z._sees and dist < 28.0 and z._dive <= 0.0 and z._windup <= 0.0:
@@ -459,7 +677,7 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		var rings := 4 if war else 1
 		for i in rings:
 			var spot := at + along * (i - 1.0) * BREATH_RADIUS * 1.6 if war else at
-			MistSeal.cast(z, _ground(z, spot), BREATH_RADIUS * (1.15 if war else 1.0), BREATH_TELL + i * 0.15, z._damage, 0.0, MistSeal.Style.FIRE)
+			MistSeal.cast(z, _ground(z, spot), BREATH_RADIUS * (1.15 if war else 1.0), BREATH_TELL + i * 0.15, z._damage, 0.0, style)
 	if phase == "breath":
 		left -= delta
 		var focus := fort.heart_at if _at_portal and fort else target.global_position

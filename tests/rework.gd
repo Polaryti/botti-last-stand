@@ -709,6 +709,8 @@ func _mists() -> void:
 	mw.director._tick_mist_boss()
 	mw.director._tick_mist_boss()
 	check(mw.count_type("veil_regent") == 1, "Regent arrives exactly once at its scheduled time")
+	check(mw.director.boss_card == "veil_regent" and mw.director.boss_card_time > 0.0, "with its own entrance card, saying what it says as it comes")
+	check(mw.director.banner.contains("return to the arena") and mw.director.banner_time > mw.director.boss_card_time, "and the warning to come back to the arena waits until the card has gone")
 	var boss: Zombie = mw.zombies.back()
 	boss.set_physics_process(false)
 	boss.freeze(10.0)

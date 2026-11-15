@@ -7,7 +7,8 @@ the Mist Bastion's music tolls (tools/make_music.py `tubular`), with its bell tr
 Run from the project root. Writes assets/sounds/boss_bells_revenant.ogg (the Great Revenant
 Elemental: a slow toll falling through E minor, the bell tree shivering after it) and
 boss_bells_wyvern.ogg (the War Wyvern: the citadel's alarm, the bells climbing fast to the octave
-over the gong). Both are in E minor, the key of the Bastion's bells."""
+over the gong). Both are in E minor, the key of the Bastion's bells. And boss_bells_regent.ogg (the Veil
+Regent: slow down through D minor to a low D struck twice over the gong, the Mists' key)."""
 import glob, os, sys
 import numpy as np
 from scipy.signal import resample_poly
@@ -65,6 +66,16 @@ def revenant():
     return mix(5.2, parts)
 
 
+def regent():
+    # The Veil Regent wakes in the Mists: D5, A4, F4 slowly down, then a low D struck twice with the gong
+    # under it and the bell tree drawn down after, the Mists' own minor, lower and slower than the others.
+    toll = [(0.0, "D5", 0.55), (0.7, "A4", 0.65), (1.4, "F4", 0.75), (2.2, "D4", 1.0), (2.6, "D4", 0.7)]
+    parts = [(at, tube(note, 5.0), gain) for at, note, gain in toll]
+    parts.append((2.2, one("Percussion/gongHit_mf.wav"), 0.4))
+    parts.append((2.62, one("Percussion/BellTree_Stroke3_*.wav"), 0.3))
+    return mix(6.2, parts)
+
+
 def wyvern():
     # The citadel's alarm: E4 G4 B4 struck quickly, the octave E5 twice, the gong under the last.
     toll = [(0.0, "E4", 0.75), (0.24, "G4", 0.78), (0.48, "B4", 0.82), (0.8, "E5", 1.0), (1.25, "E5", 0.9)]
@@ -79,4 +90,5 @@ if __name__ == "__main__":
         raise SystemExit("Give the VSCO-2 CE folder (the soundtrack's samples) as the first argument.")
     write("assets/sounds/boss_bells_revenant.ogg", revenant(), 0.8, q=4)
     write("assets/sounds/boss_bells_wyvern.ogg", wyvern(), 0.8, q=4)
+    write("assets/sounds/boss_bells_regent.ogg", regent(), 0.8, q=4)
     print("boss bells done")

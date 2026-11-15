@@ -2,6 +2,36 @@
 
 ## Development — Beyond the Mists, upgrades for every path
 
+### The wilds of Mesenlla
+- **Wyverns of Fire, Ice and Storm.** Every Wyvern and the War Wyvern rises as one of the three, a third each, and looks it: ember-red with glowing spines, pale ice with crystals down its back and tail, or storm-dark with sparks flickering in its wings. Its breath is its element: fire that burns, frost that freezes you for 0.6 s and slows you for 2 s after, or lightning that stuns. Where it dives on you, its element bursts 0.5 s later, within 2 m of where it struck (2.8 m for the War Wyvern): step out of it.
+- **Wyverns that fly like wyverns.** Wings that fold on the upstroke and open on the downstroke, glides between beats and banking into turns; before a dive it hangs in the air beating hard and roaring, then dives with its wings swept back and its talons thrown forward at the last; its breath is drawn in with its throat glowing, then poured out with the head thrown forward and its element streaming from its jaws.
+- **The War Wyvern** is twice a wyvern's size and dressed for war: plates of barding down its neck, a steel chamfron with a spike, a breastplate, a two-seat war saddle on a red caparison, chains, armoured tail rings and old scars.
+- **Its two riders are creatures of their own.** Each War Wyvern Rider has its own health and can be shot out of the saddle on its own; it falls, and may leave its bow, arrows or food. When the War Wyvern falls, its riders fall with it. They still shoot in turn at whoever is nearest. They are in the Codex.
+- **Bears in fur.** The Bear and the Mist Bear are shaggy now: a coat of tufts over the hump, the back and the belly, a ruff at the neck, long fur down the legs, and strands of fur drawn through every face; the Mist Bear's coat shines with mist at its edges. A jaw that opens, paws that flex. They amble with their weight rolling over the hump and the head swinging low, breathe and lift their noses to the wind while they stand, gallop in bounds, rear up roaring with their forepaws spread before the maul, bring both paws crashing down as they lunge and bite, and hook one paw round, left and right in turn, for an ordinary blow. The Mist Bear rakes the ground with a forepaw and snorts before it charges, instead of rearing. The bear the Woodland Cavalry ride has the fur too.
+- **The Shapeshifter's other shapes.** Close by or hurt, the white stag now takes one of four fighting shapes, and a different one every 12 seconds: the clawed beast; a Mist Wolf (fast; crouches and lunges, and howls to make every creature within 12 m move 35% faster for 6 s); a Great Owl (circles 4.5 m up, out of a blade's reach, then hangs screeching and dives talons first); or a Tusked Boar (paws the ground and snorts, then charges and knocks you down for 0.8 s). Each has its own body, its own way of moving and its own sounds. Badly hurt, it still turns back into the stag and flees.
+
+### Bosses' words
+- Every boss now says something as it enters, on its entrance card, and something as it falls. The Veil Regent has an entrance card of its own, in violet, with its own bells, slow down through D minor to a low D over the gong. A boss added later gets its card the same way.
+- A banner that comes while a boss's card is showing waits until the card has gone.
+- The Codex shows each boss's words.
+
+### Found only beyond the Mists
+- **Stone Sprite** (familiar): every 5 seconds it raises a ward of stones that circles you, blocks the next hit on you and throws back whoever struck.
+- **Mistberry Draught** (20 s): you leave a trail of mist; while you stand in it, enemies cannot see you and you heal 3 health a second.
+- **Antler Charm** (20 s): your hits root enemies to the ground for 1.5 s with vines from the valley (a boss for half as long). The same enemy cannot be caught again for 4 s after, and fliers are out of reach. In versus, other players are rooted too.
+- All three are tagged Map Exclusive · Mesenlla and listed in the Codex; Rooted is listed among the status effects.
+
+### Beastmaster
+- The Raven moves like a crow: it hovers on its wing beats, tail spread, looking about in quick turns of its head and cawing now and then; it flies forward in a few strong beats and a glide, banking into its turns; and it drops on what it attacks with its wings folded, flares, throws its talons forward and pecks, then climbs back. It shows all of this in the Store and the Armory too, with a new body: wings that fold at the elbow, fingered primaries, a fanned tail, feet and a heavy bill.
+- Choosing a pet in the Armory no longer sends the page back to the top.
+
+### Changelog screen and the map
+- The Changelog is easier to scan: the versions are listed down the left, each with a dot for every kind of change it has; the chosen version shows its name and date, a count of its changes by kind, and a card for each part, marked with an icon and a colour (Enemies, Classes and items, Maps, Store, Playing together, Look and feel, Fixes). A long change shows its gist first, with More to read the rest.
+- On the map of the world, Mist Bastion sits down among the peaks instead of on top of them, and the Valleys of Mesenlla lie further down.
+
+### Fixes
+- Nothing rises from the edge of a Mist Storm any more (an enemy could rise in the middle of a cell whose corner was clear of it).
+
 ### Spectator Mode
 - Watch a match that is under way, like a broadcast. Matches on the same Wi-Fi and public online matches show under "Matches to watch" in Play Together; a private match can be watched with its code.
 - The camera follows the fighting on its own: high above a player, circling; wide over a fight; close behind them; or through their eyes. It glides from one shot to the next and goes where the action is: enemies close, health falling, a boss.

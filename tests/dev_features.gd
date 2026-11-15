@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _together_store_and_dawn()
 	await _maps_weather_and_balance()
 	await _feedback_and_numbers()
+	await _wilds_of_mesenlla()
 	_text_audit()
 	Net.leave()
 	w.queue_free()
@@ -1179,6 +1180,205 @@ func _feedback_and_numbers() -> void:
 	Game.switched_off = saved_off
 	p.setup_class(cls)
 	await frames(1)
+
+
+## The Beastmaster's crow and pets, the Mesenlla beasts and bosses, the Wyverns, the Shapeshifter's
+## forms and the Mesenlla familiar and items.
+func _wilds_of_mesenlla() -> void:
+	# Choosing a pet in the Armory changes it where it is: the page does not jump back to the top.
+	var saved_items := Game.owned_items.duplicate()
+	var saved_pet := Game.pet
+	for pet: String in ShopDefs.PETS:
+		Game.owned_items[pet] = true
+	Game.choose_pet("wolf")
+	var m := Main.new()
+	add_child(m)
+	await frames(2)
+	m.show_armory("ranger")
+	await frames(3)
+	var choices := m.panel.find_children("Pet_raven", "Button", true, false)
+	check(choices.size() == 1, "the Armory shows the Beastmaster's pets to choose from")
+	var up: Node = choices[0]
+	while up and not (up is ScrollContainer):
+		up = up.get_parent()
+	var scroll := up as ScrollContainer
+	var content := scroll.get_child(0) as Control
+	var stage: Node = m.panel.find_children("PetStage", "", true, false)[0]
+	content.custom_minimum_size.y = scroll.size.y + 1200.0 # this square test window shows the whole page; a phone does not
+	await frames(2)
+	(scroll as DragScroll).scroll_to(240.0)
+	await frames(1)
+	var at := scroll.scroll_vertical
+	(choices[0] as Button).pressed.emit()
+	await frames(2)
+	check(Game.pet == "raven", "pressing the Raven chooses it")
+	check(is_instance_valid(stage) and is_instance_valid(content) and scroll.get_child(0) == content, "and the Armory is not built again")
+	check(scroll.scroll_vertical == at and at > 0, "so it stays where it was scrolled to (%d, was %d)" % [scroll.scroll_vertical, at])
+	check(stage.find_children("Raven", "Node3D", true, false).size() == 1, "and the stage shows the crow")
+	m.queue_free()
+	Game.owned_items = saved_items
+	Game.choose_pet(saved_pet)
+	await frames(2)
+	# The crow moves: wings beat as it hovers, it flies in beats and glides, and it drops on what it strikes.
+	var crow := RavenRig.new()
+	add_child(crow)
+	crow.set_process(false)
+	var lifts: Array[float] = []
+	var folds: Array[float] = []
+	for i in 60:
+		crow.advance(1.0 / 60.0)
+		lifts.append(crow.shoulders[0].rotation.z)
+		folds.append(crow.elbows[0].rotation.y)
+	check(lifts.max() - lifts.min() > 1.0, "hovering, its wings beat (%.2f rad)" % (lifts.max() - lifts.min()))
+	check(folds.max() > 0.5, "and fold at the elbow on the way up")
+	check(is_equal_approx(crow.shoulders[1].rotation.z, -crow.shoulders[0].rotation.z), "both wings together")
+	check(crow.body.rotation.x < -0.2 and crow.feet.rotation.x < 0.6, "it hangs upright with its feet down")
+	crow.moving = true
+	for i in 120: crow.advance(1.0 / 60.0)
+	check(crow.body.rotation.x > 0.0 and crow.feet.rotation.x > 1.2, "flying, it leans forward and tucks its feet")
+	var still := 0
+	var beat := 0
+	for i in 150:
+		crow.advance(1.0 / 60.0)
+		if absf(crow.shoulders[0].rotation.z - 0.14) < 0.05: still += 1
+		else: beat += 1
+	check(still > 15 and beat > 40, "it beats its wings and glides between beats (%d glide frames, %d beating)" % [still, beat])
+	crow.moving = false
+	crow.strike()
+	var lowest := 0.0
+	var talons := 9.0
+	var peck := 0.0
+	for i in int(RavenRig.STRIKE_TIME * 60.0) + 30:
+		crow.advance(1.0 / 60.0)
+		lowest = minf(lowest, crow.body.position.y)
+		talons = minf(talons, crow.feet.rotation.x)
+		peck = maxf(peck, crow.head.rotation.x)
+	check(lowest < -crow.dive * 0.9, "striking, it drops on its prey (%.2f m)" % lowest)
+	check(talons < -0.8 and peck > 0.6, "throws its talons forward and pecks")
+	check(not crow.striking() and crow.body.position.y > -0.2, "and climbs back to where it was")
+	crow.queue_free()
+	# In the game: the Beastmaster's raven strikes when it bites.
+	w.spawn_ally("raven", p.global_position + Vector3(3, 0, 0), 20.0)
+	var raven: Ally = w.allies.back()
+	check(raven._raven != null and raven._raven.is_inside_tree(), "the Beastmaster's raven is the crow")
+	raven._attack_left = 0.25
+	raven._move_wolf(0.016, false)
+	check(raven._raven.striking(), "and it dives on what it bites")
+	w.remove_ally(raven)
+	await _mesenlla_finds()
+	await _changelog_and_atlas()
+
+
+## The Changelog in cards by kind, and where the places beyond the Mists sit on the map.
+func _changelog_and_atlas() -> void:
+	var vs := ChangelogPanel.versions(ChangelogPanel.notes())
+	check(vs.size() > 10 and str(vs[0]["number"]).begins_with("Development") and ChangelogPanel.count(vs[0]) > 20, "the Changelog reads every version, newest first")
+	var released: Dictionary = vs.filter(func(v: Dictionary) -> bool: return str(v["number"]) == "0.21.4")[0]
+	check(released["name"] == "A Portal Worth Defending" and released["date"] == "11 November 2026", "with each version's name and date")
+	check(ChangelogPanel.category("Fixes")[1] == "Fixes" and ChangelogPanel.category("The wilds of Mesenlla")[1] == "Enemies" and ChangelogPanel.category("Spectator Mode")[1] == "Playing together", "each part is marked by what it is about")
+	for c: Array in ChangelogPanel.CATEGORIES + [ChangelogPanel.OTHER]:
+		check(Icons.exists(c[2]), "%s has its icon" % c[1])
+	var long := "**Lead words.** " + "A first sentence that runs on for a while. ".repeat(6)
+	check(ChangelogPanel.brief(long).length() < long.length() and ChangelogPanel.brief(long).begins_with("**Lead words.**"), "a long change shows its gist first")
+	check(ChangelogPanel.bbcode("**Bold** and [square]") == "[b][color=#ffffff]Bold[/color][/b] and [lb]square]", "bold stands out; brackets stay as written")
+	var m := Main.new()
+	add_child(m)
+	await frames(2)
+	m.show_changelog()
+	await frames(3)
+	var page := m.panel as ChangelogPanel
+	var cards := func() -> int: return page._body.get_children().filter(func(n: Node) -> bool: return n.has_meta("list")).size()
+	check(page._rail.get_child_count() == vs.size() and cards.call() == (vs[0]["parts"] as Array).size(), "the screen lists the versions and shows the newest in cards (%d)" % cards.call())
+	page.show_version(1)
+	await frames(2)
+	check(cards.call() == (vs[1]["parts"] as Array).size(), "and another version when it is chosen (%d)" % cards.call())
+	m.queue_free()
+	await frames(1)
+	var bastion: Vector2 = WorldAtlas.SPOTS["bastion"]
+	var valleys: Vector2 = WorldAtlas.SPOTS["mesenlla"]
+	check(bastion.x >= 0.79 and bastion.y >= 0.34, "Mist Bastion sits down among the peaks, not on top of them")
+	check(valleys.y >= 0.75 and valleys.y - bastion.y > 0.35, "and the Valleys of Mesenlla further down the map")
+
+
+## The Stone Sprite, the Mistberry Draught and the Antler Charm: found only beyond the Mists.
+func _mesenlla_finds() -> void:
+	for id: String in ["stone_sprite", "mistberry_draught", "antler_charm"]:
+		var d: Dictionary = PowerDefs.ALL[id]
+		check(d["maps"] == SpawnRules.MESENLLA and is_equal_approx(float(d["time"]), 20.0), "%s is found only in Mesenlla, for 20 seconds" % id)
+		var badge := ClassPresentation.map_tag(d)
+		check((badge.get_child(0) as Label).text == "Map Exclusive · Mesenlla", "%s is tagged Map Exclusive · Mesenlla" % id)
+		badge.free()
+		for glyph: String in Icons.power(id).split("+"):
+			check(Icons.exists(glyph), "%s's sign exists: %s" % [id, glyph])
+	check(PowerDefs.title("mistberry_draught") == "Mistberry Draught" and PowerDefs.title("speed") == "Speed Potion", "the Draught and the Charm keep their own names")
+	var village := {}
+	var valleys := {}
+	for i in 400:
+		village[PowerDefs.pick_potion("village")] = true
+		valleys[PowerDefs.pick_potion("mesenlla")] = true
+		village[PowerDefs.pick_familiar("village")] = true
+		valleys[PowerDefs.pick_familiar("bastion")] = true
+	check(not village.has("stone_sprite") and not village.has("mistberry_draught") and not village.has("antler_charm"), "none of them turns up in the Village")
+	check(valleys.has("stone_sprite") and valleys.has("mistberry_draught") and valleys.has("antler_charm"), "all of them turn up beyond the Mists")
+	check(str(PowerDefs.ALL["stone_sprite"]["desc"]).contains("Every %d seconds" % int(PowerDefs.STONE_INTERVAL)), "the Stone Sprite says how often its ward rises")
+	check(str(PowerDefs.ALL["mistberry_draught"]["desc"]).contains("%d health a second" % int(PowerDefs.MISTBERRY_HEAL)), "the Draught says how fast it mends")
+	check(str(PowerDefs.ALL["antler_charm"]["desc"]).contains("%s seconds" % str(PowerDefs.ANTLER_ROOT)) and str(PowerDefs.ALL["antler_charm"]["desc"]).contains("for %d seconds after" % int(PowerDefs.ANTLER_AGAIN)), "the Charm says how long the vines hold")
+	# The Stone Sprite: its ward takes the next blow and throws back whoever struck.
+	p.setup_class("heavy")
+	p.hp = p.max_hp()
+	p.guard_left = 0.0
+	p.activate_power("stone_sprite")
+	check(p.stone_ward and p._ward_stones.visible, "the Stone Sprite raises a ward of stones about you")
+	w.spawn_zombie("normal", p.global_position + Vector3(0, 0, -1.5))
+	var z: Zombie = w.zombies.back()
+	z.set_physics_process(false)
+	var hp0 := p.hp
+	p.hurt(30.0, z.position, z)
+	check(p.hp == hp0 and not p.stone_ward, "it takes the blow")
+	check(z._stun > 0.0 and z._knock.length() > 1.0, "and throws back whoever struck")
+	p.hurt(10.0, z.position, z)
+	check(p.hp < hp0, "the next blow lands")
+	p._tick_powers(PowerDefs.STONE_INTERVAL + 0.1)
+	check(p.stone_ward, "until the ward rises again, %d seconds later" % int(PowerDefs.STONE_INTERVAL))
+	check(p.readiness().any(func(r: Dictionary) -> bool: return r["key"] == "stone_ward" and r["primed"]), "and you can see that it is up")
+	p.powers.erase("stone_sprite")
+	p._tick_powers(0.016)
+	# The Mistberry Draught: mist where you walk; in it you are hidden and you mend.
+	p.hp = p.max_hp() - 40.0
+	p.activate_power("mistberry_draught")
+	p._tick_powers(0.016)
+	check(p.in_mist and p.is_unseen(), "the Draught leaves mist where you stand, and hides you in it")
+	var mending := p.hp
+	for i in 30:
+		p._tick_powers(1.0 / 30.0)
+	check(p.hp > mending + PowerDefs.MISTBERRY_HEAL * 0.8, "and mends you (%.1f a second)" % (p.hp - mending))
+	check(w._mist_patches.any(func(m: CPUParticles3D) -> bool: return m.emitting), "the mist can be seen")
+	var away := p.global_position
+	p.powers.erase("mistberry_draught")
+	p.global_position = away + Vector3(20, 0, 0)
+	p._tick_powers(0.016)
+	check(not p.in_mist and not p.is_unseen(), "out of it, you are seen again")
+	p.global_position = away
+	p._mistberry.clear()
+	p._tick_powers(0.016)
+	# The Antler Charm: your blows root what they hit.
+	z.root_left = 0.0
+	z._stun = 0.0
+	z._root_again = -100.0
+	p.activate_power("antler_charm")
+	p.on_melee_connect(z, WeaponDefs.ALL["sword"])
+	check(z.root_left > 0.0 and z._vines and z._vines.visible, "the Antler Charm's vines hold what you hit")
+	z.state = Zombie.State.CHASE
+	check(z._desired_speed() == 0.0, "it cannot move")
+	z.root_left = 0.0
+	p.on_melee_connect(z, WeaponDefs.ALL["sword"])
+	check(z.root_left == 0.0, "nor be caught again straight away")
+	z._root_again = w.now - 0.1
+	p.on_shot_connect(z)
+	check(z.root_left > 0.0, "arrows catch it too, once its %d seconds are up" % int(PowerDefs.ANTLER_AGAIN))
+	p.powers.erase("antler_charm")
+	z.release()
+	p.setup_class("heavy")
 
 
 func _text_audit() -> void:

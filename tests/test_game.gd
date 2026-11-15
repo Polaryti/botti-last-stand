@@ -3519,9 +3519,9 @@ func test_beyond_review() -> void:
 	m.show_changelog()
 	await frames(2)
 	ok(Game.changelog_seen == ChangelogPanel.signature(), "opening the Changelog reads them")
-	var lines: int = m.ui_layer.find_children("*", "Label", true, false).size()
+	var lines: int = m.ui_layer.find_children("*", "RichTextLabel", true, false).size()
 	await frames(30)
-	ok(m.ui_layer.find_children("*", "Label", true, false).size() > lines, "its older notes follow over the next moments, so it opens at once")
+	ok(m.ui_layer.find_children("*", "RichTextLabel", true, false).size() > lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, m.ui_layer.find_children("*", "RichTextLabel", true, false).size()])
 	m.show_menu()
 	await frames(2)
 	notes = m.ui_layer.find_child("ChangelogButton", true, false) as Button
