@@ -2144,7 +2144,7 @@ func test_version_14() -> void:
 			ok(Icons.exists("spec_%s" % sp["id"]) and not seen_icons.has(sp["id"]), "%s has its own emblem" % sp["id"])
 			seen_icons[sp["id"]] = true
 	for item: String in ShopDefs.ITEMS:
-		ok(Icons.exists(str(ShopDefs.ITEMS[item]["icon"])), "%s has an icon" % item)
+		ok(Array(str(ShopDefs.ITEMS[item]["icon"]).split("+")).all(func(part: String) -> bool: return Icons.exists(part)), "%s has an icon" % item)
 	for weapon_id: String in WeaponDefs.ALL:
 		ok(Icons.exists(Icons.weapon(weapon_id).split("+")[0]), "%s has an icon" % weapon_id)
 	for class_id: String in ClassDefs.available():

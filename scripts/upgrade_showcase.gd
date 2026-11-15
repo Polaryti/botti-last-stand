@@ -8,7 +8,8 @@ extends Node3D
 ## side it is best seen from.
 
 ## Each scene and how long one round of it lasts.
-const LOOP := {"lance_charge": 3.2, "consecration": 3.6, "whistle": 3.8, "grave_call": 3.8, "frost_nova": 3.4,
+## (The other paths' upgrades are PathScenes, played on this same stage.)
+const LOOP := {"lance_charge": 3.2, "consecration": 3.6, "grave_call": 3.8, "frost_nova": 3.4,
 	"hall_of_mirrors": 3.4, "stag_steed": 4.0, "mount_horse": 4.0}
 const RIDE_HEIGHT := 2.5 # a rider on a horse, from the hooves to the top of the head
 
@@ -27,14 +28,16 @@ var _played := {} # the last animation asked of each AnimationPlayer, so a loop 
 
 
 static func shows(id: String) -> bool:
-	return LOOP.has(id)
+	return LOOP.has(id) or PathScenes.LOOP.has(id)
 
 
 ## How tall the stage must be to hold the scene.
 static func stage_height(id: String) -> float:
+	if PathScenes.LOOP.has(id):
+		return PathScenes.stage_height(id)
 	match id:
 		"lance_charge": return 3.1
-		"whistle", "stag_steed", "mount_horse", "consecration": return 3.0
+		"stag_steed", "mount_horse", "consecration": return 3.0
 		"grave_call": return 3.4
 		"frost_nova", "hall_of_mirrors": return 2.8
 	return 2.4
@@ -42,6 +45,8 @@ static func stage_height(id: String) -> float:
 
 ## How far the camera looks down on it (radians): more where what happens is on the ground.
 static func camera_tilt(id: String) -> float:
+	if PathScenes.LOOP.has(id):
+		return PathScenes.camera_tilt(id)
 	match id:
 		"grave_call", "consecration", "frost_nova", "hall_of_mirrors": return 0.24
 		"lance_charge": return 0.08
@@ -50,22 +55,26 @@ static func camera_tilt(id: String) -> float:
 
 ## Which way the scene is turned to the camera (radians about Y; 0 shows its back, PI its face).
 static func view_turn(id: String) -> float:
+	if PathScenes.LOOP.has(id):
+		return PathScenes.view_turn(id)
 	match id:
 		"lance_charge": return PI * 0.5 + 0.38 # side on, riding to the left
-		"whistle": return PI - 0.3
 		"stag_steed", "mount_horse": return PI * 0.5 + 0.5
 	return PI - 0.35
 
 
 func configure(id: String) -> void:
 	item = id
-	_length = LOOP[id]
 	rotation.y = view_turn(id)
-	_ground_shadow(1.0 if id in ["stag_steed", "mount_horse", "lance_charge", "whistle"] else 0.6)
+	if PathScenes.LOOP.has(id):
+		_length = PathScenes.LOOP[id]
+		PathScenes.build(self, id)
+		return
+	_length = LOOP[id]
+	_ground_shadow(1.0 if id in ["stag_steed", "mount_horse", "lance_charge"] else 0.6)
 	match id:
 		"lance_charge": _build_charge()
 		"consecration": _build_consecration()
-		"whistle": _build_whistle()
 		"grave_call": _build_graves()
 		"frost_nova": _build_nova()
 		"hall_of_mirrors": _build_mirrors()
@@ -76,10 +85,12 @@ func configure(id: String) -> void:
 func _process(delta: float) -> void:
 	clock += delta
 	var t := fmod(clock, _length)
+	if PathScenes.LOOP.has(item):
+		PathScenes.play(self, item, t)
+		return
 	match item:
 		"lance_charge": _charge(t, delta)
 		"consecration": _consecrate(t)
-		"whistle": _whistle(t)
 		"grave_call": _grave_call(t)
 		"frost_nova": _nova(t)
 		"hall_of_mirrors": _mirrors(t)
@@ -483,69 +494,6 @@ func _consecrate(t: float) -> void:
 		var flick := 0.8 + 0.3 * sin(t * 17.0 + i * 1.9)
 		f.position = zh.position + Vector3(0.18 * cos(i * 1.6), 0.5 + i * 0.32, 0.18 * sin(i * 1.6))
 		f.scale = Vector3(1.0, flick, 1.0)
-
-
-# --- Whistle ------------------------------------------------------------------------------
-# The Horse Archer whistles; the horse comes at a gallop from across the field, and the archer is up.
-
-const ARCHER := Vector2(0.65, 0.1)
-
-func _build_whistle() -> void:
-	_person = _make_person("chivalry", "bow", _at(ARCHER))
-	_steed = _make_steed(false)
-	var note := _mesh(func(l: LowPoly) -> void:
-		l.box(Vector3(0, 0, 0), Vector3(0.11, 0.08, 0.04), Color(1, 1, 1))
-		l.box(Vector3(0.045, 0.13, 0), Vector3(0.025, 0.24, 0.025), Color(1, 1, 1))
-		l.box(Vector3(0.09, 0.22, 0), Vector3(0.09, 0.03, 0.025), Color(1, 1, 1)))
-	var notes: Array[MeshInstance3D] = []
-	for i in 3:
-		notes.append(_piece(note, _glow(Color(1.0, 0.95, 0.75))))
-	_parts["notes"] = notes
-	var dust: Array[Node3D] = []
-	for i in 3:
-		dust.append(_puff(Color(0.62, 0.52, 0.4), 5))
-	_parts["dust"] = dust
-	_parts["mount"] = _puff(Color(0.75, 0.68, 0.56), 7)
-
-
-func _whistle(t: float) -> void:
-	var anim: AnimationPlayer = _person["anim"]
-	var mounted := t >= 2.25 and t < 3.6
-	var notes: Array = _parts["notes"]
-	for i in notes.size():
-		var k := _window(t, 0.15 + i * 0.18, 1.0 + i * 0.18)
-		var n: MeshInstance3D = notes[i]
-		n.visible = k > 0.0 and k < 1.0
-		n.position = _at(ARCHER) + _at(Vector2(0.15 + k * 0.6, -k * 0.2)) + Vector3.UP * (1.75 + k * 0.55 + sin(k * 9.0 + i) * 0.06)
-		n.rotation.y = -rotation.y
-		n.scale = Vector3.ONE * (0.8 + 0.4 * sin(k * PI))
-	# The horse: from far off at a gallop, slowing to stand beside the archer.
-	var from := _at(Vector2(-2.4, -2.6))
-	var to := _at(Vector2(-0.3, -0.95))
-	var k := _ease_out(_window(t, 0.5, 1.9))
-	if not mounted:
-		_steed.position = from.lerp(to, k)
-		var heading := (to - from).normalized()
-		# It comes up turning broadside, its head towards the archer.
-		_steed.rotation.y = lerp_angle(atan2(-heading.x, -heading.z), _facing(Vector3.ZERO, _at(Vector2(-0.55, 1.0))), _window(t, 1.3, 2.0))
-		_steed_gait(clampf((1.0 - k) * 1.6, 0.0, 1.0))
-		_steed.position.y = absf(sin(t * 13.0)) * 0.05 * (1.0 - k)
-		_steed.visible = t >= 0.5 and t < 3.6
-		_stand(_person, _at(ARCHER))
-		_play(anim, "Whistle" if t < 0.95 else "Idle")
-		(_person["holder"] as Node3D).visible = t < 3.6
-	else:
-		if (_person["holder"] as Node3D).get_parent() != _steed:
-			_seat(_person, _steed)
-		_steed_gait(0.0)
-		_play(anim, "Ride")
-	var dust: Array = _parts["dust"]
-	for i in dust.size():
-		var age := fmod(t + i * 0.3, 0.9)
-		(dust[i] as Node3D).position = _steed.position + Vector3(0, 0.1, 0) - (to - from).normalized() * (0.8 + age * 0.5)
-		_show_puff(dust[i], age if t > 0.5 and t < 1.7 else -1.0, 0.9, 0.4)
-	_show_puff(_parts["mount"], t - 2.2, 0.5, 0.45)
-	(_parts["mount"] as Node3D).position = _steed.position + Vector3.UP * 0.8
 
 
 # --- Grave Call -------------------------------------------------------------------------

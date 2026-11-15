@@ -143,7 +143,7 @@ static func facts() -> Dictionary:
 		"composure": [pct(1.0 - CommanderKit.TRAINED_COMMAND_CD / CommanderKit.COMMAND_CD)],
 		"warlock": [WeaponDefs.DAMAGE * 1.8, 0.8, 16.0],
 		"storm_training": [70.0],
-		"last_command_warlock": [CommanderKit.STORM_TIME, CommanderKit.STORM_RADIUS, 16.0, CommanderKit.LAST_CD],
+		"last_command_warlock": [CommanderKit.STORM_TIME, CommanderKit.STORM_RADIUS, CommanderKit.STORM_DPS, 1.0 / CommanderKit.STORM_STRIKE_EVERY, CommanderKit.STORM_STRIKE_DAMAGE, 16.0, CommanderKit.LAST_CD],
 		"gunner": [16.0],
 		"bayonet_drill": [N.BAYONET_STAGGER],
 		"last_command_gunner": [CommanderKit.BARRAGE_RADIUS, CommanderKit.BARRAGE_DELAY, CommanderKit.BARRAGE_TIME, CommanderKit.FIRE_TIME, CommanderKit.FIRE_DPS, 16.0, CommanderKit.LAST_CD],
@@ -166,6 +166,21 @@ static func facts() -> Dictionary:
 		"item:grave_call": [float(UpgradeKit.GRAVE_RAISED), UpgradeKit.GRAVE_REACH, UpgradeKit.GRAVE_RECENT, UpgradeKit.GRAVE_TIME],
 		"item:frost_nova": [UpgradeKit.NOVA_RADIUS, UpgradeKit.NOVA_DAMAGE, UpgradeKit.NOVA_FREEZE],
 		"item:hall_of_mirrors": [UpgradeKit.MIRROR_REST],
+		"item:mist_reinforcements": [pct(Garrison.REINFORCED - 1.0)],
+		"item:wild_hunt": [UpgradeKit.HUNT_TIME, UpgradeKit.HUNT_EVERY, UpgradeKit.HUNT_REACH],
+		"item:mist_wake": [PathUpgrades.MIST_WAKE_RADIUS * 2.0, PathUpgrades.MIST_WAKE_TIME, PathUpgrades.MIST_WAKE_DPS],
+		"item:torn_rifts": [PathUpgrades.TORN_RIFT_DAMAGE, PathUpgrades.TORN_RIFT_RADIUS],
+		"item:soul_link": [PathUpgrades.SOUL_LINK_HEAL],
+		"item:dragon_spin": [PathUpgrades.DRAGON_SPIN_TIME, float(PathUpgrades.DRAGON_SPIN_HITS), PathUpgrades.DRAGON_SPIN_DAMAGE, PathUpgrades.DRAGON_SPIN_REACH],
+		"item:fighting_body": [PathUpgrades.FIGHTING_BODY_REACH, PathUpgrades.FIGHTING_BODY_DAMAGE, pct(PathUpgrades.FIGHTING_BODY_GUARD)],
+		"item:avalanche": [PathUpgrades.AVALANCHE_DELAY, PathUpgrades.AVALANCHE_STUN],
+		"item:healing_mist": [PathUpgrades.HEALING_MIST_RADIUS, PathUpgrades.HEALING_MIST_TIME, PathUpgrades.HEALING_MIST_HEAL],
+		"item:plague_censer": [PathUpgrades.CENSER_TIME, PathUpgrades.CENSER_RADIUS, PathUpgrades.CENSER_DPS],
+		"item:rat_tide": [float(PathUpgrades.RAT_TIDE_RATS), PathUpgrades.RAT_TIDE_REACH, PathUpgrades.RAT_TIDE_DAMAGE, PathUpgrades.RAT_TIDE_STUN],
+		"item:field_turret": [PathUpgrades.FIELD_TURRET_TIME],
+		"item:tesla_coil": [float(PathUpgrades.TESLA_TARGETS), PathUpgrades.TESLA_REACH, PathUpgrades.TESLA_EVERY, PathUpgrades.TESLA_TIME, PathUpgrades.TESLA_DAMAGE],
+		"item:grapeshot": [float(PathUpgrades.GRAPESHOT_PELLETS), PathUpgrades.GRAPESHOT_DAMAGE],
+		"item:shield_wall": [PathUpgrades.SHIELD_WALL_RADIUS, PathUpgrades.SHIELD_WALL_AMOUNT, PathUpgrades.SHIELD_WALL_TIME],
 	}
 
 
@@ -216,6 +231,8 @@ func run() -> Array[String]:
 		var said := start.search(str(d["desc"]))
 		if said and said.get_string(1) != str(WeaponDefs.ALL[d["weapon"]]["name"]):
 			failures.append("class:%s says it starts with a %s, but it starts with the %s" % [cls, said.get_string(1), WeaponDefs.ALL[d["weapon"]]["name"]])
+		if d.has("second") and not str(d["desc"]).contains(str(WeaponDefs.ALL[d["second"]]["name"])):
+			failures.append("class:%s starts with a %s as well, but does not say so" % [cls, WeaponDefs.ALL[d["second"]]["name"]])
 		_audit("class:" + cls, str(d["desc"]) + " " + ClassPresentation.description(cls), [d.get("hp", 0), d.get("speed", 0), d.get("arrows", 0), d.get("kill_heal", 0), d.get("kill_arrows", 0)])
 		var all: Array = core_kill.duplicate()
 		for spec: Dictionary in tree["specs"]:

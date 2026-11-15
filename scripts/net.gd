@@ -21,7 +21,7 @@ const DISCOVERY_PORT := 27416
 const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
-const PROTOCOL := 50
+const PROTOCOL := 51
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -454,12 +454,12 @@ func leave(reason := "") -> void:
 
 
 func _my_entry(team: int) -> Dictionary:
-	return {"name": Game.player_name, "class": Game.player_class, "team": team, "score": 0, "deaths": 0, "lives": LIVES}
+	return {"name": Game.player_name, "class": Game.player_class, "team": team, "score": 0, "deaths": 0, "lives": LIVES, "maps": Game.map_upgrades_on()}
 
 
 func _on_connected() -> void:
 	_connect_wait = 0.0
-	_hello.rpc_id(1, protocol_version(), Game.player_name, Game.player_class)
+	_hello.rpc_id(1, protocol_version(), Game.player_name, Game.player_class, Game.map_upgrades_on())
 
 
 func _on_failed() -> void:
@@ -511,7 +511,7 @@ func _remove_peer(id: int) -> void:
 
 
 @rpc("any_peer", "reliable")
-func _hello(protocol: int, player_name: String, cls: String) -> void:
+func _hello(protocol: int, player_name: String, cls: String, maps: Array = []) -> void:
 	if not is_host():
 		return
 	var id := multiplayer.get_remote_sender_id()
@@ -529,7 +529,12 @@ func _hello(protocol: int, player_name: String, cls: String) -> void:
 	if not class_slot_available(cls, id):
 		cls = "infantry"
 	var team := _smaller_team()
-	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0, "lives": LIVES}
+	# Only Map Upgrades that exist, and each once.
+	var known: Array[String] = []
+	for m: Variant in maps:
+		if m is String and ShopDefs.ITEMS.has(m) and ShopDefs.ITEMS[m]["section"] == "maps" and not known.has(m):
+			known.append(m)
+	roster[id] = {"name": player_name.substr(0, 16), "class": cls, "team": team, "score": 0, "deaths": 0, "lives": LIVES, "maps": known}
 	_share_lobby()
 
 
@@ -763,13 +768,15 @@ func start_match() -> void:
 	if not is_host() or not can_start():
 		return
 	multiplayer.multiplayer_peer.refuse_new_connections = true
+	if roster.has(1):
+		roster[1]["maps"] = Game.map_upgrades_on() # what the host has now, not when it opened the lobby
 	if _beacon:
 		_beacon.close()
 		_beacon = null
 	if _answer:
 		_answer.close()
 		_answer = null
-	var tonight := Weather.roll()
+	var tonight := Weather.roll(Game.current_map())
 	var fog_at := Vector2(randf_range(-22.0, 22.0), randf_range(-22.0, 22.0))
 	# Off the list of games waiting for players.
 	_room_dirty = true
@@ -1441,6 +1448,57 @@ func consecrate(owner_peer: int, at: Vector3, radius: float, seconds: float) -> 
 func _consecrate(owner_peer: int, at: Vector3, radius: float, seconds: float) -> void:
 	if world and is_instance_valid(world):
 		world.spawn_consecration(owner_peer, at, radius, seconds)
+
+
+## A Class Upgrade's field (PathField), so every phone has one and looks after its own people in it.
+func path_field(owner_peer: int, kind: String, at: Vector3) -> void:
+	_path_field.rpc(owner_peer, kind, at)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _path_field(owner_peer: int, kind: String, at: Vector3) -> void:
+	if world and is_instance_valid(world) and PathField.KINDS.has(kind):
+		world.spawn_path_field(owner_peer, kind, at)
+
+
+func rat_tide(from: Vector3, dir: Vector3) -> void:
+	_rat_tide.rpc(from, dir)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _rat_tide(from: Vector3, dir: Vector3) -> void:
+	if world and is_instance_valid(world):
+		world.spawn_rat_tide(from, dir)
+
+
+## A Vanguard's Shield Wall on a friend: the next `amount` of harm, within `seconds`, is taken off.
+func ward_peer(peer: int, amount: float, seconds: float) -> void:
+	if is_bot(peer):
+		if is_host():
+			_ward_player(local_player(peer), amount, seconds)
+		else:
+			_bot_ward.rpc_id(1, peer, amount, seconds)
+		return
+	if peer == my_id():
+		_ward_player(world.player, amount, seconds)
+		return
+	_ward.rpc_id(peer, amount, seconds)
+
+
+@rpc("any_peer", "reliable")
+func _bot_ward(peer: int, amount: float, seconds: float) -> void:
+	ward_peer(peer, amount, seconds)
+
+
+@rpc("any_peer", "reliable")
+func _ward(amount: float, seconds: float) -> void:
+	if world and is_instance_valid(world):
+		_ward_player(world.player, amount, seconds)
+
+
+func _ward_player(p: Player, amount: float, seconds: float) -> void:
+	if p and not p.dead:
+		p.ward(amount, seconds)
 
 
 ## A Mercenary's Nightfall, so every phone can look after its own people inside it.

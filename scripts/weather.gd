@@ -3,11 +3,19 @@ extends Node3D
 ## Most nights are clear. Some bring rain, and a few bring a storm, with lightning that strikes the map
 ## and hurts anyone standing there, friend or foe. The ground glows for a moment first, so a quick
 ## player can get out of the way. In a multiplayer game the host says where each bolt lands.
+## In the Valleys of Mesenlla and on Mist Bastion some nights are windy instead: streaks of wind and
+## blowing leaves, and the breeze. The Mists never see rain or storms.
 
-enum Kind { CLEAR, RAIN, STORM }
+enum Kind { CLEAR, RAIN, STORM, WINDY } # new kinds at the end: the number travels between phones
 
 const STORM_CHANCE := 0.05 # of nights
 const RAIN_CHANCE := 0.16 # of nights, besides the storms
+const WINDY_CHANCE := 0.1 # of nights, where the wind blows
+const WINDY_MAPS := ["mesenlla", "bastion"]
+const DRY_MAPS := ["mists"] # no rain and no storms there
+const WIND_SPEED := 13.0
+const WIND_STREAKS := [40, 80, 120]
+const WIND_LEAVES := [24, 48, 72]
 const STRIKE_RADIUS := 4.5
 const STRIKE_WARNING := 1.1
 const PLAYER_DAMAGE := 40.0
@@ -30,13 +38,31 @@ var _rings: Array[MeshInstance3D] = []
 var _roof_timer := 0.0
 var _indoors := false
 var _clear := 0.0
+var _wind: Node3D
+var wind_dir := Vector3(1, 0, 0.3).normalized()
 
 
-static func roll() -> int:
+## Tonight's weather on a map.
+static func roll(map_id := "village") -> int:
 	var r := randf()
+	if map_id in WINDY_MAPS:
+		if r < WINDY_CHANCE:
+			return Kind.WINDY
+		r = randf()
+	if map_id in DRY_MAPS:
+		return Kind.CLEAR
 	if r < STORM_CHANCE:
 		return Kind.STORM
 	return Kind.RAIN if r < STORM_CHANCE + RAIN_CHANCE else Kind.CLEAR
+
+
+## The weather a map may have: a forced or sent kind it cannot have becomes a clear night.
+static func allowed(kind: int, map_id: String) -> int:
+	if map_id in DRY_MAPS and kind in [Kind.RAIN, Kind.STORM]:
+		return Kind.CLEAR
+	if kind == Kind.WINDY and map_id not in WINDY_MAPS:
+		return Kind.CLEAR
+	return kind
 
 
 func _init(owner_world: World) -> void:
@@ -45,6 +71,7 @@ func _init(owner_world: World) -> void:
 
 func _exit_tree() -> void:
 	Sfx.rain(false, -60.0)
+	Sfx.wind(false, -60.0)
 
 
 func set_kind(new_kind: int) -> void:
@@ -53,25 +80,34 @@ func set_kind(new_kind: int) -> void:
 		(warning["ring"] as MeshInstance3D).visible = false
 	_warnings.clear()
 	kind = new_kind
-	var wet := kind != Kind.CLEAR
+	var wet := is_wet()
 	if wet and _rain == null:
 		_build_rain()
 	if _rain:
 		_rain.visible = wet
 	Sfx.rain(wet, -9.0)
+	var windy := kind == Kind.WINDY
+	if windy and _wind == null:
+		_build_wind()
+	if _wind:
+		_wind.visible = windy
+		for p: GPUParticles3D in _wind.get_children():
+			p.emitting = windy
+	Sfx.wind(windy, -11.0)
 	flash = 0.0
 	world.weather_changed()
 	_set_flash(0.0) # reset the sky shader too if the player changes weather during a flash
 
 
 func is_wet() -> bool:
-	return kind != Kind.CLEAR
+	return kind == Kind.RAIN or kind == Kind.STORM
 
 
 func opening_words() -> String:
 	match kind:
 		Kind.RAIN: return "Rain tonight"
 		Kind.STORM: return "Storm tonight. Run from the glow"
+		Kind.WINDY: return "The wind is up tonight"
 	return ""
 
 
@@ -97,7 +133,95 @@ func _build_rain() -> void:
 	add_child(_rain)
 
 
+## The wind: pale streaks blowing past and leaves tumbling in it, around wherever you are.
+func _build_wind() -> void:
+	_wind = Node3D.new()
+	_wind.name = "Wind"
+	add_child(_wind)
+	var a := randf() * TAU
+	wind_dir = Vector3(cos(a), 0, sin(a))
+	# Streaks: thin, pale and quick.
+	var streaks := GPUParticles3D.new()
+	streaks.amount = WIND_STREAKS[Game.quality]
+	streaks.lifetime = 1.4
+	streaks.local_coords = false
+	streaks.visibility_aabb = AABB(Vector3(-40, -10, -40), Vector3(80, 30, 80))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(22, 4, 22)
+	pm.direction = wind_dir
+	pm.spread = 4.0
+	pm.gravity = Vector3.ZERO
+	pm.initial_velocity_min = WIND_SPEED * 0.85
+	pm.initial_velocity_max = WIND_SPEED * 1.25
+	pm.particle_flag_align_y = true
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0))
+	fade.set_color(1, Color(1, 1, 1, 0))
+	fade.add_point(0.3, Color(1, 1, 1, 1))
+	fade.add_point(0.7, Color(1, 1, 1, 1))
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = fade
+	pm.color_ramp = ramp
+	streaks.process_material = pm
+	var streak := BoxMesh.new()
+	streak.size = Vector3(0.035, 2.0, 0.035)
+	var pale := StandardMaterial3D.new()
+	pale.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	pale.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pale.vertex_color_use_as_albedo = true
+	pale.albedo_color = Color(0.88, 0.94, 1.0, 0.38)
+	pale.disable_fog = true
+	streak.material = pale
+	streaks.draw_pass_1 = streak
+	streaks.position = Vector3.UP * 2.5
+	_wind.add_child(streaks)
+	# Leaves: tumbling, in the colours of the season.
+	var leaves := GPUParticles3D.new()
+	leaves.amount = WIND_LEAVES[Game.quality]
+	leaves.lifetime = 3.2
+	leaves.local_coords = false
+	leaves.visibility_aabb = AABB(Vector3(-40, -10, -40), Vector3(80, 30, 80))
+	var lm := ParticleProcessMaterial.new()
+	lm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	lm.emission_box_extents = Vector3(18, 3, 18)
+	lm.direction = wind_dir + Vector3.UP * 0.15
+	lm.spread = 20.0
+	lm.gravity = Vector3(0, -0.6, 0)
+	lm.initial_velocity_min = WIND_SPEED * 0.4
+	lm.initial_velocity_max = WIND_SPEED * 0.65
+	lm.angular_velocity_min = -360.0
+	lm.angular_velocity_max = 360.0
+	lm.turbulence_enabled = true
+	lm.turbulence_noise_strength = 2.0
+	lm.turbulence_noise_scale = 3.0
+	var hues := Gradient.new()
+	hues.set_color(0, Color(0.55, 0.62, 0.22))
+	hues.set_color(1, Color(0.78, 0.42, 0.14))
+	hues.add_point(0.5, Color(0.86, 0.68, 0.22))
+	var hue_ramp := GradientTexture1D.new()
+	hue_ramp.gradient = hues
+	lm.color_initial_ramp = hue_ramp
+	leaves.process_material = lm
+	var leaf := QuadMesh.new()
+	leaf.size = Vector2(0.14, 0.09)
+	var leaf_look := StandardMaterial3D.new()
+	leaf_look.vertex_color_use_as_albedo = true
+	leaf_look.cull_mode = BaseMaterial3D.CULL_DISABLED
+	leaf_look.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	leaf_look.roughness = 0.9
+	leaf.material = leaf_look
+	leaves.draw_pass_1 = leaf
+	leaves.position = Vector3.UP * 1.5
+	_wind.add_child(leaves)
+
+
 func _process(delta: float) -> void:
+	if kind == Kind.WINDY and _wind:
+		# The wind is all around you, wherever you go.
+		var at := world._player_camera_position()
+		_wind.global_position = Vector3(at.x, world.ground_at(at), at.z)
+		return
 	if kind == Kind.CLEAR:
 		return
 	_check_roof(delta)

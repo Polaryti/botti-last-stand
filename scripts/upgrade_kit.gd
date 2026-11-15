@@ -1,7 +1,7 @@
 class_name UpgradeKit
 extends RefCounted
 ## The Class Upgrades of the Cavalry and the Magician, one for each path (sold in the Store, ShopDefs):
-## Lance Charge, Consecration and Whistle; Grave Call, Frost Nova and Hall of Mirrors.
+## Lance Charge, Consecration and Wild Hunt; Grave Call, Frost Nova and Hall of Mirrors.
 
 const CHARGE_REACH := 10.0
 const CHARGE_TIME := 0.32 # seconds to cover it
@@ -32,7 +32,7 @@ static func cast(p: Player, spec: String) -> bool:
 	match spec:
 		"lancer": lance_charge(p)
 		"paladin": consecrate(p)
-		"horse_archer": whistle(p)
+		"horse_archer": wild_hunt(p)
 		"necromancer": grave_call(p)
 		"elementalist": frost_nova(p)
 		_: return false
@@ -93,19 +93,50 @@ static func consecrate(p: Player) -> void:
 	p.say("Consecration")
 
 
-# --- Whistle (Horse Archer) -------------------------------------------------------
+# --- Wild Hunt (Horse Archer) -------------------------------------------------------
 
-static func whistle(p: Player) -> void:
-	if p.is_riding():
+const HUNT_TIME := 6.0
+const HUNT_EVERY := 0.4
+const HUNT_REACH := 22.0
+
+
+## On foot, the horse comes at once; then the arrows fly by themselves for a while.
+static func wild_hunt(p: Player) -> void:
+	if not p.is_riding() and p.has_mount():
+		p.horse_progress = maxi(p.horse_progress, p.horses_needed())
+		p.mount()
+	p.hunt_left = HUNT_TIME
+	p.hunt_timer = 0.0
+	p.say("Wild Hunt!")
+	p.sfx("stag_call", -8.0, 1.4)
+
+
+## One step of the hunt: an arrow at the nearest enemy, every so often, from the archer's own bow.
+static func tick_hunt(p: Player, delta: float) -> void:
+	p.hunt_left -= delta
+	p.hunt_timer -= delta
+	if p.hunt_timer > 0.0:
 		return
-	p.horse_progress = maxi(p.horse_progress, p.horses_needed())
-	p.mount()
-	p.say("Whistle")
-
-
-## Whether Whistle would do anything now (no second horse while riding the first).
-static func whistle_has_use(p: Player) -> bool:
-	return not p.is_riding() and p.has_mount()
+	var eye := p.eye_position()
+	var target: Node3D = p.world.nearest_zombie(eye, HUNT_REACH, true)
+	var aim := Vector3.INF
+	if target:
+		aim = (target as Zombie).centre()
+	else:
+		var rival := p.world.nearest_rival(eye, HUNT_REACH)
+		if rival:
+			aim = rival.global_position + Vector3.UP * 1.1
+	if aim == Vector3.INF:
+		p.hunt_timer = 0.1
+		return
+	p.hunt_timer = HUNT_EVERY
+	var d: Dictionary = WeaponDefs.ALL["bow"]
+	var start := eye + Vector3.DOWN * 0.15
+	var dir := (aim - start).normalized()
+	var speed := float(d["speed"]) * p.m("ranged_power")
+	var dmg := WeaponDefs.DAMAGE * float(d.get("power", 1.0)) * p._ranged_mult()
+	p.world.spawn_player_arrow(p, start, dir * speed, 0.0, HUNT_REACH + 4.0, float(d["knock"]), dmg)
+	p.sfx("bow", -6.0, 1.15, 0.05)
 
 
 # --- Grave Call (Necromancer) -------------------------------------------------------

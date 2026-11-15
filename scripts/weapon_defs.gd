@@ -61,7 +61,7 @@ const ALL := {
 		"knock": 1.8, "swing": "slash", "weight": 0.0, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.46},
 	"bolas": {"only": "cartographer", "spec": "pathfinder", "power": 0.9, "name": "Pathfinder's Bolas", "shot": "bolas", "slows": 2.5, "free_ammo": true, "desc": "Pathfinder only, unearthed by its beacons. Weighted cords that tangle the legs: everything they hit is slowed for 2.5 s. No arrows needed.", "kind": Kind.RANGED, "rate": 0.7, "range": 24.0, "speed": 26.0, "gravity": 3.0,
 		"knock": 1.2, "weight": 0.0, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
-	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.1, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
+	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.4, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
 	"musket": {"only": "commander", "hidden": true, "name": "Musket", "desc": "Fire shoots; Melee thrusts the bayonet. Powder replenishes while reloading.", "kind": Kind.RANGED, "rate": 1.25, "range": 55.0, "speed": 90.0, "gravity": 0.0, "power": 2.4, "free_ammo": true, "knock": 3.0, "weight": 0.0, "pos": Vector3(0.17, -0.22, -0.4), "scale": 0.8},
 
 }

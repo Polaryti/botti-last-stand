@@ -725,7 +725,18 @@ func _use_skills() -> void:
 			if near >= 2 or (low and near > 0):
 				p.use_art()
 		"horse_archer":
-			if has_target and dist < 25.0 and UpgradeKit.whistle_has_use(p):
+			if has_target and dist < UpgradeKit.HUNT_REACH:
+				p.use_art()
+		"pestilence":
+			if _enemies_within(PathUpgrades.CENSER_RADIUS) >= 2:
+				p.use_art()
+		"rat_king":
+			if has_target and dist < PathUpgrades.RAT_TIDE_REACH - 1.0:
+				_face(_target_point(), false)
+				p.use_art()
+		"mechanic":
+			if has_target and dist < 18.0:
+				_face(_target_point(), false)
 				p.use_art()
 		"necromancer":
 			if not UpgradeKit.graves(p).is_empty():

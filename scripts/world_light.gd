@@ -39,6 +39,7 @@ const INVENTIONS := {
 	"boots": {"name": "Steam Boots", "icon": "steam"},
 	"noise": {"name": "Noise Box", "icon": "noisebox"},
 	"magnet": {"name": "Lodestone", "icon": "magnet"},
+	"tesla": {"name": "Tesla Coil", "icon": "bolt"},
 }
 const SENTRY_TIME := 14.0
 const SENTRY_REACH := 20.0

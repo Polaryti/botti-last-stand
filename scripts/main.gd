@@ -496,6 +496,11 @@ func _try_code(code: LineEdit, answer: Label) -> void:
 		"disabled":
 			answer.text = "%s is not available at this time. Keep the code for later." % ClassDefs.ALL[said["class"]]["name"]
 			answer.add_theme_color_override("font_color", UiTheme.ASH)
+		"doubloons":
+			answer.text = "%d Botti Doubloons added. You have %d." % [int(said["amount"]), Game.doubloons]
+			answer.add_theme_color_override("font_color", UiTheme.MOSS)
+			code.text = ""
+			Sfx.play("level", -3.0)
 		"used":
 			answer.text = "This code has already been redeemed."
 			answer.add_theme_color_override("font_color", UiTheme.ASH)
@@ -960,7 +965,10 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		return not (Game.owns_class(id) if section == "classes" else Game.owns_item(id))))
 	if just_bought != "":
 		var name_of: String = ClassDefs.ALL[just_bought]["name"] if ClassDefs.ALL.has(just_bought) else ShopDefs.ITEMS[just_bought]["name"]
-		var bought := _body("Bought: %s. It is yours now, in the Armory." % name_of, UiTheme.FS_BODY)
+		var where := "It is yours now, in the Armory."
+		if ShopDefs.ITEMS.has(just_bought) and ShopDefs.ITEMS[just_bought].has("map"):
+			where = "It works on %s from now on, for everyone in your matches." % Places.ALL[ShopDefs.ITEMS[just_bought]["map"]]["name"]
+		var bought := _body("Bought: %s. %s" % [name_of, where], UiTheme.FS_BODY)
 		bought.name = "JustBought"
 		bought.add_theme_color_override("font_color", UiTheme.MOSS)
 		list.add_child(bought)
@@ -973,6 +981,11 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		var gone := _body("Everything in %s is yours. Equip it, or take it off, in the Armory." % ShopDefs.SECTIONS.get(section, "Classes"), UiTheme.FS_LEAD)
 		gone.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.add_child(gone)
+		if section == "maps":
+			# Map Upgrades are not worn: they work on their map, for the whole match.
+			gone.text = "Every Map Upgrade is yours. Each works on its map for everyone in your matches; there is nothing to equip."
+			panel = root
+			return
 		var to_class := ""
 		if ShopDefs.ITEMS.has(just_bought):
 			to_class = str(ShopDefs.ITEMS[just_bought]["class"])
@@ -1016,7 +1029,7 @@ func _item_row(id: String) -> Button:
 	inner.add_theme_constant_override("separation", 12)
 	row.add_child(inner)
 	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
-	var medal := IconView.new(str(d["icon"]), ClassDefs.color(str(d["class"])), 54.0)
+	var medal := IconView.new(str(d["icon"]), ShopDefs.color_of(id), 54.0)
 	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	inner.add_child(medal)
 	var name_label := _body(d["name"], UiTheme.FS_BODY)
@@ -1060,7 +1073,10 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	words.add_child(title)
 	var owner_row := HBoxContainer.new()
 	owner_row.add_theme_constant_override("separation", 10)
-	owner_row.add_child(IconView.new(ClassDefs.icon(d["class"]), ClassDefs.color(d["class"]), 46.0))
+	if d.has("map"):
+		owner_row.add_child(IconView.new(str(Places.ALL[d["map"]]["icon"]), ShopDefs.color_of(id), 46.0))
+	else:
+		owner_row.add_child(IconView.new(ClassDefs.icon(d["class"]), ClassDefs.color(d["class"]), 46.0))
 	if d["spec"] != "":
 		owner_row.add_child(IconView.new("spec_%s" % d["spec"], ClassDefs.color(d["class"]), 46.0))
 	var owner_words := _soft(ShopDefs.whose(id), UiTheme.FS_BODY)
@@ -1071,7 +1087,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	words.add_child(desc)
 	if Game.owns_item(id):
-		var have := _body("You own this. Find it in the Armory.", UiTheme.FS_LEAD)
+		var have := _body("You own this. It works for everyone in your matches." if d.has("map") else "You own this. Find it in the Armory.", UiTheme.FS_LEAD)
 		have.add_theme_color_override("font_color", UiTheme.MOSS)
 		detail.add_child(have)
 		return
@@ -1945,7 +1961,7 @@ func show_sandbox_menu() -> void:
 	place.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
 	lower.add_child(place)
 	_section(place, "Weather")
-	place.add_child(_choices(["Clear", "Rain", "Storm"], world.weather.kind, 380.0, func(i: int) -> void: world.weather.set_kind(i)))
+	place.add_child(_choices(["Clear", "Rain", "Storm", "Windy"], world.weather.kind, 380.0, func(i: int) -> void: world.weather.set_kind(i)))
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
 	place.add_child(foot)
@@ -2441,7 +2457,7 @@ func show_command_map() -> void:
 	hud.menu_open = true
 	world.player.input_fire = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var root := _screen("Artillery target", func() -> void: _back.call(), "Choose a circle: %d m radius. Impact in %d seconds; %d-second barrage, %d-second fires." % [int(CommanderKit.BARRAGE_RADIUS), int(CommanderKit.BARRAGE_DELAY), int(CommanderKit.BARRAGE_TIME), int(CommanderKit.FIRE_TIME)], "Cancel")
+	var root := _screen("Artillery target", func() -> void: _back.call(), "The circle (%d m radius) starts on you: call it there, or tap the map to move it. Impact in %d seconds; %d-second barrage, %d-second fires." % [int(CommanderKit.BARRAGE_RADIUS), int(CommanderKit.BARRAGE_DELAY), int(CommanderKit.BARRAGE_TIME), int(CommanderKit.FIRE_TIME)], "Cancel")
 	var close := func() -> void:
 		root.queue_free()
 		if hud:
@@ -2461,8 +2477,7 @@ func show_command_map() -> void:
 		world.player.command_target_ready = true
 		close.call()
 		world.player.use_art(), Vector2(260, UiTheme.BTN), true)
-	confirm.disabled = true
-	map.selected.connect(func(_at: Vector3) -> void: confirm.disabled = false)
+	confirm.name = "CallBarrage"
 	(root.get_meta("right") as Control).add_child(confirm)
 	_back = close
 

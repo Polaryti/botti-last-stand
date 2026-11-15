@@ -42,6 +42,7 @@ func _ready() -> void:
 	await _bandit()
 	print("REWORK upgrades")
 	await _new_upgrades()
+	await _path_upgrades()
 	print("REWORK cartographer")
 	await _cartographer()
 	print("REWORK walls")
@@ -160,7 +161,7 @@ func _commander() -> void:
 	check(not p.can_use("war_staff") and not p.can_use("musket") and not p.can_use("staff"), "exclusive weapons reject another class")
 	pawn("commander", 0)
 	check(p.weapon_id() == "war_staff" and p.slots[1] == null and not p.can_drop_weapon(), "Warlock has one permanent War Staff")
-	check(not p.can_use("bow") and p.max_hp() < 110.0, "Warlock is fragile and cannot replace its weapon")
+	check(not p.can_use("bow") and p.max_hp() >= float(ClassDefs.ALL["commander"]["hp"]), "Warlock has the Commander's full health and cannot replace its weapon")
 	for i in 5:
 		p._cooldown = 0.0
 		p.input_fire = true
@@ -991,10 +992,10 @@ func _bandit() -> void:
 ## The Class Upgrades of the Cavalry and the Magician, one for each path.
 func _new_upgrades() -> void:
 	var owned_before: Dictionary = Game.owned_items.duplicate()
-	for id: String in ["lance_charge", "consecration", "whistle", "grave_call", "frost_nova", "hall_of_mirrors"]:
+	for id: String in ["lance_charge", "consecration", "wild_hunt", "grave_call", "frost_nova", "hall_of_mirrors"]:
 		Game.owned_items[id] = true
 		var d: Dictionary = ShopDefs.ITEMS[id]
-		check(d["section"] == "upgrades" and d["class"] in ["chivalry", "magician"] and int(d["price"]) >= 240 and int(d["price"]) <= 280, "%s is a Class Upgrade at the usual price" % id)
+		check(d["section"] == "upgrades" and d["class"] in ["chivalry", "magician"] and int(d["price"]) >= 240 and int(d["price"]) <= 320, "%s is a Class Upgrade at the usual price" % id)
 		check(Icons.exists(str(d["icon"]).split("+")[0]) and (not d.has("art") or Icons.exists(str(d["art"]["icon"]))), "%s has its icons" % id)
 	check(["lancer", "paladin", "horse_archer", "necromancer", "elementalist", "illusionist"].all(func(spec: String) -> bool:
 		return ShopDefs.ITEMS.values().any(func(i: Dictionary) -> bool: return i.get("spec", "") == spec)), "every Cavalry and Magician path has an upgrade")
@@ -1028,13 +1029,26 @@ func _new_upgrades() -> void:
 		if c is Consecration:
 			c.queue_free()
 	burnt.release()
-	# Whistle: the horse at once.
+	# Wild Hunt: the horse at once, and the arrows loose themselves at the nearest enemy.
+	check(not ShopDefs.ITEMS.has("whistle") and ShopDefs.ITEMS["wild_hunt"]["spec"] == "horse_archer", "Wild Hunt has taken Whistle's place")
+	var bought := {"whistle": true}
+	Game.migrate_items(bought)
+	check(bought == {"wild_hunt": true}, "whoever bought Whistle has Wild Hunt")
 	pawn("chivalry", 2)
 	p.horse_progress = 0
-	check(p.art_def()["name"] == "Whistle" and not p.horse_ready(), "a Horse Archer with Whistle, and no horse yet")
-	UpgradeKit.whistle(p)
-	check(p.is_riding(), "Whistle brings the horse at once")
-	check(not UpgradeKit.whistle_has_use(p), "and there is no calling a second while riding")
+	check(p.art_def()["name"] == "Wild Hunt" and not p.horse_ready(), "a Horse Archer with Wild Hunt, and no horse yet")
+	p.rotation.y = 0.0
+	p.yaw = 0.0
+	var prey := target(p.global_position + Vector3(0, 0, -12))
+	var quiver := p.arrows
+	UpgradeKit.wild_hunt(p)
+	check(p.is_riding() and p.hunt_left > 0.0, "Wild Hunt brings the horse at once")
+	await frames(150)
+	check(prey.hp < prey.max_hp, "its arrows find the nearest enemy (%.0f)" % (prey.max_hp - prey.hp))
+	check(p.arrows == quiver, "without spending arrows")
+	await frames(300)
+	check(p.hunt_left <= 0.0, "and the hunt ends after 6 s")
+	prey.release()
 	p.dismount()
 	# Grave Call: the fallen nearby rise.
 	pawn("magician", 0)
@@ -1077,6 +1091,176 @@ func _new_upgrades() -> void:
 	p.hurt(p.max_hp() * 0.1, p.global_position + Vector3(0, 0, -1))
 	check(p.mirror_hall_left == 0.0, "and a small hit is never swapped away")
 	Game.owned_items = owned_before
+
+
+## The Class Upgrades of the Revenant, the Monk, the Plague Doctor, the Artificer and the Commander.
+func _path_upgrades() -> void:
+	var owned_before: Dictionary = Game.owned_items.duplicate()
+	var ids := ["mist_wake", "torn_rifts", "soul_link", "dragon_spin", "fighting_body", "avalanche", "healing_mist", "plague_censer", "rat_tide",
+		"great_keg", "field_turret", "tesla_coil", "arcane_surge", "grapeshot", "shield_wall"]
+	for id: String in ids:
+		Game.owned_items[id] = true
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		check(d["section"] == "upgrades" and int(d["price"]) >= 260 and int(d["price"]) <= 320, "%s is a Class Upgrade at the usual price (%d)" % [id, int(d["price"])])
+		check(Icons.exists(str(d["icon"]).split("+")[0]) and (str(d["icon"]).split("+").size() < 2 or Icons.exists(str(d["icon"]).split("+")[1])) and (not d.has("art") or Icons.exists(str(d["art"]["icon"]))), "%s has its icons" % id)
+		check(UpgradeShowcase.shows(id), "%s has a scene of its own in the Store" % id)
+	for cls: String in ["revenant", "monk", "plague_doctor", "artificer", "commander"]:
+		for spec: Dictionary in AbilityData.tree(cls)["specs"]:
+			check(ShopDefs.ITEMS.values().filter(func(i: Dictionary) -> bool: return i.get("spec", "") == spec["id"]).size() == 1, "%s's %s path has one Class Upgrade" % [cls, spec["id"]])
+	var names: Array = ids.map(func(id: String) -> String: return ShopDefs.ITEMS[id]["name"])
+	var clashes: Array[String] = []
+	for cls: String in ClassDefs.ALL:
+		for spec: Dictionary in AbilityData.tree(cls).get("specs", []):
+			for row: Array in spec["path"]:
+				for ab: Dictionary in row:
+					if names.has(ab["name"]):
+						clashes.append("%s (%s)" % [ab["name"], cls])
+	check(clashes.is_empty(), "no new upgrade shares its name with an ability: %s" % ", ".join(clashes))
+	# Mist Wake: a pool where the Mist Leaper lands.
+	pawn("revenant", 0)
+	var waded := target(p.global_position + Vector3(1, 0, 0))
+	PathUpgrades.mist_wake(p)
+	await frames(70)
+	check(waded.hp < waded.max_hp and waded._slow > 0.0, "Mist Wake slows and hurts what stands in it (%.0f)" % (waded.max_hp - waded.hp))
+	waded.release()
+	_clear_fields()
+	# Torn Rifts: every enemy the jump went through bursts afterwards.
+	pawn("revenant", 1)
+	var first := target(p.global_position + Vector3(0, 0, -5))
+	var second := target(p.global_position + Vector3(6, 0, -5))
+	p.mana = p.max_mana()
+	p.use_art()
+	await frames(120)
+	var plain := p.m("rift_damage")
+	check(first.max_hp - first.hp > plain + PathUpgrades.TORN_RIFT_DAMAGE * 0.9 and second.max_hp - second.hp > plain + PathUpgrades.TORN_RIFT_DAMAGE * 0.9, "both hopped enemies took the hop and the tear (%.0f, %.0f)" % [first.max_hp - first.hp, second.max_hp - second.hp])
+	first.release()
+	second.release()
+	# Soul Link: a quarter of the hit to the Revenant, and strength back when one is struck down.
+	pawn("revenant", 2)
+	p._summon_revenants()
+	var called: Ally = w.allies.filter(func(a: Ally) -> bool: return a.kind == "revenant" and not a.dead).back()
+	var ally_hp := called.hp
+	var hp := p.hp
+	p.hurt(40.0, p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(hp - p.hp, 40.0 * p.m("damage_taken") * (1.0 - PathUpgrades.SOUL_LINK_SHARE)) and called.hp < ally_hp, "Soul Link: the Revenant takes a quarter of the hit (%.1f to you, %.1f to it)" % [hp - p.hp, ally_hp - called.hp])
+	hp = p.hp
+	called.hurt(10000.0, called.global_position)
+	check(is_equal_approx(p.hp, minf(p.max_hp(), hp + PathUpgrades.SOUL_LINK_HEAL)), "and its fall heals 20")
+	# Dragon Spin: three blows round the Bo Master after the vault.
+	pawn("monk", 0)
+	var spun := target(p.global_position + Vector3(2, 0, 0))
+	PathUpgrades.dragon_spin(p)
+	await frames(110)
+	check(p.spin_hits == PathUpgrades.DRAGON_SPIN_HITS and spun.max_hp - spun.hp >= PathUpgrades.DRAGON_SPIN_DAMAGE * 3 * 0.9, "Dragon Spin strikes three times (%.0f)" % (spun.max_hp - spun.hp))
+	spun.release()
+	# Fighting Body: the body left behind strikes and holds.
+	pawn("monk", 1)
+	var close := target(p.global_position + Vector3(1.5, 0, 0))
+	p._leave_body()
+	await frames(80)
+	check(close.max_hp - close.hp >= PathUpgrades.FIGHTING_BODY_DAMAGE * 0.9, "the body strikes what is close (%.0f)" % (close.max_hp - close.hp))
+	var body: Ally = w.allies.filter(func(a: Ally) -> bool: return a.kind == "body" and not a.dead).back()
+	var body_hp := body.hp
+	body.hurt(100.0, body.global_position)
+	check(is_equal_approx(body_hp - body.hp, 100.0 * (1.0 - PathUpgrades.FIGHTING_BODY_GUARD)), "and takes 30%% less (%.0f of 100)" % (body_hp - body.hp))
+	p._come_back()
+	close.release()
+	# Avalanche: a second ring, twice as far, a moment later.
+	pawn("monk", 2)
+	p.stone_skin = Player.SKIN_MAX
+	var distant := target(p.global_position + Vector3(12, 0, 0))
+	p._mountain_stomp()
+	check(is_equal_approx(distant.hp, distant.max_hp), "the stomp itself does not reach 12 m")
+	await frames(60)
+	check(distant.hp < distant.max_hp and distant._stun > 1.0, "the Avalanche does, and stuns")
+	distant.release()
+	# Healing Mist: friends mend and are cured inside it.
+	pawn("plague_doctor", 0)
+	p.hp = p.max_hp() * 0.5
+	p.poison_left = 4.0
+	p.burn_time = 3.0
+	PathUpgrades.healing_mist(p)
+	await frames(70)
+	check(p.hp > p.max_hp() * 0.5 + PathUpgrades.HEALING_MIST_HEAL * 0.7 and p.poison_left == 0.0 and p.burn_time == 0.0, "Healing Mist mends and cures (%.0f)" % p.hp)
+	_clear_fields()
+	# Plague Censer: the cloud follows, and sickens what is in it.
+	pawn("plague_doctor", 1)
+	check(p.art_def()["name"] == "Plague Censer", "a Pestilence with the upgrade has the Plague Censer")
+	var sick := target(p.global_position + Vector3(3, 0, 0))
+	p.use_art()
+	await frames(60)
+	check(sick.poison_left > 0.0 and sick._slow > 0.0, "what is within 5 m is poisoned and slowed")
+	var cloud: PathField = w.get_children().filter(func(n: Node) -> bool: return n is PathField and n.kind == "censer").back()
+	p.global_position += Vector3(4, 0, 0)
+	await frames(20)
+	check(cloud.position.distance_to(p.global_position) < 0.5, "and the cloud goes where the Plague Doctor goes")
+	sick.release()
+	_clear_fields()
+	# Rat Tide: everything in the line is bowled over, nothing beside it.
+	pawn("plague_doctor", 2)
+	check(p.art_def()["name"] == "Rat Tide", "a Rat King with the upgrade has the Rat Tide")
+	p.rotation.y = 0.0
+	p.yaw = 0.0
+	var bowled := target(p.global_position + Vector3(0, 0, -6))
+	var beside := target(p.global_position + Vector3(5, 0, -6))
+	PathUpgrades.rat_tide(p)
+	check(bowled.hp < bowled.max_hp and bowled._stun > 0.0 and is_equal_approx(beside.hp, beside.max_hp), "the tide strikes what is ahead, and not what is beside it")
+	check(w.get_children().any(func(n: Node) -> bool: return n is RatTide), "and the rats are seen running")
+	bowled.release()
+	beside.release()
+	# Great Keg: every fourth bomb.
+	pawn("artificer", 0)
+	var kegs := 0
+	for k in 8:
+		if PathUpgrades.next_is_keg(p):
+			kegs += 1
+	check(kegs == 2, "every fourth bomb is a Great Keg")
+	var outside := target(p.global_position + Vector3(p.m("bomb_radius") * 1.6, 0, 0))
+	p.bomb_burst(p.global_position + Vector3.UP * 0.5, PathUpgrades.GREAT_KEG_POWER)
+	check(outside.hp < outside.max_hp, "and a keg reaches twice as far")
+	outside.release()
+	# Field Turret: a sentry, from the ability button.
+	pawn("artificer", 1)
+	check(p.art_def()["name"] == "Field Turret", "a Mechanic with the upgrade has the Field Turret")
+	var sentries: int = w._sentries.size()
+	PathUpgrades.field_turret(p)
+	check(w._sentries.size() == sentries + 1 and is_equal_approx(float(w._sentries.back()["left"]), PathUpgrades.FIELD_TURRET_TIME), "it sets down a sentry for 20 s")
+	# Tesla Coil: the first invention, and it strikes the four nearest.
+	pawn("artificer", 2)
+	check(p._next_invention == "tesla" and p._inventions().has("tesla"), "the Inventor's first invention is the Tesla Coil")
+	var shocked: Array[Zombie] = []
+	for k in 5:
+		shocked.append(target(p.global_position + Vector3(2 + k, 0, 2)))
+	PathUpgrades.tesla_coil(p)
+	await frames(40)
+	var struck := shocked.filter(func(z: Zombie) -> bool: return z.hp < z.max_hp).size()
+	check(struck == PathUpgrades.TESLA_TARGETS, "the coil strikes the 4 nearest of 5 (%d)" % struck)
+	for z in shocked:
+		z.release()
+	_clear_fields()
+	# The Commander's three.
+	pawn("commander", 0)
+	check(PathUpgrades.bolt_every(p) == PathUpgrades.ARCANE_SURGE_EVERY, "Arcane Surge: a bolt every third attack")
+	pawn("commander", 1)
+	var shots: Array[bool] = []
+	for k in 4:
+		shots.append(PathUpgrades.grapeshot(p, p.eye_position(), -p.global_basis.z, WeaponDefs.ALL["musket"]))
+	check(shots == Array([false, false, false, true], TYPE_BOOL, "", null), "Grapeshot: every fourth musket shot")
+	pawn("commander", 2)
+	CommanderKit.cast(p)
+	check(is_equal_approx(p.ward_hp, PathUpgrades.SHIELD_WALL_AMOUNT) and p.status_effects().any(func(e: Dictionary) -> bool: return str(e["icon"]).begins_with("shield_round")), "Command raises a Shield Wall, and the status bar shows it")
+	hp = p.hp
+	p.hurt(30.0 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(p.hp, hp), "it stops a hit")
+	p.hurt(30.0 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(hp - p.hp, 20.0), "until its 40 are spent (%.1f got through)" % (hp - p.hp))
+	Game.owned_items = owned_before
+
+
+func _clear_fields() -> void:
+	for n: Node in w.get_children():
+		if n is PathField or n is RatTide:
+			n.queue_free()
 
 
 ## Beacons straight in front of the Cartographer, at the given offsets, each faced north.

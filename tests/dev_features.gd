@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _after_0212()
 	await _beyond_weapons()
 	await _together_store_and_dawn()
+	await _maps_weather_and_balance()
 	_text_audit()
 	Net.leave()
 	w.queue_free()
@@ -807,6 +808,114 @@ func _together_store_and_dawn() -> void:
 	w.map_id = was
 	# Weapons only one map has lie around a little more often.
 	check(WeaponDefs.EXCLUSIVE_BOOST > 1.0 and is_equal_approx(WeaponDefs.spawn_weight("battleaxe"), float(WeaponDefs.ALL["battleaxe"]["weight"]) * WeaponDefs.EXCLUSIVE_BOOST) and is_equal_approx(WeaponDefs.spawn_weight("sword"), float(WeaponDefs.ALL["sword"]["weight"])), "a map's own weapons are weighted %.2f times" % WeaponDefs.EXCLUSIVE_BOOST)
+
+
+## Map Upgrades, the Doubloon code, the weather of each place, the Bandit's kit and the Commander.
+func _maps_weather_and_balance() -> void:
+	# The Store's Map Upgrades: Mist Reinforcements, for Mist Bastion.
+	var d: Dictionary = ShopDefs.ITEMS["mist_reinforcements"]
+	check(ShopDefs.SECTIONS.get("maps", "") == "Map Upgrades" and d["section"] == "maps" and int(d["price"]) == 2200 and d["map"] == "bastion", "the Store sells Mist Reinforcements under Map Upgrades, for 2,200")
+	check(ShopDefs.whose("mist_reinforcements") == "Mist Bastion, for everyone in the match" and Icons.exists(str(d["icon"])) and UpgradeShowcase.shows("mist_reinforcements"), "it says where it works, and has its icon and its scene")
+	var saved_items := Game.owned_items.duplicate()
+	Game.owned_items.erase("mist_reinforcements")
+	check(not ShopDefs.map_upgrade_on("mist_reinforcements") and Game.map_upgrades_on().is_empty(), "not bought, it is off")
+	Game.owned_items["mist_reinforcements"] = true
+	check(ShopDefs.map_upgrade_on("mist_reinforcements") and Game.map_upgrades_on() == Array(["mist_reinforcements"], TYPE_STRING, "", null), "bought, it is on for a night alone")
+	# In a match together: on if anyone (not a bot) has it, and only once whoever else does.
+	check(ShopDefs.anyone_has({1: {"maps": []}, 7: {"maps": ["mist_reinforcements"]}}, "mist_reinforcements"), "in a match, one owner is enough")
+	check(ShopDefs.anyone_has({1: {"maps": ["mist_reinforcements"]}, 7: {"maps": ["mist_reinforcements"]}}, "mist_reinforcements"), "and two owners make it no stronger: it is on, once")
+	check(not ShopDefs.anyone_has({1: {"maps": []}, 7: {}}, "mist_reinforcements"), "and with no owner it is off")
+	# On Mist Bastion: a Mist Ranger on every gate, and every Mist Soldier 15% stronger.
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_fort_map := Game.fort_map
+	var was_mode := Game.mode
+	Game.mode = Game.Mode.FORT
+	Game.fort_map = "bastion"
+	var bw := World.new()
+	space.add_child(bw)
+	bw.setup(Game.Mode.FORT)
+	bw.director.running = false
+	check(bw.garrison != null and bw.garrison.reinforced and is_equal_approx(bw.garrison.power, Garrison.REINFORCED), "Mist Bastion knows it is reinforced (x%.2f)" % (bw.garrison.power if bw.garrison else 0.0))
+	bw.garrison.tick(0.0)
+	var perched := bw.allies.filter(func(a: Ally) -> bool: return a.perch != Vector3.INF and not a.dead)
+	check(perched.size() == bw.fort.gates.size() and perched.all(func(a: Ally) -> bool: return a.kind == "mist_ranger"), "a Mist Ranger stands on each of the %d gates (%d)" % [bw.fort.gates.size(), perched.size()])
+	var first: Ally = perched[0]
+	check(first.global_position.y - bw.ground_at(first.global_position) > Fort.WALL_H - 1.5, "up on top of the gate (%.1f m)" % (first.global_position.y - bw.ground_at(first.global_position)))
+	check(is_equal_approx(first.hp, float(Ally.HEALTH["mist_ranger"]) * Garrison.REINFORCED), "with 15% more health")
+	first._physics_process(0.5)
+	check(first.global_position.distance_to(first.perch) < 0.05, "and stays up there")
+	check(bw.garrison.on_lane(0) == 0, "the gate's Ranger is extra: the lane still musters its own guard")
+	bw.garrison.tick(Garrison.FIRST)
+	var walker: Ally = bw.allies.filter(func(a: Ally) -> bool: return a.perch == Vector3.INF and a.is_garrison()).back()
+	check(is_equal_approx(walker.hp, float(Ally.HEALTH[walker.kind]) * Garrison.REINFORCED), "the Mist Soldiers that muster have 15% more health too")
+	check(is_equal_approx(walker._garrison_power(), 1.15), "and deal 15% more")
+	space.queue_free()
+	Game.fort_map = was_fort_map
+	Game.mode = was_mode
+	Game.owned_items = saved_items
+	await frames(2)
+	# The Doubloon code: 2,000 every time, and the code itself is only a hash.
+	check(Game.DOUBLOON_CODES.values() == [2000] and not Game.DOUBLOON_CODES.keys().any(func(k: String) -> bool: return k.length() != 64), "a code that pays 2,000 Doubloons, kept only as a hash")
+	var key: String = Game.DOUBLOON_CODES.keys()[0]
+	var purse := Game.doubloons
+	check(Game.redeem_key(key)["result"] == "doubloons" and Game.doubloons == purse + 2000, "it pays 2,000")
+	check(Game.redeem_key(key)["result"] == "doubloons" and Game.doubloons == purse + 4000, "and again, every time")
+	Game.doubloons = purse
+	# Weather: no rain or storm in The Mists; wind in the Valleys and on Mist Bastion, about one night in ten.
+	var mists_wet := 0
+	var village_windy := 0
+	var valley_windy := 0
+	for i in 2000:
+		if Weather.roll("mists") in [Weather.Kind.RAIN, Weather.Kind.STORM]:
+			mists_wet += 1
+		if Weather.roll("village") == Weather.Kind.WINDY:
+			village_windy += 1
+		if Weather.roll("mesenlla") == Weather.Kind.WINDY:
+			valley_windy += 1
+	check(mists_wet == 0, "The Mists never have rain or storms")
+	check(village_windy == 0, "the wind does not blow in The Village")
+	check(valley_windy > 130 and valley_windy < 280, "and about one night in ten is windy in the Valleys (%d of 2000)" % valley_windy)
+	check(Weather.allowed(Weather.Kind.STORM, "mists") == Weather.Kind.CLEAR and Weather.allowed(Weather.Kind.WINDY, "fort") == Weather.Kind.CLEAR and Weather.allowed(Weather.Kind.WINDY, "bastion") == Weather.Kind.WINDY, "a sent or forced weather a place cannot have is a clear night")
+	var was_kind := w.weather.kind
+	w.weather.set_kind(Weather.Kind.WINDY)
+	check(not w.weather.is_wet() and w.weather._wind != null and w.weather._wind.visible and w.weather._wind.get_child_count() == 2, "a windy night has wind streaks and leaves, and is not wet")
+	check(ResourceLoader.exists("res://assets/sounds/wind_breeze.ogg") and Sfx._wind != null and Sfx._wind_target > -30.0, "and the breeze is heard")
+	w.weather._process(0.016)
+	var cam := w._player_camera_position()
+	check(Vector2(w.weather._wind.global_position.x - cam.x, w.weather._wind.global_position.z - cam.z).length() < 0.1, "the wind blows wherever you are")
+	w.weather.set_kind(was_kind)
+	check(Sfx._wind_target < -50.0, "and it stops with the wind")
+	# The Bandit: Dagger, Long Bow and 20 arrows.
+	var cls := p.class_id
+	var was_slots := p.slots.duplicate()
+	var was_arrows := p.arrows
+	p.setup_class("bandit")
+	check(p.slots == ["dagger", "longbow"] and p.arrows == 20, "the Bandit starts with a Dagger, a Long Bow and 20 arrows")
+	p.setup_class(cls)
+	p.slots = was_slots
+	p.arrows = was_arrows
+	p._equip()
+	# The Commander: Last Command every 35 s, a battle cry with bells, the Gunner's barrage on the spot.
+	check(CommanderKit.LAST_CD == 35.0 and float(CommanderKit.LAST_ART["cd"]) == 35.0, "Last Command is ready every 35 s")
+	check(Sfx.NAMES.has("command") and ResourceLoader.exists("res://assets/sounds/command.ogg"), "Command's cry is the new battle cry, with its bells")
+	check(ClassDefs.ALL["commander"]["hp"] == 110.0 and not (AbilityData.tree("commander")["specs"][0]["entry"]["add"] as Dictionary).has("max_hp"), "the Warlock no longer gives up health")
+	check(float(WeaponDefs.ALL["war_staff"]["power"]) > 1.1, "and its War Staff hits harder")
+	check(CommanderKit.STORM_DPS > 0.0 and CommanderKit.STORM_STRIKE_EVERY < 1.0, "its storm hurts everything inside all the while, and strikes more often")
+	var m := Main.new()
+	add_child(m)
+	await frames(2)
+	m.world = w
+	m.hud = Hud.new()
+	m.add_child(m.hud)
+	m.show_command_map()
+	await frames(2)
+	var call := m.find_child("CallBarrage", true, false) as Button
+	check(call != null and not call.disabled, "the Gunner can call the barrage at once, on the circle round itself")
+	m.world = null
+	m.queue_free()
+	await frames(2)
 
 
 ## What every class, path, ability and Class Upgrade says, against what the game does (tests/text_audit.gd).

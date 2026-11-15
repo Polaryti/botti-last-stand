@@ -346,7 +346,7 @@ static func _ranger() -> Dictionary:
 			[a("spare_parts", "Spare Parts", "Keep 3 more traps on the ground, and carry 3 more in the Trap Satchel", "trap+up", {"trap_cap": 3, "trap_carry": 3}),
 			a("quick_setup", "Quick Setup", "Traps come 4 s sooner", "trap+clock", {"trap_cd": -4.0})],
 			[a("snare_net", "Snare Net", "Traps hold enemies 2 s longer", "net+trap", {"trap_stun": 2.0}),
-			a("powder_keg", "Powder Keg", "Traps also explode in a blast", "flame+trap", {}, [], "trap_blast")],
+			a("great_keg", "Powder Keg", "Traps also explode in a blast", "flame+trap", {}, [], "trap_blast")],
 			[a("lure", "Lure", "Every trap also pulls roaming zombies to it", "horn+trap", {}, [], "trap_lure"),
 			a("fletcher", "Fletcher", "Every kill gives an arrow back", "arrows+trap", {}, [t("kill", "arrows", {"n": 1})])]],
 			a("field_snares", "Field of Snares", "Up to 8 traps on the ground and 8 in the Trap Satchel, and each trap kill drops a new one", "net+crown", {"trap_cap": 5, "trap_carry": 3}, [], "field_snares")),
@@ -508,8 +508,8 @@ static func _commander() -> Dictionary:
 		[a("supply_lines", "Supply Lines", "Heal 3 per kill", "heart+horn", {}, [t("kill", "heal", {"n": 3.0})]),
 		a("trained_retinue", "Trained Retinue", "Summons have 25% more health and damage", "ghost+up", {"ally_hp": 0.25, "ally_damage": 0.25})]
 	], "specs": [
-		_spec("warlock", "Warlock", "A fragile officer of battle magic. Every fifth War Staff attack fires a bolt", Color(0.55, 0.32, 0.85),
-			a("warlock", "Warlock", "Your only weapon becomes a War Staff. Every fifth attack fires an empowered bolt instead of striking: 45 base damage, pierces one enemy and staggers for 0.8 s. -30 max health. Command summons a Magician for 16 s", "staff", {"max_hp": -30.0}, [], "warlock"),
+		_spec("warlock", "Warlock", "An officer of battle magic. Every fifth War Staff attack fires a bolt", Color(0.55, 0.32, 0.85),
+			a("warlock", "Warlock", "Your only weapon becomes a War Staff. Every fifth attack fires an empowered bolt instead of striking: 45 base damage, pierces one enemy and staggers for 0.8 s. Command summons a Magician for 16 s", "staff", {}, [], "warlock"),
 			[[a("war_channel", "War Channel", "+25% War Staff and bolt damage", "staff+up", {"melee_damage": 0.25, "spell_damage": 0.25}),
 			a("war_cadence", "War Cadence", "+20% attack speed", "staff+clock", {"melee_rate": 0.2})],
 			[a("arcane_retinue", "Arcane Retinue", "Magicians deal 35% more damage", "ghost+bolt", {"ally_damage": 0.35}),
@@ -518,7 +518,7 @@ static func _commander() -> Dictionary:
 			a("arcane_reach", "Spellbreaker", "+0.7 m staff reach; fifth-hit bolts pierce two enemies", "staff+plus", {"melee_reach": 0.7}, [], "war_shatter")],
 			[a("storm_training", "Storm Conductor", "Fifth-hit bolts chain to two nearby enemies for 70% damage", "bolt+up", {}, [], "war_echo"),
 			a("arcane_recovery", "Arcane Recovery", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
-			a("last_command_warlock", "Last Command", "Replaces Command: an 8 s storm follows you within 11 m, slowing enemies and striking them with AoE lightning, and a Magician joins you for 16 s. 60 s cooldown", "", {}, [], "last_command")),
+			a("last_command_warlock", "Last Command", "Replaces Command: an 8 s storm follows you within 11 m. Every enemy inside takes 12 damage a second and is slowed, lightning strikes one of them twice a second for 35 around it, and a Magician joins you for 16 s. 35 s cooldown", "", {}, [], "last_command")),
 		_spec("gunner", "Gunner", "A musket officer with a bayonet for close quarters", Color(0.64, 0.46, 0.23),
 			a("gunner", "Gunner", "Your only weapon becomes a Musket. Fire shoots; the melee button thrusts its bayonet. Command summons a torch-wielding Artificer for 16 s", "crossbow", {}, [], "gunner"),
 			[[a("powder_charge", "Powder Charge", "+25% musket damage", "crossbow+up", {"ranged_damage": 0.25}),
@@ -529,7 +529,7 @@ static func _commander() -> Dictionary:
 			a("steady_barrel", "Steady Barrel", "+20% range and shot speed", "target+up", {"ranged_power": 0.2})],
 			[a("powder_reserve", "Piercing Powder", "+10% shooting rate; musket shots pierce one extra enemy", "arrows+clock", {"ranged_rate": 0.1, "pierce": 1.0}),
 			a("field_rations", "Field Rations", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
-			a("last_command_gunner", "Last Command", "Replaces Command: choose an 18 m radius. Warns everyone for 4 s, bombards enemies for 5 s, leaving 8 s fire zones (10 damage/s; no stacking), and an Artificer joins you for 16 s. 60 s cooldown", "", {}, [], "last_command")),
+			a("last_command_gunner", "Last Command", "Replaces Command: choose an 18 m radius. Warns everyone for 4 s, bombards enemies for 5 s, leaving 8 s fire zones (10 damage/s; no stacking), and an Artificer joins you for 16 s. 35 s cooldown", "", {}, [], "last_command")),
 		_spec("vanguard", "Vanguard", "A resilient banner bearer who rallies the line", Color(0.78, 0.57, 0.18),
 			a("vanguard", "Vanguard", "+30 max health, take 10% less damage. Carry an off-hand banner. Command gives nearby allies +25% speed for 6 s and calls an Infantry for 16 s", "banner", {"max_hp": 30.0, "damage_taken": -0.1}, [], "vanguard"),
 			[[a("hold_line", "Hold the Line", "Take 12% less damage", "shield+banner", {"damage_taken": -0.12}),
@@ -540,7 +540,7 @@ static func _commander() -> Dictionary:
 			a("vanguard_vigor", "Vanguard Vigor", "+30 max health", "heart+up", {"max_hp": 30.0})],
 			[a("rally_recovery", "Rally Recovery", "Command and Last Command also heal living allies within rally range by 20", "heart+clock", {}, [], "rally_recovery"),
 			a("infantry_drill", "Infantry Drill", "Summons deal 30% more damage", "ghost+sword", {"ally_damage": 0.3})]],
-			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry and a Ranger for 20 s. 60 s cooldown", "", {}, [], "last_command"))
+			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry and a Ranger for 20 s. 35 s cooldown", "", {}, [], "last_command"))
 	]}
 
 

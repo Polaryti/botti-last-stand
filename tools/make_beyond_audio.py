@@ -792,10 +792,67 @@ def dawn_bastion():
     return reverb(drums + war_horn + cry, 1.8, 0.4)
 
 
+# --- The Commander -----------------------------------------------------------------
+
+AH = ((730, 0.14, 1.0), (1090, 0.14, 0.6), (2440, 0.1, 0.22))
+OO = ((320, 0.18, 1.0), (800, 0.16, 0.45), (2300, 0.1, 0.12))
+
+
+def command():
+    """Command and Last Command: a company answering its officer, "hoo-RAAH!", five throats rising
+    together, and a peal of bells under it climbing a major chord to the octave."""
+    total = n(2.4)
+    out = np.zeros(total)
+    for k, (base, lag) in enumerate(((150, 0.0), (172, 0.02), (196, 0.035), (133, 0.05), (220, 0.06))):
+        start = n(lag)
+        hoo_m = n(0.22)
+        hoo = throat(hoo_m, curve(hoo_m, (0, base * 0.9), (1, base * 1.05)), OO, breath=0.3, rough=0.25, sub=0.1)
+        hoo *= env(hoo_m, 0.15, 1.5)
+        rah_m = n(1.05)
+        rah = throat(rah_m, curve(rah_m, (0, base * 1.1), (0.25, base * 1.45), (0.7, base * 1.4), (1, base * 1.0)), AH, breath=0.35, rough=0.35, sub=0.12)
+        rah *= np.minimum(1, np.linspace(0, 1, rah_m) / 0.08) * (1 - np.linspace(0, 1, rah_m)) ** 1.4
+        a = start
+        out[a:a + hoo_m] += hoo * 0.55
+        b = start + n(0.27)
+        out[b:b + rah_m] += rah
+    voices = lowp(out, 4200) * 0.6
+    # The bells: C, E, G and the high C, struck in turn as the cry peaks, ringing on after it.
+    bells = np.zeros(total)
+    for f, at, gain in ((523.25, 0.3, 0.5), (659.25, 0.45, 0.45), (783.99, 0.6, 0.45), (1046.5, 0.8, 0.6)):
+        ring = metal(f, 1.6, 1.5, ((1, 1), (2.0, 0.45), (3.01, 0.22), (4.16, 0.12))) * env(n(1.5), 0.002, 1.0)
+        a = n(at)
+        bells[a:a + len(ring)] += ring[:total - a] * gain
+    return reverb(voices + bells * 0.32, 1.6, 0.35)
+
+
+# --- Weather ---------------------------------------------------------------------------------
+
+LOOPS = ("wind_breeze",)
+
+def wind_breeze():
+    """A windy night's breeze, 12 s that loop: air through grass and branches, rising and falling in
+    slow gusts, with a faint whistle on the strongest of them. The end leads back into the start."""
+    m = n(12.0)
+    t = t_(m)
+    # Gusts: a few slow swells whose periods divide the loop, so it joins without a seam.
+    gust = 0.55 + 0.25 * np.sin(2 * np.pi * t / 12.0 * 2 + 0.6) + 0.15 * np.sin(2 * np.pi * t / 12.0 * 5 + 1.9) + 0.05 * np.sin(2 * np.pi * t / 12.0 * 11)
+    air = noise(m)
+    # Circular filtering: run the noise twice end to end and keep the second pass, so it loops cleanly.
+    low = band(np.concatenate([air, air]), 120, 700)[m:]
+    high = band(np.concatenate([air, air]), 1200, 4200)[m:]
+    whistle_f = 600 + 260 * gust
+    whistle = np.sin(2 * np.pi * np.cumsum(whistle_f) / SR) * np.clip(gust - 0.7, 0, None) * 0.25
+    x = low * (0.6 * gust) + high * (0.35 * gust ** 2) + whistle
+    return x
+
+
 if __name__ == "__main__" and os.environ.get("ONLY"):
     # ONLY=a,b remakes just those sounds (the others are left exactly as they are).
     for name in os.environ["ONLY"].split(","):
-        save(name, globals()[name](), 0.7)
+        if name in LOOPS:
+            write(SND + name + ".ogg", globals()[name](), 0.6, loop=True)
+        else:
+            save(name, globals()[name](), 0.7)
     raise SystemExit
 
 
@@ -824,6 +881,8 @@ if __name__ == "__main__":
                        ("wing_flap", 0.6), ("wyvern_hurt", 0.6), ("wyvern_death", 0.8), ("stag_call", 0.6), ("stag_hurt", 0.55), ("beast_growl", 0.7),
                        ("shapeshifter_death", 0.75), ("stone_hit", 0.55), ("stone_crumble", 0.8), ("revenant_death", 0.85),
                        ("mist_hurt", 0.5), ("mist_dissipate", 0.6), ("storm_hurt", 0.5), ("storm_burst", 0.8), ("woods_hurt", 0.5),
-                       ("woods_death", 0.55), ("dawn_mists", 0.7), ("dawn_valleys", 0.7), ("dawn_bastion", 0.7)):
+                       ("woods_death", 0.55), ("dawn_mists", 0.7), ("dawn_valleys", 0.7), ("dawn_bastion", 0.7), ("command", 0.8)):
         save(name, globals()[name](), gain)
+    for name in LOOPS:
+        write(SND + name + ".ogg", globals()[name](), 0.6, loop=True)
     print("Beyond the Mists sounds written to", SND)

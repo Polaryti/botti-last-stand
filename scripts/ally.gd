@@ -54,12 +54,15 @@ var guarded := 0.0
 ## For a Mist Soldier: the lane it holds (its gate's number) and where on it.
 var lane := -1
 var post := Vector3.INF
+var perch := Vector3.INF # a Mist Ranger on top of a gate (Mist Reinforcements): it stays up there
 var fell_back := false # a Mist Soldier whose gate has fallen: it holds the portal from then on
 
 var _visual: Node3D
 var _anim: AnimationPlayer
 var _current := ""
 var _cooldown := 0.0
+var _faded := false # its time ran out: it was not struck down
+var _strike_left := 0.0 # a Spirit Walker's Fighting Body: the look of its last blow
 var _attack_left := 0.0
 var _think := 0.0
 var _foe: Zombie
@@ -126,9 +129,12 @@ func activate(seconds: float) -> void:
 	master = null
 	lane = -1
 	post = Vector3.INF
+	perch = Vector3.INF
 	fell_back = false
 	_found_at = -100.0
 	dead = false
+	_faded = false
+	_strike_left = 0.0
 	hp = HEALTH[kind]
 	_dying = 0.0
 	_cooldown = 0.0
@@ -262,6 +268,8 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 	var me := _master()
 	if kind == "body" and me and me.has_flag("empty_body"):
 		amount *= 0.5
+	if kind == "body" and me and me.has_item("fighting_body"):
+		amount *= 1.0 - PathUpgrades.FIGHTING_BODY_GUARD
 	if dead:
 		return
 	if remote_owner != 0:
@@ -281,6 +289,25 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 		_die()
 
 
+## A Spirit Walker's body with Fighting Body: it sits in meditation, and strikes what comes close.
+func _tick_body(delta: float) -> void:
+	var me := _master()
+	if me == null or not me.has_item("fighting_body"):
+		return
+	_strike_left -= delta
+	if _strike_left <= 0.0 and _current != "Meditate":
+		_play("Meditate")
+	if _cooldown <= 0.0:
+		_cooldown = PathUpgrades.FIGHTING_BODY_EVERY
+		PathUpgrades.body_strikes(self, me)
+
+
+func strike_anim() -> void:
+	_strike_left = 0.5
+	_current = ""
+	_play("Unarmed_Melee_Attack_Punch_A" if _anim and _anim.has_animation("Unarmed_Melee_Attack_Punch_A") else "1H_Melee_Attack_Chop", 1.4)
+
+
 func set_dying(seconds: float) -> void:
 	_dying = seconds
 
@@ -290,6 +317,8 @@ func _die() -> void:
 	var was := world.begin_act(me)
 	if kind == "revenant" and me and me.has_flag("host_burst"):
 		me.mist_burst_at(position + Vector3.UP, 0.4)
+	if kind == "revenant" and me and not _faded:
+		PathUpgrades.soul_returns(me)
 	dead = true
 	collision_layer = 0
 	_dying = 1.2 if _anim else 0.3
@@ -330,6 +359,7 @@ func _tick_own(delta: float) -> void:
 		return
 	life -= delta
 	if life <= 0.0:
+		_faded = true
 		_die()
 		return
 	_cooldown -= delta
@@ -351,6 +381,8 @@ func _tick_own(delta: float) -> void:
 	var speed: float = BEAST_SPEED.get(kind, 5.0)
 	if kind == "decoy" or kind == "body":
 		velocity = Vector3.ZERO
+		if kind == "body":
+			_tick_body(delta)
 		return
 	if kind == "mirror" or (kind in ["magician", "ranger"] and (_foe != null or _rival != null)):
 		if _rival and not _rival.dead and _cooldown <= 0.0:
@@ -437,9 +469,16 @@ func _tick_own(delta: float) -> void:
 
 ## A Mist Soldier: hold the post, fight whatever comes near it, and go back to it. The Ranger shoots
 ## from where it stands and steps back from anything that gets close; the Infantry and the Heavy close in.
+func _garrison_power() -> float:
+	return world.garrison.power if world.garrison else 1.0
+
+
 func _tick_garrison(delta: float) -> void:
 	if _foe and not _foe.is_alive():
 		_foe = null
+	if perch != Vector3.INF:
+		_tick_perch(delta)
+		return
 	var home := _garrison_home()
 	var fort := world.fort
 	# On its way in through a fallen gate it fights only what is on top of it.
@@ -461,7 +500,7 @@ func _tick_garrison(delta: float) -> void:
 		if kind == "mist_ranger":
 			if _cooldown <= 0.0:
 				_cooldown = 1.1
-				world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT)
+				world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power())
 				_attack_left = 0.35
 				_current = ""
 				_play("2H_Ranged_Shoot", 1.5)
@@ -479,7 +518,7 @@ func _tick_garrison(delta: float) -> void:
 				var swing := "2H_Melee_Attack_Chop" if heavy and _anim and _anim.has_animation("2H_Melee_Attack_Chop") else "1H_Melee_Attack_Chop"
 				_play(swing, 1.5)
 				_foe.next_hitter = -1 # nobody's kill
-				_foe.take_damage(WeaponDefs.DAMAGE * float(GARRISON_BLOW[kind]), to.normalized(), 4.0 if heavy else 2.0, _foe.centre())
+				_foe.take_damage(WeaponDefs.DAMAGE * float(GARRISON_BLOW[kind]) * _garrison_power(), to.normalized(), 4.0 if heavy else 2.0, _foe.centre())
 				world.sfx_at("clang", position, -9.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 9.0))
@@ -501,6 +540,27 @@ func _tick_garrison(delta: float) -> void:
 ## Where a Mist Soldier's duty is right now. While its lane's gate stands: on the ground before the
 ## gate, where whatever comes up the lane to break it has to get past. Once that gate has fallen: by
 ## the portal, on the side the fallen gate is, and there it stays even if the gate is mended.
+## On top of a gate: it does not come down, and shoots whatever it can see coming.
+func _tick_perch(_delta: float) -> void:
+	global_position = perch
+	velocity = Vector3.ZERO
+	if _think <= 0.0:
+		_think = 0.25
+		_foe = world.nearest_zombie(global_position + Vector3.UP, GARRISON_SIGHT + 6.0, true)
+	if _foe == null:
+		if _attack_left <= 0.0:
+			_play("Idle")
+		return
+	var to := _foe.position - position
+	rotation.y = atan2(to.x, to.z)
+	if _cooldown <= 0.0:
+		_cooldown = 1.1
+		world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power())
+		_attack_left = 0.35
+		_current = ""
+		_play("2H_Ranged_Shoot", 1.5)
+
+
 func _garrison_home() -> Vector3:
 	var fort := world.fort
 	if fort == null or lane < 0 or lane >= fort.gates.size():

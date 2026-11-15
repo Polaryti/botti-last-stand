@@ -15,6 +15,8 @@ const CODES := {"c734137a1f7468ebdb5cf20deae67c89b15dc5de26ff06b497548a4a62a3370
 	"d9bd0d6b1b8a6dc2c11e699df4d908344b17a609e2064940b19008fa3e1419be": "adept",
 	"4a5310c45bc88862d35f592b3cb4f69b664f0b651a56b3503e99539386f7edb3": "bandit",
 	"feaeebd2dba326079890fb1cac967ee57f83292db887f82f4a1d8e54161dff7f": "cartographer"}
+## Codes that pay Doubloons, every time they are entered (also kept only as hashes).
+const DOUBLOON_CODES := {"56adbe46b05e15e74db8a9d637126086b142ac23ed9740786457771953e93791": 2000}
 
 var mode: int = Mode.MENU
 var test_map := "" # a map scene to play instead of the usual one: see MapRoot
@@ -92,6 +94,11 @@ static func code_key(code: String) -> String:
 
 
 func redeem_key(key: String) -> Dictionary:
+	if DOUBLOON_CODES.has(key):
+		var paid := int(DOUBLOON_CODES[key])
+		doubloons += paid
+		save_settings()
+		return {"result": "doubloons", "amount": paid}
 	if not CODES.has(key):
 		return {"result": "bad"}
 	if redeemed.has(key):
@@ -103,6 +110,23 @@ func redeem_key(key: String) -> Dictionary:
 	unlocked[opened] = true
 	save_settings()
 	return {"result": "opened", "class": opened}
+
+
+## Store items that were replaced: whoever had the old one has the new one. Whistle was the Horse
+## Archer's upgrade until Wild Hunt took its place.
+static func migrate_items(kept: Dictionary) -> void:
+	if kept.has("whistle"):
+		kept.erase("whistle")
+		kept["wild_hunt"] = true
+
+
+## The Map Upgrades this phone brings to a match: bought, and not switched off.
+func map_upgrades_on() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in ShopDefs.in_section("maps"):
+		if item_active(id):
+			out.append(id)
+	return out
 
 
 func owns_class(id: String) -> bool:
@@ -383,6 +407,8 @@ func load_settings() -> void:
 	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
 	owned_items = _saved(c, "progress", "owned_items", {})
 	switched_off = _saved(c, "progress", "switched_off", {})
+	migrate_items(owned_items)
+	migrate_items(switched_off)
 	pet = _saved(c, "progress", "pet", "wolf")
 	night_map = _saved(c, "progress", "night_map", "village")
 	if not MAPS.has(night_map):

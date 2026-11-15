@@ -11,15 +11,25 @@ const PER_LANE := 2
 const HEAVY_FROM := 180.0
 const ORDER := ["mist_infantry", "mist_ranger", "mist_heavy"]
 const NAMES := {"mist_infantry": "Mist Infantry", "mist_ranger": "Mist Ranger", "mist_heavy": "Mist Heavy"}
+## Mist Reinforcements (a Map Upgrade): every Mist Soldier this much stronger, and a Mist Ranger on
+## top of each gate.
+const REINFORCED := 1.15
+const REINFORCEMENTS := "mist_reinforcements"
 
 var world: World
 var next_at := FIRST
 var _turns := {} # gate -> how many have stepped out on that lane
 var _announced := false
+var reinforced := false
+var _archers_up := false
+## How much stronger (damage and health) every Mist Soldier is.
+var power := 1.0
 
 
 func _init(owner_world: World) -> void:
 	world = owner_world
+	reinforced = ShopDefs.map_upgrade_on(REINFORCEMENTS)
+	power = REINFORCED if reinforced else 1.0
 
 
 ## Where on a lane: its "muster" or "post", or INF if the map does not say.
@@ -33,7 +43,7 @@ func mark(gate: int, kind: String) -> Vector3:
 func on_lane(gate: int) -> int:
 	var n := 0
 	for a: Ally in world.allies:
-		if not a.dead and a.remote_owner == 0 and a.lane == gate and a.is_garrison():
+		if not a.dead and a.remote_owner == 0 and a.lane == gate and a.is_garrison() and a.perch == Vector3.INF:
 			n += 1
 	return n
 
@@ -48,6 +58,9 @@ func next_kind(gate: int, elapsed: float) -> String:
 
 
 func tick(elapsed: float) -> void:
+	if reinforced and not _archers_up and world.fort != null:
+		_archers_up = true
+		_man_the_gates()
 	if elapsed < next_at or world.fort == null:
 		return
 	next_at = elapsed + EVERY
@@ -71,3 +84,15 @@ func tick(elapsed: float) -> void:
 	if any and not _announced:
 		_announced = true
 		world.director.show_banner("Mist Soldiers step out of the waystones to hold the lanes", 3.5)
+
+
+## Mist Reinforcements: a Mist Ranger on top of every gate, there all night, shooting down the lane.
+func _man_the_gates() -> void:
+	for gate in world.fort.gates.size():
+		var g: Dictionary = world.fort.gates[gate]
+		var top: Vector3 = (g["at"] as Vector3) + Vector3.UP * Fort.WALL_H - (g["dir"] as Vector3) * 0.2
+		var a := world.spawn_garrison("mist_ranger", gate, top, top)
+		a.perch = top
+		a.global_position = top
+		world.fx_blast(top + Vector3.UP, 1.2, Color(0.45, 0.95, 0.92, 0.6))
+	world.director.show_banner("Mist Reinforcements: a Mist Ranger stands on every gate", 3.5)

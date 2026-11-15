@@ -321,6 +321,19 @@ func _mesenlla_south() -> void:
 		if not space.intersect_ray(ray).is_empty() and not space.intersect_ray(front).is_empty():
 			blocked += 1
 	check(blocked == tents, "nobody walks through a tent, from the side or the door (%d of %d)" % [blocked, tents])
+	# And nobody stands on one: wherever you land on a tent, it is too steep to stand on.
+	var flat_tops := 0
+	var looked := 0
+	for at: Vector3 in [Vector3(-14, 6, -34), Vector3(-14, 6, -26), Vector3(14, 6, -34), Vector3(15, 6, -24), Vector3(-7, 6, -19)]:
+		for dx: float in [-1.0, -0.4, 0.0, 0.4, 1.0]:
+			var down := PhysicsRayQueryParameters3D.create(Vector3(at.x + dx, w.ground_at(at) + 8.0, at.z), Vector3(at.x + dx, w.ground_at(at) + 0.3, at.z), 1)
+			var hit := space.intersect_ray(down)
+			if hit.is_empty():
+				continue
+			looked += 1
+			if (hit["normal"] as Vector3).y > cos(p.floor_max_angle) + 0.01:
+				flat_tops += 1
+	check(looked >= 15 and flat_tops == 0, "and no tent has anywhere flat enough to stand on top (%d flat of %d)" % [flat_tops, looked])
 	# The edge of the land is lined with tall trees.
 	var edge := w.tree_spots.filter(func(t: Vector3) -> bool: return maxf(absf(t.x), absf(t.z)) > w.play_half - 4.0)
 	check(edge.size() >= 120, "the edge of the land is lined with tall trees (%d)" % edge.size())

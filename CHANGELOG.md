@@ -1,5 +1,54 @@
 # Changelog
 
+## Development — Beyond the Mists, upgrades for every path
+
+### New Class Upgrades
+Every path of the Revenant, the Monk, the Plague Doctor, the Artificer and the Commander now has a Class Upgrade in the Store. Each has its own scene there, played with the class's own body and weapon. Bots on those paths use them too.
+- **Revenant.**
+  - Mist Wake (Mist Leaper, 260): each landing leaves a pool of mist 3 m across for 4 s that slows enemies and deals 8 damage a second.
+  - Torn Rifts (Rift Traveller, 280): every enemy a Rift Jump goes through bursts afterwards for 30 damage within 2.5 m.
+  - Soul Link (Summoner, 300): a quarter of each hit you take goes to the nearest of your Revenants, and when one is struck down you heal 20.
+- **Monk.**
+  - Dragon Spin (Bo Master, 260): Pole Vault lands in a 1.5 s spin, striking everything within 3 m three times for 15 and pulling it in.
+  - Fighting Body (Spirit Walker, 280): the body you leave behind strikes everything within 2.5 m for 20 once a second, and takes 30% less damage.
+  - Avalanche (Iron Mountain, 280): 0.6 s after Mountain Stomp, a second ring of stone reaches twice as far for half the damage and stuns for 1.5 s.
+- **Plague Doctor.**
+  - Healing Mist (Apothecary, 260): Healing Tonic leaves a cloud within 4 m for 6 s. Friends in it heal 5 a second and stop burning, bleeding and being poisoned.
+  - Plague Censer (Pestilence, 280): a new ability. For 6 s a plague cloud follows you, 5 m around, slowing and poisoning enemies for 10 a second. Every 25 s.
+  - Rat Tide (Rat King, 280): a new ability. 8 rats pour out 10 m ahead, and every enemy in the way takes 15 and is knocked down for 0.6 s. Every 20 s.
+- **Artificer.**
+  - Great Keg (Pyromaniac, 260): every fourth Incendiary Bomb is a keg with twice the reach and damage.
+  - Field Turret (Mechanic, 280): a new ability that sets down a Clockwork Sentry for 20 s. Every 35 s.
+  - Tesla Coil (Inventor, 280): a new invention, and the first one the bag gives. It zaps the 4 nearest enemies within 8 m every 0.5 s for 6 s, 12 damage each zap.
+- **Commander.**
+  - Arcane Surge (Warlock, 300): the empowered bolt comes every third attack instead of every fifth.
+  - Grapeshot (Gunner, 300): every fourth musket shot is 6 pellets of 20 base damage in a cone.
+  - Shield Wall (Vanguard, 300): Command and Last Command shield you and friends within 10 m. The next 40 damage each takes within 8 s is stopped, and the status row shows it.
+- **Horse Archer.** Wild Hunt (320) replaces Whistle. On foot, your horse comes at once; then for 6 s an arrow flies every 0.4 s at the nearest enemy within 22 m, without spending arrows, while you ride and shoot as usual. Every 40 s. Whoever bought Whistle has Wild Hunt.
+- Two upgrades were renamed so they don't clash with existing abilities: the Pyromaniac's keg is the Great Keg (the Trapper already has Powder Keg), and the Rift Traveller's is Torn Rifts (beside Rift Scar).
+
+### Map Upgrades
+- A new Store tab for things that change a place for everyone in the match. If anyone in the match (not a bot) owns one, it works once for that match, however many own it.
+- Mist Reinforcements (Mist Bastion, 2,200 Doubloons): a Mist Ranger with a bow stands on top of every gate all night, and every Mist Soldier deals 15% more damage and has 15% more health.
+
+### Redeem codes
+- A new code pays 2,000 Botti Doubloons each time it is entered.
+
+### Bandit
+- Starts with a Dagger, a Long Bow and 20 arrows.
+
+### Commander
+- Last Command is ready every 35 s, down from 60 s.
+- Command's cry is now a company answering its officer, with a peal of bells climbing to the octave.
+- Gunner: the artillery circle starts on you, and "Call barrage" works at once; tap the map only to move the circle.
+- Warlock: no longer loses 30 health, and the War Staff hits harder (power 1.4, up from 1.1). Last Command's storm deals 12 damage a second to every enemy inside, and its lightning strikes twice a second instead of once.
+
+### Weather and the world
+- The Mists have no rain or storms.
+- About one night in ten in the Valleys of Mesenlla and on Mist Bastion is windy: pale streaks of wind and tumbling leaves blow past wherever you are, with a breeze to hear. The Sandbox can turn it on too.
+- Tents have sloping sides as steep as their canvas, so neither players nor creatures can climb on top of them any more.
+- Network protocol 51: older builds cannot join newer ones.
+
 ## Development — Beyond the Mists, on show
 
 ### The Store shows the new Class Upgrades at work

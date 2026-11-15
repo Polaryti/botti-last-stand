@@ -4,7 +4,7 @@ extends RefCounted
 
 const COMMAND_CD := 24.0
 const TRAINED_COMMAND_CD := COMMAND_CD * 0.8
-const LAST_CD := 60.0
+const LAST_CD := 35.0
 const RALLY_RADIUS := 12.0
 const RALLY_SPEED := 0.25 # Command: friends nearby run this much faster
 const RALLY_TIME := 6.0
@@ -12,6 +12,11 @@ const LAST_RALLY_TIME := 8.0
 const LAST_RALLY_DAMAGE := 0.2
 const STORM_RADIUS := 11.0
 const STORM_TIME := 8.0 # the Warlock's Last Command storm
+const STORM_DPS := 12.0 # to every enemy inside, all the while
+const STORM_PULSE := 0.5 # how often the storm's hold (damage and slow) is renewed
+const STORM_STRIKE_EVERY := 0.5 # a lightning strike, on someone inside
+const STORM_STRIKE_DAMAGE := 35.0
+const STORM_STRIKE_RADIUS := 3.5
 const BARRAGE_RADIUS := 18.0
 const BARRAGE_DELAY := 4.0
 const BARRAGE_TIME := 5.0
@@ -82,6 +87,7 @@ static func cast(p: Player) -> void:
 		if Net.active():
 			for friend: Target in p.world.friends_near(p.global_position, radius):
 				Net.guard_peer(p.world.peer_of(friend), 0.0, 20.0)
+	PathUpgrades.shield_wall(p)
 	p.command_target_ready = false
 	p.sfx("command", -1.0)
 	Net.command_voice(p.net_id())

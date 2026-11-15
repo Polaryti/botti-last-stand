@@ -368,7 +368,8 @@ func setup(game_mode: int) -> void:
 func _start_weather() -> void:
 	var kind: int = Weather.Kind.CLEAR
 	if mode != Game.Mode.SANDBOX:
-		kind = Game.force_weather if Game.force_weather >= 0 else (Net.weather if Net.active() else Weather.roll())
+		kind = Game.force_weather if Game.force_weather >= 0 else (Net.weather if Net.active() else Weather.roll(map_id))
+		kind = Weather.allowed(kind, map_id)
 	weather.set_kind(kind)
 	if not Net.is_client() and kind != Weather.Kind.CLEAR:
 		get_tree().create_timer(5.0).timeout.connect(func() -> void:
@@ -796,6 +797,19 @@ func add_rotated_collider(xf: Transform3D, size: Vector3) -> void:
 	cs.shape = shape
 	cs.transform = xf
 	_body.add_child(cs)
+
+
+## A solid of any convex shape (points in xf's space): a tent's roof, sloping to a ridge with no
+## flat top. Mobs walk by the grid, which is blocked under the shape's footprint (`footprint`, a box
+## centred on xf).
+func add_convex_solid(xf: Transform3D, points: PackedVector3Array, footprint: Vector3) -> void:
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = points
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = xf
+	_body.add_child(cs)
+	grid.block_turned(xf.translated_local(Vector3.UP * footprint.y * 0.5), footprint)
 
 
 func _on_fort_fallen() -> void:
@@ -1684,6 +1698,19 @@ func spawn_consecration(owner_peer: int, at: Vector3, radius: float, seconds: fl
 	return c
 
 
+## A Class Upgrade's field (PathField), on this phone. Its owner's phone does what it does to enemies.
+func spawn_path_field(owner_peer: int, kind: String, at: Vector3) -> PathField:
+	at.y = ground_at(at)
+	var f := PathField.new(self, owner_peer, kind, at)
+	add_child(f)
+	return f
+
+
+## A Rat King's Rat Tide, as seen on this phone.
+func spawn_rat_tide(from: Vector3, dir: Vector3) -> void:
+	add_child(RatTide.new(from, dir))
+
+
 ## Where enemies fell lately (for a Necromancer's Grave Call), on every phone.
 func note_fall(at: Vector3) -> void:
 	_falls.append({"at": at, "t": now})
@@ -1959,16 +1986,22 @@ func place_sentry(p: Player, at: Vector3, seconds: float) -> void:
 
 func _sentry_mesh() -> Mesh:
 	if _sentry_look == null:
-		var iron := Color(0.27, 0.29, 0.32)
-		var brass := Color(0.72, 0.56, 0.22)
-		var l := LowPoly.new()
-		for a: float in [0.0, TAU / 3.0, TAU * 2.0 / 3.0]:
-			l.prism(Vector3(0, 0.95, 0), Vector3(cos(a) * 0.55, 0.0, sin(a) * 0.55), 0.05, 0.04, 5, Color(0.36, 0.24, 0.14))
-		l.box(Vector3(0, 1.08, 0), Vector3(0.36, 0.3, 0.56), iron)
-		l.prism(Vector3(0, 1.12, -0.2), Vector3(0, 1.12, -1.0), 0.06, 0.05, 6, brass)
-		l.box(Vector3(0, 1.12, -0.32), Vector3(1.0, 0.06, 0.06), Color(0.36, 0.24, 0.14))
-		_sentry_look = l.commit()
+		_sentry_look = sentry_model()
 	return _sentry_look
+
+
+## The Clockwork Sentry: a tripod, an iron box and a brass barrel pointing -Z. The Store's stage shows
+## the same one.
+static func sentry_model() -> Mesh:
+	var iron := Color(0.27, 0.29, 0.32)
+	var brass := Color(0.72, 0.56, 0.22)
+	var l := LowPoly.new()
+	for a: float in [0.0, TAU / 3.0, TAU * 2.0 / 3.0]:
+		l.prism(Vector3(0, 0.95, 0), Vector3(cos(a) * 0.55, 0.0, sin(a) * 0.55), 0.05, 0.04, 5, Color(0.36, 0.24, 0.14))
+	l.box(Vector3(0, 1.08, 0), Vector3(0.36, 0.3, 0.56), iron)
+	l.prism(Vector3(0, 1.12, -0.2), Vector3(0, 1.12, -1.0), 0.06, 0.05, 6, brass)
+	l.box(Vector3(0, 1.12, -0.32), Vector3(1.0, 0.06, 0.06), Color(0.36, 0.24, 0.14))
+	return l.commit()
 
 
 func _tick_sentries(delta: float) -> void:
@@ -2727,6 +2760,8 @@ func spawn_garrison(kind: String, gate: int, at: Vector3, post: Vector3) -> Ally
 	a.activate(INF)
 	a.lane = gate
 	a.post = post
+	if garrison:
+		a.hp *= garrison.power
 	_ally_seq = (_ally_seq + 1) % 250
 	a.net_index = _ally_seq
 	var placed := grid.to_world(grid.nearest_free(grid.to_cell(at)))

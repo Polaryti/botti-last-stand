@@ -656,9 +656,15 @@ static func tent(b: MapBuilder, size: float) -> void:
 		for z: float in [-deep * 0.4, deep * 0.4]:
 			l.prism(Vector3(side * w * 0.5, high * 0.5, z), Vector3(side * (w + 0.9), 0.05, z), 0.015, 0.015, 3, Color(0.75, 0.7, 0.55))
 	b.add(l)
-	# The whole tent stops you: its low sides as a wide block, and the higher middle under the ridge.
-	b.solid(Vector3(0, high * 0.25, 0), Vector3(size * 0.95, high * 0.5, deep))
-	b.solid(Vector3(0, high * 0.7, 0), Vector3(size * 0.5, high * 0.45, deep))
+	# The whole tent stops you, and nothing can stand on it: it is solid in the shape of its canvas, two
+	# slopes meeting at the ridge, steeper than anyone can stand on (a jump onto it slides off), with no
+	# flat top anywhere.
+	var points := PackedVector3Array()
+	for z: float in [-deep * 0.5, deep * 0.5]:
+		points.append(Vector3(-w * 0.97, 0.0, z))
+		points.append(Vector3(w * 0.97, 0.0, z))
+		points.append(Vector3(0.0, high, z))
+	b.w.add_convex_solid(b.xf, points, Vector3(size * 0.95, high, deep))
 
 
 ## A triangle of canvas with both faces drawn: the one turned away from `inside`, and its back.

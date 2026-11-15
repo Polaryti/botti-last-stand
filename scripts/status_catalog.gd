@@ -3,6 +3,12 @@ extends RefCounted
 ## Timed player states shared by the status bar and Codex.
 const TIMED := [
 	{
+		"field": "ward_left",
+		"name": "Shield Wall",
+		"icon": "shield_round+up",
+		"desc": "A Vanguard's Shield Wall: the next 40 damage you take is stopped, until the shield is spent or its 8 s run out."
+	},
+	{
 		"field": "dome_left",
 		"name": "Guardian Dome",
 		"icon": "shield_rect+up",

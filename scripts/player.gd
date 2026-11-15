@@ -180,6 +180,16 @@ var command_target := Vector3.ZERO
 var command_target_ready := false
 var _banner: MeshInstance3D
 var _war_attacks := 0
+# The Class Upgrades of PathUpgrades
+var spin_left := 0.0 # Dragon Spin under way
+var spin_hits := 0
+var ward_hp := 0.0 # Shield Wall: harm still to be stopped
+var ward_left := 0.0
+var bombs_thrown := 0 # for the Great Keg
+var musket_shots := 0 # for Grapeshot
+var hunt_left := 0.0 # Wild Hunt under way
+var hunt_timer := 0.0
+var _rift_scarred: Array = [] # Torn Rifts: those this Rift Jump went through
 var _bayonet_pending := false
 var _stance_mastered := false
 var stance_hits := 0
@@ -392,7 +402,7 @@ func setup_class(id: String) -> void:
 		id = "infantry"
 	class_id = id
 	var c: Dictionary = ClassDefs.ALL[id]
-	slots = [c["weapon"], null]
+	slots = [c["weapon"], c.get("second", null)]
 	current = 0
 	arrows = int(c["arrows"])
 	own_ammo.clear()
@@ -661,6 +671,26 @@ func heal(amount: float) -> void:
 
 ## Mending that comes from someone on your side (a Cartographer's lines, a Mercenary's Night Watch, a
 ## Paladin's Consecration): it heals, and the status bar says someone is at it.
+## Dragon Spin's look: the Bo goes round, once for each of its strikes.
+func start_spin_swing() -> void:
+	_swing_keys = "bo_spin"
+	_swing_time = 0.45
+	_swing = 0.0
+
+
+## Shield Wall: the next `amount` of harm, for `seconds`, is stopped.
+func ward(amount: float, seconds: float) -> void:
+	ward_hp = maxf(ward_hp, amount)
+	ward_left = maxf(ward_left, seconds)
+
+
+## Healing Mist: no more burning, poison or bleeding.
+func cure() -> void:
+	poison_left = 0.0
+	bleed_left = 0.0
+	burn_time = 0.0
+
+
 func mended_by_friend(amount: float) -> void:
 	if hp < max_hp():
 		friend_heal_left = 0.6
@@ -851,6 +881,16 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		_last_hit_left = AbilityNumbers.LONG_MIRROR if has_flag("long_mirror") else MIRROR_WINDOW
 	if attacker and m("thorns") > 0.0:
 		attacker.take_damage(m("thorns"), attacker.position - global_position, 1.0, attacker.centre())
+	dmg = PathUpgrades.soul_link(self, dmg)
+	if ward_hp > 0.0:
+		var stopped := minf(ward_hp, dmg)
+		ward_hp -= stopped
+		dmg -= stopped
+		if ward_hp <= 0.0:
+			ward_left = 0.0
+		sfx("block", -6.0, 1.2, 0.1)
+		if dmg <= 0.0:
+			return
 	hp -= dmg
 	hurt_flash = 1.0
 	hurt_from = from
@@ -2203,6 +2243,8 @@ func _pole_vault() -> void:
 
 func _vault_landing() -> void:
 	_vaulting = false
+	if has_item("dragon_spin"):
+		PathUpgrades.dragon_spin(self)
 	var crushing := has_flag("crushing")
 	_sweep(SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0), VAULT_POWER * (AbilityNumbers.CRUSHING_POWER if crushing else 1.0), AbilityNumbers.CRUSHING_STUN if crushing else (AbilityNumbers.STUN_SWEEP if has_flag("stun_sweep") else 0.0))
 
@@ -2284,6 +2326,10 @@ func _mountain_stomp() -> void:
 		world.hit_rival(r, dmg, global_position)
 		if has_flag("aftershock"):
 			world.status_rival(r, Net.Status.SLOW, AbilityNumbers.AFTERSHOCK_SLOW)
+	if has_item("avalanche"):
+		var at := global_position
+		var second := dmg * PathUpgrades.AVALANCHE_POWER
+		_later.append({"left": PathUpgrades.AVALANCHE_DELAY, "do": func() -> void: PathUpgrades.avalanche(self, at, radius * PathUpgrades.AVALANCHE_REACH, second)})
 	stone_skin = 0.0
 	_skin_step = 0
 	_still_for = 0.0
@@ -2442,6 +2488,8 @@ func _healing_tonic() -> void:
 	sfx("eat", -2.0, 0.8)
 	for t: Target in world.friends_near(global_position, FRIEND_REACH):
 		Net.guard_peer(world.peer_of(t), untouchable, AbilityNumbers.TONIC_FRIEND_HEAL + strong)
+	if has_item("healing_mist"):
+		PathUpgrades.healing_mist(self)
 
 
 func cast_progress() -> float:
@@ -2457,6 +2505,7 @@ func _tick_mist(delta: float) -> void:
 	art_cd_left = maxf(0.0, art_cd_left - delta)
 	path_art_cd_left = maxf(0.0, path_art_cd_left - delta)
 	mirror_hall_left = maxf(0.0, mirror_hall_left - delta)
+	PathUpgrades.tick(self, delta)
 	if _cast_kind == "":
 		return
 	if _cast_kind == "sharpshooter":
@@ -2468,7 +2517,7 @@ func _tick_mist(delta: float) -> void:
 	_cast_kind = ""
 	# The Class Upgrades of the Cavalry and the Magician have abilities of their own.
 	var item := ShopDefs.art_item(what)
-	if item != "" and has_item(item) and UpgradeKit.cast(self, what):
+	if item != "" and has_item(item) and (UpgradeKit.cast(self, what) or PathUpgrades.cast(self, what)):
 		return
 	match what:
 		"burst": mist_burst_at(global_position + Vector3.UP, 1.0)
@@ -2572,6 +2621,11 @@ func _throw_anim() -> void:
 
 func _throw_bombs() -> void:
 	var n := int(m("bomb_count"))
+	if PathUpgrades.next_is_keg(self):
+		# Great Keg: one great keg instead, twice the reach and damage.
+		world.spawn_thrown(_throw_start(), _throw_velocity(15.0 * m("bomb_throw")), Color(0.42, 0.26, 0.12), func(at: Vector3) -> void: bomb_burst(at, PathUpgrades.GREAT_KEG_POWER), true, 2.0)
+		say("Great Keg!")
+		n = 0
 	for i in n:
 		var spread := 0.0 if n == 1 else (float(i) / (n - 1) - 0.5) * 0.3
 		world.spawn_thrown(_throw_start(), _throw_velocity(17.0 * m("bomb_throw"), spread), Color(0.1, 0.1, 0.12), bomb_burst, true, 1.3)
@@ -2579,9 +2633,9 @@ func _throw_bombs() -> void:
 	fire("throw", {})
 
 
-func bomb_burst(at: Vector3) -> void:
-	var radius := m("bomb_radius")
-	var dmg := m("bomb_damage") * damage_multiplier()
+func bomb_burst(at: Vector3, power := 1.0) -> void:
+	var radius := m("bomb_radius") * power
+	var dmg := m("bomb_damage") * damage_multiplier() * power
 	var col := Color(1.0, 0.55, 0.15, 0.55)
 	world.fx_blast(at, radius * 0.8, col)
 	sfx("blast", -2.0, 1.0, 0.1)
@@ -2655,6 +2709,8 @@ func spec_chosen() -> void:
 		CommanderKit.equip(self)
 	if spec_id == "inventor":
 		_roll_invention()
+		if has_item("tesla_coil"):
+			_next_invention = "tesla" # the Tesla Coil is the first thing the bag gives
 
 
 ## What is in the Inventor's bag right now.
@@ -2668,6 +2724,8 @@ func _inventions() -> Array[String]:
 		bag.append("noise")
 	if has_flag("inv_magnet"):
 		bag.append("magnet")
+	if has_item("tesla_coil"):
+		bag.append("tesla")
 	return bag
 
 
@@ -2719,6 +2777,8 @@ func _run_invention(what: String) -> void:
 		"magnet":
 			world.spawn_thrown(_throw_start(), _throw_velocity(17.0), Color(0.75, 0.2, 0.2), _magnet_burst, false, 1.3)
 			_throw_anim()
+		"tesla":
+			PathUpgrades.tesla_coil(self)
 
 
 func _tick_artificer(delta: float) -> void:
@@ -2944,6 +3004,8 @@ func _tick_leap(delta: float) -> void:
 			return
 		_fog_at(global_position + Vector3.UP * 0.4, 1.9)
 		fog_flash = 1.0
+		if has_item("mist_wake"):
+			PathUpgrades.mist_wake(self)
 		if has_flag("art_leaper") and hp < max_hp():
 			heal(AbilityNumbers.LEAP_MEND_HEAL if has_flag("leap_mend") else AbilityNumbers.LEAP_HEAL)
 		if has_flag("leap_mend"):
@@ -2990,6 +3052,7 @@ func _start_rift() -> void:
 	_rift_targets.clear()
 	for i in mini(int(m("rift_hops")), all.size()):
 		_rift_targets.append(all[i])
+	_rift_scarred.clear()
 	_rift_timer = 0.0
 	if _rift_targets.is_empty():
 		mana = minf(max_mana(), mana + art_cost())
@@ -3030,6 +3093,13 @@ func _tick_rift(delta: float) -> void:
 		if has_flag("rift_freeze") and z.is_alive():
 			z.freeze(0.8)
 	on_hit(false)
+	if has_item("torn_rifts"):
+		_rift_scarred.append(z)
+		if _rift_targets.is_empty():
+			# The last hop: a moment later every rift it tore opens.
+			var scarred := _rift_scarred.duplicate()
+			_rift_scarred.clear()
+			_later.append({"left": 0.25, "do": func() -> void: PathUpgrades.torn_rifts(self, scarred)})
 	if has_flag("rift_mist"):
 		mana = minf(max_mana(), mana + AbilityNumbers.RIFT_MIST)
 	if has_flag("rift_feast") and hp < max_hp():
@@ -3401,7 +3471,7 @@ func _handle_fire() -> void:
 		WeaponDefs.Kind.MELEE:
 			if weapon_id() == "war_staff":
 				_war_attacks += 1
-				if _war_attacks % 5 == 0:
+				if _war_attacks % PathUpgrades.bolt_every(self) == 0:
 					_cast_bolt(CommanderKit.STAFF_BOLT)
 					return
 			_start_swing(d)
@@ -3490,6 +3560,11 @@ func _fire_arrow(d: Dictionary) -> void:
 		_kill_shot_cd = AbilityNumbers.KILLING_SHOT_EVERY
 		dmg = AbilityNumbers.KILLING_SHOT_DAMAGE
 		say("Killing Shot!")
+	if weapon_id() == "musket" and PathUpgrades.grapeshot(self, start, dir, d):
+		_kick = 1.0
+		sfx("blast", -5.0, 1.5, 0.05)
+		_noise(6.0)
+		return
 	world.spawn_player_arrow(self, start, dir * speed + Vector3.UP * 0.5, float(d["gravity"]), max_range, float(d["knock"]), dmg)
 	if has_flag("twin_shot"):
 		var side := dir.rotated(Vector3.UP, deg_to_rad(4.0))
