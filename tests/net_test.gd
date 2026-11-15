@@ -1647,13 +1647,18 @@ func _bastion() -> void:
 	await until(func() -> bool: return w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "war_wyvern"), 4.0)
 	ok(w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "war_wyvern"), "the War Wyvern comes on both phones")
 	await sync(415)
+	var boss: Zombie = w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "war_wyvern")[0]
+	ok(boss.element in ["fire", "ice", "storm"] and (boss._visual.get_meta("rig") as WyvernRig).element == boss.element, "it is of Fire, Ice or Storm on this phone, and looks it (%s)" % boss.element)
+	await until(func() -> bool: return w.zombies.filter(func(r: Zombie) -> bool: return r.carrier == boss).size() == 2, 3.0)
+	ok(w.zombies.filter(func(r: Zombie) -> bool: return r.carrier == boss and r.type_id == "wyvern_rider").size() == 2, "with its two riders in the saddle on this phone")
+	var style := MesenllaMind.element_style(boss.element)
 	var saw_fire := [false]
 	var deadline := Time.get_ticks_msec() + 16000
 	while Time.get_ticks_msec() < deadline and not (saw_fire[0] and f.heart_hp < portal_hp):
-		if w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.FIRE and Vector2(s.position.x - f.heart_at.x, s.position.z - f.heart_at.z).length() < 12.0):
+		if w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == style and Vector2(s.position.x - f.heart_at.x, s.position.z - f.heart_at.z).length() < 12.0):
 			saw_fire[0] = true
 		await get_tree().process_frame
-	ok(saw_fire[0], "its fire comes down on the Great Portal on this phone")
+	ok(saw_fire[0], "its breath (%s) comes down on the Great Portal on this phone" % boss.element)
 	ok(f.heart_hp < portal_hp, "and the portal's wound reaches this phone (%.0f)" % (portal_hp - f.heart_hp))
 	await sync(416)
 
