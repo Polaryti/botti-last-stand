@@ -22,6 +22,7 @@ var _pause_root: Control
 var _net_go := false
 
 const ARMORY_TABS := ["Paths", "Appearance"]
+const ARMORY_MAPS := "maps" # the Armory's Map Upgrades row, beside the classes
 var _armory_tab := 0
 const TOGETHER_TABS := ["Same Wi-Fi", "Online"]
 const ONLINE_TAB := 1
@@ -963,6 +964,13 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 	var ids: Array[String] = []
 	ids.assign((ClassDefs.for_sale() if section == "classes" else ShopDefs.in_section(section)).filter(func(id: String) -> bool:
 		return not (Game.owns_class(id) if section == "classes" else Game.owns_item(id))))
+	if section != "classes":
+		# What you can buy now first; what waits for a class you do not own yet after it, in the same order.
+		var open_now: Array[String] = []
+		var locked_now: Array[String] = []
+		for id: String in ids:
+			(locked_now if Game.item_locked(id) else open_now).append(id)
+		ids.assign(open_now + locked_now)
 	if just_bought != "":
 		var name_of: String = ClassDefs.ALL[just_bought]["name"] if ClassDefs.ALL.has(just_bought) else ShopDefs.ITEMS[just_bought]["name"]
 		var where := "It is yours now, in the Armory."
@@ -983,8 +991,13 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		detail.add_child(gone)
 		if section == "maps":
 			# Map Upgrades are not worn: they work on their map, for the whole match.
-			gone.text = "Every Map Upgrade is yours. Each works on its map for everyone in your matches; there is nothing to equip."
+			gone.text = "Every Map Upgrade is yours. Each works on its map for everyone in your matches. Switch them On or Off in the Armory."
+			var to_maps := _button("Open the Armory", func() -> void: show_armory(ARMORY_MAPS), Vector2(280, UiTheme.BTN), true)
+			to_maps.name = "OpenArmory"
+			to_maps.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			detail.add_child(to_maps)
 			panel = root
+			_store_to_top(root)
 			return
 		var to_class := ""
 		if ShopDefs.ITEMS.has(just_bought):
@@ -997,6 +1010,7 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		go.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		detail.add_child(go)
 		panel = root
+		_store_to_top(root)
 		return
 	var rows := {}
 	var pick := func(id: String) -> void:
@@ -1017,6 +1031,43 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		list.add_child(row)
 	pick.call(focus if rows.has(focus) else ids[0])
 	panel = root
+	if just_bought != "":
+		_store_to_top(root)
+
+
+## Whether a class can be bought in the Store (rather than earned, or unlocked with a code).
+static func _class_for_sale(class_id: String) -> bool:
+	return ClassDefs.for_sale().has(class_id)
+
+
+## For something of a class you do not own, in the Armory: the way to the class in the Store, or,
+## for a class that is earned rather than bought, a button that says it is locked and does nothing.
+func _unlock_class_button(class_id: String, back: Callable, min_size: Vector2) -> Button:
+	if _class_for_sale(class_id):
+		return _button("Unlock class", func() -> void: show_store(class_id, -1, "classes", back), min_size)
+	var b := _button("Class locked", func() -> void: pass, min_size)
+	b.disabled = true
+	b.tooltip_text = CodexPanel.acquisition(class_id)
+	return b
+
+
+## After a purchase the Store starts again from the top of its list, where the word of what you
+## bought is, and so does the page beside it. Now, and again once the new lists have their sizes.
+func _store_to_top(root: Control) -> void:
+	var scrolls: Array = []
+	var list: Control = root.get_meta("list")
+	if list.get_parent() is DragScroll:
+		scrolls.append(list.get_parent() as DragScroll)
+	var reading := root.find_child("DetailScroll", true, false)
+	if reading is DragScroll:
+		scrolls.append(reading as DragScroll)
+	var to_top := func() -> void:
+		for scroll: Variant in scrolls:
+			if is_instance_valid(scroll):
+				(scroll as DragScroll).scroll_to(0.0)
+	to_top.call()
+	to_top.call_deferred()
+	get_tree().process_frame.connect(to_top, CONNECT_ONE_SHOT)
 
 
 func _item_row(id: String) -> Button:
@@ -1029,8 +1080,10 @@ func _item_row(id: String) -> Button:
 	inner.add_theme_constant_override("separation", 12)
 	row.add_child(inner)
 	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
-	var medal := IconView.new(str(d["icon"]), ShopDefs.color_of(id), 54.0)
+	var locked := Game.item_locked(id)
+	var medal := IconView.new(str(d["icon"]).split("+")[0] + "+lock" if locked else str(d["icon"]), ShopDefs.color_of(id), 54.0)
 	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	medal.dim = locked
 	inner.add_child(medal)
 	var name_label := _body(d["name"], UiTheme.FS_BODY)
 	name_label.add_theme_font_override("font", UiTheme.bold_font())
@@ -1045,7 +1098,7 @@ func _item_row(id: String) -> Button:
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	words.add_child(name_label)
-	var whose := _soft(ShopDefs.whose(id), UiTheme.FS_TINY)
+	var whose := _soft("Needs the %s class" % ClassDefs.ALL[d["class"]]["name"] if locked else ShopDefs.whose(id), UiTheme.FS_TINY)
 	whose.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(whose)
 	inner.add_child(words)
@@ -1087,11 +1140,27 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	words.add_child(desc)
 	if Game.owns_item(id):
-		var have := _body("You own this. It works for everyone in your matches." if d.has("map") else "You own this. Find it in the Armory.", UiTheme.FS_LEAD)
+		var have := _body("You own this. Switch it On or Off in the Armory, under Map Upgrades." if d.has("map") else "You own this. Find it in the Armory.", UiTheme.FS_LEAD)
 		have.add_theme_color_override("font_color", UiTheme.MOSS)
+		have.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.add_child(have)
 		return
 	var price := int(d["price"])
+	if Game.item_locked(id):
+		# Only for a class you own: the class first, then what it can wear and learn.
+		var whose_class := str(d["class"])
+		var class_name_of: String = ClassDefs.ALL[whose_class]["name"]
+		var locked := _body("Locked until the %s class is yours; then it costs %d Doubloons. %s" % [class_name_of, price, CodexPanel.acquisition(whose_class)], UiTheme.FS_LEAD)
+		locked.name = "ItemLocked"
+		locked.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		locked.add_theme_color_override("font_color", UiTheme.EMBER)
+		detail.add_child(locked)
+		if _class_for_sale(whose_class):
+			var see := _button("See the %s" % class_name_of, func() -> void: show_store(whose_class, from_mode, "classes", _store_return), Vector2(300, UiTheme.BTN_TALL), true)
+			see.name = "SeeClass"
+			see.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			detail.add_child(see)
+		return
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	detail.add_child(row)
@@ -1134,7 +1203,17 @@ func show_armory(focus := "", tab := 0) -> void:
 		for other: String in rows:
 			UiTheme.plain(rows[other])
 		UiTheme.selected(rows[id])
-		_fill_armory(detail, id)
+		if id == ARMORY_MAPS:
+			_fill_armory_maps(detail)
+		else:
+			_fill_armory(detail, id)
+	# Map Upgrades first: they are not any class's, and they are what you take to every match.
+	var maps_row := _maps_row()
+	rows[ARMORY_MAPS] = maps_row
+	maps_row.pressed.connect(func() -> void:
+		Sfx.play("ui_click", -5.0)
+		pick.call(ARMORY_MAPS))
+	list.add_child(maps_row)
 	var classes: Array = ClassDefs.ALL.keys().filter(func(key: String) -> bool: return not ClassDefs.disabled(key))
 	for id: String in classes:
 		var row := _class_row(id)
@@ -1146,6 +1225,82 @@ func show_armory(focus := "", tab := 0) -> void:
 		list.add_child(row)
 	pick.call(focus if rows.has(focus) else classes[0])
 	panel = root
+
+
+## The Armory's row for the Map Upgrades, above the classes.
+func _maps_row() -> Button:
+	var row := Button.new()
+	row.name = "MapUpgradesRow"
+	row.custom_minimum_size = Vector2(320, 72)
+	var inner := HBoxContainer.new()
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_theme_constant_override("separation", 12)
+	row.add_child(inner)
+	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
+	var medal := IconView.new("compass", UiTheme.EMBER, 54.0)
+	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inner.add_child(medal)
+	var name_label := _body(ShopDefs.SECTIONS["maps"], UiTheme.FS_LEAD)
+	name_label.add_theme_font_override("font", UiTheme.bold_font())
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inner.add_child(name_label)
+	return row
+
+
+## Every Map Upgrade: what each level does, and, for the ones you own, a switch that says whether you
+## bring it to your matches.
+func _fill_armory_maps(detail: VBoxContainer) -> void:
+	for child in detail.get_children():
+		detail.remove_child(child)
+		child.queue_free()
+	var title := _body(ShopDefs.SECTIONS["maps"], UiTheme.FS_HEAD)
+	title.add_theme_font_override("font", UiTheme.title_font())
+	detail.add_child(title)
+	detail.add_child(_body("Each works on its map for everyone in the match. Every player who brings one adds a level, up to Level %d. Switched Off, yours stays at home." % ShopDefs.MAP_LEVELS, UiTheme.FS_BODY))
+	var scroll := DragScroll.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 22)
+	scroll.add_child(content)
+	for id: String in ShopDefs.in_section("maps"):
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		var block := VBoxContainer.new()
+		block.name = "Map_" + id
+		block.add_theme_constant_override("separation", 6)
+		content.add_child(block)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 12)
+		block.add_child(head)
+		var medal := IconView.new(str(d["icon"]), ShopDefs.color_of(id), 58.0)
+		medal.dim = not Game.owns_item(id)
+		head.add_child(medal)
+		var words := VBoxContainer.new()
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		words.add_theme_constant_override("separation", 0)
+		head.add_child(words)
+		var name_label := _body(d["name"], UiTheme.FS_LEAD)
+		name_label.add_theme_font_override("font", UiTheme.bold_font())
+		words.add_child(name_label)
+		words.add_child(_soft(Places.ALL[d["map"]]["name"], UiTheme.FS_SMALL))
+		if not Game.owns_item(id):
+			var chosen := id
+			var go := _button("In the Store", func() -> void: show_store(chosen, -1, "maps", func() -> void: show_armory(ARMORY_MAPS)), Vector2(190, UiTheme.BTN_SHORT))
+			go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			head.add_child(go)
+		var levels: Array = d.get("levels", [])
+		for i in levels.size():
+			block.add_child(_soft("Level %d: %s" % [i + 1, levels[i]], UiTheme.FS_SMALL))
+		if Game.owns_item(id):
+			var item := id
+			var knob := _toggle("Bring it to my matches", func() -> bool: return Game.item_active(item), func(on: bool) -> void: Game.set_item_on(item, on))
+			knob.name = "MapSwitch_" + id
+			block.add_child(knob)
+	_wrap_labels(detail)
 
 
 func _fill_armory(detail: VBoxContainer, id: String) -> void:
@@ -1164,7 +1319,7 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 		head.add_child(view)
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_theme_constant_override("separation", 10)
+	words.add_theme_constant_override("separation", 8)
 	head.add_child(words)
 	var title := _body(ClassDefs.ALL[id]["name"], UiTheme.FS_HEAD)
 	title.add_theme_font_override("font", UiTheme.title_font())
@@ -1178,25 +1333,28 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	var d: Dictionary = ClassDefs.ALL[id]
 	words.add_child(_soft("%s\nStarting weapon: %s · Starting arrows: %d" % [ClassPresentation.stats_line(id), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], UiTheme.FS_SMALL))
 	words.add_child(ClassPresentation.weapon_tags(id))
-	words.add_child(_body(ClassPresentation.COPY[id][1], UiTheme.FS_BODY))
 	_armory_tabs(detail, id)
 	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail.add_child(scroll)
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 14)
+	content.add_theme_constant_override("separation", 22)
 	scroll.add_child(content)
 	var tree := AbilityData.tree(id)
 	var items := ShopDefs.for_class(id)
 	for spec: Dictionary in tree["specs"]:
-		content.add_child(_body(spec["name"], UiTheme.FS_HEAD))
-		content.add_child(_body(ClassPresentation.profession(spec), UiTheme.FS_BODY))
+		# Each path keeps its Class Upgrades close under its own words, apart from the next path.
+		var block := VBoxContainer.new()
+		block.add_theme_constant_override("separation", 6)
+		content.add_child(block)
+		block.add_child(_body(spec["name"], UiTheme.FS_HEAD))
+		block.add_child(_body(ClassPresentation.profession(spec), UiTheme.FS_BODY))
 		var upgrades := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["spec"] == spec["id"])
 		if not upgrades.is_empty():
-			content.add_child(_armory_spec_row(id, spec["id"], upgrades))
+			block.add_child(_armory_spec_row(id, spec["id"], upgrades))
 		else:
-			content.add_child(_soft("No Class Upgrades available for this profession.", UiTheme.FS_SMALL))
+			block.add_child(_soft("No Class Upgrades available for this profession.", UiTheme.FS_SMALL))
 	_wrap_labels(detail)
 
 
@@ -1307,7 +1465,12 @@ func _look_card(class_id: String, look: String, show_look: Callable) -> PanelCon
 	line.add_child(act)
 	card.set_meta("update", func() -> void:
 		var on := _look_worn(class_id, look)
-		if not owned:
+		if not owned and Game.item_locked(look):
+			state.text = "%d Doubloons, once the class is yours" % int(d["price"])
+			act.text = "Unlock class" if _class_for_sale(class_id) else "Class locked"
+			act.disabled = not _class_for_sale(class_id)
+			UiTheme.plain(act)
+		elif not owned:
 			state.text = "%d Doubloons" % int(d["price"])
 			act.text = "In the Store"
 			UiTheme.plain(act)
@@ -1318,6 +1481,10 @@ func _look_card(class_id: String, look: String, show_look: Callable) -> PanelCon
 			else: UiTheme.plain(act)
 		UiTheme.size_button(act, UiTheme.BTN_SHORT))
 	act.pressed.connect(func() -> void:
+		if not owned and Game.item_locked(look):
+			if _class_for_sale(class_id):
+				show_store(class_id, -1, "classes", func() -> void: show_armory(class_id, 1))
+			return
 		if not owned:
 			show_store(look, -1, "", func() -> void: show_armory(class_id, 1))
 			return
@@ -1374,6 +1541,10 @@ func _item_switch(class_id: String, item: String) -> Control:
 	var description := _soft(d["desc"], UiTheme.FS_SMALL)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(description)
+	if Game.item_locked(item):
+		# The class first: the Store's page for it, and back here after (or, earned, how to earn it).
+		line.add_child(_unlock_class_button(class_id, func() -> void: show_armory(class_id), Vector2(190, UiTheme.BTN_SHORT)))
+		return column
 	if not Game.owns_item(item):
 		line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, UiTheme.BTN_SHORT)))
 		return column

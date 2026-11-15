@@ -29,6 +29,8 @@ const DAWN_FOG := Color(0.92, 0.66, 0.46)
 static var _shadow_mesh: QuadMesh
 static var _arrow_mesh: Mesh
 static var _stone_mesh: Mesh
+static var _pellet_mesh: Mesh
+var _ember_spark_mat: StandardMaterial3D
 static var _fireball_mesh: Mesh
 static var _bolt_mesh: ArrayMesh
 static var _axe_proj: Mesh
@@ -1612,15 +1614,24 @@ func _shot_mesh(id: String) -> Mesh:
 				l.box(Vector3.ZERO, Vector3(0.09, 0.09, 0.09), Color(0.5, 0.5, 0.48))
 				_stone_mesh = l.commit()
 			return _stone_mesh
+		"pellet":
+			# Grapeshot: a lump of hot iron, a little star of two crossed cubes glowing like a coal.
+			if _pellet_mesh == null:
+				var l := LowPoly.new()
+				l.box(Vector3.ZERO, Vector3(0.08, 0.08, 0.08), Color(1.0, 0.55, 0.18))
+				l.box(Vector3.ZERO, Vector3(0.08, 0.08, 0.08), Color(0.95, 0.4, 0.12), Vector3(45, 45, 0))
+				_pellet_mesh = l.commit()
+			return _pellet_mesh
 	return _arrow_mesh
 
 
-func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_range: float, knock: float, dmg: float, from_hand := true) -> void:
+## `look`: what flies, when it is not the weapon's own shot ("pellet" for Grapeshot).
+func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_range: float, knock: float, dmg: float, from_hand := true, look := "") -> Projectile:
 	var bounce := int(p.m("bounces")) + (PowerDefs.BOUNCES if p.has_power("bounce_arrows") else 0)
 	var burning := p.has_power("fire_arrows") or (p.is_riding() and (p.has_flag("riding_fire") or p.has_flag("war_machine")))
 	var d := p.weapon_def() if from_hand else {}
 	bounce += int(d.get("bounces", 0))
-	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
+	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(look if look != "" else str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
 		var kind := str(d.get("shot", ""))
 		shot.spins = kind == "chakram" or kind == "bolas"
@@ -1638,7 +1649,8 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+			Net.shot(6 if look == "pellet" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+	return shot
 
 
 func familiar_arrow(p: Player, target: Node3D) -> void:
@@ -1778,13 +1790,18 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 
 
 ## A Mist Ranger's arrow: it belongs to nobody, so nobody is credited with what it kills.
-func garrison_arrow(from: Vector3, target: Vector3, dmg: float) -> void:
+## `kind`: "fire" sets what it hits burning, "poison" poisons it (Mist Reinforcements, Level 3).
+const GARRISON_POISON := Vector2(6.0, 5.0) # damage per second, and seconds
+
+func garrison_arrow(from: Vector3, target: Vector3, dmg: float, kind := "") -> void:
 	var vel := (target - from).normalized() * 40.0
-	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(""), from, vel, 0.0, 30.0, dmg, 1.0)
+	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(""), from, vel, 0.0, 30.0, dmg, 1.0, kind == "fire")
 	if shot:
 		shot.garrison = true
+		if kind == "poison":
+			shot.poison = GARRISON_POISON
 		if Net.active():
-			Net.shot(0, from, vel, 0.0, 30.0, false, Color.WHITE)
+			Net.shot(0, from, vel, 0.0, 30.0, kind == "fire", Color(0.2, 0.9, 0.1) if kind == "poison" else Color.WHITE)
 	sfx_at("bow", from, -9.0)
 
 
@@ -1960,13 +1977,20 @@ func spawn_dart(at: Vector3, vel: Vector3, dmg: float, jumps: int) -> void:
 			Net.shot(2, at, vel, 0.0, 40.0, false, col)
 
 
-## A line of light between two points, for a moment.
-func fx_spark(a: Vector3, b: Vector3) -> void:
+## A line of light between two points, for a moment. `ember`: orange, a spray of burning powder,
+## rather than lightning's blue-white.
+func fx_spark(a: Vector3, b: Vector3, ember := false) -> void:
 	var m := _sparks[_next_spark]
 	_next_spark = (_next_spark + 1) % _sparks.size()
 	var length := a.distance_to(b)
 	if length < 0.05:
 		return
+	if ember and _ember_spark_mat == null:
+		_ember_spark_mat = StandardMaterial3D.new()
+		_ember_spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ember_spark_mat.albedo_color = Color(1.0, 0.62, 0.22)
+		_ember_spark_mat.disable_fog = true
+	m.material_override = _ember_spark_mat if ember else null
 	m.look_at_from_position((a + b) * 0.5, b, Vector3.UP if absf((b - a).normalized().y) < 0.98 else Vector3.RIGHT)
 	m.scale = Vector3(1, 1, length)
 	m.visible = true
@@ -2208,6 +2232,8 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = WeaponDefs.mesh("dagger")
 	elif mesh == 5:
 		m = WeaponDefs.bolas_mesh()
+	elif mesh == 6:
+		m = _shot_mesh("pellet")
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
@@ -3129,7 +3155,7 @@ func warm_up() -> void:
 	var kinds := ["normal", "clever", "magic", "rider", "wraith", "banshee", "crow", "gargoyle", "mimic", "scarecrow", "hero_infantry", "hero_ranger"]
 	var mist_preview: MistSeal
 	if terrain.has_islands():
-		kinds.append_array(MistModels.KINDS)
+		kinds.append_array(MistModels.BORN)
 		mist_preview = MistSeal.create(self, Vector3(0, ground_at(spot), 6), 3.0, 0.0, 1.5, 0.0, -1)
 		mist_preview.set_physics_process(false)
 		cam.position.y += ground_at(spot)
@@ -3681,6 +3707,16 @@ func fx_blast(at: Vector3, radius: float, col: Color) -> void:
 	_blast.scale = Vector3.ONE * radius * 0.7
 	_blast.visible = true
 	_blast_life = 0.18
+
+
+## Grapeshot leaving the musket, as the one who fired it sees it: the burning powder thrown out along
+## the cone the pellets fly in. (The other phones see a flash of fire at the muzzle instead; up here
+## by the eyes a flash would fill the whole screen.)
+func fx_grapeshot(at: Vector3, dir: Vector3, cone_deg: float, rays: int) -> void:
+	for i in mini(rays, _sparks.size()):
+		var k := float(i) / maxf(1.0, float(rays - 1)) - 0.5
+		var ray := dir.rotated(Vector3.UP, deg_to_rad(cone_deg) * k)
+		fx_spark(at + ray * 0.6, at + ray * randf_range(3.0, 4.5), true)
 
 
 func fx_impact(at: Vector3) -> void:

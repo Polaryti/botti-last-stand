@@ -187,6 +187,7 @@ var ward_hp := 0.0 # Shield Wall: harm still to be stopped
 var ward_left := 0.0
 var bombs_thrown := 0 # for the Great Keg
 var musket_shots := 0 # for Grapeshot
+var grapeshot_flash := 0.0 # 1 when Grapeshot has just gone off, fading: the HUD's burst round the crosshair
 var hunt_left := 0.0 # Wild Hunt under way
 var hunt_timer := 0.0
 var _rift_scarred: Array = [] # Torn Rifts: those this Rift Jump went through
@@ -512,14 +513,18 @@ func status_effects() -> Array[Dictionary]:
 		if remaining > 0 and remaining < 900 and entry["field"] == "friend_heal_left":
 			out.append({"icon": entry["icon"], "color": UiTheme.MOSS, "left": -1.0, "stacks": 1}) # for as long as it goes on: no count
 		elif remaining > 0 and remaining < 900:
-			out.append({"icon": ("status_frozen" if is_iced else "status_stunned") if entry["field"] == "frozen_left" else entry["icon"], "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left", "night_blind_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
+			var icon: String = ("status_frozen" if is_iced else "status_stunned") if entry["field"] == "frozen_left" else mount_kind() if entry["field"] == "riding_left" else entry["icon"]
+			out.append({"icon": icon, "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left", "night_blind_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
 		if key in ["command_ranged", "command_spell", "shrine_bear_ranged_damage", "shrine_bear_spell_damage"]:
 			continue
 		var b: Dictionary = _buffs[key]
 		var from_command := key.begins_with("command_")
-		out.append({"icon": _BUFF_ICONS.get(b["stat"], "star+up"), "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
+		var buff_icon: String = _BUFF_ICONS.get(b["stat"], "star+up")
+		if b["stat"] == "horse_speed":
+			buff_icon = mount_kind() + "+up"
+		out.append({"icon": buff_icon, "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
 			"left": float(b["left"]), "stacks": int(b["stacks"])})
 	var storm: MistStorm = world.storm_at(global_position) if world else null
 	if storm:
@@ -567,6 +572,18 @@ func mount_kind() -> String:
 
 func mount_name() -> String:
 	return "Chariot" if spec_id == "mechanic" else "Horse"
+
+
+## What the ride button is about right now: "chariot" or "horse". Your own mount, or the one you
+## sit behind, or the friend's you could climb onto.
+func ride_kind() -> String:
+	var peer := ride_behind
+	if peer == 0 and not is_riding() and not horse_ready() and can_board():
+		peer = Net.nearby_horse(global_position)
+	if peer != 0:
+		var a: Avatar = Net.avatar(peer)
+		return "chariot" if a != null and a.in_chariot else "horse"
+	return mount_kind()
 
 
 func carries(id: String) -> bool:
@@ -740,6 +757,24 @@ func drop_current_weapon() -> void:
 	else:
 		slots[current] = null
 		current = 1 - current
+	_equip()
+
+
+## A weapon with throws of its own (a Rift Chakram) is gone once the last is thrown: its slot is
+## left empty (a Monk's hand goes back to its fists), and you hold whatever is in the other.
+func _spent_weapon() -> void:
+	var id := weapon_id()
+	if WeaponDefs.own_ammo(id) <= 0 or ammo_of(id) > 0:
+		return
+	own_ammo.erase(id)
+	if class_id == "monk":
+		slots[current] = "fists"
+	else:
+		slots[current] = null
+		if slots[1 - current] != null:
+			current = 1 - current
+	say("%s spent" % WeaponDefs.ALL[id]["name"])
+	sfx("weapon_change", -3.0, 0.8)
 	_equip()
 
 
@@ -3359,6 +3394,7 @@ func _process_step(delta: float) -> void:
 	heal_flash = maxf(0.0, heal_flash - delta * 2.2)
 	hurt_dir_time = maxf(0.0, hurt_dir_time - delta * 1.4)
 	level_flash = maxf(0.0, level_flash - delta * 1.2)
+	grapeshot_flash = maxf(0.0, grapeshot_flash - delta * 2.0)
 	hit_marker = maxf(0.0, hit_marker - delta * 4.0)
 	toast_time = maxf(0.0, toast_time - delta)
 	_cooldown -= delta
@@ -3491,6 +3527,7 @@ func _handle_fire() -> void:
 				elif WeaponDefs.own_ammo(weapon_id()) > 0:
 					own_ammo[weapon_id()] = ammo_of(weapon_id()) - 1
 				_fire_arrow(d)
+				_spent_weapon()
 		WeaponDefs.Kind.SPELL:
 			mana -= float(d["cost"]) * m("spell_cost")
 			_cast_bolt(d)

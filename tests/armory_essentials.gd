@@ -19,7 +19,8 @@ func _ready() -> void:
 			assert(labels.any(func(l: Label) -> bool: return l.text == spec["name"]))
 			assert(not labels.any(func(l: Label) -> bool: return l.text.begins_with(spec["final"]["name"] + " —")))
 			for item: String in ShopDefs.for_class(id):
-				if not ShopDefs.ITEMS[item].get("pet", false):
+				# The Paths tab lists Class Upgrades; looks are on the Appearance tab, pets as a row of choices.
+				if ShopDefs.ITEMS[item]["section"] == "upgrades" and not ShopDefs.ITEMS[item].get("pet", false):
 					assert(labels.any(func(l: Label) -> bool: return l.text == ShopDefs.ITEMS[item]["desc"]))
 			checks += 3
 		checks += 2

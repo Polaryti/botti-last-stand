@@ -400,12 +400,22 @@ func _children() -> void:
 	check(kid.weapon_id in ZombieDefs.ALL["child_of_woods"]["weapons"], "a Child of the Woods carries a weapon it found (%s)" % kid.weapon_id)
 	check(kid.model_id == "woods_child" and not kid._custom, "on an animated body of its own")
 	kid.take_damage(10000.0, Vector3.ZERO, 0.0, kid.centre())
-	var let_go := 0
+	var left := {"weapon": 0, "arrows": 0, "": 0}
 	for n in 4000:
-		if Zombie.lets_go(ZombieDefs.ALL["child_of_woods"]):
-			let_go += 1
-	check(let_go > 640 and let_go < 960, "and one in five drops it when it falls (%d of 4000)" % let_go)
-	check(Zombie.lets_go(ZombieDefs.ALL["clever"]) and is_equal_approx(ZombieDefs.ALL["woodland_cavalry"]["weapon_drop"], 0.2), "others still always do; the riders are Children too")
+		left[Zombie.loot(ZombieDefs.ALL["child_of_woods"])] += 1
+	check(left["weapon"] > 1800 and left["weapon"] < 2200 and left["weapon"] + left["arrows"] == 4000, "falling, it leaves its weapon half the time and arrows the other half (%d weapons, %d arrows of 4000)" % [left["weapon"], left["arrows"]])
+	check(Zombie.loot(ZombieDefs.ALL["clever"]) == "weapon" and is_equal_approx(ZombieDefs.ALL["woodland_cavalry"]["weapon_drop"], 0.5) and ZombieDefs.ALL["woodland_cavalry"].get("arrows_else", false), "others still always drop their weapon; the riders are Children too")
+	var arrows_before := w.count_pickups(Pickup.Kind.ARROWS)
+	var weapons_before := w.pickups.filter(func(q: Pickup) -> bool: return q.kind == Pickup.Kind.WEAPON).size()
+	seed(20261115) # the same falls every run
+	for n in 8:
+		var child := raise("child_of_woods", at + Vector3(n * 1.5 - 6.0, 0, -18))
+		child.take_damage(10000.0, Vector3.ZERO, 0.0, child.centre())
+		child.release() # its body back to the pool for the next one; what it left stays
+	randomize()
+	var new_arrows := w.count_pickups(Pickup.Kind.ARROWS) - arrows_before
+	var new_weapons := w.pickups.filter(func(q: Pickup) -> bool: return q.kind == Pickup.Kind.WEAPON).size() - weapons_before
+	check(new_arrows + new_weapons == 8 and new_arrows > 0 and new_weapons > 0, "eight Children fallen leave eight things: %d weapons, %d bundles of arrows" % [new_weapons, new_arrows])
 	var rider := raise("woodland_cavalry", at + Vector3(0, 0, -14))
 	check(rider._mounted and rider._horse_node.visible and (rider._horse_node.material_override as ShaderMaterial).get_shader_parameter("belly") != null, "Woodland Cavalry ride bears")
 	check(rider.weapon_id == "spear", "with spears")
@@ -696,6 +706,38 @@ func _bastion_map() -> void:
 	check(not climber._fort_plan(p, 5.8), "a lane enemy goes for a player it sees on its lane")
 	p.global_position = Vector3(-46.0, w.ground_at(Vector3(-46, 0, climber.position.z)) + 0.2, climber.position.z)
 	check(climber._fort_plan(p, 46.0) and fort.lane_at(p.global_position) == 0, "but not for one on another lane: it keeps on for its gate")
+	# Someone in sight at the side of its lane, out of its reach: it looks up its road while it goes
+	# on, not at them over its shoulder.
+	var road := fort.lane_ahead(climber.fort_gate, climber.position, Zombie.LANE_AHEAD) - climber.position
+	road.y = 0.0
+	road = road.normalized()
+	var aside := road.cross(Vector3.UP).normalized()
+	p.global_position = climber.position + aside * (Zombie.LANE_REACH + 3.0) + Vector3.UP * 0.2
+	p.global_position.y = w.ground_at(p.global_position) + 0.2
+	var to_side := p.global_position - climber.position
+	climber._sees = true
+	climber._attack_left = 0.0
+	climber._on_duty = climber._fort_plan(p, to_side.length())
+	climber.rotation.y = atan2(to_side.x, to_side.z)
+	for i in 40:
+		climber._face(to_side, to_side.length(), road, 0.05)
+	var facing := Vector3(sin(climber.rotation.y), 0, cos(climber.rotation.y))
+	check(climber._on_duty and facing.dot(road) > 0.95, "a lane enemy that only sees someone beside its lane looks ahead as it goes (%.2f along its road)" % facing.dot(road))
+	climber._attack_left = 0.4
+	climber._attack_aim = Vector3.INF
+	for i in 40:
+		climber._face(to_side, to_side.length(), road, 0.05)
+	facing = Vector3(sin(climber.rotation.y), 0, cos(climber.rotation.y))
+	check(facing.dot(to_side.normalized()) > 0.95, "and turns to them only for a blow or a shot it aims at them")
+	climber._attack_left = 0.0
+	climber._on_duty = false
+	climber._hold = false
+	climber._sees = true
+	climber.state = Zombie.State.CHASE
+	for i in 40:
+		climber._face(to_side, to_side.length(), road, 0.05)
+	facing = Vector3(sin(climber.rotation.y), 0, cos(climber.rotation.y))
+	check(facing.dot(to_side.normalized()) > 0.95, "while one it is fighting, it faces")
 	p.global_position = fort.heart_at + Vector3(0, 0.1, 6)
 	check(climber._fort_plan(p, 99.0), "nor for one inside the walls")
 	# The road, not the slopes: the spot it aims for is always on its lane's road, a little ahead.

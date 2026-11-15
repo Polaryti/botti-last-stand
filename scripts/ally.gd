@@ -55,6 +55,7 @@ var guarded := 0.0
 var lane := -1
 var post := Vector3.INF
 var perch := Vector3.INF # a Mist Ranger on top of a gate (Mist Reinforcements): it stays up there
+var arrow_kind := "" # a Mist Ranger on a gate at Level 3 of Mist Reinforcements: "fire" or "poison"
 var fell_back := false # a Mist Soldier whose gate has fallen: it holds the portal from then on
 
 var _visual: Node3D
@@ -130,6 +131,7 @@ func activate(seconds: float) -> void:
 	lane = -1
 	post = Vector3.INF
 	perch = Vector3.INF
+	arrow_kind = ""
 	fell_back = false
 	_found_at = -100.0
 	dead = false
@@ -555,7 +557,7 @@ func _tick_perch(_delta: float) -> void:
 	rotation.y = atan2(to.x, to.z)
 	if _cooldown <= 0.0:
 		_cooldown = 1.1
-		world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power())
+		world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power(), arrow_kind)
 		_attack_left = 0.35
 		_current = ""
 		_play("2H_Ranged_Shoot", 1.5)

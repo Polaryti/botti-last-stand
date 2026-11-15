@@ -3195,9 +3195,15 @@ func test_version_8() -> void:
 	for i in pl.horses_needed():
 		pl.on_kill(kill_me)
 	ok(pl.horse_ready(), "and then it is ready")
+	var glyphs: Hud = Hud.new()
+	glyphs.player = pl
+	ok(glyphs._button_glyph("horse") == "chariot" and Icons.exists("chariot_off"), "its button shows a chariot, not a horse")
 	await kill_all()
 	pl.mount()
 	ok(pl.is_riding() and pl.riding_left >= Player.CHARIOT_TIME, "it lasts longer than a horse")
+	ok(glyphs._button_glyph("horse") == "chariot_off", "and getting down shows the chariot too, not the horseshoe")
+	ok(pl.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "chariot") and not pl.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "horse"), "its time left shows a chariot")
+	glyphs.free()
 	pl.input_move = Vector2(0, -1)
 	await seconds(1.0)
 	var chariot_speed := Vector2(pl.velocity.x, pl.velocity.z).length()

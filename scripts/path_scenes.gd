@@ -755,11 +755,14 @@ static func _build_rat_tide(s: UpgradeShowcase) -> void:
 	s._parts["tide"] = tide
 	var foes: Array[Dictionary] = []
 	var stars: Array[Node3D] = []
+	var poison: Array[Node3D] = []
 	for x: float in [0.25, -0.75]:
 		foes.append(_zombie_at(s, Vector2(x, KING.y - 0.1), "normal_a" if x > 0 else "normal_b", KING))
 		stars.append(_stars(s))
+		poison.append(s._puff(Color(0.4, 0.95, 0.3), 6)) # the bites poison: a green breath off each
 	s._parts["foes"] = foes
 	s._parts["stars"] = stars
+	s._parts["poison"] = poison
 
 
 static func _rat_tide(s: UpgradeShowcase, t: float) -> void:
@@ -777,6 +780,9 @@ static func _rat_tide(s: UpgradeShowcase, t: float) -> void:
 		zh.position = _sp(s, z["home"]) + Vector3.UP * down * 0.15
 		_struck(s, z, t, reach_at)
 		_show_stars(stars[i], zh.position + Vector3.DOWN * down * 1.2, t, down > 0.5)
+		var cloud: Node3D = (s._parts["poison"] as Array)[i]
+		cloud.position = zh.position + Vector3.UP * 0.9
+		s._show_puff(cloud, fmod(t - reach_at, 0.9) if t >= reach_at and t < reach_at + 2.6 else -1.0, 0.9, 0.35)
 
 
 # --- Great Keg: a keg instead of a bomb, and the blast twice as wide ----------------------------------
@@ -1004,8 +1010,9 @@ const GRAPE_SHOTS := [0.3, 0.85, 1.4, 2.05]
 static func _build_grapeshot(s: UpgradeShowcase) -> void:
 	s._person = _person_at(s, "commander", "musket", GUNNER, Vector2(-1.5, 0.0))
 	var balls: Array[MeshInstance3D] = []
+	# Three plain musket balls, then the Grapeshot's pellets as the game draws them: glowing iron.
 	for i in 3 + PathUpgrades.GRAPESHOT_PELLETS:
-		balls.append(_dot(s, Color(0.2, 0.2, 0.22), 0.05))
+		balls.append(_dot(s, Color(0.2, 0.2, 0.22) if i < 3 else Color(1.0, 0.58, 0.2), 0.05))
 	s._parts["balls"] = balls
 	s._parts["flash"] = s._puff(Color(1.0, 0.85, 0.5), 5)
 	s._parts["smoke"] = s._puff(Color(0.7, 0.7, 0.7), 6)

@@ -5,6 +5,8 @@ class_name ShopDefs
 
 const SECTIONS := {"classes": "Classes", "upgrades": "Class upgrades", "cosmetics": "Cosmetics", "maps": "Map Upgrades"}
 const PETS := ["wolf", "raven", "snake", "fox"]
+## A Map Upgrade grows a level for each player in the match who brings it, up to this.
+const MAP_LEVELS := 4
 
 const ITEMS := {
 	"oathkeeper": {"name": "Oathkeeper", "section": "upgrades", "class": "heavy", "spec": "guardian", "price": 240, "icon": "shield", "model": "mace", "desc": "Blocked attacks store 4 healing, up to 20. Shield Dome spends it to mend nearby allies and summons."},
@@ -60,7 +62,7 @@ const ITEMS := {
 		"desc": "An ability: for 6 s a plague cloud follows you, 5 m around. Enemies in it are slowed and poisoned for 10 damage a second. Ready again after 25 s.",
 		"art": {"name": "Plague Censer", "cost": 0.0, "cast": 0.3, "cd": 25.0, "icon": "poison", "anim": "Stance"}},
 	"rat_tide": {"name": "Rat Tide", "section": "upgrades", "class": "plague_doctor", "spec": "rat_king", "price": 280, "icon": "rat", "model": "blowgun",
-		"desc": "An ability: 8 rats pour out ahead of you, 10 m. Every enemy in their way takes 15 damage and is knocked down for 0.6 s. Ready again after 20 s.",
+		"desc": "An ability: 8 rats pour out ahead of you, 10 m. Every enemy in their way takes 30 damage, is knocked down for 0.6 s, and is poisoned for 8 damage a second for 5 s. Ready again after 20 s.",
 		"art": {"name": "Rat Tide", "cost": 0.0, "cast": 0.2, "cd": 20.0, "icon": "rat"}},
 	"great_keg": {"name": "Great Keg", "section": "upgrades", "class": "artificer", "spec": "pyromaniac", "price": 260, "icon": "bomb+up", "model": "torch",
 		"desc": "Every fourth Incendiary Bomb is a great keg of powder: twice the blast's reach and damage."},
@@ -72,11 +74,12 @@ const ITEMS := {
 	"arcane_surge": {"name": "Arcane Surge", "section": "upgrades", "class": "commander", "spec": "warlock", "price": 300, "icon": "staff+bolt", "model": "staff",
 		"desc": "The War Staff's empowered bolt comes every third attack instead of every fifth."},
 	"grapeshot": {"name": "Grapeshot", "section": "upgrades", "class": "commander", "spec": "gunner", "price": 300, "icon": "burst", "model": "crossbow",
-		"desc": "Every fourth musket shot is grapeshot: 6 pellets of 20 base damage, spread in a cone."},
+		"desc": "Every fourth musket shot is grapeshot: 6 pellets of 20 base damage, spread in a cone. Marks under your crosshair count the shots to it, and the last one glows when it is loaded."},
 	"shield_wall": {"name": "Shield Wall", "section": "upgrades", "class": "commander", "spec": "vanguard", "price": 300, "icon": "shield_round", "model": "sword",
 		"desc": "Command and Last Command also shield you and friends within 10 m: the next 40 damage each takes within 8 s is stopped."},
 	"mist_reinforcements": {"name": "Mist Reinforcements", "section": "maps", "class": "", "spec": "", "map": "bastion", "price": 2200, "icon": "mist_ranger",
-		"desc": "On Mist Bastion, a Mist Ranger holds the top of each gate with a bow, and every Mist Soldier deals 15% more damage and has 15% more health. If anyone in the match owns it, it works for the whole match, once."},
+		"desc": "On Mist Bastion, every Mist Soldier deals 15% more damage and has 15% more health, and a Mist Ranger holds the top of each gate with a bow. It works for the whole match, and it stacks: each player in the match who owns it and has it On adds a level, up to Level 4. Level 2: two Mist Rangers on each gate. Level 3: one of the two shoots Fire Arrows, the other Poison Arrows. Level 4: three Mist Heavies guard the Great Portal in the courtyard.",
+		"levels": ["A Mist Ranger on each gate; every Mist Soldier 15% stronger", "Two Mist Rangers on each gate", "One shoots Fire Arrows, the other Poison Arrows", "Three Mist Heavies guard the Great Portal"]},
 	"stag_steed": {"name": "White Stag", "section": "cosmetics", "class": "chivalry", "spec": "", "price": 400, "icon": "antlers", "skin": "stag",
 		"desc": "Your horse comes as a white stag of the Valleys, the shape the Shapeshifter takes, antlers and all. It rides exactly as the horse does; only its look changes, for you and everyone you play with."},
 	"raven": {"name": "Raven", "section": "upgrades", "class": "ranger", "spec": "beastmaster", "price": 150, "icon": "raven", "pet": true,
@@ -146,17 +149,28 @@ static func color_of(id: String) -> Color:
 ## Whether a Map Upgrade works in this match: on the phone alone, if it is bought and on; in a match
 ## together, if anyone in it (not a bot) has it. Never more than once, however many have it.
 static func map_upgrade_on(id: String) -> bool:
+	return map_upgrade_level(id) > 0
+
+
+## A Map Upgrade stacks: one level for each player in the match who owns it and has it On, up to
+## MAP_LEVELS. Alone, it is Level 1 when yours is On.
+static func map_upgrade_level(id: String) -> int:
 	if not Net.active():
-		return Game.item_active(id)
-	return anyone_has(Net.roster, id)
+		return 1 if Game.item_active(id) else 0
+	return owners(Net.roster, id)
 
 
-## Whether anyone in a match's roster (a person, not a bot) brought this Map Upgrade.
-static func anyone_has(roster: Dictionary, id: String) -> bool:
+## How many people (not bots) in a match's roster brought this Map Upgrade, which is its level.
+static func owners(roster: Dictionary, id: String) -> int:
+	var n := 0
 	for peer: int in roster:
 		if not Net.is_bot(peer) and (roster[peer].get("maps", []) as Array).has(id):
-			return true
-	return false
+			n += 1
+	return mini(n, MAP_LEVELS)
+
+
+static func anyone_has(roster: Dictionary, id: String) -> bool:
+	return owners(roster, id) > 0
 
 
 static func for_class(class_id: String) -> Array[String]:

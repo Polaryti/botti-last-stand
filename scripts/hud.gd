@@ -303,6 +303,7 @@ func _draw() -> void:
 			draw_line(centre + pair * 10.0, centre + pair * 22.0, col, 3.0)
 	if player.has_power("sensor"):
 		_draw_sensor(centre)
+	_draw_grapeshot(centre)
 	_draw_marks()
 	_draw_item_name()
 	_draw_enemy_bars()
@@ -502,9 +503,9 @@ func _draw_status(s: Vector2) -> void:
 	elif Game.mode == Game.Mode.SANDBOX:
 		_clock(s, "Sandbox")
 	if player.is_riding():
-		_chip("%s %d" % [player.mount_name(), ceil(player.riding_left)], "horse", UiTheme.EMBER, Vector2(cx, y))
+		_chip("%s %d" % [player.mount_name(), ceil(player.riding_left)], player.mount_kind(), UiTheme.EMBER, Vector2(cx, y))
 	elif player.has_mount():
-		_chip("%s %d/%d" % [player.mount_name(), player.horse_progress, player.horses_needed()], "horse", UiTheme.EMBER if player.horse_ready() else UiTheme.BONE, Vector2(cx, y))
+		_chip("%s %d/%d" % [player.mount_name(), player.horse_progress, player.horses_needed()], player.mount_kind(), UiTheme.EMBER if player.horse_ready() else UiTheme.BONE, Vector2(cx, y))
 	_status_bottom = y + CHIP_H
 
 
@@ -680,17 +681,18 @@ func _draw_enemy_bars() -> void:
 	var cam := player.camera
 	var scale := size / Vector2(get_viewport().get_visible_rect().size)
 	for z: Zombie in player.world.zombies:
-		if not z.is_alive() or (z.bar_time <= 0.0 and not (z.hero and z.is_hunting())):
+		var named := z.named_bar()
+		if not z.is_alive() or (z.bar_time <= 0.0 and not (named and z.is_hunting())):
 			continue
 		var top: Vector3 = z.position + Vector3.UP * (z.height + 0.3)
 		if cam.is_position_behind(top) or top.distance_squared_to(cam.global_position) > 1600.0:
 			continue
 		var at := cam.unproject_position(top) * scale
-		var w := 112.0 if z.hero else 62.0
+		var w := 112.0 if named else 62.0
 		var r := Rect2(at - Vector2(w * 0.5, 4.0), Vector2(w, 8.0))
 		draw_rect(r.grow(2.0), Color(0, 0, 0, 0.7))
-		draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(z.hp / z.max_hp, 0.0, 1.0), r.size.y)), Color(0.72, 0.13, 0.1) if not z.hero else Color(0.72, 0.28, 0.72))
-		if z.hero:
+		draw_rect(Rect2(r.position, Vector2(r.size.x * clampf(z.hp / z.max_hp, 0.0, 1.0), r.size.y)), Color(0.72, 0.13, 0.1) if not named else Color(0.72, 0.28, 0.72))
+		if named:
 			_centered(z.display_name(), at + Vector2(0, -16.0), HUD_TEXT, Color(1.0, 0.84, 0.95))
 	# Other players and bots: their health for a moment after a hit, red for foes and green for friends.
 	for t: Target in player.world.players:
@@ -755,6 +757,42 @@ func _sensor_arrow(centre: Vector2, to: Vector3, col: Color) -> void:
 
 ## What you hold, and what it has left to throw or cast, on a chip at the bottom just left of the
 ## fighting buttons, under the swap button: where the thumb that uses it already is.
+## The Gunner's Grapeshot, without a word: under the crosshair one mark for each musket shot towards
+## it, the last glowing while it is loaded; when it goes off, a burst of ember round the crosshair,
+## fanning out like the pellets.
+const GRAPESHOT_EMBER := Color(1.0, 0.6, 0.22)
+
+func _draw_grapeshot(centre: Vector2) -> void:
+	if player.grapeshot_flash > 0.0:
+		var f := player.grapeshot_flash
+		var grow := 1.0 - f
+		draw_arc(centre, 26.0 + grow * 34.0, 0.0, TAU, 48, Color(GRAPESHOT_EMBER, f * 0.9), 3.0 + f * 3.0, true)
+		var cone := deg_to_rad(PathUpgrades.GRAPESHOT_CONE * 1.4)
+		for i in PathUpgrades.GRAPESHOT_PELLETS:
+			var k := float(i) / float(PathUpgrades.GRAPESHOT_PELLETS - 1) - 0.5
+			var ray := Vector2.UP.rotated(cone * k)
+			var from := 30.0 + grow * 30.0
+			draw_line(centre + ray * from, centre + ray * (from + 18.0 * f + 6.0), Color(GRAPESHOT_EMBER, f), 4.0, true)
+	if player.weapon_id() != "musket" or not player.has_item("grapeshot"):
+		return
+	var every := PathUpgrades.GRAPESHOT_EVERY
+	var done := player.musket_shots % every
+	var loaded := PathUpgrades.grapeshot_in(player) == 0
+	var pulse := 0.6 + sin(Time.get_ticks_msec() * 0.012) * 0.4
+	for i in every:
+		var at := centre + Vector2((float(i) - float(every - 1) * 0.5) * 14.0, 34.0)
+		var last := i == every - 1
+		if last and loaded:
+			draw_circle(at, 6.5, Color(GRAPESHOT_EMBER, pulse))
+			draw_arc(at, 9.5, 0.0, TAU, 20, Color(GRAPESHOT_EMBER, pulse * 0.7), 2.0, true)
+		elif i < done:
+			draw_circle(at, 4.5, Color(UiTheme.BONE, 0.9))
+		else:
+			draw_arc(at, 4.5, 0.0, TAU, 16, Color(UiTheme.BONE, 0.55), 1.5, true)
+	if loaded:
+		draw_arc(centre, 24.0, 0.0, TAU, 40, Color(GRAPESHOT_EMBER, pulse * 0.5), 2.0, true)
+
+
 func _draw_weapon(s: Vector2) -> void:
 	var d := player.weapon_def()
 	if d.is_empty():
@@ -919,9 +957,10 @@ func _button_glyph(id: String) -> String:
 		"tree": return "tree"
 		"sandbox": return "gear"
 		"horse":
+			var chariot := player.ride_kind() == "chariot"
 			if player.is_riding() or player.ride_behind != 0:
-				return "horseshoe"
-			return "chariot" if player.mount_kind() == "chariot" else "horse"
+				return "chariot_off" if chariot else "horseshoe"
+			return "chariot" if chariot else "horse"
 		"burst": return "burst"
 		"art": return player.art_glyph()
 		"path_art": return str(player.path_art_def().get("icon", "mist"))

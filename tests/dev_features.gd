@@ -566,6 +566,22 @@ func _beyond_weapons() -> void:
 	p._handle_fire()
 	p.input_fire = false
 	check(p.ammo_of("chakram") == 39 and p.arrows == arrows_before, "a throw spends one throw and no arrows")
+	# The last throw: the Rift Chakram is gone, its slot empty, the other weapon in hand.
+	p.own_ammo["chakram"] = 1
+	var held_with: Variant = p.slots[1 - p.current]
+	var chakram_slot := p.current
+	p._cooldown = 0.0
+	var before_last := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.spins).size()
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.spins).size() == before_last + 1, "the last throw still flies")
+	check(not p.carries("chakram") and p.slots[chakram_slot] == null and not p.own_ammo.has("chakram") and p.weapon_id() == str(held_with), "and then the Rift Chakram is gone: its slot is empty and the %s is in hand (%s)" % [str(held_with), str(p.slots)])
+	check(p.has_empty_slot() and not w.pickups.any(func(q: Pickup) -> bool: return q.weapon_id == "chakram"), "nothing is left on the ground, and the empty slot takes the next weapon")
+	# Held with none left (it should not happen), it still will not throw.
+	p.slots[chakram_slot] = "chakram"
+	p.current = chakram_slot
+	p._equip()
 	p.own_ammo["chakram"] = 0
 	p._cooldown = 0.0
 	var thrown := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.spins).size()
@@ -663,6 +679,44 @@ func _together_store_and_dawn() -> void:
 	await frames(2)
 	var list: VBoxContainer = m.panel.get_meta("list")
 	check(list.get_child_count() == 1 and m.panel.find_child("NothingLeft", true, false) == null, "with it unbought, the Cosmetics tab lists it")
+	# A class you do not own: its Class Upgrades and cosmetics are shown, locked, and cannot be bought.
+	var saved_unlocked := Game.unlocked.duplicate()
+	Game.unlocked.erase("chivalry")
+	Game.doubloons = 400
+	check(Game.item_locked("stag_steed") and not Game.buy_item("stag_steed") and Game.doubloons == 400 and not Game.owns_item("stag_steed"), "without the Chivalry class, the White Stag cannot be bought")
+	m.show_store("stag_steed", -1, "cosmetics")
+	await frames(2)
+	var locked_line := m.panel.find_child("ItemLocked", true, false) as Label
+	check(locked_line != null and locked_line.text.contains("Chivalry") and locked_line.text.contains(Game.earn_text("chivalry")) and m.panel.find_child("SeeClass", true, false) == null, "the Store says so, and how the class is earned: %s" % (locked_line.text if locked_line else "nothing"))
+	check(not (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Buy"), "and offers no Buy button")
+	m.show_armory("chivalry")
+	await frames(2)
+	check((m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Class locked" and b.disabled), "the Armory, too, says the class comes first")
+	# A class that is bought: its locked Class Upgrades lead to it in the Store.
+	var bought_class := ""
+	for item: String in ShopDefs.ITEMS:
+		var owner_class := str(ShopDefs.ITEMS[item]["class"])
+		if owner_class != "" and ClassDefs.for_sale().has(owner_class) and ClassDefs.ALL[owner_class].get("hidden", false):
+			bought_class = owner_class
+			break
+	var had_bought_class := Game.unlocked.has(bought_class)
+	Game.unlocked.erase(bought_class)
+	var its_item: String = ShopDefs.for_class(bought_class)[0]
+	m.show_store(its_item, -1, str(ShopDefs.ITEMS[its_item]["section"]))
+	await frames(2)
+	var see_class := m.panel.find_child("SeeClass", true, false) as Button
+	check(Game.item_locked(its_item) and see_class != null, "%s, locked, leads to the %s in the Store" % [its_item, bought_class])
+	if see_class:
+		see_class.pressed.emit()
+		await frames(2)
+		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == ClassDefs.ALL[bought_class]["name"]), "which opens that class's page")
+	m.show_armory(bought_class)
+	await frames(2)
+	check((m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Unlock class" and not b.disabled), "and the Armory offers to unlock it")
+	if had_bought_class:
+		Game.unlocked[bought_class] = true
+	Game.unlocked["chivalry"] = true
+	check(not Game.item_locked("stag_steed") and not Game.item_locked("mist_reinforcements"), "with the class, it is for sale; a Map Upgrade belongs to no class")
 	Game.doubloons = 399
 	check(not Game.buy_item("stag_steed"), "399 Doubloons do not buy it")
 	Game.doubloons = 400
@@ -719,9 +773,36 @@ func _together_store_and_dawn() -> void:
 	a.queue_free()
 	Game.set_item_on("stag_steed", false)
 	check(p.skin_bits() == 0, "taken off in the Armory, the horse is back")
+	# The Armory's Map Upgrades: every level written out, and a switch for each one you own.
+	Game.owned_items["mist_reinforcements"] = true
+	Game.switched_off.erase("mist_reinforcements")
+	m.show_armory("maps")
+	await frames(2)
+	var knob := m.panel.find_child("MapSwitch_mist_reinforcements", true, false) as Button
+	check(m.panel.find_child("MapUpgradesRow", true, false) != null and knob != null and (knob.find_child("Switch", true, false) as UiSwitch).on, "the Armory has a Map Upgrades section, with an On switch for Mist Reinforcements")
+	var level_lines: Array = m.panel.find_children("*", "Label", true, false).filter(func(l: Label) -> bool: return l.text.begins_with("Level "))
+	check(level_lines.size() == ShopDefs.MAP_LEVELS, "it lists all %d levels" % ShopDefs.MAP_LEVELS)
+	knob.pressed.emit()
+	check(not Game.item_active("mist_reinforcements") and Game.owns_item("mist_reinforcements") and not (knob.find_child("Switch", true, false) as UiSwitch).on and Game.map_upgrades_on().is_empty(), "switched Off there, it stays owned but you do not bring it")
+	knob.pressed.emit()
+	check(Game.item_active("mist_reinforcements"), "and On again")
+	Game.owned_items.erase("mist_reinforcements")
+	m.show_armory("maps")
+	await frames(2)
+	check(m.panel.find_child("MapSwitch_mist_reinforcements", true, false) == null and (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "In the Store"), "not owned, it has no switch, only the way to the Store")
+	# After buying, the Store's list and page start again from the top.
+	m.show_store("", -1, "upgrades")
+	await frames(2)
+	var store_list := (m.panel.get_meta("list") as Control).get_parent() as DragScroll
+	store_list.scroll_to(600.0)
+	check(store_list._pos > 0.0, "the Store's list scrolls (%.0f)" % store_list._pos)
+	m._store_to_top(m.panel)
+	await frames(2)
+	check(is_instance_valid(store_list) and store_list._pos == 0.0 and store_list.get_v_scroll_bar().value == 0.0, "and is back at the top after a purchase")
 	Game.owned_items = saved_items
 	Game.switched_off = saved_off
 	Game.doubloons = saved_doubloons
+	Game.unlocked = saved_unlocked
 	# Every Class Upgrade has its own demonstration on the Store's stage: the new six (and the stag) a
 	# scene of their own, the others the older demonstrations.
 	for id: String in ShopDefs.ITEMS:
@@ -821,10 +902,19 @@ func _maps_weather_and_balance() -> void:
 	check(not ShopDefs.map_upgrade_on("mist_reinforcements") and Game.map_upgrades_on().is_empty(), "not bought, it is off")
 	Game.owned_items["mist_reinforcements"] = true
 	check(ShopDefs.map_upgrade_on("mist_reinforcements") and Game.map_upgrades_on() == Array(["mist_reinforcements"], TYPE_STRING, "", null), "bought, it is on for a night alone")
-	# In a match together: on if anyone (not a bot) has it, and only once whoever else does.
-	check(ShopDefs.anyone_has({1: {"maps": []}, 7: {"maps": ["mist_reinforcements"]}}, "mist_reinforcements"), "in a match, one owner is enough")
-	check(ShopDefs.anyone_has({1: {"maps": ["mist_reinforcements"]}, 7: {"maps": ["mist_reinforcements"]}}, "mist_reinforcements"), "and two owners make it no stronger: it is on, once")
+	check(ShopDefs.map_upgrade_level("mist_reinforcements") == 1, "alone, it is Level 1")
+	Game.set_item_on("mist_reinforcements", false)
+	check(ShopDefs.map_upgrade_level("mist_reinforcements") == 0 and Game.map_upgrades_on().is_empty(), "switched Off, you do not bring it")
+	Game.set_item_on("mist_reinforcements", true)
+	# In a match together: a level for each person (not a bot) who brings it, up to Level 4.
+	var mr := ["mist_reinforcements"]
+	check(ShopDefs.owners({1: {"maps": []}, 7: {"maps": mr}}, "mist_reinforcements") == 1, "in a match, one owner makes it Level 1")
+	check(ShopDefs.owners({1: {"maps": mr}, 7: {"maps": mr}}, "mist_reinforcements") == 2, "two owners make it Level 2")
+	check(ShopDefs.owners({1: {"maps": mr}, 7: {"maps": mr}, 8: {"maps": mr}, 9: {"maps": mr}, 10: {"maps": mr}}, "mist_reinforcements") == ShopDefs.MAP_LEVELS and ShopDefs.MAP_LEVELS == 4, "five make it no more than Level 4")
+	check(ShopDefs.owners({1: {"maps": mr}, Net.BOT_BASE + 1: {"maps": mr}}, "mist_reinforcements") == 1, "a bot adds no level")
 	check(not ShopDefs.anyone_has({1: {"maps": []}, 7: {}}, "mist_reinforcements"), "and with no owner it is off")
+	var words_of := {2: "two", 3: "three"}
+	check(str(d["desc"]).contains("%s Mist Rangers on each gate" % words_of[Garrison.GATE_ARCHERS]) and str(d["desc"]).contains("%s Mist Heavies" % words_of[Garrison.PORTAL_HEAVIES]) and (d["levels"] as Array).size() == ShopDefs.MAP_LEVELS, "its words count the Rangers and Heavies the game sends, level by level")
 	# On Mist Bastion: a Mist Ranger on every gate, and every Mist Soldier 15% stronger.
 	var space := SubViewport.new()
 	space.own_world_3d = true
@@ -851,6 +941,39 @@ func _maps_weather_and_balance() -> void:
 	var walker: Ally = bw.allies.filter(func(a: Ally) -> bool: return a.perch == Vector3.INF and a.is_garrison()).back()
 	check(is_equal_approx(walker.hp, float(Ally.HEALTH[walker.kind]) * Garrison.REINFORCED), "the Mist Soldiers that muster have 15% more health too")
 	check(is_equal_approx(walker._garrison_power(), 1.15), "and deal 15% more")
+	# Level by level, on fresh gates.
+	var perched_at := func() -> Array:
+		return bw.allies.filter(func(a: Ally) -> bool: return a.perch != Vector3.INF and not a.dead)
+	var portal_guard := func() -> Array:
+		return bw.allies.filter(func(a: Ally) -> bool: return a.kind == "mist_heavy" and a.lane < 0 and not a.dead)
+	for level in [2, 3, 4]:
+		for a: Ally in bw.allies.duplicate():
+			if a.is_garrison():
+				a.dead = true
+		bw.garrison.set_level(level)
+		bw.garrison._man_the_gates()
+		var up: Array = perched_at.call()
+		check(up.size() == bw.fort.gates.size() * Garrison.GATE_ARCHERS, "Level %d: two Mist Rangers on each gate (%d)" % [level, up.size()])
+		var by_gate := {}
+		for a: Ally in up:
+			by_gate[a.lane] = by_gate.get(a.lane, []) + [a]
+		var pair: Array = by_gate[0]
+		check((pair[0] as Ally).perch.distance_to((pair[1] as Ally).perch) > 2.0 and absf((pair[0] as Ally).perch.y - (pair[1] as Ally).perch.y) < 0.01, "side by side along the wall (%.1f m apart)" % (pair[0] as Ally).perch.distance_to((pair[1] as Ally).perch))
+		var kinds := up.map(func(a: Ally) -> String: return a.arrow_kind)
+		if level >= 3:
+			check(kinds.count("fire") == bw.fort.gates.size() and kinds.count("poison") == bw.fort.gates.size(), "Level %d: on each gate one shoots Fire Arrows, the other Poison Arrows" % level)
+		else:
+			check(kinds.all(func(k: String) -> bool: return k == ""), "Level 2: plain arrows")
+		var guard: Array = portal_guard.call()
+		if level >= 4:
+			check(guard.size() == Garrison.PORTAL_HEAVIES and guard.all(func(a: Ally) -> bool: return a.fell_back and bw.fort.inside(a.global_position) and a.global_position.distance_to(bw.fort.heart_at) < Garrison.PORTAL_RING + 2.5), "Level 4: three Mist Heavies guard the Great Portal, in the courtyard")
+		else:
+			check(guard.is_empty(), "Level %d: no Mist Heavies at the portal yet" % level)
+	# Level 3's arrows: one sets alight, the other poisons.
+	bw.garrison_arrow(Vector3(0, 8, 0), Vector3(0, 8, 10), 10.0, "fire")
+	bw.garrison_arrow(Vector3(0, 8, 0), Vector3(0, 8, 10), 10.0, "poison")
+	var flying: Array = bw._projectiles.filter(func(pr: Projectile) -> bool: return pr.active and pr.garrison)
+	check(flying.any(func(pr: Projectile) -> bool: return pr.fire) and flying.any(func(pr: Projectile) -> bool: return pr.poison == World.GARRISON_POISON), "a Fire Arrow burns and a Poison Arrow poisons")
 	space.queue_free()
 	Game.fort_map = was_fort_map
 	Game.mode = was_mode
@@ -897,9 +1020,9 @@ func _maps_weather_and_balance() -> void:
 	p.slots = was_slots
 	p.arrows = was_arrows
 	p._equip()
-	# The Commander: Last Command every 35 s, a battle cry with bells, the Gunner's barrage on the spot.
+	# The Commander: Last Command every 35 s, a battle cry of voices alone, the Gunner's barrage on the spot.
 	check(CommanderKit.LAST_CD == 35.0 and float(CommanderKit.LAST_ART["cd"]) == 35.0, "Last Command is ready every 35 s")
-	check(Sfx.NAMES.has("command") and ResourceLoader.exists("res://assets/sounds/command.ogg"), "Command's cry is the new battle cry, with its bells")
+	check(Sfx.NAMES.has("command") and ResourceLoader.exists("res://assets/sounds/command.ogg"), "Command's cry is the new battle cry, voices without bells")
 	check(ClassDefs.ALL["commander"]["hp"] == 110.0 and not (AbilityData.tree("commander")["specs"][0]["entry"]["add"] as Dictionary).has("max_hp"), "the Warlock no longer gives up health")
 	check(float(WeaponDefs.ALL["war_staff"]["power"]) > 1.1, "and its War Staff hits harder")
 	check(CommanderKit.STORM_DPS > 0.0 and CommanderKit.STORM_STRIKE_EVERY < 1.0, "its storm hurts everything inside all the while, and strikes more often")

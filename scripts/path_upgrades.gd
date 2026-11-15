@@ -35,8 +35,9 @@ const CENSER_DPS := 10.0
 const RAT_TIDE_RATS := 8
 const RAT_TIDE_REACH := 10.0
 const RAT_TIDE_WIDTH := 1.5 # either side of its line
-const RAT_TIDE_DAMAGE := 15.0
+const RAT_TIDE_DAMAGE := 30.0
 const RAT_TIDE_STUN := 0.6
+const RAT_TIDE_POISON := Vector2(8.0, 5.0) # what the bites leave: damage per second, and seconds
 const RAT_TIDE_TIME := 0.7 # for the rats to run its length
 # Artificer
 const GREAT_KEG_EVERY := 4
@@ -223,16 +224,21 @@ static func rat_tide(p: Player) -> void:
 	p.world.spawn_rat_tide(from, dir)
 	if Net.active():
 		Net.rat_tide(from, dir)
-	var dmg := RAT_TIDE_DAMAGE * p.m("ally_damage") * p.damage_multiplier()
+	var power := p.m("ally_damage") * p.damage_multiplier()
+	var dmg := RAT_TIDE_DAMAGE * power
 	for z: Zombie in p.world.zombies_near(from + dir * RAT_TIDE_REACH * 0.5, RAT_TIDE_REACH * 0.5 + RAT_TIDE_WIDTH, 32):
 		if _on_line(z.position, from, dir):
 			z.take_damage(dmg, dir, 2.0, z.centre())
+			if z.is_alive():
+				z.add_dot(RAT_TIDE_POISON.x * power, RAT_TIDE_POISON.y)
+				Game.note_poison(RAT_TIDE_POISON.x * power * RAT_TIDE_POISON.y)
 			z.stun(RAT_TIDE_STUN)
 			p.on_hit(false)
 	for r: Target in p.world.rivals_near(from + dir * RAT_TIDE_REACH * 0.5, RAT_TIDE_REACH * 0.5 + RAT_TIDE_WIDTH):
 		if _on_line(r.global_position, from, dir):
 			p.world.hit_rival(r, dmg, from)
 			p.world.status_rival(r, Net.Status.STUN, RAT_TIDE_STUN)
+			p.world.status_rival(r, Net.Status.POISON, RAT_TIDE_POISON.y)
 	p.say("Rat Tide")
 	p.sfx("wolf", -10.0, 2.2, 0.1)
 
@@ -295,9 +301,19 @@ static func grapeshot(p: Player, start: Vector3, dir: Vector3, d: Dictionary) ->
 		var k := float(i) / (GRAPESHOT_PELLETS - 1) - 0.5
 		var spread := dir.rotated(Vector3.UP, deg_to_rad(GRAPESHOT_CONE) * k)
 		spread = spread.rotated(side, deg_to_rad(randf_range(-3.0, 3.0)))
-		p.world.spawn_player_arrow(p, start, spread * speed, 0.0, reach, 1.5, dmg)
-	p.say("Grapeshot!")
+		p.world.spawn_player_arrow(p, start, spread * speed, 0.0, reach, 1.5, dmg, true, "pellet")
+	# No word on the screen: the musket says it. Fire and burning powder fan out of the muzzle, the
+	# pellets fly as glowing iron, and the HUD's charge marks burst around the crosshair.
+	p.world.fx_grapeshot(start, dir, GRAPESHOT_CONE * 1.4, GRAPESHOT_PELLETS)
+	if Net.active():
+		Net.blast_fx(start + Vector3(dir.x, 0.0, dir.z).normalized() * 0.7, 1.0, Color(1.0, 0.6, 0.2, 0.75))
+	p.grapeshot_flash = 1.0
 	return true
+
+
+## How many musket shots until the next Grapeshot, for the HUD: 0 means the next one is.
+static func grapeshot_in(p: Player) -> int:
+	return GRAPESHOT_EVERY - 1 - p.musket_shots % GRAPESHOT_EVERY
 
 
 ## Vanguard: Command (and Last Command) put a shield on you and every friend near you.

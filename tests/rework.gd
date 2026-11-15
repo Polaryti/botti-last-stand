@@ -596,6 +596,35 @@ func _mists() -> void:
 		var hit := mw.get_world_3d().direct_space_state.intersect_ray(ray)
 		check(hit.get("collider") == enemy, "%s visible face is inside its hittable collider" % kind)
 		enemy.release()
+	# The Fallen Revenant: a Revenant's own body and gear, its claws and its blow, and the Fallen's bar.
+	check(MistModels.BORN.has("fallen_revenant") and not MistModels.KINDS.has("fallen_revenant") and Game.zombie_pool_plan().has("fallen_revenant") and Icons.exists("fallen_revenant"), "the Fallen Revenant is mist-born, with a pool and an icon, but not one of the mist's own models")
+	check(mw.spawn_zombie("fallen_revenant", mp.position + Vector3(0, 0, -1.4)), "a Fallen Revenant can spawn")
+	var fallen: Zombie = mw.zombies.back()
+	fallen.set_physics_process(false)
+	check(not fallen._custom and fallen._skeleton != null and fallen._anim != null and fallen.mist_mind != null, "it has a body with bones and animations, and still the mist's mind")
+	var ghostly := fallen._visual.find_children("*", "MeshInstance3D", true, false).filter(func(mi: MeshInstance3D) -> bool: return mi.material_override == Ally._ghost())
+	var revenant_gear := ClassGear._pieces("revenant").size()
+	check(ghostly.size() >= revenant_gear and revenant_gear > 0, "it wears the Revenant's gear and its ghostly look (%d pieces)" % ghostly.size())
+	check(fallen.weapon_id == "claws" and fallen._hand_mesh != null and float(fallen.def.get("weapon_drop", 1.0)) == 0.0, "it fights with Spectral Claws, and never drops them")
+	check(fallen.named_bar() and not fallen.hero, "it has the Fallen's long bar and name, as the Fallen Heroes do")
+	fallen._flash_on()
+	fallen._restore_materials()
+	check(fallen._parts.all(func(mi: MeshInstance3D) -> bool: return mi.material_override == mi.get_meta("own_material", null)), "after a hit's flash it is a Revenant again, not a zombie's skin")
+	fallen._sees = true
+	fallen._attack_cd = 0.0
+	fallen.mist_mind.cooldown = 99.0
+	var mp_was := mp.global_position
+	mp.global_position = fallen.position + Vector3(0, 0, 1.2)
+	var player_hp := mp.hp
+	fallen.mist_mind.tick(fallen, mp, 0.016)
+	check(fallen._current_anim == BodyAnim.mob_attack("claws") and Net.ANIMS.has(fallen._current_anim) and is_equal_approx(mp.hp, player_hp), "it swings its claws as a Revenant does, and every phone sees the swing (%s)" % fallen._current_anim)
+	fallen.hp = fallen.max_hp - 20.0
+	for i in 30:
+		fallen.mist_mind.tick(fallen, mp, 0.016)
+	check(mp.hp < player_hp and fallen.hp > fallen.max_hp - 20.0, "then the blow lands and drains life (%.0f taken)" % (player_hp - mp.hp))
+	fallen.release()
+	mp.hp = player_hp
+	mp.global_position = mp_was
 	var village_only := true
 	for i in 400:
 		village_only = village_only and not ZombieDefs.ALL[ZombieDefs.pick_roamer(550.0)].get("only_islands", false)
@@ -1205,6 +1234,7 @@ func _path_upgrades() -> void:
 	var beside := target(p.global_position + Vector3(5, 0, -6))
 	PathUpgrades.rat_tide(p)
 	check(bowled.hp < bowled.max_hp and bowled._stun > 0.0 and is_equal_approx(beside.hp, beside.max_hp), "the tide strikes what is ahead, and not what is beside it")
+	check(PathUpgrades.RAT_TIDE_DAMAGE == 30.0 and bowled.poison_left >= PathUpgrades.RAT_TIDE_POISON.y - 0.01 and beside.poison_left <= 0.0, "Rat Tide hits for 30 and poisons what it bites (%.1f s)" % bowled.poison_left)
 	check(w.get_children().any(func(n: Node) -> bool: return n is RatTide), "and the rats are seen running")
 	bowled.release()
 	beside.release()
@@ -1243,9 +1273,17 @@ func _path_upgrades() -> void:
 	check(PathUpgrades.bolt_every(p) == PathUpgrades.ARCANE_SURGE_EVERY, "Arcane Surge: a bolt every third attack")
 	pawn("commander", 1)
 	var shots: Array[bool] = []
+	var loaded: Array[int] = []
+	p.toast = ""
+	p.grapeshot_flash = 0.0
 	for k in 4:
+		loaded.append(PathUpgrades.grapeshot_in(p))
 		shots.append(PathUpgrades.grapeshot(p, p.eye_position(), -p.global_basis.z, WeaponDefs.ALL["musket"]))
 	check(shots == Array([false, false, false, true], TYPE_BOOL, "", null), "Grapeshot: every fourth musket shot")
+	check(loaded == Array([3, 2, 1, 0], TYPE_INT, "", null), "the HUD's marks count down to it: %s" % str(loaded))
+	check(p.toast == "" and p.grapeshot_flash == 1.0, "it goes off with no word on the screen, only the burst round the crosshair (toast '%s')" % p.toast)
+	var pellets := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.mesh == w._shot_mesh("pellet"))
+	check(pellets.size() == PathUpgrades.GRAPESHOT_PELLETS, "its pellets fly as glowing iron, not as musket balls (%d)" % pellets.size())
 	pawn("commander", 2)
 	CommanderKit.cast(p)
 	check(is_equal_approx(p.ward_hp, PathUpgrades.SHIELD_WALL_AMOUNT) and p.status_effects().any(func(e: Dictionary) -> bool: return str(e["icon"]).begins_with("shield_round")), "Command raises a Shield Wall, and the status bar shows it")

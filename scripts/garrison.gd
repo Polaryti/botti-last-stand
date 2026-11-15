@@ -12,15 +12,24 @@ const HEAVY_FROM := 180.0
 const ORDER := ["mist_infantry", "mist_ranger", "mist_heavy"]
 const NAMES := {"mist_infantry": "Mist Infantry", "mist_ranger": "Mist Ranger", "mist_heavy": "Mist Heavy"}
 ## Mist Reinforcements (a Map Upgrade): every Mist Soldier this much stronger, and a Mist Ranger on
-## top of each gate.
+## top of each gate. It has levels, one for each player in the match who brings it (ShopDefs.MAP_LEVELS):
+## Level 2 puts GATE_ARCHERS Rangers on each gate, Level 3 gives those two Fire and Poison Arrows, and
+## Level 4 sets PORTAL_HEAVIES Mist Heavies to guard the Great Portal in the courtyard.
 const REINFORCED := 1.15
 const REINFORCEMENTS := "mist_reinforcements"
+const GATE_ARCHERS := 2
+const ARCHERS_APART := 2.6 # metres between the two Rangers on a gate, along its wall
+const ARCHER_ARROWS := ["fire", "poison"] # Level 3: what each of a gate's two Rangers shoots
+const PORTAL_HEAVIES := 3
+const PORTAL_RING := 4.5 # how far from the portal they stand
 
 var world: World
 var next_at := FIRST
 var _turns := {} # gate -> how many have stepped out on that lane
 var _announced := false
 var reinforced := false
+## Mist Reinforcements' level in this match: 0 without it, up to ShopDefs.MAP_LEVELS.
+var level := 0
 var _archers_up := false
 ## How much stronger (damage and health) every Mist Soldier is.
 var power := 1.0
@@ -28,7 +37,12 @@ var power := 1.0
 
 func _init(owner_world: World) -> void:
 	world = owner_world
-	reinforced = ShopDefs.map_upgrade_on(REINFORCEMENTS)
+	set_level(ShopDefs.map_upgrade_level(REINFORCEMENTS))
+
+
+func set_level(n: int) -> void:
+	level = clampi(n, 0, ShopDefs.MAP_LEVELS)
+	reinforced = level > 0
 	power = REINFORCED if reinforced else 1.0
 
 
@@ -86,13 +100,43 @@ func tick(elapsed: float) -> void:
 		world.director.show_banner("Mist Soldiers step out of the waystones to hold the lanes", 3.5)
 
 
-## Mist Reinforcements: a Mist Ranger on top of every gate, there all night, shooting down the lane.
+## Mist Reinforcements: Mist Rangers on top of every gate, there all night, shooting down the lane;
+## from Level 4, Mist Heavies around the portal as well.
 func _man_the_gates() -> void:
+	var archers := GATE_ARCHERS if level >= 2 else 1
 	for gate in world.fort.gates.size():
 		var g: Dictionary = world.fort.gates[gate]
-		var top: Vector3 = (g["at"] as Vector3) + Vector3.UP * Fort.WALL_H - (g["dir"] as Vector3) * 0.2
-		var a := world.spawn_garrison("mist_ranger", gate, top, top)
-		a.perch = top
-		a.global_position = top
-		world.fx_blast(top + Vector3.UP, 1.2, Color(0.45, 0.95, 0.92, 0.6))
-	world.director.show_banner("Mist Reinforcements: a Mist Ranger stands on every gate", 3.5)
+		var out: Vector3 = g["dir"]
+		var along := out.cross(Vector3.UP).normalized()
+		var top: Vector3 = (g["at"] as Vector3) + Vector3.UP * Fort.WALL_H - out * 0.2
+		for i in archers:
+			var spot := top + along * ARCHERS_APART * (float(i) - float(archers - 1) * 0.5)
+			var a := world.spawn_garrison("mist_ranger", gate, spot, spot)
+			a.perch = spot
+			a.global_position = spot
+			a.arrow_kind = ARCHER_ARROWS[i] if level >= 3 else ""
+			world.fx_blast(spot + Vector3.UP, 1.2, Color(0.45, 0.95, 0.92, 0.6))
+	if level >= 4:
+		_guard_the_portal()
+	world.director.show_banner(banner(), 3.5)
+
+
+## Level 4: Mist Heavies in the courtyard, around the portal, for whatever gets inside.
+func _guard_the_portal() -> void:
+	var heart := world.fort.heart_at
+	for i in PORTAL_HEAVIES:
+		var turn := TAU * float(i) / float(PORTAL_HEAVIES) + PI / 4.0
+		var spot := heart + Vector3(sin(turn), 0.0, cos(turn)) * PORTAL_RING
+		var a := world.spawn_garrison("mist_heavy", -1, spot, spot)
+		a.post = a.global_position
+		a.fell_back = true # its place is the portal, and what it fights is whatever is inside
+		world.fx_blast(a.global_position + Vector3.UP, 1.6, Color(0.45, 0.95, 0.92, 0.6))
+
+
+## What the night says when the Reinforcements arrive, by level.
+func banner() -> String:
+	match level:
+		1: return "Mist Reinforcements: a Mist Ranger stands on every gate"
+		2: return "Mist Reinforcements, Level 2: two Mist Rangers stand on every gate"
+		3: return "Mist Reinforcements, Level 3: Fire and Poison Arrows from every gate"
+	return "Mist Reinforcements, Level 4: Mist Heavies guard the Great Portal"

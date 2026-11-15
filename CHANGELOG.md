@@ -2,6 +2,22 @@
 
 ## Development — Beyond the Mists, upgrades for every path
 
+### Store and Armory
+- After you buy something, the Store goes back to the top of its list.
+- Class Upgrades and cosmetics of a class you don't own are locked: shown last in their tab, with no Buy button, and a way to the class (or how to earn it).
+- The Armory has a Map Upgrades section above the classes: every level of each Map Upgrade, and an On/Off switch for the ones you own. Switched Off, you don't bring it to your matches.
+- The Armory no longer repeats the class's description under its weapon tags, so the paths and their Class Upgrades sit higher.
+
+### Classes and weapons
+- The Mechanic's buttons and counters show a chariot: the kills still needed, the button that brings it, the one to get down, and its time left.
+- Grapeshot no longer says "Grapeshot!": its pellets fly as glowing iron, burning powder fans out of the muzzle, and a burst of ember rings the crosshair.
+- A Rift Chakram is gone once its last throw is spent, and its slot is left empty.
+
+### Enemies
+- The Fallen Revenant is a Revenant to look at, with the class's own gear, its Spectral Claws and its swing, and a named health bar like the Fallen Heroes. Its mist leap and life drain are unchanged.
+- Children of the Woods, on foot or riding, leave either their weapon or a bundle of arrows when they fall, each half the time.
+- On Mist Bastion, enemies walking up their lane look ahead, not at someone they only see beside it. They turn to whoever they strike or shoot.
+
 ### New Class Upgrades
 Every path of the Revenant, the Monk, the Plague Doctor, the Artificer and the Commander now has a Class Upgrade in the Store. Each has its own scene there, played with the class's own body and weapon. Bots on those paths use them too.
 - **Revenant.**
@@ -15,21 +31,21 @@ Every path of the Revenant, the Monk, the Plague Doctor, the Artificer and the C
 - **Plague Doctor.**
   - Healing Mist (Apothecary, 260): Healing Tonic leaves a cloud within 4 m for 6 s. Friends in it heal 5 a second and stop burning, bleeding and being poisoned.
   - Plague Censer (Pestilence, 280): a new ability. For 6 s a plague cloud follows you, 5 m around, slowing and poisoning enemies for 10 a second. Every 25 s.
-  - Rat Tide (Rat King, 280): a new ability. 8 rats pour out 10 m ahead, and every enemy in the way takes 15 and is knocked down for 0.6 s. Every 20 s.
+  - Rat Tide (Rat King, 280): a new ability. 8 rats pour out 10 m ahead, and every enemy in the way takes 30, is knocked down for 0.6 s and is poisoned for 8 damage a second for 5 s. Every 20 s.
 - **Artificer.**
   - Great Keg (Pyromaniac, 260): every fourth Incendiary Bomb is a keg with twice the reach and damage.
   - Field Turret (Mechanic, 280): a new ability that sets down a Clockwork Sentry for 20 s. Every 35 s.
   - Tesla Coil (Inventor, 280): a new invention, and the first one the bag gives. It zaps the 4 nearest enemies within 8 m every 0.5 s for 6 s, 12 damage each zap.
 - **Commander.**
   - Arcane Surge (Warlock, 300): the empowered bolt comes every third attack instead of every fifth.
-  - Grapeshot (Gunner, 300): every fourth musket shot is 6 pellets of 20 base damage in a cone.
+  - Grapeshot (Gunner, 300): every fourth musket shot is 6 pellets of 20 base damage in a cone. Four marks under the crosshair count the shots to it; the last glows when it is loaded.
   - Shield Wall (Vanguard, 300): Command and Last Command shield you and friends within 10 m. The next 40 damage each takes within 8 s is stopped, and the status row shows it.
 - **Horse Archer.** Wild Hunt (320) replaces Whistle. On foot, your horse comes at once; then for 6 s an arrow flies every 0.4 s at the nearest enemy within 22 m, without spending arrows, while you ride and shoot as usual. Every 40 s. Whoever bought Whistle has Wild Hunt.
 - Two upgrades were renamed so they don't clash with existing abilities: the Pyromaniac's keg is the Great Keg (the Trapper already has Powder Keg), and the Rift Traveller's is Torn Rifts (beside Rift Scar).
 
 ### Map Upgrades
-- A new Store tab for things that change a place for everyone in the match. If anyone in the match (not a bot) owns one, it works once for that match, however many own it.
-- Mist Reinforcements (Mist Bastion, 2,200 Doubloons): a Mist Ranger with a bow stands on top of every gate all night, and every Mist Soldier deals 15% more damage and has 15% more health.
+- A new Store tab for things that change a place for everyone in the match. They stack: each player in the match (not a bot) who owns one and has it On adds a level, up to Level 4.
+- Mist Reinforcements (Mist Bastion, 2,200 Doubloons). Level 1: a Mist Ranger with a bow stands on top of every gate all night, and every Mist Soldier deals 15% more damage and has 15% more health. Level 2: two Mist Rangers on every gate. Level 3: one of the two shoots Fire Arrows and the other Poison Arrows. Level 4: three Mist Heavies guard the Great Portal in the courtyard.
 
 ### Redeem codes
 - A new code pays 2,000 Botti Doubloons each time it is entered.
@@ -39,7 +55,7 @@ Every path of the Revenant, the Monk, the Plague Doctor, the Artificer and the C
 
 ### Commander
 - Last Command is ready every 35 s, down from 60 s.
-- Command's cry is now a company answering its officer, with a peal of bells climbing to the octave.
+- Command's cry is now a company answering its officer: voices only, with no bells.
 - Gunner: the artillery circle starts on you, and "Call barrage" works at once; tap the map only to move the circle.
 - Warlock: no longer loses 30 health, and the War Staff hits harder (power 1.4, up from 1.1). Last Command's storm deals 12 damage a second to every enemy inside, and its lightning strikes twice a second instead of once.
 
@@ -47,7 +63,7 @@ Every path of the Revenant, the Monk, the Plague Doctor, the Artificer and the C
 - The Mists have no rain or storms.
 - About one night in ten in the Valleys of Mesenlla and on Mist Bastion is windy: pale streaks of wind and tumbling leaves blow past wherever you are, with a breeze to hear. The Sandbox can turn it on too.
 - Tents have sloping sides as steep as their canvas, so neither players nor creatures can climb on top of them any more.
-- Network protocol 51: older builds cannot join newer ones.
+- Network protocol 52: older builds cannot join newer ones.
 
 ## Development — Beyond the Mists, on show
 

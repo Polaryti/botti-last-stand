@@ -800,7 +800,7 @@ OO = ((320, 0.18, 1.0), (800, 0.16, 0.45), (2300, 0.1, 0.12))
 
 def command():
     """Command and Last Command: a company answering its officer, "hoo-RAAH!", five throats rising
-    together, and a peal of bells under it climbing a major chord to the octave."""
+    together. Voices only: no bells under it."""
     total = n(2.4)
     out = np.zeros(total)
     for k, (base, lag) in enumerate(((150, 0.0), (172, 0.02), (196, 0.035), (133, 0.05), (220, 0.06))):
@@ -816,13 +816,7 @@ def command():
         b = start + n(0.27)
         out[b:b + rah_m] += rah
     voices = lowp(out, 4200) * 0.6
-    # The bells: C, E, G and the high C, struck in turn as the cry peaks, ringing on after it.
-    bells = np.zeros(total)
-    for f, at, gain in ((523.25, 0.3, 0.5), (659.25, 0.45, 0.45), (783.99, 0.6, 0.45), (1046.5, 0.8, 0.6)):
-        ring = metal(f, 1.6, 1.5, ((1, 1), (2.0, 0.45), (3.01, 0.22), (4.16, 0.12))) * env(n(1.5), 0.002, 1.0)
-        a = n(at)
-        bells[a:a + len(ring)] += ring[:total - a] * gain
-    return reverb(voices + bells * 0.32, 1.6, 0.35)
+    return reverb(voices, 1.6, 0.35)
 
 
 # --- Weather ---------------------------------------------------------------------------------

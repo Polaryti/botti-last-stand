@@ -166,7 +166,7 @@ static func facts() -> Dictionary:
 		"item:grave_call": [float(UpgradeKit.GRAVE_RAISED), UpgradeKit.GRAVE_REACH, UpgradeKit.GRAVE_RECENT, UpgradeKit.GRAVE_TIME],
 		"item:frost_nova": [UpgradeKit.NOVA_RADIUS, UpgradeKit.NOVA_DAMAGE, UpgradeKit.NOVA_FREEZE],
 		"item:hall_of_mirrors": [UpgradeKit.MIRROR_REST],
-		"item:mist_reinforcements": [pct(Garrison.REINFORCED - 1.0)],
+		"item:mist_reinforcements": [pct(Garrison.REINFORCED - 1.0)] + range(1, ShopDefs.MAP_LEVELS + 1).map(func(n: int) -> float: return float(n)),
 		"item:wild_hunt": [UpgradeKit.HUNT_TIME, UpgradeKit.HUNT_EVERY, UpgradeKit.HUNT_REACH],
 		"item:mist_wake": [PathUpgrades.MIST_WAKE_RADIUS * 2.0, PathUpgrades.MIST_WAKE_TIME, PathUpgrades.MIST_WAKE_DPS],
 		"item:torn_rifts": [PathUpgrades.TORN_RIFT_DAMAGE, PathUpgrades.TORN_RIFT_RADIUS],
@@ -176,7 +176,7 @@ static func facts() -> Dictionary:
 		"item:avalanche": [PathUpgrades.AVALANCHE_DELAY, PathUpgrades.AVALANCHE_STUN],
 		"item:healing_mist": [PathUpgrades.HEALING_MIST_RADIUS, PathUpgrades.HEALING_MIST_TIME, PathUpgrades.HEALING_MIST_HEAL],
 		"item:plague_censer": [PathUpgrades.CENSER_TIME, PathUpgrades.CENSER_RADIUS, PathUpgrades.CENSER_DPS],
-		"item:rat_tide": [float(PathUpgrades.RAT_TIDE_RATS), PathUpgrades.RAT_TIDE_REACH, PathUpgrades.RAT_TIDE_DAMAGE, PathUpgrades.RAT_TIDE_STUN],
+		"item:rat_tide": [float(PathUpgrades.RAT_TIDE_RATS), PathUpgrades.RAT_TIDE_REACH, PathUpgrades.RAT_TIDE_DAMAGE, PathUpgrades.RAT_TIDE_STUN, PathUpgrades.RAT_TIDE_POISON.x, PathUpgrades.RAT_TIDE_POISON.y],
 		"item:field_turret": [PathUpgrades.FIELD_TURRET_TIME],
 		"item:tesla_coil": [float(PathUpgrades.TESLA_TARGETS), PathUpgrades.TESLA_REACH, PathUpgrades.TESLA_EVERY, PathUpgrades.TESLA_TIME, PathUpgrades.TESLA_DAMAGE],
 		"item:grapeshot": [float(PathUpgrades.GRAPESHOT_PELLETS), PathUpgrades.GRAPESHOT_DAMAGE],
@@ -245,5 +245,6 @@ func run() -> Array[String]:
 			_audit(str(ab["id"]), str(ab["desc"]), [ab["add"], ab["on"], WorldLight.ARTS.get(ab["id"], {}), BanditKit.ARTS.get(ab["id"], {})])
 	for id: String in ShopDefs.ITEMS:
 		var item: Dictionary = ShopDefs.ITEMS[id]
-		_audit("item:" + id, str(item["desc"]), [item.get("art", {}), item.get("effect", {})])
+		# A Map Upgrade's levels, as the Armory lists them, are held to the same numbers.
+		_audit("item:" + id, str(item["desc"]) + " " + " ".join(PackedStringArray(item.get("levels", []))), [item.get("art", {}), item.get("effect", {})])
 	return failures

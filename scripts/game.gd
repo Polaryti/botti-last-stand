@@ -155,9 +155,15 @@ func item_active(id: String) -> bool:
 	return owned_items.has(id) and not switched_off.has(id)
 
 
+## A Class Upgrade or cosmetic of a class you do not own cannot be bought yet: own the class first.
+func item_locked(id: String) -> bool:
+	var whose_class := str(ShopDefs.ITEMS[id].get("class", ""))
+	return whose_class != "" and not owns_class(whose_class)
+
+
 func buy_item(id: String) -> bool:
 	var price := int(ShopDefs.ITEMS[id]["price"])
-	if owned_items.has(id) or doubloons < price:
+	if owned_items.has(id) or doubloons < price or item_locked(id):
 		return false
 	doubloons -= price
 	owned_items[id] = true
