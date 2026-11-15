@@ -3517,11 +3517,13 @@ func test_beyond_review() -> void:
 	await seconds(0.3)
 	ok(notes != null and notes.self_modulate != Color.WHITE, "and it does glow (%s)" % (str(notes.self_modulate) if notes else "-"))
 	m.show_changelog()
+	# Built at once: the newest version's first changes; the rest follow a few each frame.
+	var lines: int = m.panel.find_children("*", "RichTextLabel", true, false).size()
 	await frames(2)
 	ok(Game.changelog_seen == ChangelogPanel.signature(), "opening the Changelog reads them")
-	var lines: int = m.ui_layer.find_children("*", "RichTextLabel", true, false).size()
 	await frames(30)
-	ok(m.ui_layer.find_children("*", "RichTextLabel", true, false).size() > lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, m.ui_layer.find_children("*", "RichTextLabel", true, false).size()])
+	var all_lines: int = m.panel.find_children("*", "RichTextLabel", true, false).size()
+	ok(lines < all_lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, all_lines])
 	m.show_menu()
 	await frames(2)
 	notes = m.ui_layer.find_child("ChangelogButton", true, false) as Button

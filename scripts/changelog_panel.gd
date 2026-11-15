@@ -112,7 +112,8 @@ static func parse(text: String) -> Array[Dictionary]:
 	return out
 
 
-## The notes as versions: {number, name, date, parts: [{title, category, entries}]}.
+## The notes as versions: {number, name, date, intro, parts: [{title, category, entries}]}. Lines of
+## text before a version's first part are its intro, shown above its cards rather than in one.
 static func versions(entries: Array[Dictionary]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for e: Dictionary in entries:
@@ -126,6 +127,9 @@ static func versions(entries: Array[Dictionary]) -> Array[Dictionary]:
 				if out.is_empty():
 					continue
 				var parts: Array = out.back()["parts"]
+				if parts.is_empty() and e["kind"] == "text":
+					(out.back()["intro"] as Array).append(str(e["text"]))
+					continue
 				if parts.is_empty():
 					parts.append({"title": "Changes", "category": OTHER, "entries": []})
 				(parts.back()["entries"] as Array).append(e)
@@ -149,7 +153,7 @@ static func _version_head(text: String) -> Dictionary:
 		else:
 			date = number.substr(open + 2, number.length() - open - 3)
 			number = number.substr(0, open)
-	return {"number": number, "name": name, "date": date, "parts": []}
+	return {"number": number, "name": name, "date": date, "intro": [], "parts": []}
 
 
 ## What a part is about, from its heading (CATEGORIES).
@@ -245,6 +249,10 @@ func show_version(i: int) -> void:
 	head.add_child(_text(title, UiTheme.FS_HEAD, UiTheme.BONE, UiTheme.title_font(), true))
 	var meta := "In development, not yet released" if developing else ("Version %s" % v["number"] + (", %s" % v["date"] if str(v["date"]) != "" else ""))
 	head.add_child(_text(meta, UiTheme.FS_SMALL, UiTheme.TWILIGHT if developing else UiTheme.ASH))
+	for line: String in v["intro"]:
+		var intro := _rich(line, UiTheme.BONE)
+		intro.name = "Intro"
+		head.add_child(intro)
 	# The count by kind: a chip for each.
 	var tally := {}
 	for part: Dictionary in v["parts"]:
@@ -394,6 +402,8 @@ func _rich(text: String, col: Color) -> RichTextLabel:
 	r.add_theme_font_size_override("normal_font_size", UiTheme.FS_BODY)
 	r.add_theme_font_size_override("bold_font_size", UiTheme.FS_BODY)
 	r.add_theme_font_override("bold_font", UiTheme.bold_font())
+	r.add_theme_font_override("italics_font", _italics())
+	r.add_theme_font_size_override("italics_font_size", UiTheme.FS_BODY)
 	r.add_theme_color_override("default_color", col)
 	r.text = bbcode(text)
 	return r
@@ -422,20 +432,39 @@ static func brief(text: String) -> String:
 	return gist if gist.length() < text.length() - 20 else text
 
 
-## Markdown's **bold** as BBCode, with any square brackets in the words kept as they are.
+## Markdown's **bold** and *italics* as BBCode, with any square brackets in the words kept as they are.
 static func bbcode(text: String) -> String:
 	var safe := text.replace("[", "[lb]")
 	var out := ""
 	var bold := false
+	var italic := false
 	var parts := safe.split("**")
 	for i in parts.size():
 		if i > 0:
 			out += "[/color][/b]" if bold else "[b][color=#ffffff]"
 			bold = not bold
-		out += parts[i]
+		var bits := parts[i].split("*")
+		for k in bits.size():
+			if k > 0:
+				out += "[/i]" if italic else "[i]"
+				italic = not italic
+			out += bits[k]
+	if italic:
+		out += "[/i]"
 	if bold:
 		out += "[/color][/b]"
 	return out
+
+
+static var _slanted: FontVariation
+
+## The body font slanted, for *italics*.
+static func _italics() -> Font:
+	if _slanted == null:
+		_slanted = FontVariation.new()
+		_slanted.base_font = load("res://assets/fonts/FiraSans-Medium.ttf")
+		_slanted.variation_transform = Transform2D(Vector2(1.0, 0.0), Vector2(0.2, 1.0), Vector2.ZERO)
+	return _slanted
 
 
 func _text(t: String, fs: int, col: Color, font: Font = null, wrap := false) -> Label:

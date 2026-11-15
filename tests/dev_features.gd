@@ -1361,7 +1361,8 @@ func _wilds_of_mesenlla() -> void:
 ## The Changelog in cards by kind, and where the places beyond the Mists sit on the map.
 func _changelog_and_atlas() -> void:
 	var vs := ChangelogPanel.versions(ChangelogPanel.notes())
-	check(vs.size() > 10 and str(vs[0]["number"]).begins_with("Development") and ChangelogPanel.count(vs[0]) > 20, "the Changelog reads every version, newest first")
+	var current := str(ProjectSettings.get_setting("application/config/version")).get_slice("-dev.", 0)
+	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > 20, "the Changelog reads every version, newest first")
 	var released: Dictionary = vs.filter(func(v: Dictionary) -> bool: return str(v["number"]) == "0.21.4")[0]
 	check(released["name"] == "A Portal Worth Defending" and released["date"] == "11 November 2026", "with each version's name and date")
 	check(ChangelogPanel.category("Fixes")[1] == "Fixes" and ChangelogPanel.category("The wilds of Mesenlla")[1] == "Enemies" and ChangelogPanel.category("Spectator Mode")[1] == "Playing together", "each part is marked by what it is about")
@@ -1370,6 +1371,9 @@ func _changelog_and_atlas() -> void:
 	var long := "**Lead words.** " + "A first sentence that runs on for a while. ".repeat(6)
 	check(ChangelogPanel.brief(long).length() < long.length() and ChangelogPanel.brief(long).begins_with("**Lead words.**"), "a long change shows its gist first")
 	check(ChangelogPanel.bbcode("**Bold** and [square]") == "[b][color=#ffffff]Bold[/color][/b] and [lb]square]", "bold stands out; brackets stay as written")
+	check(ChangelogPanel.bbcode("*Once upon a time.* **Then** this") == "[i]Once upon a time.[/i] [b][color=#ffffff]Then[/color][/b] this", "italics too")
+	var told := ChangelogPanel.versions(ChangelogPanel.parse("## 1.0.0 — Told (1 January 2027)\n\n*A story.* What came.\n\n### Fixes\n- One.\n"))
+	check((told[0]["intro"] as Array) == ["*A story.* What came."] and (told[0]["parts"] as Array).size() == 1 and told[0]["parts"][0]["title"] == "Fixes", "words before a version's first part are its intro, not a card of their own")
 	var m := Main.new()
 	add_child(m)
 	await frames(2)
@@ -1378,6 +1382,8 @@ func _changelog_and_atlas() -> void:
 	var page := m.panel as ChangelogPanel
 	var cards := func() -> int: return page._body.get_children().filter(func(n: Node) -> bool: return n.has_meta("list")).size()
 	check(page._rail.get_child_count() == vs.size() and cards.call() == (vs[0]["parts"] as Array).size(), "the screen lists the versions and shows the newest in cards (%d)" % cards.call())
+	var intros := page._body.find_children("Intro", "RichTextLabel", true, false)
+	check(intros.size() == (vs[0]["intro"] as Array).size() and (intros.is_empty() or (intros[0] as RichTextLabel).get_parsed_text().length() > 40), "with its intro over its cards")
 	page.show_version(1)
 	await frames(2)
 	check(cards.call() == (vs[1]["parts"] as Array).size(), "and another version when it is chosen (%d)" % cards.call())
