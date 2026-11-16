@@ -702,14 +702,17 @@ func add_window_xf(t: Transform3D, size: Vector3) -> void:
 	_windows.add_child(cs)
 
 
-func add_barrier(at: Vector3, size: Vector3) -> void:
+## An unseen wall that stops bodies. With closes_paths, nothing paths through it either (pass false for
+## one high off the ground, over ground that stays open below, such as over a gateway).
+func add_barrier(at: Vector3, size: Vector3, closes_paths := true) -> void:
 	var shape := BoxShape3D.new()
 	shape.size = size
 	var cs := CollisionShape3D.new()
 	cs.shape = shape
 	cs.position = at
 	_barriers.add_child(cs)
-	grid.block_box(at, size)
+	if closes_paths:
+		grid.block_box(at, size)
 
 
 ## A flock takes turns, so there is always time to deal with the crow that is coming.

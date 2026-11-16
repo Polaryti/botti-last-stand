@@ -38,6 +38,7 @@ func _ready() -> void:
 	await _beyond_weapons()
 	await _together_store_and_dawn()
 	await _maps_weather_and_balance()
+	await _requests_1116()
 	await _feedback_and_numbers()
 	await _wilds_of_mesenlla()
 	_text_audit()
@@ -629,6 +630,8 @@ func _beyond_weapons() -> void:
 	var m := Main.new()
 	add_child(m)
 	await frames(2)
+	var had_magician := Game.unlocked.has("magician")
+	Game.unlocked["magician"] = true # the Armory shows a class's details only once it is yours
 	for id: String in ["infantry", "magician"]:
 		var want := ClassDefs.weapon_categories(id).map(func(c: String) -> String: return WeaponDefs.CATEGORY_NAMES[c])
 		m.show_class_picker(Game.Mode.NIGHT)
@@ -639,6 +642,8 @@ func _beyond_weapons() -> void:
 		m._fill_armory(m.panel.get_meta("detail"), id)
 		check(_tag_texts(m.panel) == want, "Armory tags for %s" % id)
 		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text.begins_with(ClassPresentation.stats_line(id))), "Armory stat line for %s" % id)
+	if not had_magician:
+		Game.unlocked.erase("magician")
 	var codex := CodexPanel.new()
 	add_child(codex)
 	codex._list = VBoxContainer.new()
@@ -693,7 +698,8 @@ func _together_store_and_dawn() -> void:
 	check(not (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Buy"), "and offers no Buy button")
 	m.show_armory("chivalry")
 	await frames(2)
-	check((m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Class locked" and b.disabled), "the Armory, too, says the class comes first")
+	var armory_says := m.panel.find_child("UnlockRequirement", true, false) as Label
+	check(armory_says != null and armory_says.text == Game.earn_text("chivalry") and m.panel.find_child("ToStore", true, false) == null, "the Armory, too, shows the class locked, and how it is earned")
 	# A class that is bought: its locked Class Upgrades lead to it in the Store.
 	var bought_class := ""
 	for item: String in ShopDefs.ITEMS:
@@ -714,7 +720,26 @@ func _together_store_and_dawn() -> void:
 		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == ClassDefs.ALL[bought_class]["name"]), "which opens that class's page")
 	m.show_armory(bought_class)
 	await frames(2)
-	check((m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Unlock class" and not b.disabled), "and the Armory offers to unlock it")
+	var locked_page := m.panel.find_child("LockedClass", true, false)
+	var requirement := m.panel.find_child("UnlockRequirement", true, false) as Label
+	check(locked_page != null and requirement != null and requirement.text == m.armory_unlock_text(bought_class) and requirement.text.contains(str(ClassDefs.price(bought_class))), "in the Armory, a class you don't own is locked and says only how to unlock it: %s" % (requirement.text if requirement else "nothing"))
+	check(m.panel.find_children("*", "ModelView", true, false).is_empty() and m.panel.find_child("CosmeticsSection", true, false) == null and not (m.panel.find_children("*", "Label", true, false) as Array).any(func(l: Label) -> bool: return l.text == ClassPresentation.COPY[bought_class][0]), "with nothing else of it shown: no model, description, paths or tabs")
+	var to_store := m.panel.find_child("ToStore", true, false) as Button
+	check(to_store != null, "and, sold in the Store, a button straight to it there")
+	if to_store:
+		to_store.pressed.emit()
+		await frames(2)
+		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == ClassDefs.ALL[bought_class]["name"]) and (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Buy" or b.text.begins_with("Need ")), "which opens the class in the Store, to buy")
+	var earned_class := ""
+	for c: String in ClassDefs.ALL:
+		if ClassDefs.ALL[c].has("earned") and not Game.owns_class(c):
+			earned_class = c
+			break
+	if earned_class != "":
+		m.show_armory(earned_class)
+		await frames(2)
+		var earned_req := m.panel.find_child("UnlockRequirement", true, false) as Label
+		check(earned_req != null and earned_req.text == Game.earn_text(earned_class) and m.panel.find_child("ToStore", true, false) == null, "a class earned in play shows how to earn it, with no Store button (%s)" % earned_class)
 	if had_bought_class:
 		Game.unlocked[bought_class] = true
 	Game.unlocked["chivalry"] = true
@@ -819,15 +844,26 @@ func _together_store_and_dawn() -> void:
 	m.show_armory("maps")
 	await frames(2)
 	check(m.panel.find_child("MapSwitch_mist_reinforcements", true, false) == null and (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "In the Store"), "not owned, it has no switch, only the way to the Store")
-	# After buying, the Store's list and page start again from the top.
+	# After buying, the Store's list stays where it was, on what came after the thing bought.
+	for c: String in ClassDefs.ALL:
+		Game.unlocked[c] = true
+	Game.doubloons = 100000
 	m.show_store("", -1, "upgrades")
 	await frames(2)
 	var store_list := (m.panel.get_meta("list") as Control).get_parent() as DragScroll
 	store_list.scroll_to(600.0)
-	check(store_list._pos > 0.0, "the Store's list scrolls (%.0f)" % store_list._pos)
-	m._store_to_top(m.panel)
-	await frames(2)
-	check(is_instance_valid(store_list) and store_list._pos == 0.0 and store_list.get_v_scroll_bar().value == 0.0, "and is back at the top after a purchase")
+	await frames(1)
+	var was_at := float(store_list.scroll_vertical)
+	check(was_at > 300.0, "the Store's list scrolls (%.0f)" % was_at)
+	var on_sale: Array = m.panel.get_meta("store_ids")
+	var middle := on_sale.size() / 2
+	var buying := str(on_sale[middle])
+	check(Game.buy_item(buying), "buying %s" % buying)
+	m.show_store("", -1, "upgrades", Callable(), buying)
+	await frames(3)
+	var after_list := (m.panel.get_meta("list") as Control).get_parent() as DragScroll
+	check(absf(float(after_list.scroll_vertical) - was_at) < 2.0, "after buying, the list stays where it was (%.0f, was %.0f)" % [after_list.scroll_vertical, was_at])
+	check((m.panel.find_children("*", "Label", true, false) as Array).any(func(l: Label) -> bool: return l.text == ShopDefs.ITEMS[str(on_sale[middle + 1])]["name"] and not after_list.is_ancestor_of(l)), "and the page beside it shows what came next (%s)" % ShopDefs.ITEMS[str(on_sale[middle + 1])]["name"])
 	Game.owned_items = saved_items
 	Game.switched_off = saved_off
 	Game.doubloons = saved_doubloons
@@ -966,7 +1002,9 @@ func _maps_weather_and_balance() -> void:
 	first._physics_process(0.5)
 	check(first.global_position.distance_to(first.perch) < 0.05, "and stays up there")
 	# Its two bows: the Long Bow for what comes up the lane, the Crossbow for what is at the gate.
-	check(first.hand == "longbow" and first._back_mesh != null and first._back_mesh.visible and first._back_mesh.mesh == WeaponDefs.mesh("crossbow"), "it holds a Long Bow, with a Crossbow slung on its back")
+	var held := first._hand_mesh as WeaponVisual
+	check(first.hand == "longbow" and held != null and held.weapon == "longbow" and is_equal_approx(held.body_size, WeaponDefs.held_size("longbow")), "it holds a Long Bow, at a player's size (%.2f)" % (held.body_size if held else 0.0))
+	check(first.find_children("*", "MeshInstance3D", true, false).filter(func(mi: MeshInstance3D) -> bool: return mi.mesh == WeaponDefs.mesh("crossbow") or mi.mesh == WeaponDefs.mesh("bow")).is_empty(), "and nothing else: no second bow on it")
 	var gate: Dictionary = bw.fort.gates[first.lane]
 	var out: Vector3 = gate["dir"]
 	for z: Zombie in bw.zombies.duplicate():
@@ -981,7 +1019,9 @@ func _maps_weather_and_balance() -> void:
 	var before := bw._projectiles.filter(func(pr: Projectile) -> bool: return pr.active and pr.garrison).size()
 	first._tick_perch(0.016)
 	var bolts := bw._projectiles.filter(func(pr: Projectile) -> bool: return pr.active and pr.garrison)
-	check(first.hand == "crossbow" and first._back_mesh.mesh == WeaponDefs.mesh("longbow"), "what is at the foot of its gate gets the Crossbow (%s)" % first.hand)
+	check(first.hand == "crossbow" and held.weapon == "crossbow" and held.mesh == WeaponDefs.mesh("crossbow"), "what is at the foot of its gate gets the Crossbow, in place of the Long Bow (%s)" % first.hand)
+	var crossbow_size := held.global_basis.get_scale().x
+	check(absf(crossbow_size - WeaponDefs.held_size("crossbow")) < 0.05, "a Crossbow the size a player's is (%.2f, a player's %.2f)" % [crossbow_size, WeaponDefs.held_size("crossbow")])
 	check(bolts.size() == before + 1 and is_equal_approx(first._cooldown, Ally.CROSSBOW_EVERY), "shot down at it, every %.2f s" % Ally.CROSSBOW_EVERY)
 	var lean := first._lean_point()
 	check(Vector2(lean.x - first.perch.x, lean.z - first.perch.z).dot(Vector2(out.x, out.z)) > 1.0, "leaning out over the parapet to do it")
@@ -1341,6 +1381,14 @@ func _wilds_of_mesenlla() -> void:
 	var familiar := p._familiars["raven"] as Node3D
 	var mini: BirdRig = familiar.get_child(0) as BirdRig
 	check(mini != null and mini.find_children("*", "MeshInstance3D", true, false).all(func(mi: MeshInstance3D) -> bool: return mi.layers == 2), "the Raven familiar is a little bird in view of your hands")
+	var span := AABB()
+	var first_part := true
+	for mi: MeshInstance3D in mini.find_children("*", "MeshInstance3D", true, false):
+		var part := familiar.global_transform.affine_inverse() * mi.global_transform * mi.get_aabb()
+		span = part if first_part else span.merge(part)
+		first_part = false
+	var daemon_width := PowerDefs.mesh("daemon").get_aabb().size.x * 0.22
+	check(span.size.x < daemon_width * 1.4 and span.size.x > daemon_width * 0.6, "no bigger than the other familiars beside it (%.2f m across, the Daemon %.2f m)" % [span.size.x, daemon_width])
 	var flap := mini.shoulders[0].rotation.z
 	await frames(10)
 	check(not is_equal_approx(flap, mini.shoulders[0].rotation.z), "beating its wings")
@@ -1362,7 +1410,7 @@ func _wilds_of_mesenlla() -> void:
 func _changelog_and_atlas() -> void:
 	var vs := ChangelogPanel.versions(ChangelogPanel.notes())
 	var current := str(ProjectSettings.get_setting("application/config/version")).get_slice("-dev.", 0)
-	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > 20, "the Changelog reads every version, newest first")
+	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > 5, "the Changelog reads every version, newest first")
 	var released: Dictionary = vs.filter(func(v: Dictionary) -> bool: return str(v["number"]) == "0.21.4")[0]
 	check(released["name"] == "A Portal Worth Defending" and released["date"] == "11 November 2026", "with each version's name and date")
 	check(ChangelogPanel.category("Fixes")[1] == "Fixes" and ChangelogPanel.category("The wilds of Mesenlla")[1] == "Enemies" and ChangelogPanel.category("Spectator Mode")[1] == "Playing together", "each part is marked by what it is about")
@@ -1481,3 +1529,200 @@ func _text_audit() -> void:
 	for problem in problems:
 		check(false, problem)
 	check(problems.is_empty(), "every number on a class, path, ability and Class Upgrade is the game's own (%d wrong)" % problems.size())
+
+
+
+## Mario's list of 16 November: the Armory's locked classes, keeping places in Settings, the Codex and
+## the Sandbox, icons, the Raven familiar's size, freezing, the Woodland Cavalry, Mist Bastion's
+## soldiers, archers, battlements and hollows, and what Children of the Woods carry.
+func _requests_1116() -> void:
+	var m: Main = Main.new()
+	add_child(m)
+	await frames(2)
+	# Settings: a new difficulty, or a new graphics level, leaves the page where it was.
+	var saved_difficulty := Game.difficulty
+	var saved_quality := Game.quality
+	var saved_auto := Game.quality_auto
+	m.show_menu()
+	await frames(2)
+	# A window short enough for the Settings page to scroll.
+	var window_was := get_window().size
+	get_window().size = Vector2i(1152, 380)
+	m.show_settings()
+	await frames(3)
+	var settings := m.ui_layer.find_children("SettingsScroll", "DragScroll", true, false).back() as DragScroll
+	settings.scroll_to(160.0)
+	await frames(1)
+	var settings_at := float(settings.scroll_vertical)
+	check(settings_at > 40.0, "Settings scrolls (%.0f)" % settings_at)
+	var pressed := func(text: String) -> void:
+		for b: Button in m.ui_layer.find_children("*", "Button", true, false):
+			if b.text == text and b.is_visible_in_tree() and not b.is_queued_for_deletion():
+				b.pressed.emit()
+				return
+	pressed.call("Hard" if Game.difficulty != 2 else "Easy")
+	await frames(4)
+	var again := m.ui_layer.find_children("SettingsScroll", "DragScroll", true, false).filter(func(n: Node) -> bool: return not n.is_queued_for_deletion())
+	check(again.size() == 1 and absf(float((again[0] as DragScroll).scroll_vertical) - settings_at) < 2.0, "a new difficulty keeps Settings where it was (%.0f)" % (float((again[0] as DragScroll).scroll_vertical) if again.size() == 1 else -1.0))
+	var world_before := m.world
+	pressed.call("Low" if Game.quality != 0 or Game.quality_auto else "Medium")
+	await frames(4)
+	again = m.ui_layer.find_children("SettingsScroll", "DragScroll", true, false).filter(func(n: Node) -> bool: return not n.is_queued_for_deletion())
+	check(again.size() == 1 and absf(float((again[0] as DragScroll).scroll_vertical) - settings_at) < 2.0, "a new graphics level keeps you in Settings, where you were, not back at the main menu")
+	check(m.world != world_before and m.world.mode == Game.Mode.MENU, "with the scene behind it built again at that level")
+	get_window().size = window_was
+	Game.difficulty = saved_difficulty
+	Game.quality = saved_quality
+	Game.quality_auto = saved_auto
+	Game.apply_quality()
+	# The Codex and the Sandbox: no War Wyvern Rider of its own; the Fallen Revenant with the Fallen
+	# heroes; an enemy's description hidden until you have killed one.
+	check(CodexPanel.enemy_group("fallen_revenant") == CodexPanel.enemy_group("hero_infantry"), "the Fallen Revenant is one of the Fallen heroes")
+	var saved_kills := Game.killed_kinds.duplicate()
+	Game.killed_kinds = {"bear": true}
+	var codex := CodexPanel.new()
+	add_child(codex)
+	codex._list = VBoxContainer.new()
+	codex.add_child(codex._list)
+	codex._enemies()
+	var codex_texts: Array = codex._list.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(not codex_texts.has(ZombieDefs.ALL["wyvern_rider"]["name"]), "the Codex has no War Wyvern Rider of its own")
+	check(codex_texts.has(ZombieDefs.ALL["bear"]["desc"]) and not codex_texts.has(ZombieDefs.ALL["mist_bear"]["desc"]) and codex_texts.has(CodexPanel.HIDDEN_ENEMY), "it tells you about the enemies you have killed, and not yet the others")
+	codex.queue_free()
+	var saved_mode := Game.mode
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_killed("mist_bear")
+	check(not Game.has_killed("mist_bear"), "a kill in the Sandbox doesn't count")
+	Game.mode = Game.Mode.NIGHT
+	Game.note_killed("mist_bear")
+	check(Game.has_killed("mist_bear"), "a kill in a match does")
+	Game.mode = saved_mode
+	Game.killed_kinds = saved_kills
+	# Icons: the new ones exist and differ from what they replaced.
+	for pair: Array in [["mist_bear", "mist_bear"], ["mist_eagle", "mist_eagle"], ["mist_elemental", "mist_elemental"], ["storm_elemental", "storm_elemental"], ["woodland_cavalry", "woodland_cavalry"]]:
+		check(ZombieDefs.ALL[pair[0]]["icon"] == pair[1] and Icons.glyph(pair[1]) != null, "%s has its own icon" % pair[0])
+	check(str(ZombieDefs.ALL["veil_regent"]["icon"]).ends_with("+crown") and ["great_revenant_elemental", "war_wyvern"].all(func(b: String) -> bool: return str(ZombieDefs.ALL[b]["icon"]).ends_with("+crown")), "the Veil Regent wears a crown like the other bosses")
+	check(Icons.power("daemon") == "daemon" and Icons.power("daemon") != ZombieDefs.ALL["mimic"]["icon"], "the Daemon has an icon of its own")
+	var invisible_icon := ""
+	for entry: Dictionary in StatusCatalog.TIMED:
+		if entry["field"] == "invis_left":
+			invisible_icon = entry["icon"]
+	check(invisible_icon == "invisible" and BanditKit.ARTS[""]["icon"] == "invisible", "Invisible has its own icon, apart from Unseen's closed eye")
+	# Children of the Woods: mostly blades and flails; spears, bows and crossbows now and then.
+	var def: Dictionary = ZombieDefs.ALL["child_of_woods"]
+	var far := 0
+	for i in 4000:
+		var picked: String = def["weapons"][Zombie.pick_weighted(def["weapon_odds"])]
+		if WeaponDefs.is_ranged(picked) or picked == "spear":
+			far += 1
+	check(absf(far / 4000.0 - 3.0 / 11.0) < 0.03, "about 27%% of them carry a spear or something to shoot (%.1f%%)" % (far / 40.0))
+	# Mist Bastion: soldiers fall back through a broken gate from anywhere before it; battlements are
+	# walls to auto-jump; the dry hollows have no unseen walls.
+	var saved_map := Game.fort_map
+	Game.fort_map = "bastion"
+	Game.mode = Game.Mode.FORT
+	var space := Node3D.new()
+	add_child(space)
+	var bw := World.new()
+	space.add_child(bw)
+	bw.setup(Game.Mode.FORT)
+	bw.director.running = false
+	for z: Zombie in bw.zombies.duplicate(): z.release()
+	var east: Dictionary = bw.fort.gates[2]
+	var out: Vector3 = east["dir"]
+	var heavy := bw.spawn_garrison("mist_heavy", 2, bw.garrison.mark(2, "post"), bw.garrison.mark(2, "post"))
+	bw.fort.hit_gate(east, 99999.0, east["at"])
+	# Where one stood still for good: 1.5 m from the gate's mouth, a metre off its middle.
+	heavy.global_position = (east["at"] as Vector3) + out * 5.1 + out.cross(Vector3.UP) * 1.05
+	heavy.global_position.y = bw.ground_at(heavy.global_position)
+	await frames(240)
+	check(bw.fort.inside(heavy.global_position) and heavy.fell_back, "a Mist Soldier before a fallen gate goes in to the portal, from anywhere (%s)" % heavy.global_position)
+	var merlon: Vector3 = bw.fort.merlons[bw.fort.merlons.size() / 2]
+	# Stand on the wall walk just inside a merlon, facing it.
+	var pl := bw.player
+	pl.set_physics_process(false)
+	var walk_out := Vector3.ZERO
+	for g: Dictionary in bw.fort.gates:
+		var d: Vector3 = g["dir"]
+		var rel := merlon - (g["at"] as Vector3)
+		if absf(rel.dot(d)) < Fort.WALL_T:
+			walk_out = d
+	if walk_out == Vector3.ZERO:
+		walk_out = (Vector3(merlon.x, 0, merlon.z) - Vector3(bw.fort.heart_at.x, 0, bw.fort.heart_at.z)).normalized()
+	pl.global_position = merlon - walk_out * 0.9 + Vector3.UP * 0.05
+	await frames(2)
+	check(not pl._should_auto_jump(walk_out), "walking up to a battlement, auto-jump leaves it alone")
+	for spot: Vector2 in [Vector2(-28.4, 57.9), Vector2(-59.6, 92.3)]:
+		var q := PhysicsShapeQueryParameters3D.new()
+		var ball := SphereShape3D.new()
+		ball.radius = 4.0
+		q.shape = ball
+		q.collision_mask = Terrain.BARRIER
+		q.transform = Transform3D(Basis(), Vector3(spot.x, bw.ground_at(Vector3(spot.x, 0, spot.y)) + 1.0, spot.y))
+		check(bw.get_world_3d().direct_space_state.intersect_shape(q, 4).is_empty() and bw.terrain.is_walkable(spot.x, spot.y), "no unseen wall in the dry hollow at %s" % spot)
+	# Freezing a Child of the Woods turns all of it to ice, its leaves and bark too; thawed, all comes back.
+	var at := bw.fort.heart_at + Vector3(0, 0, 8)
+	bw.spawn_zombie("child_of_woods", at)
+	var child := _nearest_zombie(at, bw)
+	check(child != null and child.type_id == "child_of_woods", "a Child of the Woods to freeze")
+	if child:
+		var worn := child._parts.filter(func(mi: MeshInstance3D) -> bool: return mi.has_meta("own_material"))
+		check(worn.size() >= 3, "its leaves, bark and eyes are of its body (%d parts)" % worn.size())
+		child.freeze(1.0)
+		check(child._parts.all(func(mi: MeshInstance3D) -> bool: return mi.material_override == Zombie.ice_material()), "frozen, every part of it is ice")
+		child._show_frozen(0.0)
+		check(worn.all(func(mi: MeshInstance3D) -> bool: return mi.material_override == mi.get_meta("own_material")), "and thawed, its own look comes back")
+		child.release()
+	# The Woodland Cavalry: a jointed bear in harness under a rider who sits in its saddle.
+	bw.spawn_zombie("woodland_cavalry", at)
+	var cav := _nearest_zombie(at, bw)
+	check(cav != null and cav.type_id == "woodland_cavalry" and cav._mounted, "a Woodland Cavalry rides out")
+	if cav:
+		cav.set_physics_process(false)
+		var bear := cav._horse_node
+		check(bear != null and not (bear is MeshInstance3D) and bear.get_node_or_null("Rig/Hind/Torso/Saddle") != null and bear.get_node_or_null("Rig/Hind/Torso/Head/Jaw") != null, "on a bear of jointed legs, head and jaw, with a saddle")
+		check(["Ride", "RideCharge", "RideThrust", "RideBrandish"].all(func(n: String) -> bool: return Net.ANIMS.has(n) and cav._anim.has_animation(n)), "the rider's riding moves, on every phone")
+		var leg := bear.get_node("Rig/Hind/Torso/LegFL") as Node3D
+		cav._current_anim = ""
+		cav._play("RideCharge", 1.0, 0.0)
+		var swings: Array[float] = []
+		for i in 30:
+			cav._tick_mount(1.0 / 30.0, 7.0)
+			swings.append(leg.rotation.x)
+		check(swings.max() - swings.min() > 0.4, "the spear couched, the bear gallops (%.2f rad of stride)" % (swings.max() - swings.min()))
+		var seat := (bear.get_node("Rig/Hind/Torso/Saddle") as Node3D).global_position
+		var hips := cav._visual.global_position + cav._visual.global_basis.y.normalized() * cav._rider_hip() * cav._visual.scale.y
+		check(hips.distance_to(seat) < 0.1, "with the rider in the saddle (%.2f m off)" % hips.distance_to(seat))
+		cav._current_anim = ""
+		cav._play("RideBrandish", 1.0, 0.0)
+		for i in 30:
+			cav._tick_mount(1.0 / 30.0, 2.0)
+		var hind := bear.get_node("Rig/Hind") as Node3D
+		check(hind.rotation.x < -0.25 and hind.rotation.x > -0.7, "wheeling round, the spear brandished, the bear half rears (%.2f rad)" % hind.rotation.x)
+		check(cav._visual.global_position.y > seat.y - 0.3, "and its rider goes up with it")
+		cav._current_anim = ""
+		cav._play("RideThrust", 1.0, 0.0)
+		cav._tick_mount(1.0 / 30.0, 7.0)
+		check(str(bear.get_meta("act_state", "")) == "m_swipe", "the spear driven home, the bear rakes with a paw")
+		cav.freeze(1.0)
+		check(bear.find_children("*", "MeshInstance3D", true, false).all(func(mi: MeshInstance3D) -> bool: return mi.material_override == Zombie.ice_material()), "frozen, the bear is ice too")
+		cav._show_frozen(0.0)
+		cav.hp = cav.max_hp * 0.3
+		cav._check_dismount()
+		check(not cav._mounted and bear.visible and bear.top_level and cav._mount_fall > 0.0, "brought down, the bear falls where it is and its rider fights on foot")
+		for i in 70:
+			cav._tick_mount_fall(1.0 / 30.0)
+		check(not bear.visible and not bear.top_level, "then it is gone")
+		cav.release()
+	space.queue_free()
+	Game.fort_map = saved_map
+	Game.mode = Game.Mode.NIGHT
+	m.queue_free()
+
+
+func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
+	var best: Zombie = null
+	for z: Zombie in in_world.zombies:
+		if z.active and (best == null or z.position.distance_to(at) < best.position.distance_to(at)):
+			best = z
+	return best

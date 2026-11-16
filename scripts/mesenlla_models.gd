@@ -35,7 +35,6 @@ const LEAF_DARK := Color(0.2, 0.34, 0.15)
 const BARK := Color(0.4, 0.3, 0.2)
 
 static var _meshes := {}
-static var _gait_shader: Shader
 static var _glow: StandardMaterial3D
 static var _ghost: StandardMaterial3D
 
@@ -93,49 +92,80 @@ static func ghost_material() -> StandardMaterial3D:
 
 # --- Bodies ----------------------------------------------------------------------
 
-## A bear, head towards -Z: heavy shoulders, a hump, a short muzzle and pale claws.
-static func _bear_mesh(l: LowPoly, fur: Color, dark: Color, muzzle: Color, eye: Color, saddle := false) -> void:
-	l.box(Vector3(0, 0.88, 0.1), Vector3(0.92, 0.72, 1.5), fur)
-	l.box(Vector3(0, 1.1, -0.42), Vector3(0.98, 0.5, 0.62), fur.lightened(0.05))
-	l.box(Vector3(0, 0.98, 0.72), Vector3(0.8, 0.56, 0.5), fur.darkened(0.06))
-	l.box(Vector3(0, 0.98, -0.95), Vector3(0.56, 0.5, 0.5), fur)
-	l.box(Vector3(0, 0.88, -1.27), Vector3(0.32, 0.26, 0.3), muzzle)
-	l.box(Vector3(0, 0.95, -1.44), Vector3(0.12, 0.09, 0.05), BLACK)
-	for x: float in [-0.2, 0.2]:
-		l.box(Vector3(x, 1.27, -0.92), Vector3(0.13, 0.13, 0.1), dark)
-		l.box(Vector3(x * 0.75, 1.06, -1.21), Vector3(0.06, 0.05, 0.03), eye)
-	for leg: Vector2 in [Vector2(-0.3, -0.5), Vector2(0.3, -0.5), Vector2(-0.3, 0.62), Vector2(0.3, 0.62)]:
-		l.prism(Vector3(leg.x, 0.62, leg.y), Vector3(leg.x, 0.08, leg.y), 0.17, 0.15, 6, dark)
-		l.box(Vector3(leg.x, 0.05, leg.y - 0.06), Vector3(0.26, 0.1, 0.3), dark.darkened(0.1))
-		for c in 3:
-			l.prism(Vector3(leg.x - 0.08 + c * 0.08, 0.05, leg.y - 0.2), Vector3(leg.x - 0.08 + c * 0.08, 0.02, leg.y - 0.3), 0.025, 0.0, 4, CLAW)
-	l.box(Vector3(0, 0.98, 0.98), Vector3(0.16, 0.14, 0.12), dark)
-	if saddle:
-		# Woven of leaves and bark by the Children of the Woods, with a seat and reins.
-		l.box(Vector3(0, 1.3, -0.1), Vector3(1.0, 0.1, 0.8), LEAF_DARK)
-		l.box(Vector3(0, 1.36, -0.1), Vector3(0.5, 0.12, 0.6), BARK)
-		for x: float in [-0.52, 0.52]:
-			l.box(Vector3(x, 1.0, -0.1), Vector3(0.04, 0.5, 0.6), LEAF)
-		l.box(Vector3(0, 1.18, -0.75), Vector3(0.62, 0.04, 0.04), BARK)
+## The Woodland Cavalry's bear: the bear of the valleys on its jointed legs, in the Children of the
+## Woods' harness: a saddle of bark and moss on a woven blanket, a girth of braided vine, a breast band
+## hung with leaves and a bridle of twisted root to the reins. "Saddle" on its back is where the rider
+## sits, and moves with it. ride_bear() animates it.
+const CAVALRY_SIZE := 1.25 # of a wild bear's size, beside the rider's own (small) scale: a big war bear
+const RIDER_SEAT := Vector3(0, 0.72, 0.25) # the seat of the saddle, from the bear's hips
+static func cavalry_bear() -> Node3D:
+	var root := Node3D.new()
+	root.name = "CavalryBear"
+	_quadruped(root, "bear", _bear_look(FUR, FUR_DARK, MUZZLE, BLACK, false))
+	var torso := root.get_node("Rig/Hind/Torso") as Node3D
+	var hip: Vector3 = Vector3(0, 0.76, -0.55)
+	_part(torso, _mesh("cavalry_harness", func(l: LowPoly) -> void:
+		# The blanket, woven of rushes, draped over the back behind the hump.
+		l.box(Vector3(0, 1.36, -0.32), Vector3(0.82, 0.05, 0.86), Color(0.42, 0.36, 0.22), Vector3(4, 0, 0))
+		for i in 5:
+			l.box(Vector3(0, 1.375, -0.66 + i * 0.17), Vector3(0.84, 0.02, 0.05), Color(0.3, 0.42, 0.2))
+		for x: float in [-1.0, 1.0]:
+			# Its sides hang over the flanks, edged with a fringe of rush ends.
+			l.box(Vector3(x * 0.49, 1.22, -0.32), Vector3(0.04, 0.26, 0.78), Color(0.36, 0.3, 0.18), Vector3(0, 0, x * -14.0))
+			for i in 7:
+				var z := -0.66 + i * 0.113
+				l.prism(Vector3(x * 0.52, 1.1, z), Vector3(x * 0.54, 1.0, z + 0.01), 0.018, 0.0, 3, Color(0.46, 0.4, 0.24))
+		# The saddle: a seat of curved bark, a high cantle behind and a pommel of root before.
+		l.box(Vector3(0, 1.44, -0.3), Vector3(0.46, 0.08, 0.5), BARK)
+		l.box(Vector3(0, 1.52, -0.56), Vector3(0.44, 0.18, 0.07), BARK.darkened(0.15), Vector3(-12, 0, 0))
+		l.prism(Vector3(0, 1.46, -0.04), Vector3(0, 1.66, 0.02), 0.07, 0.035, 6, BARK.darkened(0.25))
+		l.box(Vector3(0, 1.49, -0.3), Vector3(0.38, 0.03, 0.4), Color(0.28, 0.42, 0.2)) # moss on the seat
+		# The girth of braided vine round the barrel, and the breast band across the chest.
+		for x: float in [-1.0, 1.0]:
+			l.prism(Vector3(x * 0.46, 1.3, -0.12), Vector3(x * 0.5, 0.62, -0.1), 0.025, 0.025, 5, LEAF_DARK.darkened(0.2))
+			l.prism(Vector3(x * 0.44, 1.18, 0.05), Vector3(x * 0.3, 0.86, 0.7), 0.032, 0.032, 5, LEAF_DARK)
+		l.prism(Vector3(-0.5, 0.62, -0.1), Vector3(0.5, 0.62, -0.1), 0.025, 0.025, 5, LEAF_DARK.darkened(0.2))
+		l.prism(Vector3(-0.3, 0.86, 0.72), Vector3(0.3, 0.86, 0.72), 0.034, 0.034, 5, LEAF_DARK)
+		# Leaves hung from the breast band, and a knot of feathers at the pommel.
+		for i in 5:
+			var x := -0.24 + i * 0.12
+			l.prism(Vector3(x, 0.85, 0.74), Vector3(x * 1.1, 0.68, 0.78), 0.05, 0.0, 4, LEAF if i % 2 == 0 else LEAF_DARK)
+		l.prism(Vector3(0.04, 1.62, 0.0), Vector3(0.16, 1.82, -0.08), 0.03, 0.0, 4, Color(0.75, 0.7, 0.6))
+		l.prism(Vector3(-0.02, 1.62, 0.0), Vector3(-0.12, 1.84, -0.04), 0.03, 0.0, 4, Color(0.5, 0.36, 0.25))), -hip)
+	var head := torso.get_node("Head") as Node3D
+	_part(head, _mesh("cavalry_bridle", func(l: LowPoly) -> void:
+		# A bridle of twisted root round the muzzle and behind the ears, and the reins back to the saddle.
+		l.prism(Vector3(-0.17, 0.02, 0.3), Vector3(0.17, 0.02, 0.3), 0.025, 0.025, 5, BARK.darkened(0.2))
+		for x: float in [-1.0, 1.0]:
+			l.prism(Vector3(x * 0.17, 0.02, 0.3), Vector3(x * 0.2, 0.2, 0.02), 0.022, 0.022, 5, BARK.darkened(0.2))
+			l.prism(Vector3(x * 0.17, 0.02, 0.3), Vector3(x * 0.22, 0.18, -0.55), 0.016, 0.016, 4, LEAF_DARK)))
+	_pivot(torso, RIDER_SEAT, "Saddle")
+	root.scale = Vector3.ONE * CAVALRY_SIZE
+	return root
 
 
-static func bear_mount() -> MeshInstance3D:
-	var body := _mesh("bear_mount", func(l: LowPoly) -> void: _bear_mesh(l, FUR, FUR_DARK, MUZZLE, BLACK, true))
-	var mi := MeshInstance3D.new()
-	mi.mesh = body
-	if _gait_shader == null:
-		_gait_shader = load("res://assets/shaders/beast_gait.gdshader")
-	var m := ShaderMaterial.new()
-	m.shader = _gait_shader
-	m.set_shader_parameter("belly", 0.62)
-	m.set_shader_parameter("neck_z", -0.75)
-	m.set_shader_parameter("stride", 0.5)
-	m.set_shader_parameter("gait", 0.0)
-	m.set_shader_parameter("fur", 1.0)
-	mi.material_override = m
-	mi.extra_cull_margin = 0.6
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	return mi
+## The Woodland Cavalry's bear under its rider, moving with what the rider is doing (its animation):
+## galloping when the rider couches the spear for a charge, a paw raking as the spear goes home,
+## half rearing with a roar as the rider brandishes the spear at the end of a pass, and otherwise
+## ambling or standing by how fast it goes (pace, in metres a second).
+static func ride_bear(z: Zombie, mount: Node3D, delta: float, pace: float, rider_anim: String) -> void:
+	var state := ""
+	match rider_anim:
+		"RideCharge":
+			state = "m_charge"
+		"RideThrust":
+			state = "m_swipe"
+		"RideBrandish":
+			state = "m_rear"
+	if state != str(mount.get_meta("act_state", "")):
+		mount.set_meta("from_state", mount.get_meta("act_state", ""))
+		mount.set_meta("act_state", state)
+		mount.set_meta("act_t", 0.0)
+		if state == "m_swipe":
+			mount.set_meta("swipes", int(mount.get_meta("swipes", 0)) + 1)
+	else:
+		mount.set_meta("act_t", float(mount.get_meta("act_t", 0.0)) + delta)
+	_animate_bear(z, mount, delta, clampf(pace / 4.0, 0.0, 1.0), state, 0.45)
 
 
 # --- Four legs on joints ------------------------------------------------------------
@@ -825,7 +855,7 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 ## raking the ground with a forepaw and snorting (the Mist Bear, before it charges). The maul brings
 ## both paws crashing down as it lunges and bites; an ordinary blow is one paw hooked round, left
 ## and right in turn.
-static func _animate_bear(z: Zombie, root: Node3D, delta: float, speed: float, state: String) -> void:
+static func _animate_bear(z: Zombie, root: Node3D, delta: float, speed: float, state: String, rear_k := 1.0) -> void:
 	var rig := root.get_node("Rig") as Node3D
 	var hind := rig.get_node("Hind") as Node3D
 	var torso := hind.get_node("Torso") as Node3D
@@ -955,6 +985,8 @@ static func _animate_bear(z: Zombie, root: Node3D, delta: float, speed: float, s
 				mouth = 0.05 if sniffing else 0.0
 				roll = sin(now * 0.5) * 0.025
 				ease = 5.0
+	if rear < 0.0:
+		rear *= rear_k # with someone on its back, it rears only part of the way
 	# Breathing, always: deeper after it has charged or roared.
 	torso.scale = Vector3.ONE * (1.0 + sin(now * 2.2) * 0.012 * (1.0 - gait))
 	var k := minf(1.0, delta * ease)

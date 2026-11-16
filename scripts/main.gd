@@ -457,7 +457,7 @@ func _vignette() -> TextureRect:
 	return v
 
 
-func show_settings(from_pause := false) -> void:
+func show_settings(from_pause := false, scrolled := 0.0) -> void:
 	var root := _screen("Settings", func() -> void: _back.call(), "Kept on this phone." if not from_pause else ("The night goes on while you are here." if Net.active() else ""))
 	_back = func() -> void:
 		root.queue_free()
@@ -473,6 +473,13 @@ func show_settings(from_pause := false) -> void:
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_theme_constant_override("separation", UiTheme.GAP)
 	scroll.add_child(inner)
+	if scrolled > 0.0:
+		# Opened again after a change: back where it was, once the rows have their sizes.
+		var settle := func() -> void:
+			if is_instance_valid(scroll):
+				scroll.scroll_to(scrolled)
+		settle.call_deferred()
+		get_tree().process_frame.connect(settle, CONNECT_ONE_SHOT)
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 40)
 	inner.add_child(columns)
@@ -518,8 +525,7 @@ func show_settings(from_pause := false) -> void:
 		left.add_child(_choices(["Easy", "Normal", "Hard"], Game.difficulty, 380.0, func(i: int) -> void:
 			Game.difficulty = i
 			Game.save_settings()
-			root.queue_free()
-			show_settings()))
+			_settings_again(root)))
 		left.add_child(_soft("Graphics" if not Game.quality_auto else "Graphics (Auto: %s now)" % ["Low", "Medium", "High"][Game.quality], UiTheme.FS_BODY))
 		left.add_child(_choices(["Auto", "Low", "Medium", "High"], 0 if Game.quality_auto else Game.quality + 1, 380.0, func(i: int) -> void:
 			Game.quality_auto = i == 0
@@ -530,7 +536,8 @@ func show_settings(from_pause := false) -> void:
 				Game.quality = i - 1
 			Game.apply_quality()
 			Game.save_settings()
-			show_menu(true)))
+			# The Valleys behind the menu are built again at the new level; Settings stays open.
+			_settings_again(root, true)))
 	_section(left, "Sound", from_pause)
 	_slider(left, "Music", 0.0, 1.0, Game.music_volume, func(v: float) -> void:
 		Game.music_volume = v
@@ -550,6 +557,17 @@ func show_settings(from_pause := false) -> void:
 	_slider(right, "Screen brightness, when steady", 0.1, 1.0, Game.brightness if Game.brightness > 0.0 else PhoneScreen.current_level(), func(v: float) -> void:
 		Game.brightness = v
 		PhoneScreen.apply_brightness())
+
+
+## Settings opened again after a change that shows on the page itself, at the same place in its list.
+## With rebuild_world, the scene behind the menu is built again first (a new graphics level).
+func _settings_again(root: Control, rebuild_world := false) -> void:
+	var scroll := root.find_child("SettingsScroll", true, false) as DragScroll
+	var at := float(scroll.scroll_vertical) if scroll else 0.0
+	if rebuild_world and world != null and world.mode == Game.Mode.MENU:
+		_new_world(Game.Mode.MENU)
+	root.queue_free()
+	show_settings(false, at)
 
 
 ## The heading of a group of settings (or of any part of a page).
@@ -1014,7 +1032,7 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 			return
 		if Game.buy_class(id):
 			Sfx.play("level", -3.0)
-			show_store("", mode, "classes", Callable(), id))
+			show_store("", mode, "classes", _store_return, id))
 	row.add_child(buy)
 
 
@@ -1022,6 +1040,17 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 ## back_to: where Back goes, when the Store was opened from somewhere other than the menu or a class.
 ## Moving around inside the Store keeps it.
 func show_store(focus := "", from_mode := -1, section := "", back_to := Callable(), just_bought := "") -> void:
+	# After a purchase the list stays where it was, and the page beside it shows what came after the
+	# thing just bought (or, at the end of the list, what came before it).
+	var kept_at := 0.0
+	if just_bought != "" and is_instance_valid(panel) and panel.has_meta("store_ids"):
+		var old_list: Control = panel.get_meta("list")
+		if old_list.get_parent() is DragScroll:
+			kept_at = float((old_list.get_parent() as DragScroll).scroll_vertical)
+		var old_ids: Array = panel.get_meta("store_ids")
+		var at := old_ids.find(just_bought)
+		if focus == "" and at >= 0:
+			focus = str(old_ids[at + 1]) if at + 1 < old_ids.size() else (str(old_ids[at - 1]) if at > 0 else "")
 	_clear_ui()
 	if back_to.is_valid():
 		_store_return = back_to
@@ -1078,7 +1107,7 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 			to_maps.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 			detail.add_child(to_maps)
 			panel = root
-			_store_to_top(root)
+			_store_keep(root, 0.0)
 			return
 		var to_class := ""
 		if ShopDefs.ITEMS.has(just_bought):
@@ -1091,7 +1120,7 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		go.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		detail.add_child(go)
 		panel = root
-		_store_to_top(root)
+		_store_keep(root, 0.0)
 		return
 	var rows := {}
 	var pick := func(id: String) -> void:
@@ -1112,8 +1141,9 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		list.add_child(row)
 	pick.call(focus if rows.has(focus) else ids[0])
 	panel = root
+	root.set_meta("store_ids", ids)
 	if just_bought != "":
-		_store_to_top(root)
+		_store_keep(root, kept_at)
 
 
 ## Whether a class can be bought in the Store (rather than earned, or unlocked with a code).
@@ -1132,23 +1162,20 @@ func _unlock_class_button(class_id: String, back: Callable, min_size: Vector2) -
 	return b
 
 
-## After a purchase the Store starts again from the top of its list, where the word of what you
-## bought is, and so does the page beside it. Now, and again once the new lists have their sizes.
-func _store_to_top(root: Control) -> void:
-	var scrolls: Array = []
+## After a purchase the Store's list goes back to where it was (`at`, in pixels) and the page beside
+## it starts from its top. Now, and again once the new lists have their sizes.
+func _store_keep(root: Control, at: float) -> void:
 	var list: Control = root.get_meta("list")
-	if list.get_parent() is DragScroll:
-		scrolls.append(list.get_parent() as DragScroll)
-	var reading := root.find_child("DetailScroll", true, false)
-	if reading is DragScroll:
-		scrolls.append(reading as DragScroll)
-	var to_top := func() -> void:
-		for scroll: Variant in scrolls:
-			if is_instance_valid(scroll):
-				(scroll as DragScroll).scroll_to(0.0)
-	to_top.call()
-	to_top.call_deferred()
-	get_tree().process_frame.connect(to_top, CONNECT_ONE_SHOT)
+	var listing: DragScroll = list.get_parent() as DragScroll
+	var reading := root.find_child("DetailScroll", true, false) as DragScroll
+	var settle := func() -> void:
+		if is_instance_valid(listing):
+			listing.scroll_to(at)
+		if is_instance_valid(reading):
+			reading.scroll_to(0.0)
+	settle.call()
+	settle.call_deferred()
+	get_tree().process_frame.connect(settle, CONNECT_ONE_SHOT)
 
 
 func _item_row(id: String) -> Button:
@@ -1388,6 +1415,9 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	for child in detail.get_children():
 		detail.remove_child(child)
 		child.queue_free()
+	if not Game.owns_class(id):
+		_armory_locked(detail, id)
+		return
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 18)
 	head.size_flags_vertical = Control.SIZE_FILL
@@ -1437,6 +1467,52 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 		else:
 			block.add_child(_soft("No Class Upgrades available for this profession.", UiTheme.FS_SMALL))
 	_wrap_labels(detail)
+
+
+## A class you don't own, in the Armory: locked, with nothing of it shown but its name, crest and
+## how to unlock it; a class sold in the Store gets a button straight to it there.
+func _armory_locked(detail: VBoxContainer, id: String) -> void:
+	var page := VBoxContainer.new()
+	page.name = "LockedClass"
+	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.alignment = BoxContainer.ALIGNMENT_CENTER
+	page.add_theme_constant_override("separation", 14)
+	detail.add_child(page)
+	var crest := IconView.new(ClassDefs.icon(id), ClassDefs.color(id), 120.0)
+	crest.dim = true
+	crest.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	page.add_child(crest)
+	var lock := TextureRect.new()
+	lock.texture = Icons.glyph("lock")
+	lock.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	lock.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	lock.custom_minimum_size = Vector2(44, 44)
+	lock.modulate = UiTheme.ASH
+	lock.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	page.add_child(lock)
+	var title := _body(ClassDefs.ALL[id]["name"], UiTheme.FS_HEAD)
+	title.add_theme_font_override("font", UiTheme.title_font())
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	page.add_child(title)
+	var how := _body(armory_unlock_text(id), UiTheme.FS_LEAD)
+	how.name = "UnlockRequirement"
+	how.add_theme_color_override("font_color", UiTheme.EMBER)
+	how.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	page.add_child(how)
+	if _class_for_sale(id):
+		var go := _button("Go to the Store", func() -> void: show_store(id, -1, "classes", func() -> void: show_armory(id)), Vector2(280, UiTheme.BTN_TALL), true)
+		go.name = "ToStore"
+		go.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		page.add_child(go)
+	_wrap_labels(detail)
+
+
+## How a class is unlocked, for the Armory's locked page: its price when the Store sells it.
+static func armory_unlock_text(id: String) -> String:
+	if _class_for_sale(id):
+		return "Unlock it in the Store for %d Botti Doubloons." % ClassDefs.price(id)
+	return CodexPanel.acquisition(id)
 
 
 func _armory_tabs(detail: VBoxContainer, id: String) -> void:
@@ -2219,7 +2295,8 @@ func show_sandbox_menu() -> void:
 	grid.add_theme_constant_override("v_separation", UiTheme.GAP_SMALL)
 	enemy_scroll.add_child(grid)
 	var enemies: Array = ["dummy"]
-	enemies.append_array(ZombieDefs.ALL.keys())
+	# A War Wyvern's rider is only ever seated on one: it comes with the wyvern, not by itself.
+	enemies.append_array(ZombieDefs.ALL.keys().filter(func(k: String) -> bool: return not ZombieDefs.ALL[k].get("carried", false)))
 	for id: String in enemies:
 		var chosen := id
 		var b := _button(str(ZombieDefs.def_of(id)["name"]), func() -> void:

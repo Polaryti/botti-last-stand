@@ -34,6 +34,7 @@ var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bas
 var bastion_wins := 0
 var changelog_seen := "" # ChangelogPanel.signature() when the notes were last opened
 var poison_dealt := 0.0
+var killed_kinds := {} # every kind of enemy you have killed at least once: the Codex tells you about those
 var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
@@ -239,6 +240,18 @@ func note_beyond_win() -> void:
 	save_settings()
 
 
+## Your first kill of a kind of enemy opens its Codex entry. Kills in the Sandbox don't count.
+func note_killed(kind: String) -> void:
+	if mode == Mode.SANDBOX or kind == "" or killed_kinds.has(kind):
+		return
+	killed_kinds[kind] = true
+	save_settings()
+
+
+func has_killed(kind: String) -> bool:
+	return killed_kinds.has(kind)
+
+
 func note_rider_killed() -> void:
 	if mode != Mode.SANDBOX and not unlocked.has("chivalry"):
 		_earn("chivalry")
@@ -411,6 +424,7 @@ func load_settings() -> void:
 	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
 	changelog_seen = str(_saved(c, "progress", "changelog_seen", ""))
 	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
+	killed_kinds = _saved(c, "progress", "killed_kinds", {})
 	owned_items = _saved(c, "progress", "owned_items", {})
 	switched_off = _saved(c, "progress", "switched_off", {})
 	migrate_items(owned_items)
@@ -457,6 +471,7 @@ func save_settings() -> void:
 	c.set_value("progress", "bastion_wins", bastion_wins)
 	c.set_value("progress", "changelog_seen", changelog_seen)
 	c.set_value("progress", "poison_dealt", poison_dealt)
+	c.set_value("progress", "killed_kinds", killed_kinds)
 	c.set_value("progress", "owned_items", owned_items)
 	c.set_value("progress", "switched_off", switched_off)
 	c.set_value("progress", "pet", pet)

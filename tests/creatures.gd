@@ -506,7 +506,7 @@ func _children() -> void:
 	var after := [count_of.call(Pickup.Kind.WEAPON) - before[0], count_of.call(Pickup.Kind.ARROWS) - before[1], count_of.call(Pickup.Kind.FOOD) - before[2]]
 	check(after[0] + after[1] + after[2] > 0 and after[0] + after[1] + after[2] < 15, "thirty Children fallen leave a few things on the ground: %s weapons, arrows, food" % str(after))
 	var rider := raise("woodland_cavalry", at + Vector3(0, 0, -14))
-	check(rider._mounted and rider._horse_node.visible and (rider._horse_node.material_override as ShaderMaterial).get_shader_parameter("belly") != null, "Woodland Cavalry ride bears")
+	check(rider._mounted and rider._horse_node.visible and rider._horse_node.get_node_or_null("Rig/Hind/Torso/Saddle") != null, "Woodland Cavalry ride bears, in a saddle")
 	check(rider.weapon_id == "spear", "with spears")
 	rider.take_damage(rider.max_hp * 0.65, Vector3.ZERO, 0.0, rider.centre())
 	check(not rider._mounted, "bring the bear down and the rider fights on foot")

@@ -15,6 +15,7 @@ signal closed
 const PATH := "res://CHANGELOG.md"
 const RAIL_WIDTH := 330.0
 const PER_FRAME := 18 # changes built each frame once the first cards are up
+const FIRST_BUILT := 28 # changes built at once, when a version opens
 ## What a part of a version is about, from words in its heading: [words, name, icon, colour]. The first
 ## that matches wins, so the more particular come first.
 const CATEGORIES := [
@@ -274,7 +275,7 @@ func show_version(i: int) -> void:
 		for e: Dictionary in part["entries"]:
 			_queue.append([card.get_meta("list"), e, part["category"][3]])
 	# The first changes at once, the rest a few at a time while the top is being read.
-	_build_queued(28)
+	_build_queued(FIRST_BUILT)
 	_scroll.scroll_to(0.0)
 
 

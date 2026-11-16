@@ -108,12 +108,7 @@ static func _bake(w: World) -> ImageTexture:
 
 ## Water is only drawn where the river's water lies: low ground elsewhere is just a hollow.
 static func _by_river(t: Terrain, x: float, z: float) -> bool:
-	var at := Vector2(x, z)
-	var reach := t.river_width + Terrain.BANK * 0.5
-	for i in t.river.size() - 1:
-		if at.distance_to(Geometry2D.get_closest_point_to_segment(at, t.river[i], t.river[i + 1])) <= reach:
-			return true
-	return false
+	return t.by_river(x, z)
 
 
 ## A line of square dots on the baked map, thick pixels to each side.

@@ -1,5 +1,32 @@
 # Changelog
 
+## Development — Fixes and polish after Beyond the Mists
+
+### Screens
+- **Armory:** a class you don't own is locked, showing only how to unlock it. Classes sold in the Store have a button straight to it.
+- **Store:** buying something no longer sends the list back to the top.
+- **Settings:** changing the difficulty no longer jumps to the top, and changing Graphics no longer drops you back to the main menu.
+- **Codex:** an enemy's description stays hidden until you kill your first one. Kills in the Sandbox don't count.
+- The War Wyvern Rider is no longer listed on its own in the Codex or the Sandbox, and the Fallen Revenant is now with the Fallen heroes.
+
+### Icons
+- New icons for the Bear, Mist Bear, Mist Eagle, Mist Elemental, Storm Elemental, Woodland Cavalry and the Daemon familiar.
+- The Veil Regent wears a crown like the other bosses.
+- Invisible has its own icon (a dashed figure), no longer the same closed eye as Unseen.
+
+### Creatures
+- **Woodland Cavalry:** now rides a full bear in a bark-and-moss harness, with legs that walk and gallop. The rider sits astride with the spear couched, drives it home as they pass while the bear rakes with a paw, then brandishes it as the bear half rears to wheel round.
+- When the bear is brought down, it rolls over where it fell and its rider fights on.
+- Children of the Woods carry spears, bows and crossbows less often: about 1 in 4 now, down from 1 in 2.
+- Freezing a Child of the Woods turns all of it to ice, leaves and bark included.
+- The Raven familiar is now the size of the other familiars.
+
+### Mist Bastion
+- Gate archers hold one weapon at a time, the Long Bow or the Crossbow, both at their proper size.
+- Mist Soldiers outside a fallen gate always make it back to the portal; some used to stand still outside while being hit.
+- The battlements no longer set off auto-jump over and over.
+- The invisible walls in the dry hollows are gone. Only the river's deep water stops you now.
+
 ## 0.22.0 — Beyond the Mists (16 November 2026)
 
 *Having conquered the heart of the Mists, new paths open through its portals to distant lands.* Two new places, the creatures that live there, two new classes, 21 new Class Upgrades, Map Upgrades, Spectator Mode and a new look for every screen.

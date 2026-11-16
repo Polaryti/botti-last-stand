@@ -1692,6 +1692,8 @@ func _on_kill(z: Zombie) -> void:
 			_note_poison(70.0)
 	if has_item("shadow_shroud"):
 		shadow_kills = mini(SHROUD_KILLS, shadow_kills + 1)
+	if bot_peer == 0:
+		Game.note_killed(z.type_id)
 	if bot_peer == 0 and z.type_id == "rider" and not Game.unlocked.has("chivalry"):
 		Game.note_rider_killed()
 		if Game.unlocked.has("chivalry"):
@@ -1971,7 +1973,7 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 				shown = Node3D.new()
 				var bird := BirdRig.new("crow")
 				bird.rotation.y = PI * 0.8
-				bird.scale = Vector3.ONE * 0.32
+				bird.scale = Vector3.ONE * RAVEN_FAMILIAR_SCALE
 				shown.add_child(bird)
 				bird.set_layers(2)
 			else:
@@ -1990,6 +1992,10 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 		if id == "mistberry_draught":
 			_mist_timer = 0.0
 	say(str(d["name"]) + "!")
+
+
+## The Raven familiar's size in view: its wings spread about 14 cm, like the other familiars beside it.
+const RAVEN_FAMILIAR_SCALE := 0.15
 
 
 func _arrange_familiars() -> void:

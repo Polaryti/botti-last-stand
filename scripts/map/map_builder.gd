@@ -242,7 +242,7 @@ func boundary(h: float) -> void:
 			# You can walk off the edge. Mobs know better.
 			w.add_enemy_block(Vector3(c.x, 0.0, c.y), Vector3(r.size.x, 120.0, r.size.y))
 		else:
-			if terrain.height(c.x, c.y) < Terrain.WATER_Y - Terrain.WADE:
+			if terrain.deep_water(c.x, c.y):
 				w.add_barrier(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
 			else:
 				w.add_enemy_block(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))

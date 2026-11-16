@@ -471,9 +471,25 @@ func is_walkable(x: float, z: float) -> bool:
 		var dx := ground_height(x + 0.5, z) - ground_height(x - 0.5, z)
 		var dz := ground_height(x, z + 0.5) - ground_height(x, z - 0.5)
 		return ground_height(x, z) > 0.0 and Vector2(dx, dz).length() < STEEP
-	if height(x, z) < WATER_Y - WADE:
+	if deep_water(x, z):
 		return false
 	return on_deck(x, z) or slope(x, z) < STEEP
+
+
+## Water too deep to wade: only in the river's own bed. Low ground anywhere else (Mist Bastion has
+## no river at all) is a dry hollow you walk through.
+func deep_water(x: float, z: float) -> bool:
+	return height(x, z) < WATER_Y - WADE and by_river(x, z)
+
+
+## Whether this spot is in or beside the river's course.
+func by_river(x: float, z: float) -> bool:
+	var at := Vector2(x, z)
+	var reach := river_width + BANK * 0.5
+	for i in river.size() - 1:
+		if at.distance_to(Geometry2D.get_closest_point_to_segment(at, river[i], river[i + 1])) <= reach:
+			return true
+	return false
 
 
 ## The physics ground, 1 m a sample, as big as the map.

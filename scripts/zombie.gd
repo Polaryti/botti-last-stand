@@ -190,7 +190,9 @@ var _dummy_log: Array = []
 var _dummy_last := 0.0
 var _dummy_show := 0.0
 var _dummy_label: Label3D
-var _horse_node: MeshInstance3D
+var _horse_node: Node3D # a Dread Rider's horse (a MeshInstance3D), or a Woodland Cavalry's bear (MesenllaModels.cavalry_bear)
+var _mount_fall := 0.0 # seconds left of the cavalry's bear going down, once it is brought down
+var _seat_y := 0.0 # where the rider's body stands, from its feet, sitting on the bear
 var _ride_pass := 0.0
 var _ride_turn := 0.0
 var _ride_dir := Vector3.ZERO
@@ -390,15 +392,18 @@ func _build_visual() -> void:
 			# A Child of the Woods: leaves, bark and twigs over a small body, green eyes, and a bear to ride.
 			_eyes.visible = false
 			var gear := MesenllaModels.child_gear()
+			var worn: Array[MeshInstance3D] = []
 			for bone: String in gear:
-				_attach(bone, gear[bone], Vector3.ZERO)
+				worn.append(_attach(bone, gear[bone], Vector3.ZERO))
 			var eyes := _attach("head", MesenllaModels.child_eyes(), Vector3.ZERO)
 			eyes.material_override = MesenllaModels.glow_material()
 			_eyes = eyes
-			_horse_node = MesenllaModels.bear_mount()
-			_horse_node.rotation.y = PI
-			_horse_node.visible = false
-			add_child(_horse_node)
+			worn.append(eyes)
+			# Its leaves, bark and eyes are of it too: they freeze, and flash when struck, with its
+			# body, and come back to their own look after. (So does its bear, made when it first rides.)
+			for piece in worn:
+				piece.set_meta("own_material", piece.material_override)
+				_parts.append(piece)
 	_shadow = World.make_blob_shadow(1.0)
 	add_child(_shadow)
 
@@ -596,9 +601,10 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		weapon_id = def["weapon"]
 		_show_weapon(weapon_id)
 	elif def.has("weapons"):
-		# Whatever it found: a blade, a spear or a bow.
+		# Whatever it found: a blade, a spear or a bow, each as often as its odds say.
 		var found: Array = def["weapons"]
-		weapon_id = str(found[randi() % found.size()])
+		var odds: Array = def.get("weapon_odds", [])
+		weapon_id = str(found[randi() % found.size()] if odds.size() != found.size() else found[pick_weighted(odds)])
 		_show_weapon(weapon_id)
 	for c: MeshInstance3D in _claws:
 		c.visible = def.get("claws", false)
@@ -653,20 +659,53 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		mesenlla_mind.start(self)
 
 
-func _show_mount(on: bool) -> void:
+func _show_mount(on: bool, falls := false) -> void:
+	var was := _mounted
 	_mounted = on
+	if on and _horse_node == null and model_id == "woods_child":
+		_make_bear_mount()
+	var bear := _horse_node != null and not (_horse_node is MeshInstance3D)
 	if _horse_node:
+		_mount_fall = 0.0
+		_horse_node.top_level = false
+		if bear:
+			MesenllaModels.reset_pose(_horse_node)
 		_horse_node.visible = on
-		_horse_node.rotation.z = 0.0
-		_horse_node.position.y = 0.0
+		_horse_node.rotation = Vector3(0, 0 if bear else PI, 0)
+		_horse_node.position = Vector3.ZERO
 		_visual.position.x = 0.0
-		_horse_node.scale = Vector3.ONE * _scale * HorseModel.RIDDEN_SIZE
-	_visual.position.y = HorseModel.SADDLE * _scale if on else 0.0
+		_horse_node.scale = Vector3.ONE * _scale * (MesenllaModels.CAVALRY_SIZE if bear else HorseModel.RIDDEN_SIZE)
+		if bear:
+			if not on and was and falls:
+				# Brought down: the bear stays where it fell and rolls over, and its rider jumps clear.
+				_horse_node.visible = true
+				_horse_node.top_level = true
+				_horse_node.global_transform = global_transform.scaled_local(Vector3.ONE * _scale * MesenllaModels.CAVALRY_SIZE)
+				_mount_fall = MOUNT_FALL_TIME
+	_visual.rotation = Vector3.ZERO
+	_visual.position.z = 0.0
+	if bear and on:
+		_seat_rider()
+	else:
+		_visual.position.y = HorseModel.SADDLE * _scale if on else 0.0
 	if def.get("rider", false):
 		# On horseback there is a lot more of it to hit.
 		_capsule.radius = (0.85 if on else 0.36) * _scale
 		_capsule.height = height + (1.1 * _scale if on else 0.0)
 		_shape.position = Vector3(0, _capsule.height * 0.5, 0)
+
+
+## Which of these weights wins a draw, each in proportion to its weight.
+static func pick_weighted(weights: Array) -> int:
+	var total := 0.0
+	for w: Variant in weights:
+		total += float(w)
+	var roll := randf() * total
+	for i in weights.size():
+		roll -= float(weights[i])
+		if roll < 0.0:
+			return i
+	return weights.size() - 1
 
 
 ## A training dummy cannot die or do anything back. It only says how hard it has been hit.
@@ -707,8 +746,11 @@ func _tick_dummy(delta: float) -> void:
 		_dummy_label.text = "Last hit %d\n%d a second" % [int(_dummy_last), int(total / DUMMY_WINDOW)]
 
 
-## The rider comes through at a gallop, turns wide, and comes through again.
+## The rider comes through at a gallop, turns wide, and comes through again. On a bear (the Woodland
+## Cavalry) it sits astride: the spear couched as the bear gallops in, driven home as they pass while
+## the bear rakes with a paw, then brandished overhead as the bear half rears and roars, wheeling.
 func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void:
+	var on_bear: bool = def.get("mount", "") == "bear"
 	if _attack_left > 0.0:
 		_attack_left -= delta
 	if _ride_pass > 0.0:
@@ -717,11 +759,16 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		rotation.y = lerp_angle(rotation.y, atan2(_ride_dir.x, _ride_dir.z), min(1.0, delta * 10.0))
 		move_and_slide()
 		position.y = world.ground_at(position)
+		if on_bear and _attack_left <= 0.0:
+			_play("RideCharge", 1.0, 0.15)
 		if not _ride_hit and dist < 2.7 and absf(target.global_position.y - position.y) < 2.6:
 			_ride_hit = true
 			_attack_left = ATTACK_TIME * 0.6
 			_current_anim = ""
-			_play("1H_Melee_Attack_Chop", 1.8, 0.05)
+			if on_bear:
+				_play("RideThrust", 1.0, 0.04)
+			else:
+				_play("1H_Melee_Attack_Chop", 1.8, 0.05)
 			target.hurt(_melee_damage(), position, self)
 			world.sfx_at("clang", position, -2.0)
 		if get_slide_collision_count() > 0:
@@ -736,6 +783,8 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		rotation.y += delta * 2.6
 		move_and_slide()
 		position.y = world.ground_at(position)
+		if on_bear and _attack_left <= 0.0:
+			_play("RideBrandish", 1.0, 0.15)
 		return
 	if _sees and dist > 1.0:
 		_ride_dir = to / dist
@@ -744,13 +793,86 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		world.sfx_at("gallop", position, 0.0)
 		return
 	_move(target, to, dist, delta)
-	_play("Idle")
+	_play("Ride" if on_bear else "Idle")
+
+
+## The Woodland Cavalry's bear, the first time this body rides one.
+func _make_bear_mount() -> void:
+	_horse_node = MesenllaModels.cavalry_bear()
+	_horse_node.visible = false
+	add_child(_horse_node)
+	MesenllaModels.remember_pose(_horse_node)
+	for mi in _horse_node.find_children("*", "MeshInstance3D", true, false):
+		var piece := mi as MeshInstance3D
+		piece.set_meta("own_material", piece.material_override)
+		_parts.append(piece)
+	if _frozen > 0.0 or _flash > 0.0:
+		_restore_materials()
+
+
+const MOUNT_FALL_TIME := 1.8 # seconds the cavalry's bear takes to roll over and sink away, brought down
+
+
+## The rider sits in the bear's saddle and moves with its back: up and down with its gallop, tipped
+## back as it half rears.
+func _seat_rider() -> void:
+	var seat := _horse_node.get_node_or_null("Rig/Hind/Torso/Saddle") as Node3D
+	if seat == null or not seat.is_inside_tree():
+		return
+	var to := global_transform.affine_inverse() * seat.global_transform
+	var turn := Basis(to.basis.get_rotation_quaternion())
+	var size := _visual.scale
+	_visual.transform = Transform3D(turn.scaled(size), to.origin - turn.y * _rider_hip() * size.y)
+	_seat_y = _visual.position.y
+
+
+## How high the rider's hips are above its feet, in its body's own measure, sitting astride.
+func _rider_hip() -> float:
+	if not _fit.has("woods_child_hip"):
+		var hip := 0.42
+		if _skeleton:
+			var i := _skeleton.find_bone("hips")
+			if i >= 0:
+				var rest := _skeleton.get_bone_global_rest(i)
+				hip = ((_visual.global_transform.affine_inverse() * _skeleton.global_transform) * rest.origin).y
+		_fit["woods_child_hip"] = hip
+	return float(_fit["woods_child_hip"])
+
+
+## A mount under its rider: the horse's legs swinging with its pace, or the bear moving with what
+## its rider is doing, the rider sitting in its saddle. pace: metres a second.
+func _tick_mount(delta: float, pace: float) -> void:
+	if _horse_node is MeshInstance3D:
+		HorseModel.set_gait(_horse_node as MeshInstance3D, clampf(pace / 7.0, 0.0, 1.0))
+		return
+	MesenllaModels.ride_bear(self, _horse_node, delta, pace, _current_anim)
+	_seat_rider()
+
+
+## The cavalry's bear, brought down: it rolls over where it fell, then sinks away.
+func _tick_mount_fall(delta: float) -> void:
+	if _mount_fall <= 0.0 or _horse_node == null:
+		return
+	_mount_fall -= delta
+	var t := MOUNT_FALL_TIME - _mount_fall
+	var over := smoothstep(0.0, 0.7, t)
+	var rig := _horse_node.get_node("Rig") as Node3D
+	rig.rotation.z = 1.5 * over
+	rig.position.y = 0.42 * over
+	var head := rig.get_node("Hind/Torso/Head") as Node3D
+	head.rotation.x = lerpf(head.rotation.x, 0.5 * over, minf(1.0, delta * 6.0))
+	rig.position.y -= 1.2 * smoothstep(1.1, MOUNT_FALL_TIME, t)
+	if _mount_fall <= 0.0:
+		_horse_node.visible = false
+		_horse_node.top_level = false
+		rig.rotation.z = 0.0
+		rig.position = Vector3.ZERO
 
 
 ## Below 40% health the horse goes down, and whoever rode it fights on foot.
 func _check_dismount() -> void:
 	if _mounted and hp < max_hp * 0.4:
-		_show_mount(false)
+		_show_mount(false, true)
 		_speed = 3.6 * Game.enemy_speed()
 		_stun = maxf(_stun, 0.9)
 		_current_anim = ""
@@ -788,7 +910,9 @@ func _restore_materials() -> void:
 		return
 	var ghost: Variant = def.get("ghost")
 	for p in _parts:
-		if ghost != null:
+		if p.has_meta("own_material"):
+			p.material_override = p.get_meta("own_material")
+		elif ghost != null:
 			p.material_override = _ghost_material(ghost)
 		else:
 			p.material_override = _material_for(type_id, p.mesh.surface_get_material(0))
@@ -1496,7 +1620,7 @@ func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_nam
 	_show_stun(flags & 16 != 0)
 	net_warning = flags & 64 != 0
 	if def.get("rider", false) and (flags & 128 != 0) != _mounted:
-		_show_mount(flags & 128 != 0)
+		_show_mount(flags & 128 != 0, true)
 	_show_frozen(0.25 if flags & 32 != 0 else 0.0)
 	var burning := flags & 8 != 0
 	if burning and burn_time <= 0.0:
@@ -1535,7 +1659,8 @@ func _puppet_tick(delta: float) -> void:
 		if root_left <= 0.0:
 			show_roots(0.0)
 	if _mounted:
-		HorseModel.set_gait(_horse_node, clampf(was.distance_to(position) / maxf(delta, 0.001) / 7.0, 0.0, 1.0))
+		_tick_mount(delta, was.distance_to(position) / maxf(delta, 0.001))
+	_tick_mount_fall(delta)
 	if _custom and not dormant:
 		# The host's creatures move here by snapshots: their pace is how far they came this frame.
 		var pace := was.distance_to(position) / maxf(delta, 0.001) if model_id in MesenllaModels.KINDS else was.distance_squared_to(position)
@@ -1987,9 +2112,12 @@ func _physics_process(delta: float) -> void:
 			var over := k * k * (3.0 - 2.0 * k)
 			_horse_node.rotation.z = 1.45 * over
 			_horse_node.position.y = 0.45 * over * _scale
-			_visual.position.y = HorseModel.SADDLE * _scale * (1.0 - over)
+			var bear := not (_horse_node is MeshInstance3D)
+			_visual.rotation = Vector3.ZERO
+			_visual.position.y = (_seat_y if bear else HorseModel.SADDLE * _scale) * (1.0 - over)
 			_visual.position.x = -0.7 * over * _scale
-			HorseModel.set_gait(_horse_node, 0.0)
+			if not bear:
+				HorseModel.set_gait(_horse_node as MeshInstance3D, 0.0)
 		if _dying <= 0.0:
 			release()
 		return
@@ -1999,6 +2127,7 @@ func _physics_process(delta: float) -> void:
 	if puppet:
 		_puppet_tick(delta)
 		return
+	_tick_mount_fall(delta)
 	if _frozen > 0.0:
 		_frozen -= delta
 		if _frozen <= 0.0:
@@ -2108,7 +2237,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if _mounted:
 		_tick_rider(target, to, dist, delta)
-		HorseModel.set_gait(_horse_node, clampf(velocity.length() / 7.0, 0.0, 1.0))
+		_tick_mount(delta, velocity.length())
 		return
 	if _can_hop:
 		_hop_cd -= delta

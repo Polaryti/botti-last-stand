@@ -69,6 +69,20 @@ const POSES := {
 	"Ride": [1.0, [0.0, RIDE_REINS], [1.0, RIDE_REINS]],
 	# In the saddle at the charge: leaning in, the right forearm along the lance.
 	"RideCharge": [1.0, [0.0, RIDE_COUCHED], [1.0, RIDE_COUCHED]],
+	# A Woodland Cavalry's spear driven home from the couch as it passes, and back to the couch.
+	"RideThrust": [0.5,
+		[0.0, RIDE_COUCHED],
+		[0.1, {"r": [Vector3(-0.35, -0.55, -0.55), Vector3(-0.1, -0.05, 1.0)], "l": RIDE_REINS["l"], "wrist": ALONG, "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(0.05, 0.35, 0.0), "drop": 0.08}],
+		[0.2, {"r": [Vector3(-0.2, -0.25, 0.95), Vector3(-0.06, -0.35, 0.94)], "l": [Vector3(0.35, -0.5, 0.6), Vector3(0.1, -0.3, 0.95)], "wrist": ALONG, "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(0.38, -0.25, 0.0), "drop": 0.08}],
+		[0.32, {"r": [Vector3(-0.22, -0.3, 0.92), Vector3(-0.06, -0.38, 0.92)], "l": [Vector3(0.35, -0.5, 0.6), Vector3(0.1, -0.3, 0.95)], "wrist": ALONG, "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(0.34, -0.22, 0.0), "drop": 0.08}],
+		[0.5, RIDE_COUCHED]],
+	# Wheeling round after a pass: the spear raised high and shaken, the rider leaning back in the saddle.
+	"RideBrandish": [1.2,
+		[0.0, RIDE_RAISED],
+		[0.3, RIDE_SHAKE],
+		[0.6, RIDE_RAISED],
+		[0.9, RIDE_SHAKE],
+		[1.2, RIDE_RAISED]],
 	# Two fingers to the lips, calling a horse.
 	"Whistle": [0.9,
 		[0.0, {}],
@@ -101,6 +115,8 @@ const RIDE_LEG_L := [Vector3(0.8, -0.35, 0.5), Vector3(0.25, -0.95, 0.1)]
 const RIDE_BOW := [Vector3(-0.15, 0.2, 1.0), Vector3(-0.05, 0.15, 1.0)]
 const RIDE_AIM := {"r": RIDE_BOW, "l": [Vector3(0.45, 0.1, 0.9), Vector3(-0.3, 0.1, 0.95)], "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(-0.05, -0.25, 0.0), "drop": 0.08}
 const RIDE_REINS := {"r": [Vector3(-0.2, -0.6, 0.75), Vector3(0.15, -0.15, 0.98)], "l": [Vector3(0.2, -0.6, 0.75), Vector3(-0.15, -0.15, 0.98)], "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(0.06, 0.0, 0.0), "drop": 0.08}
+const RIDE_RAISED := {"r": [Vector3(-0.35, 0.88, 0.25), Vector3(-0.1, 0.92, 0.36)], "l": [Vector3(0.2, -0.6, 0.75), Vector3(-0.15, -0.15, 0.98)], "wrist": ALONG, "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(-0.12, 0.15, 0.0), "drop": 0.08}
+const RIDE_SHAKE := {"r": [Vector3(-0.35, 0.82, 0.42), Vector3(-0.1, 0.7, 0.7)], "l": [Vector3(0.2, -0.6, 0.75), Vector3(-0.15, -0.15, 0.98)], "wrist": ALONG, "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(-0.06, 0.22, 0.0), "drop": 0.08}
 const RIDE_COUCHED := {"r": [Vector3(-0.3, -0.85, 0.42), Vector3(-0.04, -0.02, 1.0)], "l": [Vector3(0.2, -0.6, 0.75), Vector3(-0.15, -0.15, 0.98)], "wrist": ALONG, "leg_r": RIDE_LEG_R, "leg_l": RIDE_LEG_L, "chest": Vector3(0.28, 0.0, 0.0), "drop": 0.08}
 ## The Crossbow over the parapet: both arms forward and down, the chest bent over the wall.
 const CROSS_AIM := {"r": [Vector3(-0.2, -0.42, 0.88), Vector3(-0.04, -0.45, 0.89)], "l": [Vector3(0.45, -0.55, 0.7), Vector3(-0.55, -0.35, 0.76)], "chest": Vector3(0.22, -0.08, 0.0), "drop": 0.05}

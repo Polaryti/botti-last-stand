@@ -72,9 +72,7 @@ func _line(view: SubViewport, ids: Array, gap: float) -> Array[Node3D]:
 			anim.play("Idle")
 		elif id == "mount":
 			body = Node3D.new()
-			var bear := MesenllaModels.bear_mount()
-			bear.rotation.y = PI
-			body.add_child(bear)
+			body.add_child(MesenllaModels.cavalry_bear())
 		else:
 			body = MesenllaModels.build(id)
 		if id in ["eagle", "mist_eagle"]:

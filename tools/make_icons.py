@@ -445,7 +445,91 @@ def wyvern():
     return (path(("#6f5446", "#3a2a22"), wing) + f'<g transform="translate(100 0) scale(-1 1)">{path(("#6f5446", "#3a2a22"), wing)}</g>'
         + path(green, "M44 40 C44 26 56 26 56 40 L56 70 C56 76 44 76 44 70Z") + path(green, "M46 30 C46 18 54 18 54 30 L54 34 L46 34Z") + poly(green, (44, 14), (56, 14), (50, 4))
         + curve("#33482a", 5, "M50 74 C52 84 46 90 50 96", ink=False) + poly(BONE, (50, 98), (44, 90), (56, 90)) + circ("#ffb52e", 47, 12, 2, 0) + circ("#ffb52e", 53, 12, 2, 0))
-for g in (bear, eagle, antlers, sprout, boulder, storm, wyvern):
+def _ruff(cx, cy, rx, ry, spikes, deep, col):
+    # A shaggy outline: points alternating out and in around an ellipse.
+    pts = []
+    for i in range(spikes * 2):
+        a = math.pi * 2 * i / (spikes * 2) - math.pi / 2
+        k = 1.0 if i % 2 == 0 else deep
+        pts.append((round(cx + math.cos(a) * rx * k, 1), round(cy + math.sin(a) * ry * k, 1)))
+    return poly(col, *pts)
+def _bear_head(fur, ruff, muzzle, eyes, mouth="#5a1414", glow=None):
+    # A bear's head from the front, snarling: a shaggy ruff, small round ears, a heavy brow, an open
+    # mouth with fangs.
+    out = circ(fur, 22, 22, 11) + circ(fur, 78, 22, 11) + circ(ruff[1], 22, 22, 5, 0) + circ(ruff[1], 78, 22, 5, 0)
+    out += _ruff(50, 55, 44, 40, 13, 0.86, ruff)
+    out += path(fur, "M20 50 C20 24 80 24 80 50 C80 74 66 88 50 88 C34 88 20 74 20 50Z")
+    out += path(muzzle, "M34 66 C34 54 66 54 66 66 C66 80 58 88 50 88 C42 88 34 80 34 66Z")
+    out += path(mouth, "M38 72 C42 84 58 84 62 72 C56 76 44 76 38 72Z", 2.4)
+    out += poly("#fffbe8", (41, 73), (44, 81), (46.5, 74.5), w=1.6) + poly("#fffbe8", (53.5, 74.5), (56, 81), (59, 73), w=1.6)
+    out += ell(INK, 50, 62, 7, 5, 0, 0)
+    out += line(ruff[1], 3.2, (30, 40), (44, 46), ink=False) + line(ruff[1], 3.2, (70, 40), (56, 46), ink=False)
+    if glow:
+        out += circ(glow, 38, 49, 7, 0).replace("/>", ' opacity="0.45"/>') + circ(glow, 62, 49, 7, 0).replace("/>", ' opacity="0.45"/>')
+    out += ell(eyes, 38, 49, 4.2, 3.2, 12, 1.6) + ell(eyes, 62, 49, 4.2, 3.2, -12, 1.6)
+    return out
+def bear():
+    # A brown bear's head, snarling, in a shaggy ruff of fur.
+    return _bear_head(("#a5743f", "#4e3018"), ("#7a5028", "#3a2410"), ("#d8b88c", "#9a7248"), ("#ffcf5a", "#d98a14"))
+def mist_bear():
+    # The Mist Bear: the same snarl in pale spectral fur, eyes burning cyan, mist curling below it.
+    head = _bear_head(("#d4fbf6", "#4fa8a4"), ("#a8ece6", "#2c6e6c"), ("#f2fffd", "#9ed8d2"), ("#ffffff", "#5ff0ff"), "#1f4a50", "#9ff8ff")
+    wisps = curve("#e6fffc", 5, "M4 90 C20 80 32 96 48 90 C64 84 76 98 96 88", ink=False) + curve("#bff3ec", 3.5, "M10 98 C26 92 40 100 56 96", ink=False)
+    return head + wisps
+def mist_eagle():
+    # A Mist Eagle's head in profile: a hooked beak, a burning eye, its feathers trailing into mist.
+    ghost = ("#e8fffc", "#55b8b3")
+    return (path(ghost, "M30 30 C40 12 70 8 84 22 C94 32 96 50 88 60 C94 68 96 78 90 90 C80 84 72 82 62 86 C60 76 54 70 46 68 C36 66 30 58 30 48Z")
+        + curve("#9fdcd6", 3, "M58 30 C70 34 78 44 80 56", ink=False) + curve("#9fdcd6", 3, "M52 46 C62 50 70 60 72 72", ink=False)
+        + path(GOLD, "M32 32 C18 30 6 40 4 56 C10 50 16 48 22 50 C20 56 22 60 28 62 C30 52 34 46 40 44Z")
+        + path(("#fff2a8", "#e0b030"), "M30 32 C34 30 40 32 42 36 C38 36 34 36 30 36Z", 2)
+        + circ("#9ff8ff", 48, 38, 9, 0).replace("/>", ' opacity="0.45"/>') + circ(("#ffffff", "#5ff0ff"), 48, 38, 5.5, 2) + circ(INK, 49, 38, 2.2, 0)
+        + line("#2c6e6c", 3, (38, 30), (58, 32), ink=False)
+        + curve("#e6fffc", 5, "M62 92 C72 86 80 96 92 90", ink=False) + curve("#bff3ec", 3.5, "M70 99 C78 95 86 100 96 96", ink=False))
+def mist_elemental():
+    # A column of swirling mist round a glowing core, with two pale eyes in its hood.
+    body = path(("#d8fffb", "#3a9e9a"), "M50 6 C70 8 82 26 78 44 C90 54 88 72 74 80 C70 90 58 96 50 96 C42 96 30 90 26 80 C12 72 10 54 22 44 C18 26 30 8 50 6Z")
+    swirl = curve("#ffffff", 4, "M28 74 C20 56 40 42 56 50 C70 58 60 78 46 72", ink=False) + curve("#bff7f2", 3, "M70 30 C78 40 76 52 68 58", ink=False) + curve("#bff7f2", 3, "M24 34 C30 26 38 22 46 22", ink=False)
+    core = circ("#ffffff", 50, 62, 15, 0).replace("/>", ' opacity="0.35"/>') + circ(("#ffffff", "#5fe3da"), 50, 62, 9, 2.4)
+    eyes = (ell("#1f4a50", 40, 32, 7, 4.5, 14, 0) + ell("#1f4a50", 60, 32, 7, 4.5, -14, 0)
+        + ell(("#ffffff", "#9ff8ff"), 40.5, 32, 4, 2.2, 14, 0) + ell(("#ffffff", "#9ff8ff"), 59.5, 32, 4, 2.2, -14, 0))
+    return body + swirl + core + eyes
+def storm_elemental():
+    # A thunderhead with burning eyes, a body that is one bolt of lightning, and crackling arms.
+    cloud = path(("#8c95ac", "#353b50"), "M14 50 C2 48 4 28 18 28 C18 12 40 6 50 18 C60 6 82 12 82 28 C96 28 98 48 86 50 C80 56 20 56 14 50Z")
+    eyes = ell(("#ffffff", "#bfe0ff"), 38, 36, 6, 3, 12, 1.6) + ell(("#ffffff", "#bfe0ff"), 62, 36, 6, 3, -12, 1.6)
+    body = poly(("#ffffff", "#7fc0ff"), (42, 52), (60, 52), (52, 68), (64, 68), (38, 98), (46, 74), (34, 74))
+    arms = line("#cfe8ff", 3.2, (16, 52), (8, 64), (16, 66), (6, 82)) + line("#cfe8ff", 3.2, (84, 52), (92, 64), (84, 66), (94, 82))
+    return arms + cloud + body + eyes
+def woodland_cavalry():
+    # A Child of the Woods riding a bear into battle, its spear couched across the bear's head.
+    spear_shaft = line("#c08a52", 4, (8, 74), (84, 12))
+    tip = poly(STEEL, (84, 12), (97, 2), (90, 18), w=2.4)
+    rider = at(46, 24, 0.48, sprout())
+    beast = at(50, 64, 0.74, _bear_head(("#a5743f", "#4e3018"), ("#7a5028", "#3a2410"), ("#d8b88c", "#9a7248"), ("#ffcf5a", "#d98a14")))
+    return beast + rider + spear_shaft + tip
+def daemon():
+    # A horned daemon's head on bat wings, eyes burning and fangs bared.
+    wing = "M40 46 C28 30 12 26 2 32 C8 40 10 46 8 54 C16 52 22 56 24 62 C30 56 36 54 42 56Z"
+    red = ("#ff6a4a", "#8c1010")
+    return (path(("#5a1a1a", "#250808"), wing) + f'<g transform="translate(100 0) scale(-1 1)">{path(("#5a1a1a", "#250808"), wing)}</g>'
+        + path(BONE, "M30 32 C18 24 14 12 18 2 C24 12 32 16 40 22Z") + path(BONE, "M70 32 C82 24 86 12 82 2 C76 12 68 16 60 22Z")
+        + path(red, "M26 42 C26 18 74 18 74 42 L72 64 C68 82 58 92 50 92 C42 92 32 82 28 64Z")
+        + line("#4a0808", 3.4, (32, 42), (46, 48), ink=False) + line("#4a0808", 3.4, (68, 42), (54, 48), ink=False)
+        + circ("#ffe066", 39, 52, 7, 0).replace("/>", ' opacity="0.4"/>') + circ("#ffe066", 61, 52, 7, 0).replace("/>", ' opacity="0.4"/>')
+        + ell(("#fff6b0", "#ffb52e"), 39, 52, 5, 2.8, 15, 1.6) + ell(("#fff6b0", "#ffb52e"), 61, 52, 5, 2.8, -15, 1.6)
+        + path("#3a0606", "M34 70 C42 80 58 80 66 70 C58 74 42 74 34 70Z", 2.2)
+        + poly("#fffbe8", (38, 71), (41, 79), (43, 72.5), w=1.4) + poly("#fffbe8", (57, 72.5), (59, 79), (62, 71), w=1.4))
+def invisible():
+    # Someone who is there and isn't: a dashed outline of a figure, faintly filled, with glints of light.
+    dash = 'stroke-dasharray="7 5"'
+    fig = ('<g fill="#dcfdf8" fill-opacity="0.18">'
+        + f'<circle cx="50" cy="28" r="13" stroke="{INK}" stroke-width="8" {dash}/>'
+        + f'<path d="M24 94 C24 60 34 46 50 46 C66 46 76 60 76 94Z" stroke="{INK}" stroke-width="8" stroke-linejoin="round" {dash}/>'
+        + f'<circle cx="50" cy="28" r="13" stroke="#dcfdf8" stroke-width="4" {dash}/>'
+        + f'<path d="M24 94 C24 60 34 46 50 46 C66 46 76 60 76 94Z" stroke="#dcfdf8" stroke-width="4" stroke-linejoin="round" {dash}/></g>')
+    return fig + at(82, 18, 0.3, star()) + at(16, 54, 0.22, star()) + at(86, 70, 0.16, star())
+for g in (bear, mist_bear, eagle, mist_eagle, antlers, sprout, boulder, storm, wyvern, mist_elemental, storm_elemental, woodland_cavalry, daemon, invisible):
     PLAIN.append(g)
 
 # Beyond the Mists: Mist Bastion's garrison

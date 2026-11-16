@@ -611,7 +611,7 @@ func _draw_chips(s: Vector2) -> void:
 	if Game.is_night() and director:
 		var hunting := player.world.count_hunting()
 		if player.invis_left > 0.0:
-			chips.append(["Invisible", "eye_closed", UiTheme.MIST])
+			chips.append(["Invisible", "invisible", UiTheme.MIST])
 		elif hunting > 0:
 			chips.append(["Hunted", "eye", UiTheme.BLOOD.lightened(0.3)])
 		else:

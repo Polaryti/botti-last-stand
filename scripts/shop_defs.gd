@@ -26,7 +26,7 @@ const ITEMS := {
 		"desc": "When you would die, you rise again in a rage for 5 s: 30% faster, attacks 30% faster, and your blows set enemies on fire. Once every 60 s."},
 	"shadow_shroud": {"name": "Shadow Shroud", "section": "upgrades", "class": "infantry", "spec": "shadow", "price": 240, "icon": "shroud", "model": "dagger",
 		"desc": "Every 8 kills, an ability makes you Invisible for 3 s. Nothing can see you, even right next to it.",
-		"art": {"name": "Shadow Shroud", "cost": 0.0, "cast": 0.0, "cd": 0.0, "icon": "eye_closed"}},
+		"art": {"name": "Shadow Shroud", "cost": 0.0, "cast": 0.0, "cd": 0.0, "icon": "invisible"}},
 	"lance_charge": {"name": "Lance Charge", "section": "upgrades", "class": "chivalry", "spec": "lancer", "price": 260, "icon": "lance", "model": "lance",
 		"desc": "An ability: dash 10 m forward with your lance couched, on foot or riding. Everything in the way takes 55 damage and is thrown aside. Ready again after 16 s.",
 		"art": {"name": "Lance Charge", "cost": 0.0, "cast": 0.0, "cd": 16.0, "icon": "lance"}},

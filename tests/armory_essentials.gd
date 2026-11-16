@@ -4,6 +4,16 @@ func _ready() -> void:
 	add_child(m)
 	await get_tree().process_frame
 	var checks := 0
+	# A class you don't own is locked in the Armory, with only how to unlock it.
+	var saved_unlocked := Game.unlocked.duplicate()
+	Game.unlocked.erase("monk")
+	m.show_armory("monk")
+	await get_tree().process_frame
+	assert(m.panel.find_child("LockedClass", true, false) != null and m.panel.find_child("WeaponTags", true, false) == null)
+	checks += 1
+	# Each class's page, as its owner sees it.
+	for id: String in ClassDefs.ALL:
+		Game.unlocked[id] = true
 	for id: String in ClassDefs.ALL:
 		assert(ClassPresentation.COPY.has(id))
 		assert(ClassPresentation.description(id).count(".") == 2)
@@ -24,6 +34,7 @@ func _ready() -> void:
 					assert(labels.any(func(l: Label) -> bool: return l.text == ShopDefs.ITEMS[item]["desc"]))
 			checks += 3
 		checks += 2
+	Game.unlocked = saved_unlocked
 	print("ARMORY ESSENTIALS: ", checks, " checks passed")
 	if not OS.get_cmdline_user_args().is_empty():
 		m.show_armory()

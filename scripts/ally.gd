@@ -18,6 +18,7 @@ const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy"]
 const GARRISON_BLOW := {"mist_infantry": 0.65, "mist_heavy": 1.04}
 const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2}
 const GARRISON_SIGHT := 18.0
+const GARRISON_THERE := 1.5 # metres from a spot a Mist Soldier walking to it counts as there
 const GARRISON_LEASH := 16.0
 const GARRISON_GATE_OUT := 4.0 # metres before its gate that a Mist Soldier stands
 const GARRISON_PORTAL_OUT := 5.0 # and from the portal, once its gate has fallen
@@ -62,8 +63,7 @@ var arrow_kind := "" # a Mist Ranger on a gate at Level 3 of Mist Reinforcements
 var perch_out := Vector3.ZERO
 var hand := ""
 var net_hand := 0 # another phone's word on what it holds: 0 bow, 1 longbow, 2 crossbow
-var _hand_mesh: MeshInstance3D
-var _back_mesh: MeshInstance3D
+var _hand_mesh: MeshInstance3D # a WeaponVisual for a bow or crossbow, else a plain mesh
 var _close_foe: Zombie
 var _lean := 0.0
 var _lean_to := 0.0
@@ -572,7 +572,7 @@ func _tick_garrison(delta: float) -> void:
 	elif home != Vector3.INF:
 		var to := _garrison_step(home) - position
 		to.y = 0.0
-		if to.length() > 1.5:
+		if to.length() > GARRISON_THERE:
 			dir = to.normalized()
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 7.0))
 	if _attack_left > 0.0:
@@ -662,12 +662,20 @@ func arm(weapon: String) -> void:
 		return
 	hand = weapon
 	_lean_to = LEAN_TILT * 0.7 if weapon == "crossbow" else 0.0
-	_hand_mesh.mesh = WeaponDefs.mesh(weapon)
-	_hand_mesh.rotation = WeaponDefs.hand_rotation(weapon)
-	if _back_mesh:
-		_back_mesh.visible = weapon != "bow"
-		var slung := "crossbow" if weapon == "longbow" else "longbow"
-		_back_mesh.mesh = WeaponDefs.mesh(slung)
+	_hold(_hand_mesh as WeaponVisual, weapon)
+
+
+## A bow or a crossbow in the hand at the size a player's is (WeaponDefs.held_size), one at a time.
+## A bow is laid along where it faces, as a player's is; a crossbow follows the hand, so it aims
+## down with the arms when it leans out over a parapet.
+func _hold(held: WeaponVisual, weapon: String) -> void:
+	held.equip(weapon)
+	held.rotation = WeaponDefs.hand_rotation(weapon)
+	if weapon == "crossbow":
+		held.scale = Vector3.ONE * WeaponDefs.held_size(weapon) / maxf(0.01, _visual.global_basis.get_scale().x if _visual.is_inside_tree() else _visual.scale.x * scale.x)
+	else:
+		held.scale = Vector3.ONE
+		held.hold(self, true, WeaponDefs.held_size(weapon))
 
 
 ## Leans out over the parapet, or straightens up, a little at a time.
@@ -707,8 +715,13 @@ func _garrison_step(home: Vector3) -> Vector3:
 	from.y = 0.0
 	var along := from.dot(out)
 	var aside := (from - out * along).length()
-	if aside > 1.0 and along > -1.0:
-		return (g["at"] as Vector3) + out * maxf(2.0, minf(along, 4.0))
+	var mouth := (g["at"] as Vector3) + out * maxf(2.0, minf(along, 4.0))
+	var to_mouth := mouth - position
+	to_mouth.y = 0.0
+	# Off to the side of the gateway, it first comes in front of it; once there (as close as it counts
+	# as having arrived anywhere), straight on through to the far side.
+	if aside > 1.0 and along > -1.0 and to_mouth.length() > GARRISON_THERE:
+		return mouth
 	return (g["at"] as Vector3) - out * (Fort.WALL_T * 0.5 + 2.5)
 
 
@@ -777,31 +790,23 @@ func _equip_retinue() -> void:
 	var attachment := BoneAttachment3D.new()
 	attachment.bone_name = bone
 	skeleton.add_child(attachment)
-	var held := MeshInstance3D.new()
 	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind in ["ranger", "mist_ranger"] else "battleaxe" if kind == "mist_heavy" else "sword"
-	held.mesh = WeaponDefs.mesh(weapon)
-	held.rotation = WeaponDefs.hand_rotation(weapon)
-	held.scale = Vector3.ONE * 0.8 / _visual.scale.x
-	held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	attachment.add_child(held)
-	if kind == "mist_ranger":
+	var held: MeshInstance3D
+	if weapon == "bow":
+		# Bows (and a gate's Crossbow) at a player's size, one in the hand at a time.
+		held = WeaponVisual.new()
+		held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		attachment.add_child(held)
 		_hand_mesh = held
 		hand = weapon
-		# The bow it is not using, slung across its back (shown on a gate, where it carries two).
-		for back_bone: String in ["chest", "spine", "torso"]:
-			if skeleton.find_bone(back_bone) >= 0:
-				var on_back := BoneAttachment3D.new()
-				on_back.bone_name = back_bone
-				skeleton.add_child(on_back)
-				_back_mesh = MeshInstance3D.new()
-				_back_mesh.mesh = WeaponDefs.mesh("crossbow")
-				_back_mesh.position = Vector3(0.0, 0.1, -0.22) / _visual.scale.x
-				_back_mesh.rotation = Vector3(0.0, 0.0, 0.9)
-				_back_mesh.scale = Vector3.ONE * 0.8 / _visual.scale.x
-				_back_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				_back_mesh.visible = false
-				on_back.add_child(_back_mesh)
-				break
+		_hold(held as WeaponVisual, weapon)
+	else:
+		held = MeshInstance3D.new()
+		held.mesh = WeaponDefs.mesh(weapon)
+		held.rotation = WeaponDefs.hand_rotation(weapon)
+		held.scale = Vector3.ONE * 0.8 / _visual.scale.x
+		held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		attachment.add_child(held)
 	if weapon == "torch":
 		var flame := MeshInstance3D.new()
 		flame.mesh = WorldLight.flame_mesh()

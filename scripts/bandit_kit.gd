@@ -20,7 +20,7 @@ const FAN_RANGE := 22.0
 const PLUNDER_ARROWS := 6
 
 const ARTS := {
-	"": {"name": "Into the Shadows", "cost": 0.0, "cast": 0.1, "cd": 12.0, "icon": "eye_closed", "anim": "Stance"},
+	"": {"name": "Into the Shadows", "cost": 0.0, "cast": 0.1, "cd": 12.0, "icon": "invisible", "anim": "Stance"},
 	"thief": {"name": "Steal", "cost": 0.0, "cast": 0.08, "cd": 10.0, "icon": "hand"},
 	"mercenary": {"name": "Nightfall", "cost": 0.0, "cast": 0.3, "cd": 22.0, "icon": "moon", "anim": "Stance"},
 	"highwayman": {"name": "Dagger Fan", "cost": 0.0, "cast": 0.15, "cd": 8.0, "icon": "dagger"},

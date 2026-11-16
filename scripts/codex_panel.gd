@@ -95,13 +95,16 @@ static func enemy_group(id: String) -> int:
 	var d: Dictionary = ZombieDefs.ALL[id]
 	if d.get("mist_boss", false) or d.get("mesenlla_boss", false): return 5
 	if SpawnRules.is_mesenlla(d): return 4
+	if d.get("hero", false) or d.get("rider", false) or d.get("fallen", false): return 2
 	if d.get("maps", []).has("mists"): return 3
-	if d.get("hero", false) or d.get("rider", false): return 2
 	if id in ["normal", "clever", "magic", "beast", "leaper"]: return 0
 	return 1
 
+const HIDDEN_ENEMY := "Kill one to learn about it."
+
 func _enemies() -> void:
-	var order: Array = ZombieDefs.ALL.keys()
+	# A War Wyvern's rider is part of the War Wyvern's entry, not one of its own.
+	var order: Array = ZombieDefs.ALL.keys().filter(func(k: String) -> bool: return not ZombieDefs.ALL[k].get("carried", false))
 	order.sort_custom(func(a: String, b: String) -> bool:
 		var ga := enemy_group(a)
 		var gb := enemy_group(b)
@@ -129,6 +132,9 @@ func _enemies() -> void:
 		if d.has("first_words"):
 			# A boss's words: as it comes, and as it falls.
 			words += "\nAs it comes: \u201c%s\u201d\nAs it falls: \u201c%s\u201d" % [d["first_words"], d.get("last_words", "")]
+		if not Game.has_killed(id):
+			# What it is, and what it does, are learned by killing one.
+			words = HIDDEN_ENEMY
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], words, note)
 		_map_badge(d, d.get("maps", []).has("village"))
 

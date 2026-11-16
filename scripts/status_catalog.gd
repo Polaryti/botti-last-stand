@@ -29,7 +29,7 @@ const TIMED := [
 	{
 		"field": "invis_left",
 		"name": "Invisible",
-		"icon": "eye_closed",
+		"icon": "invisible",
 		"desc": "Hides you from ordinary enemies until the timer ends or you attack. Some foes can see through it. Afterwards you cannot turn invisible again for 3 seconds."
 	},
 	{

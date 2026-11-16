@@ -3523,7 +3523,11 @@ func test_beyond_review() -> void:
 	ok(Game.changelog_seen == ChangelogPanel.signature(), "opening the Changelog reads them")
 	await frames(30)
 	var all_lines: int = m.panel.find_children("*", "RichTextLabel", true, false).size()
-	ok(lines < all_lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, all_lines])
+	var newest := ChangelogPanel.count(ChangelogPanel.versions(ChangelogPanel.notes())[0])
+	if newest > ChangelogPanel.FIRST_BUILT:
+		ok(lines < all_lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, all_lines])
+	else:
+		ok(lines == all_lines and all_lines >= newest, "the newest version's %d changes are all there at once (%d)" % [newest, all_lines])
 	m.show_menu()
 	await frames(2)
 	notes = m.ui_layer.find_child("ChangelogButton", true, false) as Button

@@ -50,7 +50,7 @@ func add_solid(_at: Vector3, _size: Vector3) -> void: pass
 func add_solid_xf(_t: Transform3D, _size: Vector3) -> void: pass
 func add_collider(_at: Vector3, _size: Vector3) -> void: pass
 func add_collider_xf(_t: Transform3D, _size: Vector3) -> void: pass
-func add_barrier(_at: Vector3, _size: Vector3) -> void: pass
+func add_barrier(_at: Vector3, _size: Vector3, _closes_paths := true) -> void: pass
 func add_barrier_xf(_t: Transform3D, _size: Vector3) -> void: pass
 func add_window_xf(_t: Transform3D, _size: Vector3) -> void: pass
 func add_enemy_block(_at: Vector3, _size: Vector3) -> void: pass
