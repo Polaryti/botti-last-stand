@@ -1,9 +1,10 @@
 class_name Updates
 extends Node
-## Looks once per launch for a newer version on the game's GitHub page, where every version is
-## published with its Android app. On Android it can fetch the new app and hand it to Android's own
-## installer, which asks before it changes anything. An iPhone app cannot install another, so there it
-## only says a new version is out and where to find it. With no connection it says nothing.
+## Looks for a newer version on the game's GitHub page, where every version is published with its
+## Android app: when the game starts, and again each time a match ends and the menu comes back. On
+## Android it can fetch the new app and hand it to Android's own installer, which asks before it changes
+## anything. An iPhone app cannot install another, so there it only says a new version is out and
+## where to find it. With no connection it says nothing.
 
 signal changed
 

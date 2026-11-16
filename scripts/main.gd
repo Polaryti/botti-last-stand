@@ -4,6 +4,7 @@ extends Node
 
 var world: World
 var hud: Hud
+var spectator: SpectatorView # Spectator Mode: the broadcast over a match this phone only watches
 var ui_layer: CanvasLayer
 var panel: Control
 var _theme: Theme
@@ -11,6 +12,8 @@ var tree_panel: TreePanel
 var _together_tab := 0
 var _run_over := false
 var _back := Callable() # what the phone's back button does on the current screen
+var _warmed := false # see _warm_up
+var _warm_models: Array[Resource] = []
 var _store_return := Callable() # where the Store's Back goes
 var _start_listed := true # online: a new game is public unless you choose private
 var updates: Updates
@@ -19,8 +22,12 @@ var _checked_updates := false
 var _pause_root: Control
 var _net_go := false
 
-const TOGETHER_TABS := ["Same Wi-Fi", "Hotspot", "Online"]
-const ONLINE_TAB := 2
+const ARMORY_TABS := ["Paths", "Appearance"]
+const ARMORY_MAPS := "maps" # the Armory's Map Upgrades row, beside the classes
+var _armory_tab := 0
+const TOGETHER_TABS := ["Same Wi-Fi", "Online"]
+const ONLINE_TAB := 1
+const SPECTATE_RED := Color(0.92, 0.24, 0.2) # a match to watch: its rows, the Play Together glow, the LIVE mark
 const TIPS := [
 	"Push the stick halfway to walk quietly.",
 	"Zombies see you much less in tall wheat.",
@@ -31,7 +38,7 @@ const TIPS := [
 	"Fire hurts a Wraith twice as much.",
 	"Fallen Heroes grow stronger every minute, and drop their weapon.",
 	"The night does not wait: open the tree somewhere safe.",
-	"The bell strikes once for each minute gone, and draws zombies to the church.",
+	"In The Village, the bell strikes once for each minute gone, and draws zombies to the church.",
 	"Beasts track by scent. Hiding only delays them.",
 	"A chime means a familiar has appeared close by. Look for its light.",
 	"In the last two minutes, everything comes for you. Save your strength.",
@@ -58,22 +65,36 @@ func _ready() -> void:
 	ui_layer = CanvasLayer.new()
 	add_child(ui_layer)
 	_theme = UiTheme.make()
+	# Every button anywhere in the menus gives under the finger, whoever made it.
+	get_tree().node_added.connect(func(n: Node) -> void:
+		if n is BaseButton:
+			UiTheme.give(n as BaseButton))
 	Net.game_started.connect(func() -> void: start_game(Net.game_mode()))
 	Net.left.connect(_on_net_left)
 	Net.game_over.connect(_on_net_over)
 	Net.all_ready.connect(func() -> void: _net_go = true)
 	Net.back_in_room.connect(_return_to_room)
-	Board.counted.connect(func(result: Dictionary) -> void:
-		_counted = result
-		_apply_board_note())
 	updates = Updates.new()
 	add_child(updates)
+	var auto := AutoQuality.new(self)
+	auto.name = "AutoQuality"
+	add_child(auto)
+	auto.changed.connect(_on_auto_quality)
 	if Game.test_map != "":
 		# Someone pressed F6 on a map in the editor, so go straight to it.
 		var map := Game.test_map
-		start_game(Game.Mode.SANDBOX if map.contains("sandbox") else (Game.Mode.FORT if map.contains("fort") else Game.Mode.NIGHT))
+		start_game(Game.Mode.SANDBOX if map.contains("sandbox") else (Game.Mode.FORT if map.contains("fort") or map.contains("bastion") else Game.Mode.NIGHT))
 		return
 	show_menu()
+
+
+## Auto graphics picked a level (on the title screen) or stepped down (in a match). The pick takes
+## hold at once for sharpness and effects, and in full with the next world that is built.
+func _on_auto_quality(quality: int, in_match: bool) -> void:
+	if in_match:
+		if world and is_instance_valid(world):
+			world._grade()
+			world.director.local_banner("Graphics lowered to %s to keep the game smooth" % ["Low", "Medium", "High"][quality], 4.0)
 
 
 func _quit() -> void:
@@ -84,11 +105,35 @@ func _fill(c: Control) -> void:
 	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
+## The first time a class is shown turning on its stand (the Store, choosing a class) its model has to
+## be read and its look prepared for drawing, which made those screens hitch as they opened. The
+## models are read in the background as the menu first appears and kept, and one is drawn once out of
+## sight a moment later, while nothing else is happening.
+func _warm_up() -> void:
+	if _warmed:
+		return
+	_warmed = true
+	var paths := PackedStringArray()
+	for model: String in ["clever", "magic", "beast"]:
+		var path := "res://assets/characters/%s.glb" % model
+		paths.append(path)
+		ResourceLoader.load_threaded_request(path)
+	get_tree().create_timer(1.2).timeout.connect(func() -> void:
+		for path in paths:
+			_warm_models.append(ResourceLoader.load_threaded_get(path))
+		var view := ModelView.new(Vector2(96, 96))
+		view.position = Vector2(-4000, -4000)
+		add_child(view)
+		view.show_class(Game.player_class if ClassDefs.ALL.has(Game.player_class) else "infantry")
+		get_tree().create_timer(0.4).timeout.connect(view.queue_free))
+
+
 func _clear_ui() -> void:
 	for c in ui_layer.get_children():
 		c.queue_free()
 	panel = null
 	hud = null
+	spectator = null
 	tree_panel = null
 
 
@@ -112,11 +157,14 @@ func show_menu(rebuild := false) -> void:
 	_clear_ui()
 	Game.mode = Game.Mode.MENU
 	_back = _quit
-	# Coming back from another menu screen, the Mists behind it can simply stay.
+	# Back from a match: worth looking again for a new version, which may have come out while playing.
+	var from_match := world != null and world.mode != Game.Mode.MENU
+	# Coming back from another menu screen, the Valleys behind it can simply stay.
 	if rebuild or world == null or world.mode != Game.Mode.MENU:
 		_new_world(Game.Mode.MENU)
 	Sfx.ambient(true)
 	Sfx.set_mood(0.0, 0.0)
+	_warm_up()
 	var root := Control.new()
 	root.theme = _theme
 	ui_layer.add_child(root)
@@ -141,19 +189,21 @@ func show_menu(rebuild := false) -> void:
 	mark.custom_minimum_size = Vector2(590, 80)
 	mark.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	top.add_child(mark)
-	var update_title := _label("The Mists Update", 27, UiTheme.EMBER)
+	var update_title := _label("Beyond the Mists", UiTheme.FS_LEAD, UiTheme.TWILIGHT.lightened(0.25))
 	update_title.name = "UpdateTitle"
 	update_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(update_title)
 	top.add_child(_expand())
-	top.add_child(_name_button())
 	top.add_child(_purse_button())
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 14
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
-	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal to The Mists.", func() -> void: show_class_picker(Game.Mode.FORT)))
-	box.add_child(_menu_row("Play Together", "Up to four phones, nearby or online.", show_together))
+	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal.", func() -> void: show_fort_picker()))
+	var together := _menu_row("Play Together", "Up to four phones, nearby or online.", show_together)
+	together.name = "PlayTogether"
+	box.add_child(together)
+	_scout_sessions(together)
 	box.add_child(_menu_row("Armory", "What you own for each class, and your pet.", func() -> void: show_armory()))
 	box.add_child(_menu_row("Leaderboard", "The top players of all time, and of this week.", func() -> void: show_leaderboard()))
 	box.add_child(_menu_row("Sandbox", "Try any weapon, item or class you own.", func() -> void: show_class_picker(Game.Mode.SANDBOX)))
@@ -169,13 +219,22 @@ func show_menu(rebuild := false) -> void:
 	if not updates.changed.is_connected(_fill_update_box):
 		updates.changed.connect(_fill_update_box)
 	_fill_update_box()
-	if not _checked_updates:
+	# (Once a new version has been found, the offer stands until it is taken.)
+	if not _checked_updates or (from_match and updates.state != Updates.State.AVAILABLE):
 		_checked_updates = true
 		updates.check()
-	foot.add_child(_button("Codex", show_codex, Vector2(132, 56)))
-	foot.add_child(_button("Changelog", show_changelog, Vector2(168, 56)))
-	foot.add_child(_button("Settings", show_settings, Vector2(146, 56)))
-	var version := _soft("v%s" % ProjectSettings.get_setting("application/config/version"), 20)
+	foot.add_child(_button("Codex", show_codex, Vector2(132, UiTheme.BTN)))
+	var notes := _button("Changelog", show_changelog, Vector2(168, UiTheme.BTN))
+	notes.name = "ChangelogButton"
+	foot.add_child(notes)
+	if ChangelogPanel.has_news():
+		# New notes since you last read them: the button glows on and off until you do.
+		notes.set_meta("news", true)
+		var glow := notes.create_tween().set_loops()
+		glow.tween_property(notes, "self_modulate", Color(1.0, 0.62, 0.25), 0.55).set_trans(Tween.TRANS_SINE)
+		glow.tween_property(notes, "self_modulate", Color.WHITE, 0.55).set_trans(Tween.TRANS_SINE)
+	foot.add_child(_button("Settings", show_settings, Vector2(146, UiTheme.BTN)))
+	var version := _soft("v%s" % ProjectSettings.get_setting("application/config/version"), UiTheme.FS_SMALL)
 	version.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	foot.add_child(version)
 	panel = root
@@ -183,6 +242,79 @@ func show_menu(rebuild := false) -> void:
 		show_name_prompt(true)
 	elif _asks_for_name():
 		_collect_prizes()
+
+
+## Each time the menu shows, a look for games: on the Wi-Fi for a few seconds, and online. Play
+## Together then glows as Changelog does when a game is open to join, glows red when a match can be
+## watched, and does both, one after the other, when there are both.
+const SCOUT_TIME := 6.0
+const JOIN_GLOW := Color(1.0, 0.62, 0.25)
+
+func _scout_sessions(row: Button) -> void:
+	var found := {"open": false, "live": false}
+	var look := func() -> void:
+		if not is_instance_valid(row):
+			return
+		var open := false
+		var live := false
+		for info: Dictionary in Net.rooms.values():
+			if not info.get("version_ok", false):
+				continue
+			if info.get("watchable", false):
+				live = true
+			elif not info.get("live", false) and int(info.get("players", 1)) < Net.MAX_PLAYERS:
+				open = true
+		for room: Dictionary in Net.public_rooms:
+			if room.get("live", false):
+				live = true
+			elif room.get("waiting", true):
+				open = true
+		if open != found["open"] or live != found["live"]:
+			found["open"] = open
+			found["live"] = live
+			_show_sessions(row, open, live)
+	Net.rooms_changed.connect(look)
+	Net.public_rooms_changed.connect(look)
+	var searching := [true]
+	Net.public_rooms.clear() # what was found before is not what is open now
+	Net.start_search()
+	if EpicNet.available():
+		Net.look_for_rooms()
+	var stop := func() -> void:
+		if searching[0]:
+			searching[0] = false
+			Net.stop_search_keep_rooms_counted()
+	get_tree().create_timer(SCOUT_TIME).timeout.connect(stop)
+	row.tree_exiting.connect(func() -> void:
+		stop.call()
+		if Net.rooms_changed.is_connected(look):
+			Net.rooms_changed.disconnect(look)
+		if Net.public_rooms_changed.is_connected(look):
+			Net.public_rooms_changed.disconnect(look))
+	look.call()
+
+
+func _show_sessions(row: Button, open: bool, live: bool) -> void:
+	row.set_meta("open", open)
+	row.set_meta("live", live)
+	var title := row.find_child("Title", true, false) as Label
+	var line := row.find_child("Line", true, false) as Label
+	if row.has_meta("glow"):
+		(row.get_meta("glow") as Tween).kill()
+		row.remove_meta("glow")
+	title.self_modulate = Color.WHITE
+	if not open and not live:
+		line.text = "Up to four phones, nearby or online."
+		return
+	line.text = "A game is open to join, and a match to watch." if open and live else ("A game is open to join." if open else "A match is live: watch it.")
+	var glow := title.create_tween().set_loops()
+	if open:
+		glow.tween_property(title, "self_modulate", JOIN_GLOW, 0.55).set_trans(Tween.TRANS_SINE)
+		glow.tween_property(title, "self_modulate", Color.WHITE, 0.55).set_trans(Tween.TRANS_SINE)
+	if live:
+		glow.tween_property(title, "self_modulate", SPECTATE_RED.lightened(0.15), 0.55).set_trans(Tween.TRANS_SINE)
+		glow.tween_property(title, "self_modulate", Color.WHITE, 0.55).set_trans(Tween.TRANS_SINE)
+	row.set_meta("glow", glow)
 
 
 ## A new version on the game's page: on Android, one tap fetches it and Android asks to install it.
@@ -219,14 +351,14 @@ func _fill_update_box() -> void:
 			press = updates.download
 	if line == "":
 		return
-	var l := _body(line, 22)
+	var l := _body(line, UiTheme.FS_BODY)
 	l.add_theme_color_override("font_color", UiTheme.EMBER)
 	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_update_box.add_child(l)
 	if action != "":
-		_update_box.add_child(_button(action, press, Vector2(150, 56), true))
+		_update_box.add_child(_button(action, press, Vector2(150, UiTheme.BTN), true))
 
 
 ## A margin that also keeps clear of the camera cut-out, on whichever side it is.
@@ -263,11 +395,13 @@ func _menu_row(title: String, line: String, action: Callable, first := false) ->
 	words.alignment = BoxContainer.ALIGNMENT_CENTER
 	b.add_child(words)
 	words.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
-	var head := _label(title, 38, UiTheme.EMBER if first else UiTheme.BONE)
+	var head := _label(title, UiTheme.FS_TITLE, UiTheme.EMBER if first else UiTheme.BONE)
+	head.name = "Title"
 	head.add_theme_font_override("font", UiTheme.bold_font())
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(head)
-	var sub := _soft(line, 23)
+	var sub := _soft(line, UiTheme.FS_BODY)
+	sub.name = "Line"
 	sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(sub)
 	b.pressed.connect(func() -> void: Sfx.play("ui_click", -3.0))
@@ -286,13 +420,13 @@ func _purse_button() -> Button:
 	b.add_child(row)
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
 	row.add_child(_coin(44.0))
-	var count := _label("%d" % Game.doubloons, 30, UiTheme.BONE)
+	var count := _label("%d" % Game.doubloons, UiTheme.FS_HEAD, UiTheme.BONE)
 	count.add_theme_font_override("font", UiTheme.bold_font())
 	row.add_child(count)
-	var word := _soft("Store", 26)
+	var word := _soft("Store", UiTheme.FS_LEAD)
 	word.add_theme_color_override("font_color", UiTheme.EMBER)
 	row.add_child(word)
-	b.custom_minimum_size.x = 64.0 + 44.0 + 30.0 + _text_width(str(Game.doubloons), 30) + _text_width("Store", 26)
+	b.custom_minimum_size.x = 64.0 + 44.0 + 30.0 + _text_width(str(Game.doubloons), UiTheme.FS_HEAD) + _text_width("Store", UiTheme.FS_LEAD)
 	for c in row.get_children():
 		(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 		(c as Control).size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -324,68 +458,111 @@ func _vignette() -> TextureRect:
 
 
 func show_settings(from_pause := false) -> void:
-	var root := _modal("Settings")
-	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 800
-	var close := func() -> void:
+	var root := _screen("Settings", func() -> void: _back.call(), "Kept on this phone." if not from_pause else ("The night goes on while you are here." if Net.active() else ""))
+	_back = func() -> void:
 		root.queue_free()
 		_back = _resume if from_pause else _quit
-	_back = close
+	var page := UiScreen.page(root.get_meta("box"))
+	var scroll := DragScroll.new()
+	scroll.name = "SettingsScroll"
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	page.add_child(scroll)
+	var inner := VBoxContainer.new()
+	inner.name = "SettingsRows"
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.add_theme_constant_override("separation", UiTheme.GAP)
+	scroll.add_child(inner)
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 36)
-	box.add_child(columns)
+	columns.add_theme_constant_override("separation", 40)
+	inner.add_child(columns)
 	var left := VBoxContainer.new()
-	left.custom_minimum_size.x = 380
-	left.add_theme_constant_override("separation", 6)
-	columns.add_child(left)
-	_slider(left, "Look sensitivity", 0.4, 2.5, Game.sensitivity, func(v: float) -> void: Game.sensitivity = v)
+	var right := VBoxContainer.new()
+	for side: VBoxContainer in [left, right]:
+		side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		side.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+		columns.add_child(side)
+	if not from_pause:
+		# Who you are to other players and on the leaderboard: first, as it is who you are.
+		_section(left, "You", true)
+		var name_row := HBoxContainer.new()
+		name_row.name = "NameRow"
+		name_row.add_theme_constant_override("separation", UiTheme.GAP)
+		left.add_child(name_row)
+		var name_title := _soft("Your name", UiTheme.FS_BODY)
+		name_title.custom_minimum_size.x = 130
+		name_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		name_row.add_child(name_title)
+		var rename := _button(Game.player_name, func() -> void:
+			root.queue_free()
+			show_name_prompt(false, func() -> void: show_settings()), Vector2(0, UiTheme.BTN))
+		rename.name = "Rename"
+		rename.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rename.tooltip_text = "Change your name"
+		name_row.add_child(rename)
+		var code_row := HBoxContainer.new()
+		code_row.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+		left.add_child(code_row)
+		var code := LineEdit.new()
+		code.placeholder_text = "Redeem a code"
+		code.custom_minimum_size = Vector2(0, UiTheme.BTN)
+		code.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		code_row.add_child(code)
+		var answer := _soft("", UiTheme.FS_SMALL)
+		code_row.add_child(_button("Redeem", func() -> void: _try_code(code, answer), Vector2(140, UiTheme.BTN)))
+		answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		left.add_child(answer)
+		# Both of these only apply to a new night, so they stay out of a running game.
+		_section(left, "Game")
+		left.add_child(_soft("Difficulty", UiTheme.FS_BODY))
+		left.add_child(_choices(["Easy", "Normal", "Hard"], Game.difficulty, 380.0, func(i: int) -> void:
+			Game.difficulty = i
+			Game.save_settings()
+			root.queue_free()
+			show_settings()))
+		left.add_child(_soft("Graphics" if not Game.quality_auto else "Graphics (Auto: %s now)" % ["Low", "Medium", "High"][Game.quality], UiTheme.FS_BODY))
+		left.add_child(_choices(["Auto", "Low", "Medium", "High"], 0 if Game.quality_auto else Game.quality + 1, 380.0, func(i: int) -> void:
+			Game.quality_auto = i == 0
+			if i == 0:
+				Game.quality_measured = false # look again
+				Game.quality = 1
+			else:
+				Game.quality = i - 1
+			Game.apply_quality()
+			Game.save_settings()
+			show_menu(true)))
+	_section(left, "Sound", from_pause)
 	_slider(left, "Music", 0.0, 1.0, Game.music_volume, func(v: float) -> void:
 		Game.music_volume = v
 		Sfx.apply_volumes())
 	_slider(left, "Sounds", 0.0, 1.0, Game.sound_volume, func(v: float) -> void:
 		Game.sound_volume = v
 		Sfx.apply_volumes())
-	var right := VBoxContainer.new()
-	right.custom_minimum_size.x = 380
-	right.add_theme_constant_override("separation", 8)
-	columns.add_child(right)
+	_section(right, "Controls", true)
+	_slider(right, "Look sensitivity", 0.4, 2.5, Game.sensitivity, func(v: float) -> void: Game.sensitivity = v)
 	right.add_child(_toggle("Auto-jump", func() -> bool: return Game.auto_jump, func(on: bool) -> void: Game.auto_jump = on))
 	right.add_child(_toggle("Vibration", func() -> bool: return Game.vibration, func(on: bool) -> void: Game.vibration = on))
+	_section(right, "Screen")
+	right.add_child(_toggle("Damage numbers", func() -> bool: return Game.damage_numbers, func(on: bool) -> void: Game.damage_numbers = on))
 	right.add_child(_toggle("Steady brightness", func() -> bool: return Game.steady_brightness, func(on: bool) -> void:
 		Game.steady_brightness = on
 		PhoneScreen.apply_brightness()))
-	_slider(left, "Screen brightness, when steady", 0.1, 1.0, Game.brightness if Game.brightness > 0.0 else PhoneScreen.current_level(), func(v: float) -> void:
+	_slider(right, "Screen brightness, when steady", 0.1, 1.0, Game.brightness if Game.brightness > 0.0 else PhoneScreen.current_level(), func(v: float) -> void:
 		Game.brightness = v
 		PhoneScreen.apply_brightness())
-	if not from_pause:
-		# Both of these only apply to a new night, so they stay out of a running game.
-		left.add_child(_soft("Difficulty", 23))
-		left.add_child(_choices(["Easy", "Normal", "Hard"], Game.difficulty, 380.0, func(i: int) -> void:
-			Game.difficulty = i
-			Game.save_settings()
-			root.queue_free()
-			show_settings()))
-		right.add_child(_soft("Graphics", 23))
-		right.add_child(_choices(["Low", "Medium", "High"], Game.quality, 380.0, func(i: int) -> void:
-			Game.quality = i
-			Game.apply_quality()
-			Game.save_settings()
-			show_menu(true)))
-		var code_row := HBoxContainer.new()
-		code_row.add_theme_constant_override("separation", 8)
-		box.add_child(code_row)
-		var code := LineEdit.new()
-		code.placeholder_text = "Redeem a code"
-		code.custom_minimum_size = Vector2(290, 58)
-		code.add_theme_font_size_override("font_size", 24)
-		code_row.add_child(code)
-		var answer := _soft("", 22)
-		code_row.add_child(_button("Redeem", func() -> void: _try_code(code, answer), Vector2(140, 58)))
-		answer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		answer.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		answer.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		code_row.add_child(answer)
-	box.add_child(_button("Done", close, Vector2(800, 60), true))
+
+
+## The heading of a group of settings (or of any part of a page).
+func _section(box: Control, title: String, first := false) -> void:
+	if not first:
+		var gap := Control.new()
+		gap.custom_minimum_size.y = 10
+		gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(gap)
+	var head := _label(title, UiTheme.FS_LEAD, UiTheme.EMBER)
+	head.add_theme_font_override("font", UiTheme.bold_font())
+	head.add_theme_constant_override("outline_size", 0)
+	box.add_child(head)
 
 
 func _try_code(code: LineEdit, answer: Label) -> void:
@@ -401,6 +578,11 @@ func _try_code(code: LineEdit, answer: Label) -> void:
 		"disabled":
 			answer.text = "%s is not available at this time. Keep the code for later." % ClassDefs.ALL[said["class"]]["name"]
 			answer.add_theme_color_override("font_color", UiTheme.ASH)
+		"doubloons":
+			answer.text = "%d Botti Doubloons added. You have %d." % [int(said["amount"]), Game.doubloons]
+			answer.add_theme_color_override("font_color", UiTheme.MOSS)
+			code.text = ""
+			Sfx.play("level", -3.0)
 		"used":
 			answer.text = "This code has already been redeemed."
 			answer.add_theme_color_override("font_color", UiTheme.ASH)
@@ -415,8 +597,8 @@ func _choices(names: Array, on: int, width: float, picked: Callable) -> HBoxCont
 	row.add_theme_constant_override("separation", 6)
 	for i in names.size():
 		var index := i
-		var b := _button(str(names[i]), func() -> void: picked.call(index), Vector2((width - 6.0 * (names.size() - 1)) / names.size(), 54))
-		b.add_theme_font_size_override("font_size", 24)
+		var b := _button(str(names[i]), func() -> void: picked.call(index), Vector2((width - 6.0 * (names.size() - 1)) / names.size(), UiTheme.BTN_SHORT))
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if i == on:
 			UiTheme.selected(b)
 		row.add_child(b)
@@ -424,45 +606,42 @@ func _choices(names: Array, on: int, width: float, picked: Callable) -> HBoxCont
 
 
 func _slider(box: VBoxContainer, title: String, low: float, high: float, value: float, changed: Callable) -> void:
-	box.add_child(_soft(title, 23))
+	box.add_child(_soft(title, UiTheme.FS_BODY))
 	var slider := HSlider.new()
 	slider.min_value = low
 	slider.max_value = high
 	slider.step = 0.05
 	slider.value = value
 	slider.custom_minimum_size = Vector2(360, 44)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slider.value_changed.connect(func(v: float) -> void:
 		changed.call(v)
 		Game.save_settings())
 	box.add_child(slider)
 
 
-## A name on the left, and whether it is on at the right.
+## A name on the left, and a switch at the right that says whether it is on. The whole row is the
+## thing to tap.
 func _toggle(title: String, read: Callable, write: Callable) -> Button:
-	var b := _button("", func() -> void: pass, Vector2(380, 58))
+	var b := _button("", func() -> void: pass, Vector2(380, UiTheme.BTN))
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", UiTheme.GAP)
 	b.add_child(row)
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 14)
-	var name_label := _body(title, 24)
+	var name_label := _body(title, UiTheme.FS_BODY)
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(name_label)
-	var state := _body("", 24)
-	state.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	state.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	state.add_theme_font_override("font", UiTheme.bold_font())
-	row.add_child(state)
-	var show_state := func() -> void:
-		var on: bool = read.call()
-		state.text = "On" if on else "Off"
-		state.add_theme_color_override("font_color", UiTheme.EMBER if on else UiTheme.ASH)
-	show_state.call()
+	var knob := UiSwitch.new(read.call())
+	knob.name = "Switch"
+	row.add_child(knob)
 	b.pressed.connect(func() -> void:
 		write.call(not read.call())
 		Game.save_settings()
-		show_state.call())
+		knob.on = read.call())
 	return b
 
 
@@ -481,6 +660,7 @@ func show_codex() -> void:
 ## What changed in each version, read from CHANGELOG.md so the game and the repository always agree.
 func show_changelog() -> void:
 	_clear_ui()
+	ChangelogPanel.mark_read()
 	var c := ChangelogPanel.new()
 	c.theme = _theme
 	ui_layer.add_child(c)
@@ -521,11 +701,20 @@ func _button(text: String, action: Callable, min_size: Vector2, primary := false
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = min_size
-	b.add_theme_font_size_override("font_size", 26)
+	UiTheme.size_button(b, min_size.y)
 	if primary:
 		UiTheme.primary(b)
 	b.pressed.connect(func() -> void: Sfx.play("ui_click", -3.0))
 	b.pressed.connect(action)
+	return b
+
+
+## One of a row of options, marked when it is the one chosen. (A choice is never drawn as the big
+## thing to do on a screen: that is what a primary button is for.)
+func _choice(text: String, action: Callable, min_size: Vector2, on: bool) -> Button:
+	var b := _button(text, action, min_size)
+	if on:
+		UiTheme.selected(b)
 	return b
 
 
@@ -534,27 +723,83 @@ func _button(text: String, action: Callable, min_size: Vector2, primary := false
 ## The list of classes on the left, what the chosen one is on the right.
 ## Where to spend the night.
 func show_map_picker() -> void:
+	_show_atlas(Game.Mode.NIGHT)
+
+
+## Which stronghold to hold.
+func show_fort_picker() -> void:
+	_show_atlas(Game.Mode.FORT)
+
+
+## Where to play, chosen on the world atlas: the places this mode can be played in are lit, the rest
+## dimmed. Tapping a place shows what it is; Play here goes on to choosing a class.
+func _show_atlas(mode: int) -> void:
 	_clear_ui()
 	_back = show_menu
-	var root := _modal("Survive the Night")
+	var fort := mode == Game.Mode.FORT
+	var root := _screen("Defend the Fort" if fort else "Survive the Night", func() -> void: _back.call(), "Where will you hold the line?" if fort else "Where will you spend the night?")
+	root.name = "Atlas"
 	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 860
-	for id: String in Game.MAPS:
+	var panes := HBoxContainer.new()
+	panes.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panes.add_theme_constant_override("separation", 16)
+	box.add_child(panes)
+	var allowed: Array = (Game.FORT_MAPS if fort else Game.MAPS).keys()
+	var atlas := WorldAtlas.new(allowed, Game.fort_map if fort else Game.night_map)
+	atlas.name = "WorldAtlas"
+	atlas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	atlas.size_flags_stretch_ratio = 1.9
+	panes.add_child(atlas)
+	var page := PanelContainer.new()
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panes.add_child(page)
+	var detail := VBoxContainer.new()
+	detail.name = "PlaceDetail"
+	detail.add_theme_constant_override("separation", 10)
+	page.add_child(detail)
+	var show_place := func(id: String) -> void:
+		for c in detail.get_children():
+			detail.remove_child(c) # at once, so the new page's names (PlayHere) are never taken
+			c.queue_free()
+		var place: Dictionary = Places.ALL[id]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		detail.add_child(row)
+		row.add_child(IconView.new(place["icon"], (place["color"] as Color).darkened(0.55), 64.0))
+		var title := _label(place["name"], UiTheme.FS_HEAD, UiTheme.BONE)
+		title.add_theme_font_override("font", UiTheme.title_font())
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(title)
+		var lore := _label(place["lore"], UiTheme.FS_BODY, UiTheme.ASH)
+		lore.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lore.custom_minimum_size.x = 300
+		detail.add_child(lore)
+		var plays := _label("Played in %s." % place["plays"], UiTheme.FS_SMALL, UiTheme.BONE.darkened(0.15))
+		plays.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		plays.custom_minimum_size.x = 300
+		detail.add_child(plays)
+		detail.add_child(_expand(true))
 		var chosen := id
-		var row := _menu_row(Game.MAPS[id]["name"], Game.MAPS[id]["desc"], func() -> void:
-			Game.night_map = chosen
+		var go := _button("Play here", func() -> void:
+			if fort:
+				Game.fort_map = chosen
+			else:
+				Game.night_map = chosen
 			Game.save_settings()
-			show_class_picker(Game.Mode.NIGHT))
-		row.custom_minimum_size.x = 800
-		box.add_child(row)
-	box.add_child(_button("Back", show_menu, Vector2(160, 60)))
+			show_class_picker(mode), Vector2(0, UiTheme.BTN_TALL), true)
+		go.name = "PlayHere"
+		detail.add_child(go)
+	atlas.picked.connect(show_place)
+	show_place.call(atlas.selected)
 	panel = root
 
 
 func show_class_picker(mode: int) -> void:
 	_clear_ui()
-	_back = show_map_picker if mode == Game.Mode.NIGHT else show_menu
-	var root := _two_panes("Choose your class")
+	_back = show_map_picker if mode == Game.Mode.NIGHT else show_fort_picker if mode == Game.Mode.FORT else show_menu
+	var root := _two_panes("Choose your class", true)
 	var list: VBoxContainer = root.get_meta("list")
 	var detail: VBoxContainer = root.get_meta("detail")
 	var ids := ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id))
@@ -563,8 +808,7 @@ func show_class_picker(mode: int) -> void:
 	var rows := {}
 	var pick := func(id: String) -> void:
 		for other: String in rows:
-			(rows[other] as Button).remove_theme_stylebox_override("normal")
-			(rows[other] as Button).remove_theme_stylebox_override("hover")
+			UiTheme.plain(rows[other])
 		UiTheme.selected(rows[id])
 		_fill_class_detail(detail, id, mode)
 	for id: String in ids:
@@ -580,30 +824,11 @@ func show_class_picker(mode: int) -> void:
 
 
 ## Header, a list down the left and a page on the right. Used by the classes and the Store.
-func _two_panes(title: String) -> Control:
-	var root := Control.new()
-	root.theme = _theme
-	ui_layer.add_child(root)
-	_fill(root)
-	var shade := _vignette()
-	root.add_child(shade)
-	_fill(shade)
-	var margin := _screen_margin(44, 18)
-	root.add_child(margin)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 12)
-	margin.add_child(box)
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 14)
-	box.add_child(top)
-	var back := _button("Back", func() -> void: _back.call(), Vector2(116, 56))
-	top.add_child(back)
-	var head := _label(title, 40, UiTheme.BONE)
-	head.add_theme_font_override("font", UiTheme.title_font())
-	head.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top.add_child(head)
-	root.set_meta("top", top)
+func _two_panes(title: String, purse := false) -> Control:
+	var root := _screen(title, func() -> void: _back.call())
+	var box: VBoxContainer = root.get_meta("box")
+	if purse:
+		(root.get_meta("right") as Control).add_child(_purse())
 	var panes := HBoxContainer.new()
 	panes.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panes.add_theme_constant_override("separation", 16)
@@ -618,9 +843,18 @@ func _two_panes(title: String) -> Control:
 	var page := PanelContainer.new()
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panes.add_child(page)
+	# The page scrolls when what it says is longer than the screen; when it is shorter, its last
+	# button still sits at the bottom.
+	var reading := DragScroll.new()
+	reading.name = "DetailScroll"
+	reading.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	page.add_child(reading)
 	var detail := VBoxContainer.new()
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail.add_theme_constant_override("separation", 10)
-	page.add_child(detail)
+	reading.add_child(detail)
+	root.set_meta("panes", panes)
 	root.set_meta("list", list)
 	root.set_meta("detail", detail)
 	return root
@@ -640,7 +874,7 @@ func _class_row(id: String) -> Button:
 	medal.dim = not owned
 	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	inner.add_child(medal)
-	var name_label := _body(c["name"], 25)
+	var name_label := _body(c["name"], UiTheme.FS_LEAD)
 	name_label.add_theme_font_override("font", UiTheme.bold_font())
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -681,54 +915,63 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override("separation", 0)
 	head.add_child(words)
-	var title := _body(c["name"], 38)
+	var title := _body(c["name"], UiTheme.FS_TITLE)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
-	words.add_child(_soft("Health %d. Speed %d%%." % [int(c["hp"]), int(round(float(c["speed"]) * 100.0))], 24))
-	var desc := _body(ClassPresentation.description(id), 25)
+	words.add_child(_soft(ClassPresentation.stats_line(id), UiTheme.FS_BODY))
+	words.add_child(ClassPresentation.weapon_tags(id))
+	# The preview and action stay visible; prose can grow without stretching the screen.
+	var scroll := DragScroll.new()
+	scroll.name = "ClassDescriptionScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(scroll)
+	var prose := VBoxContainer.new()
+	prose.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	prose.add_theme_constant_override("separation", 12)
+	scroll.add_child(prose)
+	var desc := _body(ClassPresentation.description(id), UiTheme.FS_LEAD)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	detail.add_child(desc)
+	prose.add_child(desc)
 	for spec: Dictionary in AbilityData.tree(id)["specs"]:
 		var line := HBoxContainer.new()
 		line.add_theme_constant_override("separation", 12)
-		detail.add_child(line)
+		prose.add_child(line)
 		var emblem := IconView.new("spec_%s" % spec["id"], ClassDefs.color(id), 44.0)
 		emblem.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		line.add_child(emblem)
-		var spec_name := _body(spec["name"], 23)
+		var spec_name := _body(spec["name"], UiTheme.FS_BODY)
 		spec_name.add_theme_font_override("font", UiTheme.bold_font())
 		spec_name.custom_minimum_size.x = 190
 		spec_name.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		line.add_child(spec_name)
-		var spec_desc := _soft(ClassPresentation.profession(spec), 23)
+		var spec_desc := _soft(ClassPresentation.profession(spec), UiTheme.FS_BODY)
 		spec_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		spec_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		line.add_child(spec_desc)
 	if id == "ranger" and not in_store and ShopDefs.PETS.any(func(p: String) -> bool: return Game.owns_item(p)):
 		var pets := HBoxContainer.new()
 		pets.add_theme_constant_override("separation", 6)
-		detail.add_child(pets)
-		pets.add_child(_body("Pet", 23))
+		prose.add_child(pets)
+		pets.add_child(_body("Pet", UiTheme.FS_BODY))
 		for pet: String in ShopDefs.PETS:
 			if pet == "wolf" or Game.owns_item(pet):
 				var chosen_pet := pet
-				pets.add_child(_button(pet.capitalize(), func() -> void:
+				pets.add_child(_choice(pet.capitalize(), func() -> void:
 					Game.choose_pet(chosen_pet)
-					_fill_class_detail(detail, id, mode, in_store), Vector2(120, 48), Game.pet == pet))
-	detail.add_child(_expand(true))
+					_fill_class_detail(detail, id, mode, in_store), Vector2(120, UiTheme.BTN_SHORT), Game.pet == pet))
 	if not owned and c.get("unavailable", false):
-		var how := _body(CodexPanel.acquisition(id), 26)
+		var how := _body(CodexPanel.acquisition(id), UiTheme.FS_LEAD)
 		how.add_theme_color_override("font_color", UiTheme.ASH)
 		detail.add_child(how)
 	elif not owned and c.has("earned"):
-		var how := _body(Game.earn_text(id), 26)
+		var how := _body(Game.earn_text(id), UiTheme.FS_LEAD)
 		how.add_theme_color_override("font_color", UiTheme.EMBER)
 		how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.add_child(how)
 	elif not owned:
 		_buy_row(detail, id, mode, in_store)
 	elif in_store:
-		var have := _body("You own this class.", 26)
+		var have := _body("You own this class.", UiTheme.FS_LEAD)
 		have.add_theme_color_override("font_color", UiTheme.MOSS)
 		detail.add_child(have)
 	else:
@@ -737,8 +980,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 			Sfx.play("ui_choose", -3.0)
 			Game.player_class = chosen
 			Game.save_settings()
-			start_game(mode), Vector2(0, 72), true)
-		go.add_theme_font_size_override("font_size", 30)
+			start_game(mode), Vector2(0, UiTheme.BTN_TALL), true)
 		detail.add_child(go)
 
 
@@ -749,7 +991,7 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 	row.add_theme_constant_override("separation", 14)
 	detail.add_child(row)
 	row.add_child(_coin(52.0))
-	var cost := _body("%d" % price, 34)
+	var cost := _body("%d" % price, UiTheme.FS_HEAD)
 	cost.add_theme_font_override("font", UiTheme.bold_font())
 	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(cost)
@@ -758,9 +1000,9 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left)
 	if not in_store:
-		row.add_child(_button("Go to Store", func() -> void: show_store(id, mode), Vector2(220, 68), true))
+		row.add_child(_button("Go to Store", func() -> void: show_store(id, mode), Vector2(220, UiTheme.BTN_TALL), true))
 		return
-	var buy := _button("Buy", func() -> void: pass, Vector2(260, 68), true)
+	var buy := _button("Buy", func() -> void: pass, Vector2(260, UiTheme.BTN_TALL), true)
 	buy.disabled = Game.doubloons < price
 	if buy.disabled:
 		buy.text = "Need %d more" % (price - Game.doubloons)
@@ -772,14 +1014,14 @@ func _buy_row(detail: VBoxContainer, id: String, mode: int, in_store: bool) -> v
 			return
 		if Game.buy_class(id):
 			Sfx.play("level", -3.0)
-			show_store(id, mode))
+			show_store("", mode, "classes", Callable(), id))
 	row.add_child(buy)
 
 
 ## Everything for sale, by section. What you pick turns slowly beside its description.
 ## back_to: where Back goes, when the Store was opened from somewhere other than the menu or a class.
 ## Moving around inside the Store keeps it.
-func show_store(focus := "", from_mode := -1, section := "", back_to := Callable()) -> void:
+func show_store(focus := "", from_mode := -1, section := "", back_to := Callable(), just_bought := "") -> void:
 	_clear_ui()
 	if back_to.is_valid():
 		_store_return = back_to
@@ -793,30 +1035,68 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		section = "classes"
 		if ShopDefs.ITEMS.has(focus):
 			section = str(ShopDefs.ITEMS[focus]["section"])
-	var root := _two_panes("Store")
-	var top: HBoxContainer = root.get_meta("top")
-	top.add_child(_coin(44.0))
-	var purse := _label("%d" % Game.doubloons, 32, UiTheme.BONE)
-	purse.add_theme_font_override("font", UiTheme.bold_font())
-	purse.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	top.add_child(purse)
+	var root := _two_panes("Store", true)
 	var list: VBoxContainer = root.get_meta("list")
 	var detail: VBoxContainer = root.get_meta("detail")
-	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 6)
-	list.add_child(tabs)
-	for key: String in ShopDefs.SECTIONS:
-		var chosen_section := key
-		var tab := _button(ShopDefs.SECTIONS[key], func() -> void: show_store("", from_mode, chosen_section, here), Vector2(0, 52), key == section)
-		tab.add_theme_font_size_override("font_size", 19)
-		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		tabs.add_child(tab)
-	var ids: Array[String] = ClassDefs.for_sale() if section == "classes" else ShopDefs.in_section(section)
+	var keys: Array = ShopDefs.SECTIONS.keys()
+	var tabs := UiScreen.tabs(root.get_meta("box"), keys.map(func(k: String) -> String: return ShopDefs.SECTIONS[k]), keys.find(section), func(i: int) -> void: show_store("", from_mode, keys[i], here))
+	tabs.get_parent().move_child(tabs, 1)
+	# What you own is not for sale any more: it leaves the list, and lives in the Armory.
+	var ids: Array[String] = []
+	ids.assign((ClassDefs.for_sale() if section == "classes" else ShopDefs.in_section(section)).filter(func(id: String) -> bool:
+		return not (Game.owns_class(id) if section == "classes" else Game.owns_item(id))))
+	if section != "classes":
+		# What you can buy now first; what waits for a class you do not own yet after it, in the same order.
+		var open_now: Array[String] = []
+		var locked_now: Array[String] = []
+		for id: String in ids:
+			(locked_now if Game.item_locked(id) else open_now).append(id)
+		ids.assign(open_now + locked_now)
+	if just_bought != "":
+		var name_of: String = ClassDefs.ALL[just_bought]["name"] if ClassDefs.ALL.has(just_bought) else ShopDefs.ITEMS[just_bought]["name"]
+		var where := "It is yours now, in the Armory."
+		if ShopDefs.ITEMS.has(just_bought) and ShopDefs.ITEMS[just_bought].has("map"):
+			where = "It works on %s from now on, for everyone in your matches." % Places.ALL[ShopDefs.ITEMS[just_bought]["map"]]["name"]
+		var bought := _body("Bought: %s. %s" % [name_of, where], UiTheme.FS_BODY)
+		bought.name = "JustBought"
+		bought.add_theme_color_override("font_color", UiTheme.MOSS)
+		list.add_child(bought)
+		bought.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if ids.is_empty():
+		var none := _soft("You own everything here.", UiTheme.FS_BODY)
+		none.name = "NothingLeft"
+		list.add_child(none)
+		# The other pane says where it all went, and takes you there.
+		var gone := _body("Everything in %s is yours. Equip it, or take it off, in the Armory." % ShopDefs.SECTIONS.get(section, "Classes"), UiTheme.FS_LEAD)
+		gone.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.add_child(gone)
+		if section == "maps":
+			# Map Upgrades are not worn: they work on their map, for the whole match.
+			gone.text = "Every Map Upgrade is yours. Each works on its map for everyone in your matches. Switch them On or Off in the Armory."
+			var to_maps := _button("Open the Armory", func() -> void: show_armory(ARMORY_MAPS), Vector2(280, UiTheme.BTN), true)
+			to_maps.name = "OpenArmory"
+			to_maps.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			detail.add_child(to_maps)
+			panel = root
+			_store_to_top(root)
+			return
+		var to_class := ""
+		if ShopDefs.ITEMS.has(just_bought):
+			to_class = str(ShopDefs.ITEMS[just_bought]["class"])
+		elif ClassDefs.ALL.has(just_bought):
+			to_class = just_bought
+		var to_tab := 1 if section == "cosmetics" else 0
+		var go := _button("Open the Armory", func() -> void: show_armory(to_class, to_tab), Vector2(280, UiTheme.BTN), true)
+		go.name = "OpenArmory"
+		go.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		detail.add_child(go)
+		panel = root
+		_store_to_top(root)
+		return
 	var rows := {}
 	var pick := func(id: String) -> void:
 		for other: String in rows:
-			(rows[other] as Button).remove_theme_stylebox_override("normal")
-			(rows[other] as Button).remove_theme_stylebox_override("hover")
+			UiTheme.plain(rows[other])
 		UiTheme.selected(rows[id])
 		if section == "classes":
 			_fill_class_detail(detail, id, from_mode, true)
@@ -832,6 +1112,43 @@ func show_store(focus := "", from_mode := -1, section := "", back_to := Callable
 		list.add_child(row)
 	pick.call(focus if rows.has(focus) else ids[0])
 	panel = root
+	if just_bought != "":
+		_store_to_top(root)
+
+
+## Whether a class can be bought in the Store (rather than earned, or unlocked with a code).
+static func _class_for_sale(class_id: String) -> bool:
+	return ClassDefs.for_sale().has(class_id)
+
+
+## For something of a class you do not own, in the Armory: the way to the class in the Store, or,
+## for a class that is earned rather than bought, a button that says it is locked and does nothing.
+func _unlock_class_button(class_id: String, back: Callable, min_size: Vector2) -> Button:
+	if _class_for_sale(class_id):
+		return _button("Unlock class", func() -> void: show_store(class_id, -1, "classes", back), min_size)
+	var b := _button("Class locked", func() -> void: pass, min_size)
+	b.disabled = true
+	b.tooltip_text = CodexPanel.acquisition(class_id)
+	return b
+
+
+## After a purchase the Store starts again from the top of its list, where the word of what you
+## bought is, and so does the page beside it. Now, and again once the new lists have their sizes.
+func _store_to_top(root: Control) -> void:
+	var scrolls: Array = []
+	var list: Control = root.get_meta("list")
+	if list.get_parent() is DragScroll:
+		scrolls.append(list.get_parent() as DragScroll)
+	var reading := root.find_child("DetailScroll", true, false)
+	if reading is DragScroll:
+		scrolls.append(reading as DragScroll)
+	var to_top := func() -> void:
+		for scroll: Variant in scrolls:
+			if is_instance_valid(scroll):
+				(scroll as DragScroll).scroll_to(0.0)
+	to_top.call()
+	to_top.call_deferred()
+	get_tree().process_frame.connect(to_top, CONNECT_ONE_SHOT)
 
 
 func _item_row(id: String) -> Button:
@@ -844,10 +1161,12 @@ func _item_row(id: String) -> Button:
 	inner.add_theme_constant_override("separation", 12)
 	row.add_child(inner)
 	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
-	var medal := IconView.new(str(d["icon"]), ClassDefs.color(str(d["class"])), 54.0)
+	var locked := Game.item_locked(id)
+	var medal := IconView.new(str(d["icon"]).split("+")[0] + "+lock" if locked else str(d["icon"]), ShopDefs.color_of(id), 54.0)
 	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	medal.dim = locked
 	inner.add_child(medal)
-	var name_label := _body(d["name"], 24)
+	var name_label := _body(d["name"], UiTheme.FS_BODY)
 	name_label.add_theme_font_override("font", UiTheme.bold_font())
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -860,7 +1179,7 @@ func _item_row(id: String) -> Button:
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	words.add_child(name_label)
-	var whose := _soft(ShopDefs.whose(id), 18)
+	var whose := _soft("Needs the %s class" % ClassDefs.ALL[d["class"]]["name"] if locked else ShopDefs.whose(id), UiTheme.FS_TINY)
 	whose.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	words.add_child(whose)
 	inner.add_child(words)
@@ -883,31 +1202,51 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	words.add_theme_constant_override("separation", 8)
 	head.add_child(words)
-	var title := _body(d["name"], 36)
+	var title := _body(d["name"], UiTheme.FS_HEAD)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
 	var owner_row := HBoxContainer.new()
 	owner_row.add_theme_constant_override("separation", 10)
-	owner_row.add_child(IconView.new(ClassDefs.icon(d["class"]), ClassDefs.color(d["class"]), 46.0))
-	owner_row.add_child(IconView.new("spec_%s" % d["spec"], ClassDefs.color(d["class"]), 46.0))
-	var owner_words := _soft(ShopDefs.whose(id), 23)
+	if d.has("map"):
+		owner_row.add_child(IconView.new(str(Places.ALL[d["map"]]["icon"]), ShopDefs.color_of(id), 46.0))
+	else:
+		owner_row.add_child(IconView.new(ClassDefs.icon(d["class"]), ClassDefs.color(d["class"]), 46.0))
+	if d["spec"] != "":
+		owner_row.add_child(IconView.new("spec_%s" % d["spec"], ClassDefs.color(d["class"]), 46.0))
+	var owner_words := _soft(ShopDefs.whose(id), UiTheme.FS_BODY)
 	owner_words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	owner_row.add_child(owner_words)
 	words.add_child(owner_row)
-	var desc := _body(d["desc"], 24)
+	var desc := _body(d["desc"], UiTheme.FS_BODY)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	words.add_child(desc)
 	if Game.owns_item(id):
-		var have := _body("You own this. Find it in the Armory.", 26)
+		var have := _body("You own this. Switch it On or Off in the Armory, under Map Upgrades." if d.has("map") else "You own this. Find it in the Armory.", UiTheme.FS_LEAD)
 		have.add_theme_color_override("font_color", UiTheme.MOSS)
+		have.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.add_child(have)
 		return
 	var price := int(d["price"])
+	if Game.item_locked(id):
+		# Only for a class you own: the class first, then what it can wear and learn.
+		var whose_class := str(d["class"])
+		var class_name_of: String = ClassDefs.ALL[whose_class]["name"]
+		var locked := _body("Locked until the %s class is yours; then it costs %d Doubloons. %s" % [class_name_of, price, CodexPanel.acquisition(whose_class)], UiTheme.FS_LEAD)
+		locked.name = "ItemLocked"
+		locked.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		locked.add_theme_color_override("font_color", UiTheme.EMBER)
+		detail.add_child(locked)
+		if _class_for_sale(whose_class):
+			var see := _button("See the %s" % class_name_of, func() -> void: show_store(whose_class, from_mode, "classes", _store_return), Vector2(300, UiTheme.BTN_TALL), true)
+			see.name = "SeeClass"
+			see.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+			detail.add_child(see)
+		return
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
 	detail.add_child(row)
 	row.add_child(_coin(52.0))
-	var cost := _body("%d" % price, 34)
+	var cost := _body("%d" % price, UiTheme.FS_HEAD)
 	cost.add_theme_font_override("font", UiTheme.bold_font())
 	cost.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(cost)
@@ -915,7 +1254,7 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 	left.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left)
-	var buy := _button("Buy", func() -> void: pass, Vector2(260, 68), true)
+	var buy := _button("Buy", func() -> void: pass, Vector2(260, UiTheme.BTN_TALL), true)
 	buy.disabled = Game.doubloons < price
 	if buy.disabled:
 		buy.text = "Need %d more" % (price - Game.doubloons)
@@ -927,24 +1266,35 @@ func _fill_item_detail(detail: VBoxContainer, id: String, from_mode: int) -> voi
 			return
 		if Game.buy_item(id):
 			Sfx.play("level", -3.0)
-			show_store(id, from_mode, "", _store_return))
+			show_store("", from_mode, str(ShopDefs.ITEMS[id]["section"]), _store_return, id))
 	row.add_child(buy)
 
 
 ## What you own for each class, to switch on and off.
-func show_armory(focus := "") -> void:
+## `tab`: 0 the paths and their Class Upgrades, 1 the class's looks.
+func show_armory(focus := "", tab := 0) -> void:
+	_armory_tab = tab
 	_clear_ui()
 	_back = show_menu
-	var root := _two_panes("Armory")
+	var root := _two_panes("Armory", true)
 	var list: VBoxContainer = root.get_meta("list")
 	var detail: VBoxContainer = root.get_meta("detail")
 	var rows := {}
 	var pick := func(id: String) -> void:
 		for other: String in rows:
-			(rows[other] as Button).remove_theme_stylebox_override("normal")
-			(rows[other] as Button).remove_theme_stylebox_override("hover")
+			UiTheme.plain(rows[other])
 		UiTheme.selected(rows[id])
-		_fill_armory(detail, id)
+		if id == ARMORY_MAPS:
+			_fill_armory_maps(detail)
+		else:
+			_fill_armory(detail, id)
+	# Map Upgrades first: they are not any class's, and they are what you take to every match.
+	var maps_row := _maps_row()
+	rows[ARMORY_MAPS] = maps_row
+	maps_row.pressed.connect(func() -> void:
+		Sfx.play("ui_click", -5.0)
+		pick.call(ARMORY_MAPS))
+	list.add_child(maps_row)
 	var classes: Array = ClassDefs.ALL.keys().filter(func(key: String) -> bool: return not ClassDefs.disabled(key))
 	for id: String in classes:
 		var row := _class_row(id)
@@ -958,6 +1308,82 @@ func show_armory(focus := "") -> void:
 	panel = root
 
 
+## The Armory's row for the Map Upgrades, above the classes.
+func _maps_row() -> Button:
+	var row := Button.new()
+	row.name = "MapUpgradesRow"
+	row.custom_minimum_size = Vector2(320, 72)
+	var inner := HBoxContainer.new()
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inner.add_theme_constant_override("separation", 12)
+	row.add_child(inner)
+	inner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
+	var medal := IconView.new("compass", UiTheme.EMBER, 54.0)
+	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inner.add_child(medal)
+	var name_label := _body(ShopDefs.SECTIONS["maps"], UiTheme.FS_LEAD)
+	name_label.add_theme_font_override("font", UiTheme.bold_font())
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	inner.add_child(name_label)
+	return row
+
+
+## Every Map Upgrade: what each level does, and, for the ones you own, a switch that says whether you
+## bring it to your matches.
+func _fill_armory_maps(detail: VBoxContainer) -> void:
+	for child in detail.get_children():
+		detail.remove_child(child)
+		child.queue_free()
+	var title := _body(ShopDefs.SECTIONS["maps"], UiTheme.FS_HEAD)
+	title.add_theme_font_override("font", UiTheme.title_font())
+	detail.add_child(title)
+	detail.add_child(_body("Each works on its map for everyone in the match. Every player who brings one adds a level, up to Level %d. Switched Off, yours stays at home." % ShopDefs.MAP_LEVELS, UiTheme.FS_BODY))
+	var scroll := DragScroll.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 22)
+	scroll.add_child(content)
+	for id: String in ShopDefs.in_section("maps"):
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		var block := VBoxContainer.new()
+		block.name = "Map_" + id
+		block.add_theme_constant_override("separation", 6)
+		content.add_child(block)
+		var head := HBoxContainer.new()
+		head.add_theme_constant_override("separation", 12)
+		block.add_child(head)
+		var medal := IconView.new(str(d["icon"]), ShopDefs.color_of(id), 58.0)
+		medal.dim = not Game.owns_item(id)
+		head.add_child(medal)
+		var words := VBoxContainer.new()
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		words.add_theme_constant_override("separation", 0)
+		head.add_child(words)
+		var name_label := _body(d["name"], UiTheme.FS_LEAD)
+		name_label.add_theme_font_override("font", UiTheme.bold_font())
+		words.add_child(name_label)
+		words.add_child(_soft(Places.ALL[d["map"]]["name"], UiTheme.FS_SMALL))
+		if not Game.owns_item(id):
+			var chosen := id
+			var go := _button("In the Store", func() -> void: show_store(chosen, -1, "maps", func() -> void: show_armory(ARMORY_MAPS)), Vector2(190, UiTheme.BTN_SHORT))
+			go.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			head.add_child(go)
+		var levels: Array = d.get("levels", [])
+		for i in levels.size():
+			block.add_child(_soft("Level %d: %s" % [i + 1, levels[i]], UiTheme.FS_SMALL))
+		if Game.owns_item(id):
+			var item := id
+			var knob := _toggle("Bring it to my matches", func() -> bool: return Game.item_active(item), func(on: bool) -> void: Game.set_item_on(item, on))
+			knob.name = "MapSwitch_" + id
+			block.add_child(knob)
+	_wrap_labels(detail)
+
+
 func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	for child in detail.get_children():
 		detail.remove_child(child)
@@ -966,44 +1392,199 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 	head.add_theme_constant_override("separation", 18)
 	head.size_flags_vertical = Control.SIZE_FILL
 	detail.add_child(head)
-	var view := ModelView.new(Vector2(170, 180))
-	view.show_class(id)
-	head.add_child(view)
+	# On the Appearance tab the stage below is the class's; up here, only its name and line.
+	var looks_tab := _armory_tab == 1
+	if not looks_tab:
+		var view := ModelView.new(Vector2(170, 180))
+		view.show_class(id)
+		head.add_child(view)
 	var words := VBoxContainer.new()
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_theme_constant_override("separation", 10)
+	words.add_theme_constant_override("separation", 8)
 	head.add_child(words)
-	var title := _body(ClassDefs.ALL[id]["name"], 36)
+	var title := _body(ClassDefs.ALL[id]["name"], UiTheme.FS_HEAD)
 	title.add_theme_font_override("font", UiTheme.title_font())
 	words.add_child(title)
-	words.add_child(_body(ClassPresentation.COPY[id][0], 23))
+	words.add_child(_body(ClassPresentation.COPY[id][0], UiTheme.FS_BODY))
+	if looks_tab:
+		_armory_tabs(detail, id)
+		detail.add_child(_appearance(id))
+		_wrap_labels(detail)
+		return
 	var d: Dictionary = ClassDefs.ALL[id]
-	words.add_child(_soft("Base health %d · Speed %d%%\nStarting weapon: %s · Starting arrows: %d" % [int(d["hp"]), roundi(float(d["speed"]) * 100), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], 21))
-	words.add_child(_body(ClassPresentation.COPY[id][1], 22))
+	words.add_child(_soft("%s\nStarting weapon: %s · Starting arrows: %d" % [ClassPresentation.stats_line(id), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], UiTheme.FS_SMALL))
+	words.add_child(ClassPresentation.weapon_tags(id))
+	_armory_tabs(detail, id)
 	var scroll := DragScroll.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	detail.add_child(scroll)
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 14)
+	content.add_theme_constant_override("separation", 22)
 	scroll.add_child(content)
 	var tree := AbilityData.tree(id)
 	var items := ShopDefs.for_class(id)
 	for spec: Dictionary in tree["specs"]:
-		content.add_child(_body(spec["name"], 29))
-		content.add_child(_body(ClassPresentation.profession(spec), 22))
+		# Each path keeps its Class Upgrades close under its own words, apart from the next path.
+		var block := VBoxContainer.new()
+		block.add_theme_constant_override("separation", 6)
+		content.add_child(block)
+		block.add_child(_body(spec["name"], UiTheme.FS_HEAD))
+		block.add_child(_body(ClassPresentation.profession(spec), UiTheme.FS_BODY))
 		var upgrades := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["spec"] == spec["id"])
 		if not upgrades.is_empty():
-			content.add_child(_armory_spec_row(id, spec["id"], upgrades))
+			block.add_child(_armory_spec_row(id, spec["id"], upgrades))
 		else:
-			content.add_child(_soft("No Class Upgrades available for this profession.", 20))
-	var cosmetics := VBoxContainer.new()
-	cosmetics.name = "CosmeticsSection"
-	content.add_child(cosmetics)
-	cosmetics.add_child(_body("Appearance", 25))
-	cosmetics.add_child(_soft("Default appearance. No additional skins available yet.", 21))
+			block.add_child(_soft("No Class Upgrades available for this profession.", UiTheme.FS_SMALL))
+	_wrap_labels(detail)
+
+
+func _armory_tabs(detail: VBoxContainer, id: String) -> void:
+	UiScreen.tabs(detail, ARMORY_TABS, _armory_tab, func(i: int) -> void:
+		_armory_tab = i
+		_fill_armory(detail, id))
+
+
+func _wrap_labels(detail: Control) -> void:
 	for label: Label in detail.find_children("*", "Label", true, false):
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if not label.get_parent().has_meta("tag"):
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+
+## The Armory's Appearance tab: a stage showing a look, and beside it the class's looks (the one it
+## starts with and those from the Store's Cosmetics), each on a small stage of its own. Tapping a look
+## shows it on the big stage; a look you own is worn from here, one you do not is a tap from the Store.
+func _appearance(class_id: String) -> Control:
+	var section := VBoxContainer.new()
+	section.name = "CosmeticsSection"
+	section.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	section.add_theme_constant_override("separation", 8)
+	var skins: Array = ShopDefs.for_class(class_id).filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["section"] == "cosmetics")
+	if skins.is_empty() or not ShopDefs.DEFAULT_LOOKS.has(class_id):
+		var own := ModelView.new(Vector2(220, 240))
+		own.show_class(class_id)
+		section.add_child(own)
+		section.add_child(_soft("Default appearance. No other looks for this class yet.", UiTheme.FS_BODY))
+		return section
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	section.add_child(row)
+	var stage := VBoxContainer.new()
+	stage.add_theme_constant_override("separation", 4)
+	row.add_child(stage)
+	var view := ModelView.new(Vector2(280, 270))
+	view.name = "LookStage"
+	stage.add_child(view)
+	var caption := _body("", UiTheme.FS_SMALL)
+	caption.name = "StageCaption"
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stage.add_child(caption)
+	var list := VBoxContainer.new()
+	list.name = "Looks"
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 10)
+	row.add_child(list)
+	list.add_child(_soft("Tap a look to see it on the stage.", UiTheme.FS_SMALL))
+	var looks: Array[String] = [""]
+	looks.append_array(skins)
+	var cards: Array[PanelContainer] = []
+	var show_look := func(look: String) -> void:
+		for card in cards:
+			card.add_theme_stylebox_override("panel", UiTheme.flat(UiTheme.DUSK, UiTheme.EMBER if card.get_meta("look") == look else UiTheme.STEEL, UiTheme.RADIUS_CARD, 10.0))
+			(card.get_meta("update") as Callable).call()
+		var d: Dictionary = ShopDefs.ITEMS[look] if look != "" else ShopDefs.DEFAULT_LOOKS[class_id]
+		view.show_mount(look != "" and str(d.get("skin", "")) == "stag")
+		caption.text = ("Wearing: %s" if _look_worn(class_id, look) else "Trying on: %s") % d["name"]
+	for look: String in looks:
+		var card := _look_card(class_id, look, show_look)
+		cards.append(card)
+		list.add_child(card)
+	var worn := ""
+	for look: String in looks:
+		if _look_worn(class_id, look):
+			worn = look
+	show_look.call(worn)
+	return section
+
+
+## One look: its small stage, its name and state, and the button that wears it (or finds it in the Store).
+func _look_card(class_id: String, look: String, show_look: Callable) -> PanelContainer:
+	var d: Dictionary = ShopDefs.ITEMS[look] if look != "" else ShopDefs.DEFAULT_LOOKS[class_id]
+	var card := PanelContainer.new()
+	card.name = "Look_%s" % (look if look != "" else "default")
+	card.set_meta("look", look)
+	card.add_theme_stylebox_override("panel", UiTheme.flat(UiTheme.DUSK, UiTheme.STEEL, UiTheme.RADIUS_CARD, 10.0))
+	# The whole card shows the look on the stage; its button wears or buys it.
+	var tap := Button.new()
+	tap.name = "TryOn"
+	tap.flat = true
+	tap.focus_mode = Control.FOCUS_NONE
+	card.add_child(tap)
+	tap.pressed.connect(func() -> void:
+		Sfx.play("ui_click", -5.0)
+		show_look.call(look))
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 12)
+	line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(line)
+	var thumb := ModelView.new(Vector2(120, 100))
+	thumb.show_mount(look != "" and str(d.get("skin", "")) == "stag")
+	line.add_child(thumb)
+	var words := VBoxContainer.new()
+	words.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.alignment = BoxContainer.ALIGNMENT_CENTER
+	line.add_child(words)
+	words.add_child(_body(str(d["name"]), UiTheme.FS_BODY))
+	var state := _soft("", UiTheme.FS_SMALL)
+	words.add_child(state)
+	var owned := look == "" or Game.owns_item(look)
+	var act := _button("", func() -> void: pass, Vector2(150, UiTheme.BTN_SHORT))
+	act.name = "LookButton"
+	act.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(act)
+	card.set_meta("update", func() -> void:
+		var on := _look_worn(class_id, look)
+		if not owned and Game.item_locked(look):
+			state.text = "%d Doubloons, once the class is yours" % int(d["price"])
+			act.text = "Unlock class" if _class_for_sale(class_id) else "Class locked"
+			act.disabled = not _class_for_sale(class_id)
+			UiTheme.plain(act)
+		elif not owned:
+			state.text = "%d Doubloons" % int(d["price"])
+			act.text = "In the Store"
+			UiTheme.plain(act)
+		else:
+			state.text = "Worn" if on else "Yours"
+			act.text = "Worn" if on else "Wear"
+			if on: UiTheme.selected(act)
+			else: UiTheme.plain(act)
+		UiTheme.size_button(act, UiTheme.BTN_SHORT))
+	act.pressed.connect(func() -> void:
+		if not owned and Game.item_locked(look):
+			if _class_for_sale(class_id):
+				show_store(class_id, -1, "classes", func() -> void: show_armory(class_id, 1))
+			return
+		if not owned:
+			show_store(look, -1, "", func() -> void: show_armory(class_id, 1))
+			return
+		# Wearing one look takes off the others of the same class.
+		for other: String in ShopDefs.ITEMS:
+			if ShopDefs.ITEMS[other]["section"] == "cosmetics" and ShopDefs.ITEMS[other]["class"] == class_id and Game.owns_item(other):
+				Game.set_item_on(other, other == look)
+		show_look.call(look))
+	return card
+
+
+## Whether this look ("" for the class's own) is the one worn.
+static func _look_worn(class_id: String, look: String) -> bool:
+	if look != "":
+		return ShopDefs.skin_on(look)
+	for other: String in ShopDefs.ITEMS:
+		if ShopDefs.ITEMS[other]["section"] == "cosmetics" and ShopDefs.ITEMS[other]["class"] == class_id and ShopDefs.skin_on(other):
+			return false
+	return true
 
 
 ## One specialization: its emblem and name, and what you have for it.
@@ -1017,34 +1598,47 @@ func _armory_spec_row(class_id: String, spec: String, items: Array) -> Control:
 	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	column.add_theme_constant_override("separation", 4)
 	row.add_child(column)
-	column.add_child(_body("Class Upgrades", 23))
+	column.add_child(_body("Class Upgrades", UiTheme.FS_BODY))
 	if ShopDefs.ITEMS[items[0]].get("pet", false):
 		column.add_child(_pet_row())
 		return row
 	for item: String in items:
-		var d: Dictionary = ShopDefs.ITEMS[item]
-		var line := HBoxContainer.new()
-		line.add_theme_constant_override("separation", 12)
-		column.add_child(line)
-		var description := _soft(d["desc"], 21)
-		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		column.add_child(description)
-		var name_label := _soft(d["name"], 22)
-		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		line.add_child(name_label)
-		if not Game.owns_item(item):
-			line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, 50)))
-			continue
-		var on := Game.item_active(item)
-		var toggle := _button("Equipped" if on else "Not equipped", func() -> void: pass, Vector2(190, 50), on)
-		line.add_child(toggle)
-		toggle.pressed.connect(func() -> void:
-			Game.set_item_on(item, not Game.item_active(item))
-			var active := Game.item_active(item)
-			toggle.text = "Equipped" if active else "Not equipped"
-			if active: UiTheme.selected(toggle)
-			else: UiTheme.plain(toggle))
+		column.add_child(_item_switch(class_id, item))
 	return row
+
+
+## One item's name and what it does, with Equipped / Not equipped when you own it, or the way to the
+## Store when you do not.
+func _item_switch(class_id: String, item: String) -> Control:
+	var d: Dictionary = ShopDefs.ITEMS[item]
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	var line := HBoxContainer.new()
+	line.add_theme_constant_override("separation", 12)
+	column.add_child(line)
+	var name_label := _soft(d["name"], UiTheme.FS_BODY)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_child(name_label)
+	var description := _soft(d["desc"], UiTheme.FS_SMALL)
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(description)
+	if Game.item_locked(item):
+		# The class first: the Store's page for it, and back here after (or, earned, how to earn it).
+		line.add_child(_unlock_class_button(class_id, func() -> void: show_armory(class_id), Vector2(190, UiTheme.BTN_SHORT)))
+		return column
+	if not Game.owns_item(item):
+		line.add_child(_button("In the Store", func() -> void: show_store(item, -1, "", func() -> void: show_armory(class_id)), Vector2(190, UiTheme.BTN_SHORT)))
+		return column
+	var on := Game.item_active(item)
+	var toggle := _choice("Equipped" if on else "Not equipped", func() -> void: pass, Vector2(190, UiTheme.BTN_SHORT), on)
+	line.add_child(toggle)
+	toggle.pressed.connect(func() -> void:
+		Game.set_item_on(item, not Game.item_active(item))
+		var active := Game.item_active(item)
+		toggle.text = "Equipped" if active else "Not equipped"
+		if active: UiTheme.selected(toggle)
+		else: UiTheme.plain(toggle))
+	return column
 
 
 static func _spec_name(class_id: String, spec: String) -> String:
@@ -1059,25 +1653,35 @@ func _pet_row() -> Control:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 6)
 	var row := HBoxContainer.new()
+	row.name = "PetChoices"
 	row.add_theme_constant_override("separation", 6)
 	box.add_child(row)
+	var shown := ModelView.new(Vector2(200, 130))
+	shown.name = "PetStage"
+	var buttons := {}
 	for pet: String in ShopDefs.PETS:
 		var owned := pet == "wolf" or Game.owns_item(pet)
 		var chosen := pet
 		var label: String = pet.capitalize()
-		var b := _button(label, func() -> void:
+		var b := _choice(label, func() -> void:
 			if not owned:
 				show_store(chosen, -1, "", func() -> void: show_armory("ranger"))
 				return
+			# Chosen here, in place: the page stays where it was scrolled to, and only the stage
+			# and the buttons change.
 			Game.choose_pet(chosen)
-			if panel:
-				show_armory("ranger"), Vector2(0, 52), Game.pet == pet)
+			for other: String in buttons:
+				if other == chosen:
+					UiTheme.selected(buttons[other])
+				else:
+					UiTheme.plain(buttons[other])
+			shown.show_pet(chosen), Vector2(0, UiTheme.BTN_SHORT), Game.pet == pet)
+		b.name = "Pet_" + pet
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.add_theme_font_size_override("font_size", 20)
 		if not owned:
 			b.modulate = Color(1, 1, 1, 0.55)
+		buttons[pet] = b
 		row.add_child(b)
-	var shown := ModelView.new(Vector2(200, 130))
 	shown.show_pet(Game.pet)
 	box.add_child(shown)
 	return box
@@ -1123,6 +1727,7 @@ func start_game(mode: int) -> void:
 	Game.mode = mode
 	get_tree().paused = false
 	_run_over = false
+	_rewards.clear()
 	_clear_ui()
 	_back = Callable()
 	# The slow part runs in one go, so the loading screen must be drawn before it starts.
@@ -1160,6 +1765,9 @@ func start_game(mode: int) -> void:
 		if world != current or not Net.active():
 			return
 	loading.queue_free()
+	if Net.spectating:
+		_start_spectating()
+		return
 	hud.visible = true
 	_back = show_pause
 	if mode == Game.Mode.SANDBOX:
@@ -1168,32 +1776,81 @@ func start_game(mode: int) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
+## Where the match is about to be played, painted across the screen, with its name, its lore, how it
+## is played and a hint for it, and the class you are bringing. Shown while the world is built.
 func _loading_screen() -> Control:
+	var where := Places.of_match(Game.mode)
+	var place: Dictionary = Places.ALL.get(where, {})
 	var root := Control.new()
+	root.name = "Loading"
 	root.theme = _theme
 	ui_layer.add_child(root)
 	_fill(root)
-	var bg := ColorRect.new()
-	bg.color = UiTheme.NIGHT.darkened(0.25)
-	root.add_child(bg)
-	_fill(bg)
-	var center := CenterContainer.new()
-	root.add_child(center)
-	_fill(center)
+	var vista := PlaceVista.new(where if where != "" else "village")
+	vista.name = "Vista"
+	root.add_child(vista)
+	_fill(vista)
+	# A darker band at the bottom, so the words read over any sky.
+	var shade := TextureRect.new()
+	shade.texture = load("res://assets/ui/menu_shade.png")
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.flip_h = true
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shade.modulate = Color(1, 1, 1, 0.85)
+	root.add_child(shade)
+	_fill(shade)
+	var margin := _screen_margin(64, 40)
+	root.add_child(margin)
 	var box := VBoxContainer.new()
-	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 14)
-	center.add_child(box)
-	var medal := IconView.new(ClassDefs.icon(Game.player_class), ClassDefs.color(Game.player_class), 110.0)
-	medal.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(medal)
-	var title := _label("Preparing the night", 48, UiTheme.BONE)
+	box.alignment = BoxContainer.ALIGNMENT_END
+	box.add_theme_constant_override("separation", 6)
+	margin.add_child(box)
+	var mode_word := "Sandbox"
+	if Net.active():
+		mode_word = Net.RULE_NAMES[Net.rules]
+	elif Game.mode == Game.Mode.NIGHT:
+		mode_word = "Survive the Night"
+	elif Game.mode == Game.Mode.FORT:
+		mode_word = "Defend the Fort"
+	var caption := _label(mode_word, UiTheme.FS_LEAD, UiTheme.EMBER)
+	caption.name = "Mode"
+	box.add_child(caption)
+	var title := _label(str(place.get("name", "Sandbox")), 64, UiTheme.BONE)
+	title.name = "Place"
 	title.add_theme_font_override("font", UiTheme.title_font())
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
-	var tip := _label(TIPS[randi() % TIPS.size()], 26, UiTheme.ASH)
-	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	box.add_child(tip)
+	var lore := _label(str(place.get("lore", "Try any weapon, item or class you own.")), UiTheme.FS_LEAD, UiTheme.ASH)
+	lore.name = "Lore"
+	lore.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lore.custom_minimum_size.x = 820
+	lore.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	box.add_child(lore)
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 14
+	box.add_child(gap)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	box.add_child(row)
+	var medal := IconView.new(ClassDefs.icon(Game.player_class), ClassDefs.color(Game.player_class), 72.0)
+	medal.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(medal)
+	var words := VBoxContainer.new()
+	words.add_theme_constant_override("separation", 0)
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(words)
+	words.add_child(_label(str(ClassDefs.ALL[Game.player_class]["name"]), UiTheme.FS_HEAD, UiTheme.BONE))
+	var hints: Array = place.get("tips", []).duplicate()
+	if where in ["village", "fort", ""]:
+		hints.append_array(TIPS)
+	var tip := _label(str(hints[randi() % hints.size()]), UiTheme.FS_BODY, UiTheme.ASH)
+	tip.name = "Tip"
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip.custom_minimum_size.x = 760
+	words.add_child(tip)
+	row.add_child(_expand())
+	var preparing := _label("Preparing the night" if Game.mode != Game.Mode.SANDBOX else "Preparing the yard", UiTheme.FS_BODY, UiTheme.BONE)
+	preparing.size_flags_vertical = Control.SIZE_SHRINK_END
+	row.add_child(preparing)
 	return root
 
 
@@ -1216,12 +1873,63 @@ func _modal(title: String) -> Control:
 	box.add_theme_constant_override("separation", 12)
 	box.custom_minimum_size.x = 480
 	card.add_child(box)
-	var head := _body(title, 40)
+	var head := _body(title, UiTheme.FS_TITLE)
 	head.add_theme_font_override("font", UiTheme.title_font())
 	box.add_child(head)
 	root.set_meta("box", box)
 	panel = root
 	return root
+
+
+## A menu screen in the one layout every screen shares (UiScreen): the way back at the top left, the
+## name of the screen beside it. Its metas: box (everything under the bar), top, right, back.
+func _screen(title: String, on_back: Callable, line := "", back_text := "Back") -> Control:
+	var root := Control.new()
+	root.theme = _theme
+	root.process_mode = Node.PROCESS_MODE_ALWAYS
+	ui_layer.add_child(root)
+	_fill(root)
+	var parts := UiScreen.frame(root, title, on_back, line, back_text)
+	for key: String in parts:
+		root.set_meta(key, parts[key])
+	# A screen covers whatever it was opened over (the title menu, the HUD and the Pause card) and
+	# gives it back when it closes.
+	var under: Array[Control] = []
+	for c in ui_layer.get_children():
+		if c != root and c is Control and (c as Control).visible:
+			under.append(c)
+			(c as Control).visible = false
+	root.tree_exiting.connect(func() -> void:
+		for c: Control in under:
+			if is_instance_valid(c) and not c.is_queued_for_deletion():
+				c.visible = true)
+	panel = root
+	return root
+
+
+## How many Doubloons you have, for the right end of a screen's bar.
+func _purse() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "Purse"
+	row.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	row.add_child(_coin(40.0))
+	var count := _label("%d" % Game.doubloons, UiTheme.FS_HEAD, UiTheme.BONE)
+	count.add_theme_font_override("font", UiTheme.bold_font())
+	count.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(count)
+	return row
+
+
+## A setting with its name in a column of its own, so a page of them lines up.
+func _setting_row(box: Control, title: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	box.add_child(row)
+	var name_label := _soft(title, UiTheme.FS_BODY)
+	name_label.custom_minimum_size.x = 150
+	name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(name_label)
+	return row
 
 
 func show_pause() -> void:
@@ -1239,29 +1947,30 @@ func show_pause() -> void:
 	_pause_root = root
 	_back = _resume
 	var box: VBoxContainer = root.get_meta("box")
-	box.add_child(_button("Resume", _resume, Vector2(480, 72), true))
-	box.add_child(_button("Map", show_map, Vector2(480, 72)))
-	box.add_child(_button("Settings", func() -> void: show_settings(true), Vector2(480, 72)))
-	box.add_child(_button("Leave the game" if Net.active() else "Quit to menu", show_menu, Vector2(480, 72)))
+	box.add_child(_button("Resume", _resume, Vector2(480, UiTheme.BTN_TALL), true))
+	box.add_child(_button("Map", show_map, Vector2(480, UiTheme.BTN_TALL)))
+	box.add_child(_button("Settings", func() -> void: show_settings(true), Vector2(480, UiTheme.BTN_TALL)))
+	box.add_child(_button("Leave the game" if Net.active() else "Quit to menu", show_menu, Vector2(480, UiTheme.BTN_TALL)))
 
 
 func show_map() -> void:
-	var root := _modal("Map")
-	var box: VBoxContainer = root.get_meta("box")
-	var map := MapPanel.new()
-	map.world = world
-	map.custom_minimum_size = Vector2(470, 470)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	box.add_child(row)
-	row.add_child(map)
-	var close := func() -> void:
+	var root := _screen("Map", func() -> void: _back.call(), str(Places.ALL.get(world.map_id, {}).get("name", "")))
+	_back = func() -> void:
 		root.queue_free()
 		_back = _resume
-	var back := _button("Back", close, Vector2(180, 70))
-	back.size_flags_vertical = Control.SIZE_SHRINK_END
-	row.add_child(back)
-	_back = close
+	_square_map(root.get_meta("box")).world = world
+
+
+## A map as big as the screen allows under its bar, and square.
+func _square_map(box: VBoxContainer) -> MapPanel:
+	var fit := AspectRatioContainer.new()
+	fit.ratio = 1.0
+	fit.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	fit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_child(fit)
+	var map := MapPanel.new()
+	fit.add_child(map)
+	return map
 
 
 func _resume() -> void:
@@ -1322,6 +2031,7 @@ func _on_dawn() -> void:
 		return
 	_run_over = true
 	Game.note_mists_win()
+	Game.note_beyond_win()
 	close_tree()
 	if hud:
 		hud.release_all()
@@ -1354,22 +2064,76 @@ func _on_fort_lost() -> void:
 	_end_screen("The portal has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
 
 
+## What the match earned is listed under the end screen's words, each with its picture: doubloons
+## with a doubloon, a class unlocked with its emblem, and the leaderboard points. Returns "" so it
+## can stand where the words of the end screen are put together.
 func _earned_line(earned: int) -> String:
-	var line := "\n+%d Botti Doubloons" % earned if earned > 0 else ""
+	if earned > 0:
+		_rewards.append({"coin": true, "text": "+%d Botti Doubloons" % earned})
 	Game.note_game_finished()
 	for id: String in Game.fresh_unlocks:
-		line += "\n%s unlocked!" % ClassDefs.ALL[id]["name"]
+		_rewards.append({"class": id, "text": "%s unlocked!" % ClassDefs.ALL[id]["name"]})
 	Game.fresh_unlocks.clear()
-	return line
+	return ""
+
+
+## The rows of what the match earned, under the end screen's words.
+func _reward_rows(box: VBoxContainer) -> void:
+	for i in _rewards.size():
+		var reward: Dictionary = _rewards[i]
+		var row := HBoxContainer.new()
+		row.name = "Reward%d" % i
+		row.add_theme_constant_override("separation", 12)
+		box.add_child(row)
+		if reward.has("coin"):
+			row.add_child(_coin(40.0))
+		elif reward.has("class"):
+			var id: String = reward["class"]
+			var emblem := IconView.new(ClassDefs.icon(id), ClassDefs.color(id), 44.0)
+			emblem.name = "ClassIcon"
+			row.add_child(emblem)
+		else:
+			var star := IconView.new("star", UiTheme.STEEL, 40.0)
+			star.name = "PointsIcon"
+			row.add_child(star)
+		var words := _body(reward["text"], UiTheme.FS_LEAD)
+		words.add_theme_font_override("font", UiTheme.bold_font())
+		words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(words)
+	_rewards.clear()
+
+
+## Spectator Mode: the broadcast instead of the player's view and its controls.
+func _start_spectating() -> void:
+	hud.visible = false
+	spectator = SpectatorView.new(world)
+	spectator.theme = _theme
+	ui_layer.add_child(spectator)
+	_fill(spectator)
+	spectator.leave_requested.connect(show_menu)
+	_back = show_menu
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
 func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 	if _run_over or world == null:
 		return
 	_run_over = true
+	if Net.spectating:
+		# Watching earns nothing: the result, and the way out.
+		_back = show_menu
+		var end := _modal(title)
+		var end_box: VBoxContainer = end.get_meta("box")
+		var said := _body(line, UiTheme.FS_LEAD)
+		said.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		end_box.add_child(said)
+		end_box.add_child(_button("Menu", show_menu, Vector2(480, UiTheme.BTN_TALL), true))
+		return
 	var won := reached_dawn or Net.last_winner == Net.my_id()
 	if reached_dawn:
 		Game.note_mists_win()
+	if won:
+		Game.note_beyond_win()
 	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp() and Net.humans() > 1))
 	line += _board_line(world.director.elapsed, world.player.kills, won)
 	close_tree()
@@ -1378,19 +2142,21 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 		hud.menu_open = true
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_back = show_menu
+	_close_screens()
 	var root := _modal(title)
 	var box: VBoxContainer = root.get_meta("box")
-	var l := _body(line, 26)
+	var l := _body(line, UiTheme.FS_LEAD)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(l)
+	_reward_rows(box)
 	if Net.is_host():
-		box.add_child(_button("Back to the room", Net.return_to_room, Vector2(480, 72), true))
-		box.add_child(_button("Menu", show_menu, Vector2(480, 64)))
+		box.add_child(_button("Back to the room", Net.return_to_room, Vector2(480, UiTheme.BTN_TALL), true))
+		box.add_child(_button("Menu", show_menu, Vector2(480, UiTheme.BTN_TALL)))
 	else:
-		var wait := _soft("Your host can take everyone back to the room for another night.", 22)
+		var wait := _soft("Your host can take everyone back to the room for another night.", UiTheme.FS_BODY)
 		wait.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		box.add_child(wait)
-		box.add_child(_button("Menu", show_menu, Vector2(480, 72), true))
+		box.add_child(_button("Menu", show_menu, Vector2(480, UiTheme.BTN_TALL), true))
 
 
 ## Everyone still here, back in the room the night began from.
@@ -1417,10 +2183,10 @@ func _on_net_left(reason: String) -> void:
 		show_together()
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
-	var l := _body(reason, 26)
+	var l := _body(reason, UiTheme.FS_LEAD)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(l)
-	box.add_child(_button("OK", func() -> void: root.queue_free(), Vector2(480, 72), true))
+	box.add_child(_button("OK", func() -> void: root.queue_free(), Vector2(480, UiTheme.BTN_TALL), true))
 
 
 # --- Play together -----------------------------------------------------------
@@ -1433,97 +2199,120 @@ func show_sandbox_menu() -> void:
 		hud.release_all()
 		hud.menu_open = true
 	get_tree().paused = true
-	var root := _modal("Sandbox")
+	var root := _screen("Sandbox", _resume, "The world waits while you are here.", "Back to it")
 	_pause_root = root
 	_back = _resume
-	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 1000
-	box.add_child(_soft("Bring in an enemy, a few steps in front of you", 23))
+	var page := UiScreen.page(root.get_meta("box"))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	page.add_child(box)
+	_section(box, "Bring in an enemy, a few steps in front of you", true)
+	# Every enemy in the game no longer fits on one screen: the list scrolls, the rest stays put.
+	var enemy_scroll := DragScroll.new()
+	enemy_scroll.name = "SandboxEnemies"
+	enemy_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	box.add_child(enemy_scroll)
 	var grid := GridContainer.new()
 	grid.columns = 5
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
-	box.add_child(grid)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", UiTheme.GAP_SMALL)
+	grid.add_theme_constant_override("v_separation", UiTheme.GAP_SMALL)
+	enemy_scroll.add_child(grid)
 	var enemies: Array = ["dummy"]
 	enemies.append_array(ZombieDefs.ALL.keys())
 	for id: String in enemies:
 		var chosen := id
 		var b := _button(str(ZombieDefs.def_of(id)["name"]), func() -> void:
-			world.sandbox_spawn(chosen), Vector2(194, 54))
-		b.add_theme_font_size_override("font_size", 22)
+			world.sandbox_spawn(chosen), Vector2(0, UiTheme.BTN_SHORT))
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.clip_text = true
 		grid.add_child(b)
-	box.add_child(_soft("You", 23))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	box.add_child(row)
+	var lower := HBoxContainer.new()
+	lower.add_theme_constant_override("separation", 40)
+	box.add_child(lower)
+	var you := VBoxContainer.new()
+	you.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	you.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	lower.add_child(you)
+	_section(you, "You")
 	var pl := world.player
-	row.add_child(_button("New skill tree", func() -> void: start_game(Game.Mode.SANDBOX), Vector2(220, 60)))
 	var safe := _toggle("Cannot be hurt", func() -> bool: return pl.guard_left > 100.0, func(on: bool) -> void: pl.guard_left = 9999.0 if on else 0.0)
-	safe.custom_minimum_size.x = 300
-	row.add_child(safe)
-	row.add_child(_button("Clear enemies", func() -> void: world.sandbox_clear(), Vector2(210, 60)))
+	you.add_child(safe)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	you.add_child(row)
+	for b: Button in [_button("New skill tree", func() -> void: start_game(Game.Mode.SANDBOX), Vector2(0, UiTheme.BTN)), _button("Clear enemies", func() -> void: world.sandbox_clear(), Vector2(0, UiTheme.BTN))]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(b)
+	var place := VBoxContainer.new()
+	place.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	place.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	lower.add_child(place)
+	_section(place, "Weather")
+	place.add_child(_choices(["Clear", "Rain", "Storm", "Windy"], world.weather.kind, 380.0, func(i: int) -> void: world.weather.set_kind(i)))
 	var foot := HBoxContainer.new()
-	foot.add_theme_constant_override("separation", 8)
-	box.add_child(foot)
-	var weather_row := HBoxContainer.new()
-	weather_row.add_theme_constant_override("separation", 8)
-	box.add_child(weather_row)
-	weather_row.add_child(_soft("Weather", 23))
-	weather_row.add_child(_choices(["Clear", "Rain", "Storm"], world.weather.kind, 150.0, func(i: int) -> void: world.weather.set_kind(i)))
-	foot.add_child(_button("Change class", func() -> void: show_class_picker(Game.Mode.SANDBOX), Vector2(240, 66)))
-	foot.add_child(_button("Quit to menu", show_menu, Vector2(240, 66)))
-	foot.add_child(_expand())
-	foot.add_child(_button("Back to it", _resume, Vector2(260, 66), true))
+	foot.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	place.add_child(foot)
+	for b: Button in [_button("Change class", func() -> void: show_class_picker(Game.Mode.SANDBOX), Vector2(0, UiTheme.BTN)), _button("Quit to menu", show_menu, Vector2(0, UiTheme.BTN))]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		foot.add_child(b)
 
 
 ## The four ways to play together, and what each one needs.
 func show_together(tab := -1) -> void:
 	if tab >= 0:
-		_together_tab = tab
+		_together_tab = clampi(tab, 0, TOGETHER_TABS.size() - 1)
 	_clear_ui()
 	_back = show_menu
-	var root := _modal("Play Together")
-	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 900
-	var tabs := HBoxContainer.new()
-	tabs.add_theme_constant_override("separation", 8)
-	box.add_child(tabs)
-	for t in TOGETHER_TABS.size():
-		var pick := t
-		tabs.add_child(_button(TOGETHER_TABS[t], func() -> void: show_together(pick), Vector2(216, 60), _together_tab == t))
+	var root := _screen("Play Together", show_menu, "Up to four phones, nearby or online.")
+	# Who you play as is shown, not changed, here: the name is changed in Settings.
+	var right: HBoxContainer = root.get_meta("right")
+	var playing := _soft("Playing as", UiTheme.FS_BODY)
+	playing.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	right.add_child(playing)
+	var who := _label(Game.player_name, UiTheme.FS_LEAD, UiTheme.BONE)
+	who.name = "PlayingAs"
+	who.add_theme_font_override("font", UiTheme.bold_font())
+	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	right.add_child(who)
+	UiScreen.tabs(root.get_meta("box"), TOGETHER_TABS, _together_tab, func(i: int) -> void: show_together(i))
+	var page := UiScreen.page(root.get_meta("box"))
+	var scroll := DragScroll.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	page.add_child(scroll)
+	var box := VBoxContainer.new()
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.add_theme_constant_override("separation", UiTheme.GAP)
+	scroll.add_child(box)
+	# What this way needs on the left; starting a game on the right, the same on every tab.
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 10)
+	top.add_theme_constant_override("separation", UiTheme.GAP)
 	box.add_child(top)
-	top.add_child(_soft("Playing as", 24))
-	var who := _button(Game.player_name, func() -> void: show_name_prompt(false, func() -> void: show_together()), Vector2(250, 58))
-	who.tooltip_text = "Change your name"
-	top.add_child(who)
+	var about := _body(["Everyone on the same Wi-Fi network.", "Over the internet, from almost any network, mobile data included."][_together_tab], UiTheme.FS_LEAD)
+	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	about.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	about.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(about)
 	if _together_tab == ONLINE_TAB:
 		if EpicNet.available():
-			top.add_child(_button("Start a game", _start_online, Vector2(300, 66), true))
+			top.add_child(_button("Start a game", _start_online, Vector2(280, UiTheme.BTN_TALL), true))
 	else:
 		top.add_child(_button("Start a game", func() -> void:
 			var problem := Net.host_game()
 			if problem == OK:
 				show_lobby()
 			else:
-				_on_net_left("Could not start a game here (%d)." % problem), Vector2(300, 66), true))
-	top.add_child(_button("Back", show_menu, Vector2(130, 66)))
+				_on_net_left("Could not start a game here (%d)." % problem), Vector2(280, UiTheme.BTN_TALL), true))
 	match _together_tab:
 		0:
-			box.add_child(_soft("Everyone on the same Wi-Fi network.", 24))
 			_nearby_games(box, root)
-		1:
-			var steps := _soft("1. On one phone, turn on the hotspot in its settings.\n2. Connect the others to that hotspot's Wi-Fi. If a phone warns there is no internet, stay connected.\n3. Start a game on the hotspot phone, and it appears on the others.\nIf a phone keeps getting dropped, turn off its mobile data.", 23)
-			steps.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			box.add_child(steps)
-			_nearby_games(box, root)
-		2:
+		ONLINE_TAB:
 			_online_tab(box)
 
 
 func _nearby_games(box: VBoxContainer, root: Control) -> void:
-	box.add_child(_body("Games nearby", 26))
+	_section(box, "Games nearby")
 	var rooms := VBoxContainer.new()
 	rooms.custom_minimum_size.y = 80
 	rooms.add_theme_constant_override("separation", 6)
@@ -1533,39 +2322,53 @@ func _nearby_games(box: VBoxContainer, root: Control) -> void:
 			return
 		for c in rooms.get_children():
 			c.queue_free()
-		if Net.rooms.is_empty():
-			rooms.add_child(_body("Looking...", 24))
-		for address: String in Net.rooms:
+		var open := Net.rooms.keys().filter(func(a: String) -> bool: return not Net.rooms[a].get("live", false))
+		var live := Net.rooms.keys().filter(func(a: String) -> bool: return Net.rooms[a].get("watchable", false))
+		if open.is_empty():
+			rooms.add_child(_body("Looking...", UiTheme.FS_BODY))
+		for address: String in open:
 			var info: Dictionary = Net.rooms[address]
-			rooms.add_child(_button("%s's game: %s, %d of %d players" % [info["name"], Net.RULE_NAMES[int(info["rules"])], info["players"], Net.MAX_PLAYERS], func() -> void: _join(address), Vector2(860, 60)))
+			rooms.add_child(_button("%s's game: %s, %d of %d players" % [info["name"], Net.RULE_NAMES[int(info["rules"])], info["players"], Net.MAX_PLAYERS], func() -> void: _join(address), Vector2(0, UiTheme.BTN)))
+		if not live.is_empty():
+			_section(rooms, "Matches to watch")
+		for address: String in live:
+			rooms.add_child(_live_row(Net.rooms[address], func() -> void: _watch(address)))
 	Net.rooms_changed.connect(fill)
+	# The screen shows at once; the search (which reaches into the phone's Wi-Fi settings and opens a
+	# socket, and can take a moment) starts just after it is on screen.
+	var searching := [false]
 	root.tree_exiting.connect(func() -> void:
 		Net.rooms_changed.disconnect(fill)
-		Net.stop_search())
-	Net.start_search()
+		if searching[0]:
+			Net.stop_search())
 	fill.call()
+	# Held weakly: the screen may be gone (another tab) before the timer fires.
+	var screen: WeakRef = weakref(root)
+	get_tree().create_timer(0.05).timeout.connect(func() -> void:
+		var still := screen.get_ref() as Control
+		if still and still.is_inside_tree() and not searching[0]:
+			searching[0] = true
+			Net.start_search())
 	var manual := HBoxContainer.new()
 	manual.add_theme_constant_override("separation", 10)
 	box.add_child(manual)
-	manual.add_child(_body("Join by address", 24))
+	var by := _soft("Join by address", UiTheme.FS_BODY)
+	by.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	manual.add_child(by)
 	var address_edit := LineEdit.new()
 	address_edit.placeholder_text = _example_address()
-	address_edit.custom_minimum_size = Vector2(400, 58)
-	address_edit.add_theme_font_size_override("font_size", 26)
+	address_edit.custom_minimum_size = Vector2(400, UiTheme.BTN)
 	# Number keyboards on Android allow a single dot, and an address has three.
 	address_edit.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_URL
 	manual.add_child(address_edit)
 	manual.add_child(_button("Join", func() -> void:
 		if address_edit.text.strip_edges() != "":
-			_join(address_edit.text.strip_edges()), Vector2(160, 60)))
+			_join(address_edit.text.strip_edges()), Vector2(140, UiTheme.BTN)))
 
 
 func _online_tab(box: VBoxContainer) -> void:
-	var how := _soft("Over the internet, from almost any network, mobile data included.", 24)
-	how.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(how)
 	if not EpicNet.available():
-		var missing := _body("This build has no online play.", 24)
+		var missing := _body("This build has no online play.", UiTheme.FS_BODY)
 		missing.add_theme_color_override("font_color", UiTheme.EMBER)
 		box.add_child(missing)
 		return
@@ -1573,29 +2376,40 @@ func _online_tab(box: VBoxContainer) -> void:
 	var kind := HBoxContainer.new()
 	kind.add_theme_constant_override("separation", 8)
 	box.add_child(kind)
-	kind.add_child(_body("New game", 24))
-	kind.add_child(_button("Public", func() -> void:
+	var new_game := _soft("New game", UiTheme.FS_BODY)
+	new_game.custom_minimum_size.x = 150
+	new_game.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	kind.add_child(new_game)
+	kind.add_child(_choice("Public", func() -> void:
 		_start_listed = true
-		show_together(ONLINE_TAB), Vector2(150, 54), _start_listed))
-	kind.add_child(_button("Private", func() -> void:
+		show_together(ONLINE_TAB), Vector2(150, UiTheme.BTN_SHORT), _start_listed))
+	kind.add_child(_choice("Private", func() -> void:
 		_start_listed = false
-		show_together(ONLINE_TAB), Vector2(150, 54), not _start_listed))
-	var says := _soft("Anyone can find it in the list below, or join with its code." if _start_listed else "Only friends with its code can join.", 21)
+		show_together(ONLINE_TAB), Vector2(150, UiTheme.BTN_SHORT), not _start_listed))
+	var says := _soft("Anyone can find it in the list below, or join with its code." if _start_listed else "Only friends with its code can join.", UiTheme.FS_SMALL)
 	says.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	kind.add_child(says)
 	var join := HBoxContainer.new()
 	join.add_theme_constant_override("separation", 10)
 	box.add_child(join)
-	join.add_child(_body("Room code", 24))
+	var code_title := _soft("Room code", UiTheme.FS_BODY)
+	code_title.custom_minimum_size.x = 150
+	code_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	join.add_child(code_title)
 	var code_edit := LineEdit.new()
 	code_edit.placeholder_text = "ABC234"
 	code_edit.max_length = EpicNet.USER_ID_LENGTH
-	code_edit.custom_minimum_size = Vector2(260, 58)
-	code_edit.add_theme_font_size_override("font_size", 26)
+	code_edit.custom_minimum_size = Vector2(260, UiTheme.BTN)
 	join.add_child(code_edit)
 	join.add_child(_button("Join", func() -> void:
 		if code_edit.text.strip_edges() != "":
-			_join_online(code_edit.text), Vector2(160, 60)))
+			_join_online(code_edit.text), Vector2(140, UiTheme.BTN)))
+	# A private match under way can be watched by whoever has its code.
+	var watch_code := _button("Watch", func() -> void:
+		if code_edit.text.strip_edges() != "":
+			_watch_online(code_edit.text), Vector2(140, UiTheme.BTN))
+	watch_code.name = "WatchByCode"
+	join.add_child(watch_code)
 	_public_games(box)
 
 
@@ -1604,30 +2418,35 @@ func _public_games(box: VBoxContainer) -> void:
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 10)
 	box.add_child(head)
-	var title := _body("Public games", 26)
+	var title := VBoxContainer.new()
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_section(title, "Public games")
 	head.add_child(title)
-	head.add_child(_button("Refresh", func() -> void: Net.look_for_rooms(), Vector2(150, 50)))
-	var scroll := DragScroll.new()
-	scroll.custom_minimum_size = Vector2(860, 150)
-	box.add_child(scroll)
+	head.add_child(_button("Refresh", func() -> void: Net.look_for_rooms(), Vector2(150, UiTheme.BTN_SHORT)))
 	var rows := VBoxContainer.new()
 	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rows.add_theme_constant_override("separation", 6)
-	scroll.add_child(rows)
+	rows.add_theme_constant_override("separation", UiTheme.GAP_SMALL)
+	box.add_child(rows)
 	var fill := func() -> void:
 		if not is_instance_valid(rows):
 			return
 		for c in rows.get_children():
 			rows.remove_child(c)
 			c.queue_free()
-		if Net.public_rooms.is_empty():
+		var waiting := Net.public_rooms.filter(func(room: Dictionary) -> bool: return room.get("waiting", true))
+		var live := Net.public_rooms.filter(func(room: Dictionary) -> bool: return room.get("live", false))
+		if waiting.is_empty():
 			var empty := "Looking..." if Net.looking_up else ("Could not look: %s" % Net.lookup_problem if Net.lookup_problem != "" else "No public games right now. Start one, or join a friend's with a code.")
-			var l := _soft(empty, 22)
+			var l := _soft(empty, UiTheme.FS_BODY)
 			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			rows.add_child(l)
-		for room: Dictionary in Net.public_rooms:
+		for room: Dictionary in waiting:
 			rows.add_child(_public_room_row(room))
+		if not live.is_empty():
+			_section(rows, "Matches to watch")
+		for room: Dictionary in live:
+			var host := str(room["host"])
+			rows.add_child(_live_row(room, func() -> void: _watch_online(host)))
 	Net.public_rooms_changed.connect(fill)
 	var timer := Timer.new()
 	timer.wait_time = 6.0
@@ -1645,7 +2464,7 @@ func _public_room_row(room: Dictionary) -> Button:
 	var map_name: String = Game.MAPS.get(str(room["map"]), {}).get("name", "")
 	var rules: String = Net.RULE_NAMES[clampi(int(room["rules"]), 0, Net.RULE_NAMES.size() - 1)]
 	var what := rules if int(room["rules"]) != Net.Rules.COOP or map_name == "" else "%s, %s" % [rules, map_name]
-	var b := _button("%s's game: %s. %d of %d players" % [room["name"], what, int(room["players"]), Net.MAX_PLAYERS], func() -> void: _join_online(str(room["host"])), Vector2(840, 58))
+	var b := _button("%s's game: %s. %d of %d players" % [room["name"], what, int(room["players"]), Net.MAX_PLAYERS], func() -> void: _join_online(str(room["host"])), Vector2(0, UiTheme.BTN))
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	return b
 
@@ -1655,7 +2474,7 @@ func _online_wait() -> void:
 	var root := _modal("Play Together")
 	var box: VBoxContainer = root.get_meta("box")
 	box.custom_minimum_size.x = 600
-	box.add_child(_body("Connecting...", 28))
+	box.add_child(_body("Connecting...", UiTheme.FS_HEAD))
 
 
 func _start_online() -> void:
@@ -1696,20 +2515,74 @@ func _join(address: String) -> void:
 		_on_net_left("That address does not look right.")
 
 
+## A match under way, in a list: who hosts it, what and where, how many watch, and the way in.
+func _live_row(room: Dictionary, watch: Callable) -> Button:
+	var map_id := str(room.get("map", ""))
+	var place: String = Places.ALL.get(map_id, {}).get("name", "") if map_id != "" else ""
+	var rules: String = Net.RULE_NAMES[clampi(int(room["rules"]), 0, Net.RULE_NAMES.size() - 1)]
+	var what := rules if place == "" else "%s, %s" % [rules, place]
+	var b := _button("Watch %s's match: %s. %d watching" % [room["name"], what, int(room.get("watchers", 0))], watch, Vector2(0, UiTheme.BTN))
+	b.name = "WatchRow"
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.add_theme_color_override("font_color", SPECTATE_RED.lightened(0.35))
+	return b
+
+
+func _watch(address: String) -> void:
+	if Net.watch_game(address) == OK:
+		_watch_wait()
+	else:
+		_on_net_left("That address does not look right.")
+
+
+func _watch_online(code: String) -> void:
+	_online_wait()
+	var problem := await Net.watch_online(code)
+	if problem != "":
+		_on_online_failed(problem)
+	else:
+		_watch_wait()
+
+
+## Joining a match to watch it: a moment while the host says yes and the world is built.
+func _watch_wait() -> void:
+	_clear_ui()
+	_back = func() -> void:
+		Net.leave()
+		show_together()
+	var root := _modal("Spectator Mode")
+	var box: VBoxContainer = root.get_meta("box")
+	box.custom_minimum_size.x = 600
+	box.add_child(_body("Joining the match to watch it...", UiTheme.FS_HEAD))
+	box.add_child(_button("Cancel", func() -> void:
+		Net.leave()
+		show_together(), Vector2(240, UiTheme.BTN)))
+
+
 ## Who is here, and what the game will be.
 func show_lobby() -> void:
 	_clear_ui()
 	_back = _leave_lobby
-	var root := _modal("Play Together")
+	var root := _screen("Game room", _leave_lobby, "", "Leave")
 	var box: VBoxContainer = root.get_meta("box")
-	box.custom_minimum_size.x = 900
+	var page := UiScreen.page(box)
+	var inside := VBoxContainer.new()
+	inside.add_theme_constant_override("separation", UiTheme.GAP)
+	page.add_child(inside)
 	var scroll := DragScroll.new()
-	scroll.custom_minimum_size = Vector2(900, 520)
-	box.add_child(scroll)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	inside.add_child(scroll)
 	var body := VBoxContainer.new()
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 8)
 	scroll.add_child(body)
+	# Start and Leave stay in reach below the scrolling part, however long the room gets.
+	var foot := HBoxContainer.new()
+	foot.name = "LobbyFoot"
+	foot.add_theme_constant_override("separation", UiTheme.GAP)
+	inside.add_child(foot)
+	body.set_meta("foot", foot)
 	var refresh := func() -> void: _fill_lobby(body)
 	Net.lobby_changed.connect(refresh)
 	root.tree_exiting.connect(func() -> void: Net.lobby_changed.disconnect(refresh))
@@ -1724,111 +2597,179 @@ func _leave_lobby() -> void:
 func _fill_lobby(body: VBoxContainer) -> void:
 	if not is_instance_valid(body):
 		return
-	for c in body.get_children():
-		# This can run from inside one of these buttons' own press.
-		body.remove_child(c)
-		c.queue_free()
+	var foot: HBoxContainer = body.get_meta("foot")
+	for holder: Node in [body, foot]:
+		for c in holder.get_children():
+			# This can run from inside one of these buttons' own press.
+			holder.remove_child(c)
+			c.queue_free()
 	if Net.is_client() and not Net.roster.has(Net.my_id()):
-		body.add_child(_body("Connecting...", 28))
-		body.add_child(_button("Back", _leave_lobby, Vector2(240, 60)))
+		body.add_child(_body("Connecting...", UiTheme.FS_HEAD))
 		return
 	if Net.is_host():
 		if Net.way == Net.Way.ONLINE:
 			var row := HBoxContainer.new()
 			row.add_theme_constant_override("separation", 10)
 			body.add_child(row)
-			var shown := _body("Room code: %s" % Net.room_code, 30 if Net.room_problem == "" else 22)
+			var shown := _body("Room code: %s" % Net.room_code, UiTheme.FS_HEAD if Net.room_problem == "" else UiTheme.FS_BODY)
 			shown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(shown)
-			row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(Net.room_code), Vector2(120, 48)))
-			row.add_child(_button("Public", func() -> void: Net.set_listed(true), Vector2(130, 48), Net.room_listed))
-			row.add_child(_button("Private", func() -> void: Net.set_listed(false), Vector2(130, 48), not Net.room_listed))
+			row.add_child(_button("Copy", func() -> void: DisplayServer.clipboard_set(Net.room_code), Vector2(120, UiTheme.BTN_SHORT)))
+			row.add_child(_choice("Public", func() -> void: Net.set_listed(true), Vector2(130, UiTheme.BTN_SHORT), Net.room_listed))
+			row.add_child(_choice("Private", func() -> void: Net.set_listed(false), Vector2(130, UiTheme.BTN_SHORT), not Net.room_listed))
 			if Net.room_problem != "":
-				var why := _soft("%s This longer code still works: copy it and send it to your friends." % Net.room_problem, 22)
+				var why := _soft("%s This longer code still works: copy it and send it to your friends." % Net.room_problem, UiTheme.FS_BODY)
 				why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 				body.add_child(why)
 		else:
 			var where := Net.local_addresses()
-			body.add_child(_body("Your address, if someone needs it: %s" % (where[0] if not where.is_empty() else "no Wi-Fi?"), 24))
-		var kinds := HBoxContainer.new()
-		kinds.add_theme_constant_override("separation", 8)
-		body.add_child(kinds)
+			body.add_child(_body("Your address, if someone needs it: %s" % (where[0] if not where.is_empty() else "no Wi-Fi?"), UiTheme.FS_BODY))
+		# Each setting of the night on its own line, its name in a column, its choices beside it.
+		var kinds := _setting_row(body, "Game")
 		for r in Net.RULE_NAMES.size():
 			var pick := r
-			kinds.add_child(_button(Net.RULE_NAMES[r], func() -> void: Net.set_rules(pick), Vector2(215, 58), Net.rules == r))
-		if Net.rules == Net.Rules.COOP:
-			var maps := HBoxContainer.new()
-			maps.add_theme_constant_override("separation", 8)
-			body.add_child(maps)
+			kinds.add_child(_choice(Net.RULE_NAMES[r], func() -> void: Net.set_rules(pick), Vector2(210, UiTheme.BTN_SHORT), Net.rules == r))
+		var maps := _setting_row(body, "Place")
+		if Net.rules == Net.Rules.FORT:
+			for id: String in Game.FORT_MAPS:
+				var chosen_fort := id
+				maps.add_child(_choice(Game.FORT_MAPS[id]["name"], func() -> void: Net.set_fort_map(chosen_fort), Vector2(210, UiTheme.BTN_SHORT), Net.fort_map == id))
+		else:
 			for id: String in Game.MAPS:
+				if Net.pvp() and id not in Game.VERSUS_MAPS:
+					continue
 				var chosen_map := id
-				maps.add_child(_button(Game.MAPS[id]["name"], func() -> void: Net.set_night_map(chosen_map), Vector2(215, 52), Net.night_map == id))
-		var levels := HBoxContainer.new()
-		levels.add_theme_constant_override("separation", 8)
-		body.add_child(levels)
-		var bots_row := levels
-		levels.add_child(_body("Difficulty", 24))
+				maps.add_child(_choice(Game.MAPS[id]["name"], func() -> void: Net.set_night_map(chosen_map), Vector2(210, UiTheme.BTN_SHORT), Net.night_map == id))
+		var levels := _setting_row(body, "Difficulty")
 		for d in 3:
 			var level := d
-			levels.add_child(_button(["Easy", "Normal", "Hard"][d], func() -> void: Net.set_difficulty(level), Vector2(125, 52), Net.difficulty == d))
-		bots_row.add_child(_body("  Bots", 24))
+			levels.add_child(_choice(["Easy", "Normal", "Hard"][d], func() -> void: Net.set_difficulty(level), Vector2(150, UiTheme.BTN_SHORT), Net.difficulty == d))
+		var bots_row := _setting_row(body, "Bots")
 		for n in Net.MAX_PLAYERS - Net.humans() + 1:
 			var wanted := n
-			bots_row.add_child(_button(str(n), func() -> void: Net.set_bots(wanted), Vector2(62, 52), Net.bot_count() == n))
+			bots_row.add_child(_choice(str(n), func() -> void: Net.set_bots(wanted), Vector2(72, UiTheme.BTN_SHORT), Net.bot_count() == n))
+		var watch_row := _setting_row(body, "Spectators")
+		var allow := _choice("Allowed", func() -> void: Net.set_allow_spectators(true), Vector2(150, UiTheme.BTN_SHORT), Net.allow_spectators)
+		allow.name = "AllowSpectators"
+		watch_row.add_child(allow)
+		var refuse := _choice("Not allowed", func() -> void: Net.set_allow_spectators(false), Vector2(180, UiTheme.BTN_SHORT), not Net.allow_spectators)
+		refuse.name = "RefuseSpectators"
+		watch_row.add_child(refuse)
+		var watch_says := _soft("Up to %d more can watch once it starts." % Net.MAX_SPECTATORS if Net.allow_spectators else "Nobody can watch this match.", UiTheme.FS_SMALL)
+		watch_says.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		watch_row.add_child(watch_says)
 	else:
-		body.add_child(_body("Game: %s, %s. The host starts when everyone is ready." % [Net.RULE_NAMES[Net.rules], ["Easy", "Normal", "Hard"][Net.difficulty]], 24))
+		body.add_child(_body("Game: %s, %s. The host starts when everyone is ready." % [Net.RULE_NAMES[Net.rules], ["Easy", "Normal", "Hard"][Net.difficulty]], UiTheme.FS_BODY))
 	if Net.rules == Net.Rules.FFA:
-		body.add_child(_soft("Three lives each, and a deadly fog closes in. The last one standing wins.", 23))
+		body.add_child(_soft("Three lives each, and a deadly fog closes in. The last one standing wins.", UiTheme.FS_BODY))
 	if not Net.can_start():
 		var need := "All vs All needs someone to fight." if Net.rules == Net.Rules.FFA else "Teams needs a player or bot on each side."
 		if Net.is_host():
 			need += " Wait for a friend or add a bot."
-		var why := _soft(need, 23)
+		var why := _soft(need, UiTheme.FS_BODY)
 		why.add_theme_color_override("font_color", UiTheme.EMBER)
 		body.add_child(why)
+	# Who is in the room on the left, the class you play on the right.
+	var split := HBoxContainer.new()
+	split.add_theme_constant_override("separation", 18)
+	body.add_child(split)
+	var people := VBoxContainer.new()
+	people.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	people.add_theme_constant_override("separation", 6)
+	split.add_child(people)
+	people.add_child(_soft("In the room", UiTheme.FS_BODY))
 	var ids: Array = Net.roster.keys()
 	ids.sort()
 	for peer: int in ids:
-		var info: Dictionary = Net.roster[peer]
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
-		body.add_child(row)
-		var medal := IconView.new(ClassDefs.icon(str(info["class"])), ClassDefs.color(str(info["class"])), 44.0)
-		row.add_child(medal)
-		var who := "%s: %s" % [info["name"], ClassDefs.ALL[str(info["class"])]["name"]]
-		if peer == Net.my_id():
-			who += " (you)"
-		var l := _body(who, 26)
-		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(l)
-		if Net.rules == Net.Rules.TEAMS:
-			var team := _body("Team %s" % ("Gold" if int(info["team"]) == 0 else "Blue"), 26)
-			team.add_theme_color_override("font_color", Net.team_colour(int(info["team"])))
-			row.add_child(team)
+		people.add_child(_lobby_person(peer))
+	var side := VBoxContainer.new()
+	side.add_theme_constant_override("separation", 6)
+	split.add_child(side)
+	side.add_child(_soft("Your class", UiTheme.FS_BODY))
 	var classes := GridContainer.new()
-	classes.columns = 6
-	classes.add_theme_constant_override("h_separation", 6)
-	classes.add_theme_constant_override("v_separation", 6)
-	body.add_child(classes)
-	var offered := ClassDefs.available()
-	for id: String in offered:
+	classes.name = "LobbyClasses"
+	classes.columns = 4
+	classes.add_theme_constant_override("h_separation", 8)
+	classes.add_theme_constant_override("v_separation", 8)
+	side.add_child(classes)
+	var mine := str(Net.roster[Net.my_id()]["class"])
+	for id: String in ClassDefs.available():
 		var pick := id
-		var mine := str(Net.roster[Net.my_id()]["class"]) == id
-		var b := _button(String(ClassDefs.ALL[id]["name"]).get_slice(" ", 0), func() -> void: Net.set_my_class(pick), Vector2(136, 56), mine)
-		b.add_theme_font_size_override("font_size", 22)
-		b.disabled = not Net.class_slot_available(id, Net.my_id())
-		b.tooltip_text = "Only one Commander per match" if b.disabled else ""
-		classes.add_child(b)
-	var foot := HBoxContainer.new()
-	foot.add_theme_constant_override("separation", 10)
-	body.add_child(foot)
+		classes.add_child(_class_tile(id, mine == id, Net.class_slot_available(id, Net.my_id()), func() -> void: Net.set_my_class(pick)))
 	if Net.rules == Net.Rules.TEAMS:
-		foot.add_child(_button("Change team", Net.switch_team, Vector2(240, 66)))
+		foot.add_child(_button("Change team", Net.switch_team, Vector2(240, UiTheme.BTN)))
+	foot.add_child(_expand())
 	if Net.is_host():
-		var go := _button("Start the night", Net.start_match, Vector2(360, 66), true)
+		var go := _button("Start the night", Net.start_match, Vector2(360, UiTheme.BTN_TALL), true)
 		go.disabled = not Net.can_start()
 		foot.add_child(go)
-	foot.add_child(_button("Leave", _leave_lobby, Vector2(180, 66)))
+
+
+## One person in the room: the emblem of their class, their name, the class and, in Teams, their side.
+func _lobby_person(peer: int) -> PanelContainer:
+	var info: Dictionary = Net.roster[peer]
+	var cls := str(info["class"])
+	var card := PanelContainer.new()
+	var me := peer == Net.my_id()
+	card.add_theme_stylebox_override("panel", UiTheme.flat(Color(UiTheme.EMBER, 0.12) if me else Color(UiTheme.DUSK, 0.7), Color(UiTheme.EMBER, 0.55) if me else Color.TRANSPARENT, 8, 8.0))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	card.add_child(row)
+	row.add_child(IconView.new(ClassDefs.icon(cls), ClassDefs.color(cls), 54.0))
+	var words := VBoxContainer.new()
+	words.add_theme_constant_override("separation", 0)
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(words)
+	var who := _body(str(info["name"]) + (" (you)" if me else ""), UiTheme.FS_LEAD)
+	who.add_theme_font_override("font", UiTheme.bold_font())
+	who.clip_text = true
+	who.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	words.add_child(who)
+	var as_class := _soft(str(ClassDefs.ALL[cls]["name"]), UiTheme.FS_SMALL)
+	as_class.add_theme_color_override("font_color", ClassDefs.color(cls).lightened(0.35))
+	words.add_child(as_class)
+	if Net.rules == Net.Rules.TEAMS:
+		var team := _body("Team %s" % ("Gold" if int(info["team"]) == 0 else "Blue"), UiTheme.FS_BODY)
+		team.add_theme_color_override("font_color", Net.team_colour(int(info["team"])))
+		team.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(team)
+	return card
+
+
+## A class to pick in the room: its emblem over its name, lit when it is yours. A class that cannot be
+## taken (a second Commander) is faded and says why.
+func _class_tile(id: String, chosen: bool, can: bool, action: Callable) -> Button:
+	var col := ClassDefs.color(id)
+	var b := _button(String(ClassDefs.ALL[id]["name"]).get_slice(" ", 0), action, Vector2(128, 112))
+	b.name = "Class_" + id
+	b.add_theme_font_size_override("font_size", UiTheme.FS_SMALL)
+	b.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	b.clip_text = true
+	b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	# The name sits under the emblem: the top of the button is left for it.
+	var look := {
+		"normal": UiTheme.flat(Color(UiTheme.DUSK, 0.9), UiTheme.STEEL, 10, 8.0),
+		"hover": UiTheme.flat(Color(UiTheme.DUSK.lightened(0.08), 0.95), col.lightened(0.2), 10, 8.0),
+		"pressed": UiTheme.flat(Color(UiTheme.DUSK.darkened(0.2), 0.95), col, 10, 8.0),
+		"disabled": UiTheme.flat(Color(UiTheme.DUSK, 0.45), Color.TRANSPARENT, 10, 8.0),
+	}
+	if chosen:
+		for state: String in ["normal", "hover", "pressed"]:
+			look[state] = UiTheme.flat(Color(UiTheme.EMBER, 0.22), UiTheme.EMBER, 10, 8.0, 3)
+	for state: String in look:
+		var box: StyleBoxFlat = look[state]
+		box.content_margin_top = 70.0
+		box.content_margin_bottom = 6.0
+		b.add_theme_stylebox_override(state, box)
+	b.add_theme_color_override("font_color", UiTheme.EMBER if chosen else UiTheme.BONE)
+	b.add_theme_color_override("font_hover_color", UiTheme.EMBER if chosen else UiTheme.BONE)
+	var emblem := IconView.new(ClassDefs.icon(id), col, 58.0)
+	emblem.dim = not can
+	emblem.position = Vector2(35, 9)
+	b.add_child(emblem)
+	b.disabled = not can
+	b.tooltip_text = "Only one Commander per match" if not can else ""
+	return b
 
 
 func _character_name(pl: Player) -> String:
@@ -1837,20 +2778,29 @@ func _character_name(pl: Player) -> String:
 	return String(pl.class_def()["name"])
 
 
+## Whatever was open over the night (the Map, Settings, the Pause card) goes when the night ends,
+## so the end of it is never shown on top of a screen left open.
+func _close_screens() -> void:
+	for c in ui_layer.get_children():
+		if c != hud and not c.is_queued_for_deletion():
+			c.queue_free()
+	_pause_root = null
+
+
 func _end_screen(title: String, line: String) -> void:
 	if hud:
 		hud.menu_open = true # touches now belong to these buttons, not the character behind them
 	_back = show_menu
+	_close_screens()
 	var root := _modal(title)
 	var box: VBoxContainer = root.get_meta("box")
-	var l := _body(line, 26)
+	var l := _body(line, UiTheme.FS_LEAD)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(l)
-	_end_label = l
-	_apply_board_note()
-	box.add_child(_button("Play again", func() -> void: start_game(Game.mode), Vector2(480, 72), true))
-	box.add_child(_button("Change class", func() -> void: show_class_picker(Game.mode), Vector2(480, 72)))
-	box.add_child(_button("Menu", show_menu, Vector2(480, 72)))
+	_reward_rows(box)
+	box.add_child(_button("Play again", func() -> void: start_game(Game.mode), Vector2(480, UiTheme.BTN_TALL), true))
+	box.add_child(_button("Change class", func() -> void: show_class_picker(Game.mode), Vector2(480, UiTheme.BTN_TALL)))
+	box.add_child(_button("Menu", show_menu, Vector2(480, UiTheme.BTN_TALL)))
 
 
 func _notification(what: int) -> void:
@@ -1868,18 +2818,7 @@ func show_command_map() -> void:
 	hud.menu_open = true
 	world.player.input_fire = false
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	var root := _modal("Artillery target")
-	var box: VBoxContainer = root.get_meta("box")
-	box.add_child(_soft("Choose a circle: %d m radius. Impact in %d seconds; %d-second barrage, %d-second fires." % [int(CommanderKit.BARRAGE_RADIUS), int(CommanderKit.BARRAGE_DELAY), int(CommanderKit.BARRAGE_TIME), int(CommanderKit.FIRE_TIME)], 22))
-	var map := MapPanel.new()
-	map.world = world
-	map.targeting = true
-	map.selected_spot = world.player.global_position
-	map.custom_minimum_size = Vector2(440, 440)
-	map.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	box.add_child(map)
-	var row := HBoxContainer.new()
-	box.add_child(row)
+	var root := _screen("Artillery target", func() -> void: _back.call(), "The circle (%d m radius) starts on you: call it there, or tap the map to move it. Impact in %d seconds; %d-second barrage, %d-second fires." % [int(CommanderKit.BARRAGE_RADIUS), int(CommanderKit.BARRAGE_DELAY), int(CommanderKit.BARRAGE_TIME), int(CommanderKit.FIRE_TIME)], "Cancel")
 	var close := func() -> void:
 		root.queue_free()
 		if hud:
@@ -1887,7 +2826,10 @@ func show_command_map() -> void:
 		_back = show_pause
 		if not DisplayServer.is_touchscreen_available():
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	row.add_child(_button("Cancel", close, Vector2(210, 60)))
+	var map := _square_map(root.get_meta("box"))
+	map.targeting = true
+	map.world = world
+	map.selected_spot = world.player.global_position
 	var confirm := _button("Call barrage", func() -> void:
 		if world == null or world.player.dead:
 			close.call()
@@ -1895,10 +2837,9 @@ func show_command_map() -> void:
 		world.player.command_target = map.selected_spot
 		world.player.command_target_ready = true
 		close.call()
-		world.player.use_art(), Vector2(230, 60), true)
-	confirm.disabled = true
-	map.selected.connect(func(_at: Vector3) -> void: confirm.disabled = false)
-	row.add_child(confirm)
+		world.player.use_art(), Vector2(260, UiTheme.BTN), true)
+	confirm.name = "CallBarrage"
+	(root.get_meta("right") as Control).add_child(confirm)
 	_back = close
 
 
@@ -1909,16 +2850,6 @@ func show_command_map() -> void:
 func _asks_for_name() -> bool:
 	var scene := get_tree().current_scene
 	return scene == null or scene == self
-
-
-## Who you are, at the top of the menu. Tapping it changes your name.
-func _name_button() -> Button:
-	var b := _button(Game.player_name, func() -> void: show_name_prompt(false), Vector2(0, 64))
-	b.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	b.add_theme_font_size_override("font_size", 26)
-	b.custom_minimum_size.x = maxf(150.0, _text_width(Game.player_name, 26) + 48.0)
-	b.tooltip_text = "Change your name"
-	return b
 
 
 ## Your display name: shown to others in games together and on the leaderboard. Names are unique.
@@ -1940,7 +2871,7 @@ func show_name_prompt(required: bool, after := Callable()) -> void:
 	var line := "Other players see this name in games together and on the leaderboard. Each name belongs to one player."
 	if Board.name_state == Board.NameState.TAKEN:
 		line = ("\"%s\" isn't allowed on the leaderboard. Choose another name." if Board.taken_blocked else "Someone else took \"%s\" while you were offline. Choose another name.") % Board.taken_name
-	var about := _soft(line, 23)
+	var about := _soft(line, UiTheme.FS_BODY)
 	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(about)
 	var edit := LineEdit.new()
@@ -1948,17 +2879,17 @@ func show_name_prompt(required: bool, after := Callable()) -> void:
 	edit.placeholder_text = "3 to 16 letters"
 	edit.max_length = Board.NAME_MAX
 	edit.custom_minimum_size = Vector2(640, 64)
-	edit.add_theme_font_size_override("font_size", 30)
+	edit.add_theme_font_size_override("font_size", UiTheme.FS_HEAD)
 	edit.select_all_on_focus = true
 	box.add_child(edit)
-	var problem := _body("", 22)
+	var problem := _body("", UiTheme.FS_BODY)
 	problem.add_theme_color_override("font_color", UiTheme.EMBER)
 	problem.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(problem)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
 	box.add_child(row)
-	var save := _button("Save", func() -> void: pass, Vector2(0, 66), true)
+	var save := _button("Save", func() -> void: pass, Vector2(0, UiTheme.BTN), true)
 	save.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var choose := func() -> void:
 		if save.disabled:
@@ -1980,7 +2911,7 @@ func show_name_prompt(required: bool, after := Callable()) -> void:
 	edit.text_submitted.connect(func(_t: String) -> void: choose.call())
 	edit.text_changed.connect(func(t: String) -> void: problem.text = Board.name_problem(t) if t.strip_edges() != "" else "")
 	if not required:
-		row.add_child(_button("Cancel", close, Vector2(180, 66)))
+		row.add_child(_button("Cancel", close, Vector2(180, UiTheme.BTN)))
 	row.add_child(save)
 	edit.grab_focus.call_deferred()
 
@@ -1992,43 +2923,15 @@ func _board_line(seconds: float, kills: int, won: bool) -> String:
 	var mode := "fort" if Game.mode == Game.Mode.FORT else "night"
 	if Net.active():
 		mode = {Net.Rules.COOP: "coop", Net.Rules.FFA: "ffa", Net.Rules.TEAMS: "teams", Net.Rules.FORT: "fort"}.get(Net.rules, "coop")
-	var map := "fort" if Game.mode == Game.Mode.FORT else Game.current_map()
+	var map := Game.current_map()
 	var difficulty: int = Net.difficulty if Net.active() else Game.difficulty
-	_counted = {}
 	var points := Board.record_match(seconds, kills, won, mode, map, world.player.class_id, world.player.spec_id, difficulty)
-	_board_note = "+%d leaderboard points" % points
-	return "\n" + _board_note
+	_rewards.append({"points": true, "text": "+%d leaderboard points" % points})
+	return ""
 
 
-var _board_note := "" # "+250 leaderboard points" on the current end screen
-var _end_label: Label
-var _counted := {} # what the board said about the last match
+var _rewards: Array[Dictionary] = [] # what the match earned, for the end screen
 var _prizes_checked := -1e9
-
-
-## Once the board has counted the match, the end screen also says where it moved you.
-func _apply_board_note() -> void:
-	if _counted.is_empty() or _board_note == "" or not is_instance_valid(_end_label) or not _end_label.text.contains(_board_note):
-		return
-	var moves: Array = []
-	for period: String in ["week", "all"]:
-		var now: Dictionary = _counted.get(period, {})
-		var was: Dictionary = (_counted.get("before", {}) as Dictionary).get(period, {})
-		if now.get("rank") == null:
-			continue
-		var where := "this week" if period == "week" else "of all time"
-		var rank := int(now["rank"])
-		if was.get("rank") == null:
-			moves.append("#%d %s" % [rank, where])
-		elif int(was["rank"]) > rank:
-			moves.append("#%d %s (up %d)" % [rank, where, int(was["rank"]) - rank])
-		else:
-			moves.append("#%d %s" % [rank, where])
-	if moves.is_empty():
-		return
-	var line := _board_note + ": " + " and ".join(moves)
-	_end_label.text = _end_label.text.replace(_board_note, line)
-	_board_note = line
 
 
 ## Weekly prizes: collected quietly when the menu opens, and announced when there is one.
@@ -2044,14 +2947,14 @@ func _collect_prizes() -> void:
 	for reward: Dictionary in won:
 		var place: String = ["first", "second", "third"][clampi(int(reward.get("rank", 1)) - 1, 0, 2)]
 		var start := Time.get_datetime_dict_from_unix_time(int(reward.get("week", 0)) * 7 * 86400 + 4 * 86400)
-		var l := _body("You finished %s in the week of %d %s. +%d doubloons." % [place, start["day"], ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][int(start["month"]) - 1], int(reward.get("doubloons", 0))], 26)
+		var l := _body("You finished %s in the week of %d %s. +%d doubloons." % [place, start["day"], ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][int(start["month"]) - 1], int(reward.get("doubloons", 0))], UiTheme.FS_LEAD)
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		l.custom_minimum_size.x = 560
 		box.add_child(l)
 	var close := func() -> void:
 		root.queue_free()
 		show_menu()
-	box.add_child(_button("Close", close, Vector2(480, 72), true))
+	box.add_child(_button("Close", close, Vector2(480, UiTheme.BTN_TALL), true))
 
 
 var _board_period := "all" # "all", "week" or "mine"
@@ -2067,46 +2970,19 @@ func show_leaderboard(period := "", kind := "") -> void:
 		_board_kind = kind
 	_clear_ui()
 	_back = show_menu
-	var root := Control.new()
-	root.theme = _theme
-	ui_layer.add_child(root)
-	_fill(root)
-	var shade := _vignette()
-	root.add_child(shade)
-	_fill(shade)
-	var margin := _screen_margin(44, 18)
-	root.add_child(margin)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	margin.add_child(box)
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 12)
-	box.add_child(top)
-	top.add_child(_button("Back", show_menu, Vector2(116, 56)))
-	var head := _label("Leaderboard", 40, UiTheme.BONE)
-	head.add_theme_font_override("font", UiTheme.title_font())
-	head.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	top.add_child(head)
-	top.add_child(_expand())
-	for tab: Array in [["all", "All time"], ["week", "This week"], ["mine", "Your matches"]]:
-		var which: String = tab[0]
-		top.add_child(_button(tab[1], func() -> void: show_leaderboard(which), Vector2(168, 56), _board_period == which))
-	# Which matches count: every one, or one kind.
+	var root := _screen("Leaderboard", show_menu, "Points from every finished night, the best of each player.")
+	var box: VBoxContainer = root.get_meta("box")
+	var periods := [["all", "All time"], ["week", "This week"], ["mine", "Your matches"]]
+	UiScreen.tabs(box, periods.map(func(t: Array) -> String: return t[1]), periods.map(func(t: Array) -> String: return t[0]).find(_board_period), func(i: int) -> void: show_leaderboard(periods[i][0]))
+	# Which matches count: every one, or one kind. Chosen in the same way, a row below.
 	if _board_period != "mine":
-		var kinds := HBoxContainer.new()
-		kinds.add_theme_constant_override("separation", 8)
-		box.add_child(kinds)
-		for id: String in Board.BOARDS:
-			var b := _button(Board.BOARDS[id], func() -> void: show_leaderboard("", id), Vector2(0, 46), _board_kind == id)
-			b.add_theme_font_size_override("font_size", 21)
-			b.custom_minimum_size.x = maxf(96.0, _text_width(Board.BOARDS[id], 21) + 36.0)
-			kinds.add_child(b)
-	var note := _soft("", 21)
+		var ids: Array = Board.BOARDS.keys()
+		var kinds := UiScreen.tabs(box, ids.map(func(id: String) -> String: return Board.BOARDS[id]), ids.find(_board_kind), func(i: int) -> void: show_leaderboard("", ids[i]))
+		kinds.name = "BoardKinds"
+	var note := _soft("", UiTheme.FS_SMALL)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(note)
-	var page := PanelContainer.new()
-	page.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(page)
+	var page := UiScreen.page(box)
 	var inside := VBoxContainer.new()
 	inside.add_theme_constant_override("separation", 4)
 	page.add_child(inside)
@@ -2121,15 +2997,11 @@ func show_leaderboard(period := "", kind := "") -> void:
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 2)
 	scroll.add_child(list)
-	var foot := HBoxContainer.new()
-	foot.add_theme_constant_override("separation", 12)
-	box.add_child(foot)
-	var mine := _body("", 23)
+	var mine := _body("", UiTheme.FS_BODY)
 	mine.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	mine.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	mine.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	foot.add_child(mine)
-	foot.add_child(_button("Refresh", func() -> void: _fill_leaderboard(list, note, mine, true), Vector2(150, 56)))
+	inside.add_child(mine)
+	(root.get_meta("right") as Control).add_child(_button("Refresh", func() -> void: _fill_leaderboard(list, note, mine, true), Vector2(150, UiTheme.BTN)))
 	panel = root
 	_fill_leaderboard(list, note, mine, false)
 
@@ -2142,9 +3014,9 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 	mine.text = ""
 	note.text = ""
 	if not Board.configured():
-		list.add_child(_soft("This version of the game has no leaderboard.", 24))
+		list.add_child(_soft("This version of the game has no leaderboard.", UiTheme.FS_BODY))
 		return
-	var asking := _soft("Asking the leaderboard…", 24)
+	var asking := _soft("Asking the leaderboard…", UiTheme.FS_BODY)
 	list.add_child(asking)
 	if period == "mine":
 		note.text = "Your last 30 matches on the leaderboard, newest first."
@@ -2155,7 +3027,7 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 		if not got["ok"]:
 			list.add_child(_board_problem(got["error"]))
 		elif got["matches"].is_empty():
-			list.add_child(_soft("No matches yet. Finish a match outside the Sandbox and it shows here.", 24))
+			list.add_child(_soft("No matches yet. Finish a match outside the Sandbox and it shows here.", UiTheme.FS_BODY))
 		for m: Dictionary in got.get("matches", []):
 			var played := _match_word(str(m.get("mode", "")), str(m.get("map", "")))
 			var as_class := Board.class_label(str(m.get("class", "")), str(m.get("spec", "")))
@@ -2167,29 +3039,24 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 	if not is_instance_valid(list) or _board_period != period or _board_kind != kind:
 		return
 	asking.queue_free()
-	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort", "coop": "Co-op nights in the Village", "versus": "All vs All and Teams"}[kind]
+	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village and the Valleys of Mesenlla", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort and Mist Bastion", "coop": "Co-op nights in the Village and the Valleys of Mesenlla", "versus": "All vs All and Teams"}[kind]
 	note.text = ("Points from %s, since the leaderboard began." if period == "all" else "Points from %s since Monday 00:00 UTC.") % what
 	if not result["ok"]:
 		list.add_child(_board_problem(result["error"]))
 	else:
 		var entries: Array = result["entries"]
 		if entries.is_empty():
-			list.add_child(_soft("No one has scored here yet%s. Finish a match to be the first." % (" this week" if period == "week" else ""), 24))
+			list.add_child(_soft("No one has scored here yet%s. Finish a match to be the first." % (" this week" if period == "week" else ""), UiTheme.FS_BODY))
 		for e: Dictionary in entries:
 			var me_row := str(e.get("name", "")) == Game.player_name and Board.registered != ""
 			var rank := int(e.get("rank", 0))
 			var col: Color = [UiTheme.EMBER, Color(0.66, 0.76, 0.92), Color(0.8, 0.55, 0.35)][rank - 1] if rank >= 1 and rank <= 3 else UiTheme.BONE
 			var row := _board_row(str(rank), str(e.get("name", "")), str(int(e.get("points", 0))), Board.class_label(str(e.get("class", "")), str(e.get("spec", ""))), col, false)
+			_board_badge(row, str(e.get("class", "")), str(e.get("spec", "")))
 			if me_row:
 				var mark := UiTheme.flat(Color(UiTheme.EMBER, 0.18), Color(UiTheme.EMBER, 0.6), 6, 4.0)
 				row.add_theme_stylebox_override("panel", mark)
 			list.add_child(row)
-		var me: Dictionary = result.get("me", {})
-		if not me.is_empty():
-			if me.get("rank") == null:
-				mine.text = "You (%s) haven't scored here yet%s." % [Game.player_name, " this week" if period == "week" else ""]
-			else:
-				mine.text = "You: #%d with %d points." % [int(me["rank"]), int(me["points"])]
 		if period == "week" and int(result.get("week_end", 0)) > 0:
 			var left := int(result["week_end"]) - int(Time.get_unix_time_from_system())
 			note.text += " A new week starts in %s." % _span(left)
@@ -2203,7 +3070,7 @@ func _board_problem(error: String) -> Label:
 	var why := "Can't reach the leaderboard. Check your connection and try again."
 	if error == "wrong_board":
 		why = "The leaderboard answered for another version of the game, so it was ignored."
-	var l := _soft(why, 24)
+	var l := _soft(why, UiTheme.FS_BODY)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return l
 
@@ -2214,10 +3081,11 @@ func _note_pending(mine: Label) -> void:
 
 
 static func _map_word(map: String) -> String:
-	return {"village": "Village", "mists": "Mists", "fort": "Fort"}.get(map, map.capitalize())
+	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion"}.get(map, map.capitalize())
 
 
-## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort".
+## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort",
+## and Mist Bastion "Fort · Mist Bastion".
 static func _match_word(mode: String, map: String) -> String:
 	var word: String = {"night": "Night", "coop": "Co-op", "fort": "Fort", "ffa": "All vs All", "teams": "Teams"}.get(mode, mode.capitalize())
 	return word if map == "fort" or map == "" else word + " · " + _map_word(map)
@@ -2244,7 +3112,7 @@ func _history_row(when: String, played: String, as_class: String, kills: String,
 	var line := HBoxContainer.new()
 	line.add_theme_constant_override("separation", 14)
 	row.add_child(line)
-	var size := 21 if header else 23
+	var size := UiTheme.FS_SMALL if header else UiTheme.FS_BODY
 	var cells: Array = [[when, 150.0, HORIZONTAL_ALIGNMENT_LEFT], [played, 200.0, HORIZONTAL_ALIGNMENT_LEFT], [as_class, 0.0, HORIZONTAL_ALIGNMENT_LEFT],
 		[kills, 80.0, HORIZONTAL_ALIGNMENT_RIGHT], [result, 170.0, HORIZONTAL_ALIGNMENT_LEFT], [points, 90.0, HORIZONTAL_ALIGNMENT_RIGHT]]
 	for i in cells.size():
@@ -2279,13 +3147,28 @@ static func _span(seconds: int) -> String:
 	return plural.call(minutes, "minute")
 
 
+## The emblem of what a player plays most, in front of its name: the profession's when there is
+## one, else the class's.
+func _board_badge(row: PanelContainer, cls: String, spec: String) -> void:
+	if not ClassDefs.ALL.has(cls):
+		return
+	var line: HBoxContainer = row.get_child(0)
+	var icon := ClassDefs.icon(cls)
+	if spec != "" and Icons.exists("spec_" + spec):
+		icon = "spec_" + spec
+	var badge := IconView.new(icon, ClassDefs.color(cls), 38.0)
+	badge.name = "Played"
+	line.add_child(badge)
+	line.move_child(badge, line.get_child_count() - 2)
+
+
 func _board_row(rank: String, who: String, points: String, played: String, col: Color, header: bool) -> PanelContainer:
 	var row := PanelContainer.new()
 	row.add_theme_stylebox_override("panel", UiTheme.flat(Color(0, 0, 0, 0), Color.TRANSPARENT, 6, 4.0))
 	var line := HBoxContainer.new()
 	line.add_theme_constant_override("separation", 16)
 	row.add_child(line)
-	var size := 21 if header else 25
+	var size := UiTheme.FS_SMALL if header else UiTheme.FS_LEAD
 	var cells: Array = [[rank, 64.0, HORIZONTAL_ALIGNMENT_RIGHT], [who, 300.0, HORIZONTAL_ALIGNMENT_LEFT], [points, 140.0, HORIZONTAL_ALIGNMENT_RIGHT], [played, 0.0, HORIZONTAL_ALIGNMENT_LEFT]]
 	for i in cells.size():
 		var cell: Array = cells[i]

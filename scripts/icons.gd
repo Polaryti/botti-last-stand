@@ -3,6 +3,7 @@ class_name Icons
 ## Icon strings look like "sword" or "sword+flame".
 
 static var _tex := {}
+static var _glyphs := {}
 
 
 static func tex(path: String) -> Texture2D:
@@ -12,8 +13,12 @@ static func tex(path: String) -> Texture2D:
 
 
 static func glyph(name: String) -> Texture2D:
+	# Assets do not change during a match: resolve SVG/PNG once per glyph.
+	if _glyphs.has(name): return _glyphs[name]
 	var vector := "res://assets/icons/%s.svg" % name
-	return tex(vector if ResourceLoader.exists(vector) else "res://assets/icons/%s.png" % name)
+	var texture := tex(vector if ResourceLoader.exists(vector) else "res://assets/icons/%s.png" % name)
+	_glyphs[name] = texture
+	return texture
 
 
 static func exists(name: String) -> bool:
@@ -50,10 +55,12 @@ static func weapon(id: String) -> String:
 	return {"dagger": "dagger", "sword": "sword", "spear": "spear", "mace": "mace", "lance": "lance", "scythe": "scythe",
 		"flail": "flail", "bell_hammer": "bell_hammer", "pitchfork": "pitchfork", "torch": "torch", "bow": "bow",
 		"crossbow": "crossbow", "longbow": "longbow", "axes": "axe", "javelins": "javelins", "fists": "hand", "bo": "bo",
-		"blowgun": "blowgun", "war_staff": "staff", "musket": "crossbow", "staff": "staff", "claws": "claw"}.get(id, "sword")
+		"blowgun": "blowgun", "war_staff": "staff", "musket": "crossbow", "staff": "staff", "claws": "claw",
+		"greatsword": "greatsword", "battleaxe": "battleaxe", "chakram": "chakram", "machete": "machete", "bolas": "bolas"}.get(id, "sword")
 
 
 static func power(id: String) -> String:
 	return {"speed": "boot", "sensor": "eye", "fire_arrows": "flame+arrow", "bounce_arrows": "swap+arrow", "angel": "wings",
 		"daemon": "tooth", "archer": "bow", "thunder": "bolt", "raven": "raven", "ghost": "ghost", "imp": "grab",
-		"bell_spirit": "bell", "rat": "rat"}.get(id, "potion")
+		"bell_spirit": "bell", "rat": "rat", "lantern": "lantern", "stone_sprite": "boulder", "mistberry_draught": "potion+mist",
+		"antler_charm": "antlers"}.get(id, "potion")

@@ -5,7 +5,7 @@ func _ready() -> void:
 		for i in 500:
 			assert(SpawnRules.allows(WeaponDefs.ALL[WeaponDefs.pick_random(map_id)], map_id))
 			assert(SpawnRules.allows(PowerDefs.ALL[PowerDefs.pick_familiar(map_id)], map_id))
-			assert(SpawnRules.allows(ZombieDefs.ALL[ZombieDefs.pick_roamer(600, map_id == "mists")], map_id))
+			assert(SpawnRules.allows(ZombieDefs.ALL[ZombieDefs.pick_roamer(600, map_id)], map_id))
 			checks += 3
 	assert(ClassDefs.ALL.plague_doctor.hp == 100 and ClassDefs.ALL.plague_doctor.speed == 1.0)
 	assert(ClassDefs.ALL.commander.speed == 1.05 and ClassDefs.ALL.artificer.hp == 100)

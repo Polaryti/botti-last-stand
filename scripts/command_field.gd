@@ -1,6 +1,6 @@
 class_name CommandField
 extends Node3D
-## Bounded work: storm queries at 2 Hz, lightning at 1 Hz, barrage at 4 Hz.
+## Bounded work: storm queries at 2 Hz, lightning at 2 Hz, barrage at 4 Hz.
 ## Only the host applies damage. Every peer draws the same warning and duration.
 
 var world: World
@@ -67,7 +67,7 @@ func _physics_process(delta: float) -> void:
 	var authority := not Net.active() or Net.is_host()
 	if kind == "warlock":
 		var source := source_target()
-		if source == null or source.dead or elapsed >= 8.0:
+		if source == null or source.dead or elapsed >= CommanderKit.STORM_TIME:
 			queue_free()
 			return
 		global_position = source.global_position
@@ -77,10 +77,10 @@ func _physics_process(delta: float) -> void:
 			_pulse -= delta
 			_strike -= delta
 			if _pulse <= 0.0:
-				_pulse += 0.5
-				_slow_enemies()
+				_pulse += CommanderKit.STORM_PULSE
+				_storm_hold()
 			if _strike <= 0.0:
-				_strike += 1.0
+				_strike += CommanderKit.STORM_STRIKE_EVERY
 				_lightning()
 	else:
 		var warning := elapsed < CommanderKit.BARRAGE_DELAY
@@ -112,12 +112,17 @@ func enemy(target: Target) -> bool:
 	return not target.dead and Net.active() and Net.bots_foes(peer, world.peer_of(target))
 
 
-func _slow_enemies() -> void:
+## Every pulse: everything inside the storm is slowed and takes its share of the storm's damage.
+func _storm_hold() -> void:
+	var dmg := CommanderKit.STORM_DPS * CommanderKit.STORM_PULSE
 	for z: Zombie in world.zombies_near(global_position, CommanderKit.STORM_RADIUS, 128):
 		z.slow(0.8)
+		z.next_hitter = peer
+		z.take_damage(dmg, Vector3.ZERO, 0.0, z.centre())
 	for target: Target in world.players:
 		if enemy(target) and target.global_position.distance_to(global_position) <= CommanderKit.STORM_RADIUS:
 			Net.status_peer(world.peer_of(target), Net.Status.SLOW, 0.8, peer)
+			Net.hit_player(world.peer_of(target), dmg, global_position, peer)
 
 
 func _lightning() -> void:
@@ -129,7 +134,7 @@ func _lightning() -> void:
 			spots.append(target.global_position)
 	if not spots.is_empty():
 		var at := spots[_rng.randi_range(0, spots.size() - 1)]
-		_impact(at, 3.5, 35.0)
+		_impact(at, CommanderKit.STORM_STRIKE_RADIUS, CommanderKit.STORM_STRIKE_DAMAGE)
 
 
 func _impact(at: Vector3, radius: float, damage: float) -> void:

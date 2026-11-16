@@ -38,6 +38,8 @@ static func tree(class_id: String) -> Dictionary:
 			"adept": _cache[class_id] = _adept()
 			"plague_doctor": _cache[class_id] = _plague_doctor()
 			"commander": _cache[class_id] = _commander()
+			"bandit": _cache[class_id] = _bandit()
+			"cartographer": _cache[class_id] = _cartographer()
 	return _cache[class_id]
 
 
@@ -344,7 +346,7 @@ static func _ranger() -> Dictionary:
 			[a("spare_parts", "Spare Parts", "Keep 3 more traps on the ground, and carry 3 more in the Trap Satchel", "trap+up", {"trap_cap": 3, "trap_carry": 3}),
 			a("quick_setup", "Quick Setup", "Traps come 4 s sooner", "trap+clock", {"trap_cd": -4.0})],
 			[a("snare_net", "Snare Net", "Traps hold enemies 2 s longer", "net+trap", {"trap_stun": 2.0}),
-			a("powder_keg", "Powder Keg", "Traps also explode in a blast", "flame+trap", {}, [], "trap_blast")],
+			a("great_keg", "Powder Keg", "Traps also explode in a blast", "flame+trap", {}, [], "trap_blast")],
 			[a("lure", "Lure", "Every trap also pulls roaming zombies to it", "horn+trap", {}, [], "trap_lure"),
 			a("fletcher", "Fletcher", "Every kill gives an arrow back", "arrows+trap", {}, [t("kill", "arrows", {"n": 1})])]],
 			a("field_snares", "Field of Snares", "Up to 8 traps on the ground and 8 in the Trap Satchel, and each trap kill drops a new one", "net+crown", {"trap_cap": 5, "trap_carry": 3}, [], "field_snares")),
@@ -506,8 +508,8 @@ static func _commander() -> Dictionary:
 		[a("supply_lines", "Supply Lines", "Heal 3 per kill", "heart+horn", {}, [t("kill", "heal", {"n": 3.0})]),
 		a("trained_retinue", "Trained Retinue", "Summons have 25% more health and damage", "ghost+up", {"ally_hp": 0.25, "ally_damage": 0.25})]
 	], "specs": [
-		_spec("warlock", "Warlock", "A fragile officer of battle magic. Every fifth War Staff attack fires a bolt", Color(0.55, 0.32, 0.85),
-			a("warlock", "Warlock", "Your only weapon becomes a War Staff. Every fifth attack fires an empowered bolt instead of striking: 45 base damage, pierces one enemy and staggers for 0.8 s. -30 max health. Command summons a Magician for 16 s", "staff", {"max_hp": -30.0}, [], "warlock"),
+		_spec("warlock", "Warlock", "An officer of battle magic. Every fifth War Staff attack fires a bolt", Color(0.55, 0.32, 0.85),
+			a("warlock", "Warlock", "Your only weapon becomes a War Staff. Every fifth attack fires an empowered bolt instead of striking: 45 base damage, pierces one enemy and staggers for 0.8 s. Command summons a Magician for 16 s", "staff", {}, [], "warlock"),
 			[[a("war_channel", "War Channel", "+25% War Staff and bolt damage", "staff+up", {"melee_damage": 0.25, "spell_damage": 0.25}),
 			a("war_cadence", "War Cadence", "+20% attack speed", "staff+clock", {"melee_rate": 0.2})],
 			[a("arcane_retinue", "Arcane Retinue", "Magicians deal 35% more damage", "ghost+bolt", {"ally_damage": 0.35}),
@@ -516,7 +518,7 @@ static func _commander() -> Dictionary:
 			a("arcane_reach", "Spellbreaker", "+0.7 m staff reach; fifth-hit bolts pierce two enemies", "staff+plus", {"melee_reach": 0.7}, [], "war_shatter")],
 			[a("storm_training", "Storm Conductor", "Fifth-hit bolts chain to two nearby enemies for 70% damage", "bolt+up", {}, [], "war_echo"),
 			a("arcane_recovery", "Arcane Recovery", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
-			a("last_command_warlock", "Last Command", "Replaces Command: an 8 s storm follows you within 11 m, slowing enemies and striking them with AoE lightning, and a Magician joins you for 16 s. 60 s cooldown", "", {}, [], "last_command")),
+			a("last_command_warlock", "Last Command", "Replaces Command: an 8 s storm follows you within 11 m. Every enemy inside takes 12 damage a second and is slowed, lightning strikes one of them twice a second for 35 around it, and a Magician joins you for 16 s. 35 s cooldown", "", {}, [], "last_command")),
 		_spec("gunner", "Gunner", "A musket officer with a bayonet for close quarters", Color(0.64, 0.46, 0.23),
 			a("gunner", "Gunner", "Your only weapon becomes a Musket. Fire shoots; the melee button thrusts its bayonet. Command summons a torch-wielding Artificer for 16 s", "crossbow", {}, [], "gunner"),
 			[[a("powder_charge", "Powder Charge", "+25% musket damage", "crossbow+up", {"ranged_damage": 0.25}),
@@ -527,7 +529,7 @@ static func _commander() -> Dictionary:
 			a("steady_barrel", "Steady Barrel", "+20% range and shot speed", "target+up", {"ranged_power": 0.2})],
 			[a("powder_reserve", "Piercing Powder", "+10% shooting rate; musket shots pierce one extra enemy", "arrows+clock", {"ranged_rate": 0.1, "pierce": 1.0}),
 			a("field_rations", "Field Rations", "Heal 1 per second", "heart+clock", {"regen": 1.0})]],
-			a("last_command_gunner", "Last Command", "Replaces Command: choose an 18 m radius. Warns everyone for 4 s, bombards enemies for 5 s, leaving 8 s fire zones (10 damage/s; no stacking), and an Artificer joins you for 16 s. 60 s cooldown", "", {}, [], "last_command")),
+			a("last_command_gunner", "Last Command", "Replaces Command: choose an 18 m radius. Warns everyone for 4 s, bombards enemies for 5 s, leaving 8 s fire zones (10 damage/s; no stacking), and an Artificer joins you for 16 s. 35 s cooldown", "", {}, [], "last_command")),
 		_spec("vanguard", "Vanguard", "A resilient banner bearer who rallies the line", Color(0.78, 0.57, 0.18),
 			a("vanguard", "Vanguard", "+30 max health, take 10% less damage. Carry an off-hand banner. Command gives nearby allies +25% speed for 6 s and calls an Infantry for 16 s", "banner", {"max_hp": 30.0, "damage_taken": -0.1}, [], "vanguard"),
 			[[a("hold_line", "Hold the Line", "Take 12% less damage", "shield+banner", {"damage_taken": -0.12}),
@@ -538,5 +540,98 @@ static func _commander() -> Dictionary:
 			a("vanguard_vigor", "Vanguard Vigor", "+30 max health", "heart+up", {"max_hp": 30.0})],
 			[a("rally_recovery", "Rally Recovery", "Command and Last Command also heal living allies within rally range by 20", "heart+clock", {}, [], "rally_recovery"),
 			a("infantry_drill", "Infantry Drill", "Summons deal 30% more damage", "ghost+sword", {"ally_damage": 0.3})]],
-			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry and a Ranger for 20 s. 60 s cooldown", "", {}, [], "last_command"))
+			a("last_command_vanguard", "Last Command", "Replaces Command: revive nearby allies with lives remaining, heal 35, grant speed and 20% damage for 8 s, and summon two Infantry and a Ranger for 20 s. 35 s cooldown", "", {}, [], "last_command"))
+	]}
+
+
+## The Bandit vanishes before it does anything else. Into the Shadows is its ability from the start and
+## stays; each path adds something of its own on a second button (BanditKit), and the tree sharpens that.
+static func _bandit() -> Dictionary:
+	var plum := Color(0.48, 0.23, 0.36)
+	return {"core": [
+		[a("sly_hands", "Sly Hands", "Attack 15% faster", "hand+clock", {"melee_rate": 0.15, "ranged_rate": 0.15}),
+		a("light_purse", "Light Purse", "+10% move speed", "boot+up", {"speed": 0.1})],
+		[a("long_shadows", "Long Shadows", "All your invisibility lasts 2 s longer, and Dagger Fan hides you for 2 s", "moon+clock", {"shadow_time": 2.0}),
+		a("ambusher", "Ambusher", "+60% damage on unaware enemies or from behind", "dagger+up", {"backstab": 0.6})],
+		[a("cutpurse", "Cutpurse", "Each kill heals 3", "heart+dagger", {}, [t("kill", "heal", {"n": 3.0})]),
+		a("slippery", "Slippery", "15% chance to avoid any hit", "boot+eye_closed", {"dodge": 0.15})],
+	], "specs": [
+		_spec("thief", "Thief", "Takes what others are holding, and is gone before they notice.", plum,
+			a("thief_entry", "Thief", "Unlocks Steal, a second ability beside Into the Shadows: appear in front of the nearest foe within 14 m, turn invisible, strike, and knock their weapon to the ground", "hand+dagger", {}, [], "art_steal"),
+			[[a("long_reach", "Long Reach", "Steal reaches 6 m further", "hand+up", {"steal_range": 6.0}),
+			a("nimble", "Nimble", "Steal comes back 25% sooner", "hand+clock", {"art_cd": -0.25})],
+			[a("heavy_hand", "Heavy Hand", "Steal strikes 60% harder", "hand+up", {"steal_damage": 0.6}),
+			a("pocket_sand", "Pocket Sand", "Steal stuns its target for 1.5 s", "star+hand", {}, [], "steal_stun")],
+			[a("slip_away", "Slip Away", "After a Steal, +35% speed for 3 s", "boot+hand", {}, [], "steal_dash"),
+			a("light_step", "Light Step", "Invisibility after a Steal lasts 2 s longer", "moon+hand", {"steal_hide": 2.0})],
+			[a("unseen_blade", "Unseen Blade", "+40% damage on unaware enemies or from behind", "dagger+eye_closed", {"backstab": 0.4}),
+			a("fence", "Fence", "A weapon stolen from a creature goes straight to your hand, even when both are full: the one you hold drops", "hand+plus", {}, [], "steal_keep")]],
+			a("grand_larceny", "Grand Larceny", "Steal also strikes and disarms every foe within 4 m of its target", "hand+crown", {}, [], "steal_all")),
+		_spec("mercenary", "Mercenary", "Sells the night: friends inside it disappear, foes inside it go half blind.", plum,
+			a("mercenary_entry", "Mercenary", "Unlocks Nightfall, a second ability beside Into the Shadows: a dome of night for 8 s. You and friends inside are invisible, and stay so 1.5 s after leaving; enemies inside barely see", "moon+shield", {}, [], "art_nightfall"),
+			[[a("wide_night", "Wide Night", "The dome is 2 m wider", "moon+up", {"night_radius": 2.0}),
+			a("long_night", "Long Night", "The dome lasts 3 s longer", "moon+clock", {"night_time": 3.0})],
+			[a("paid_in_full", "Paid in Full", "+25% damage while inside your dome", "sword+moon", {}, [], "night_damage"),
+			a("hired_blades", "Hired Blades", "Friends inside your dome take 20% less damage", "shield+moon", {}, [], "night_guard")],
+			[a("pitch_black", "Pitch Black", "Enemies inside your dome are slowed", "wind+moon", {}, [], "night_slow"),
+			a("on_contract", "On Contract", "Nightfall comes back 25% sooner", "moon+clock", {"art_cd": -0.25})],
+			[a("night_watch", "Night Watch", "You and friends inside heal 2 health a second", "heart+moon", {}, [], "night_heal"),
+			a("cover_of_dark", "Cover of Dark", "Invisibility lingers 2 s longer after leaving the dome", "eye_closed+moon", {"night_linger": 2.0})]],
+			a("endless_night", "Endless Night", "Your dome follows you, and lasts 4 s longer", "moon+crown", {"night_time": 4.0}, [], "night_follow")),
+		_spec("highwayman", "Highwayman", "Stops the road with a fan of knives, and keeps what falls.", plum,
+			a("highwayman_entry", "Highwayman", "Unlocks Dagger Fan, a second ability beside Into the Shadows: throw five knives in a fan. Plunder: 12% of your kills leave food, arrows or a potion", "dagger+burst", {"plunder": 0.12}, [], "art_fan"),
+			[[a("more_blades", "More Blades", "Two more knives in each fan", "dagger+plus", {"fan_knives": 2.0}),
+			a("honed", "Honed", "Knives hit 30% harder", "dagger+up", {"fan_damage": 0.3})],
+			[a("serrated", "Serrated", "Knives make enemies bleed", "drop+dagger", {}, [], "fan_bleed"),
+			a("quick_draw", "Quick Draw", "Dagger Fan comes back 25% sooner", "dagger+clock", {"art_cd": -0.25})],
+			[a("rich_pickings", "Rich Pickings", "Plunder from 10% more of your kills", "crown+plus", {"plunder": 0.1}),
+			a("stand_deliver", "Stand and Deliver", "Knives slow what they hit for 2 s", "wind+dagger", {}, [], "fan_slow")],
+			[a("ricochet_knives", "Ricochet", "Each knife bounces on to one more enemy", "swap+dagger", {"fan_bounces": 1.0}),
+			a("point_blank", "Point Blank", "Knives hit 50% harder within 6 m", "target+dagger", {}, [], "fan_close")]],
+			a("dead_or_alive", "Dead or Alive", "Every Dagger Fan throws a second fan a moment later", "dagger+crown", {}, [], "fan_twice")),
+	]}
+
+static func _cartographer() -> Dictionary:
+	var azure := Color(0.25, 0.56, 0.82)
+	return {"core": [
+		[a("good_boots", "Good Boots", "+10% move speed", "boot+up", {"speed": 0.1}),
+		a("field_kit", "Field Kit", "+20 max health", "heart+up", {"max_hp": 20.0})],
+		[a("fourth_marker", "Fourth Marker", "One more beacon at a time", "beacon+plus", {"beacons": 1.0}),
+		a("long_lines", "Long Lines", "Beacons link 8 m further apart", "link+up", {"link_range": 8.0})],
+		[a("bright_lamps", "Bright Lamps", "Beacon light reaches 2 m further", "beacon+up", {"beacon_radius": 2.0}),
+		a("mending_paths", "Mending Paths", "The lines heal 2 more health a second", "heart+link", {"line_heal": 2.0})],
+	], "specs": [
+		_spec("star_reader", "Star Reader", "Reads the sky into the map: three linked Star Stones hold a constellation that strengthens friends and strikes enemies with starlight.", azure,
+			a("star_reader_entry", "Star Reader", "Your beacons are Star Stones. Three stones linked to each other hold a constellation: friends inside deal 20% more damage, and every 2 s starlight strikes each enemy inside for 15", "star+beacon", {}, [], "art_stars"),
+			[[a("bright_signs", "Bright Signs", "Friends inside deal 15% more damage again", "sword+star", {"star_bonus": 0.15}),
+			a("quick_stars", "Quick Stars", "Starlight strikes every 1.5 s", "star+clock", {}, [], "quick_stars")],
+			[a("guiding_star", "Guiding Star", "Friends inside take 15% less damage", "shield+star", {}, [], "stars_guard"),
+			a("heavy_light", "Heavy Light", "Starlight strikes 60% harder", "star+up", {"star_power": 0.6})],
+			[a("north_star", "North Star", "Friends inside heal 2 health a second", "heart+star", {}, [], "stars_heal"),
+			a("dazzle", "Dazzle", "Starlight slows what it strikes for 1 s", "wind+star", {}, [], "star_slow")],
+			[a("star_lines", "Star Lines", "Starlight also strikes enemies on the line between any two linked stones", "link+star", {}, [], "star_lines"),
+			a("astrolabe", "Astrolabe", "Star Stones come back 30% sooner", "compass+clock", {"art_cd": -0.3})]],
+			a("falling_star", "Falling Star", "Every 6 s a star falls on the toughest enemy inside: 120 damage within 3 m and a 1 s stun", "star+crown", {}, [], "falling_star")),
+		_spec("worlds_traveler", "Worlds Traveler", "Has walked other worlds: beacons become Waygates, and stepping into one carries you or a friend to the next.", azure,
+			a("worlds_traveler_entry", "Worlds Traveler", "Your beacons are Waygates. You and friends step into one to come out of the next linked gate with 30% more speed for 2 s. Each traveller can pass again after 3 s", "waygate", {}, [], "art_gates"),
+			[[a("light_luggage", "Light Luggage", "Travel gives 50% more speed instead", "boot+waygate", {"gate_speed": 0.2}),
+			a("open_roads", "Open Roads", "Pass again after 1.5 s", "waygate+clock", {"gate_rest": -1.5})],
+			[a("grand_arrival", "Grand Arrival", "Arriving deals 30 damage within 3 m and throws enemies back", "burst+waygate", {}, [], "gate_burst"),
+			a("veiled_passage", "Veiled Passage", "Arriving turns you invisible for 2 s", "eye_closed+waygate", {}, [], "gate_hide")],
+			[a("restful_road", "Restful Road", "Each passage heals 15", "heart+waygate", {"gate_heal": 15.0}),
+			a("many_doors", "Many Doors", "One more gate at a time", "waygate+plus", {"beacons": 1.0})],
+			[a("far_gates", "Far Gates", "Gates link 12 m further apart", "link+up", {"link_range": 12.0}),
+			a("gatewright", "Gatewright", "Waygates come back 30% sooner", "waygate+clock", {"art_cd": -0.3})]],
+			a("rift_road", "Rift Road", "Enemies that step into a gate are thrown out of the farthest one, stunned for 2 s", "waygate+crown", {}, [], "rift_road")),
+		_spec("pathfinder", "Pathfinder", "Knows where things were hidden: a beacon on new ground unearths finds that only a Pathfinder can use.", azure,
+			a("pathfinder_entry", "Pathfinder", "A beacon planted 15 m or more from your last find unearths a Pathfinder find, once every 30 s: the Machete, the Bolas or the Wayfinder's Lantern. Only Pathfinders can use them", "compass+beacon", {}, [], "art_finds"),
+			[[a("keen_eye", "Keen Eye", "A find every 22 s", "eye+clock", {"find_rest": -8.0}),
+			a("wanderer", "Wanderer", "Finds need only 8 m of new ground", "boot+compass", {"find_gap": -7.0})],
+			[a("trail_hardened", "Trail-Hardened", "+25 max health", "heart+up", {"max_hp": 25.0}),
+			a("light_pack", "Light Pack", "+12% move speed", "boot+up", {"speed": 0.12})],
+			[a("wild_lore", "Wild Lore", "Beacons mark enemies 6 m further", "eye+beacon", {"mark_range": 6.0}),
+			a("trail_rations", "Trail Rations", "Each find comes with food", "heart+compass", {}, [], "find_food")],
+			[a("old_steel", "Old Steel", "The Machete and Bolas hit 25% harder", "machete+up", {"find_damage": 0.25}),
+			a("long_wick", "Long Wick", "The Lantern burns 10 s longer", "lantern+clock", {"lantern_time": 10.0})]],
+			a("lost_wonders", "Lost Wonders", "Every find unearths two", "compass+crown", {}, [], "find_twice")),
 	]}

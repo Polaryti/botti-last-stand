@@ -3,6 +3,18 @@ extends RefCounted
 ## Timed player states shared by the status bar and Codex.
 const TIMED := [
 	{
+		"field": "rooted_left",
+		"name": "Rooted",
+		"icon": "antlers",
+		"desc": "Vines from an Antler Charm hold you where you stand: you can still fight, but cannot move until they let go."
+	},
+	{
+		"field": "ward_left",
+		"name": "Shield Wall",
+		"icon": "shield_round+up",
+		"desc": "A Vanguard's Shield Wall: the next 40 damage you take is stopped, until the shield is spent or its 8 s run out."
+	},
+	{
 		"field": "dome_left",
 		"name": "Guardian Dome",
 		"icon": "shield_rect+up",
@@ -18,7 +30,25 @@ const TIMED := [
 		"field": "invis_left",
 		"name": "Invisible",
 		"icon": "eye_closed",
-		"desc": "Hides you from ordinary enemies until the timer ends or you attack. Some foes can see through it."
+		"desc": "Hides you from ordinary enemies until the timer ends or you attack. Some foes can see through it. Afterwards you cannot turn invisible again for 3 seconds."
+	},
+	{
+		"field": "friend_heal_left",
+		"name": "Mended",
+		"icon": "heart+hand",
+		"desc": "Someone on your side is healing you right now: a Cartographer's beacon line, a Mercenary's Night Watch or a Paladin's Consecration."
+	},
+	{
+		"field": "invis_lockout",
+		"name": "Revealed",
+		"icon": "eye+clock",
+		"desc": "You have just been invisible. Nothing can hide you again until this runs out."
+	},
+	{
+		"field": "night_blind_left",
+		"name": "Benighted",
+		"icon": "eye+moon",
+		"desc": "Standing inside an enemy Bandit's Nightfall: your view darkens and the people it hides cannot be seen."
 	},
 	{
 		"field": "void_left",
@@ -37,6 +67,18 @@ const TIMED := [
 		"name": "Blade Flurry",
 		"icon": "sword+wind",
 		"desc": "Faster attacks and critical strikes."
+	},
+	{
+		"field": "spin_left",
+		"name": "Dragon Spin",
+		"icon": "spiral",
+		"desc": "A Bo Master's Dragon Spin under way: the Bo whirls round you, striking everything close."
+	},
+	{
+		"field": "hunt_left",
+		"name": "Wild Hunt",
+		"icon": "bow+horse",
+		"desc": "A Horse Archer's Wild Hunt under way: arrows loosed on their own at whatever is near, from the saddle."
 	},
 	{
 		"field": "rage_left",

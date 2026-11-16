@@ -37,6 +37,14 @@ static func _beacon_material(col: Color) -> StandardMaterial3D:
 	return m
 
 
+## For a weapon with its own ammunition, the throws it brings: a fresh one its full share, one that
+## was put down what it had left (kept as throws + 1, so that 0 still means fresh).
+func throws() -> int:
+	if bonus_arrows <= 0:
+		return WeaponDefs.own_ammo(weapon_id)
+	return bonus_arrows - 1
+
+
 func setup(k: int, id: String, bonus := 0) -> void:
 	kind = k
 	item_id = id

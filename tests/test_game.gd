@@ -49,11 +49,11 @@ func _ready() -> void:
 	Game.night_map = "village"
 	Game.pet = "wolf"
 	var plan: Array[String] = ["test_map", "test_flow", "test_weapons", "test_touch", "test_auto_jump", "test_items", "test_powers", "test_zombies", "test_night",
-		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review"]
+		"test_land", "test_version_20_1", "test_version_19_1", "test_version_20", "test_version_19", "test_version_18", "test_version_16", "test_version_15", "test_version_14", "test_version_13", "test_version_12_4", "test_version_12_2", "test_version_11", "test_version_10", "test_version_9", "test_version_8", "test_new_things", "test_fort", "test_crows", "test_revenant", "test_fire", "test_trees", "test_finals", "test_classes", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish", "test_third_review"]
 	var groups := {
 		"core": plan.slice(0, 9), "recent": plan.slice(9, 17), "legacy": plan.slice(17, 25),
 		"classes": ["test_new_things", "test_revenant", "test_trees", "test_finals", "test_classes"],
-		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review"]}
+		"world": ["test_fort", "test_crows", "test_fire", "test_enemies", "test_new_stuff", "test_review", "test_beyond_review", "test_polish", "test_third_review"]}
 	var selected := "all"
 	for arg: String in args:
 		if arg.begins_with("group="):
@@ -710,8 +710,8 @@ func test_version_18() -> void:
 	Game.unlocked.erase("adept")
 	Game.redeemed.erase(_code_of("adept"))
 	ok(not Game.owns_class("adept"), "the Adept is locked")
-	ok(ClassDefs.price("adept") == 1150 and not ClassDefs.for_sale().has("adept"), "it keeps its price, but is not sold while switched off")
-	ok(Game.redeem_key(_code_of("adept"))["result"] == "disabled" and not Game.owns_class("adept") and not Game.redeemed.has(_code_of("adept")), "its code is kept for when it returns")
+	ok(ClassDefs.price("adept") == 1150 and ClassDefs.for_sale().has("adept"), "it is sold again, at its old price")
+	ok(Game.redeem_key(_code_of("adept"))["result"] == "opened" and Game.owns_class("adept") and Game.redeemed.has(_code_of("adept")), "and its code opens it")
 	Game.unlocked["monk"] = true
 	# The Bo and the hands are nobody's item.
 	ok(WeaponDefs.ALL["bo"].get("hidden", false) and WeaponDefs.ALL["fists"].get("hidden", false), "neither the Bo nor empty hands are offered anywhere")
@@ -1117,6 +1117,11 @@ func test_version_20_1() -> void:
 	# Updates.
 	ok(Updates.is_newer("v0.20.2", "0.20.1") and Updates.is_newer("0.21.0", "0.20.9") and not Updates.is_newer("v0.20.1", "0.20.1") and not Updates.is_newer("0.19.9", "0.20.1"), "versions compare the right way")
 	var up: Updates = m.updates
+	# The real check of GitHub may still be on its way: dropped, so it cannot land between the forced
+	# releases below and the menu (it did, now and then, and said nothing newer was out).
+	if up._http:
+		up._http.queue_free()
+		up._http = null
 	var apk := {"name": "botti-last-stand-9.0.0.apk", "browser_download_url": "https://github.com/Polaryti/botti-last-stand/releases/download/v9.0.0/botti-last-stand-9.0.0.apk", "size": 1000}
 	up.apply_release({"tag_name": "v9.0.0", "draft": false, "prerelease": false, "html_url": "https://example.invalid/r", "assets": [apk]})
 	ok(up.state == Updates.State.AVAILABLE and up.latest == "9.0.0", "a newer version with its app is offered")
@@ -1128,7 +1133,20 @@ func test_version_20_1() -> void:
 	m.show_menu()
 	await frames(3)
 	texts = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
-	ok(texts.any(func(t: String) -> bool: return t.begins_with("Version 9.0.0 is out")), "the menu says a new version is out")
+	ok(texts.any(func(t: String) -> bool: return t.begins_with("Version 9.0.0 is out")), "the menu says a new version is out (%s, %s, %s)" % [up.state, texts, m._update_box.get_child_count() if is_instance_valid(m._update_box) else -1])
+	up.state = Updates.State.NONE
+	m._fill_update_box()
+	# The menu looks again when a match ends, and not when coming back from another menu screen.
+	m.show_menu()
+	await frames(2)
+	ok(up.state == Updates.State.NONE, "going between menu screens does not look again")
+	m.world.mode = Game.Mode.NIGHT
+	m.show_menu()
+	await frames(1)
+	ok(up.state == Updates.State.CHECKING, "back from a match, the menu looks for a new version again")
+	if up._http:
+		up._http.queue_free()
+		up._http = null
 	up.state = Updates.State.NONE
 	m._fill_update_box()
 	# The skill tree's words fit their cards, however long.
@@ -1164,10 +1182,16 @@ func test_version_20_1() -> void:
 	e._ieos = fake
 	e._user = "me"
 	fake.rooms = [{"owner": "aaaa", "attrs": {"CODE": "ABC234", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Mara", "RULES": "1", "MAP": "village", "PLAYERS": "2"}},
-		{"owner": "bbbb", "attrs": {"CODE": "XYZ789", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Full", "RULES": "0", "MAP": "mists", "PLAYERS": str(Net.MAX_PLAYERS)}}]
+		{"owner": "bbbb", "attrs": {"CODE": "XYZ789", "PUBLIC": "1", "OPEN": "1", "VER": str(Net.PROTOCOL), "HOST": "Full", "RULES": "0", "MAP": "mists", "PLAYERS": str(Net.MAX_PLAYERS)}},
+		{"owner": "cccc", "attrs": {"CODE": "LIV234", "PUBLIC": "1", "OPEN": "0", "LIVE": "1", "WATCHERS": "1", "VER": str(Net.PROTOCOL), "HOST": "Bo", "RULES": "0", "MAP": "mists", "PLAYERS": "4"}},
+		{"owner": "dddd", "attrs": {"CODE": "SHUT23", "PUBLIC": "1", "OPEN": "0", "LIVE": "0", "WATCHERS": "0", "VER": str(Net.PROTOCOL), "HOST": "Shut", "RULES": "0", "MAP": "mists", "PLAYERS": "2"}},
+		{"owner": "eeee", "attrs": {"CODE": "BUSY23", "PUBLIC": "1", "OPEN": "0", "LIVE": "1", "WATCHERS": str(Net.MAX_SPECTATORS), "VER": str(Net.PROTOCOL), "HOST": "Busy", "RULES": "0", "MAP": "mists", "PLAYERS": "2"}}]
 	var listed: Array[Dictionary] = await e.list_rooms()
-	ok(listed.size() == 1 and listed[0]["name"] == "Mara" and listed[0]["host"] == "aaaa" and int(listed[0]["players"]) == 2 and int(listed[0]["rules"]) == 1, "public games are read from the search, and full ones are left out (%s)" % str(listed))
-	ok(fake.searched.get("PUBLIC") == "1" and fake.searched.get("OPEN") == "1" and fake.searched.get("VER") == str(Net.PROTOCOL), "the search asks only for public games waiting, of this version")
+	var waiting := listed.filter(func(r: Dictionary) -> bool: return r["waiting"])
+	var live := listed.filter(func(r: Dictionary) -> bool: return r["live"])
+	ok(waiting.size() == 1 and waiting[0]["name"] == "Mara" and waiting[0]["host"] == "aaaa" and int(waiting[0]["players"]) == 2 and int(waiting[0]["rules"]) == 1, "public games are read from the search, and full ones are left out (%s)" % str(listed))
+	ok(live.size() == 1 and live[0]["name"] == "Bo" and int(live[0]["watchers"]) == 1 and listed.size() == 2, "matches under way are listed to watch, unless closed to spectators or already watched by %d" % Net.MAX_SPECTATORS)
+	ok(fake.searched.get("PUBLIC") == "1" and not fake.searched.has("OPEN") and fake.searched.get("VER") == str(Net.PROTOCOL), "the search asks for public games of this version, waiting or under way")
 	var code: String = await e.open_room(false)
 	ok(code.length() == EpicNet.CODE_LENGTH and fake.written.get("PUBLIC") == "0" and fake.written.get("CODE") == code and fake.written.get("OPEN") == "1", "a private room keeps its code but stays off the list")
 	ok(await e.update_room(EpicNet.room_card(true, false)) and fake.written.get("OPEN") == "0" and fake.written.get("PUBLIC") == "1", "and a room can go public, and leave the list when its night starts")
@@ -1314,7 +1338,7 @@ func test_version_20() -> void:
 	ok(not _saw_mist_roamer, "no Rift Stalker walks the ordinary maps")
 	var in_mists := {}
 	for i in 300:
-		in_mists[ZombieDefs.pick_roamer(600.0, true)] = true
+		in_mists[ZombieDefs.pick_roamer(600.0, "mists")] = true
 	ok(in_mists.has("rift_stalker"), "the Mists have them")
 	Game.night_map = "village"
 	Game.mode = Game.Mode.NIGHT
@@ -1461,7 +1485,7 @@ func test_version_19_1() -> void:
 	ok(pl.weapon_id() == "bo" and not pl.can_drop_weapon(), "the Bo can't be dropped")
 	# Who can be had, and how.
 	ok(ClassDefs.for_sale().has("monk") and ClassDefs.price("monk") > ClassDefs.price("artificer"), "the Monk is in the Store, above the Artificer")
-	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and not ClassDefs.for_sale().has("adept"), "and nothing that is earned, nor the switched-off Adept")
+	ok(not ClassDefs.for_sale().has("revenant") and not ClassDefs.for_sale().has("plague_doctor") and not ClassDefs.for_sale().has("cartographer"), "and nothing that is earned")
 	var saved_mode := Game.mode
 	var saved_unlocks := Game.unlocked.duplicate()
 	var saved_poison := Game.poison_dealt
@@ -1486,6 +1510,41 @@ func test_version_19_1() -> void:
 	ok(not Game.owns_class("revenant"), "four dawns in the Mists are not enough")
 	Game.note_mists_win()
 	ok(Game.owns_class("revenant"), "five open the Revenant")
+	# Three wins in the Valleys of Mesenlla and three at Mist Bastion earn the Cartographer.
+	var saved_beyond := [Game.mesenlla_wins, Game.bastion_wins]
+	var saved_fort := Game.fort_map
+	Game.unlocked.erase("cartographer")
+	Game.mesenlla_wins = 0
+	Game.bastion_wins = 0
+	ok(Game.earn_text("cartographer") == "Win 3 matches in the Valleys of Mesenlla and 3 in Mist Bastion to unlock this class. So far: 0 and 0.", "the Cartographer says how it is earned: %s" % Game.earn_text("cartographer"))
+	Game.night_map = "village"
+	Game.note_beyond_win()
+	ok(Game.mesenlla_wins == 0 and Game.bastion_wins == 0, "a win in the Village counts for neither")
+	Game.night_map = "mesenlla"
+	for i in 5:
+		Game.note_beyond_win()
+	ok(Game.mesenlla_wins == 5 and not Game.owns_class("cartographer"), "wins in the Valleys alone are not enough")
+	Game.mode = Game.Mode.FORT
+	Game.fort_map = "bastion"
+	Game.note_beyond_win()
+	Game.note_beyond_win()
+	ok(Game.bastion_wins == 2 and not Game.owns_class("cartographer"), "nor two at Mist Bastion")
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_beyond_win()
+	ok(Game.bastion_wins == 2, "the Sandbox counts for nothing")
+	Game.mode = Game.Mode.FORT
+	Game.note_beyond_win()
+	ok(Game.owns_class("cartographer") and Game.fresh_unlocks.has("cartographer"), "the third at Mist Bastion opens the Cartographer")
+	ok(Game.earn_text("cartographer").ends_with("So far: 3 and 3."), "and the count stops at what was needed")
+	Game.save_settings()
+	Game.mesenlla_wins = 0
+	Game.bastion_wins = 0
+	Game.load_settings()
+	ok(Game.mesenlla_wins == 5 and Game.bastion_wins == 3, "the wins are saved")
+	Game.mesenlla_wins = saved_beyond[0]
+	Game.bastion_wins = saved_beyond[1]
+	Game.fort_map = saved_fort
+	Game.mode = Game.Mode.NIGHT
 	Game.fresh_unlocks.clear()
 	Game.unlocked = saved_unlocks
 	Game.poison_dealt = saved_poison
@@ -2005,7 +2064,45 @@ func test_version_15() -> void:
 	m.show_map_picker()
 	await frames(2)
 	var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
-	ok(m.panel.find_children("*", "Button", true, false).size() >= 3, "you can choose where to spend the night")
+	var night_atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
+	ok(night_atlas != null and night_atlas.allowed == Game.MAPS.keys(), "you can choose where to spend the night on the world atlas: %s" % (str(night_atlas.allowed) if night_atlas else "none"))
+	# Choosing where to hold the fort: the Fort, or Mist Bastion.
+	var saved_fort := Game.fort_map
+	var mode_before := Game.mode
+	m.show_fort_picker()
+	await frames(2)
+	var atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
+	ok(atlas != null and atlas.allowed == ["fort", "bastion"], "Defend the Fort asks where, on the world atlas: the Fort or Mist Bastion")
+	if atlas:
+		var places := ["village", "fort", "mists", "mesenlla", "bastion"]
+		ok(places.all(func(id: String) -> bool: return (atlas.find_child("Place_" + id, true, false) as Button).disabled == (id not in ["fort", "bastion"])), "the atlas shows all five places, and only the strongholds can be picked")
+		(atlas.find_child("Place_bastion", true, false) as Button).pressed.emit()
+		await frames(2)
+		ok(atlas.selected == "bastion" and Game.fort_map == saved_fort and m.panel.find_child("WorldAtlas", true, false) == atlas, "tapping Mist Bastion shows it without starting anything")
+		var shown := (m.panel.find_child("PlaceDetail", true, false) as Node).find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		ok(shown.has("Mist Bastion") and shown.has(Places.ALL["bastion"]["lore"]), "and tells its story")
+		(m.panel.find_child("PlayHere", true, false) as Button).pressed.emit()
+		await frames(2)
+	ok(Game.fort_map == "bastion", "Play here remembers Mist Bastion")
+	# Play Together shows at once and looks for games just after; changing tabs keeps looking.
+	m.show_together(0)
+	ok(Net._listener == null, "Play Together is on screen before it starts looking for games")
+	await get_tree().create_timer(0.3).timeout
+	ok(Net._listener != null, "then it looks for games nearby")
+	m.show_together(0)
+	await get_tree().create_timer(0.3).timeout
+	ok(Net._listener != null and Net._searchers == 1, "and keeps looking when the screen is built again (%d)" % Net._searchers)
+	ok(Main.TOGETHER_TABS == ["Same Wi-Fi", "Online"], "only Same Wi-Fi and Online are offered")
+	ok(m.panel.find_child("Rename", true, false) == null and not m.panel.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.text == Game.player_name), "and your name is shown, not changed, here")
+	m.show_menu()
+	await frames(3)
+	ok(Net._searchers == 1, "until you leave: then only the menu's own short look goes on (%d)" % Net._searchers)
+	await get_tree().create_timer(Main.SCOUT_TIME + 0.5).timeout
+	ok(Net._listener == null and Net._searchers == 0, "and stops after a few seconds")
+	Game.mode = Game.Mode.FORT
+	ok(Game.current_map() == "bastion", "where the next Fort is held")
+	Game.fort_map = saved_fort
+	Game.mode = mode_before
 	m.show_menu()
 	await frames(2)
 	await start_clean()
@@ -2055,7 +2152,7 @@ func test_version_14() -> void:
 			ok(Icons.exists("spec_%s" % sp["id"]) and not seen_icons.has(sp["id"]), "%s has its own emblem" % sp["id"])
 			seen_icons[sp["id"]] = true
 	for item: String in ShopDefs.ITEMS:
-		ok(Icons.exists(str(ShopDefs.ITEMS[item]["icon"])), "%s has an icon" % item)
+		ok(Array(str(ShopDefs.ITEMS[item]["icon"]).split("+")).all(func(part: String) -> bool: return Icons.exists(part)), "%s has an icon" % item)
 	for weapon_id: String in WeaponDefs.ALL:
 		ok(Icons.exists(Icons.weapon(weapon_id).split("+")[0]), "%s has an icon" % weapon_id)
 	for class_id: String in ClassDefs.available():
@@ -2449,7 +2546,7 @@ func test_version_11() -> void:
 		var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 		for title: String in Main.TOGETHER_TABS:
 			ok(names.has(title), "the %s way is on offer" % title)
-		ok(not names.has("Hotspot?"), "with no Hotspot? button")
+		ok(not names.has("Hotspot?") and not names.has("Hotspot"), "with no Hotspot button")
 		ok(names.has("Back"), "and a way back")
 	m.show_together(0)
 	await frames(2)
@@ -2734,9 +2831,9 @@ func test_version_9() -> void:
 	var counts := [0, 0, 0]
 	for i in 10000:
 		counts[Weather.roll()] += 1
-	ok(counts[0] > 6800 and counts[0] < 7700, "most nights are clear (%d)" % counts[0])
-	ok(counts[1] > 1700 and counts[1] < 2300, "some are wet (%d)" % counts[1])
-	ok(counts[2] > 500 and counts[2] < 900, "and a few have a storm (%d)" % counts[2])
+	ok(counts[0] > 7500 and counts[0] < 8300, "most nights are clear: 79%% (%d)" % counts[0])
+	ok(counts[1] > 1350 and counts[1] < 1850, "some are wet: 16%% (%d)" % counts[1])
+	ok(counts[2] > 350 and counts[2] < 650, "and a few have a storm: 5%% (%d)" % counts[2])
 	ok(w.weather.kind == Weather.Kind.CLEAR or w.weather.kind == Weather.Kind.RAIN or w.weather.kind == Weather.Kind.STORM, "tonight has weather")
 	w.weather.set_kind(Weather.Kind.STORM)
 	w.weather._next_strike = 9999.0
@@ -2824,10 +2921,15 @@ func test_version_8() -> void:
 	ok(Game.owns_class("artificer"), "and the class is yours")
 	ok(Game.redeem_key(_code_of("artificer"))["result"] == "used", "the same code cannot be used twice")
 	Game.unlocked.clear()
-	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598, "the prices are set")
+	ok(ClassDefs.price("monk") == 920 and ClassDefs.price("artificer") == 598 and ClassDefs.price("bandit") == 860 and ClassDefs.price("adept") == 1150, "the prices are set")
+	ok(ClassDefs.price("cartographer") == 0, "the Cartographer is earned, not bought")
+	var cartographer_code := Game.redeem_key(_code_of("cartographer"))
+	ok(cartographer_code["result"] == "opened" and Game.owns_class("cartographer"), "though its code still opens it")
+	Game.unlocked.clear()
+	Game.redeemed.clear()
 	ok(ClassDefs.price("infantry") == 0, "the others are free")
 	var sale := ClassDefs.for_sale()
-	ok(sale.size() == 2 and sale.has("monk") and sale.has("artificer") and not sale.has("adept"), "the Store sells Monk and Artificer, and not the switched-off Adept")
+	ok(sale.size() == 4 and sale.has("monk") and sale.has("artificer") and sale.has("bandit") and sale.has("adept") and not sale.has("cartographer"), "the Store sells Monk, Artificer, Bandit and Adept; the Cartographer is earned")
 	Game.doubloons = 597
 	ok(not Game.buy_class("artificer") and Game.doubloons == 597, "you cannot buy what you cannot pay for")
 	Game.doubloons = 599
@@ -2861,7 +2963,8 @@ func test_version_8() -> void:
 	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
-	ok(m.panel.get_meta("list").get_child_count() == 3, "the Store opens, with its tabs and two classes")
+	var unowned := ClassDefs.for_sale().filter(func(c: String) -> bool: return not Game.owns_class(c)).size()
+	ok(m.panel.get_meta("list").get_child_count() == maxi(unowned, 1) and (m.panel.find_child("Tabs", true, false) as Container).get_child_count() == ShopDefs.SECTIONS.size(), "the Store opens, with its tabs under its bar and the classes not yet owned (%d)" % unowned)
 	m.show_class_picker(Game.Mode.SANDBOX)
 	await frames(2)
 	ok(m.panel.get_meta("list").get_child_count() == ClassDefs.available().size(), "the Sandbox only offers what you own")
@@ -3014,12 +3117,13 @@ func test_version_8() -> void:
 	ok(w.count_pickups(Pickup.Kind.WEAPON) == weapon_count, "every weapon is on show (%d)" % w.count_pickups(Pickup.Kind.WEAPON))
 	var missing := 0
 	for id: String in PowerDefs.ALL:
-		if not items.has(id):
+		# Pathfinder finds are unearthed by its beacons, never set out on a stand.
+		if not items.has(id) and not PowerDefs.ALL[id].has("spec"):
 			missing += 1
 	for id: String in PowerDefs.FOODS:
 		if not items.has(id):
 			missing += 1
-	ok(missing == 0 and items.has("arrows"), "and every item and familiar")
+	ok(missing == 0 and items.has("arrows") and not items.has("lantern"), "and every item and familiar, but no Pathfinder find")
 	var taken: Pickup = w.pickups[0]
 	var taken_id := taken.item_id
 	w.remove_pickup(taken)
@@ -3099,9 +3203,15 @@ func test_version_8() -> void:
 	for i in pl.horses_needed():
 		pl.on_kill(kill_me)
 	ok(pl.horse_ready(), "and then it is ready")
+	var glyphs: Hud = Hud.new()
+	glyphs.player = pl
+	ok(glyphs._button_glyph("horse") == "chariot" and Icons.exists("chariot_off"), "its button shows a chariot, not a horse")
 	await kill_all()
 	pl.mount()
 	ok(pl.is_riding() and pl.riding_left >= Player.CHARIOT_TIME, "it lasts longer than a horse")
+	ok(glyphs._button_glyph("horse") == "chariot_off", "and getting down shows the chariot too, not the horseshoe")
+	ok(pl.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "chariot") and not pl.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "horse"), "its time left shows a chariot")
+	glyphs.free()
 	pl.input_move = Vector2(0, -1)
 	await seconds(1.0)
 	var chariot_speed := Vector2(pl.velocity.x, pl.velocity.z).length()
@@ -3315,8 +3425,8 @@ func test_flow() -> void:
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await frames(3)
-	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.terrain.has_islands(), "menu shows the Mists")
-	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "The Mists Update", "main title names the production update")
+	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.map_id == "mesenlla", "the title screen shows the Valleys of Mesenlla")
+	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "Beyond the Mists", "main title names the production update")
 	ok(m.world.player == null and m.world.zombies.is_empty() and not m.world.director.running, "the title backdrop has no active match")
 	await m.start_game(Game.Mode.SANDBOX)
 	await seconds(3.0)
@@ -3324,6 +3434,333 @@ func test_flow() -> void:
 	ok(m.world.pickups.size() > 0, "the Sandbox has things to pick up")
 	m.queue_free()
 	await frames(2)
+
+
+## Mario's review of Beyond the Mists, 13 November: campfires, walking backwards, the menu screens.
+func test_beyond_review() -> void:
+	await start_clean()
+	# Nobody stands on a campfire, and standing right at one too long sets you alight.
+	var fire: Dictionary = {}
+	for f: Dictionary in w.fires:
+		if f["heals"]:
+			fire = f
+			break
+	ok(not fire.is_empty(), "the Village has a bonfire")
+	if not fire.is_empty():
+		var at: Vector3 = fire["at"]
+		var q := PhysicsPointQueryParameters3D.new()
+		q.position = at + Vector3.UP * 1.6
+		q.collision_mask = Terrain.BARRIER
+		ok(not w.get_world_3d().direct_space_state.intersect_point(q).is_empty(), "an unseen column over a bonfire keeps anyone off the top of it")
+		pl.set_physics_process(true)
+		pl.guard_left = 0.0
+		pl.global_position = at + Vector3(0, 1.3, 0)
+		pl.velocity = Vector3.ZERO
+		await seconds(1.5)
+		ok(Vector2(pl.global_position.x - at.x, pl.global_position.z - at.z).length() > 0.9 or pl.global_position.y < at.y + 1.2, "dropped on top of one, you do not stay up there (%.1f m off, %.1f up)" % [Vector2(pl.global_position.x - at.x, pl.global_position.z - at.z).length(), pl.global_position.y - at.y])
+		pl.global_position = at + Vector3(1.9, 0.1, 0)
+		pl.velocity = Vector3.ZERO
+		pl.burn_time = 0.0
+		pl._scorch = 0.0
+		pl.hp = pl.max_hp()
+		await seconds(WorldLight.SCORCH_AFTER - 1.5)
+		ok(pl.burn_time <= 0.0 and w.at_bonfire(pl.global_position), "right at the stones, at first you only get warm")
+		await seconds(2.5)
+		ok(pl.burn_time > 0.0, "but after %d seconds you catch fire" % int(WorldLight.SCORCH_AFTER))
+		pl.global_position = at + Vector3(6.0, 0.1, 0)
+		await seconds(0.5)
+		ok(pl._scorch == 0.0, "step back and it starts over")
+		pl.burn_time = 0.0
+		pl.hp = pl.max_hp()
+	# Backing away is slower than walking on.
+	place(OPEN)
+	pl.set_physics_process(true)
+	pl.input_move = Vector2(0, -1)
+	await seconds(1.0)
+	var ahead := Vector2(pl.velocity.x, pl.velocity.z).length()
+	pl.input_move = Vector2(0, 1)
+	await seconds(1.0)
+	var back := Vector2(pl.velocity.x, pl.velocity.z).length()
+	pl.input_move = Vector2.ZERO
+	ok(absf(back / maxf(ahead, 0.01) - Player.BACK_SPEED) < 0.03, "walking backwards goes at %d%% of walking on (%.2f against %.2f m/s)" % [int(Player.BACK_SPEED * 100.0), back, ahead])
+	# The Scarecrow belongs to the Village.
+	ok(ZombieDefs.ALL["scarecrow"]["maps"] == ["village"] and SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "village") and not SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "mesenlla"), "the Scarecrow is the Village's alone")
+	# The world atlas: the Mists lead only to Mist Bastion, and the Valleys lie below it.
+	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion"], "on the atlas the Mists connect to the Fort and Mist Bastion only")
+	ok((WorldAtlas.SPOTS["mesenlla"] as Vector2).y > (WorldAtlas.SPOTS["bastion"] as Vector2).y, "and the Valleys of Mesenlla lie below Mist Bastion")
+	m.show_map_picker()
+	await frames(2)
+	var atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
+	(atlas.find_child("Place_mesenlla", true, false) as Button).pressed.emit()
+	await frames(2)
+	var shown: Array = m.panel.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	ok(shown.has("Valleys of Mesenlla") and not shown.any(func(t: String) -> bool: return t.begins_with("Map Exclusive")), "choosing where to play shows no map tags")
+	# Your name is changed in Settings, not on the menu.
+	m.show_menu()
+	await frames(2)
+	ok(not m.ui_layer.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.text == Game.player_name), "the menu no longer has your name on a button")
+	m.show_settings()
+	await frames(2)
+	var rename := m.ui_layer.find_child("Rename", true, false) as Button
+	ok(rename != null and rename.text == Game.player_name, "Settings has it, to change your name")
+	if rename:
+		rename.pressed.emit()
+		await frames(2)
+		ok(m.ui_layer.find_children("*", "LineEdit", true, false).any(func(e: LineEdit) -> bool: return e.text == Game.player_name), "and tapping it asks for the new one")
+	# New notes make the Changelog button glow until they are read.
+	var read := Game.changelog_seen
+	Game.changelog_seen = "older notes"
+	m.show_menu()
+	await frames(2)
+	var notes := m.ui_layer.find_child("ChangelogButton", true, false) as Button
+	ok(notes != null and notes.has_meta("news"), "new notes in the Changelog make its button glow")
+	await seconds(0.3)
+	ok(notes != null and notes.self_modulate != Color.WHITE, "and it does glow (%s)" % (str(notes.self_modulate) if notes else "-"))
+	m.show_changelog()
+	# Built at once: the newest version's first changes; the rest follow a few each frame.
+	var lines: int = m.panel.find_children("*", "RichTextLabel", true, false).size()
+	await frames(2)
+	ok(Game.changelog_seen == ChangelogPanel.signature(), "opening the Changelog reads them")
+	await frames(30)
+	var all_lines: int = m.panel.find_children("*", "RichTextLabel", true, false).size()
+	ok(lines < all_lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, all_lines])
+	m.show_menu()
+	await frames(2)
+	notes = m.ui_layer.find_child("ChangelogButton", true, false) as Button
+	ok(notes != null and not notes.has_meta("news"), "after which the button stops glowing")
+	Game.changelog_seen = read
+	Game.save_settings()
+	await start_clean()
+
+
+## Mario's third review of Beyond the Mists: campfires nobody hops at, Settings that scroll, a switch
+## for damage numbers, levels in the list of players, and ground that cannot be reached left alone.
+func test_third_review() -> void:
+	await start_clean()
+	# Walking at a campfire is not a reason to jump: what is over it cannot be jumped onto.
+	var fire: Dictionary = {}
+	for f: Dictionary in w.fires:
+		if f["heals"]:
+			fire = f
+			break
+	if not fire.is_empty():
+		var at: Vector3 = fire["at"]
+		var hops := 0
+		for a in 8:
+			var from := Vector3(cos(a * TAU / 8.0), 0, sin(a * TAU / 8.0))
+			pl.global_position = at + from * 1.75 + Vector3.UP * 0.1
+			pl.velocity = Vector3.ZERO
+			await frames(2)
+			if pl._should_auto_jump(-from):
+				hops += 1
+		ok(hops == 0, "nobody jumps at a campfire they walk up to (%d of 8 sides)" % hops)
+	# The edge of the map is nothing to jump at either, whatever stands low in front of it.
+	pl.global_position = Vector3(0, 0.3, 0)
+	ok(Terrain.BARRIER != 1, "what cannot be passed is told apart from what can be seen")
+	# Settings scroll, down to the last row; your name is the first.
+	m.show_settings()
+	await frames(3)
+	var scroll := m.ui_layer.find_child("SettingsScroll", true, false) as ScrollContainer
+	var rows := m.ui_layer.find_child("SettingsRows", true, false) as Control
+	ok(scroll != null and rows != null and scroll.is_ancestor_of(rows), "the Settings rows are in a scrolling list")
+	if scroll and rows:
+		var view := m.get_viewport().get_visible_rect().size
+		ok(scroll.get_global_rect().end.y <= view.y and scroll.size.y >= 200.0, "that fits on the screen (%.0f px tall, ending at %.0f of %.0f)" % [scroll.size.y, scroll.get_global_rect().end.y, view.y])
+		var last := rows.get_child(rows.get_child_count() - 1) as Control
+		(scroll as DragScroll).scroll_to(rows.size.y)
+		await frames(3)
+		ok(scroll.get_global_rect().grow(1.0).encloses(last.get_global_rect()), "and scrolls down to its last row (%s in %s)" % [last.get_global_rect(), scroll.get_global_rect()])
+		var rename := m.ui_layer.find_child("Rename", true, false) as Button
+		ok(rename != null and scroll.is_ancestor_of(rename) and rows.get_child(0).is_ancestor_of(rename), "your name is the first of them")
+		var back := m.ui_layer.find_child("BackButton", true, false) as Button
+		ok(back != null and back.text == "Back" and not scroll.is_ancestor_of(back) and back.get_global_rect().position.y < scroll.get_global_rect().position.y, "the way back stays in reach above the list")
+	var texts: Array = m.ui_layer.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	texts.append_array(m.ui_layer.find_children("*", "CheckButton", true, false).map(func(b: CheckButton) -> String: return b.text))
+	ok(texts.has("Damage numbers"), "Settings has a switch for damage numbers")
+	# Switched off, nothing rises from what you hit.
+	var numbers := w.damage_numbers
+	var showing := func() -> int: return numbers._labels.filter(func(l: Label3D) -> bool: return l.visible).size()
+	Game.damage_numbers = false
+	numbers.show_hit(7001, pl.global_position + Vector3(0, 1, -3), 25.0, 100.0)
+	ok(showing.call() == 0, "damage numbers switched off: none shown")
+	Game.damage_numbers = true
+	numbers.show_hit(7001, pl.global_position + Vector3(0, 1, -3), 25.0, 100.0)
+	ok(showing.call() == 1, "switched on: shown again")
+	Game.damage_numbers = false
+	Game.save_settings()
+	Game.damage_numbers = true
+	Game.load_settings()
+	ok(not Game.damage_numbers, "the switch is kept")
+	Game.damage_numbers = true
+	Game.save_settings()
+	# Everyone's level travels with where they are.
+	pl.level = 7
+	var pose := Net.pose_bytes(pl)
+	ok(pose.size() == Net.POSE_BYTES and pose[39] == 7 and Net.valid_pose(pose), "a player's level is part of what every phone hears of them")
+	var ghost := Avatar.new(w, 4242, {"name": "Ghost", "team": 0, "class": "infantry"})
+	w.add_child(ghost)
+	Net._apply_pose(ghost, pose)
+	ok(ghost.level == 7, "and their figure on other phones knows it")
+	ghost.queue_free()
+	pl.level = 1
+	# Ground nobody can walk to: nothing is left there.
+	var corner := Vector3(w.half_size - 2.0, 0, w.half_size - 2.0)
+	ok(w.in_reach(pl.global_position) and not w.in_reach(corner), "the edge of the map is out of reach; where the players stand is not")
+	var stray := 0
+	var made := 0
+	for i in 60:
+		var item := w.spawn_pickup_random(Pickup.Kind.FOOD, "apple")
+		if item:
+			made += 1
+			if not w.in_reach(item.global_position):
+				stray += 1
+	ok(made > 20 and stray == 0, "nothing to find is left out of reach (%d of %d)" % [stray, made])
+	# Ground to keep off: ways are planned round it, and the nearest way off it is straight out.
+	var middle := Vector3(40, 0, 40)
+	ok(not w.ground_shunned(middle), "open ground is not shunned")
+	w.shun_ground(middle, 10.0)
+	ok(w.ground_shunned(middle + Vector3(6, 0, 0)) and not w.ground_shunned(middle + Vector3(12, 0, 0)), "a circle to keep off covers what is inside it")
+	var off := w.off_shunned(middle + Vector3(6, 0, 0))
+	ok(not w.ground_shunned(off) and off.x > middle.x + 10.0 and absf(off.z - middle.z) < 0.5, "the way off it is straight out from its middle")
+	ok(w.grid.astar.get_point_weight_scale(w.grid.to_cell(middle)) > 5.0 and is_equal_approx(w.grid.astar.get_point_weight_scale(w.grid.to_cell(middle + Vector3(20, 0, 0))), 1.0), "and ways planned through it cost many times their length")
+	w.shunned.clear()
+	w.grid.weigh_disc(middle, 12.0, 1.0)
+	await start_clean()
+
+
+## The graphics and performance pass: the finished picture, cheap floor checks, far lights put out,
+## damage numbers and Auto graphics.
+func test_polish() -> void:
+	await start_clean()
+	var env: Environment = w._env
+	ok(env.tonemap_mode == Environment.TONE_MAPPER_FILMIC and env.adjustment_enabled, "the picture goes through a filmic curve with a little more contrast and colour")
+	var was_quality := Game.quality
+	Game.quality = 0
+	w._grade()
+	ok(not env.glow_enabled, "on Low nothing blooms")
+	Game.quality = 2
+	w._grade()
+	ok(env.glow_enabled and env.get_glow_level(3) > 0.0, "on High light blooms from what glows, in more layers than on Medium")
+	Game.quality = was_quality
+	w._grade()
+	# Tall things stand in their own shade at the foot; small things do not.
+	ok(LowPoly.foot_shade(6.0) > 0.2 and LowPoly.foot_shade(1.0) == 0.0, "walls are shaded darker at the foot, small things are not")
+	var wall := LowPoly.new().box(Vector3(0, 3, 0), Vector3(4, 6, 0.4), Color(0.6, 0.6, 0.6)).commit()
+	var colours: PackedColorArray = wall.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	var verts: PackedVector3Array = wall.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var low := 1.0
+	var high := 0.0
+	for i in verts.size():
+		if verts[i].y < 0.1: low = minf(low, colours[i].r)
+		else: high = maxf(high, colours[i].r)
+	ok(low < high - 0.1, "a wall's mesh carries the shade in its colours (%.2f at the foot, %.2f at the top)" % [low, high])
+	# On level land the floor is found with a short reach; on a slope or off the ground, the long one.
+	var level := Vector3.INF
+	var slope := Vector3.INF
+	for i in 400:
+		var at := Vector3(randf_range(-60, 60), 0, randf_range(-60, 60))
+		if not w.grid.is_free(w.grid.to_cell(at)) or w.terrain.in_water(at.x, at.z):
+			continue
+		var h := w.terrain.height(at.x, at.z)
+		var tilt := maxf(maxf(absf(w.terrain.height(at.x + 0.5, at.z) - h), absf(w.terrain.height(at.x - 0.5, at.z) - h)), maxf(absf(w.terrain.height(at.x, at.z + 0.5) - h), absf(w.terrain.height(at.x, at.z - 0.5) - h)))
+		if tilt < 0.002 and level == Vector3.INF: level = at
+		if tilt > 0.08 and slope == Vector3.INF: slope = at
+	ok(level != Vector3.INF and slope != Vector3.INF, "the Village has level land and slopes to try")
+	pl.set_physics_process(false)
+	pl.input_move = Vector2.ZERO
+	place(level)
+	ok(pl._snap_reach() == Player.SNAP_LEVEL, "standing on level land, feet reach only a little way for the floor (%.2f)" % pl._snap_reach())
+	place(slope)
+	ok(pl._snap_reach() == Player.SNAP_FULL, "on a slope the full reach is used (%.2f)" % pl._snap_reach())
+	place(level)
+	pl.global_position += Vector3.UP * 1.0
+	ok(pl._snap_reach() == Player.SNAP_FULL, "and off the ground too")
+	pl.set_physics_process(true)
+	place(level)
+	await seconds(0.5)
+	ok(pl.is_on_floor() and is_equal_approx(pl.floor_snap_length, Player.SNAP_LEVEL), "walking about, the short reach still keeps you on the floor (floor %s, reach %.2f, %.3f above the land)" % [pl.is_on_floor(), pl.floor_snap_length, pl.global_position.y - w.terrain.height(pl.global_position.x, pl.global_position.z)])
+	place(OPEN)
+	await seconds(0.3)
+	# Lights and drifting particles far from whoever is looking are put out.
+	var lamp_near := OmniLight3D.new()
+	var lamp_far := OmniLight3D.new()
+	w.add_child(lamp_near)
+	w.add_child(lamp_far)
+	var eye := w._player_camera_position()
+	lamp_near.global_position = eye + Vector3(10, 0, 0)
+	lamp_far.global_position = eye + Vector3(80, 0, 0)
+	w.add_scenery(lamp_near, 48.0)
+	w.add_scenery(lamp_far, 48.0)
+	w._fire_timer = 0.0
+	w._tick_fires(1.0)
+	ok(lamp_near.visible and not lamp_far.visible, "a scenery light far from whoever is looking is put out, a near one stays lit")
+	lamp_far.queue_free()
+	lamp_near.queue_free()
+	w._scenery.resize(w._scenery.size() - 2)
+	# Halos of light are drawn in batches.
+	ok(w.find_children("*", "MultiMeshInstance3D", true, false).any(func(mm: MultiMeshInstance3D) -> bool: return mm.multimesh.mesh is QuadMesh and mm.multimesh.instance_count > 1), "the halos round lights are drawn together, not one by one")
+	# Damage numbers.
+	var z := spawn("normal", pl.global_position + Vector3(0, 0, -3))
+	z.take_damage(12.0, Vector3.FORWARD, 0.0, z.centre())
+	var shown := w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible)
+	ok(shown.size() == 1 and (shown[0] as Label3D).text == "12", "a blow on an enemy shows what it took")
+	z.take_damage(7.0, Vector3.FORWARD, 0.0, z.centre())
+	shown = w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible)
+	ok(shown.size() == 1 and (shown[0] as Label3D).text == "19", "blows landing together are added up (%s)" % (shown[0] as Label3D).text)
+	z.hp = z.max_hp
+	z.take_damage(z.max_hp * 0.5, Vector3.FORWARD, 0.0, z.centre())
+	await seconds(0.3)
+	z.take_damage(z.max_hp * 0.4, Vector3.FORWARD, 0.0, z.centre())
+	shown = w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible)
+	ok(shown.any(func(l: Label3D) -> bool: return l.font_size > 40), "a heavy blow shows bigger")
+	await seconds(0.2)
+	if z.is_alive():
+		z.hp = z.max_hp
+		z.next_hitter = -1
+		z.take_damage(5.0, Vector3.FORWARD, 0.0, z.centre())
+	ok(w.damage_numbers.get_children().filter(func(l: Label3D) -> bool: return l.visible and l.text == "5").is_empty(), "a blow that was nobody's shows nothing")
+	await seconds(DamageNumbers.LIFE + 0.2)
+	ok(w.damage_numbers.get_children().all(func(l: Label3D) -> bool: return not l.visible) and not w.damage_numbers.is_processing(), "the numbers fade and the labels rest")
+	# Auto graphics.
+	var auto := m.get_node("AutoQuality") as AutoQuality
+	var saved := [Game.quality, Game.quality_auto, Game.quality_measured]
+	ok(not AutoQuality.enabled(), "Auto graphics leaves a computer alone")
+	AutoQuality.force = true
+	Game.quality_auto = true
+	Game.quality_measured = false
+	Game.quality = 1
+	auto.take(58.0, false)
+	ok(Game.quality == 2 and Game.quality_measured, "a phone that draws the title screen fast gets High")
+	Game.quality = 1
+	auto.take(28.0, false)
+	ok(Game.quality == 0, "a slow one gets Low")
+	Game.quality = 1
+	auto.take(45.0, false)
+	ok(Game.quality == 1, "one in between stays on Medium")
+	auto._slow = 0
+	auto.take(30.0, true)
+	ok(Game.quality == 1, "in a match one slow look changes nothing")
+	auto.take(50.0, true)
+	auto.take(30.0, true)
+	ok(Game.quality == 1, "nor do slow looks with a smooth one between")
+	auto.take(30.0, true)
+	ok(Game.quality == 0 and w.director.banner.contains("Graphics lowered"), "two in a row step the graphics down, and say so: %s" % w.director.banner)
+	auto.take(20.0, true)
+	auto.take(20.0, true)
+	ok(Game.quality == 0, "and it never goes below Low")
+	Game.quality_auto = false
+	ok(not AutoQuality.enabled(), "with Graphics set by hand it does nothing")
+	AutoQuality.force = false
+	Game.quality = saved[0]
+	Game.quality_auto = saved[1]
+	Game.quality_measured = saved[2]
+	Game.apply_quality()
+	Game.save_settings()
+	w._grade()
+	m.show_settings()
+	await frames(2)
+	ok(m.ui_layer.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.text == "Auto"), "Settings offers Auto beside Low, Medium and High")
+	await start_clean()
 
 
 func start_clean() -> void:
@@ -3402,6 +3839,9 @@ func aim_at(z: Zombie, height := 0.55) -> void:
 func equip(id: String) -> void:
 	pl.slots = [id, null]
 	pl.current = 0
+	pl.own_ammo.clear()
+	if WeaponDefs.own_ammo(id) > 0:
+		pl.add_own_ammo(id, WeaponDefs.own_ammo_max(id)) # as if two had been picked up
 	pl._equip()
 	await seconds(0.3)
 
@@ -3654,8 +4094,19 @@ func test_powers() -> void:
 	place(OPEN)
 	clear_pickups()
 	for id: String in PowerDefs.ALL:
-		w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
-		await seconds(0.25)
+		if PowerDefs.ALL[id].has("spec"):
+			# A Pathfinder find: anyone else walks past it.
+			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
+			await seconds(0.25)
+			ok(not pl.has_power(id) and w.pickups.any(func(i: Pickup) -> bool: return i.item_id == id), "%s stays on the ground for anyone but a %s" % [id, PowerDefs.ALL[id]["spec"]])
+			var was_spec := pl.spec_id
+			pl.spec_id = str(PowerDefs.ALL[id]["spec"])
+			await seconds(0.25)
+			pl.spec_id = was_spec
+			clear_pickups()
+		else:
+			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
+			await seconds(0.25)
 		ok(pl.has_power(id), "%s activates" % id)
 		var want := 20.0
 		ok(absf(float(pl.powers[id]) - want) < 1.0, "%s lasts %d s" % [id, want])
@@ -4405,7 +4856,10 @@ func test_classes() -> void:
 	await seconds(0.3)
 	pl.take_nearby_weapon()
 	await frames(2)
-	ok(pl.weapon_id() == "staff" and not pl.slots.has("sword") and not pl.can_use("sword"), "the Magician refuses a ground weapon and keeps only the staff")
+	ok(pl.slots.has("sword") and pl.slots.has("staff") and pl.can_use("sword") and not pl.can_use("bow"), "the Magician picks up a melee weapon beside the staff, but no bow")
+	pl.slots = ["staff", null]
+	pl.current = 0
+	pl._equip()
 	clear_pickups()
 
 	# Chivalry and the horse.
@@ -5312,13 +5766,14 @@ func test_review() -> void:
 	await _press_toggle("Vibration")
 	ok(Game.vibration == vibration, "and back")
 	var village: World = m.world
-	await _press("Done")
+	await _press("Back")
 	ok(m.world == village and m._back == Callable(m, "_quit"), "leaving Settings keeps the village behind the menu")
+	ok(m.ui_layer.find_children("*", "Button", true, false).any(func(b: Button) -> bool: return b.is_visible_in_tree() and b.name == "ChangelogButton"), "and the title menu shows again under it")
 	# Class cards start a game of that class, with a loading screen in between.
 	m.show_class_picker(Game.Mode.NIGHT)
 	await frames(2)
 	var rows: Node = m.panel.get_meta("list")
-	ok(rows.get_child_count() == ClassDefs.ALL.size() - 1, "every class but the switched-off Adept is listed")
+	ok(rows.get_child_count() == ClassDefs.ALL.size(), "every class is listed, the Adept too")
 	(rows.get_child(2) as Button).pressed.emit()
 	await frames(1)
 	await _press("Play as Heavy Infantry")

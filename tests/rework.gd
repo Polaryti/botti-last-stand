@@ -39,6 +39,14 @@ func _ready() -> void:
 	await _adept()
 	print("REWORK commander")
 	await _commander()
+	await _bandit()
+	print("REWORK upgrades")
+	await _new_upgrades()
+	await _path_upgrades()
+	print("REWORK cartographer")
+	await _cartographer()
+	print("REWORK walls")
+	await _walls_protect()
 	print("REWORK statuses")
 	_statuses()
 	_projectile_lifecycle()
@@ -153,7 +161,7 @@ func _commander() -> void:
 	check(not p.can_use("war_staff") and not p.can_use("musket") and not p.can_use("staff"), "exclusive weapons reject another class")
 	pawn("commander", 0)
 	check(p.weapon_id() == "war_staff" and p.slots[1] == null and not p.can_drop_weapon(), "Warlock has one permanent War Staff")
-	check(not p.can_use("bow") and p.max_hp() < 110.0, "Warlock is fragile and cannot replace its weapon")
+	check(not p.can_use("bow") and p.max_hp() >= float(ClassDefs.ALL["commander"]["hp"]), "Warlock has the Commander's full health and cannot replace its weapon")
 	for i in 5:
 		p._cooldown = 0.0
 		p.input_fire = true
@@ -545,12 +553,25 @@ func _mists() -> void:
 		approaches.append([outside, inside])
 	approaches.append([Vector3(11, 0, 0), Vector3(3, 0, 0)])
 	approaches.append([Vector3(19, 0, 124), Vector3(12, 0, 124)])
-	for approach: Array in approaches:
+	# Each body a Zombie can rise in (the spawn picks one at random): every one of them must get through.
+	var bodies: Array = ZombieDefs.ALL["normal"]["models"]
+	for run in approaches.size() * bodies.size():
+		var approach: Array = approaches[run / bodies.size()]
+		var body: String = bodies[run % bodies.size()]
 		var outside: Vector3 = approach[0]
 		var inside: Vector3 = approach[1]
 		outside.y = mw.ground_at(outside)
-		mw.spawn_zombie("normal", outside)
-		var walker: Zombie = mw.zombies.back()
+		var walker: Zombie = null
+		for attempt in 24:
+			mw.spawn_zombie("normal", outside)
+			var risen: Zombie = mw.zombies.back()
+			if risen.model_id == body:
+				walker = risen
+				break
+			risen.release()
+		if walker == null:
+			check(false, "a Zombie rises as %s" % body)
+			continue
 		walker.set_physics_process(false)
 		walker.state = Zombie.State.CHASE
 		walker._sees = true
@@ -570,7 +591,15 @@ func _mists() -> void:
 				if to.length() < 1.8: break
 				walker._move(mp, to, to.length(), 0.016)
 				await frames(1)
-			check(Vector2(walker.position.x - goal.x, walker.position.z - goal.z).length() < 2.0, "physical mob from %s reaches goal %s (ended %s)" % [outside, goal, walker.position])
+			var reached := Vector2(walker.position.x - goal.x, walker.position.z - goal.z).length() < 2.0
+			var blocker := ""
+			if not reached:
+				# What stopped it, for whoever reads the failure.
+				var ray := PhysicsRayQueryParameters3D.create(walker.centre(), Vector3(goal.x, walker.centre().y, goal.z))
+				ray.exclude = [walker.get_rid()]
+				var hit := mw.get_world_3d().direct_space_state.intersect_ray(ray)
+				blocker = " blocked by %s at %s" % [str((hit["collider"] as Node).get_path()) if hit.has("collider") and hit["collider"] is Node else "nothing", str(hit.get("position", "-"))]
+			check(reached, "physical mob (%s) from %s reaches goal %s (ended %s, blocked %.1f s)%s" % [body, outside, goal, walker.position, walker._blocked_timer, blocker])
 		walker.release()
 	mp.position = Vector3(0, 10.06, 16)
 	check(mw.night_bg.get_luminance() < 0.06 and mw.night_moon <= 0.35 and mw.night_sky_shows, "Mists uses a moonlit night palette with stars")
@@ -588,13 +617,42 @@ func _mists() -> void:
 		var hit := mw.get_world_3d().direct_space_state.intersect_ray(ray)
 		check(hit.get("collider") == enemy, "%s visible face is inside its hittable collider" % kind)
 		enemy.release()
+	# The Fallen Revenant: a Revenant's own body and gear, its claws and its blow, and the Fallen's bar.
+	check(MistModels.BORN.has("fallen_revenant") and not MistModels.KINDS.has("fallen_revenant") and Game.zombie_pool_plan().has("fallen_revenant") and Icons.exists("fallen_revenant"), "the Fallen Revenant is mist-born, with a pool and an icon, but not one of the mist's own models")
+	check(mw.spawn_zombie("fallen_revenant", mp.position + Vector3(0, 0, -1.4)), "a Fallen Revenant can spawn")
+	var fallen: Zombie = mw.zombies.back()
+	fallen.set_physics_process(false)
+	check(not fallen._custom and fallen._skeleton != null and fallen._anim != null and fallen.mist_mind != null, "it has a body with bones and animations, and still the mist's mind")
+	var ghostly := fallen._visual.find_children("*", "MeshInstance3D", true, false).filter(func(mi: MeshInstance3D) -> bool: return mi.material_override == Ally._ghost())
+	var revenant_gear := ClassGear._pieces("revenant").size()
+	check(ghostly.size() >= revenant_gear and revenant_gear > 0, "it wears the Revenant's gear and its ghostly look (%d pieces)" % ghostly.size())
+	check(fallen.weapon_id == "claws" and fallen._hand_mesh != null and float(fallen.def.get("weapon_drop", 1.0)) == 0.0, "it fights with Spectral Claws, and never drops them")
+	check(fallen.named_bar() and not fallen.hero, "it has the Fallen's long bar and name, as the Fallen Heroes do")
+	fallen._flash_on()
+	fallen._restore_materials()
+	check(fallen._parts.all(func(mi: MeshInstance3D) -> bool: return mi.material_override == mi.get_meta("own_material", null)), "after a hit's flash it is a Revenant again, not a zombie's skin")
+	fallen._sees = true
+	fallen._attack_cd = 0.0
+	fallen.mist_mind.cooldown = 99.0
+	var mp_was := mp.global_position
+	mp.global_position = fallen.position + Vector3(0, 0, 1.2)
+	var player_hp := mp.hp
+	fallen.mist_mind.tick(fallen, mp, 0.016)
+	check(fallen._current_anim == BodyAnim.mob_attack("claws") and Net.ANIMS.has(fallen._current_anim) and is_equal_approx(mp.hp, player_hp), "it swings its claws as a Revenant does, and every phone sees the swing (%s)" % fallen._current_anim)
+	fallen.hp = fallen.max_hp - 20.0
+	for i in 30:
+		fallen.mist_mind.tick(fallen, mp, 0.016)
+	check(mp.hp < player_hp and fallen.hp > fallen.max_hp - 20.0, "then the blow lands and drains life (%.0f taken)" % (player_hp - mp.hp))
+	fallen.release()
+	mp.hp = player_hp
+	mp.global_position = mp_was
 	var village_only := true
 	for i in 400:
 		village_only = village_only and not ZombieDefs.ALL[ZombieDefs.pick_roamer(550.0)].get("only_islands", false)
 	check(village_only, "Village roster excludes mist-only enemies")
 	var seen := {}
 	for i in 400:
-		seen[ZombieDefs.pick_roamer(550.0, true)] = true
+		seen[ZombieDefs.pick_roamer(550.0, "mists")] = true
 	check(seen.has("lantern_wisp") and seen.has("mist_weaver") and not seen.has("veil_regent"), "Mists roaming waves include both spirits and exclude the scheduled boss")
 	mw.spawn_zombie("lantern_wisp", mp.position + Vector3.RIGHT * 12)
 	var spirit: Zombie = mw.zombies.back()
@@ -651,6 +709,8 @@ func _mists() -> void:
 	mw.director._tick_mist_boss()
 	mw.director._tick_mist_boss()
 	check(mw.count_type("veil_regent") == 1, "Regent arrives exactly once at its scheduled time")
+	check(mw.director.boss_card == "veil_regent" and mw.director.boss_card_time > 0.0, "with its own entrance card, saying what it says as it comes")
+	check(mw.director.banner.contains("return to the arena") and mw.director.banner_time > mw.director.boss_card_time, "and the warning to come back to the arena waits until the card has gone")
 	var boss: Zombie = mw.zombies.back()
 	boss.set_physics_process(false)
 	boss.freeze(10.0)
@@ -670,7 +730,8 @@ func _mists() -> void:
 	check(mw.count_type("lantern_wisp") == 5, "second-phase reinforcement happens only once")
 	var angels := mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size()
 	boss._die()
-	check(mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size() == angels + 1, "defeating the Regent drops an Angel familiar")
+	check(mw.pickups.filter(func(it: Pickup) -> bool: return it.kind == Pickup.Kind.POWER and it.item_id == "angel").size() == angels, "defeating the Regent drops no Angel familiar")
+	check(mw.director.banner.contains("Veil Regent") and mw.director.banner.contains("It closes behind every one of you"), "the Regent says its last words: %s" % mw.director.banner)
 
 	mp.position = Vector3(0, 10.1, 16)
 	mp.hp = mp.max_hp()
@@ -706,6 +767,35 @@ func _mists() -> void:
 	finale._physics_process(30.0)
 	check(is_instance_valid(finale) and not finale.is_queued_for_deletion(), "finale storms persist rather than expiring after twenty seconds")
 	finale.free()
+	# The night's storms: the next gathers soon after the last ends, and later two rage at once.
+	var d := mw.director
+	var was_elapsed := d.elapsed
+	d._next_storm = MistStorm.FIRST
+	d._storm_index = 0
+	d._storms_last = 0
+	d.elapsed = MistStorm.FIRST
+	d._tick_storms()
+	check(mw.mist_storms.size() == 1 and mw.mist_storms[0].island == 0, "the first storm gathers at %d s, over the arena" % int(MistStorm.FIRST))
+	mw.mist_storms[0].end_now()
+	d.elapsed += MistStorm.WARNING + MistStorm.DURATION
+	d._tick_storms()
+	check(mw.mist_storms.is_empty() and is_equal_approx(d._next_storm, d.elapsed + MistStorm.GAP), "when it ends, the next is due %d s later" % int(MistStorm.GAP))
+	d.elapsed += MistStorm.GAP
+	d._tick_storms()
+	check(mw.mist_storms.size() == 1 and mw.mist_storms[0].island > 0, "and gathers then, over an outer island")
+	d.elapsed += MistStorm.STAGGER + 1.0
+	d._tick_storms()
+	check(mw.mist_storms.size() == 1, "before %d s only one storm rages at a time" % int(MistStorm.TWO_FROM))
+	d.elapsed = MistStorm.TWO_FROM + 1.0
+	d._next_storm = 0.0
+	d._tick_storms()
+	check(mw.mist_storms.size() == 2 and mw.mist_storms[0].island != mw.mist_storms[1].island, "later, a second storm rages at the same time, over another island")
+	mp.position = Vector3(MapIslands.ISLANDS[mw.mist_storms[1].island].x, 0, MapIslands.ISLANDS[mw.mist_storms[1].island].y)
+	check(mw.storm_at(mp.position) == mw.mist_storms[1] and mw.storm_at(Vector3(16, 10, 0)) == null, "each storm covers only its own island")
+	for raging: MistStorm in mw.mist_storms.duplicate():
+		raging.free()
+	check(mw.mist_storms.is_empty(), "storms leave the world's list as they go")
+	d.elapsed = was_elapsed
 	mp.position = Vector3(16, 10.06, 0)
 	mp.hp = mp.max_hp()
 	mp.dead = false
@@ -789,3 +879,640 @@ func _guardian_protection() -> void:
 	Net._dome_fx(p.position + Vector3.UP * 0.5, 6.0, 3.0)
 	check(ally.guarded == 3.0, "a remotely cast Guardian dome protects locally owned summons")
 	w.remove_ally(ally)
+
+
+## 0.22 step 2: the Bandit.
+func _bandit() -> void:
+	var d: Dictionary = ClassDefs.ALL["bandit"]
+	check(d["weapon"] == "dagger" and ClassDefs.price("bandit") == 860 and ClassDefs.for_sale().has("bandit"), "the Bandit starts with a Dagger and is sold in the Store")
+	check(ClassDefs.weapon_categories("bandit") == Array(["melee", "ranged"], TYPE_STRING, "", null), "Bandit wields Melee and Ranged weapons")
+	check(Game.CODES.values().has("bandit"), "a Bandit code exists, kept only as a hash")
+	var specs: Array = AbilityData.tree("bandit")["specs"].map(func(s: Dictionary) -> String: return s["id"])
+	check(specs == ["thief", "mercenary", "highwayman"], "Thief, Mercenary and Highwayman")
+	for id: String in ["crest_bandit", "spec_thief", "spec_mercenary", "spec_highwayman"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for s: String in ["vanish", "steal", "nightfall", "dagger_fan"]:
+		check(Sfx.NAMES.has(s) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % s), "%s sound" % s)
+	# Into the Shadows, before a profession.
+	pawn("bandit")
+	check(p.art_def()["name"] == "Into the Shadows", "the Bandit's own ability is Into the Shadows")
+	p.use_art()
+	check(p._cast_kind == "bandit", "it casts as the Bandit")
+	await frames(10)
+	check(p.invis_left > 3.0, "and turns the Bandit invisible (%.1f)" % p.invis_left)
+	p.invis_left = 0.0
+	p.art_cd_left = 0.0
+	BanditKit.into_shadows(p)
+	check(p.invis_left == 0.0, "but not again within 3 s of coming out")
+	p.invis_lockout = 0.0
+	# Steal: in front of the nearest foe, invisible, a blow, and the weapon on the ground.
+	pawn("bandit", 0)
+	check(p.art_def()["name"] == "Into the Shadows" and p.path_art_def()["name"] == "Steal", "a Thief keeps Into the Shadows and gets Steal on a second button")
+	check(p.has_path_art() and not p.path_art_has_use(), "with nobody near, Steal has nothing to do")
+	w.spawn_zombie("clever", p.global_position + Vector3(0, 0, -10))
+	var victim: Zombie = w.zombies.back()
+	victim.set_physics_process(false)
+	victim.hp = 1000.0
+	victim.max_hp = 1000.0
+	victim.weapon_id = "sword"
+	victim.rotation.y = 0.0
+	check(p.path_art_has_use(), "with a foe in reach, Steal can be used")
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	BanditKit.cast_path(p)
+	check(p.global_position.distance_to(victim.position) < 2.2, "the Thief appears beside its target (%.1f m)" % p.global_position.distance_to(victim.position))
+	var look := -p.global_basis.z
+	check(look.dot((victim.position - p.global_position).normalized()) > 0.8, "facing it")
+	check(p.invis_left > 2.0 and victim.hp < 1000.0, "invisible, and the blow lands")
+	check(victim._attack_cd >= BanditKit.STEAL_FLINCH - 0.01 and not victim._attack_hit_pending, "and the target, caught off guard, cannot strike back at once")
+	p.mods["shadow_time"] = 0.0
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	victim.weapon_id = ""
+	BanditKit.cast_path(p)
+	var hidden_for := p.invis_left
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.mods["shadow_time"] = 2.0
+	BanditKit.cast_path(p)
+	check(is_equal_approx(p.invis_left, hidden_for + 2.0), "Long Shadows keeps a Thief hidden 2 s longer after a Steal (%.1f, was %.1f)" % [p.invis_left, hidden_for])
+	p.mods["shadow_time"] = 0.0
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	check(victim.weapon_id == "" and w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "sword"), "the stolen Sword lies on the ground")
+	victim.weapon_id = "lance"
+	BanditKit.cast_path(p)
+	check(victim.weapon_id == "lance", "a class weapon cannot be stolen")
+	victim.weapon_id = "spear"
+	p.flags["steal_keep"] = true
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.slots = ["dagger", null]
+	BanditKit.cast_path(p)
+	check(p.slots.has("spear") and victim.weapon_id == "", "Fence puts the stolen weapon in the Thief's empty hand")
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	victim.weapon_id = "mace"
+	p.slots = ["dagger", "spear"]
+	p.current = 1
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	BanditKit.cast_path(p)
+	check(p.weapon_id() == "mace" and p.slots.has("dagger") and not p.slots.has("spear"), "with both hands full, Fence swaps the stolen Mace for the Spear held")
+	check(w.pickups.any(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.item_id == "spear"), "and the Spear drops")
+	# Grand Larceny: every armed foe round the target is struck and disarmed too.
+	p.flags.erase("steal_keep")
+	p.flags["steal_all"] = true
+	victim.weapon_id = "sword"
+	var crowd: Array[Zombie] = []
+	for k in 3:
+		w.spawn_zombie("clever", victim.position + Vector3(cos(k * 2.1), 0, sin(k * 2.1)) * 2.5)
+		var other: Zombie = w.zombies.back()
+		other.set_physics_process(false)
+		other.hp = 1000.0
+		other.max_hp = 1000.0
+		other.weapon_id = ["sword", "spear", "mace"][k]
+		crowd.append(other)
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.path_art_cd_left = 0.0
+	BanditKit.cast_path(p)
+	check(victim.weapon_id == "", "Grand Larceny disarms the target")
+	check(crowd.all(func(o: Zombie) -> bool: return o.weapon_id == "" and o.hp < 1000.0), "and strikes and disarms every armed foe within 4 m of it: %s" % str(crowd.map(func(o: Zombie) -> String: return "%s %.0f %.1f m" % [o.weapon_id, o.hp, o.position.distance_to(victim.position)])))
+	for o in crowd: o.release()
+	p.flags.erase("steal_all")
+	victim.release()
+	# Steal goes for nothing when nothing is near.
+	p.path_art_cd_left = 0.0
+	BanditKit.cast_path(p)
+	check(p.path_art_cd_left <= 0.5, "nothing to steal from costs no cooldown")
+	# A robbed player keeps a class weapon or a last weapon, and drops anything else.
+	pawn("ranger")
+	p.slots = ["bow", "sword"]
+	p.current = 1
+	p._equip()
+	BanditKit.be_robbed(p, false)
+	check(p.slots[1] == null and p.weapon_id() == "bow", "a robbed player drops the weapon in hand")
+	BanditKit.be_robbed(p, false)
+	check(p.weapon_id() == "bow", "but never the last one")
+	# Nightfall: friends inside vanish and stay hidden a moment, creatures inside barely see.
+	pawn("bandit", 1)
+	check(p.art_def()["name"] == "Into the Shadows" and p.path_art_def()["name"] == "Nightfall", "a Mercenary keeps Into the Shadows and gets Nightfall")
+	var near := target(p.global_position + Vector3(4, 0, 0))
+	BanditKit.cast_path(p)
+	var dome: NightfallDome = w.find_children("Nightfall", "NightfallDome", false, false).back() if not w.find_children("Nightfall", "NightfallDome", false, false).is_empty() else null
+	check(dome != null and is_equal_approx(dome.radius, BanditKit.NIGHT_RADIUS), "a dome of night rises")
+	await frames(4)
+	check(p.invis_left > 1.0, "the Mercenary inside it is invisible")
+	check(near.blind_left > 0.0 and not near._can_see(p, p.global_position - near.position, 4.0), "a creature inside it cannot see four metres")
+	p.global_position += Vector3(BanditKit.NIGHT_RADIUS + 3.0, 0, 0)
+	await frames(2)
+	check(p.invis_left > 1.0, "and the darkness lingers just after leaving")
+	dome.queue_free()
+	near.release()
+	# The Highwayman's Dagger Fan, and Plunder.
+	pawn("bandit", 2)
+	check(p.art_def()["name"] == "Into the Shadows" and p.path_art_def()["name"] == "Dagger Fan", "a Highwayman keeps Into the Shadows and gets Dagger Fan")
+	var before := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size()
+	BanditKit.dagger_fan(p)
+	var thrown := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() - before
+	check(thrown == BanditKit.FAN_KNIVES, "five knives in a fan (%d)" % thrown)
+	p.mods["shadow_time"] = 0.0
+	p.invis_left = 0.0
+	for q: Projectile in w._projectiles: q.stop()
+	BanditKit.dagger_fan(p)
+	check(p.invis_left <= 0.0, "without Long Shadows a Dagger Fan does not hide the Highwayman")
+	p.mods["shadow_time"] = 2.0
+	p.invis_lockout = 0.0
+	for q: Projectile in w._projectiles: q.stop()
+	BanditKit.dagger_fan(p)
+	check(is_equal_approx(p.invis_left, 2.0), "with Long Shadows it hides the Highwayman for 2 s (%.1f)" % p.invis_left)
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.mods["shadow_time"] = 0.0
+	p.mods["fan_knives"] = 2.0
+	for q: Projectile in w._projectiles: q.stop()
+	BanditKit.dagger_fan(p)
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() == 7, "More Blades adds two")
+	for q: Projectile in w._projectiles: q.stop()
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	p.mods["plunder"] = 1.0
+	var mark := target(p.global_position + Vector3(0, 0, -3))
+	p.on_kill(mark)
+	check(not w.pickups.is_empty() and w.pickups.back().kind in [Pickup.Kind.FOOD, Pickup.Kind.ARROWS, Pickup.Kind.POWER], "Plunder leaves something behind")
+	mark.release()
+
+
+## The Class Upgrades of the Cavalry and the Magician, one for each path.
+func _new_upgrades() -> void:
+	var owned_before: Dictionary = Game.owned_items.duplicate()
+	for id: String in ["lance_charge", "consecration", "wild_hunt", "grave_call", "frost_nova", "hall_of_mirrors"]:
+		Game.owned_items[id] = true
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		check(d["section"] == "upgrades" and d["class"] in ["chivalry", "magician"] and int(d["price"]) >= 240 and int(d["price"]) <= 320, "%s is a Class Upgrade at the usual price" % id)
+		check(Icons.exists(str(d["icon"]).split("+")[0]) and (not d.has("art") or Icons.exists(str(d["art"]["icon"]))), "%s has its icons" % id)
+	check(["lancer", "paladin", "horse_archer", "necromancer", "elementalist", "illusionist"].all(func(spec: String) -> bool:
+		return ShopDefs.ITEMS.values().any(func(i: Dictionary) -> bool: return i.get("spec", "") == spec)), "every Cavalry and Magician path has an upgrade")
+	# Lance Charge: ten metres on, and what is in the way is struck and thrown aside.
+	pawn("chivalry", 0)
+	check(p.art_def()["name"] == "Lance Charge", "a Lancer with the upgrade has Lance Charge")
+	p.rotation.y = 0.0
+	p.yaw = 0.0
+	var start := p.global_position
+	var in_way := target(start + Vector3(0, 0, -4))
+	var aside := target(start + Vector3(6, 0, -4))
+	p.use_art()
+	await frames(150)
+	var went := Vector2(p.global_position.x - start.x, p.global_position.z - start.z).length()
+	check(went > UpgradeKit.CHARGE_REACH * 0.6 and went < UpgradeKit.CHARGE_REACH + 1.5, "Lance Charge carries the Lancer about 10 m (%.1f)" % went)
+	check(in_way.hp < in_way.max_hp - UpgradeKit.CHARGE_DAMAGE * 0.9, "it strikes what is in the way (%.0f)" % (in_way.max_hp - in_way.hp))
+	check(is_equal_approx(aside.hp, aside.max_hp), "and nothing off to the side")
+	check(p.art_cd_left > 10.0, "then rests (%.0f s)" % p.art_cd_left)
+	in_way.release()
+	aside.release()
+	# Consecration: friends heal inside, enemies burn.
+	pawn("chivalry", 1)
+	check(p.art_def()["name"] == "Consecration", "a Paladin with the upgrade has Consecration")
+	var burnt := target(p.global_position + Vector3(3, 0, 0))
+	p.hp = p.max_hp() * 0.5
+	UpgradeKit.consecrate(p)
+	await frames(400)
+	check(p.hp > p.max_hp() * 0.5 + 4.0 and p.status_effects().any(func(e: Dictionary) -> bool: return e["icon"] == "heart+hand"), "the Paladin heals inside it, and the status bar says a friend is mending (%.0f)" % p.hp)
+	check(burnt.burn_time > 0.0, "an enemy inside burns")
+	for c: Node in w.get_children():
+		if c is Consecration:
+			c.queue_free()
+	burnt.release()
+	# Wild Hunt: the horse at once, and the arrows loose themselves at the nearest enemy.
+	check(not ShopDefs.ITEMS.has("whistle") and ShopDefs.ITEMS["wild_hunt"]["spec"] == "horse_archer", "Wild Hunt has taken Whistle's place")
+	var bought := {"whistle": true}
+	Game.migrate_items(bought)
+	check(bought == {"wild_hunt": true}, "whoever bought Whistle has Wild Hunt")
+	pawn("chivalry", 2)
+	p.horse_progress = 0
+	check(p.art_def()["name"] == "Wild Hunt" and not p.horse_ready(), "a Horse Archer with Wild Hunt, and no horse yet")
+	p.rotation.y = 0.0
+	p.yaw = 0.0
+	var prey := target(p.global_position + Vector3(0, 0, -12))
+	var quiver := p.arrows
+	UpgradeKit.wild_hunt(p)
+	check(p.is_riding() and p.hunt_left > 0.0, "Wild Hunt brings the horse at once")
+	await frames(150)
+	check(prey.hp < prey.max_hp, "its arrows find the nearest enemy (%.0f)" % (prey.max_hp - prey.hp))
+	check(p.arrows == quiver, "without spending arrows")
+	await frames(300)
+	check(p.hunt_left <= 0.0, "and the hunt ends after 6 s")
+	prey.release()
+	p.dismount()
+	# Grave Call: the fallen nearby rise.
+	pawn("magician", 0)
+	check(p.art_def()["name"] == "Grave Call", "a Necromancer with the upgrade has Grave Call")
+	p.mana = p.max_mana()
+	p.art_cd_left = 0.0
+	UpgradeKit.grave_call(p)
+	check(p.art_cd_left == 0.0, "with nobody fallen, Grave Call costs nothing")
+	for k in 4:
+		var fallen := target(p.global_position + Vector3(2 + k, 0, 2))
+		fallen.take_damage(100000.0, Vector3.ZERO, 0.0, fallen.centre())
+	await frames(4)
+	var before := w.allies.size()
+	UpgradeKit.grave_call(p)
+	check(w.allies.size() - before == UpgradeKit.GRAVE_RAISED, "three of the four fallen rise as skeletons (%d)" % (w.allies.size() - before))
+	check(UpgradeKit.graves(p).size() == 1, "and those graves are spent")
+	# Frost Nova: everything near freezes.
+	pawn("magician", 1)
+	check(p.art_def()["name"] == "Frost Nova", "an Elementalist with the upgrade has Frost Nova")
+	var cold := target(p.global_position + Vector3(4, 0, 0))
+	var far := target(p.global_position + Vector3(12, 0, 0))
+	UpgradeKit.frost_nova(p)
+	check(cold._stun > 1.5 and cold.hp < cold.max_hp and is_equal_approx(far.hp, far.max_hp), "Frost Nova freezes and hurts what is within 6 m, and nothing further")
+	cold.release()
+	far.release()
+	# Hall of Mirrors: a big hit swaps the Illusionist away, once every 30 s.
+	pawn("magician", 2)
+	check(p.art_def()["name"] == "Mirror Swap", "an Illusionist keeps Mirror Swap on the button")
+	var hp := p.hp
+	var was_at := p.global_position
+	p.hurt(p.max_hp() * 0.5, p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(p.hp, hp) and p.mirror_hall_left > 25.0, "a hit of half its health misses: Hall of Mirrors")
+	check(w.allies.any(func(a: Ally) -> bool: return a.kind == "decoy"), "and a decoy is left behind (moved %.1f m)" % p.global_position.distance_to(was_at))
+	p.guard_left = 0.0
+	p.hurt(p.max_hp() * 0.5, p.global_position + Vector3(0, 0, -1))
+	check(p.hp < hp, "the next one within 30 s lands")
+	p.hp = p.max_hp()
+	p.guard_left = 0.0
+	p.mirror_hall_left = 0.0
+	p.hurt(p.max_hp() * 0.1, p.global_position + Vector3(0, 0, -1))
+	check(p.mirror_hall_left == 0.0, "and a small hit is never swapped away")
+	Game.owned_items = owned_before
+
+
+## The Class Upgrades of the Revenant, the Monk, the Plague Doctor, the Artificer and the Commander.
+func _path_upgrades() -> void:
+	var owned_before: Dictionary = Game.owned_items.duplicate()
+	var ids := ["mist_wake", "torn_rifts", "soul_link", "dragon_spin", "fighting_body", "avalanche", "healing_mist", "plague_censer", "rat_tide",
+		"great_keg", "field_turret", "tesla_coil", "arcane_surge", "grapeshot", "shield_wall"]
+	for id: String in ids:
+		Game.owned_items[id] = true
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		check(d["section"] == "upgrades" and int(d["price"]) >= 260 and int(d["price"]) <= 320, "%s is a Class Upgrade at the usual price (%d)" % [id, int(d["price"])])
+		check(Icons.exists(str(d["icon"]).split("+")[0]) and (str(d["icon"]).split("+").size() < 2 or Icons.exists(str(d["icon"]).split("+")[1])) and (not d.has("art") or Icons.exists(str(d["art"]["icon"]))), "%s has its icons" % id)
+		check(UpgradeShowcase.shows(id), "%s has a scene of its own in the Store" % id)
+	for cls: String in ["revenant", "monk", "plague_doctor", "artificer", "commander"]:
+		for spec: Dictionary in AbilityData.tree(cls)["specs"]:
+			check(ShopDefs.ITEMS.values().filter(func(i: Dictionary) -> bool: return i.get("spec", "") == spec["id"]).size() == 1, "%s's %s path has one Class Upgrade" % [cls, spec["id"]])
+	var names: Array = ids.map(func(id: String) -> String: return ShopDefs.ITEMS[id]["name"])
+	var clashes: Array[String] = []
+	for cls: String in ClassDefs.ALL:
+		for spec: Dictionary in AbilityData.tree(cls).get("specs", []):
+			for row: Array in spec["path"]:
+				for ab: Dictionary in row:
+					if names.has(ab["name"]):
+						clashes.append("%s (%s)" % [ab["name"], cls])
+	check(clashes.is_empty(), "no new upgrade shares its name with an ability: %s" % ", ".join(clashes))
+	# Mist Wake: a pool where the Mist Leaper lands.
+	pawn("revenant", 0)
+	var waded := target(p.global_position + Vector3(1, 0, 0))
+	PathUpgrades.mist_wake(p)
+	await frames(70)
+	check(waded.hp < waded.max_hp and waded._slow > 0.0, "Mist Wake slows and hurts what stands in it (%.0f)" % (waded.max_hp - waded.hp))
+	waded.release()
+	_clear_fields()
+	# Torn Rifts: every enemy the jump went through bursts afterwards.
+	pawn("revenant", 1)
+	var first := target(p.global_position + Vector3(0, 0, -5))
+	var second := target(p.global_position + Vector3(6, 0, -5))
+	p.mana = p.max_mana()
+	p.use_art()
+	await frames(120)
+	var plain := p.m("rift_damage")
+	check(first.max_hp - first.hp > plain + PathUpgrades.TORN_RIFT_DAMAGE * 0.9 and second.max_hp - second.hp > plain + PathUpgrades.TORN_RIFT_DAMAGE * 0.9, "both hopped enemies took the hop and the tear (%.0f, %.0f)" % [first.max_hp - first.hp, second.max_hp - second.hp])
+	first.release()
+	second.release()
+	# Soul Link: a quarter of the hit to the Revenant, and strength back when one is struck down.
+	pawn("revenant", 2)
+	p._summon_revenants()
+	var called: Ally = w.allies.filter(func(a: Ally) -> bool: return a.kind == "revenant" and not a.dead).back()
+	var ally_hp := called.hp
+	var hp := p.hp
+	p.hurt(40.0, p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(hp - p.hp, 40.0 * p.m("damage_taken") * (1.0 - PathUpgrades.SOUL_LINK_SHARE)) and called.hp < ally_hp, "Soul Link: the Revenant takes a quarter of the hit (%.1f to you, %.1f to it)" % [hp - p.hp, ally_hp - called.hp])
+	hp = p.hp
+	called.hurt(10000.0, called.global_position)
+	check(is_equal_approx(p.hp, minf(p.max_hp(), hp + PathUpgrades.SOUL_LINK_HEAL)), "and its fall heals 20")
+	# Dragon Spin: three blows round the Bo Master after the vault.
+	pawn("monk", 0)
+	var spun := target(p.global_position + Vector3(2, 0, 0))
+	PathUpgrades.dragon_spin(p)
+	await frames(110)
+	check(p.spin_hits == PathUpgrades.DRAGON_SPIN_HITS and spun.max_hp - spun.hp >= PathUpgrades.DRAGON_SPIN_DAMAGE * 3 * 0.9, "Dragon Spin strikes three times (%.0f)" % (spun.max_hp - spun.hp))
+	spun.release()
+	# Fighting Body: the body left behind strikes and holds.
+	pawn("monk", 1)
+	var close := target(p.global_position + Vector3(1.5, 0, 0))
+	p._leave_body()
+	await frames(80)
+	check(close.max_hp - close.hp >= PathUpgrades.FIGHTING_BODY_DAMAGE * 0.9, "the body strikes what is close (%.0f)" % (close.max_hp - close.hp))
+	var body: Ally = w.allies.filter(func(a: Ally) -> bool: return a.kind == "body" and not a.dead).back()
+	var body_hp := body.hp
+	body.hurt(100.0, body.global_position)
+	check(is_equal_approx(body_hp - body.hp, 100.0 * (1.0 - PathUpgrades.FIGHTING_BODY_GUARD)), "and takes 30%% less (%.0f of 100)" % (body_hp - body.hp))
+	p._come_back()
+	close.release()
+	# Avalanche: a second ring, twice as far, a moment later.
+	pawn("monk", 2)
+	p.stone_skin = Player.SKIN_MAX
+	var distant := target(p.global_position + Vector3(12, 0, 0))
+	p._mountain_stomp()
+	check(is_equal_approx(distant.hp, distant.max_hp), "the stomp itself does not reach 12 m")
+	await frames(60)
+	check(distant.hp < distant.max_hp and distant._stun > 1.0, "the Avalanche does, and stuns")
+	distant.release()
+	# Healing Mist: friends mend and are cured inside it.
+	pawn("plague_doctor", 0)
+	p.hp = p.max_hp() * 0.5
+	p.poison_left = 4.0
+	p.burn_time = 3.0
+	PathUpgrades.healing_mist(p)
+	await frames(70)
+	check(p.hp > p.max_hp() * 0.5 + PathUpgrades.HEALING_MIST_HEAL * 0.7 and p.poison_left == 0.0 and p.burn_time == 0.0, "Healing Mist mends and cures (%.0f)" % p.hp)
+	_clear_fields()
+	# Plague Censer: the cloud follows, and sickens what is in it.
+	pawn("plague_doctor", 1)
+	check(p.art_def()["name"] == "Plague Censer", "a Pestilence with the upgrade has the Plague Censer")
+	var sick := target(p.global_position + Vector3(3, 0, 0))
+	p.use_art()
+	await frames(60)
+	check(sick.poison_left > 0.0 and sick._slow > 0.0, "what is within 5 m is poisoned and slowed")
+	var cloud: PathField = w.get_children().filter(func(n: Node) -> bool: return n is PathField and n.kind == "censer").back()
+	p.global_position += Vector3(4, 0, 0)
+	await frames(20)
+	check(cloud.position.distance_to(p.global_position) < 0.5, "and the cloud goes where the Plague Doctor goes")
+	sick.release()
+	_clear_fields()
+	# Rat Tide: everything in the line is bowled over, nothing beside it.
+	pawn("plague_doctor", 2)
+	check(p.art_def()["name"] == "Rat Tide", "a Rat King with the upgrade has the Rat Tide")
+	p.rotation.y = 0.0
+	p.yaw = 0.0
+	var bowled := target(p.global_position + Vector3(0, 0, -6))
+	var beside := target(p.global_position + Vector3(5, 0, -6))
+	PathUpgrades.rat_tide(p)
+	check(bowled.hp < bowled.max_hp and bowled._stun > 0.0 and is_equal_approx(beside.hp, beside.max_hp), "the tide strikes what is ahead, and not what is beside it")
+	check(PathUpgrades.RAT_TIDE_DAMAGE == 30.0 and bowled.poison_left >= PathUpgrades.RAT_TIDE_POISON.y - 0.01 and beside.poison_left <= 0.0, "Rat Tide hits for 30 and poisons what it bites (%.1f s)" % bowled.poison_left)
+	check(w.get_children().any(func(n: Node) -> bool: return n is RatTide), "and the rats are seen running")
+	bowled.release()
+	beside.release()
+	# Great Keg: every fourth bomb.
+	pawn("artificer", 0)
+	var kegs := 0
+	for k in 8:
+		if PathUpgrades.next_is_keg(p):
+			kegs += 1
+	check(kegs == 2, "every fourth bomb is a Great Keg")
+	var outside := target(p.global_position + Vector3(p.m("bomb_radius") * 1.6, 0, 0))
+	p.bomb_burst(p.global_position + Vector3.UP * 0.5, PathUpgrades.GREAT_KEG_POWER)
+	check(outside.hp < outside.max_hp, "and a keg reaches twice as far")
+	outside.release()
+	# Field Turret: a sentry, from the ability button.
+	pawn("artificer", 1)
+	check(p.art_def()["name"] == "Field Turret", "a Mechanic with the upgrade has the Field Turret")
+	var sentries: int = w._sentries.size()
+	PathUpgrades.field_turret(p)
+	check(w._sentries.size() == sentries + 1 and is_equal_approx(float(w._sentries.back()["left"]), PathUpgrades.FIELD_TURRET_TIME), "it sets down a sentry for 20 s")
+	# Tesla Coil: the first invention, and it strikes the four nearest.
+	pawn("artificer", 2)
+	check(p._next_invention == "tesla" and p._inventions().has("tesla"), "the Inventor's first invention is the Tesla Coil")
+	var shocked: Array[Zombie] = []
+	for k in 5:
+		shocked.append(target(p.global_position + Vector3(2 + k, 0, 2)))
+	PathUpgrades.tesla_coil(p)
+	await frames(40)
+	var struck := shocked.filter(func(z: Zombie) -> bool: return z.hp < z.max_hp).size()
+	check(struck == PathUpgrades.TESLA_TARGETS, "the coil strikes the 4 nearest of 5 (%d)" % struck)
+	for z in shocked:
+		z.release()
+	_clear_fields()
+	# The Commander's three.
+	pawn("commander", 0)
+	check(PathUpgrades.bolt_every(p) == PathUpgrades.ARCANE_SURGE_EVERY, "Arcane Surge: a bolt every third attack")
+	pawn("commander", 1)
+	var shots: Array[bool] = []
+	var loaded: Array[int] = []
+	p.toast = ""
+	p.grapeshot_flash = 0.0
+	for k in 4:
+		loaded.append(PathUpgrades.grapeshot_in(p))
+		shots.append(PathUpgrades.grapeshot(p, p.eye_position(), -p.global_basis.z, WeaponDefs.ALL["musket"]))
+	check(shots == Array([false, false, false, true], TYPE_BOOL, "", null), "Grapeshot: every fourth musket shot")
+	check(loaded == Array([3, 2, 1, 0], TYPE_INT, "", null), "the HUD's marks count down to it: %s" % str(loaded))
+	check(p.toast == "" and p.grapeshot_flash == 1.0, "it goes off with no word on the screen, only the burst round the crosshair (toast '%s')" % p.toast)
+	var pellets := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.mesh == w._shot_mesh("pellet"))
+	check(pellets.size() == PathUpgrades.GRAPESHOT_PELLETS, "its pellets fly as glowing iron, not as musket balls (%d)" % pellets.size())
+	pawn("commander", 2)
+	CommanderKit.cast(p)
+	check(is_equal_approx(p.ward_hp, PathUpgrades.SHIELD_WALL_AMOUNT) and p.status_effects().any(func(e: Dictionary) -> bool: return str(e["icon"]).begins_with("shield_round")), "Command raises a Shield Wall, and the status bar shows it")
+	hp = p.hp
+	p.hurt(30.0 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(p.hp, hp), "it stops a hit")
+	p.hurt(30.0 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	check(is_equal_approx(hp - p.hp, 20.0), "until its 40 are spent (%.1f got through)" % (hp - p.hp))
+	Game.owned_items = owned_before
+
+
+func _clear_fields() -> void:
+	for n: Node in w.get_children():
+		if n is PathField or n is RatTide:
+			n.queue_free()
+
+
+## Beacons straight in front of the Cartographer, at the given offsets, each faced north.
+func plant_at(spots: Array) -> SurveyNet:
+	var start := p.global_position
+	for spot: Vector3 in spots:
+		p.global_position = Vector3(start.x + spot.x, w.ground_at(start + spot) + 0.05, start.z + spot.z + CartographerKit.PLANT_AHEAD)
+		p.yaw = 0.0
+		p.rotation.y = 0.0
+		CartographerKit.cast(p)
+	p.global_position = start
+	return w.surveys.get(p.net_id())
+
+
+func _cartographer() -> void:
+	var d: Dictionary = ClassDefs.ALL["cartographer"]
+	check(d["weapon"] == "spear" and ClassDefs.price("cartographer") == 0 and not ClassDefs.for_sale().has("cartographer") and d.get("earned", "") == "beyond", "the Cartographer starts with a Spear and is earned beyond the Mists, not bought")
+	check(ClassDefs.weapon_categories("cartographer") == Array(["melee", "ranged", "exclusive"], TYPE_STRING, "", null), "Cartographer wields Melee and Ranged weapons, and the Pathfinder's own")
+	check(Game.CODES.values().has("cartographer"), "a Cartographer code exists, kept only as a hash")
+	var specs: Array = AbilityData.tree("cartographer")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["star_reader", "worlds_traveler", "pathfinder"], "Star Reader, Worlds Traveler and Pathfinder")
+	for id: String in ["crest_cartographer", "spec_star_reader", "spec_worlds_traveler", "spec_pathfinder", "beacon", "link", "waygate", "machete", "bolas", "lantern", "compass"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_throw", "bolas_wrap"]:
+		check(Sfx.NAMES.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# Linked beacons: speed near one, mending on a line, marks near one, and only three at a time.
+	pawn("cartographer")
+	check(p.art_def()["name"] == "Plant Beacon", "the Cartographer's ability is Plant Beacon")
+	p.use_art()
+	check(p._cast_kind == "cartographer", "it casts as the Cartographer")
+	await frames(90)
+	var survey: SurveyNet = w.surveys.get(p.net_id())
+	check(survey != null and survey.beacons.size() == 1, "a beacon stands in front of the Cartographer")
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	await frames(1)
+	survey = plant_at([Vector3(0, 0, 0), Vector3(12, 0, 0), Vector3(6, 0, -10)])
+	check(survey.beacons.size() == 3 and survey.links().size() == 3, "three beacons, all linked")
+	var a: Vector3 = survey.beacons[0]["at"]
+	var b: Vector3 = survey.beacons[1]["at"]
+	p.global_position = Vector3(a.x + 1.0, w.ground_at(a) + 0.05, a.z + 1.0)
+	await frames(4)
+	check(p._buffs.has("beacon_speed"), "near a beacon a friend runs faster")
+	var mid := (a + b) * 0.5
+	p.global_position = Vector3(mid.x, w.ground_at(mid) + 0.05, mid.z)
+	p.hp = 50.0
+	await frames(60)
+	check(p.hp > 50.0, "on the line between two beacons a friend mends (%.1f)" % p.hp)
+	var watched := target(a + Vector3(3, 0, 3))
+	await frames(80)
+	check(watched.reveal_left > 0.0, "an enemy near a beacon is marked")
+	watched.release()
+	plant_at([Vector3(30, 0, 30)])
+	check(survey.beacons.size() == 3 and survey.beacons[0]["at"] == b, "a fourth beacon pulls up the oldest")
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	# Star Reader: a constellation strengthens friends inside and strikes creatures with starlight.
+	pawn("cartographer", 0)
+	check(p.art_def()["name"] == "Set a Star Stone", "Star Reader sets Star Stones")
+	survey = plant_at([Vector3(-8, 0, 0), Vector3(8, 0, 0), Vector3(0, 0, -14)])
+	check(survey.kind() == "stars" and survey.triangles().size() == 1, "three linked stones hold a constellation")
+	var inside: Vector3 = (Vector3(survey.beacons[0]["at"]) + survey.beacons[1]["at"] + survey.beacons[2]["at"]) / 3.0
+	check(survey.in_constellation(inside) and not survey.in_constellation(inside + Vector3(0, 0, 30)), "and it covers the space between them")
+	p.global_position = Vector3(inside.x, w.ground_at(inside) + 0.05, inside.z)
+	var under := target(inside + Vector3(1.5, 0, 0))
+	await frames(4)
+	check(p._buffs.has("stars_melee_damage") and is_equal_approx(p.m("melee_damage"), 1.0 + CartographerKit.STAR_BONUS), "friends inside deal 20% more damage")
+	var hp0 := under.hp
+	await frames(int(SurveyNet.STAR_EVERY * 240) + 30)
+	check(under.hp < hp0, "starlight strikes creatures inside (%.0f)" % (hp0 - under.hp))
+	under.release()
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	# Worlds Traveler: step into one gate and out of the next.
+	pawn("cartographer", 1)
+	check(p.art_def()["name"] == "Raise a Waygate", "Worlds Traveler raises Waygates")
+	survey = plant_at([Vector3(0, 0, 0), Vector3(16, 0, 0)])
+	var gate_a: Vector3 = survey.beacons[0]["at"]
+	var gate_b: Vector3 = survey.beacons[1]["at"]
+	p.gate_rest_left = 0.0
+	p.global_position = Vector3(gate_a.x, w.ground_at(gate_a) + 0.05, gate_a.z)
+	await frames(3)
+	check(SurveyNet._flat(p.global_position, gate_b) < 2.5, "stepping into a Waygate comes out of the next (%.1f m)" % SurveyNet._flat(p.global_position, gate_b))
+	check(p._buffs.has("gate_speed") and p.gate_rest_left > 2.0, "with a burst of speed, and a rest before the next passage")
+	var rested := p.global_position
+	p.global_position = Vector3(gate_b.x, w.ground_at(gate_b) + 0.05, gate_b.z)
+	await frames(3)
+	check(SurveyNet._flat(p.global_position, gate_b) < 0.5, "not again until the rest is over")
+	# Learning Veiled Passage and Rift Road works on the gates already standing.
+	check(not survey.has("gate_hide") and not survey.has("rift_road"), "these gates were raised before Veiled Passage and Rift Road")
+	p.flags["gate_hide"] = true
+	p.flags["rift_road"] = true
+	CartographerKit.retune(p)
+	check(survey.has("gate_hide") and survey.has("rift_road") and survey.beacons.size() == 2, "learning them reaches the gates already raised")
+	p.gate_rest_left = 0.0
+	p.invis_left = 0.0
+	p.invis_lockout = 0.0
+	p.global_position = Vector3(gate_a.x, w.ground_at(gate_a) + 0.05, gate_a.z)
+	await frames(3)
+	check(SurveyNet._flat(p.global_position, gate_b) < 2.5 and p.invis_left > 1.5, "Veiled Passage hides you coming out of an old gate (%.1f s)" % p.invis_left)
+	p.global_position = gate_b + Vector3(30, 0, 0)
+	var walker := target(gate_a + Vector3(0.6, 0, 0))
+	await frames(3)
+	check(SurveyNet._flat(walker.position, gate_b) < 2.5 and walker._stun > 0.0, "and Rift Road throws a creature walking into it out of the far gate, stunned")
+	walker.release()
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	# Pathfinder: new ground unearths finds only a Pathfinder can use.
+	pawn("cartographer", 2)
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	survey = plant_at([Vector3(0, 0, 0)])
+	var finds := w.pickups.filter(func(i: Pickup) -> bool: return i.item_id in CartographerKit.FINDS)
+	check(finds.size() == 1 and p.find_rest_left > 25.0, "a Pathfinder's beacon unearths a find, then rests")
+	plant_at([Vector3(20, 0, 0)])
+	check(w.pickups.filter(func(i: Pickup) -> bool: return i.item_id in CartographerKit.FINDS).size() == 1, "not again before the rest is over")
+	check(p.can_use("machete") and p.can_use("bolas"), "the Pathfinder can wield the Machete and the Bolas")
+	pawn("cartographer", 0)
+	check(not p.can_use("machete") and not p.can_use("bolas"), "another Cartographer cannot")
+	pawn("infantry")
+	check(not p.can_use("machete"), "nor any other class")
+	check(not WeaponDefs.lies_around("machete") and not WeaponDefs.lies_around("bolas") and not PowerDefs.pick_potion() == "lantern", "finds are never ordinary loot")
+	check(WeaponDefs.category("machete") == "exclusive" and WeaponDefs.category("bolas") == "exclusive", "the Codex calls them Exclusive Weapons")
+	pawn("cartographer", 2)
+	var pace := p.m("speed")
+	p.activate_power("lantern")
+	check(p.has_power("lantern") and (p._light == null or p._light.omni_range > 17.0), "the Wayfinder's Lantern lights the way")
+	check(is_equal_approx(CartographerKit.LANTERN_SPEED, 1.15) and is_equal_approx(p.m("speed"), pace), "and quickens the step through movement, not a skill bonus")
+	for left: SurveyNet in w.surveys.values():
+		if is_instance_valid(left):
+			left.queue_free()
+	w.surveys.clear()
+
+
+## A wall between a shot and a body protects the body: an arrow flying along a wall does not graze a
+## creature on its far side, and a thrown axe coming back through a wall strikes nothing behind it.
+func _walls_protect() -> void:
+	pawn("ranger")
+	var base := Vector3(30, 0, -30)
+	base.y = w.ground_at(base)
+	# A wall 6 m long running along Z, 0.3 m thick, 3 m tall.
+	w.add_solid(base + Vector3(0, 1.5, 0), Vector3(0.3, 3.0, 6.0))
+	await frames(2)
+	var behind := target(base + Vector3(0.55, 0, 0))
+	var hp0 := behind.hp
+	# An arrow flying along the near face of the wall, 0.3 m from it.
+	p.global_position = base + Vector3(-0.45, 0, 6.0)
+	w.spawn_player_arrow(p, base + Vector3(-0.45, 1.0, 3.5), Vector3(0, 0, -40), 0.0, 20.0, 1.0, 30.0)
+	await frames(20)
+	check(is_equal_approx(behind.hp, hp0), "an arrow along a wall does not hit a creature behind it (%.0f)" % (hp0 - behind.hp))
+	# Without the wall the same shot grazes it.
+	var open := target(base + Vector3(-0.45 + 0.55, 0, -12.0))
+	var open_hp := open.hp
+	w.spawn_player_arrow(p, base + Vector3(-0.45, 1.0, -8.5), Vector3(0, 0, -40), 0.0, 20.0, 1.0, 30.0)
+	await frames(20)
+	check(open.hp < open_hp, "while in the open the same shot grazes it (%.0f)" % (open_hp - open.hp))
+	open.release()
+	# A thrown axe coming back through the wall.
+	hp0 = behind.hp
+	p.global_position = base + Vector3(-4.0, 0, 0)
+	w.spawn_axe(p, base + Vector3(-3.5, 1.4, 0.0), Vector3(-30, 0, 0), 8.0, 1.0, 30.0)
+	await frames(10)
+	p.global_position = base + Vector3(4.0, 0, 0)
+	await frames(40)
+	check(is_equal_approx(behind.hp, hp0), "an axe flying back through a wall does not strike what is behind it (%.0f)" % (hp0 - behind.hp))
+	behind.release()
+	# A window: seen and shot through, but no blade reaches through it and nobody jumps at it.
+	var panes := w._windows.get_children()
+	check(not panes.is_empty(), "the houses' windows are filled in (%d)" % panes.size())
+	if panes.is_empty():
+		return
+	var pane := panes[0] as CollisionShape3D
+	var size := (pane.shape as BoxShape3D).size
+	var normal := pane.transform.basis * (Vector3.RIGHT if size.x < size.z else Vector3.BACK)
+	normal = Vector3(normal.x, 0, normal.z).normalized()
+	var sill := pane.transform.origin
+	var near := sill + normal * 1.0
+	near.y = w.ground_at(near)
+	var far := sill - normal * 1.1
+	far.y = w.ground_at(far)
+	pawn("infantry")
+	p.global_position = near
+	var look := far - near
+	p.yaw = atan2(-look.x, -look.z)
+	p.rotation.y = p.yaw
+	p.pitch = -0.15
+	p.head.rotation.x = p.pitch
+	var outside := target(far)
+	await frames(2)
+	check(w.has_line_of_sight(p.eye_position(), outside.centre()), "a creature outside a window can be seen")
+	var sword := WeaponDefs.ALL["sword"]
+	var landed := w.melee_hit(p, sword, p.melee_stats(sword))
+	check(landed == 0, "but a sword swung through the window does not reach it")
+	check(not p._should_auto_jump(look.normalized()), "and walking up to a window never jumps at it")
+	outside.release()

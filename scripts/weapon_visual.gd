@@ -48,6 +48,20 @@ func equip(id: String, view_model := false) -> void:
 	set_process(chain != null or arrow != null)
 
 
+## Into a body's hand: sized for a body scaled by `fit`, turned the way the hand holds it, and (for
+## the long weapons) laid along where `owner_body` faces. The night's other players and the Store's
+## demonstrations hold weapons the same way.
+func arm(id: String, fit: float, owner_body: Node3D) -> void:
+	equip(id)
+	if id == "" or not WeaponDefs.ALL.has(id):
+		return
+	var d: Dictionary = WeaponDefs.ALL[id]
+	scale = Vector3.ONE * float(d["scale"]) * (0.8 if d["kind"] == WeaponDefs.Kind.RANGED or d.get("swing", "") == "thrust" else 1.6) / fit
+	rotation = WeaponDefs.hand_rotation(id)
+	if id in WeaponDefs.ALIGNED_HELD:
+		hold(owner_body, false, WeaponDefs.held_size(id))
+
+
 func attack() -> void:
 	swing_left = 0.6
 	reload_left = float(WeaponDefs.ALL.get(weapon, {}).get("rate", 0.5))

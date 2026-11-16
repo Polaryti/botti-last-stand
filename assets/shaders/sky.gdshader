@@ -7,6 +7,7 @@ uniform vec3 sun_dir = vec3(0.0, -0.2, -1.0);
 uniform float cloud = 0.0; // how overcast it is
 uniform float flash = 0.0; // lightning
 uniform vec3 tint = vec3(1.0); // the Mists are teal
+uniform float dusk = 0.0; // Mesenlla: a luminous twilight, still glowing where the sun went down
 
 varying vec3 dir;
 
@@ -20,6 +21,17 @@ void fragment() {
 	vec3 night_top = vec3(0.012, 0.022, 0.06);
 	vec3 night_low = vec3(0.05, 0.08, 0.135);
 	vec3 night = mix(night_low, night_top, pow(max(h, 0.0), 0.5)) * tint;
+	if (dusk > 0.0) {
+		// Indigo overhead, violet in the middle, rose and amber along the horizon, brightest in the west.
+		vec3 west = normalize(vec3(-0.9, 0.0, 0.35));
+		float glow_side = 0.55 + 0.45 * max(dot(normalize(vec3(d.x, 0.0, d.z)), west), 0.0);
+		vec3 top = vec3(0.05, 0.05, 0.16);
+		vec3 mid = vec3(0.24, 0.15, 0.34);
+		vec3 low = mix(vec3(0.42, 0.24, 0.38), vec3(0.98, 0.58, 0.36), glow_side);
+		vec3 twilight = mix(low, mid, smoothstep(0.0, 0.22, h));
+		twilight = mix(twilight, top, smoothstep(0.18, 0.75, h));
+		night = mix(night, twilight, dusk);
+	}
 	vec3 day_top = vec3(0.28, 0.44, 0.68);
 	vec3 day_mid = vec3(0.74, 0.62, 0.62);
 	vec3 day_low = vec3(1.0, 0.62, 0.34);

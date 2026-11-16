@@ -15,6 +15,7 @@ var args_soak := false
 var _their_count := -1
 var _their_positions := PackedVector3Array()
 var _step := -1
+var _told := ""
 
 
 func ok(cond: bool, what: String) -> void:
@@ -28,6 +29,12 @@ func ok(cond: bool, what: String) -> void:
 
 func wait(t: float) -> void:
 	await get_tree().create_timer(t).timeout
+
+
+## A word from the other phone, for what both should agree on.
+@rpc("any_peer", "reliable", "call_remote")
+func told(text: String) -> void:
+	_told = text
 
 
 ## Both sides meet at each numbered step, so the test reads as one story.
@@ -83,11 +90,17 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer", "commander"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer"]:
 		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await wait(0.3)
+	if rules == "spectate":
+		if host:
+			await _spectate_host()
+		else:
+			await _spectate_client()
+		return
 	if host:
 		await _as_host()
 	else:
@@ -110,7 +123,13 @@ func _as_host() -> void:
 	if rules == "mists":
 		Net.set_night_map("mists")
 		ok(true, "the host picks the Mists")
-	Net.set_rules({"commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	if rules == "mesenlla":
+		Net.set_night_map("mesenlla")
+		ok(Net.night_map == "mesenlla", "the host picks the Valleys of Mesenlla")
+	if rules == "bastion":
+		Net.set_fort_map("bastion")
+		ok(Net.fort_map == "bastion", "the host picks Mist Bastion")
+	Net.set_rules({"bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -126,7 +145,7 @@ func _as_host() -> void:
 		Net.set_bots(2)
 	if rules == "room":
 		Net.set_bots(1)
-	if rules == "teams":
+	if rules == "teams" or rules == "bandit":
 		# Put the two on opposite teams.
 		Net.roster[1]["team"] = 0
 		for p: int in Net.roster:
@@ -151,7 +170,7 @@ func _as_host() -> void:
 	await wait(0.1)
 	Net.set_rules(chosen)
 	await wait(0.2)
-	if rules == "teams":
+	if rules == "teams" or rules == "bandit":
 		Net.roster[1]["team"] = 0
 		for p: int in Net.roster:
 			if p != 1:
@@ -188,12 +207,16 @@ func _as_client() -> void:
 	_press("Infantry")
 	if rules == "commander":
 		Net.set_my_class("commander")
+	if rules == "bandit":
+		Net.set_my_class("bandit")
+	if rules == "cartographer":
+		Net.set_my_class("cartographer")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == ("commander" if rules == "commander" else "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -250,6 +273,14 @@ func _play() -> void:
 		await _mists()
 	elif rules == "commander":
 		await _commander()
+	elif rules == "bandit":
+		await _bandit()
+	elif rules == "cartographer":
+		await _cartographer()
+	elif rules == "mesenlla":
+		await _mesenlla()
+	elif rules == "bastion":
+		await _bastion()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -322,6 +353,8 @@ func _mists() -> void:
 		(w.zombies.back() as Zombie).set_physics_process(false)
 	await until(func() -> bool: return w.count_type("veil_regent") == 1, 4.0)
 	ok(w.count_type("veil_regent") == 1, "one scheduled Veil Regent appears on both phones")
+	await until(func() -> bool: return w.director.boss_card == "veil_regent", 2.0)
+	ok(w.director.boss_card == "veil_regent", "and both see its entrance card")
 	await until(func() -> bool: return w.mist_storm != null and w.mist_storm.finale, 4.0)
 	ok(w.mist_storm != null and w.mist_storm.finale and w.mist_storm.contains(Vector3(0, 40, -122)) and not w.mist_storm.contains(Vector3(16, 10, 0)), "boss arrival replicates outer-island storms with a safe arena")
 	await sync(19)
@@ -843,9 +876,17 @@ func _coop() -> void:
 		w.drop_weapon(Vector3(6, 0, 12), "sword")
 	await wait(0.5)
 	await sync(13)
+	# The sword goes to the host and comes back; on a busy machine that can take a few frames longer.
+	for i in 30:
+		if not w.pickups.is_empty():
+			break
+		await wait(0.1)
 	for it: Pickup in w.pickups:
 		print("  on the ground: ", it.display_name(), " id ", it.net_id, " at ", it.global_position)
 	ok(w.pickups.size() == 1 and w.pickups[0].weapon_id == "sword", "a dropped weapon reaches both phones")
+	# The host clears the sword away next, so it waits for this phone to have looked: whoever reaches a
+	# meeting point first leaves it a little later, and the host's clearing could beat the look.
+	await _looked("sword")
 	# Effects a player puts on a zombie reach the host.
 	if host:
 		for it: Pickup in w.pickups.duplicate():
@@ -865,7 +906,8 @@ func _coop() -> void:
 		ok(w.zombies[0].burn_time > 0.0, "so does setting it on fire")
 		ok(w.zombies[0].state == Zombie.State.INVESTIGATE or w.zombies[0]._has_goal, "and so does noise")
 	else:
-		ok(w.zombies[0].burn_time > 0.0, "and I can see it burning")
+		ok(not w.zombies.is_empty() and w.zombies[0].burn_time > 0.0, "and I can see it burning")
+	await _looked("burning")
 	await _clear_zombies_on_host()
 	# A summon is seen by the others, and enemies on the host can hurt it.
 	await sync(40)
@@ -1272,7 +1314,366 @@ func _commander() -> void:
 	await sync(108)
 
 
+## A Bandit on the other phone, on the other team: Steal robs this player, a last weapon stays,
+## Nightfall hides the Mercenary and darkens this player's view, and a Dagger Fan reaches them.
+func _bandit() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		for it: Pickup in w.pickups.duplicate():
+			w.remove_pickup(it)
+	var spot := Vector3(-1.5 if host else 1.5, 0, 36)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.input_fire = false
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	await wait(0.6)
+	await sync(200)
+	if host:
+		ok(Net.bots_foes(Net.my_id(), _other()), "the Bandit's phone is on the other team")
+		pl.slots = ["sword", "mace"]
+		pl.current = 0
+		pl._equip()
+	else:
+		ok(pl.class_id == "bandit" and ClassDefs.ALL["bandit"]["weapon"] == "dagger", "the client plays a Bandit, who starts with a Dagger")
+		# Whatever it picked up on the way in, the Thief goes in with a Dagger and a free hand.
+		pl.slots = ["dagger", null]
+		pl.current = 0
+		pl._equip()
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 0)
+		ok(pl.spec_id == "thief" and pl.path_art_def()["name"] == "Steal", "and becomes a Thief")
+	await wait(0.6)
+	await sync(201)
+	var hp_before := pl.hp
+	if not host:
+		ok(BanditKit.steal_target(pl) == _avatar(), "Steal goes for the other player")
+		pl.path_art_cd_left = 0.0
+		pl.use_path_art()
+	await wait(1.0)
+	await sync(202)
+	if host:
+		ok(pl.hp < hp_before, "the Thief's blow lands on this phone (%.0f)" % pl.hp)
+		ok(pl.weapon_id() == "mace" and not pl.slots.has("sword"), "and the Sword is knocked out of this player's hand")
+		ok(_avatar().is_unseen(), "the Thief is invisible to this player")
+	else:
+		ok(pl.global_position.distance_to(_avatar().global_position) < 2.5, "the Thief appears beside the other player (%.1f m)" % pl.global_position.distance_to(_avatar().global_position))
+		ok(pl.invis_left > 0.0, "and turns invisible")
+		# The Sword fell at the Thief's feet, and a free hand picks it up.
+		ok(pl.slots.has("sword"), "the Thief walks off with the other player's Sword")
+		pl.path_art_cd_left = 0.0
+		pl.use_path_art()
+	await wait(1.0)
+	await sync(203)
+	if host:
+		ok(pl.weapon_id() == "mace", "a last weapon is never stolen")
+	# Nightfall: the Mercenary vanishes inside; the other team's player inside barely sees.
+	if not host:
+		pl.spec_id = "mercenary"
+		pl.invis_left = 0.0
+		pl.invis_lockout = 0.0
+		pl.path_art_cd_left = 0.0
+		ok(pl.path_art_def()["name"] == "Nightfall", "a Mercenary casts Nightfall")
+		pl.use_path_art()
+	await wait(1.0)
+	await sync(204)
+	ok(w.get_children().filter(func(n: Node) -> bool: return n is NightfallDome).size() == 1, "the dome of night is on both phones")
+	if host:
+		ok(pl.night_blind_left > 0.0, "this player, inside an enemy dome, is Benighted")
+		ok(pl.invis_left <= 0.0, "and is not hidden by it")
+		ok(_avatar().is_unseen(), "the Mercenary inside cannot be seen")
+	else:
+		ok(pl.invis_left > 0.0 and pl.night_blind_left <= 0.0, "the Mercenary is hidden, not darkened")
+	await sync(205)
+	# A Highwayman's Dagger Fan, from 6 m away.
+	if host:
+		pl.guard_left = 0.0
+	hp_before = pl.hp
+	if not host:
+		pl.spec_id = "highwayman"
+		pl.path_art_cd_left = 0.0
+		var them := _avatar().global_position
+		pl.global_position = them + Vector3(6, 0, 0)
+		var to := them - pl.global_position
+		pl.yaw = atan2(-to.x, -to.z)
+		pl.rotation.y = pl.yaw
+		pl.pitch = 0.0
+		pl.head.rotation.x = 0.0
+		await wait(0.2)
+		ok(pl.path_art_def()["name"] == "Dagger Fan", "a Highwayman throws a Dagger Fan")
+		pl.use_path_art()
+	await wait(1.2)
+	await sync(206)
+	if host:
+		ok(pl.hp < hp_before, "the fan's knives reach this phone (%.0f)" % pl.hp)
+	await sync(207)
+	# Grand Larceny from this phone's Thief on the host's armed creatures: the host disarms them for
+	# real, and their weapons lie on the ground on both phones.
+	var den := Vector3(-30, 0, 60)
+	if host:
+		pl.global_position = Vector3(30, w.ground_at(Vector3(30, 0, 60)) + 0.05, 60)
+		for k in 3:
+			var at := den + Vector3(cos(k * 2.1), 0, sin(k * 2.1)) * (0.0 if k == 0 else 1.6)
+			w.spawn_zombie("clever", at)
+			var armed: Zombie = w.zombies.back()
+			armed.set_physics_process(false)
+			armed.hp = 1000.0
+			armed.max_hp = 1000.0
+			armed.weapon_id = ["sword", "spear", "mace"][k]
+			Net.zombie_weapon(armed)
+	await wait(1.0)
+	await sync(208)
+	var armed_ones := func() -> Array: return w.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and z.position.distance_to(den) < 6.0)
+	if not host:
+		ok((armed_ones.call() as Array).size() == 3 and (armed_ones.call() as Array).all(func(z: Zombie) -> bool: return z.weapon_id != ""), "three armed creatures stand on this phone too")
+		pl.spec_id = "thief"
+		pl.flags["steal_all"] = true
+		pl.flags.erase("steal_keep")
+		pl.invis_left = 0.0
+		pl.invis_lockout = 0.0
+		pl.path_art_cd_left = 0.0
+		pl.global_position = den + Vector3(0, w.ground_at(den) + 0.05, 7.0)
+		await wait(0.2)
+		pl.use_path_art()
+	await wait(1.5)
+	await sync(209)
+	var after: Array = armed_ones.call()
+	ok(after.size() == 3 and after.all(func(z: Zombie) -> bool: return z.weapon_id == ""), "Grand Larceny disarms all three on this phone: %s" % str(after.map(func(z: Zombie) -> String: return z.weapon_id)))
+	var dropped := w.pickups.filter(func(i: Pickup) -> bool: return i.kind == Pickup.Kind.WEAPON and i.global_position.distance_to(den) < 8.0).map(func(i: Pickup) -> String: return i.item_id)
+	dropped.sort()
+	ok(dropped == ["mace", "spear", "sword"], "and their weapons lie on the ground on this phone: %s" % str(dropped))
+	await sync(210)
+
+
+
+## A Cartographer on the other phone: its beacons stand on both phones, a friend here travels through
+## its Waygates, and its starlight hurts the host's creatures.
+func _cartographer() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	pl.global_position = Vector3(base.x - 4.0, w.ground_at(base) + 0.05, base.z + 6.0) if host else Vector3(base.x, w.ground_at(base) + 0.05, base.z + 6.0)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	await wait(0.6)
+	await sync(300)
+	if not host:
+		ok(pl.class_id == "cartographer", "the client plays a Cartographer")
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 1 if step == 3 else 0)
+		ok(pl.spec_id == "worlds_traveler" and pl.art_def()["name"] == "Raise a Waygate", "and becomes a Worlds Traveler")
+		for spot: Vector3 in [base, base + Vector3(14, 0, 0)]:
+			pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z + CartographerKit.PLANT_AHEAD)
+			pl.yaw = 0.0
+			pl.rotation.y = 0.0
+			CartographerKit.cast(pl)
+		pl.global_position = Vector3(base.x + 4.0, w.ground_at(base) + 0.05, base.z + 6.0)
+		# Veiled Passage, learned after the gates were raised.
+		pl.flags["gate_hide"] = true
+		CartographerKit.retune(pl)
+	await wait(0.8)
+	await sync(301)
+	var survey: SurveyNet = w.surveys.get(Net.my_id() if not host else _other())
+	ok(survey != null and survey.beacons.size() == 2 and survey.kind() == "gates", "both Waygates stand on both phones")
+	if host:
+		var gate_a: Vector3 = survey.beacons[0]["at"]
+		pl.gate_rest_left = 0.0
+		pl.global_position = Vector3(gate_a.x, w.ground_at(gate_a) + 0.05, gate_a.z)
+		await wait(0.3)
+		ok(SurveyNet._flat(pl.global_position, survey.beacons[1]["at"]) < 2.5, "a friend on this phone steps through a Waygate and out of the other")
+		ok(survey.has("gate_hide") and pl.invis_left > 1.0, "hidden by Veiled Passage, learned after the gates were raised (%.1f s)" % pl.invis_left)
+	await sync(302)
+	# Star Reader: the client's stones, and the host's creature inside them.
+	if not host:
+		pl.spec_id = "star_reader"
+		for spot: Vector3 in [base + Vector3(-8, 0, -20), base + Vector3(8, 0, -20), base + Vector3(0, 0, -34)]:
+			pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z + CartographerKit.PLANT_AHEAD)
+			pl.yaw = 0.0
+			pl.rotation.y = 0.0
+			CartographerKit.cast(pl)
+		pl.global_position = Vector3(base.x + 4.0, w.ground_at(base) + 0.05, base.z + 6.0)
+	await wait(0.8)
+	await sync(303)
+	ok(survey.kind() == "stars" and survey.triangles().size() == 1, "a new profession pulls up the gates; three Star Stones hold a constellation on both phones")
+	var inside := base + Vector3(0, 0, -25)
+	var hp_before := 0.0
+	if host:
+		w.spawn_zombie("normal", inside)
+		var under: Zombie = w.zombies.back()
+		under.set_physics_process(false)
+		under.hp = 400.0
+		under.max_hp = 400.0
+		hp_before = under.hp
+	await wait(SurveyNet.STAR_EVERY * 2.0 + 1.0)
+	await sync(304)
+	if host:
+		var under: Zombie = w.zombies.back()
+		ok(under.hp < hp_before, "the other phone's starlight strikes this phone's creature (%.0f)" % (hp_before - under.hp))
+	await sync(305)
+
+
+
+## Two phones in the Valleys of Mesenlla: the creatures look and act the same on both, a tell's circle
+## reaches the other phone and hurts there, and the boss rises on both.
+func _mesenlla() -> void:
+	ok(w.map_id == "mesenlla" and Game.zombie_pool_plan().has("woods_child"), "both phones are in the Valleys of Mesenlla")
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := w.start_spots[0] if not w.start_spots.is_empty() else Vector3.ZERO
+	pl.global_position = Vector3(base.x + (-2.0 if host else 2.0), w.ground_at(base) + 0.05, base.z)
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	await wait(0.6)
+	await sync(400)
+	# A Child of the Woods carries the same weapon on both phones.
+	if host:
+		w.spawn_zombie("child_of_woods", base + Vector3(0, 0, -6))
+		var kid: Zombie = w.zombies.back()
+		kid.set_physics_process(false)
+		told.rpc(kid.weapon_id)
+	await wait(0.8)
+	await sync(401)
+	if not host:
+		var kids := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "child_of_woods")
+		ok(kids.size() == 1 and kids[0].weapon_id == _told and _told != "", "the Child of the Woods holds the same %s here" % _told)
+	await sync(402)
+	# An Earth Elemental's amber circle closes on the other phone's player.
+	var hp_before := pl.hp
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("earth_elemental", them + Vector3(0, 0, -2.5))
+		var rock: Zombie = w.zombies.back()
+		rock.mesenlla_mind.cooldown = 0.0
+		rock._start_chase(them)
+		rock.mesenlla_mind.tick(rock, _avatar(), them - rock.position, rock.position.distance_to(them), 0.0)
+	await wait(0.4)
+	await sync(403)
+	ok(w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.QUAKE), "the amber circle shows on this phone")
+	if not host:
+		var rocks := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "earth_elemental")
+		ok(rocks.size() == 1 and rocks[0].is_warning() and rocks[0]._current_anim == "m_slam", "and the elemental raises its fists here too")
+	# The stun is short (it is cut for players), so watch for it while the circle closes.
+	var stunned := false
+	var until := Time.get_ticks_msec() + int((MesenllaMind.SLAM_TELL + 0.6) * 1000.0)
+	while Time.get_ticks_msec() < until:
+		stunned = stunned or pl.frozen_left > 0.0
+		await get_tree().process_frame
+	await sync(404)
+	if not host:
+		ok(pl.hp < hp_before and stunned, "staying inside hurts and stuns the player on this phone (%.0f)" % (hp_before - pl.hp))
+	await sync(405)
+	# The Shapeshifter changes shape on both phones.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		w.spawn_zombie("shapeshifter", base + Vector3(0, 0, -8))
+		var shifter: Zombie = w.zombies.back()
+		shifter.set_physics_process(false)
+		shifter.mesenlla_mind._set_form(shifter, "beast")
+	await wait(0.8)
+	await sync(406)
+	if not host:
+		var shifters := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "shapeshifter")
+		ok(shifters.size() == 1 and shifters[0]._current_anim == "m_beast" and (shifters[0]._visual.get_node("Beast") as Node3D).visible, "the Shapeshifter's beast shows on this phone")
+	await sync(407)
+	# And the boss rises at the Ring of Stones for everyone.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		w.director.elapsed = 520.0
+		w.director._tick_mist_boss()
+	await wait(1.0)
+	await sync(408)
+	var bosses := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "great_revenant_elemental")
+	ok(bosses.size() == 1 and (bosses[0]._visual.get_node("BossHealth") as Label3D).text.begins_with("GREAT REVENANT ELEMENTAL"), "the Great Revenant Elemental stands on both phones, its name over it")
+	ok(w.director.boss_card == "great_revenant_elemental" and w.director.boss_card_time > 0.0, "and both see its entrance card")
+	await sync(409)
+
+
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.
+## Mist Bastion on two phones: the same stronghold, the host's garrison on both, a gate falling, and
+## the War Wyvern's burning pass at the Great Portal.
+func _bastion() -> void:
+	await _clear_zombies_on_host()
+	w.director.set_process(false)
+	ok(Game.mode == Game.Mode.FORT and w.map_id == "bastion" and Net.fort_map == "bastion", "both phones are at Mist Bastion")
+	var f := w.fort
+	ok(f != null and f.gates.size() == 3 and f.region.size() == 4, "with its three gates and its walls")
+	await sync(410)
+	# The host musters the garrison, and the other phone sees them.
+	if host:
+		w.garrison.tick(Garrison.FIRST)
+	await until(func() -> bool: return w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and not a.dead).size() >= 3, 4.0)
+	await sync(411)
+	var mine := w.allies.filter(func(a: Ally) -> bool: return a.is_garrison() and not a.dead)
+	if host:
+		ok(mine.size() == 3 and mine.all(func(a: Ally) -> bool: return a.remote_owner == 0), "the host musters a Mist Soldier for each lane")
+	else:
+		ok(mine.size() == 3 and mine.all(func(a: Ally) -> bool: return a.remote_owner == 1), "and they stand on this phone too, as the host's")
+		ok(w.garrison != null and w.garrison.next_at == Garrison.FIRST, "this phone musters none of its own")
+	await sync(412)
+	# The west gate falls on both phones.
+	var g: Dictionary = f.gates[0]
+	if host:
+		f.hit_gate(g, 99999.0, g["at"])
+	await until(func() -> bool: return not g["closed"], 4.0)
+	await sync(413)
+	ok(not g["closed"] and g["name"] == "west", "the west gate falling reaches both phones")
+	# The War Wyvern, and a burning pass at the Great Portal while everyone is away from it.
+	var away := Vector3(-46.0 if host else 46.0, 0, 60)
+	pl.global_position = Vector3(away.x, w.ground_at(away) + 0.05, away.z)
+	await wait(0.4)
+	await sync(414)
+	var portal_hp := f.heart_hp
+	if host:
+		w.director.elapsed = 520.0
+		w.director._tick_mist_boss()
+		for z: Zombie in w.zombies:
+			if z.type_id == "war_wyvern":
+				z.mesenlla_mind._pass_left = 0.0
+	await until(func() -> bool: return w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "war_wyvern"), 4.0)
+	ok(w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "war_wyvern"), "the War Wyvern comes on both phones")
+	await sync(415)
+	var boss: Zombie = w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "war_wyvern")[0]
+	ok(boss.element in ["fire", "ice", "storm"] and (boss._visual.get_meta("rig") as WyvernRig).element == boss.element, "it is of Fire, Ice or Storm on this phone, and looks it (%s)" % boss.element)
+	await until(func() -> bool: return w.zombies.filter(func(r: Zombie) -> bool: return r.carrier == boss).size() == 2, 3.0)
+	ok(w.zombies.filter(func(r: Zombie) -> bool: return r.carrier == boss and r.type_id == "wyvern_rider").size() == 2, "with its two riders in the saddle on this phone")
+	var style := MesenllaMind.element_style(boss.element)
+	var saw_fire := [false]
+	var deadline := Time.get_ticks_msec() + 16000
+	while Time.get_ticks_msec() < deadline and not (saw_fire[0] and f.heart_hp < portal_hp):
+		if w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == style and Vector2(s.position.x - f.heart_at.x, s.position.z - f.heart_at.z).length() < 12.0):
+			saw_fire[0] = true
+		await get_tree().process_frame
+	ok(saw_fire[0], "its breath (%s) comes down on the Great Portal on this phone" % boss.element)
+	ok(f.heart_hp < portal_hp, "and the portal's wound reaches this phone (%.0f)" % (portal_hp - f.heart_hp))
+	await sync(416)
+
+
+## The client has checked what it was looking at, and says so; the host waits for that word before it
+## changes what the client was looking at.
+func _looked(what: String) -> void:
+	if host:
+		await until(func() -> bool: return _told == "looked " + what, 5.0)
+		if _told != "looked " + what:
+			ok(false, "the other phone finished looking at the %s" % what)
+	else:
+		told.rpc("looked " + what)
+
+
 func until(condition: Callable, timeout: float) -> void:
 	var deadline := Time.get_ticks_msec() + int(timeout * 1000.0)
 	while not condition.call() and Time.get_ticks_msec() < deadline:
@@ -1319,3 +1720,137 @@ func _bot_mounts() -> void:
 		bot.spec_id = original_spec
 		bot.set_physics_process(true)
 	pl.set_physics_process(true)
+
+
+# --- Spectator Mode ----------------------------------------------------------
+
+## The host plays a night with a bot. A second phone, not in it, finds it on the Wi-Fi as a match to
+## watch, comes in as a spectator part-way, sees what was already there and what happens after, and
+## is sent off when the host takes everyone back to the room.
+func _spectate_host() -> void:
+	m.show_together()
+	await wait(0.2)
+	ok(Net.host_game() == OK, "a game can be started")
+	print("NET_TEST_HOST_READY")
+	m.show_lobby()
+	await wait(0.2)
+	ok(m.ui_layer.find_child("AllowSpectators", true, false) != null, "the host has a switch for spectators")
+	_press("Not allowed")
+	await wait(0.1)
+	ok(not Net.allow_spectators, "and can turn them away")
+	_press("Allowed")
+	await wait(0.1)
+	ok(Net.allow_spectators, "or let them watch")
+	Net.set_bots(1)
+	await wait(0.3)
+	Net.start_match()
+	var t := 0.0
+	while (m.world == null or m.world.mode == Game.Mode.MENU or not m._net_go) and t < 80.0:
+		await wait(0.1)
+		t += 0.1
+	w = m.world
+	ok(w != null and m._net_go, "the match is under way")
+	w.player.guard_left = 999.0
+	# Some already here before anyone watches.
+	for i in 3:
+		w.spawn_zombie("normal", w.player.global_position + Vector3(6.0 + i * 2.0, 0.0, 8.0))
+	ok(Net._beacon != null, "the match still tells the Wi-Fi it is there, to watch")
+	t = 0.0
+	while Net.spectators.is_empty() and t < 80.0:
+		await wait(0.1)
+		t += 0.1
+	ok(Net.spectators.size() == 1 and Net.roster.size() == 2, "a spectator came in, and is not a player (%d watching, %d playing)" % [Net.spectators.size(), Net.roster.size()])
+	ok(not w.players.any(func(x: Target) -> bool: return x is Avatar and not Net.roster.has((x as Avatar).peer)), "nobody new walks about in the match")
+	# Held still for the count: no more coming, none falling to the bot.
+	w.director.running = false
+	for z: Zombie in w.zombies:
+		if z.active and z.is_alive():
+			z.max_hp = 100000.0
+			z.hp = 100000.0
+	await wait(0.3)
+	await sync(1)
+	var alive := w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	told.rpc(",".join(PackedStringArray(alive.map(func(z: Zombie) -> String: return "%d:%s" % [z.net_id, z.type_id]))))
+	await sync(2)
+	w.spawn_zombie("normal", w.player.global_position + Vector3(-6.0, 0.0, 8.0))
+	await wait(0.5)
+	alive = w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	told.rpc(str(alive.size()))
+	await sync(3)
+	await sync(4)
+	Net.return_to_room()
+	t = 0.0
+	while not Net.spectators.is_empty() and t < 10.0:
+		await wait(0.1)
+		t += 0.1
+	await wait(1.5)
+	ok(Net.spectators.is_empty(), "back to the room, the spectator is sent off")
+	finish()
+
+
+func _spectate_client() -> void:
+	var t := 0.0
+	Net.start_search()
+	var address := ""
+	while address == "" and t < 80.0:
+		for a: String in Net.rooms:
+			if Net.rooms[a].get("watchable", false):
+				address = a
+		await wait(0.1)
+		t += 0.1
+	ok(address != "", "the match under way shows on the Wi-Fi as one to watch")
+	ok(address == "" or (Net.rooms[address]["live"] and int(Net.rooms[address]["watchers"]) == 0), "live, nobody watching yet")
+	Net.stop_search()
+	m.show_together()
+	await wait(0.2)
+	m._watch(address if address != "" else "127.0.0.1")
+	t = 0.0
+	while (m.spectator == null or not is_instance_valid(m.spectator)) and t < 80.0:
+		await wait(0.1)
+		t += 0.1
+	ok(m.spectator != null and Net.spectating, "this phone watches the match")
+	w = m.world
+	ok(not Net.roster.has(Net.my_id()) and Net.roster.size() == 2, "it is not in the roster: the host and the bot are")
+	ok(Net.roster.keys().all(func(p: int) -> bool: return Net.avatar(p) != null), "both players are seen")
+	ok(w.player.dead and not w.player.visible and w.player.camera.current and w.player.camera.top_level, "nobody of its own: an unseen body, its camera the broadcast's")
+	ok(m.hud != null and not m.hud.visible and m.spectator.find_child("PlayerCards", true, false) != null, "the broadcast's screen, not a player's controls")
+	await sync(1)
+	await wait(0.5)
+	var theirs := Array(_told.split(",", false))
+	var alive := w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	var mine := alive.map(func(z: Zombie) -> String: return "%d:%s" % [z.net_id, z.type_id])
+	var missing := theirs.filter(func(k: String) -> bool: return not mine.has(k))
+	ok(theirs.size() > 0 and missing.is_empty(), "the enemies already there are caught up: %d here, %d on the host, missing %s, extra %s" % [mine.size(), theirs.size(), str(missing), str(mine.filter(func(k: String) -> bool: return not theirs.has(k)))])
+	await wait(1.5)
+	var view: SpectatorView = m.spectator
+	ok(view.focus != 0 and Net.roster.has(view.focus), "the director follows a player (%d)" % view.focus)
+	var target := Net.avatar(view.focus)
+	ok(target != null and view.cam.global_position.distance_to(target.global_position) < 45.0, "the camera is on them (%.1f m)" % (view.cam.global_position.distance_to(target.global_position) if target else -1.0))
+	view.set_lock(1)
+	ok(view.lock == 1 and view.focus == 1, "tapping the host's card keeps the camera on the host")
+	view.set_lock(0)
+	ok(view.lock == 0, "Auto gives it back to the director")
+	for kind: int in [SpectatorView.Shot.AERIAL, SpectatorView.Shot.WIDE, SpectatorView.Shot.CHASE, SpectatorView.Shot.EYES]:
+		view._choose(1, kind, true)
+		await wait(0.4)
+		var goal: Array = view._goal(0.0)
+		ok((goal[0] as Vector3).is_finite() and view.cam.global_position.is_finite(), "%s: the camera has somewhere to be" % SpectatorView.SHOT_NAMES[kind])
+		if shots != "":
+			await snap("spectate_%d" % kind)
+	ok(Net.avatar(1)._watched, "through someone's eyes, their own body is out of the way")
+	view._choose(1, SpectatorView.Shot.AERIAL)
+	ok(not Net.avatar(1)._watched, "and back when the shot changes")
+	await sync(2)
+	await sync(3)
+	await wait(0.5)
+	alive = w.zombies.filter(func(z: Zombie) -> bool: return z.active and z.is_alive())
+	ok(alive.size() == int(_told), "what comes after arrives as it does for players: %d here, %s on the host" % [alive.size(), _told])
+	await sync(4)
+	t = 0.0
+	while Net.active() and t < 20.0:
+		await wait(0.1)
+		t += 0.1
+	ok(not Net.active() and not Net.spectating, "when the host goes back to the room, watching ends")
+	await wait(0.5)
+	ok(m.world != null and m.world.mode == Game.Mode.MENU, "and it is back at the menu")
+	finish()

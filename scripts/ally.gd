@@ -2,12 +2,29 @@ class_name Ally
 extends Target
 ## Friendly fighter: Ghost Knight familiar or summoned skeleton. Follows the player,
 ## attacks nearby zombies, and draws attacks away from the player.
+## Mist Soldiers (the mist_ kinds) belong to nobody: Mist Bastion's garrison holds a post on its
+## lane, fights what comes within reach of it and goes back to it. Nobody is credited with their kills.
 ## Bodies are pooled, because building one in the middle of a fight would stutter.
 
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
-const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0}
-const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger"] # new kinds go at the end: their index travels between phones
+const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0,
+	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0}
+const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger",
+	"mist_infantry", "mist_ranger", "mist_heavy"] # new kinds go at the end: their index travels between phones
+## Mist Bastion's garrison: who they are, what they hit for (a weapon blow is 1) and how far from
+## their post they will go after an enemy.
+const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy"]
+const GARRISON_BLOW := {"mist_infantry": 0.65, "mist_heavy": 1.04}
+const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2}
+const GARRISON_SIGHT := 18.0
+const GARRISON_LEASH := 16.0
+const GARRISON_GATE_OUT := 4.0 # metres before its gate that a Mist Soldier stands
+const GARRISON_PORTAL_OUT := 5.0 # and from the portal, once its gate has fallen
+const GARRISON_ABREAST := 1.7 # between soldiers side by side
+const GARRISON_RANGER_ROOM := 6.0 # how far from its place a Mist Ranger backs away from what comes at it
+const HEAVY_GUARD := 0.3 # the Mist Heavy's tower shield takes this much off every blow
+const RANGER_SHOT := 0.585 # of a weapon blow, every 1.1 seconds
 const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
 const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
 const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}
@@ -34,11 +51,48 @@ var net_yaw := 0.0
 var net_biting := false
 var _snake: SnakeBody
 var guarded := 0.0
+## For a Mist Soldier: the lane it holds (its gate's number) and where on it.
+var lane := -1
+var post := Vector3.INF
+var perch := Vector3.INF # a Mist Ranger on top of a gate (Mist Reinforcements): it stays up there
+var arrow_kind := "" # a Mist Ranger on a gate at Level 3 of Mist Reinforcements: "fire" or "poison"
+## A Mist Ranger on a gate carries a Long Bow and a Crossbow: the Long Bow for what comes up the lane,
+## the Crossbow, leaning out over the parapet, for what is at the foot of the gate. perch_out: the way
+## out from its gate. hand: what it holds ("bow", "longbow" or "crossbow"); the other is on its back.
+var perch_out := Vector3.ZERO
+var hand := ""
+var net_hand := 0 # another phone's word on what it holds: 0 bow, 1 longbow, 2 crossbow
+var _hand_mesh: MeshInstance3D
+var _back_mesh: MeshInstance3D
+var _close_foe: Zombie
+var _lean := 0.0
+var _lean_to := 0.0
+var _net_shot := false
+const HANDS := ["bow", "longbow", "crossbow"]
+const PERCH_REACH := 40.0 # how far a Ranger on a gate shoots with its Long Bow
+const PERCH_CLOSE := 9.0 # within this of it (along the ground, outside its gate), the Crossbow
+## How far out its bolts start, leaning out to shoot down: past the merlons and the gateway's arch-face
+## (the wall's outer face is 1.3 m out from where it stands), so the parapet never stops a bolt.
+const LEAN_OUT := 1.5
+## How far its body leans out (radians) and comes forward (metres) at most; how far depends on how
+## steeply it has to shoot down: the CrossbowDown pose already aims the bow LEAN_ARMS below level.
+const LEAN_TILT := 0.45
+const LEAN_FORWARD := 0.3
+const LEAN_MIN := 0.12
+const LEAN_ARMS := 0.75
+const LEAN_RATE := 3.0 # radians a second
+const LONGBOW_SHOT := 1.7 # of a Mist Ranger's arrow
+const LONGBOW_EVERY := 1.8
+const CROSSBOW_SHOT := 0.55
+const CROSSBOW_EVERY := 0.55
+var fell_back := false # a Mist Soldier whose gate has fallen: it holds the portal from then on
 
 var _visual: Node3D
 var _anim: AnimationPlayer
 var _current := ""
 var _cooldown := 0.0
+var _faded := false # its time ran out: it was not struck down
+var _strike_left := 0.0 # a Spirit Walker's Fighting Body: the look of its last blow
 var _attack_left := 0.0
 var _think := 0.0
 var _foe: Zombie
@@ -50,6 +104,9 @@ var _run := 0.0
 var _head: Node3D
 var _tail: Node3D
 var _idle_time := 0.0
+var _raven: BirdRig
+var _was_striking := false
+var _last_yaw := 0.0
 
 
 func _init(owner_world: World, ally_kind: String) -> void:
@@ -67,7 +124,8 @@ func _init(owner_world: World, ally_kind: String) -> void:
 	if BEASTS.has(ally_kind):
 		_build_beast(_visual_root())
 		return
-	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever", "ranger": "clever"}.get(ally_kind, "skeleton")
+	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever", "ranger": "clever",
+		"mist_infantry": "clever", "mist_ranger": "clever", "mist_heavy": "beast"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
 		_scenes[model] = load("res://assets/characters/%s.glb" % model)
 	_visual = (_scenes[model] as PackedScene).instantiate()
@@ -84,12 +142,12 @@ func _init(owner_world: World, ally_kind: String) -> void:
 		p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		p.extra_cull_margin = 1.0
 		top = maxf(top, p.get_aabb().end.y)
-		if ally_kind not in ["skeleton", "body", "magician", "artificer", "infantry", "ranger"]:
+		if ally_kind not in ["skeleton", "body", "magician", "artificer", "infantry", "ranger"] and ally_kind not in GARRISON:
 			p.material_override = _ghost()
 	_visual.scale = Vector3.ONE * height / float(Zombie.BODY_TOP.get(model, maxf(top, 0.5)))
 	if ally_kind == "body":
 		ClassDefs.dress(_visual, "monk")
-	elif ally_kind in ["magician", "artificer", "infantry", "ranger"]:
+	elif ally_kind in ["magician", "artificer", "infantry", "ranger"] or ally_kind in GARRISON:
 		ClassDefs.dress(_visual, ally_kind)
 		_equip_retinue()
 
@@ -98,12 +156,29 @@ func _init(owner_world: World, ally_kind: String) -> void:
 func activate(seconds: float) -> void:
 	guarded = 0.0
 	net_biting = false
+	_was_striking = false
 	if _snake: _snake.reset_pose()
 	life = seconds
 	remote_owner = 0
 	master = null
+	lane = -1
+	post = Vector3.INF
+	perch = Vector3.INF
+	perch_out = Vector3.ZERO
+	arrow_kind = ""
+	net_hand = 0
+	_close_foe = null
+	if kind == "mist_ranger":
+		arm("bow")
+		_lean = 0.0
+		if _visual:
+			_visual.rotation.x = 0.0
+			_visual.position.z = 0.0
+	fell_back = false
 	_found_at = -100.0
 	dead = false
+	_faded = false
+	_strike_left = 0.0
 	hp = HEALTH[kind]
 	_dying = 0.0
 	_cooldown = 0.0
@@ -137,6 +212,7 @@ func _build_beast(root: Node3D) -> void:
 	_tail = made["tail"]
 	_legs.assign(made["legs"])
 	_snake = made.get("snake")
+	_raven = made.get("raven")
 
 
 static func _part(root: Node3D, mesh: Mesh, at: Vector3) -> MeshInstance3D:
@@ -182,19 +258,9 @@ static func _four_legs_model(beast: String, root: Node3D) -> Dictionary:
 
 
 static func _raven_model(root: Node3D) -> Dictionary:
-	var ink := Color(0.1, 0.1, 0.14)
-	if not _beast_parts.has("raven"):
-		_beast_parts["raven"] = {
-			"body": LowPoly.new().box(Vector3(0, 0, 0), Vector3(0.2, 0.2, 0.5), ink).commit(),
-			"head": LowPoly.new().box(Vector3(0, 0, 0), Vector3(0.16, 0.16, 0.16), ink.lightened(0.08)).prism(Vector3(0, 0, 0.08), Vector3(0, -0.03, 0.26), 0.04, 0.0, 4, Color(0.75, 0.62, 0.2)).commit(),
-			"tail": LowPoly.new().box(Vector3(0, 0, -0.15), Vector3(0.18, 0.03, 0.3), ink).commit(),
-			"wing": LowPoly.new().box(Vector3(0.28, 0, 0), Vector3(0.56, 0.03, 0.3), ink.lightened(0.05)).commit()}
-	var parts: Dictionary = _beast_parts["raven"]
-	_part(root, parts["body"], Vector3.ZERO)
-	_part(root, parts["wing"], Vector3(0.08, 0.05, 0))
-	var left := _part(root, parts["wing"], Vector3(-0.08, 0.05, 0))
-	left.rotation.y = PI
-	return {"head": _part(root, parts["head"], Vector3(0, 0.08, 0.3)), "tail": _part(root, parts["tail"], Vector3(0, 0, -0.25)), "legs": [] as Array[Node3D]}
+	var rig := BirdRig.new("crow")
+	root.add_child(rig)
+	return {"head": rig.head, "tail": rig.tail, "legs": [] as Array[Node3D], "raven": rig}
 
 
 static func _snake_model(root: Node3D) -> Dictionary:
@@ -224,13 +290,21 @@ func _play(n: String, speed := 1.0) -> void:
 
 
 func _master() -> Player:
+	if kind in GARRISON:
+		return null
 	return master if master != null and is_instance_valid(master) else world.player
+
+
+func is_garrison() -> bool:
+	return kind in GARRISON
 
 
 func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 	var me := _master()
 	if kind == "body" and me and me.has_flag("empty_body"):
 		amount *= 0.5
+	if kind == "body" and me and me.has_item("fighting_body"):
+		amount *= 1.0 - PathUpgrades.FIGHTING_BODY_GUARD
 	if dead:
 		return
 	if remote_owner != 0:
@@ -238,6 +312,8 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 		return
 	if guarded > 0.0:
 		amount *= 1.0 - WorldLight.DOME_REDUCTION
+	if kind == "mist_heavy":
+		amount *= 1.0 - HEAVY_GUARD
 	# A Guardian shields its own summons too.
 	if me and me.m("cover") > 0.0 and global_position.distance_to(me.global_position) <= me.m("cover_radius"):
 		amount *= 1.0 - me.m("cover")
@@ -246,6 +322,25 @@ func hurt(amount: float, _from: Vector3, _attacker: Zombie = null) -> void:
 		me.body_hit(amount)
 	if hp <= 0.0:
 		_die()
+
+
+## A Spirit Walker's body with Fighting Body: it sits in meditation, and strikes what comes close.
+func _tick_body(delta: float) -> void:
+	var me := _master()
+	if me == null or not me.has_item("fighting_body"):
+		return
+	_strike_left -= delta
+	if _strike_left <= 0.0 and _current != "Meditate":
+		_play("Meditate")
+	if _cooldown <= 0.0:
+		_cooldown = PathUpgrades.FIGHTING_BODY_EVERY
+		PathUpgrades.body_strikes(self, me)
+
+
+func strike_anim() -> void:
+	_strike_left = 0.5
+	_current = ""
+	_play("Unarmed_Melee_Attack_Punch_A" if _anim and _anim.has_animation("Unarmed_Melee_Attack_Punch_A") else "1H_Melee_Attack_Chop", 1.4)
 
 
 func set_dying(seconds: float) -> void:
@@ -257,6 +352,8 @@ func _die() -> void:
 	var was := world.begin_act(me)
 	if kind == "revenant" and me and me.has_flag("host_burst"):
 		me.mist_burst_at(position + Vector3.UP, 0.4)
+	if kind == "revenant" and me and not _faded:
+		PathUpgrades.soul_returns(me)
 	dead = true
 	collision_layer = 0
 	_dying = 1.2 if _anim else 0.3
@@ -279,7 +376,19 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, net_yaw, minf(1.0, delta * 9.0))
 		var moving := was.distance_squared_to(global_position) > 0.000004
 		_attack_left = 0.25 if net_biting else 0.0
-		if kind != "body":
+		if kind == "mist_ranger":
+			arm(HANDS[net_hand])
+			_tick_lean(delta)
+			if hand == "crossbow":
+				if net_biting and not _net_shot:
+					_current = "" # a bolt: the kick again
+				_play("CrossbowDown")
+			elif net_biting:
+				_play(_shoot_anim(), 1.5)
+			else:
+				_play("Running_A" if moving else "Idle")
+			_net_shot = net_biting
+		elif kind != "body":
 			_play("Running_A" if moving else "Idle")
 		_move_wolf(delta, moving)
 		return
@@ -297,11 +406,15 @@ func _tick_own(delta: float) -> void:
 		return
 	life -= delta
 	if life <= 0.0:
+		_faded = true
 		_die()
 		return
 	_cooldown -= delta
 	_attack_left -= delta
 	_think -= delta
+	if kind in GARRISON:
+		_tick_garrison(delta)
+		return
 	if _think <= 0.0:
 		_think = 0.25
 		_foe = world.nearest_zombie(global_position + Vector3.UP, 16.0, true)
@@ -315,6 +428,8 @@ func _tick_own(delta: float) -> void:
 	var speed: float = BEAST_SPEED.get(kind, 5.0)
 	if kind == "decoy" or kind == "body":
 		velocity = Vector3.ZERO
+		if kind == "body":
+			_tick_body(delta)
 		return
 	if kind == "mirror" or (kind in ["magician", "ranger"] and (_foe != null or _rival != null)):
 		if _rival and not _rival.dead and _cooldown <= 0.0:
@@ -365,7 +480,7 @@ func _tick_own(delta: float) -> void:
 			if not _foe.is_alive() and player:
 				player.on_ally_kill()
 			elif BEASTS.has(kind) and player and player.has_flag("wolf_stun"):
-				_foe.stun(0.7)
+				_foe.stun(AbilityNumbers.SAVAGE_BITE_STUN)
 			if _foe.is_alive() and kind == "snake" and randf() < SNAKE_POISON:
 				_foe.add_dot(10.0, 4.0)
 				if player == world.player:
@@ -399,6 +514,204 @@ func _tick_own(delta: float) -> void:
 	_move_wolf(delta, dir != Vector3.ZERO)
 
 
+## A Mist Soldier: hold the post, fight whatever comes near it, and go back to it. The Ranger shoots
+## from where it stands and steps back from anything that gets close; the Infantry and the Heavy close in.
+func _garrison_power() -> float:
+	return world.garrison.power if world.garrison else 1.0
+
+
+func _tick_garrison(delta: float) -> void:
+	if _foe and not _foe.is_alive():
+		_foe = null
+	if perch != Vector3.INF:
+		_tick_perch(delta)
+		return
+	var home := _garrison_home()
+	var fort := world.fort
+	# On its way in through a fallen gate it fights only what is on top of it.
+	var falling_back := fell_back and fort != null and not fort.inside(position)
+	if _think <= 0.0:
+		_think = 0.25
+		_foe = world.nearest_zombie(global_position + Vector3.UP, 3.0 if falling_back else GARRISON_SIGHT, true)
+		if _foe and home != Vector3.INF and _foe.position.distance_to(home) > GARRISON_LEASH + 4.0:
+			_foe = null
+		# Before its gate it fights what comes up the lane; at the portal, what has got inside.
+		if _foe and fort and not falling_back and fort.inside(_foe.position) != fell_back and not _foe.flies:
+			_foe = null
+	var heavy := kind == "mist_heavy"
+	var dir := Vector3.ZERO
+	var speed: float = GARRISON_SPEED[kind]
+	if _foe:
+		var to := _foe.position - position
+		to.y = 0.0
+		if kind == "mist_ranger":
+			if _cooldown <= 0.0:
+				_cooldown = 1.1
+				world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power())
+				_attack_left = 0.35
+				_current = ""
+				_play("2H_Ranged_Shoot", 1.5)
+			var stand := home if home != Vector3.INF else position
+			if to.length() < 5.0 and position.distance_to(stand) < GARRISON_RANGER_ROOM and (fort == null or fort.inside(position - to.normalized()) == fort.inside(position)):
+				dir = -to.normalized()
+		else:
+			var reach := ATTACK_RANGE + (0.5 if heavy else 0.0)
+			if to.length() > reach * 0.8:
+				dir = to.normalized()
+			if to.length() < reach and _cooldown <= 0.0:
+				_cooldown = ATTACK_EVERY * (1.35 if heavy else 1.0)
+				_attack_left = 0.5
+				_current = ""
+				var swing := "2H_Melee_Attack_Chop" if heavy and _anim and _anim.has_animation("2H_Melee_Attack_Chop") else "1H_Melee_Attack_Chop"
+				_play(swing, 1.5)
+				_foe.next_hitter = -1 # nobody's kill
+				_foe.take_damage(WeaponDefs.DAMAGE * float(GARRISON_BLOW[kind]) * _garrison_power(), to.normalized(), 4.0 if heavy else 2.0, _foe.centre())
+				world.sfx_at("clang", position, -9.0)
+		if to.length() > 0.01:
+			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 9.0))
+	elif home != Vector3.INF:
+		var to := _garrison_step(home) - position
+		to.y = 0.0
+		if to.length() > 1.5:
+			dir = to.normalized()
+			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 7.0))
+	if _attack_left > 0.0:
+		dir = Vector3.ZERO
+	velocity = dir * speed
+	move_and_slide()
+	position.y = world.ground_at(position)
+	if _attack_left <= 0.0:
+		_play("Running_A" if dir != Vector3.ZERO else "Idle")
+
+
+## Where a Mist Soldier's duty is right now. While its lane's gate stands: on the ground before the
+## gate, where whatever comes up the lane to break it has to get past. Once that gate has fallen: by
+## the portal, on the side the fallen gate is, and there it stays even if the gate is mended.
+## On top of a gate: it does not come down, and shoots whatever it can see coming.
+func _tick_perch(delta: float) -> void:
+	global_position = perch
+	velocity = Vector3.ZERO
+	_tick_lean(delta)
+	if _think <= 0.0:
+		_think = 0.25
+		_close_foe = _foe_below()
+		_foe = _close_foe if _close_foe else world.nearest_zombie(global_position + Vector3.UP, PERCH_REACH, true)
+	if _foe == null or not _foe.is_alive():
+		if _attack_left <= 0.0:
+			_play("Idle")
+			arm("longbow")
+		return
+	var close := _foe == _close_foe
+	arm("crossbow" if close else "longbow")
+	var to := _foe.position - position
+	rotation.y = atan2(to.x, to.z)
+	if close:
+		# Leans out as far as it needs to, for the pose's aim to meet what it shoots at.
+		var down := _lean_point().y - _foe.centre().y
+		_lean_to = clampf(atan2(down, Vector2(to.x, to.z).length()) - LEAN_ARMS, LEAN_MIN, LEAN_TILT)
+		if _cooldown > 0.0 and _attack_left <= 0.0:
+			_play("CrossbowDown") # holding its aim between bolts
+	if _cooldown <= 0.0:
+		var power := WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power()
+		if close:
+			# Leaning out over the parapet, straight down at what is breaking its gate.
+			_cooldown = CROSSBOW_EVERY
+			world.garrison_arrow(_lean_point(), _foe.centre(), power * CROSSBOW_SHOT, arrow_kind, "crossbow")
+		else:
+			_cooldown = LONGBOW_EVERY
+			world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), power * LONGBOW_SHOT, arrow_kind, "longbow")
+		_attack_left = 0.35
+		_current = ""
+		_play(_shoot_anim(), 1.0 if close else 1.5)
+
+
+## Where a Ranger on a gate shoots down from: leaning out beyond the parapet.
+func _lean_point() -> Vector3:
+	return perch + perch_out * LEAN_OUT + Vector3.UP * 1.0
+
+
+## What is at the foot of its gate: the nearest creature on the ground outside it, within PERCH_CLOSE
+## of the Ranger along the ground, that it can see by leaning out.
+func _foe_below() -> Zombie:
+	var best: Zombie = null
+	var best_d := PERCH_CLOSE
+	for z: Zombie in world.zombies_near(Vector3(perch.x, perch.y - Fort.WALL_H, perch.z), PERCH_CLOSE + 2.0, 16):
+		if not z.is_alive() or z.flies or z.carrier:
+			continue
+		var flat := Vector2(z.position.x - perch.x, z.position.z - perch.z)
+		if flat.length() > best_d or Vector2(perch_out.x, perch_out.z).dot(flat) < -0.5:
+			continue
+		if not world.has_line_of_sight(_lean_point(), z.centre()):
+			continue
+		best = z
+		best_d = flat.length()
+	return best
+
+
+## How it shoots: a Crossbow from one hand, a bow drawn with both, a spell for the rest.
+func _shoot_anim() -> String:
+	if hand == "crossbow":
+		return "CrossbowDown"
+	return "2H_Ranged_Shoot" if kind in ["ranger", "mist_ranger"] else "Spellcast_Shoot"
+
+
+## Holds this bow in its hand; on a gate, the other one is slung on its back. With the Crossbow it
+## leans out over the parapet, to shoot down at the foot of the gate.
+func arm(weapon: String) -> void:
+	if weapon == hand or _hand_mesh == null:
+		return
+	hand = weapon
+	_lean_to = LEAN_TILT * 0.7 if weapon == "crossbow" else 0.0
+	_hand_mesh.mesh = WeaponDefs.mesh(weapon)
+	_hand_mesh.rotation = WeaponDefs.hand_rotation(weapon)
+	if _back_mesh:
+		_back_mesh.visible = weapon != "bow"
+		var slung := "crossbow" if weapon == "longbow" else "longbow"
+		_back_mesh.mesh = WeaponDefs.mesh(slung)
+
+
+## Leans out over the parapet, or straightens up, a little at a time.
+func _tick_lean(delta: float) -> void:
+	if _visual == null or is_equal_approx(_lean, _lean_to):
+		return
+	_lean = move_toward(_lean, _lean_to, LEAN_RATE * delta)
+	_visual.rotation.x = _lean
+	_visual.position.z = LEAN_FORWARD * _lean / LEAN_TILT
+
+
+func _garrison_home() -> Vector3:
+	var fort := world.fort
+	if fort == null or lane < 0 or lane >= fort.gates.size():
+		return post
+	var g: Dictionary = fort.gates[lane]
+	var out: Vector3 = g["dir"]
+	var side := out.cross(Vector3.UP) * (float(net_index % 3) - 1.0) * GARRISON_ABREAST
+	if not g["closed"]:
+		fell_back = true
+	if fell_back:
+		var towards := (g["at"] as Vector3) - fort.heart_at
+		towards.y = 0.0
+		return fort.heart_at + towards.normalized() * GARRISON_PORTAL_OUT + side
+	return (g["at"] as Vector3) + out * (GARRISON_GATE_OUT + (1.6 if kind == "mist_ranger" else 0.0)) + side
+
+
+## The next spot to walk to on the way home. Falling back from before a fallen gate, that is first
+## the mouth of the gateway and then the far side of it: a straight line would meet the wall.
+func _garrison_step(home: Vector3) -> Vector3:
+	var fort := world.fort
+	if not fell_back or fort == null or fort.inside(position):
+		return home
+	var g: Dictionary = fort.gates[lane]
+	var out: Vector3 = g["dir"]
+	var from: Vector3 = position - (g["at"] as Vector3)
+	from.y = 0.0
+	var along := from.dot(out)
+	var aside := (from - out * along).length()
+	if aside > 1.0 and along > -1.0:
+		return (g["at"] as Vector3) + out * maxf(2.0, minf(along, 4.0))
+	return (g["at"] as Vector3) - out * (Fort.WALL_T * 0.5 + 2.5)
+
+
 ## Now and then a bite turns something up: food, or a few arrows. Never twice in quick succession.
 func _forage() -> void:
 	if world.now - _found_at < FOX_FIND_GAP or randf() >= FOX_FOOD:
@@ -411,8 +724,17 @@ func _forage() -> void:
 		world.spawn_pickup_at(spot, Pickup.Kind.ARROWS, "arrows")
 
 
-## Legs, a bounce in its stride, a tail that never quite stops, and a lunge when it bites.
+## Legs, a bounce in its stride, a tail that never quite stops, and a lunge when it bites. The crow
+## (BirdRig) and the snake (SnakeBody) move themselves: they are told whether it moves and when it strikes.
 func _move_wolf(delta: float, moving: bool) -> void:
+	if _raven:
+		_raven.moving = moving
+		_raven.turn = wrapf(rotation.y - _last_yaw, -PI, PI) / maxf(delta, 0.001)
+		_last_yaw = rotation.y
+		if _attack_left > 0.0 and not _was_striking:
+			_raven.strike()
+		_was_striking = _attack_left > 0.0
+		return
 	if _snake:
 		_snake.moving = moving
 		_snake.biting = _attack_left > 0.0
@@ -436,10 +758,6 @@ func _move_wolf(delta: float, moving: bool) -> void:
 		_head.rotation.y = sin(_idle_time * 0.7) * (0.0 if moving else 0.28)
 
 
-func _shoot_anim() -> String:
-	return "2H_Ranged_Shoot" if kind == "ranger" else "Spellcast_Shoot"
-
-
 func _retinue_shot(from: Vector3, at: Vector3) -> void:
 	var owner_player := _master()
 	if owner_player and kind == "ranger":
@@ -459,16 +777,34 @@ func _equip_retinue() -> void:
 	var attachment := BoneAttachment3D.new()
 	attachment.bone_name = bone
 	skeleton.add_child(attachment)
-	var hand := MeshInstance3D.new()
-	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind == "ranger" else "sword"
-	hand.mesh = WeaponDefs.mesh(weapon)
-	hand.rotation = WeaponDefs.hand_rotation(weapon)
-	hand.scale = Vector3.ONE * 0.8 / _visual.scale.x
-	hand.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	attachment.add_child(hand)
+	var held := MeshInstance3D.new()
+	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind in ["ranger", "mist_ranger"] else "battleaxe" if kind == "mist_heavy" else "sword"
+	held.mesh = WeaponDefs.mesh(weapon)
+	held.rotation = WeaponDefs.hand_rotation(weapon)
+	held.scale = Vector3.ONE * 0.8 / _visual.scale.x
+	held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	attachment.add_child(held)
+	if kind == "mist_ranger":
+		_hand_mesh = held
+		hand = weapon
+		# The bow it is not using, slung across its back (shown on a gate, where it carries two).
+		for back_bone: String in ["chest", "spine", "torso"]:
+			if skeleton.find_bone(back_bone) >= 0:
+				var on_back := BoneAttachment3D.new()
+				on_back.bone_name = back_bone
+				skeleton.add_child(on_back)
+				_back_mesh = MeshInstance3D.new()
+				_back_mesh.mesh = WeaponDefs.mesh("crossbow")
+				_back_mesh.position = Vector3(0.0, 0.1, -0.22) / _visual.scale.x
+				_back_mesh.rotation = Vector3(0.0, 0.0, 0.9)
+				_back_mesh.scale = Vector3.ONE * 0.8 / _visual.scale.x
+				_back_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				_back_mesh.visible = false
+				on_back.add_child(_back_mesh)
+				break
 	if weapon == "torch":
 		var flame := MeshInstance3D.new()
 		flame.mesh = WorldLight.flame_mesh()
 		flame.position.y = WeaponDefs.TORCH_FIRE
 		flame.scale = Vector3.ONE * 0.14
-		hand.add_child(flame)
+		held.add_child(flame)

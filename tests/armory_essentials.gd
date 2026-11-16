@@ -11,12 +11,16 @@ func _ready() -> void:
 		m._fill_armory(m.panel.get_meta("detail"), id)
 		await get_tree().process_frame
 		var labels := m.panel.find_children("*", "Label", true, false)
+		# The weapon tags sit in a row, each word on one line.
+		var tags := m.panel.find_child("WeaponTags", true, false) as HFlowContainer
+		assert(tags != null and tags.get_children().all(func(t: Control) -> bool: return (t.get_child(0) as Label).autowrap_mode == TextServer.AUTOWRAP_OFF))
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:
 			assert(ClassPresentation.profession(spec).ends_with("."))
 			assert(labels.any(func(l: Label) -> bool: return l.text == spec["name"]))
 			assert(not labels.any(func(l: Label) -> bool: return l.text.begins_with(spec["final"]["name"] + " —")))
 			for item: String in ShopDefs.for_class(id):
-				if not ShopDefs.ITEMS[item].get("pet", false):
+				# The Paths tab lists Class Upgrades; looks are on the Appearance tab, pets as a row of choices.
+				if ShopDefs.ITEMS[item]["section"] == "upgrades" and not ShopDefs.ITEMS[item].get("pet", false):
 					assert(labels.any(func(l: Label) -> bool: return l.text == ShopDefs.ITEMS[item]["desc"]))
 			checks += 3
 		checks += 2

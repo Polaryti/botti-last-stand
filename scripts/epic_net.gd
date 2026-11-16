@@ -19,6 +19,8 @@ const HOST_NAME := "HOST"
 const RULES := "RULES"
 const MAP := "MAP"
 const PLAYERS := "PLAYERS"
+const LIVE := "LIVE" # "1": a match under way that can be watched (Spectator Mode)
+const WATCHERS := "WATCHERS" # how many are watching it
 const LIST_MAX := 20
 const PUBLIC := 0 # EOS_LAT_Public
 const EQUAL := 0 # EOS_CO_EQUAL
@@ -153,11 +155,20 @@ func _process(_delta: float) -> void:
 		_ieos.call("tick")
 
 
+## Lobby searches waiting for Epic's answer. Only this node holds them, so that one still waiting when
+## the game closes (the menu looks for games each time it shows) is let go here, before Epic shuts
+## down: let go after that, it would crash the game on its way out.
+var _list_search: Object
+var _code_search: Object
+
+
 func _exit_tree() -> void:
+	_list_search = null
+	_code_search = null
 	if _ieos:
 		_ieos.call("platform_interface_release")
 		_ieos.call("platform_interface_shutdown")
-		_ieos = null
+	_ieos = null
 
 
 ## Starts Epic's system once, and signs this phone in. Returns false and sets last_error if it cannot.
@@ -260,6 +271,8 @@ static func room_card(listed: bool, waiting: bool) -> Dictionary:
 		RULES: str(Net.rules),
 		MAP: Net.night_map,
 		PLAYERS: str(maxi(1, Net.roster.size())),
+		LIVE: "1" if not waiting and Net.allow_spectators else "0",
+		WATCHERS: str(Net.spectators.size()),
 	}
 
 
@@ -302,12 +315,18 @@ func list_rooms() -> Array[Dictionary]:
 	if int(made["result_code"]) != SUCCESS:
 		_fail("Could not look for games (%d)." % int(made["result_code"]))
 		return out
-	var search: Object = made["lobby_search"]
-	search.call("set_parameter", LISTED, "1", EQUAL)
-	search.call("set_parameter", WAITING, "1", EQUAL)
-	search.call("set_parameter", VERSION, str(Net.protocol_version()), EQUAL)
-	search.call("find", _user)
+	# Held by this node only while Epic answers (see _exit_tree), not by this waiting function.
+	_list_search = made["lobby_search"]
+	made.clear()
+	# Waiting for players or under way: the list shows the first to join and the second to watch.
+	_list_search.call("set_parameter", LISTED, "1", EQUAL)
+	_list_search.call("set_parameter", VERSION, str(Net.protocol_version()), EQUAL)
+	_list_search.call("find", _user)
 	var found: Dictionary = await _ieos.get("lobby_search_find_callback")
+	var search: Object = _list_search
+	_list_search = null
+	if search == null:
+		return out # the game is closing
 	if int(found["result_code"]) == NOT_FOUND:
 		return out
 	if int(found["result_code"]) != SUCCESS:
@@ -329,10 +348,14 @@ func list_rooms() -> Array[Dictionary]:
 			var data: Dictionary = (got["attribute"] as Dictionary).get("data", {})
 			card[str(data.get("key", "")).to_upper()] = str(data.get("value", ""))
 		var players := int(card.get(PLAYERS, "1"))
-		if players >= Net.MAX_PLAYERS:
+		var waiting: bool = card.get(WAITING, "1") == "1"
+		var live: bool = not waiting and card.get(LIVE, "0") == "1"
+		var watchers := int(card.get(WATCHERS, "0"))
+		if (waiting and players >= Net.MAX_PLAYERS) or (not waiting and (not live or watchers >= Net.MAX_SPECTATORS)):
 			continue
 		out.append({"host": owner, "name": str(card.get(HOST_NAME, "Someone")), "rules": int(card.get(RULES, "0")),
-			"map": str(card.get(MAP, "village")), "players": players, "code": str(card.get(CODE_ATTRIBUTE, ""))})
+			"map": str(card.get(MAP, "village")), "players": players, "code": str(card.get(CODE_ATTRIBUTE, "")),
+			"waiting": waiting, "live": live, "watchers": watchers})
 	return out
 
 
@@ -350,10 +373,16 @@ func find_room(code: String) -> String:
 	if int(made["result_code"]) != SUCCESS:
 		_fail("Could not look for that room (%d)." % int(made["result_code"]))
 		return ""
-	var search: Object = made["lobby_search"]
-	search.call("set_parameter", CODE_ATTRIBUTE, code.to_upper(), EQUAL)
-	search.call("find", _user)
+	_code_search = made["lobby_search"]
+	made.clear()
+	_code_search.call("set_parameter", CODE_ATTRIBUTE, code.to_upper(), EQUAL)
+	_code_search.call("find", _user)
 	var found: Dictionary = await _ieos.get("lobby_search_find_callback")
+	var search: Object = _code_search
+	_code_search = null
+	if search == null:
+		_fail("The game is closing.")
+		return ""
 	if int(found["result_code"]) != SUCCESS or int(search.call("get_search_result_count")) < 1:
 		_fail("No game with that code. Check it with your host.")
 		return ""

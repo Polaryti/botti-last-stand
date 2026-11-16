@@ -30,16 +30,55 @@ const ALL := {
 		"sight": 40.0, "models": ["harrier"], "from": 150.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 6.0, "only_islands": true, "maps": ["mists"], "shoves": true},
 	"lantern_wisp": {"name": "Lantern Wisp", "icon": "lantern_wisp", "desc": "A lost lantern carried by living mist. Marks your last position with a cyan seal, then bursts it. Step outside the ring before it closes.", "hp": 60.0, "roam_speed": 2.0, "speed": 3.8, "damage": 9.0, "scale": 1.0, "xp": 20, "sight": 32.0, "models": ["lantern_wisp"], "from": 50.0, "weight": 3.0, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"]},
 	"mist_weaver": {"name": "Mist Weaver", "icon": "mist_weaver", "desc": "An antlered moth woven from funeral veils. Lays three mist seals around your last position. The seals slow as well as wound; move through a gap instead of retreating along the line.", "hp": 115.0, "roam_speed": 2.0, "speed": 2.9, "damage": 13.0, "scale": 1.1, "xp": 32, "sight": 36.0, "models": ["mist_weaver"], "from": 180.0, "weight": 1.8, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"]},
-	"veil_regent": {"name": "Veil Regent", "icon": "veil_regent", "desc": "Sovereign of the Mists. Sees through concealment and resists stun and freezing. Awakens once around 8:30. Its expanding crown leaves a safe eye at the centre. Below half health it weaves three distant seals and calls two Lantern Wisps. Killing it leaves an Angel familiar. Survive ten minutes and defeat the Regent to win.", "hp": 850.0, "roam_speed": 2.5, "speed": 3.2, "damage": 22.0, "scale": 1.6, "xp": 180, "sight": 100.0, "models": ["veil_regent"], "from": 525.0, "weight": 0.0, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"], "mist_boss": true},
+	"veil_regent": {"name": "Veil Regent", "icon": "veil_regent", "desc": "Sovereign of the Mists. Sees through concealment and resists stun and freezing. Awakens once around 8:30. Its expanding crown leaves a safe eye at the centre. Below half health it weaves three distant seals and calls two Lantern Wisps. Survive ten minutes and defeat the Regent to win.", "hp": 850.0, "roam_speed": 2.5, "speed": 3.2, "damage": 22.0, "scale": 1.6, "xp": 180, "sight": 100.0, "models": ["veil_regent"], "from": 525.0, "weight": 0.0, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"], "mist_boss": true,
+		"first_words": "Kneel, little lights. Every road in the Mists ends at my throne.",
+		"last_words": "You have only parted the veil. It closes behind every one of you."},
 
-	"fallen_revenant": {"name": "Fallen Revenant", "icon": "fallen_revenant", "desc": "A fallen wielder of Mist. Spectral claws drain life. Its marked mist leap bursts after a warning; move out of the seal before it arrives.", "hp": 160.0, "roam_speed": 2.0, "speed": 3.5, "damage": 16.0, "scale": 1.1, "xp": 45, "sight": 36.0, "models": ["fallen_revenant"], "from": 240.0, "weight": 1.5, "custom": true, "phases": true, "only_islands": true, "maps": ["mists"]},
+	# Beyond the Mists: only on the Valleys of Mesenlla and Mist Bastion ("Map Exclusive · Mesenlla").
+	"bear": {"name": "Bear", "icon": "bear", "desc": "A mountain bear. Claws anyone close, and when it rears up on its hind legs, a heavy maul follows: step out of reach.", "hp": 210.0, "roam_speed": 1.6, "speed": 3.7, "damage": 18.0, "scale": 1.0, "xp": 34,
+		"sight": 30.0, "models": ["bear"], "from": 60.0, "weight": 2.5, "custom": true, "maps": ["mesenlla", "bastion"], "radius": 0.75, "tall": 1.6},
+	"mist_bear": {"name": "Mist Bear", "icon": "bear+mist", "desc": "A bear the Mists have soaked through. Paws the ground in a cloud of mist, then charges in a straight line and throws you back. Sidestep the charge.", "hp": 300.0, "roam_speed": 1.6, "speed": 3.9, "damage": 22.0, "scale": 1.15, "xp": 48,
+		"sight": 34.0, "models": ["mist_bear"], "from": 200.0, "weight": 1.4, "custom": true, "maps": ["mesenlla", "bastion"], "shoves": true, "radius": 0.85, "tall": 1.75},
+	"eagle": {"name": "Eagle", "icon": "eagle", "desc": "Circles high over the slopes, then folds its wings and stoops on you. A roof or an overhang stops it.", "hp": 40.0, "roam_speed": 6.0, "speed": 7.0, "damage": 8.0, "scale": 1.0, "xp": 10,
+		"sight": 40.0, "models": ["eagle"], "from": 120.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 7.0, "maps": ["mesenlla", "bastion"]},
+	"mist_eagle": {"name": "Mist Eagle", "icon": "eagle+mist", "desc": "An eagle of living mist. Its stoop throws you back and leaves a ring of mist that bursts a moment later and slows: keep moving after it strikes.", "hp": 70.0, "roam_speed": 6.0, "speed": 7.4, "damage": 12.0, "scale": 1.2, "xp": 20,
+		"sight": 44.0, "models": ["mist_eagle"], "from": 180.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 8.0, "maps": ["mesenlla", "bastion"], "shoves": true},
+	"shapeshifter": {"name": "Shapeshifter", "icon": "antlers", "desc": "Looks like a white stag until you come close or hurt it. Then it takes another shape, and a different one every 12 seconds: a great clawed beast; a Mist Wolf that lunges and howls to hasten the creatures near it; a Great Owl that circles out of reach and dives with its talons; or a Tusked Boar that paws the ground and charges, knocking you down. Badly hurt, it turns back into the stag and flees. Catch it within ten seconds, or it comes back whole.", "hp": 240.0, "roam_speed": 2.2, "speed": 5.2, "damage": 20.0, "scale": 1.0, "xp": 40,
+		"sight": 34.0, "models": ["shapeshifter"], "from": 150.0, "weight": 1.2, "custom": true, "maps": ["mesenlla", "bastion"], "radius": 0.7, "tall": 1.9},
+	"child_of_woods": {"loot_chance": 0.2, "loot": ["weapon", "arrows", "food"], "name": "Child of the Woods", "icon": "sprout", "desc": "Small, quick and never alone. Each carries whatever weapon it found: a blade, a spear or a bow. One time in five it leaves something when it falls: that weapon, a bundle of arrows or some food, each as likely.", "hp": 70.0, "roam_speed": 1.8, "speed": 3.8, "damage": 9.0, "scale": 0.8, "xp": 14,
+		"sight": 32.0, "tint": Color(0.55, 0.62, 0.36), "models": ["woods_child"], "from": 0.0, "weight": 10.0, "maps": ["mesenlla", "bastion"], "weapons": ["dagger", "sword", "spear", "flail", "bow", "crossbow"]},
+	"woodland_cavalry": {"loot_chance": 0.2, "loot": ["weapon", "arrows", "food"], "name": "Woodland Cavalry", "icon": "bear+spear", "desc": "A Child of the Woods riding a bear. Rushes through you with a spear and turns wide to come again. Bring the bear down and its rider fights on foot.", "hp": 280.0, "roam_speed": 3.0, "speed": 7.4, "damage": 18.0, "scale": 0.85, "xp": 46,
+		"sight": 40.0, "tint": Color(0.55, 0.62, 0.36), "models": ["woods_child"], "from": 300.0, "weight": 0.0, "weapon": "spear", "rider": true, "mount": "bear", "maps": ["mesenlla", "bastion"]},
+	"earth_elemental": {"name": "Earth Elemental", "icon": "boulder", "desc": "Mossy boulders held together by old mist. Slow, but it pounds the ground: get out of the amber circle before it closes.", "hp": 280.0, "roam_speed": 1.1, "speed": 2.5, "damage": 20.0, "scale": 1.0, "xp": 42,
+		"sight": 28.0, "models": ["earth_elemental"], "from": 120.0, "weight": 1.6, "custom": true, "maps": ["mesenlla", "bastion"], "shoves": true, "radius": 0.8, "tall": 2.3},
+	"mist_elemental": {"name": "Mist Elemental", "icon": "mist+orb", "desc": "A swirl of mist around a bone-white heart. Passes through walls and vanishes, to appear behind you. When it falls, its mist bursts and slows everyone near.", "hp": 130.0, "roam_speed": 2.0, "speed": 3.2, "damage": 15.0, "scale": 1.0, "xp": 30,
+		"sight": 32.0, "models": ["mist_elemental"], "from": 180.0, "weight": 1.3, "custom": true, "phases": true, "maps": ["mesenlla", "bastion"], "tall": 2.2},
+	"storm_elemental": {"name": "Storm Elemental", "icon": "storm", "desc": "A crackling thundercloud over a ring of stones. Keeps its distance and calls lightning where you stand. Keep moving when the ground glows white.", "hp": 120.0, "roam_speed": 1.6, "speed": 2.6, "damage": 16.0, "scale": 1.0, "xp": 32,
+		"sight": 38.0, "models": ["storm_elemental"], "from": 240.0, "weight": 1.1, "custom": true, "maps": ["mesenlla", "bastion"], "tall": 2.4},
+	"wyvern": {"name": "Wyvern", "icon": "wyvern", "desc": "Glides over the valleys and breathes on the ground below. Each is of Fire, Ice or Storm: fire burns, ice freezes you and slows you after, lightning stuns. Leave the circle before its breath comes down. Where it dives on you, its element bursts a moment later.", "hp": 260.0, "roam_speed": 5.0, "speed": 6.2, "damage": 16.0, "scale": 1.0, "xp": 50,
+		"sight": 46.0, "models": ["wyvern"], "from": 300.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 9.0, "maps": ["mesenlla", "bastion"],
+		"elements": ["fire", "ice", "storm"]},
+	"great_revenant_elemental": {"name": "Great Revenant Elemental", "icon": "boulder+crown", "desc": "Lord of the valleys: a giant of boulders bound by mist. Pounds the ground around it and throws boulders where you stand. Below half health its boulders break loose and it throws two at a time. Rises once in the Valleys of Mesenlla around 8:30.", "hp": 1200.0, "roam_speed": 1.4, "speed": 2.4, "damage": 26.0, "scale": 1.0, "xp": 200,
+		"sight": 100.0, "models": ["great_revenant_elemental"], "from": 9999.0, "weight": 0.0, "custom": true, "maps": ["mesenlla"], "mesenlla_boss": true, "shoves": true, "radius": 1.5, "tall": 4.6,
+		"first_words": "You woke the valley. Now the stones will bury you in it.",
+		"last_words": "Stone forgets nothing. The valley will raise me again."},
+	"war_wyvern": {"name": "War Wyvern", "icon": "wyvern+crown", "desc": "An armoured wyvern under a war banner, of Fire, Ice or Storm. Makes passes along the lanes to the Great Portal, breathing its element. Two Children of the Woods ride it with bows: shoot them out of the saddle one by one, or bring the wyvern down and they fall with it. Below half health it calls the eagles of the peaks. Attacks Mist Bastion once, late in the night.", "hp": 1300.0, "roam_speed": 5.0, "speed": 6.6, "damage": 24.0, "scale": 1.0, "xp": 220,
+		"sight": 100.0, "models": ["war_wyvern"], "from": 9999.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 11.0, "maps": ["bastion"], "mesenlla_boss": true,
+		"elements": ["fire", "ice", "storm"], "riders": 2,
+		"first_words": "Burn the gate. Tonight the Great Portal falls, and the sky with it.",
+		"last_words": "My fire goes out, but the sky was never yours."},
+	"wyvern_rider": {"loot_chance": 0.2, "loot": ["weapon", "arrows", "food"], "name": "War Wyvern Rider", "icon": "sprout+bow", "desc": "A Child of the Woods in the War Wyvern's saddle, shooting at whoever is nearest. It has its own health: shoot it out of the saddle and it falls. When the wyvern falls, its riders fall with it. One time in five it leaves something where it lands: its bow, a bundle of arrows or some food, each as likely.", "hp": 90.0, "roam_speed": 0.0, "speed": 0.0, "damage": 0.0, "scale": 0.8, "xp": 20,
+		"sight": 34.0, "tint": Color(0.55, 0.62, 0.36), "models": ["woods_child"], "from": 9999.0, "weight": 0.0, "weapon": "bow", "carried": true, "maps": ["bastion"]},
+
+	"fallen_revenant": {"name": "Fallen Revenant", "icon": "fallen_revenant", "desc": "A fallen wielder of Mist. Spectral claws drain life. Its marked mist leap bursts after a warning; move out of the seal before it arrives.", "hp": 160.0, "roam_speed": 2.0, "speed": 3.5, "damage": 16.0, "scale": 1.1, "xp": 45, "sight": 36.0, "models": ["fallen_revenant"], "from": 240.0, "weight": 1.5, "phases": true, "only_islands": true, "maps": ["mists"],
+		"weapon": "claws", "weapon_drop": 0.0, "fallen": true},
 	"crow": {"maps": ["village", "fort"], "name": "Carrion Crow", "icon": "feather", "desc": "Comes in flocks that circle and dive. A roof stops them.", "hp": 25.0, "roam_speed": 5.0, "speed": 6.0, "damage": 5.0, "scale": 1.0, "xp": 6,
 		"sight": 32.0, "models": ["crow"], "from": 120.0, "weight": 0.0, "flies": true, "custom": true, "fly_height": 4.5},
 	"gargoyle": {"name": "Gargoyle", "icon": "wings", "desc": "A statue on a rooftop, until you walk too close. Then it hunts from the air.", "hp": 120.0, "roam_speed": 4.0, "speed": 7.5, "damage": 18.0, "scale": 1.0, "xp": 28,
 		"sight": 14.0, "models": ["gargoyle"], "from": 240.0, "weight": 0.0, "flies": true, "custom": true, "statue": true, "fly_height": 6.0},
 	"mimic": {"name": "Mimic", "icon": "tooth", "desc": "Looks just like a weapon on the ground. Bites when you reach for it.", "hp": 60.0, "roam_speed": 0.0, "speed": 4.6, "damage": 15.0, "scale": 1.0, "xp": 20,
 		"sight": 4.0, "models": ["mimic"], "from": 90.0, "weight": 0.0, "custom": true, "dormant": true},
-	"scarecrow": {"name": "Scarecrow", "icon": "eye", "desc": "Stands still while you watch it. Walks when you look away.", "hp": 90.0, "roam_speed": 0.0, "speed": 3.4, "damage": 14.0, "scale": 1.0, "xp": 18,
+	"scarecrow": {"maps": ["village"], "name": "Scarecrow", "icon": "eye", "desc": "Stands still while you watch it. Walks when you look away.", "hp": 90.0, "roam_speed": 0.0, "speed": 3.4, "damage": 14.0, "scale": 1.0, "xp": 18,
 		"sight": 18.0, "models": ["scarecrow"], "from": 90.0, "weight": 0.0, "custom": true, "scarecrow": true},
 	"wraith": {"name": "Wraith", "icon": "ghost", "desc": "Drifts through walls. Fire hurts it far more than steel.", "hp": 70.0, "roam_speed": 1.4, "speed": 2.1, "damage": 12.0, "scale": 1.05, "xp": 24,
 		"sight": 24.0, "tint": Color(0.5, 0.8, 1.0), "models": ["magic"], "from": 270.0, "weight": 1.4, "phases": true, "ghost": Color(0.5, 0.82, 1.0, 0.5)},
@@ -71,18 +110,31 @@ static func def_of(id: String) -> Dictionary:
 	return DUMMY if id == "dummy" else ALL[id]
 
 
-static func pick_roamer(elapsed: float, islands := false) -> String:
+## Whether this kind wanders the given map at this point of the night. Beyond the Mists only its own
+## creatures roam, and they roam nowhere else.
+static func roams(id: String, elapsed: float, map_id: String) -> bool:
+	var d: Dictionary = ALL[id]
+	if elapsed < float(d.get("from", 9999.0)):
+		return false
+	if map_id in SpawnRules.MESENLLA:
+		return d.get("maps", []).has(map_id)
+	if d.get("only_islands", false) and map_id != "mists":
+		return false
+	return SpawnRules.allows(d, map_id)
+
+
+static func pick_roamer(elapsed: float, map_id := "village") -> String:
 	var total := 0.0
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)) and SpawnRules.allows(ALL[id], "mists" if islands else "village"):
+		if roams(id, elapsed, map_id):
 			total += float(ALL[id].get("weight", 0.0))
 	var r := randf() * total
 	for id: String in ALL:
-		if elapsed >= float(ALL[id].get("from", 9999.0)) and (islands or not ALL[id].get("only_islands", false)) and SpawnRules.allows(ALL[id], "mists" if islands else "village"):
+		if roams(id, elapsed, map_id):
 			var w: float = ALL[id].get("weight", 0.0)
 			if w <= 0.0:
 				continue
 			r -= w
 			if r <= 0.0:
 				return id
-	return "normal"
+	return "child_of_woods" if map_id in SpawnRules.MESENLLA else "normal"

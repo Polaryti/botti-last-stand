@@ -27,9 +27,17 @@ var on_burst := Callable() # thrown things: what happens where it lands
 var chaos_left := 0 # bomblets: how many more times it bounces off and goes on
 var sparks := 0 # darts: how many others the spark jumps to
 var poison_trail := false
+var spins := false # a thrown ring turns flat as it flies
+var spin_axis := Vector3.UP # ...and a thrown knife tumbles end over end
+var hit_sound := ""
+var bleed := Vector2.ZERO # damage per second and seconds of bleeding, for a Highwayman's knives
+var slow_secs := 0.0
+var close_from := Vector3.INF # Point Blank: half as strong again within 6 m of here
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
+var garrison := false
+var _through_wall := false # a returning axe that has passed through a wall # shot by a Mist Soldier: nobody's, and nobody is credited with what it kills
 var _owner_assigned := false
 var _returning := false
 var _spin := 0.0
@@ -79,6 +87,12 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	scale = Vector3.ONE
 	rotation = Vector3.ZERO
 	_spin = 0.0
+	spins = false
+	spin_axis = Vector3.UP
+	hit_sound = ""
+	bleed = Vector2.ZERO
+	slow_secs = 0.0
+	close_from = Vector3.INF
 	_owner_assigned = false
 	poison = Vector2.ZERO
 	poison_trail = false
@@ -107,7 +121,9 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	sparks = 0
 	source = ""
 	owner_player = null
+	garrison = false
 	_returning = false
+	_through_wall = false
 	_flame.scale = Vector3.ONE * (0.3 if k in [Kind.ARROW, Kind.ENEMY_ARROW] else 1.0)
 	_flame.visible = k == Kind.FIREBALL or (on_fire and k not in [Kind.ARROW, Kind.ENEMY_ARROW])
 	_update_arrow_aura()
@@ -125,6 +141,8 @@ func set_owner_player(p: Player) -> void:
 
 
 func _owner() -> Player:
+	if garrison:
+		return null
 	if _owner_assigned:
 		return owner_player if is_instance_valid(owner_player) else null
 	return world.player
@@ -198,6 +216,8 @@ func _fly(delta: float) -> void:
 	elif not _is_friendly() and Net.is_host() and not Net.bot_players().is_empty():
 		# The host's enemies shoot at its bots too. Nobody else's phone fires these.
 		mask |= Avatar.LAYER_AVATAR
+	if _returning and not _through_wall and _walled(position, next):
+		_through_wall = true
 	var q := PhysicsRayQueryParameters3D.create(position, next, mask, _exclude)
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	if _is_friendly() and not visual:
@@ -210,9 +230,16 @@ func _fly(delta: float) -> void:
 		if kind == Kind.AXE:
 			_spin += delta * 18.0
 			rotate_object_local(Vector3.RIGHT, _spin)
+		elif spins:
+			_spin += delta * 22.0
+			rotate_object_local(spin_axis, _spin)
 		return
 	var c: Object = hit["collider"]
 	var at: Vector3 = hit["position"]
+	# A returning axe flies back through walls to its thrower, but once through one it strikes nothing.
+	if _returning and c is CollisionObject3D and (_through_wall or _walled(position, at)):
+		_exclude.append((c as CollisionObject3D).get_rid())
+		return
 	if _is_friendly() and c is Zombie:
 		_hit_zombie(c as Zombie, at)
 		return
@@ -243,6 +270,10 @@ func _fly(delta: float) -> void:
 			shooter.on_shot_rival(peer, fire, frost)
 			if poison.y > 0.0:
 				world.status_rival(t, Net.Status.POISON, poison.y)
+			if slow_secs > 0.0:
+				world.status_rival(t, Net.Status.SLOW, slow_secs)
+			if bleed.y > 0.0:
+				world.status_rival(t, Net.Status.BLEED, bleed.y)
 			if sparks > 0:
 				world.status_rival(t, Net.Status.STUN, 0.5)
 			if kind != Kind.AXE:
@@ -293,7 +324,17 @@ func _grazed_body(from: Vector3, step: Vector3, ray_hit: Dictionary) -> Dictiona
 	var touching := space.intersect_shape(_graze_query, 1)
 	if touching.is_empty():
 		return {}
+	# Only a body the shot could actually touch: not one on the far side of a wall it flies along.
+	var body := touching[0]["collider"] as Node3D
+	if body and _walled(at, body.global_position + Vector3.UP * 0.9):
+		return {}
 	return {"collider": touching[0]["collider"], "position": at}
+
+
+## Whether a wall or the ground stands between two points.
+func _walled(a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.LAYER)
+	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 func _turn_back() -> void:
@@ -333,12 +374,17 @@ func _burst_here(at: Vector3) -> void:
 func _hit_zombie(z: Zombie, at: Vector3) -> void:
 	var head := z.headshot_at(at.y)
 	var amount := damage * (2.0 if head and sharp else 1.0)
+	if close_from != Vector3.INF and close_from.distance_to(at) <= AbilityNumbers.FAN_CLOSE_REACH:
+		amount *= AbilityNumbers.FAN_CLOSE
 	var shooter := _owner()
 	if from_player and shooter:
 		amount = shooter.modify_damage(z, amount)
 	if fire and z.phases:
 		amount *= 1.5
-	if amount > 0.0:
+	if amount > 0.0 and garrison:
+		z.next_hitter = -1
+		z.take_damage(amount, _vel.normalized(), knock, at)
+	elif amount > 0.0:
 		world.damage_zombie(z, amount, _vel.normalized(), knock, at, head)
 	if sparks > 0 and shooter:
 		shooter.spark_from(z, sparks, amount)
@@ -354,7 +400,11 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 			Game.note_poison(poison.x * poison.y)
 	if stagger > 0.0:
 		z.stun(stagger)
-	world.sfx_at("thunk", at, -3.0)
+	if bleed.y > 0.0:
+		z.add_dot(bleed.x, bleed.y, true)
+	if slow_secs > 0.0:
+		z.slow(slow_secs)
+	world.sfx_at(hit_sound if hit_sound != "" else "thunk", at, -3.0)
 	_exclude.append(z.get_rid())
 	if blast_radius > 0.0:
 		_explode(at)

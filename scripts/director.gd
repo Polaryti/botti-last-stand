@@ -2,6 +2,7 @@ class_name Director
 extends Node
 ## Runs the night: roaming population, Beast howls, supplies, and dawn.
 
+const BASTION_CROWD := 1.6 # how many more come up the lanes of Mist Bastion than roam other maps
 const FIRST_BEAST := 170.0
 const BEAST_EVERY := 85.0
 const MAX_BEASTS := 2
@@ -21,6 +22,8 @@ const MAX_HARRIERS := 3
 const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
+## What each land sounds like when the dead sense the dawn. The Village and the Fort keep the wolf.
+const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion"}
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0
@@ -28,6 +31,13 @@ const WOOD_EVERY := 4.0 # Defend the Fort: seconds between new pieces of wood, w
 const FIRST_RIDER := 300.0
 const RIDER_EVERY := 75.0
 const MAX_RIDERS := 2
+## Beyond the Mists: eagles circle in from the peaks, wyverns come down late, and the Woodland
+## Cavalry ride through the valley.
+const FIRST_WYVERN := 300.0
+const WYVERN_EVERY := 95.0
+const MAX_WYVERNS := 1
+const MESENLLA_BOSS := "great_revenant_elemental"
+const BASTION_BOSS := "war_wyvern"
 
 var world: World
 var running := false
@@ -55,11 +65,16 @@ var _last_stand := false
 var _call_timer := 0.0
 var _far_timer := 4.0
 var _next_rider := FIRST_RIDER
-var _next_storm := MistStorm.EVERY
+var _next_storm := MistStorm.FIRST
 var _storm_index := 0
+var _storms_last := 0 # island storms raging at the last look, to notice when one ends
+var camp: CampSiege # the shelling of the Valleys' camp, on that map
+var _cache_due := {} # cache spot index -> when it may be filled again
+var _cache_look := 0.0
 var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
 var _mist_boss_defeated := false
+var _next_wyvern := FIRST_WYVERN
 
 
 func _init(owner_world: World) -> void:
@@ -103,21 +118,106 @@ func begin(with_zombies: bool) -> void:
 		_spawn_timer = 0.0
 		for i in target_population():
 			_spawn_roamer()
-		var opening := "Survive until dawn"
-		if world.fort:
-			opening = "Hold the fort until dawn"
-		elif requires_regent():
-			opening = "Survive ten minutes and defeat the Veil Regent"
-		elif Net.fog_rules():
-			opening = "Three lives. Last one standing"
-		show_banner(opening, 4.0)
+		show_banner(opening_line(), 4.0)
+
+
+## What the night asks of you, as it begins: to live until the dawn, or to keep something standing
+## until then. Whatever else the night holds (a boss, a barrage) is not given away here.
+func opening_line() -> String:
+	var opening := "Survive until the dawn"
+	if world.map_id == "bastion":
+		opening = "Defend the Great Portal until the dawn"
+	elif world.fort:
+		opening = "Defend the fort until the dawn"
+	elif Net.fog_rules():
+		opening = "Three lives. Last one standing"
+	return opening
+
+
+## Every boss enters with a card of its own instead of an ordinary banner: its name large in its
+## colour, where it comes, what it says as it comes (its "first_words"), and the soundtrack's bells
+## (tools/make_boss_bells.py). As it falls it says its "last_words". World.spawn_zombie shows the card
+## for any boss, so a boss added later only needs its card here and its words in ZombieDefs.
+const BOSS_CARDS := {
+	"veil_regent": {"name": "Veil Regent", "line": "wakes on its throne in the Mists", "color": Color(0.78, 0.62, 1.0), "glow": Color(0.36, 0.16, 0.62), "bells": "boss_bells_regent", "strikes": [0.0, 0.7, 1.4, 2.2, 2.6]},
+	MESENLLA_BOSS: {"name": "Great Revenant Elemental", "line": "rises at the Ring of Stones", "color": Color(0.45, 0.95, 0.88), "glow": Color(0.15, 0.55, 0.62), "bells": "boss_bells_revenant", "strikes": [0.0, 0.55, 1.1, 1.75]},
+	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
+}
+const BOSS_CARD_TIME := 7.0 # long enough to read what it says
+var boss_card := "" # the boss whose card shows, while boss_card_time lasts
+var boss_card_time := 0.0
+
+
+func boss_entrance(kind: String) -> void:
+	show_boss_card(kind)
+	if Net.is_host():
+		Net.boss_entrance(kind)
+
+
+## Shows the card and rings the bells on this phone (each phone rings its own: they carry no position).
+func show_boss_card(kind: String) -> void:
+	boss_card = kind
+	boss_card_time = BOSS_CARD_TIME
+	banner_time = 0.0
+	Sfx.play(str(BOSS_CARDS[kind]["bells"]), 0.0, 1.0, 1.0)
 
 
 func show_banner(text: String, seconds: float) -> void:
 	banner = text
-	banner_time = seconds
+	# Over a boss's card it waits its turn, and then shows for as long as it would have.
+	banner_time = seconds + boss_card_time
 	if Net.is_host():
 		Net.banner(text, seconds)
+
+
+## The Mists' storms: one gathers a little after the last one ends, and from TWO_FROM on two can
+## rage at once, on different islands, the second gathering a while after the first.
+func _tick_storms() -> void:
+	var raging := world.mist_storms.filter(func(storm: MistStorm) -> bool: return not storm.finale and storm.island >= 0)
+	if raging.size() < _storms_last:
+		_next_storm = maxf(_next_storm, elapsed + MistStorm.GAP)
+	var room := (2 if elapsed >= MistStorm.TWO_FROM else 1) - raging.size()
+	if room > 0 and elapsed >= _next_storm:
+		var taken := raging.map(func(storm: MistStorm) -> int: return storm.island)
+		var free: Array[int] = []
+		for n in range(1, 9):
+			if n not in taken:
+				free.append(n)
+		var island: int = 0 if _storm_index == 0 else free.pick_random()
+		_storm_index += 1
+		if Net.active(): Net.start_mist_storm(island)
+		else: MistStorm.create(world, island)
+		_next_storm = elapsed + MistStorm.STAGGER
+	_storms_last = world.mist_storms.filter(func(storm: MistStorm) -> bool: return not storm.finale and storm.island >= 0).size()
+
+
+## The ruins' caches: each holds one of the rarer weapons or a potion, and is filled again
+## CACHE_REFILL seconds after what it held was taken. Not inside a Mist Storm.
+const CACHE_REFILL := 100.0
+func _tick_caches() -> void:
+	if elapsed < _cache_look:
+		return
+	_cache_look = elapsed + 2.0
+	for i in world.cache_spots.size():
+		var at: Vector3 = world.cache_spots[i]
+		var held := world.pickups.any(func(p: Pickup) -> bool: return is_instance_valid(p) and Vector2(p.global_position.x - at.x, p.global_position.z - at.z).length() < 2.0)
+		if held:
+			_cache_due[i] = elapsed + CACHE_REFILL
+			continue
+		if elapsed < float(_cache_due.get(i, 0.0)) or world.storm_at(at) != null:
+			continue
+		_cache_due[i] = elapsed + CACHE_REFILL
+		if randf() < 0.65:
+			var id := WeaponDefs.pick_rare(world.spawn_map())
+			world.spawn_pickup_at(at, Pickup.Kind.WEAPON, id, 12 if WeaponDefs.is_ranged(id) else 0)
+		else:
+			world.spawn_pickup_at(at, Pickup.Kind.POWER, PowerDefs.pick_potion(world.spawn_map()))
+
+
+## Words for this phone's player alone.
+func local_banner(text: String, seconds: float) -> void:
+	banner = text
+	banner_time = seconds
 
 
 ## How long this match runs. In All vs All the clock counts down to the fog closing, not to dawn.
@@ -142,7 +242,11 @@ func target_population() -> int:
 	var cap := Game.max_live_zombies()
 	var mists := world.terrain.has_islands() and not Net.fog_rules()
 	if mists: cap += 4
-	var start := mini(12 if mists else 6, cap)
+	var bastion := world.map_id == "bastion"
+	if bastion:
+		# Three lanes to fill: Mist Bastion is fought against far bigger numbers.
+		cap = int(round(cap * BASTION_CROWD))
+	var start := mini(12 if mists or bastion else 6, cap)
 	# A slow start while the player finds a weapon, then the crowd builds.
 	var t := pow(clampf(elapsed / (Game.NIGHT_LENGTH * 0.75), 0.0, 1.0), 1.3)
 	var crowd := lerpf(start, cap, t) * (1.0 + 0.35 * (world.players.size() - 1))
@@ -158,11 +262,12 @@ func stock(kind: int) -> void:
 		Pickup.Kind.WEAPON: world.spawn_pickup_random(kind, WeaponDefs.pick_random(world.spawn_map()))
 		Pickup.Kind.FOOD: world.spawn_pickup_random(kind, PowerDefs.pick_weighted(PowerDefs.FOODS))
 		Pickup.Kind.ARROWS: world.spawn_pickup_random(kind, "arrows")
-		Pickup.Kind.POWER: world.spawn_pickup_random(kind, PowerDefs.pick_potion())
+		Pickup.Kind.POWER: world.spawn_pickup_random(kind, PowerDefs.pick_potion(world.spawn_map()))
 
 
 func _process(delta: float) -> void:
 	banner_time = maxf(0.0, banner_time - delta)
+	boss_card_time = maxf(0.0, boss_card_time - delta)
 	if sandbox:
 		world.tick_stands(delta)
 		return
@@ -172,8 +277,9 @@ func _process(delta: float) -> void:
 		return
 	if _waiting or _won or _everyone_down():
 		return
+	# The church bell tolls the minutes, and there is a church only in The Village.
 	_bell_timer -= delta
-	if _bell_timer <= 0.0:
+	if _bell_timer <= 0.0 and world.map_id == "village":
 		_bell_timer = 60.0
 		_bell_minute += 1
 		world.ring_bell(_bell_minute)
@@ -195,12 +301,15 @@ func _process(delta: float) -> void:
 	if not running:
 		return
 	elapsed += delta
-	if world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _next_storm:
-		_next_storm = elapsed + MistStorm.EVERY
-		var island := 0 if _storm_index == 0 else randi_range(1, 8)
-		_storm_index += 1
-		if Net.active(): Net.start_mist_storm(island)
-		else: MistStorm.create(world, island)
+	if world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned:
+		_tick_storms()
+	if not _follows_host and not sandbox and not world.cache_spots.is_empty():
+		_tick_caches()
+	if not _follows_host and not sandbox:
+		if camp == null and CampSiege.wanted(world):
+			camp = CampSiege.new(world)
+		if camp:
+			camp.tick(elapsed)
 	_tick_specials()
 	_tick_last_stand(delta)
 	_spawn_timer -= delta
@@ -245,7 +354,7 @@ func _sound(sound: String, volume: float, pitch := 1.0) -> void:
 func _clear_far_zombies() -> void:
 	if world.terrain.has_islands(): return # Keep the island garrisons rather than recycling them around the centre.
 	for z: Zombie in world.zombies.duplicate():
-		if not z.is_alive() or z.flies or z.dormant or z.hero or z.def.get("mist_boss", false) or z.is_hunting():
+		if not z.is_alive() or z.flies or z.dormant or z.hero or z.is_boss() or z.is_hunting():
 			continue
 		var near := INF
 		for p in world.players:
@@ -274,7 +383,7 @@ func _tick_last_stand(delta: float) -> void:
 			_last_stand = true
 			_call_timer = 2.0
 			show_banner("They sense the dawn...", 4.0)
-			_sound("howl", -1.0, 0.8)
+			_sound(DAWN_SOUNDS.get(world.map_id, "howl"), -1.0, 0.8 if not DAWN_SOUNDS.has(world.map_id) else 1.0)
 		return
 	_call_timer -= delta
 	if _call_timer <= 0.0 and world.player:
@@ -287,12 +396,15 @@ func minute() -> int:
 
 
 func _pick_roamer() -> String:
-	var kind := ZombieDefs.pick_roamer(elapsed, world.terrain.has_islands())
+	var kind := ZombieDefs.pick_roamer(elapsed, world.spawn_map())
 	# Leave two pooled bodies available for the Regent's second phase.
 	return "rift_stalker" if kind == "lantern_wisp" and world.count_type(kind) >= 3 else kind
 
 
 func _tick_mist_boss() -> void:
+	if not _follows_host and not sandbox and world.map_id in SpawnRules.MESENLLA and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
+		_raise_mesenlla_boss()
+		return
 	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		var throne := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3.ZERO)))
 		throne.y = world.ground_at(throne)
@@ -305,8 +417,61 @@ func _tick_mist_boss() -> void:
 			_sound("mist_regent", 0.0)
 
 
+## The Great Revenant Elemental rises from the Ring of Stones, the boulders of the meadow drawing together.
+## Over Mist Bastion the War Wyvern comes up from the valley instead, for the Great Portal.
+func _raise_mesenlla_boss() -> void:
+	var at := Vector3.ZERO
+	for mark: Dictionary in world.map_marks:
+		if mark["name"] == "boss":
+			at = Vector3(mark["at"].x, 0, mark["at"].y)
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(at)))
+	spot.y = world.ground_at(spot)
+	if world.map_id == "bastion":
+		if world.spawn_zombie(BASTION_BOSS, spot):
+			_mist_boss_spawned = true
+			_sound("wyvern_roar", 4.0)
+		return
+	if world.spawn_zombie(MESENLLA_BOSS, spot):
+		_mist_boss_spawned = true
+		CommandField.visual_impact(world, spot, 10.0, true)
+		if Net.is_host(): Net.command_impact_visual(spot, 10.0, true)
+		_sound("revenant_roar", 2.0)
+
+
+## A boss has fallen: the Veil Regent, the Great Revenant Elemental or the War Wyvern. Dawn can come now.
+func boss_fallen(_z: Zombie) -> void:
+	_mist_boss_defeated = true
+
+
+## What only happens beyond the Mists.
+func _tick_mesenlla() -> void:
+	if elapsed >= _next_crows:
+		_next_crows = elapsed + CROWS_EVERY
+		# A pair of eagles, and a Mist Eagle with them once the night is old.
+		for i in 2:
+			world.spawn_zombie("eagle")
+		if elapsed >= ZombieDefs.ALL["mist_eagle"]["from"]:
+			world.spawn_zombie("mist_eagle")
+		world.sfx_at("eagle_cry", world.player.global_position + Vector3(18, 6, 0), -2.0)
+	if elapsed >= _next_rider and elapsed >= ZombieDefs.ALL["woodland_cavalry"]["from"]:
+		_next_rider = elapsed + RIDER_EVERY
+		if world.count_type("woodland_cavalry") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("woodland_cavalry"):
+			_sound("bear_roar", 0.0)
+			show_banner("Riders of the woods...", 3.0)
+	if elapsed >= _next_wyvern:
+		_next_wyvern = elapsed + WYVERN_EVERY
+		if world.count_type("wyvern") < MAX_WYVERNS + (1 if _last_stand else 0) and world.spawn_zombie("wyvern"):
+			_sound("wyvern_roar", 2.0)
+			show_banner("A wyvern over the valley!", 3.0)
+
+
 func _tick_specials() -> void:
 	_tick_mist_boss()
+	if world.garrison:
+		world.garrison.tick(elapsed)
+	if world.map_id in SpawnRules.MESENLLA:
+		_tick_mesenlla()
+		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
 		_next_rider = elapsed + RIDER_EVERY
 		if world.count_type("rider") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("rider"):
@@ -364,7 +529,7 @@ func _spawn_roamer() -> void:
 		world.spawn_zombie(_pick_roamer())
 		return
 	# Keep pressure near explorers and replenish the least populated outer island.
-	if (world.mist_storm and world.mist_storm.finale) or (world.count_living() >= 8 and randf() < 0.5):
+	if world.storm_finale() or (world.count_living() >= 8 and randf() < 0.5):
 		world.spawn_zombie(_pick_roamer())
 		return
 	var counts := PackedInt32Array()
@@ -386,5 +551,6 @@ func _spawn_roamer() -> void:
 			return
 
 
+## The Mists end only when the Veil Regent falls, and Mesenlla only when the Great Revenant Elemental does.
 func requires_regent() -> bool:
-	return world.terrain.has_islands() and not sandbox and not Net.fog_rules()
+	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA) and not sandbox and not Net.fog_rules()

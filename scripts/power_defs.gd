@@ -18,7 +18,13 @@ const ALL := {
 	"ghost": {"name": "Ghost Knight", "desc": "A spirit fights at your side and draws attacks away from you.", "time": FAMILIAR_TIME, "color": Color(0.55, 0.9, 1.0), "familiar": true, "weight": 1.0},
 	"imp": {"name": "Thief Imp", "desc": "Brings you the nearest item on the map, every 4 seconds.", "time": FAMILIAR_TIME, "color": Color(0.9, 0.65, 0.2), "familiar": true, "weight": 1.0},
 	"bell_spirit": {"maps": ["village", "fort"], "name": "Bell Spirit", "desc": "Rings every 6 seconds, stunning all within 10 metres.", "time": FAMILIAR_TIME, "color": Color(1.0, 0.85, 0.45), "familiar": true, "weight": 1.0},
+	# A Pathfinder find: never random loot, and only a Pathfinder can take it.
+	"lantern": {"spec": "pathfinder", "name": "Wayfinder's Lantern", "desc": "Pathfinder only, unearthed by its beacons. Marks every enemy within 30 metres, lights the way further and makes you run 15% faster.", "time": POTION_TIME, "color": Color(1.0, 0.78, 0.36), "familiar": false, "weight": 0.0},
 	"rat": {"maps": ["village", "fort"], "name": "Plague Rat", "desc": "Leaves a trail of poison behind you.", "time": FAMILIAR_TIME, "color": Color(0.5, 0.85, 0.3), "familiar": true, "weight": 1.0},
+	# Beyond the Mists: found only in the Valleys of Mesenlla and at Mist Bastion.
+	"stone_sprite": {"maps": SpawnRules.MESENLLA, "name": "Stone Sprite", "desc": "A spirit of the Ring of Stones. Every 5 seconds it raises a stone ward that blocks the next hit on you and knocks back whoever struck.", "time": FAMILIAR_TIME, "color": Color(0.6, 0.66, 0.58), "familiar": true, "weight": 1.0},
+	"mistberry_draught": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Mistberry Draught", "desc": "You leave a trail of mist behind you. While you stand in it, enemies cannot see you and you heal 3 health a second.", "time": POTION_TIME, "color": Color(0.62, 0.78, 0.95), "familiar": false, "weight": 2.0},
+	"antler_charm": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Antler Charm", "desc": "Vines from the valley: your hits root enemies to the ground for 1.5 seconds. The same enemy cannot be rooted again for 4 seconds after it is caught, and fliers are out of the vines' reach.", "time": POTION_TIME, "color": Color(0.55, 0.78, 0.32), "familiar": false, "weight": 2.0},
 }
 
 const FOODS := {
@@ -47,9 +53,30 @@ const RAT_INTERVAL := 1.1
 const POISON_TIME := 6.0
 const POISON_DPS := 10.0
 const BOUNCES := 2
+const LANTERN_RANGE := 30.0
+const STONE_INTERVAL := 5.0 # the Stone Sprite raises a ward this long after the last one was spent
+const STONE_KNOCK := 9.0
+const STONE_STAGGER := 0.5
+const MIST_TRAIL_EVERY := 0.35 # the Mistberry Draught leaves a patch of mist this often
+const MIST_TRAIL_LIFE := 5.0
+const MIST_TRAIL_RADIUS := 1.6
+const MISTBERRY_HEAL := 3.0 # a second, while you stand in your mist
+const ANTLER_ROOT := 1.5
+const ANTLER_AGAIN := 4.0 # from being caught until the same enemy can be caught again
 
 static var _meshes := {}
 static var _moving := {}
+
+
+## One of the stones of a Stone Sprite's ward.
+static func ward_stone_mesh() -> Mesh:
+	if not _meshes.has("ward_stone"):
+		var l := LowPoly.new()
+		l.box(Vector3.ZERO, Vector3(0.16, 0.13, 0.14), Color(0.52, 0.5, 0.46), Vector3(15, 30, 10))
+		l.box(Vector3(0, 0.07, 0), Vector3(0.1, 0.03, 0.08), Color(0.3, 0.48, 0.22))
+		l.box(Vector3(0, 0.0, 0.075), Vector3(0.05, 0.02, 0.01), Color(0.55, 1.0, 0.9))
+		_meshes["ward_stone"] = l.commit()
+	return _meshes["ward_stone"]
 
 
 static func pick_weighted(table: Dictionary) -> String:
@@ -64,12 +91,18 @@ static func pick_weighted(table: Dictionary) -> String:
 	return table.keys()[0]
 
 
-static func pick_potion() -> String:
+static func pick_potion(map_id := "") -> String:
 	var t := {}
 	for id: String in ALL:
-		if not ALL[id]["familiar"]:
+		if not ALL[id]["familiar"] and not ALL[id].has("spec") and SpawnRules.allows(ALL[id], map_id):
 			t[id] = ALL[id]
 	return pick_weighted(t)
+
+
+## What the Codex, the HUD and the pickup call it: "Speed Potion", but "Mistberry Draught".
+static func title(id: String) -> String:
+	var d: Dictionary = ALL[id]
+	return str(d["name"]) if d["familiar"] or d.has("spec") or d.get("named", false) else "%s Potion" % d["name"]
 
 
 static func pick_familiar(map_id := "") -> String:
@@ -189,6 +222,52 @@ static func mesh(id: String) -> Mesh:
 			l.box(Vector3(-0.06, 0.09, 0.1), Vector3(0.07, 0.09, 0.012), Color(0.6, 0.45, 0.45))
 			l.box(Vector3(0.04, 0.03, 0.2), Vector3(0.02, 0.02, 0.01), Color(0.6, 1.0, 0.25))
 			l.box(Vector3(-0.04, 0.03, 0.2), Vector3(0.02, 0.02, 0.01), Color(0.6, 1.0, 0.25))
+		"lantern":
+			# A brass lantern with a warm flame behind its panes.
+			var brass := Color(0.78, 0.6, 0.24)
+			l.prism(Vector3(0, -0.24, 0), Vector3(0, -0.18, 0), 0.15, 0.15, 6, brass.darkened(0.2))
+			l.prism(Vector3(0, -0.18, 0), Vector3(0, 0.12, 0), 0.12, 0.12, 6, Color(1.0, 0.86, 0.5))
+			l.prism(Vector3(0, -0.12, 0), Vector3(0, 0.04, 0), 0.05, 0.03, 5, Color(1.0, 0.55, 0.15))
+			for i in 6:
+				var a := TAU * i / 6.0
+				l.box(Vector3(cos(a), 0, sin(a)) * 0.12 + Vector3(0, -0.03, 0), Vector3(0.02, 0.3, 0.02), brass)
+			l.prism(Vector3(0, 0.12, 0), Vector3(0, 0.22, 0), 0.14, 0.04, 6, brass)
+			l.prism(Vector3(-0.06, 0.22, 0), Vector3(0.06, 0.22, 0), 0.015, 0.015, 4, brass.darkened(0.3))
+			l.box(Vector3(0, 0.29, 0), Vector3(0.14, 0.02, 0.02), brass.darkened(0.3))
+		"stone_sprite":
+			# A little spirit of the Ring of Stones: a rough stone with moss on its crown, glowing
+			# rune-eyes, and pebbles that float about it.
+			var stone := Color(0.52, 0.5, 0.46)
+			l.box(Vector3(0, -0.02, 0), Vector3(0.26, 0.3, 0.24), stone, Vector3(8, 25, 6))
+			l.box(Vector3(0.02, 0.12, 0.0), Vector3(0.2, 0.08, 0.2), stone.lightened(0.08), Vector3(-6, 10, 4))
+			l.box(Vector3(0, 0.17, 0), Vector3(0.18, 0.04, 0.16), Color(0.3, 0.48, 0.22)) # moss
+			l.box(Vector3(-0.05, 0.04, 0.12), Vector3(0.05, 0.03, 0.02), Color(0.55, 1.0, 0.9))
+			l.box(Vector3(0.05, 0.04, 0.12), Vector3(0.05, 0.03, 0.02), Color(0.55, 1.0, 0.9))
+			l.box(Vector3(0, -0.06, 0.125), Vector3(0.08, 0.015, 0.01), Color(0.55, 1.0, 0.9)) # a rune for a mouth
+			for i in 3:
+				var a := TAU * i / 3.0
+				l.box(Vector3(cos(a) * 0.24, -0.12 + i * 0.06, sin(a) * 0.24), Vector3(0.07, 0.06, 0.07), stone.darkened(0.1), Vector3(20, 40 * i, 0))
+		"mistberry_draught":
+			# A round flask of pale mist, stoppered with bark, a sprig of dark berries tied at its neck.
+			var glass := Color(0.62, 0.78, 0.95)
+			l.prism(Vector3(0, -0.22, 0), Vector3(0, -0.02, 0), 0.12, 0.17, 8, glass.darkened(0.1))
+			l.prism(Vector3(0, -0.02, 0), Vector3(0, 0.1, 0), 0.17, 0.07, 8, glass)
+			l.prism(Vector3(0, 0.1, 0), Vector3(0, 0.2, 0), 0.05, 0.05, 6, Color(0.85, 0.92, 1.0))
+			l.prism(Vector3(0, 0.2, 0), Vector3(0, 0.26, 0), 0.06, 0.055, 6, Color(0.42, 0.3, 0.2))
+			l.box(Vector3(0.07, 0.14, 0.04), Vector3(0.1, 0.02, 0.05), Color(0.25, 0.42, 0.2), Vector3(0, 0, 30))
+			for i in 3:
+				l.box(Vector3(0.1 + i * 0.03, 0.1 - i * 0.03, 0.06), Vector3(0.045, 0.045, 0.045), Color(0.3, 0.14, 0.42))
+		"antler_charm":
+			# A small antler bound with green twine on a cord, a leaf tied to it.
+			var antler := Color(0.88, 0.84, 0.72)
+			l.prism(Vector3(0, -0.2, 0), Vector3(0, 0.05, 0), 0.04, 0.03, 5, antler)
+			l.prism(Vector3(0, 0.05, 0), Vector3(-0.12, 0.24, 0), 0.03, 0.012, 4, antler)
+			l.prism(Vector3(0, 0.05, 0), Vector3(0.1, 0.22, 0), 0.03, 0.012, 4, antler)
+			l.prism(Vector3(0, -0.06, 0), Vector3(0.12, 0.04, 0), 0.025, 0.0, 4, antler)
+			l.prism(Vector3(-0.06, 0.14, 0), Vector3(-0.17, 0.14, 0), 0.018, 0.0, 4, antler)
+			l.box(Vector3(0, -0.1, 0), Vector3(0.1, 0.06, 0.1), Color(0.3, 0.55, 0.22)) # the twine
+			l.prism(Vector3(0, 0.05, 0), Vector3(0, 0.34, -0.02), 0.008, 0.008, 3, Color(0.45, 0.32, 0.2)) # the cord
+			l.box(Vector3(0.07, -0.16, 0.03), Vector3(0.1, 0.02, 0.06), Color(0.36, 0.6, 0.26), Vector3(0, 0, -30))
 		_:
 			# A potion bottle, tinted per potion.
 			var col: Color = ALL[id]["color"]

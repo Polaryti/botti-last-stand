@@ -1,5 +1,94 @@
 # Changelog
 
+## 0.22.0 — Beyond the Mists (16 November 2026)
+
+*Having conquered the heart of the Mists, new paths open through its portals to distant lands.* Two new places, the creatures that live there, two new classes, 21 new Class Upgrades, Map Upgrades, Spectator Mode and a new look for every screen.
+
+### Two new places beyond the Mists
+- **A world atlas.** Survive the Night and Defend the Fort open a map of the world: tap a place to read its story, then Play here. A painted loading screen names the place, its story and a hint.
+- **Valleys of Mesenlla** is a new map for Survive the Night, alone, together or in versus. A deep forested valley with a makeshift outpost, the Great Falls, a river with a log bridge and fords, mossy rock arches, the Ring of Stones and about 420 trees, giant firs among them.
+- **The south is worth the walk.** The Fallen Hall, the Hunters' Lodge and the Old Mine each keep a cache of rarer weapons or a potion, refilled 100 s after it is taken. Three shrines bless you for a while: the Stag (25% faster for 30 s), the Bear (25% harder blows for 30 s) and the Mossy Spring (20 health, then 4 a second for 15 s).
+- **The outpost falls.** From 2:00 the camp is shelled. At 5:00 everyone is told to leave; at 5:15 a barrage brings the watchtowers down and a Mist Storm settles over the camp for the rest of the night.
+- **Mist Bastion** (Defend the Fort): a citadel on a mountaintop guarding a Great Portal. The creatures of Mesenlla climb three lanes to its west, middle and east gates, up to 1.6 times as many as on other maps. Mend the gates with wood; posterns let only players through.
+- **The Mist Soldiers** step out of each lane's waystone from 0:20 and hold a post before their gate: Mist Infantry (117 health), Mist Rangers (72) and, from 3:00, Mist Heavies (221). When their gate falls they fall back to the portal.
+- Each place has its own music for the night, the hunt and the dawn, and its own sound when the dawn is near. The title screen now tours the Valleys at twilight to a new theme.
+- **The Mists:** a new Mist Storm gathers 12 s after the last one ends (the first at 0:45), and from 5:00 two can rage at once. No rain or storms there; about one night in ten beyond the Mists is windy.
+- **The Map** draws each land in its own colours, with floating islands, rifts, gates by their state and the portal's health.
+
+### Creatures of Mesenlla
+- **Children of the Woods** carry whatever they found and drop something one time in five: their weapon, arrows or food. The **Woodland Cavalry** ride them in on bears.
+- **Bears in fur.** The Bear rears up roaring before its maul; the Mist Bear rakes the ground and charges. Both have shaggy coats and new walks, gallops and blows.
+- **Eagles and Mist Eagles** soar, hang screeching, then stoop with their wings folded and talons forward. The Mist Eagle's stoop leaves a ring of mist that bursts and slows.
+- **The Shapeshifter** is a white stag until you come close, then a clawed beast, a Mist Wolf, a Great Owl or a Tusked Boar, a different shape every 12 s. Badly hurt, it flees as the stag: catch it within 10 s.
+- **Earth, Mist and Storm Elementals** pound the ground, fade through walls and call lightning.
+- **Wyverns of Fire, Ice and Storm:** each breathes its own element and bursts it where it dives. They fly with folding wings, glides and banking turns.
+- Every special move has a tell and a ground circle in its own colour. Every creature has its own voice, its own death and a Codex entry.
+
+### Bosses
+- **The Great Revenant Elemental** rises at the Ring of Stones at about 8:30, a giant of boulders bound by mist. Dawn waits until it falls.
+- **The War Wyvern** comes for Mist Bastion's portal at about 8:30, burning a lane every 22 s. Twice a wyvern's size, in barding and a war saddle, it carries two riders you can shoot out of the saddle.
+- **Every boss speaks** as it enters, on a card of its own with its name, colour and bells, and as it falls. The Codex shows their words.
+- Bosses no longer leave an Angel, the Veil Regent included.
+
+### New classes
+- **Bandit** (860 Doubloons): 110 health, 110% speed, a Dagger, a Long Bow and 20 arrows. Into the Shadows turns you invisible for 4 s. Each path adds a second ability: the Thief's Steal, the Mercenary's Nightfall dome or the Highwayman's Dagger Fan.
+- **Cartographer** (earned: win 3 matches in the Valleys and 3 at Mist Bastion): 100 health, 105% speed and a Spear. Plant beacons linked by lines of light that speed and mend friends and mark enemies. Star Reader holds constellations, Worlds Traveler steps through Waygates, Pathfinder unearths finds.
+- **The Adept** is back in the Store for 1,150 Doubloons.
+
+### 21 new Class Upgrades
+- Every path of these seven classes now has a Class Upgrade in the Store, each with its own scene played by the class itself. Bots use them too.
+- **Chivalry:** Lance Charge, Consecration, Wild Hunt (replaces Whistle; owners of Whistle have it).
+- **Magician:** Grave Call, Frost Nova, Hall of Mirrors.
+- **Revenant:** Mist Wake, Torn Rifts, Soul Link.
+- **Monk:** Dragon Spin, Fighting Body, Avalanche.
+- **Plague Doctor:** Healing Mist, Plague Censer, Rat Tide.
+- **Artificer:** Great Keg, Field Turret, Tesla Coil.
+- **Commander:** Arcane Surge, Grapeshot, Shield Wall.
+
+### Weapons and finds
+- **Two-Handed weapons:** the Bell Hammer, Pitchfork, Scythe and the new Greatsword, which cuts through up to five. Infantry, Chivalry, Monk, Adept, Artificer and Commander can wield them.
+- **Found only beyond the Mists:** the Battleaxe, whose third blow cleaves, and the Rift Chakram, which ricochets. Also the Stone Sprite familiar (a ward of stones that blocks a hit), the Mistberry Draught (hide and heal in your trail of mist) and the Antler Charm (your hits root enemies).
+- Weapons found on one map only turn up a little more often there.
+- After invisibility ends you are Revealed for 3 s before you can vanish again.
+
+### Store and Armory
+- **Map Upgrades:** Mist Reinforcements (2,200 Doubloons) strengthens the Mist Soldiers and puts Mist Rangers on Mist Bastion's gates, with a Long Bow for the lane and a Crossbow for the foot of the gate. Each player who brings it adds a level, up to Level 4.
+- **Cosmetics:** the White Stag (Chivalry, 400 Doubloons). Try any look on in the Armory's new Appearance tab before you buy it.
+- What you own leaves the Store and lives in the Armory, with On/Off switches for Map Upgrades. Upgrades for classes you don't own show as locked.
+- The end of a match shows the leaderboard points and Doubloons it earned. Leaderboard rows show each player's class emblem.
+- A new redeem code pays 2,000 Doubloons.
+
+### Spectator Mode and playing together
+- **Spectator Mode:** watch a match under way like a broadcast, from Matches to watch or with a private match's code. The camera follows the action by itself, or tap a player to stay on them. Up to 4 can watch.
+- Play Together has two tabs, Same Wi-Fi and Online. The room shows each player's class emblem, and you pick your class from tiles.
+- Bots play the new classes and upgrades, explore the new maps and no longer get stuck at the edge of a map.
+- Online matches need everyone on 0.22.0.
+
+### Seeing it coming
+- **Special attacks show before they happen.** Marks under the crosshair count up to them, and the fire button and your weapon glow when one is next.
+- **Numbers:** damage floats up from your blows (switchable in Settings), poison, bleeding and fire count down in their colours, and healing a friend shows green numbers.
+
+### Screens, look and sound
+- **Every screen redesigned** the same way: Back and the title at the top, tabs under the bar, real switches in Settings and buttons that give under your finger.
+- **A cleaner HUD:** health, level and mana on one panel, status chips under the clock, your weapon by the attack button.
+- **The Changelog** lists versions down the side, with each part in a card marked by its colour and icon.
+- **A richer picture:** filmic colour, soft bloom on Medium and High, deeper shading, waterfalls of falling ropes and mist drifting through the trees.
+- **Auto graphics** (the default on a new install) picks the right level for your phone and steps down if a match runs slowly.
+- **Smoother play:** ground checks, lights, mist and glowing details cost far less, so busy fights run steadier.
+- A new app icon and boot splash for Beyond the Mists.
+
+### Balance
+- Commander: Last Command every 35 s (was 60 s). The Warlock no longer loses 30 health and its War Staff hits harder.
+- The Magician can pick up one-handed melee weapons beside the Staff.
+- Walking backwards goes at 80% speed. Rain and storms are a little rarer.
+
+### Fixes
+- Arrows, darts and thrown weapons no longer hit through walls, and blows no longer land through windows.
+- No more jumping on the spot at campfires, the river's edge or the edge of the map, and nobody can climb onto campfires or tents.
+- Slows and bleeding from shots now affect rival players too.
+- A win at the Fort no longer counts towards the Mists wins that earn the Revenant.
+- The Changelog and Play Together open at once, and the game checks for a new version each time a match ends.
+
 ## 0.21.4 — A Portal Worth Defending (11 November 2026)
 
 ### The Fort

@@ -9,6 +9,7 @@ var actor: Node3D
 var pet := {}
 var actor_scale := Vector3.ONE
 var pet_root: Node3D
+var _raven_struck := -1
 
 func configure(id: String, body: Node3D = null) -> void:
 	item = id
@@ -19,6 +20,8 @@ func configure(id: String, body: Node3D = null) -> void:
 		add_child(pet_root)
 		pet_root.position.y = 0.6 if id == "raven" else 0
 		pet = Ally.build_beast_model(id, pet_root)
+		if pet.has("raven"):
+			(pet["raven"] as BirdRig).dive = 0.4 # it stays in the frame
 		return
 	var definition: Dictionary = ShopDefs.ITEMS[id]
 	weapon = MeshInstance3D.new()
@@ -44,15 +47,27 @@ func configure(id: String, body: Node3D = null) -> void:
 		add_child(p)
 		particles.append(p)
 
+## The crow shows all it does, over and over: it hovers and looks about, flies a few beats and a glide,
+## then drops on something below and climbs back.
+const RAVEN_SHOW := 6.0
+func _show_raven(rig: BirdRig) -> void:
+	var at := fmod(clock, RAVEN_SHOW)
+	rig.moving = at >= 2.4 and at < 4.6
+	var round_now := int(clock / RAVEN_SHOW)
+	if at >= 4.7 and _raven_struck != round_now:
+		_raven_struck = round_now
+		rig.strike()
+
+
 func _process(delta: float) -> void:
 	clock += delta
 	if pet_root:
-		pet_root.position.y = (0.6 + sin(clock * 3) * 0.08) if item == "raven" else absf(sin(clock * 5)) * 0.035
+		if item == "raven":
+			_show_raven(pet["raven"])
+			return
+		pet_root.position.y = absf(sin(clock * 5)) * 0.035
 		if item == "snake":
 			(pet["snake"] as SnakeBody).moving = true
-		elif item == "raven":
-			pet_root.get_child(1).rotation.z = sin(clock * 9) * 0.6
-			pet_root.get_child(2).rotation.z = -sin(clock * 9) * 0.6
 		else:
 			var legs: Array = pet.get("legs", [])
 			for i in legs.size(): legs[i].rotation.x = sin(clock * 7 + (i % 2) * PI) * 0.5

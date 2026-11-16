@@ -39,6 +39,13 @@ class DevBuildTests(unittest.TestCase):
         self.assertIn('package/unique_name="com.botti.laststand.dev"', options)
         self.assertIn('permissions/custom_permissions=PackedStringArray("android.permission.REQUEST_INSTALL_PACKAGES")', options)
         self.assertIn('release_channel="dev"', (self.root / "project.godot").read_text())
+        # Its own icons, with the DEV band; production keeps its own.
+        for key, path in dev.DEV_ICONS.items():
+            self.assertIn(f'{key}="{path}"', options)
+            self.assertTrue((ROOT / path.removeprefix("res://")).is_file(), path)
+            self.assertNotIn(path, dev.section(after, "preset.0.options").group(1))
+        self.assertIn('config/icon="res://assets/ui/dev/icon.png"', (self.root / "project.godot").read_text())
+        self.assertIn('config/icon="res://icon.png"', (ROOT / "project.godot").read_text())
 
     def test_reruns_are_idempotent_and_new_builds_increment(self):
         first = dev.prepare(self.root, 42, "a" * 40)

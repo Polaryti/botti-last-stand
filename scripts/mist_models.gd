@@ -1,7 +1,11 @@
 class_name MistModels
 extends RefCounted
 ## Three distinct silhouettes, cached low-poly meshes and lightweight procedural animation.
-const KINDS := ["lantern_wisp", "mist_weaver", "veil_regent", "fallen_revenant"]
+## The mist-born built here, of their own parts.
+const KINDS := ["lantern_wisp", "mist_weaver", "veil_regent"]
+## Every mist-born enemy: those, and the Fallen Revenant, which wears a Revenant's own body (Zombie
+## builds it) but moves, speaks and dies as the mist does (MistMind).
+const BORN := ["lantern_wisp", "mist_weaver", "veil_regent", "fallen_revenant"]
 const INK := Color(0.075, 0.09, 0.16)
 const VEIL := Color(0.19, 0.22, 0.36)
 const BONE := Color(0.68, 0.78, 0.82)
@@ -52,18 +56,12 @@ static func build(kind: String) -> Node3D:
 				l.prism(Vector3(side * 0.23, 1.9, 0), Vector3(side * 0.6, 2.35, -0.1), 0.06, 0.0, 4, BONE)
 				l.prism(Vector3(side * 0.38, 2.1, -0.05), Vector3(side * 0.7, 2.12, -0.12), 0.04, 0.0, 4, BONE)
 				l.prism(Vector3(side * 0.23, 1.45, 0), Vector3(side * 0.85, 1.1, 0.14), 0.12, 0.05, 5, INK))
-		if not boss and kind != "fallen_revenant":
+		if not boss:
 			for side: float in [-1, 1]:
 				var wing := _part(root, "WingLeft" if side < 0 else "WingRight", func(l: LowPoly) -> void:
 					l.prism(Vector3.ZERO, Vector3(side * 1.1, 0.25, -0.15), 0.12, 0.4, 4, VEIL)
 					l.prism(Vector3(side * 1.1, 0.25, -0.15), Vector3(side * 1.6, -0.4, -0.35), 0.4, 0.0, 4, BONE))
 				wing.position.y = 1.25
-	if kind == "fallen_revenant":
-		_part(root, "SpectralClaws", func(l: LowPoly) -> void:
-			for side: float in [-1.0, 1.0]:
-				for finger in 3:
-					var at := Vector3(side * (0.72 + finger * 0.06), 1.12, 0.14)
-					l.prism(at, at + Vector3(side * 0.12, -0.25, 0.48), 0.035, 0.0, 4, LIGHT))
 	if boss:
 		for i in 3:
 			var orbit := _part(root, "Orbit%d" % i, func(l: LowPoly) -> void:

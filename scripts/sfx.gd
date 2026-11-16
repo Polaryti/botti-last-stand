@@ -5,7 +5,24 @@ extends Node
 const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "crossbow", "crow", "eat", "empty",
 	"familiar", "fireball", "gallop", "gargoyle", "hammer", "howl", "banshee", "jump_a", "land", "leaper", "level",
 	"mimic", "pickup", "potion", "rooster", "spell", "thunder", "thunder_far", "thunk", "trap", "ui_choose", "ui_click",
-	"weapon_change", "wolf", "wraith"]
+	"weapon_change", "wolf", "wraith",
+	# Beyond the Mists (tools/make_beyond_audio.py)
+	"heavy_swing", "cleave", "chakram_throw", "chakram_hit", "vanish", "steal", "nightfall", "dagger_fan",
+	"beacon_plant", "waygate", "starlight", "falling_star", "unearth", "bolas_throw", "bolas_wrap",
+	"bear_roar", "bear_maul", "eagle_cry", "shapeshift", "quake_warning", "earth_slam", "mist_blink", "storm_call", "fire_warning",
+	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter", "mist_muster", "portal_wound",
+	# Their hurts, deaths and the rest of their voices
+	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death",
+	# An Ice wyvern's breath
+	"frost_warning", "frost_burst",
+	# The Shapeshifter's owl and boar
+	"owl_screech", "boar_snort",
+	# Each land senses the dawn in its own voice (the last two minutes)
+	"dawn_mists", "dawn_valleys", "dawn_bastion",
+	# The Commander's battle cry
+	"command",
+	# The bosses of Beyond the Mists enter to the soundtrack's bells (tools/make_boss_bells.py)
+	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],
@@ -17,7 +34,9 @@ const MUSIC_SETS := {
 	"village": ["night", "hunted", "dawn"],
 	"mists": ["mists_night", "mists_hunted", "mists_dawn"],
 	"fort": ["fort_night", "fort_hunted", "fort_dawn"],
-	"menu": ["menu", "", ""],
+	"mesenlla": ["mesenlla_night", "mesenlla_hunted", "mesenlla_dawn"],
+	"bastion": ["bastion_night", "bastion_hunted", "bastion_dawn"],
+	"menu": ["menu_mesenlla", "", ""],
 }
 const MUSIC_BUS := "Music"
 const SOUND_BUS := "Sounds"
@@ -33,6 +52,8 @@ var _music_on := false
 var music_set := "village"
 var _music_cache := {} # set -> its three streams, loaded once
 var _rain: AudioStreamPlayer
+var _wind: AudioStreamPlayer
+var _wind_target := -60.0
 var _rain_target := -60.0
 
 
@@ -44,7 +65,6 @@ func _ready() -> void:
 	for group: String in VARIANTS:
 		for n: String in VARIANTS[group]:
 			_streams[n] = load("res://assets/sounds/%s.ogg" % n)
-	_streams["command"] = _command_cry()
 	for kind in ["warning", "burst", "regent"]:
 		_streams["mist_" + kind] = _mist_sound(kind)
 	for sound in ["warning", "fall", "impact"]:
@@ -176,6 +196,23 @@ func rain(on: bool, volume_db: float) -> void:
 		_rain.play()
 
 
+## A windy night's breeze, looping, faded in and out like the rain.
+func wind(on: bool, volume_db: float) -> void:
+	if on and _wind == null:
+		var loop: AudioStreamOggVorbis = load("res://assets/sounds/wind_breeze.ogg")
+		loop.loop = true
+		_wind = AudioStreamPlayer.new()
+		_wind.stream = loop
+		_wind.volume_db = -40.0
+		_wind.bus = SOUND_BUS
+		add_child(_wind)
+	if _wind == null:
+		return
+	_wind_target = volume_db if on else -60.0
+	if on and not _wind.playing:
+		_wind.play()
+
+
 ## Hunted fades in the drums, dawn fades in the warm stem. The world calls this a few times a second.
 func set_mood(hunted: float, dawn: float) -> void:
 	var calm := 1.0 - dawn
@@ -192,6 +229,10 @@ func _process(delta: float) -> void:
 		_rain.volume_db = move_toward(_rain.volume_db, _rain_target, delta * 24.0)
 		if _rain.volume_db <= -59.0 and _rain_target <= -59.0:
 			_rain.stop()
+	if _wind and _wind.playing:
+		_wind.volume_db = move_toward(_wind.volume_db, _wind_target, delta * 12.0)
+		if _wind.volume_db <= -59.0 and _wind_target <= -59.0:
+			_wind.stop()
 
 
 ## min_gap keeps a horde from machine-gunning the same sample.
@@ -224,39 +265,6 @@ func play_at(sound: String, pos: Vector3, listener: Vector3, volume_db := 0.0, m
 	if d > 38.0:
 		return
 	play(sound, volume_db - d * 0.55, 1.0, min_gap)
-
-
-## A short voiced rally, generated once at startup; no extra audio file or streaming cost.
-func _command_cry() -> AudioStreamWAV:
-	const RATE := 16000
-	const LENGTH := 1.15
-	var count := int(RATE * LENGTH)
-	var data := PackedByteArray()
-	data.resize(count * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 712
-	var phase := 0.0
-	var breath := 0.0
-	for i in count:
-		var t := float(i) / RATE
-		var x := t / LENGTH
-		var envelope := smoothstep(0.0, 0.07, x) * (1.0 - smoothstep(0.55, 1.0, x))
-		# A rough glottal source through the resonant formants of an open 'ah', with breath and pitch fall.
-		var fundamental := 155.0 - x * 35.0 + sin(t * 47.0) * 2.8 + rng.randf_range(-1.2, 1.2)
-		phase += TAU * fundamental / RATE
-		var voiced := 0.0
-		for harmonic in range(1, 33):
-			var f := harmonic * fundamental
-			var vowel := exp(-pow((f - 820.0) / 180.0, 2.0)) + exp(-pow((f - 1230.0) / 240.0, 2.0)) * 0.7 + exp(-pow((f - 2700.0) / 420.0, 2.0)) * 0.25
-			voiced += sin(phase * harmonic) * (0.07 / harmonic + vowel * 0.14)
-		breath = lerpf(breath, rng.randf_range(-1, 1), 0.6)
-		var voice := tanh((voiced + breath * 0.035) * 1.8) * envelope * 0.8
-		data.encode_s16(i * 2, int(clampf(voice, -1.0, 1.0) * 32767.0))
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = RATE
-	stream.data = data
-	return stream
 
 
 func _artillery_sound(kind: String) -> AudioStreamWAV:

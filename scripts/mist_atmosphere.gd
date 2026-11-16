@@ -1,7 +1,7 @@
 class_name MistAtmosphere
 extends Node3D
 ## Local night atmosphere. Every profile has a fixed particle budget independent of map size.
-enum Place { MISTS, VILLAGE, FORT }
+enum Place { MISTS, VILLAGE, FORT, MESENLLA }
 var place := Place.MISTS
 var world: World
 var _follow := 0.0
@@ -11,7 +11,7 @@ var _motes: CPUParticles3D
 func _ready() -> void:
 	_wisps = CPUParticles3D.new()
 	_wisps.name = "GroundWisps"
-	_wisps.amount = (8 if Game.quality == 0 else 18) if place == Place.MISTS else (5 if Game.quality == 0 else 10)
+	_wisps.amount = (8 if Game.quality == 0 else 18) if place in [Place.MISTS, Place.MESENLLA] else (5 if Game.quality == 0 else 10)
 	_wisps.lifetime = 7.0
 	_wisps.preprocess = 1.0
 	_wisps.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
@@ -29,7 +29,10 @@ func _ready() -> void:
 	quad.size = Vector2(9, 2.2)
 	var material := ShaderMaterial.new()
 	material.shader = preload("res://assets/shaders/mist_wisp.gdshader")
-	if place != Place.MISTS:
+	if place == Place.MESENLLA:
+		material.set_shader_parameter("tint", Vector3(0.62, 0.5, 0.78))
+		material.set_shader_parameter("opacity", 0.16)
+	elif place != Place.MISTS:
 		material.set_shader_parameter("tint", Vector3(0.27, 0.29, 0.34) if place == Place.VILLAGE else Vector3(0.29, 0.25, 0.21))
 		material.set_shader_parameter("opacity", 0.10)
 	quad.material = material
@@ -42,7 +45,7 @@ func _ready() -> void:
 	_wisps.emitting = false
 	add_child(_wisps)
 	_motes = CPUParticles3D.new()
-	_motes.amount = 6 if Game.quality == 0 else 12
+	_motes.amount = (10 if Game.quality == 0 else 22) if place == Place.MESENLLA else (6 if Game.quality == 0 else 12)
 	_motes.color_ramp = fade
 	_motes.lifetime = 5.0
 	_motes.preprocess = 1.0
@@ -59,7 +62,7 @@ func _ready() -> void:
 	mote.rings = 2
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.albedo_color = Color(0.3, 0.75, 0.8) if place == Place.MISTS else Color(0.8, 0.65, 0.25) if place == Place.VILLAGE else Color(0.85, 0.34, 0.1)
+	glow.albedo_color = Color(0.3, 0.75, 0.8) if place == Place.MISTS else Color(0.8, 0.65, 0.25) if place == Place.VILLAGE else Color(0.65, 0.95, 0.92) if place == Place.MESENLLA else Color(0.85, 0.34, 0.1)
 	mote.material = glow
 	_motes.mesh = mote
 	_motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

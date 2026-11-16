@@ -6,6 +6,11 @@ var enraged := false
 var casts := 0
 var leap_left := 0.0
 var leap_to := Vector3.ZERO
+## A Fallen Revenant's claws, between the start of a swing and the blow landing.
+var swing_left := 0.0
+const REVENANT_SWING := 0.28 # seconds into the swing that the claws land
+const REVENANT_DRAIN := 8.0 # health a blow that lands gives back to it
+const REVENANT_REACH := 2.2
 
 func tick(z: Zombie, target: Target, delta: float) -> void:
 	cooldown -= delta
@@ -17,6 +22,10 @@ func tick(z: Zombie, target: Target, delta: float) -> void:
 			z.position = leap_to
 			z.world.fx_mist(z.centre(), 2.0)
 		return
+	if swing_left > 0.0:
+		swing_left -= delta
+		if swing_left <= 0.0:
+			_claws_land(z, target)
 	if boss and not enraged and z.hp <= z.max_hp * 0.5:
 		enraged = true
 		z.world.fx_blast(z.centre(), 8.0, Color(0.6, 0.3, 1.0, 0.7))
@@ -30,9 +39,10 @@ func tick(z: Zombie, target: Target, delta: float) -> void:
 				z.world.spawn_zombie("lantern_wisp", at)
 	var visible := boss or (z._sees and not target.is_unseen())
 	var destination := target.global_position if visible else z._goal if z._has_goal else z.position
-	if z.world.mist_storm and z.world.mist_storm.contains(z.position) and not boss:
+	var storm := z.world.storm_at(z.position)
+	if storm and not boss:
 		visible = false
-		destination = z.world.mist_storm.escape(z.position)
+		destination = storm.escape(z.position)
 		var exit := z.world.portals.exit_from(z.position)
 		if exit != Vector3.INF:
 			z.position = exit
@@ -57,8 +67,15 @@ func tick(z: Zombie, target: Target, delta: float) -> void:
 	z.state = Zombie.State.CHASE
 	if distance < 1.8 and absf(to.y) < 3.0 and z._attack_cd <= 0.0:
 		z._attack_cd = 1.4
-		target.hurt(z._damage, z.position, z)
-		if z.type_id == "fallen_revenant": z.hp = minf(z.max_hp, z.hp + 8.0)
+		if z.type_id == "fallen_revenant":
+			# A Revenant's own blow: the swing its claws make in a player's hands, then the hit.
+			swing_left = REVENANT_SWING
+			z._attack_left = Zombie.ATTACK_TIME
+			z._current_anim = ""
+			z._play(BodyAnim.mob_attack("claws"), 1.4, 0.1)
+			z.world.sfx_at("swing", z.position, -6.0)
+		else:
+			target.hurt(z._damage, z.position, z)
 	if cooldown > 0.0 or distance > (55.0 if boss else 30.0):
 		return
 	if not z.world.has_line_of_sight(z.centre(), target.eye_position()):
@@ -83,3 +100,14 @@ func tick(z: Zombie, target: Target, delta: float) -> void:
 		for i in count:
 			var offset := across * ((i - 1) * 5.5) if count == 3 else Vector3.ZERO
 			MistSeal.cast(z, centre + offset, 2.6 if not boss else 3.3, 1.5 if not boss else 1.8, (13.0 if not boss else 20.0) * Game.enemy_damage())
+
+
+## The Fallen Revenant's claws reach whoever is still close, and drain them.
+func _claws_land(z: Zombie, target: Target) -> void:
+	if not z.is_alive() or target == null or not is_instance_valid(target):
+		return
+	var to := target.global_position - z.position
+	if Vector2(to.x, to.z).length() > REVENANT_REACH or absf(to.y) > 3.0:
+		return
+	target.hurt(z._damage, z.position, z)
+	z.hp = minf(z.max_hp, z.hp + REVENANT_DRAIN)

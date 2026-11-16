@@ -12,7 +12,11 @@ const CODES := {"c734137a1f7468ebdb5cf20deae67c89b15dc5de26ff06b497548a4a62a3370
 	"87d952a34c98ffc8a98c3f809286c052d94848c42ee7c09828ffd205c468c90a": "plague_doctor",
 	"7aec114a9acdb22075cdf4ae79d321a80f7a4b5ad4ff07187cdfc67a9bd71b36": "revenant",
 	"28e314800565692691a7af4606286f26fc0f53b2201fe1fb4c8feaa018e3a6ad": "artificer",
-	"d9bd0d6b1b8a6dc2c11e699df4d908344b17a609e2064940b19008fa3e1419be": "adept"}
+	"d9bd0d6b1b8a6dc2c11e699df4d908344b17a609e2064940b19008fa3e1419be": "adept",
+	"4a5310c45bc88862d35f592b3cb4f69b664f0b651a56b3503e99539386f7edb3": "bandit",
+	"feaeebd2dba326079890fb1cac967ee57f83292db887f82f4a1d8e54161dff7f": "cartographer"}
+## Codes that pay Doubloons, every time they are entered (also kept only as hashes).
+const DOUBLOON_CODES := {"56adbe46b05e15e74db8a9d637126086b142ac23ed9740786457771953e93791": 2000}
 
 var mode: int = Mode.MENU
 var test_map := "" # a map scene to play instead of the usual one: see MapRoot
@@ -26,22 +30,36 @@ var doubloons := 0
 var board_prizes := {} # week -> doubloons, for leaderboard prizes already paid
 var finished_games := 0
 var mists_wins := 0
+var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
+var bastion_wins := 0
+var changelog_seen := "" # ChangelogPanel.signature() when the notes were last opened
 var poison_dealt := 0.0
 var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
 var night_map := "village"
+var fort_map := "fort"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
-	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."}}
+	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
+	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."}}
+## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
+const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
+	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
+## The maps All vs All and Teams can be played on: the Mists have no room to run.
+const VERSUS_MAPS := ["village", "mesenlla"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
+const WINS_FOR_CARTOGRAPHER := 3 # in each of the Valleys of Mesenlla and Mist Bastion
 const POISON_FOR_PLAGUE := 3000
 var sensitivity := 1.0
 var quality := 1 # 0 low, 1 medium, 2 high
+var quality_auto := true # the game picks and lowers it by itself (AutoQuality)
+var quality_measured := false # whether the first pick on the title screen has been made
 var difficulty := 1 # 0 easy, 1 normal, 2 hard
 var auto_jump := true
 var vibration := true
+var damage_numbers := true # the numbers that rise from what you hit
 var steady_brightness := true # hold the screen's brightness still while playing
 var brightness := -1.0 # the level to hold, from 0 to 1. Below 0: whatever the phone was at when the game opened
 var music_volume := 0.8
@@ -76,6 +94,11 @@ static func code_key(code: String) -> String:
 
 
 func redeem_key(key: String) -> Dictionary:
+	if DOUBLOON_CODES.has(key):
+		var paid := int(DOUBLOON_CODES[key])
+		doubloons += paid
+		save_settings()
+		return {"result": "doubloons", "amount": paid}
 	if not CODES.has(key):
 		return {"result": "bad"}
 	if redeemed.has(key):
@@ -89,6 +112,23 @@ func redeem_key(key: String) -> Dictionary:
 	return {"result": "opened", "class": opened}
 
 
+## Store items that were replaced: whoever had the old one has the new one. Whistle was the Horse
+## Archer's upgrade until Wild Hunt took its place.
+static func migrate_items(kept: Dictionary) -> void:
+	if kept.has("whistle"):
+		kept.erase("whistle")
+		kept["wild_hunt"] = true
+
+
+## The Map Upgrades this phone brings to a match: bought, and not switched off.
+func map_upgrades_on() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in ShopDefs.in_section("maps"):
+		if item_active(id):
+			out.append(id)
+	return out
+
+
 func owns_class(id: String) -> bool:
 	return not ClassDefs.ALL[id].get("hidden", false) or unlocked.has(id)
 
@@ -96,7 +136,13 @@ func owns_class(id: String) -> bool:
 ## Which map a night is played on: the host decides in a game together.
 func current_map() -> String:
 	if Net.active():
-		return "village" if Net.pvp() else Net.night_map
+		if Net.rules == Net.Rules.FORT:
+			return Net.fort_map if FORT_MAPS.has(Net.fort_map) else "fort"
+		if Net.pvp():
+			return Net.night_map if Net.night_map in VERSUS_MAPS else "village"
+		return Net.night_map
+	if mode == Mode.FORT:
+		return fort_map
 	return night_map
 
 
@@ -109,9 +155,15 @@ func item_active(id: String) -> bool:
 	return owned_items.has(id) and not switched_off.has(id)
 
 
+## A Class Upgrade or cosmetic of a class you do not own cannot be bought yet: own the class first.
+func item_locked(id: String) -> bool:
+	var whose_class := str(ShopDefs.ITEMS[id].get("class", ""))
+	return whose_class != "" and not owns_class(whose_class)
+
+
 func buy_item(id: String) -> bool:
 	var price := int(ShopDefs.ITEMS[id]["price"])
-	if owned_items.has(id) or doubloons < price:
+	if owned_items.has(id) or doubloons < price or item_locked(id):
 		return false
 	doubloons -= price
 	owned_items[id] = true
@@ -146,6 +198,8 @@ func earn_text(id: String) -> String:
 			return "Survive until dawn %d times in The Mists to unlock this class. So far: %d." % [WINS_FOR_REVENANT, mini(mists_wins, WINS_FOR_REVENANT)]
 		"poison":
 			return "Deal %d poison damage to unlock this class. So far: %d." % [POISON_FOR_PLAGUE, mini(int(poison_dealt), POISON_FOR_PLAGUE)]
+		"beyond":
+			return "Win %d matches in the Valleys of Mesenlla and %d in Mist Bastion to unlock this class. So far: %d and %d." % [WINS_FOR_CARTOGRAPHER, WINS_FOR_CARTOGRAPHER, mini(mesenlla_wins, WINS_FOR_CARTOGRAPHER), mini(bastion_wins, WINS_FOR_CARTOGRAPHER)]
 	return ""
 
 
@@ -165,6 +219,23 @@ func note_mists_win() -> void:
 	mists_wins += 1
 	if mists_wins >= WINS_FOR_REVENANT and not unlocked.has("revenant"):
 		_earn("revenant")
+	save_settings()
+
+
+## A match won beyond the Mists: dawn reached in the Valleys of Mesenlla or at Mist Bastion, or a
+## versus match won in the Valleys. Three wins in each earn the Cartographer.
+func note_beyond_win() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	match current_map():
+		"mesenlla":
+			mesenlla_wins += 1
+		"bastion":
+			bastion_wins += 1
+		_:
+			return
+	if mesenlla_wins >= WINS_FOR_CARTOGRAPHER and bastion_wins >= WINS_FOR_CARTOGRAPHER and not unlocked.has("cartographer"):
+		_earn("cartographer")
 	save_settings()
 
 
@@ -253,10 +324,26 @@ func max_live_zombies() -> int:
 
 
 ## How many of each model to keep ready. Together they match max_live_zombies().
+## Beyond the Mists only its own creatures roam: the Children of the Woods and the beasts of the valleys.
+const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 6, "mist_eagle": 3, "shapeshifter": 2,
+	"earth_elemental": 2, "mist_elemental": 2, "storm_elemental": 2, "wyvern": 2, "great_revenant_elemental": 1, "war_wyvern": 1}
+
+
+## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
+const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6, "mist_eagle": 3, "shapeshifter": 3,
+	"earth_elemental": 4, "mist_elemental": 3, "storm_elemental": 3, "wyvern": 2, "war_wyvern": 1}
+
+
 func zombie_pool_plan() -> Dictionary:
+	if mode == Mode.FORT and current_map() == "bastion":
+		return BASTION_POOLS.duplicate()
+	if mode == Mode.NIGHT and current_map() in SpawnRules.MESENLLA:
+		return MESENLLA_POOLS.duplicate()
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:
 		plan["dummy"] = 6
+		for model: String in MESENLLA_POOLS:
+			plan[model] = mini(int(MESENLLA_POOLS[model]), 4)
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent
@@ -303,10 +390,14 @@ func load_settings() -> void:
 		player_class = "infantry"
 	auto_jump = _saved(c, "input", "auto_jump", true)
 	vibration = _saved(c, "input", "vibration", true)
+	damage_numbers = _saved(c, "display", "damage_numbers", true)
 	steady_brightness = _saved(c, "video", "steady_brightness", true)
 	brightness = clampf(_saved(c, "video", "brightness", -1.0), -1.0, 1.0)
 	music_volume = clampf(_saved(c, "audio", "music", 0.8), 0.0, 1.0)
 	sound_volume = clampf(_saved(c, "audio", "sound", 1.0), 0.0, 1.0)
+	# Someone who chose their graphics before Auto existed keeps their choice.
+	quality_auto = bool(_saved(c, "video", "auto", not c.has_section_key("video", "quality")))
+	quality_measured = bool(_saved(c, "video", "measured", false))
 	quality = clampi(_saved(c, "video", "quality", 1), 0, 2)
 	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
 	player_name = str(_saved(c, "progress", "player_name", ""))
@@ -316,13 +407,21 @@ func load_settings() -> void:
 	board_prizes = _saved(c, "progress", "board_prizes", {})
 	finished_games = maxi(0, _saved(c, "progress", "finished_games", 0))
 	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
+	mesenlla_wins = maxi(0, _saved(c, "progress", "mesenlla_wins", 0))
+	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
+	changelog_seen = str(_saved(c, "progress", "changelog_seen", ""))
 	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
 	owned_items = _saved(c, "progress", "owned_items", {})
 	switched_off = _saved(c, "progress", "switched_off", {})
+	migrate_items(owned_items)
+	migrate_items(switched_off)
 	pet = _saved(c, "progress", "pet", "wolf")
 	night_map = _saved(c, "progress", "night_map", "village")
 	if not MAPS.has(night_map):
 		night_map = "village"
+	fort_map = _saved(c, "progress", "fort_map", "fort")
+	if not FORT_MAPS.has(fort_map):
+		fort_map = "fort"
 	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
 		pet = "wolf"
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class) or ClassDefs.disabled(player_class):
@@ -338,11 +437,14 @@ func save_settings() -> void:
 	c.set_value("progress", "player_class", player_class)
 	c.set_value("input", "auto_jump", auto_jump)
 	c.set_value("input", "vibration", vibration)
+	c.set_value("display", "damage_numbers", damage_numbers)
 	c.set_value("video", "steady_brightness", steady_brightness)
 	c.set_value("video", "brightness", brightness)
 	c.set_value("audio", "music", music_volume)
 	c.set_value("audio", "sound", sound_volume)
 	c.set_value("video", "quality", quality)
+	c.set_value("video", "auto", quality_auto)
+	c.set_value("video", "measured", quality_measured)
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
 	c.set_value("progress", "unlocked", unlocked)
@@ -351,11 +453,15 @@ func save_settings() -> void:
 	c.set_value("progress", "board_prizes", board_prizes)
 	c.set_value("progress", "finished_games", finished_games)
 	c.set_value("progress", "mists_wins", mists_wins)
+	c.set_value("progress", "mesenlla_wins", mesenlla_wins)
+	c.set_value("progress", "bastion_wins", bastion_wins)
+	c.set_value("progress", "changelog_seen", changelog_seen)
 	c.set_value("progress", "poison_dealt", poison_dealt)
 	c.set_value("progress", "owned_items", owned_items)
 	c.set_value("progress", "switched_off", switched_off)
 	c.set_value("progress", "pet", pet)
 	c.set_value("progress", "night_map", night_map)
+	c.set_value("progress", "fort_map", fort_map)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)

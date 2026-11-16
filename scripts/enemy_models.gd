@@ -21,25 +21,23 @@ static func _part(root: Node3D, mesh: Mesh, at := Vector3.ZERO) -> MeshInstance3
 	return mi
 
 
+## A bird (BirdRig) as a creature's body: kept as "bird", its shoulders as "wing_l" and "wing_r".
+static func _bird(root: Node3D, kind: String) -> BirdRig:
+	var rig := BirdRig.new(kind)
+	root.add_child(rig)
+	root.set_meta("bird", rig)
+	root.set_meta("wing_l", rig.shoulders[1])
+	root.set_meta("wing_r", rig.shoulders[0])
+	return rig
+
+
 ## Returns the model. Named parts are stored as metadata for the animation code.
 static func build(id: String) -> Node3D:
 	var root := Node3D.new()
 	match id:
 		"crow":
-			var black := Color(0.08, 0.07, 0.11)
-			_part(root, _mesh("crow_body", func(l: LowPoly) -> void:
-				l.prism(Vector3(0, 0, -0.34), Vector3(0, 0, 0.26), 0.09, 0.17, 6, black)
-				l.prism(Vector3(0, 0.05, 0.26), Vector3(0, 0.09, 0.46), 0.13, 0.1, 6, black)
-				l.prism(Vector3(0, 0.08, 0.46), Vector3(0, 0.05, 0.68), 0.05, 0.0, 4, Color(0.55, 0.45, 0.2))
-				l.box(Vector3(0.08, 0.15, 0.48), Vector3(0.03, 0.03, 0.02), Color(1, 0.2, 0.1))
-				l.box(Vector3(-0.08, 0.15, 0.48), Vector3(0.03, 0.03, 0.02), Color(1, 0.2, 0.1))
-				l.box(Vector3(0, -0.02, -0.5), Vector3(0.18, 0.03, 0.34), black)))
-			var wing := _mesh("crow_wing", func(l: LowPoly) -> void:
-				l.box(Vector3(0.36, 0, 0), Vector3(0.72, 0.03, 0.34), black.lightened(0.08)))
-			root.set_meta("wing_l", _part(root, wing, Vector3(0.06, 0.05, 0)))
-			var wr := _part(root, wing, Vector3(-0.06, 0.05, 0))
-			wr.scale = Vector3(-1, 1, 1)
-			root.set_meta("wing_r", wr)
+			# The Carrion Crow: a ragged crow with burning red eyes (BirdRig "carrion").
+			_bird(root, "carrion")
 		"harrier":
 			# A pale ray of the mist: all wing, with a long whip of a tail and a burning eye each side.
 			var pale := Color(0.74, 0.94, 0.9)

@@ -106,5 +106,73 @@ func _ready() -> void:
 	w.stock_wood()
 	var wood: Pickup = w.pickups.back()
 	await snap("forest_firewood", wood.position + Vector3(5, 3, 5), wood.position + Vector3.UP * 0.4)
+	# A Mercenary's Nightfall from outside, and from inside an enemy's.
+	var spot := Vector3(0, w.ground_at(Vector3(0, 0, 60)), 60)
+	w.spawn_nightfall(99, spot, 6.0, 30.0, 1.5, 0)
+	await get_tree().create_timer(0.4).timeout
+	await snap("nightfall_outside", spot + Vector3(9, 2.4, 9), spot + Vector3.UP * 1.5)
+	hud.visible = true
+	w.player.night_blind_left = 5.0
+	await snap("nightfall_blind", spot + Vector3(0, 1.65, 2), spot + Vector3(0, 1.4, -8))
+	w.player.night_blind_left = 0.0
+	hud.visible = false
+	await snap("nightfall_inside", spot + Vector3(1.5, 1.65, 1.0), spot + Vector3(-4, 0.2, -5))
+	# On a slope: the dome meets the ground all round, and its rim lies on the ground.
+	var hill := spot
+	var steepest := 0.0
+	for i in 60:
+		var probe := Vector3(randf_range(-60, 60), 0, randf_range(-60, 60))
+		var rise := absf(w.ground_at(probe + Vector3(5, 0, 0)) - w.ground_at(probe - Vector3(5, 0, 0)))
+		if rise > steepest and w.grid.is_free(w.grid.to_cell(probe)):
+			steepest = rise
+			hill = Vector3(probe.x, w.ground_at(probe), probe.z)
+	w.spawn_nightfall(98, hill, 6.0, 30.0, 1.5, 0)
+	await get_tree().create_timer(0.4).timeout
+	await snap("nightfall_slope", hill + Vector3(10, 3.5, 6), hill + Vector3.UP * 1.0)
+	# A Cartographer's linked beacons, a Star Reader's constellation and a Worlds Traveler's Waygates.
+	var base := {"kind": "", "max": 3, "link": 24.0, "radius": 4.0, "heal": 2.0, "mark": 10.0, "bonus": 0.2, "power": 15.0, "gate_speed": 0.3, "gate_rest": 3.0, "gate_heal": 0.0, "bits": 0}
+	var field := Vector3(0, 0, 96)
+	for offset: Vector3 in [Vector3(-7, 0, 0), Vector3(7, 0, 0), Vector3(0, 0, -11)]:
+		w.plant_beacon(201, field + offset, base, 0.0)
+	await get_tree().create_timer(0.3).timeout
+	var field_y := w.ground_at(field)
+	await snap("survey_beacons", field + Vector3(0, field_y + 7.0, 14), field + Vector3(0, field_y + 0.5, -4))
+	var stars := base.duplicate()
+	stars["kind"] = "stars"
+	var sky := Vector3(-40, 0, 96)
+	for offset: Vector3 in [Vector3(-8, 0, 0), Vector3(8, 0, 0), Vector3(0, 0, -13)]:
+		w.plant_beacon(202, sky + offset, stars, 0.0)
+	await get_tree().create_timer(0.3).timeout
+	await snap("survey_constellation", sky + Vector3(0, w.ground_at(sky) + 8.0, 13), sky + Vector3(0, w.ground_at(sky) + 0.5, -5))
+	# Starlight striking what stands in the constellation.
+	var struck: Array[Zombie] = []
+	for offset: Vector3 in [Vector3(-2.5, 0, -3), Vector3(2.0, 0, -1.5), Vector3(0.5, 0, -6)]:
+		w.spawn_zombie("normal", sky + offset)
+		var star_target: Zombie = w.zombies.back()
+		star_target.set_physics_process(false)
+		star_target.position.y = w.ground_at(star_target.position)
+		struck.append(star_target)
+	await get_tree().create_timer(0.3).timeout
+	for z: Zombie in struck:
+		SurveyNet.show_starlight(w, z.position, z.centre().y - z.position.y)
+	await snap("survey_starlight", sky + Vector3(1.5, w.ground_at(sky) + 3.2, 6.5), sky + Vector3(0, w.ground_at(sky) + 1.6, -3))
+	for z: Zombie in struck:
+		z.release()
+	var gates := base.duplicate()
+	gates["kind"] = "gates"
+	var road := Vector3(40, 0, 96)
+	w.plant_beacon(203, road, gates, 0.0)
+	w.plant_beacon(203, road + Vector3(10, 0, -8), gates, 0.6)
+	await get_tree().create_timer(0.3).timeout
+	await snap("survey_waygates", road + Vector3(-2, w.ground_at(road) + 2.4, 7), road + Vector3(3, w.ground_at(road) + 1.2, -4))
+	# The rings that warn of what the creatures of Mesenlla are about to bring down: mist, quake, storm, fire, boulder.
+	var rings := Vector3(0, 0, 74)
+	for i in 5:
+		var ring_at := rings + Vector3(-12 + i * 6, 0, 0)
+		ring_at.y = w.ground_at(ring_at)
+		var seal := MistSeal.create(w, ring_at, 2.4, 0.0, 30.0, 0.0, -1, i)
+		seal.elapsed = 12.0
+	await get_tree().create_timer(0.3).timeout
+	await snap("mesenlla_rings", rings + Vector3(0, w.ground_at(rings) + 9.0, 11), rings + Vector3(0, w.ground_at(rings), -1))
 	canvas.queue_free()
 	await preload("res://tests/scene_cleanup.gd").finish(w)

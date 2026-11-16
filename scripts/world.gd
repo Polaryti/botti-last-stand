@@ -9,6 +9,13 @@ signal fort_lost
 
 static var HALF_SIZE := 110.0 # default for legacy callers; each world keeps its own extent
 var half_size := 110.0
+var _falls: Array[Dictionary] = [] # see note_fall
+const LANE_SPAWN_BACK := 4.5 # metres behind a lane's foot, towards its rift, where its enemies step out
+const LANE_SPAWN_SPREAD := 4.0
+const REACH_EDGE := 5 # metres from the edge of the map that count as out of reach: the forest wall stands there
+var _reach := PackedByteArray() # see in_reach
+const SHUN_WEIGHT := 12.0 # how much longer a way through shunned ground counts than one round it
+var shunned: Array[Vector3] = [] # circles to keep off: x, z, radius (see shun_ground)
 const PATHS_PER_FRAME := 1
 const SKY_EVERY := 0.15
 const BELL_GAP := 0.5
@@ -22,6 +29,9 @@ const DAWN_FOG := Color(0.92, 0.66, 0.46)
 static var _shadow_mesh: QuadMesh
 static var _arrow_mesh: Mesh
 static var _stone_mesh: Mesh
+static var _pellet_mesh: Mesh
+static var _keg_mesh: Mesh
+var _ember_spark_mat: StandardMaterial3D
 static var _fireball_mesh: Mesh
 static var _bolt_mesh: ArrayMesh
 static var _axe_proj: Mesh
@@ -32,7 +42,15 @@ static var _mist_warmed_quality := -1
 static var _warmed_quality := -1
 static var _lands := {} # the land takes a moment to work out, and it never changes
 
-var mist_storm: MistStorm
+var mist_storms: Array[MistStorm] = [] # every Mist Storm raging or gathering now
+## The newest Mist Storm, if there is one.
+var mist_storm: MistStorm:
+	get: return mist_storms.back() if not mist_storms.is_empty() else null
+var damage_numbers: DamageNumbers
+var _glows_open := true # halos are gathered until the map is built
+var _glow_batches := {}
+var _scenery: Array[Array] = [] # [node, where, reach squared]: see add_scenery
+var _storm_inside := false # whether whoever is looking stood in a storm last frame
 var mist_seals: Array[MistSeal] = []
 var stone_chains: Array = [] # each line of stones in the Mists, in order, by the middle of each top
 var mode: int = Game.Mode.MENU
@@ -42,14 +60,21 @@ var fort: Fort
 var wood_spots: Array[Vector3] = []
 var yard_wood_spots: Array[Vector3] = []
 var map_roads: Array = []
+## Landmarks the Map screen draws beyond the land and roads: {kind, at, dir, size}, from the map's builders.
+var map_features: Array[Dictionary] = []
 var weather: Weather
 var fog: ClosingFog
 var play_half := 110.0
 var start_spots: Array[Vector3] = []
 var dummy_spots: Array[Vector3] = []
 var rival_spots: Array[Vector3] = []
+## On a stronghold with lanes: {kind: lane, muster or post, gate, at} (see MapSpot).
+var lane_marks: Array[Dictionary] = []
+## Mist Bastion's Mist Soldiers (null on every other map).
+var garrison: Garrison
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
 var _enemy_blocks: StaticBody3D
+var _windows: StaticBody3D
 var portals: MistPortals
 var caches: MistCaches
 var _ledge_body: StaticBody3D
@@ -75,6 +100,10 @@ var church_door := Vector3(0, 0, -36)
 var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
+var cache_spots: Array[Vector3] = [] # where the ruins keep better things than lie about elsewhere
+var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
+var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
+var camp_fallen := false # the Valleys' camp, shelled and lost to the mist
 const PICKUP_APART := 6.0
 const WOOD_GATE_CLEARANCE := 18.0 # forest wood: out of the gates' approaches
 const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itself
@@ -127,6 +156,8 @@ var _night_dome: MeshInstance3D
 var _star_material: StandardMaterial3D
 var _burn_lights: Array[OmniLight3D] = []
 var _burning: Array[Zombie] = []
+var _lit_burning: Array[Zombie] = []
+var _lit_burning_distances := PackedFloat64Array()
 var _bell_swing := 0.0
 var _bell_strokes := 0
 var _bell_wait := 0.0
@@ -165,6 +196,8 @@ var _moon_now := 0.5
 var _moon_colour := Color(0.6, 0.7, 1.0)
 var _fog_now := 0.03
 var _fog_thick := 1.0
+var surveys := {} # Cartographer's peer -> SurveyNet
+var map_id := "village" # which map: village, mists, fort, mesenlla
 var now := 0.0 # game seconds: unlike the system clock, these stop during a pause
 
 
@@ -220,8 +253,9 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
+	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
 	half_size = float(map.land_half)
 	HALF_SIZE = half_size
@@ -239,6 +273,10 @@ func setup(game_mode: int) -> void:
 	_barriers.collision_layer = Terrain.BARRIER
 	_barriers.collision_mask = 0
 	add_child(_barriers)
+	_windows = StaticBody3D.new()
+	_windows.collision_layer = Terrain.BARRIER | Terrain.WINDOW
+	_windows.collision_mask = 0
+	add_child(_windows)
 	_enemy_blocks = StaticBody3D.new()
 	_enemy_blocks.collision_layer = Terrain.ENEMY_ONLY
 	_enemy_blocks.collision_mask = 0
@@ -253,15 +291,32 @@ func setup(game_mode: int) -> void:
 	_build_environment()
 	var builder := MapBuilder.new(self, terrain)
 	builder.quality = Game.quality
-	builder.grass_tufts = Game.grass_count()
+	builder.grass_tufts = int(Game.grass_count() * map.grass)
 	builder.skip_beyond = mode == Game.Mode.MENU
+	# The title screen's camera flies high over the valley, so its grass and flowers are drawn much
+	# further off than a player on foot would need.
+	builder.sight = 3.0 if mode == Game.Mode.MENU else 1.0
+	if mode == Game.Mode.MENU:
+		builder.grass_tufts *= 2 # and seen from up there, thin grass looks like none
 	builder.build(map)
+	flush_glows()
+	damage_numbers = DamageNumbers.new()
+	add_child(damage_numbers)
 	map.free()
+	if fort:
+		for mark: Dictionary in lane_marks:
+			if mark["kind"] == "lane":
+				fort.add_lane(int(mark["gate"]), mark["at"])
+			elif mark["kind"] == "lane_way":
+				fort.add_lane_way(int(mark["gate"]), mark["at"])
+		fort.lay_ways()
 	grid.astar.update()
 	grid.build_far_grid()
 	prepare_forest_wood()
 	if terrain.has_islands():
 		_mists_look()
+	elif map_id in SpawnRules.MESENLLA:
+		_mesenlla_look()
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
 		var atmosphere := MistAtmosphere.new()
 		atmosphere.name = "VillageAura" if fort == null else "FortAura"
@@ -271,6 +326,8 @@ func setup(game_mode: int) -> void:
 	_build_fx()
 	director = Director.new(self)
 	add_child(director)
+	if map_id in SpawnRules.MESENLLA:
+		add_child(Ambience.new(self)) # wisps, motes and falling leaves or mist round the camera
 	if mode == Game.Mode.MENU:
 		menu_camera = Camera3D.new()
 		menu_camera.far = 340.0
@@ -287,6 +344,10 @@ func setup(game_mode: int) -> void:
 		add_child(fog)
 	_build_zombie_pools()
 	prepare_allies("ghost", 1)
+	if map_id == "bastion" and fort:
+		garrison = Garrison.new(self)
+		for kind: String in Garrison.ORDER:
+			prepare_allies(kind, 3)
 	player = Player.new(self)
 	add_child(player)
 	var start: Vector3 = start_spots[0] if not start_spots.is_empty() else Vector3.ZERO
@@ -310,7 +371,8 @@ func setup(game_mode: int) -> void:
 func _start_weather() -> void:
 	var kind: int = Weather.Kind.CLEAR
 	if mode != Game.Mode.SANDBOX:
-		kind = Game.force_weather if Game.force_weather >= 0 else (Net.weather if Net.active() else Weather.roll())
+		kind = Game.force_weather if Game.force_weather >= 0 else (Net.weather if Net.active() else Weather.roll(map_id))
+		kind = Weather.allowed(kind, map_id)
 	weather.set_kind(kind)
 	if not Net.is_client() and kind != Weather.Kind.CLEAR:
 		get_tree().create_timer(5.0).timeout.connect(func() -> void:
@@ -322,6 +384,143 @@ func _start_weather() -> void:
 func weather_changed() -> void:
 	_sky_value = -1.0
 	_apply_sky(_last_dawn)
+
+
+## The shrines bless whoever touches them on this phone, then rest a while, dark, before they will again.
+const SHRINE_REACH := 2.6
+const SHRINE_REST := 120.0
+func _tick_shrines() -> void:
+	for shrine: Dictionary in shrines:
+		var ready := now >= float(shrine["ready_at"])
+		for part: Variant in shrine["glow"]:
+			if part is Node3D and is_instance_valid(part):
+				(part as Node3D).visible = ready
+		if not ready or player == null or player.dead:
+			continue
+		var at: Vector3 = shrine["at"]
+		if Vector2(player.global_position.x - at.x, player.global_position.z - at.z).length() < SHRINE_REACH and absf(player.global_position.y - at.y) < 2.5:
+			shrine["ready_at"] = now + SHRINE_REST
+			for part: Variant in shrine["glow"]:
+				if part is Node3D and is_instance_valid(part):
+					(part as Node3D).visible = false
+			player.bless(shrine["blessing"])
+			director.local_banner(Player.BLESSING_WORDS.get(shrine["blessing"], "Blessed"), 3.5)
+			fx_mist(at + Vector3.UP * 1.2, 1.4)
+
+
+## A watchtower brought down: its body and lamp gone, its stumps and wreckage left where it stood.
+func ruin_tower(tower: Dictionary) -> void:
+	for part: Variant in tower["parts"]:
+		if part is Node3D and is_instance_valid(part):
+			(part as Node3D).visible = false
+	var at: Vector3 = tower["at"]
+	var wreck := MeshInstance3D.new()
+	wreck.mesh = MesenllaBuilder.tower_ruin(float(tower["high"]), int(at.x * 31.0 + at.z * 7.0))
+	wreck.transform = Transform3D(tower["basis"], at)
+	add_child(wreck)
+	fx_blast(at + Vector3.UP * 2.0, 4.0, Color(0.85, 0.5, 1.0, 0.7))
+	fx_gore(at + Vector3.UP * 1.0, Color(0.36, 0.26, 0.18))
+	fx_mist(at + Vector3.UP * 2.0, 3.0)
+	sfx_at("boulder_impact", at, 2.0)
+	tower["ruined"] = true
+
+
+## The Valleys' camp is lost: its towers come down, and a Mist Storm settles over it for the rest of
+## the night. Nothing rises or is found there any more (see storm_at in the spawning).
+func fall_camp(centre: Vector3, radius: float) -> void:
+	if camp_fallen:
+		return
+	camp_fallen = true
+	for tower: Dictionary in watchtowers:
+		var at: Vector3 = tower["at"]
+		if not tower.get("ruined", false) and Vector2(at.x - centre.x, at.z - centre.z).length() <= radius + 4.0:
+			ruin_tower(tower)
+	MistStorm.create_zone(self, centre, radius, "THE CAMP", 4.0)
+	shun_ground(centre, radius + 2.0)
+
+
+## Whether this spot can be walked to from where the players are: not beyond the edge of the map or
+## what closes it, not up a cliff, not sealed in. Things to find are only left in reach, and bots only
+## go for what is. Worked out once, the first time it is asked. The islands of the Mists are joined
+## by their gates rather than by ground, and keep to their own marked spots instead.
+func in_reach(at: Vector3) -> bool:
+	if terrain.has_islands():
+		return true
+	if _reach.is_empty():
+		var starts: Array[Vector3] = []
+		for t: Target in players:
+			if is_instance_valid(t):
+				starts.append(t.global_position)
+		if fort:
+			starts.append(fort.outside_point()) # the gates are shut, but both sides are in the night
+		if starts.is_empty():
+			return true # nobody is here yet to walk from
+		var edge := REACH_EDGE
+		var side := grid.size
+		var half := grid.half
+		_reach = grid.reach_from(starts, func(c: Vector2i) -> bool:
+			return c.x >= edge and c.y >= edge and c.x < side - edge and c.y < side - edge and terrain.is_walkable(c.x + 0.5 - half, c.y + 0.5 - half))
+		if _reach.count(1) < 400:
+			_reach.fill(1) # the start itself was on a ledge: better everything than nothing
+	var cell := grid.to_cell(at)
+	return _reach[cell.y * grid.size + cell.x] == 1
+
+
+## Ground nobody should cross from now on (a Mist Storm that never lifts): ways are planned round it.
+func shun_ground(centre: Vector3, radius: float) -> void:
+	if shunned.any(func(z: Vector3) -> bool: return Vector2(z.x - centre.x, z.y - centre.z).length() < 1.0):
+		return
+	shunned.append(Vector3(centre.x, centre.z, radius))
+	grid.weigh_disc(centre, radius, SHUN_WEIGHT)
+
+
+## Whether this spot is on ground to keep off: under a Mist Storm, or where one is about to settle.
+func ground_shunned(p: Vector3) -> bool:
+	for z: Vector3 in shunned:
+		if Vector2(p.x - z.x, p.z - z.y).length() <= z.z:
+			return true
+	return storm_at(p) != null
+
+
+## The nearest spot off shunned ground, going straight out from the middle of it.
+func off_shunned(p: Vector3) -> Vector3:
+	for z: Vector3 in shunned:
+		var out := Vector2(p.x - z.x, p.z - z.y)
+		if out.length() <= z.z:
+			if out.length() < 0.1:
+				out = Vector2(0, 1)
+			var to := Vector2(z.x, z.y) + out.normalized() * (z.z + 4.0)
+			return Vector3(to.x, ground_at(Vector3(to.x, 0, to.y)), to.y)
+	var storm := storm_at(p)
+	return storm.escape(p) if storm else p
+
+
+## The Mist Storm over this spot, if any.
+func storm_at(p: Vector3) -> MistStorm:
+	for storm: MistStorm in mist_storms:
+		if storm.contains(p):
+			return storm
+	return null
+
+
+## Whether the Regent's storm is over every outer island.
+func storm_finale() -> bool:
+	return mist_storms.any(func(storm: MistStorm) -> bool: return storm.finale)
+
+
+## Thick, violet air for whoever is looking from inside a storm, and the night's own air again
+## when they step out of it or the last storm ends.
+func storm_air() -> void:
+	if player == null:
+		return
+	var here := storm_at(player.global_position)
+	set_fog_thickness((4.0 if here.burning() else 1.5) if here else 1.0)
+	if here:
+		_env.fog_light_color = Color(0.16, 0.1, 0.25)
+	elif _storm_inside:
+		_sky_value = -1.0
+		_apply_sky(_last_dawn)
+	_storm_inside = here != null
 
 
 ## Standing out in the deadly fog, you cannot see far.
@@ -343,9 +542,47 @@ func show_lightning(amount: float) -> void:
 
 
 ## A clear view of the arena sword, its moonlit terraces and the distant islands.
+## The main menu's slow tour of the Valleys of Mesenlla: up the river from the south past the arch,
+## along the outpost, to the great falls, high over the outpost towards the Ring of Stones, back over
+## the woodcutters' camp and down to the river by the bridge. Low only over water and clearings, high
+## over the forest, whose oldest firs stand over thirty metres. Where the camera is and what it looks at
+## both follow smooth curves through these, so it never stops or jerks.
+const MENU_TOUR := [
+	[Vector3(4, 12, 62), Vector3(12, 12, -70)],
+	[Vector3(2, 32, 54), Vector3(22, 8, 14)],
+	[Vector3(34, 30, -4), Vector3(2, 8, -30)],
+	[Vector3(14, 20, -42), Vector3(12, 10, -78)],
+	[Vector3(-14, 44, -22), Vector3(-54, 14, -64)],
+	[Vector3(-34, 34, 28), Vector3(-8, 2, 58)],
+	[Vector3(-14, 13, 60), Vector3(20, 8, 30)],
+]
+const MENU_LEG := 22.0 # seconds from one point of the tour to the next
+
+
 func _menu_view() -> void:
-	menu_camera.position = Vector3(cos(_orbit) * 38.0, 24.0, sin(_orbit) * 38.0)
-	menu_camera.look_at(Vector3(0, 18.0, 0))
+	if map_id != "mesenlla":
+		menu_camera.position = Vector3(cos(_orbit) * 38.0, 24.0, sin(_orbit) * 38.0)
+		menu_camera.look_at(Vector3(0, 18.0, 0))
+		return
+	var n := MENU_TOUR.size()
+	var t := fmod(_orbit / 0.05 / MENU_LEG, float(n))
+	var i := int(t)
+	var f := t - i
+	var at := _tour_point(i, f, 0)
+	var look := _tour_point(i, f, 1)
+	at.y = maxf(at.y, ground_at(at) + 6.0)
+	menu_camera.position = at
+	menu_camera.look_at(look)
+
+
+## A Catmull-Rom curve through the tour, so it passes through every point smoothly.
+func _tour_point(i: int, f: float, which: int) -> Vector3:
+	var n := MENU_TOUR.size()
+	var p0: Vector3 = MENU_TOUR[posmod(i - 1, n)][which]
+	var p1: Vector3 = MENU_TOUR[i % n][which]
+	var p2: Vector3 = MENU_TOUR[(i + 1) % n][which]
+	var p3: Vector3 = MENU_TOUR[(i + 2) % n][which]
+	return 0.5 * ((2.0 * p1) + (-p0 + p2) * f + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * f * f + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * f * f * f)
 
 
 ## Which map scene this game is on. Pressing F6 on a map in the editor overrides it.
@@ -353,12 +590,14 @@ func _map_file() -> String:
 	if Game.test_map != "":
 		return Game.test_map
 	match mode:
-		Game.Mode.MENU: return "res://maps/mists.tscn"
-		Game.Mode.FORT: return "res://maps/fort.tscn"
+		Game.Mode.MENU: return "res://maps/mesenlla.tscn"
+		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
 			if Game.current_map() == "mists":
 				return "res://maps/mists.tscn"
+			if Game.current_map() == "mesenlla":
+				return "res://maps/mesenlla.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -453,6 +692,16 @@ func ground_at(at: Vector3) -> float:
 	return h
 
 
+## A window's opening: it stops bodies like a barrier, and blades (see _reachable), not sight or shots.
+func add_window_xf(t: Transform3D, size: Vector3) -> void:
+	var shape := BoxShape3D.new()
+	shape.size = size
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = t
+	_windows.add_child(cs)
+
+
 func add_barrier(at: Vector3, size: Vector3) -> void:
 	var shape := BoxShape3D.new()
 	shape.size = size
@@ -483,11 +732,27 @@ func in_firelight(p: Vector3) -> bool:
 	return false
 
 
+## Right at the stones of a bonfire, close enough to be scorched.
+func at_bonfire(p: Vector3) -> bool:
+	for f: Dictionary in fires:
+		if f["heals"] and Vector2(p.x - f["at"].x, p.z - f["at"].z).length_squared() < WorldLight.SCORCH_REACH * WorldLight.SCORCH_REACH \
+				and absf(p.y - f["at"].y) < 3.0:
+			return true
+	return false
+
+
 func beside_bonfire(p: Vector3) -> bool:
 	for f: Dictionary in fires:
 		if f["heals"] and p.distance_squared_to(f["at"]) < 18.0:
 			return true
 	return false
+
+
+## A light or a drift of particles that is part of the scenery: only switched on while whoever is
+## looking is within reach of it. A light costs every surface it touches and particles are moved one
+## by one each frame, seen or not, so the far ones are put out.
+func add_scenery(node: Node3D, reach: float) -> void:
+	_scenery.append([node, node.global_position if node.is_inside_tree() else node.position, reach * reach])
 
 
 ## Only fires near the player cast light, because a phone can only afford a few.
@@ -499,6 +764,13 @@ func _tick_fires(delta: float) -> void:
 	var cam := _player_camera_position()
 	var t := Time.get_ticks_msec() * 0.001
 	var bright := smoothstep(0.25, 1.0, _sky_value) if _sky_value > 0.0 else 0.0
+	for item: Array in _scenery:
+		var node: Node3D = item[0]
+		var show: bool = cam.distance_squared_to(item[1]) < float(item[2])
+		if node.visible != show:
+			node.visible = show
+			if node is CPUParticles3D:
+				(node as CPUParticles3D).emitting = show
 	for f: Dictionary in fires:
 		var l: OmniLight3D = f["light"]
 		if l == null:
@@ -528,6 +800,19 @@ func add_rotated_collider(xf: Transform3D, size: Vector3) -> void:
 	cs.shape = shape
 	cs.transform = xf
 	_body.add_child(cs)
+
+
+## A solid of any convex shape (points in xf's space): a tent's roof, sloping to a ridge with no
+## flat top. Mobs walk by the grid, which is blocked under the shape's footprint (`footprint`, a box
+## centred on xf).
+func add_convex_solid(xf: Transform3D, points: PackedVector3Array, footprint: Vector3) -> void:
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = points
+	var cs := CollisionShape3D.new()
+	cs.shape = shape
+	cs.transform = xf
+	_body.add_child(cs)
+	grid.block_turned(xf.translated_local(Vector3.UP * footprint.y * 0.5), footprint)
 
 
 func _on_fort_fallen() -> void:
@@ -621,28 +906,66 @@ func add_solid(at: Vector3, size: Vector3) -> void:
 
 func add_lantern_light(l: OmniLight3D) -> void:
 	_lanterns.append(l)
+	add_scenery(l, 55.0)
 
 
-func add_glow(at: Vector3, col: Color, size: float, fade_at := 0.0) -> void:
+## A soft halo of light in the air. While the map is being built, halos of one colour that fade at
+## the same distance are gathered by 48 m square and drawn together (flush_glows); one asked for
+## with `own`, or made later, is a node of its own, which is returned.
+func add_glow(at: Vector3, col: Color, size: float, fade_at := 0.0, own := false) -> MeshInstance3D:
 	if not _glow_material_cache.has(col):
 		var m := StandardMaterial3D.new()
 		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 		m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		m.billboard_keep_scale = true
 		m.albedo_texture = load("res://assets/sprites/glow.png")
 		m.albedo_color = Color(col, 0.75)
 		m.disable_fog = true
 		_glow_material_cache[col] = m
+	if _glows_open and not own:
+		var key := [col, fade_at, int(floor(at.x / 48.0)), int(floor(at.z / 48.0))]
+		if not _glow_batches.has(key):
+			_glow_batches[key] = []
+		(_glow_batches[key] as Array).append(Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * size), at))
+		return null
 	var q := QuadMesh.new()
-	q.size = Vector2(size, size)
 	q.material = _glow_material_cache[col]
 	var g := MeshInstance3D.new()
 	g.mesh = q
 	g.position = at
+	g.scale = Vector3.ONE * size
 	g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	g.visibility_range_end = fade_at
 	add_child(g)
+	return g
+
+
+## The halos gathered while the map was built, drawn a batch at a time.
+func flush_glows() -> void:
+	_glows_open = false
+	for key: Array in _glow_batches:
+		var list: Array = _glow_batches[key]
+		var q := QuadMesh.new()
+		q.material = _glow_material_cache[key[0]]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = q
+		mm.instance_count = list.size()
+		var middle := Vector3.ZERO
+		for t: Transform3D in list:
+			middle += t.origin / list.size()
+		for i in list.size():
+			var t: Transform3D = list[i]
+			mm.set_instance_transform(i, Transform3D(t.basis, t.origin - middle))
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.position = middle
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mmi.visibility_range_end = float(key[1])
+		add_child(mmi)
+	_glow_batches.clear()
 
 
 # --- Night, fog and sky ------------------------------------------------------
@@ -654,7 +977,7 @@ func _build_environment() -> void:
 	_env.fog_enabled = true
 	_env.fog_sky_affect = 0.0
 	_env.fog_density = 0.03
-	_env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	_grade()
 	var we := WorldEnvironment.new()
 	we.environment = _env
 	add_child(we)
@@ -666,6 +989,62 @@ func _build_environment() -> void:
 	_moon.directional_shadow_max_distance = 45.0
 	add_child(_moon)
 	_build_sky()
+
+
+## How the picture is finished. A filmic curve keeps fires, portals and the dawn sky from burning out
+## to flat white and gives the dark its depth; a little more contrast and colour; and on Medium and
+## High, light blooms softly from whatever glows (cheaper on Medium: fewer, coarser layers).
+func _grade() -> void:
+	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	_env.tonemap_exposure = 1.18
+	_env.tonemap_white = 3.2
+	_env.adjustment_enabled = true
+	_env.adjustment_contrast = 1.07
+	_env.adjustment_saturation = 1.12
+	_env.glow_enabled = Game.quality > 0
+	if _env.glow_enabled:
+		_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
+		_env.glow_intensity = 0.85
+		_env.glow_strength = 0.9
+		_env.glow_bloom = 0.06
+		_env.glow_hdr_threshold = 0.6
+		_env.glow_hdr_scale = 1.6
+		for level in 7:
+			_env.set_glow_level(level, 0.0)
+		_env.set_glow_level(1, 0.7)
+		_env.set_glow_level(2, 1.0)
+		if Game.quality == 2:
+			_env.set_glow_level(3, 0.8)
+			_env.set_glow_level(4, 0.45)
+
+
+## Mesenlla: a luminous twilight that never quite becomes night. The sky still glows rose and amber
+## in the west, the light is violet and soft, and mist drifts lilac over the meadows.
+func _mesenlla_look() -> void:
+	night_bg = Color(0.1, 0.07, 0.17)
+	night_fog_colour = Color(0.26, 0.19, 0.31)
+	night_fog = 0.011 if Game.quality > 0 else 0.014
+	day_fog = 0.004 if Game.quality > 0 else 0.008
+	night_ambient = Color(0.5, 0.45, 0.66)
+	night_sky_shows = true
+	night_moon_colour = Color(1.0, 0.72, 0.6)
+	night_moon = 0.55
+	if map_id == "bastion":
+		# Up on the peaks the twilight is colder, and the Great Portal's mist is everywhere.
+		night_fog_colour = Color(0.2, 0.2, 0.32)
+		night_ambient = Color(0.46, 0.48, 0.68)
+		night_moon_colour = Color(0.9, 0.78, 0.86)
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.name = "MesenllaAura"
+	atmosphere.world = self
+	atmosphere.place = MistAtmosphere.Place.MESENLLA
+	add_child(atmosphere)
+	# Islands hang high and far off: the sky has to be further away than they are.
+	_sky_root.scale = Vector3.ONE * 2.3
+	_sky_material.set_shader_parameter("dusk", 1.0)
+	_sky_material.set_shader_parameter("tint", Vector3(1.0, 0.95, 1.25) if map_id == "bastion" else Vector3(1.1, 0.95, 1.2))
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
 
 
 ## A violet night with nothing under it.
@@ -799,6 +1178,10 @@ func _process(delta: float) -> void:
 	for s: Dictionary in _spinners:
 		(s["node"] as Node3D).rotate_object_local(s["axis"], float(s["speed"]) * delta)
 	_tick_fires(delta)
+	if not mist_storms.is_empty() or _storm_inside:
+		storm_air()
+	if not shrines.is_empty():
+		_tick_shrines()
 	_sky_root.position = _player_camera_position()
 	if mode == Game.Mode.MENU:
 		_orbit += delta * 0.05
@@ -882,6 +1265,25 @@ func local_players() -> Array[Player]:
 	return out
 
 
+## Healing this phone's player gave to `peer` (a friend, or a bot): a green number over them. Not
+## for the player themselves: they see their own bar fill.
+func show_heal_on_peer(peer: int, amount: float) -> void:
+	if player == null or peer == player.net_id():
+		return
+	var body: Node3D = Net.avatar(peer)
+	if body == null:
+		body = Net.local_player(peer)
+	if body == null or not is_instance_valid(body) or body == player:
+		return
+	damage_numbers.show_heal(body.get_instance_id(), body.global_position + Vector3.UP * 2.1, amount)
+
+
+## Healing for one of the player's own summons.
+func show_heal_on(body: Node3D, amount: float) -> void:
+	if body and is_instance_valid(body):
+		damage_numbers.show_heal(body.get_instance_id(), body.global_position + Vector3.UP * 1.6, amount)
+
+
 func peer_of(t: Target) -> int:
 	if t is Avatar:
 		return (t as Avatar).peer
@@ -947,25 +1349,33 @@ func nearest_zombie_excluding(from: Vector3, radius: float, excluded: Array[RID]
 	return best
 
 
+var _weapon_regions: Array[int] = []
+
+
 func nearest_weapon_pickup(from: Vector3, radius: float) -> Pickup:
-	var regions: Array[int] = []
-	if portals: regions = MapIslands.regions()
+	if portals and _weapon_regions.is_empty(): _weapon_regions = MapIslands.regions()
 	var source_island := portals.island_of(from) if portals else -1
 	var best: Pickup = null
 	var best_d := radius * radius
 	for p in pickups:
 		if p.kind != Pickup.Kind.WEAPON or WeaponDefs.ALL.get(p.weapon_id, {}).get("hidden", false):
 			continue
+		var d := p.global_position.distance_squared_to(from)
+		if d >= best_d: continue
 		if not grid.is_free(grid.to_cell(p.global_position)) or absf(p.global_position.y - ground_at(p.global_position)) > 2.5:
 			continue
 		if portals:
 			var target_island := portals.island_of(p.global_position)
-			if source_island < 0 or target_island < 0 or regions[source_island] != regions[target_island]: continue
-		var d := p.global_position.distance_squared_to(from)
-		if d < best_d:
-			best_d = d
-			best = p
+			if source_island < 0 or target_island < 0 or _weapon_regions[source_island] != _weapon_regions[target_island]: continue
+		best_d = d
+		best = p
 	return best
+
+
+## Whether a blow can reach from a to b: nothing solid between, and no window either.
+func _reachable(a: Vector3, b: Vector3) -> bool:
+	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.LAYER | Terrain.WINDOW)
+	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
 func has_line_of_sight(a: Vector3, b: Vector3) -> bool:
@@ -1070,8 +1480,10 @@ func forget_around(at: Vector3, radius: float) -> int:
 
 func zombies_near(at: Vector3, radius: float, limit: int) -> Array[Zombie]:
 	var out: Array[Zombie] = []
+	if radius < 0.0: return out
+	var radius_squared := radius * radius
 	for z in zombies:
-		if z.is_alive() and not z.dormant and z.position.distance_to(at) <= radius:
+		if z.is_alive() and not z.dormant and z.position.distance_squared_to(at) <= radius_squared:
 			out.append(z)
 			if out.size() >= limit:
 				break
@@ -1079,9 +1491,11 @@ func zombies_near(at: Vector3, radius: float, limit: int) -> Array[Zombie]:
 
 
 func ally_near(at: Vector3, radius: float) -> bool:
+	if radius < 0.0: return false
+	var radius_squared := radius * radius
 	var owner_player := acting()
 	for a in allies:
-		if not a.dead and a.remote_owner == 0 and a.master == owner_player and a.position.distance_to(at) <= radius:
+		if not a.dead and a.remote_owner == 0 and a.master == owner_player and a.position.distance_squared_to(at) <= radius_squared:
 			return true
 	return false
 
@@ -1165,7 +1579,8 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 			continue
 		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos(minf(half_cone + atan2(body, dist), PI)):
 			continue
-		if not has_line_of_sight(origin, centre):
+		# A blade cannot reach through a wall, nor through a window.
+		if not _reachable(origin, centre):
 			continue
 		damage_zombie(z, attacker.modify_damage(z, float(stats["damage"])), forward, float(stats["knock"]), centre, false)
 		attacker.on_melee_connect(z, d)
@@ -1188,7 +1603,7 @@ func _melee_rivals(attacker: Player, origin: Vector3, flat_forward: Vector3, ran
 			continue
 		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos_limit:
 			continue
-		if has_line_of_sight(origin, centre):
+		if _reachable(origin, centre):
 			hit_rival(t, damage, attacker.global_position)
 			fx_gore(centre, Color(0.6, 0.1, 0.08))
 			attacker.on_hit(false)
@@ -1209,21 +1624,54 @@ func _shot_mesh(id: String) -> Mesh:
 	match id:
 		"javelin":
 			return WeaponDefs.mesh("javelins")
+		"chakram":
+			return WeaponDefs.chakram_mesh()
+		"bolas":
+			return WeaponDefs.bolas_mesh()
 		"stone":
 			if _stone_mesh == null:
 				var l := LowPoly.new()
 				l.box(Vector3.ZERO, Vector3(0.09, 0.09, 0.09), Color(0.5, 0.5, 0.48))
 				_stone_mesh = l.commit()
 			return _stone_mesh
+		"keg":
+			# The Great Keg: a powder keg, staves, iron hoops, and its burning fuse on top.
+			if _keg_mesh == null:
+				var l := LowPoly.new()
+				l.prism(Vector3(0, -0.13, 0), Vector3(0, 0.13, 0), 0.1, 0.1, 8, Color(0.46, 0.28, 0.13))
+				l.prism(Vector3(0, -0.06, 0), Vector3(0, 0.06, 0), 0.12, 0.12, 8, Color(0.5, 0.31, 0.15))
+				for y: float in [-0.1, 0.1]:
+					l.prism(Vector3(0, y - 0.012, 0), Vector3(0, y + 0.012, 0), 0.115, 0.115, 8, Color(0.22, 0.2, 0.2))
+				l.prism(Vector3(0, 0.13, 0), Vector3(0.03, 0.22, 0), 0.012, 0.01, 4, Color(0.3, 0.25, 0.18))
+				l.box(Vector3(0.035, 0.235, 0), Vector3(0.035, 0.035, 0.035), Color(1.0, 0.75, 0.25))
+				_keg_mesh = l.commit()
+			return _keg_mesh
+		"pellet":
+			# Grapeshot: a lump of hot iron, a little star of two crossed cubes glowing like a coal.
+			if _pellet_mesh == null:
+				var l := LowPoly.new()
+				l.box(Vector3.ZERO, Vector3(0.08, 0.08, 0.08), Color(1.0, 0.55, 0.18))
+				l.box(Vector3.ZERO, Vector3(0.08, 0.08, 0.08), Color(0.95, 0.4, 0.12), Vector3(45, 45, 0))
+				_pellet_mesh = l.commit()
+			return _pellet_mesh
 	return _arrow_mesh
 
 
-func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_range: float, knock: float, dmg: float, from_hand := true) -> void:
+## `look`: what flies, when it is not the weapon's own shot ("pellet" for Grapeshot).
+func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_range: float, knock: float, dmg: float, from_hand := true, look := "") -> Projectile:
 	var bounce := int(p.m("bounces")) + (PowerDefs.BOUNCES if p.has_power("bounce_arrows") else 0)
 	var burning := p.has_power("fire_arrows") or (p.is_riding() and (p.has_flag("riding_fire") or p.has_flag("war_machine")))
 	var d := p.weapon_def() if from_hand else {}
-	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
+	bounce += int(d.get("bounces", 0))
+	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(look if look != "" else str(d.get("shot", ""))), at, vel, grav, max_range, dmg, knock, burning, bounce)
 	if shot:
+		var kind := str(d.get("shot", ""))
+		shot.spins = kind == "chakram" or kind == "bolas"
+		if kind == "chakram":
+			shot.hit_sound = "chakram_hit"
+		elif kind == "bolas":
+			shot.hit_sound = "bolas_wrap"
+		shot.slow_secs = float(d.get("slows", 0.0))
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
@@ -1233,7 +1681,8 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+			Net.shot(6 if look == "pellet" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+	return shot
 
 
 func familiar_arrow(p: Player, target: Node3D) -> void:
@@ -1242,6 +1691,98 @@ func familiar_arrow(p: Player, target: Node3D) -> void:
 	var dir := (aim - from).normalized()
 	spawn_player_arrow(p, from, dir * 40.0, 0.0, PowerDefs.ARCHER_RANGE + 5.0, 1.0, WeaponDefs.DAMAGE * p.damage_multiplier(), false)
 	sfx_at("bow", from, -9.0)
+
+
+## A Highwayman's thrown knife.
+func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float, bounce: int, bleed: bool, slows: bool, close: bool) -> void:
+	var shot := _launch(Projectile.Kind.ARROW, WeaponDefs.mesh("dagger"), at, vel, 0.0, max_range, dmg, 1.0, false, bounce)
+	if shot == null:
+		return
+	shot.set_owner_player(p)
+	shot.from_player = true
+	shot.spins = true
+	shot.spin_axis = Vector3.RIGHT
+	if bleed:
+		shot.bleed = Vector2(8.0, 4.0)
+	if slows:
+		shot.slow_secs = AbilityNumbers.FAN_SLOW
+	if close:
+		shot.close_from = at
+	if Net.active():
+		Net.shot(4, at, vel, 0.0, max_range, false, Color.WHITE)
+
+
+## A Mercenary's Nightfall, on this phone.
+## A Cartographer's beacon: added to that Cartographer's own set of markers, made on first use.
+func plant_beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> SurveyNet:
+	var found: Variant = surveys.get(owner_peer)
+	var survey: SurveyNet = found if found != null and is_instance_valid(found) else null
+	if survey == null:
+		survey = SurveyNet.new(self, owner_peer)
+		add_child(survey)
+		surveys[owner_peer] = survey
+	at.y = ground_at(at)
+	survey.add(at, cfg, yaw)
+	return survey
+
+
+## A Cartographer's beacons take up its new settings.
+func refresh_survey(owner_peer: int, cfg: Dictionary) -> void:
+	var found: Variant = surveys.get(owner_peer)
+	if found != null and is_instance_valid(found):
+		(found as SurveyNet).refresh(cfg)
+
+
+## A Paladin's Consecration. Every phone makes its own and looks after its own people inside it.
+func spawn_consecration(owner_peer: int, at: Vector3, radius: float, seconds: float) -> Consecration:
+	at.y = ground_at(at)
+	var c := Consecration.new(self, owner_peer, at, radius, seconds)
+	add_child(c)
+	sfx_at("chime", at, -2.0)
+	return c
+
+
+## A Class Upgrade's field (PathField), on this phone. Its owner's phone does what it does to enemies.
+func spawn_path_field(owner_peer: int, kind: String, at: Vector3) -> PathField:
+	at.y = ground_at(at)
+	var f := PathField.new(self, owner_peer, kind, at)
+	add_child(f)
+	return f
+
+
+## A Rat King's Rat Tide, as seen on this phone.
+func spawn_rat_tide(from: Vector3, dir: Vector3) -> void:
+	add_child(RatTide.new(from, dir))
+
+
+## Where enemies fell lately (for a Necromancer's Grave Call), on every phone.
+func note_fall(at: Vector3) -> void:
+	_falls.append({"at": at, "t": now})
+	if _falls.size() > 40:
+		_falls.pop_front()
+
+
+func recent_falls(seconds: float) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for f: Dictionary in _falls:
+		if now - float(f["t"]) <= seconds:
+			out.append(f)
+	return out
+
+
+## A grave once raised is not raised again.
+func forget_fall(at: Vector3) -> void:
+	for i in range(_falls.size() - 1, -1, -1):
+		if (_falls[i]["at"] as Vector3).distance_to(at) < 0.05:
+			_falls.remove_at(i)
+
+
+func spawn_nightfall(owner_peer: int, at: Vector3, radius: float, seconds: float, linger: float, bits: int) -> NightfallDome:
+	at.y = ground_at(at)
+	var dome := NightfallDome.new(self, owner_peer, at, radius, seconds, linger, bits)
+	add_child(dome)
+	sfx_at("nightfall", at, -2.0)
+	return dome
 
 
 func spawn_axe(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: float, dmg: float) -> void:
@@ -1278,6 +1819,32 @@ func spawn_bolt(p: Player, at: Vector3, vel: Vector3, max_range: float, knock: f
 			shot.scale = Vector3.ONE * 2.0
 		else:
 			shot.scale = Vector3.ONE
+
+
+## A Mist Ranger's arrow: it belongs to nobody, so nobody is credited with what it kills.
+## `kind`: "fire" sets what it hits burning, "poison" poisons it (Mist Reinforcements, Level 3).
+const GARRISON_POISON := Vector2(6.0, 5.0) # damage per second, and seconds
+
+## A Mist Soldier's arrow, from its bow ("bow", "longbow" or "crossbow": its speed and reach are that
+## weapon's; a Crossbow bolt flies faster and flatter than a player's, down from the walls).
+func garrison_arrow(from: Vector3, target: Vector3, dmg: float, kind := "", weapon := "bow") -> void:
+	var speed := 40.0
+	var reach := 30.0
+	if weapon == "longbow":
+		speed = float(WeaponDefs.ALL["longbow"]["speed"])
+		reach = Ally.PERCH_REACH + 6.0
+	elif weapon == "crossbow":
+		speed = 34.0
+		reach = Ally.PERCH_CLOSE + 8.0
+	var vel := (target - from).normalized() * speed
+	var shot := _launch(Projectile.Kind.ARROW, _shot_mesh(""), from, vel, 0.0, reach, dmg, 1.0, kind == "fire")
+	if shot:
+		shot.garrison = true
+		if kind == "poison":
+			shot.poison = GARRISON_POISON
+		if Net.active():
+			Net.shot(0, from, vel, 0.0, reach, kind == "fire", Color(0.2, 0.9, 0.1) if kind == "poison" else Color.WHITE)
+	sfx_at("crossbow" if weapon == "crossbow" else "bow", from, -9.0)
 
 
 func mirror_bolt(from: Vector3, target: Vector3) -> void:
@@ -1371,7 +1938,7 @@ func set_up_stands() -> void:
 						entries.append([Pickup.Kind.WEAPON, id])
 			"item":
 				for id: String in PowerDefs.ALL:
-					if not PowerDefs.ALL[id]["familiar"]:
+					if not PowerDefs.ALL[id]["familiar"] and not PowerDefs.ALL[id].has("spec"):
 						entries.append([Pickup.Kind.POWER, id])
 				for id: String in PowerDefs.FOODS:
 					entries.append([Pickup.Kind.FOOD, id])
@@ -1424,8 +1991,9 @@ func sandbox_clear() -> void:
 
 
 ## Something thrown by hand, that does its work where it lands.
-func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burning := false, size := 1.0) -> Projectile:
-	var shot := _launch(Projectile.Kind.BOLT, _orb_mesh(col), at, vel, 14.0, 70.0, 0.0, 0.0, burning)
+## `look`: "keg" throws the Great Keg's keg instead of a ball.
+func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burning := false, size := 1.0, look := "") -> Projectile:
+	var shot := _launch(Projectile.Kind.BOLT, _shot_mesh("keg") if look == "keg" else _orb_mesh(col), at, vel, 14.0, 70.0, 0.0, 0.0, burning)
 	if shot == null:
 		burst.call(at + vel * 0.5)
 		return null
@@ -1434,8 +2002,10 @@ func spawn_thrown(at: Vector3, vel: Vector3, col: Color, burst: Callable, burnin
 	shot.blast_radius = 0.01
 	shot.on_burst = burst
 	shot.scale = Vector3.ONE * size
+	if look == "keg":
+		shot.spins = true
 	if Net.active():
-		Net.shot(2, at, vel, 14.0, 70.0, burning, col)
+		Net.shot(7 if look == "keg" else 2, at, vel, 14.0, 70.0, burning, col)
 	return shot
 
 
@@ -1452,13 +2022,20 @@ func spawn_dart(at: Vector3, vel: Vector3, dmg: float, jumps: int) -> void:
 			Net.shot(2, at, vel, 0.0, 40.0, false, col)
 
 
-## A line of light between two points, for a moment.
-func fx_spark(a: Vector3, b: Vector3) -> void:
+## A line of light between two points, for a moment. `ember`: orange, a spray of burning powder,
+## rather than lightning's blue-white.
+func fx_spark(a: Vector3, b: Vector3, ember := false) -> void:
 	var m := _sparks[_next_spark]
 	_next_spark = (_next_spark + 1) % _sparks.size()
 	var length := a.distance_to(b)
 	if length < 0.05:
 		return
+	if ember and _ember_spark_mat == null:
+		_ember_spark_mat = StandardMaterial3D.new()
+		_ember_spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_ember_spark_mat.albedo_color = Color(1.0, 0.62, 0.22)
+		_ember_spark_mat.disable_fog = true
+	m.material_override = _ember_spark_mat if ember else null
 	m.look_at_from_position((a + b) * 0.5, b, Vector3.UP if absf((b - a).normalized().y) < 0.98 else Vector3.RIGHT)
 	m.scale = Vector3(1, 1, length)
 	m.visible = true
@@ -1478,16 +2055,22 @@ func place_sentry(p: Player, at: Vector3, seconds: float) -> void:
 
 func _sentry_mesh() -> Mesh:
 	if _sentry_look == null:
-		var iron := Color(0.27, 0.29, 0.32)
-		var brass := Color(0.72, 0.56, 0.22)
-		var l := LowPoly.new()
-		for a: float in [0.0, TAU / 3.0, TAU * 2.0 / 3.0]:
-			l.prism(Vector3(0, 0.95, 0), Vector3(cos(a) * 0.55, 0.0, sin(a) * 0.55), 0.05, 0.04, 5, Color(0.36, 0.24, 0.14))
-		l.box(Vector3(0, 1.08, 0), Vector3(0.36, 0.3, 0.56), iron)
-		l.prism(Vector3(0, 1.12, -0.2), Vector3(0, 1.12, -1.0), 0.06, 0.05, 6, brass)
-		l.box(Vector3(0, 1.12, -0.32), Vector3(1.0, 0.06, 0.06), Color(0.36, 0.24, 0.14))
-		_sentry_look = l.commit()
+		_sentry_look = sentry_model()
 	return _sentry_look
+
+
+## The Clockwork Sentry: a tripod, an iron box and a brass barrel pointing -Z. The Store's stage shows
+## the same one.
+static func sentry_model() -> Mesh:
+	var iron := Color(0.27, 0.29, 0.32)
+	var brass := Color(0.72, 0.56, 0.22)
+	var l := LowPoly.new()
+	for a: float in [0.0, TAU / 3.0, TAU * 2.0 / 3.0]:
+		l.prism(Vector3(0, 0.95, 0), Vector3(cos(a) * 0.55, 0.0, sin(a) * 0.55), 0.05, 0.04, 5, Color(0.36, 0.24, 0.14))
+	l.box(Vector3(0, 1.08, 0), Vector3(0.36, 0.3, 0.56), iron)
+	l.prism(Vector3(0, 1.12, -0.2), Vector3(0, 1.12, -1.0), 0.06, 0.05, 6, brass)
+	l.box(Vector3(0, 1.12, -0.32), Vector3(1.0, 0.06, 0.06), Color(0.36, 0.24, 0.14))
+	return l.commit()
 
 
 func _tick_sentries(delta: float) -> void:
@@ -1545,6 +2128,7 @@ func burn_tick(z: Zombie) -> void:
 	if z.phases:
 		mult *= 2.0
 	z.next_hitter = z.last_hitter
+	z.dot_kind = "fire"
 	z.take_damage(6.0 * mult, Vector3.ZERO, 0.0, z.centre())
 	if who and who == player:
 		player.hit_marker = maxf(player.hit_marker, 0.35)
@@ -1560,14 +2144,34 @@ func _tick_burn_lights() -> void:
 	for i in range(_burning.size() - 1, -1, -1):
 		if _burning[i].burn_time <= 0.0 or not _burning[i].is_alive():
 			_burning.remove_at(i)
-	for i in _burn_lights.size():
-		var l := _burn_lights[i]
-		if i < _burning.size():
-			l.visible = true
-			l.global_position = _burning[i].centre() + Vector3.UP * 0.3
-			l.light_energy = 2.2 + sin(Time.get_ticks_msec() * 0.02 + i) * 0.5
-		else:
-			l.visible = false
+	var count := _burn_lights.size()
+	if count == 0: return
+	if _lit_burning.size() != count:
+		_lit_burning.resize(count)
+		_lit_burning_distances.resize(count)
+	for i in count:
+		_lit_burning[i] = null
+		_lit_burning_distances[i] = INF
+	var camera_at := _player_camera_position()
+	# Only the small fixed light budget is ranked; no sorting or per-frame candidate arrays.
+	for z in _burning:
+		var distance_squared := camera_at.distance_squared_to(z.centre())
+		for slot in count:
+			if distance_squared < _lit_burning_distances[slot]:
+				for shift in range(count - 1, slot, -1):
+					_lit_burning[shift] = _lit_burning[shift - 1]
+					_lit_burning_distances[shift] = _lit_burning_distances[shift - 1]
+				_lit_burning[slot] = z
+				_lit_burning_distances[slot] = distance_squared
+				break
+	var now := Time.get_ticks_msec() * 0.02
+	for i in count:
+		var light := _burn_lights[i]
+		var z := _lit_burning[i]
+		light.visible = z != null
+		if z:
+			light.global_position = z.centre() + Vector3.UP * 0.3
+			light.light_energy = 2.2 + sin(now + i) * 0.5
 
 
 # --- Spawning ----------------------------------------------------------------
@@ -1586,8 +2190,7 @@ func _build_zombie_pools() -> void:
 
 func spawn_map() -> String:
 	if mode == Game.Mode.SANDBOX: return ""
-	if mode == Game.Mode.FORT: return "fort"
-	return "mists" if terrain.has_islands() else "village"
+	return map_id
 
 
 func spawn_zombie(id: String, at := Vector3.INF) -> bool:
@@ -1595,13 +2198,13 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	models.shuffle()
 	var pool: Array = []
 	for m: String in models:
-		if _pools.has(m) and not (_pools[m] as Array).is_empty():
+		if _pools.has(m) and (_pools[m] as Array).size() > _kept_back(m, id):
 			pool = _pools[m]
 			break
 	if pool.is_empty():
 		return false
 	# Defend the Fort: each new zombie goes against the gate with the fewest, and rises on its side.
-	var gate := fort.least_pressed_gate(zombies) if fort and fort.gates.size() == 4 else -1
+	var gate := fort.least_pressed_gate(zombies) if fort and not fort.gates.is_empty() else -1
 	if at == Vector3.INF:
 		at = _pick_spawn_point(gate)
 		if at == Vector3.INF and gate >= 0:
@@ -1612,11 +2215,45 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	zombies.append(z)
 	var minute := director.minute() if director else 0
 	z.spawn(id, at, minute)
+	if z.is_boss() and director and not _warming and not Net.is_client():
+		director.boss_entrance(id) # every boss enters with its card (Director.BOSS_CARDS)
 	z.fort_gate = gate
+	if fort and fort.has_lanes():
+		z.fort_gate = fort.lane_at(at) # wherever it rose, that lane is its own from now on
 	z.fort_shortcut = randf() < 0.25
+	if z.def.has("elements") and not _warming:
+		# Fire, Ice or Storm, a third each.
+		var elements: Array = z.def["elements"]
+		z.set_element(str(elements[randi() % elements.size()]))
 	if Net.is_host() and not _warming:
 		Net.zombie_spawned(z, id, z.position, minute)
+		if z.def.has("weapons"):
+			# It picked its weapon at random here; every phone shows the same one.
+			Net.zombie_weapon(z)
+		if z.element != "":
+			Net.zombie_element(z)
+	if z.def.has("riders") and not _warming:
+		_seat_riders(z)
 	return true
+
+
+## The War Wyvern's riders, each a creature of its own (wyvern_rider), in its saddle.
+func _seat_riders(wyvern: Zombie) -> void:
+	for i in int(wyvern.def["riders"]):
+		if not spawn_zombie("wyvern_rider", wyvern.position):
+			return
+		var rider: Zombie = zombies.back()
+		rider.mount_on(wyvern, i)
+		if Net.is_host():
+			Net.zombie_mount(rider, wyvern, i)
+
+
+## Bodies of a kind held back for something still to come: on a map the War Wyvern can still attack,
+## two Children of the Woods for its riders.
+func _kept_back(model: String, id: String) -> int:
+	if model == "woods_child" and id != "wyvern_rider" and map_id == "bastion" and director and not director._mist_boss_spawned:
+		return int(ZombieDefs.ALL["war_wyvern"]["riders"])
+	return 0
 
 
 func zombie_by_id(id: int) -> Zombie:
@@ -1664,9 +2301,22 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = _axe_proj
 	elif mesh == 2:
 		m = _orb_mesh(col)
+	elif mesh == 3:
+		m = WeaponDefs.chakram_mesh()
+	elif mesh == 4:
+		m = WeaponDefs.mesh("dagger")
+	elif mesh == 5:
+		m = WeaponDefs.bolas_mesh()
+	elif mesh == 6:
+		m = _shot_mesh("pellet")
+	elif mesh == 7:
+		m = _shot_mesh("keg")
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
+		shot.spins = mesh == 3 or mesh == 4 or mesh == 5 or mesh == 7
+		if mesh == 4:
+			shot.spin_axis = Vector3.RIGHT
 		if mesh == 0 and col.g > col.r + 0.3:
 			shot.poison_trail = true
 
@@ -1697,14 +2347,14 @@ func prepare_forest_wood() -> void:
 	near_wood_spots.clear()
 	field_wood_spots.clear()
 	if fort == null: return
-	var reachable := grid.flood(Fort.DIRS[0] * (Fort.HALF + 8.0))
+	var reachable := grid.flood(fort.outside_point())
 	# The open ground round the walls, every 3 m: how far out decides near or field.
-	var reach := Fort.HALF + 30.0
+	var reach := Fort.HALF + 30.0 if fort.region.is_empty() else half_size
 	var x := -reach
 	while x <= reach:
 		var z := -reach
 		while z <= reach:
-			var out := maxf(absf(x), absf(z)) - Fort.HALF - Fort.WALL_T * 0.5
+			var out := fort.outside_by(Vector3(x, 0, z))
 			if out >= 6.0 and out <= 30.0:
 				var at := Vector3(x, 0, z)
 				at.y = ground_at(at)
@@ -1862,14 +2512,27 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 	var best_score := -INF
 	for i in 16:
 		var p: Vector3
+		var lane_spawn := false
 		if players.is_empty():
 			p = Vector3(randf_range(-half_size + 2, half_size - 2), 0, randf_range(-half_size + 2, half_size - 2))
 		else:
 			var a := randf() * TAU
 			p = random_player_position() + Vector3(cos(a), 0, sin(a)) * randf_range(28.0, 62.0)
-			if fort:
+			if fort and not fort.region.is_empty() and not fort.gates.is_empty():
+				# A stronghold with lanes: up from the foot of the lane to its gate (any lane, if it has none).
+				# They step out at the very end of it, between its foot and the rift behind, wherever
+				# the players are: there is nowhere else on a lane to come from.
+				var lane_gate := fort_gate if fort_gate >= 0 else randi() % fort.gates.size()
+				var lane: Array = fort.gates[lane_gate]["lane"]
+				if lane.is_empty():
+					continue
+				var foot: Vector3 = lane.pick_random()
+				var b := randf() * TAU
+				p = foot + fort.lane_back(lane_gate) * LANE_SPAWN_BACK + Vector3(cos(b), 0, sin(b)) * randf_range(0.0, LANE_SPAWN_SPREAD)
+				lane_spawn = true
+			elif fort:
 				if fort_gate >= 0:
-					var d: Vector3 = Fort.DIRS[fort_gate]
+					var d: Vector3 = fort.gates[fort_gate]["dir"]
 					a = atan2(d.z, d.x) + randf_range(-0.7, 0.7)
 				p = Vector3(cos(a), 0, sin(a)) * randf_range(44.0, 72.0)
 			if absf(p.x) > half_size - 2.0 or absf(p.z) > half_size - 2.0:
@@ -1877,9 +2540,11 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 		p.y = 0.0
 		if fog and not fog.contains(p, -4.0):
 			continue
+		if storm_at(p) != null:
+			continue # nothing rises inside a Mist Storm
 		var c := grid.to_cell(p)
-		if not grid.is_free(c):
-			continue
+		if not grid.is_free(c) or storm_at(grid.to_world(c)) != null:
+			continue # (the middle of its cell, where it really rises, can be over a storm's edge)
 		var near := INF
 		var seen := false
 		for pl in players:
@@ -1890,7 +2555,7 @@ func _pick_spawn_point(fort_gate := -1) -> Vector3:
 			near = minf(near, to.length())
 			if to.normalized().dot(pl.look_direction()) > 0.4:
 				seen = true
-		if near < 26.0:
+		if near < 26.0 and not lane_spawn:
 			continue
 		var score := -near * 0.2 + (0.0 if seen else 20.0)
 		if score > best_score:
@@ -1905,7 +2570,8 @@ func recycle_zombie(z: Zombie) -> void:
 
 
 func on_zombie_killed(z: Zombie) -> void:
-	if z.def.get("mist_boss", false): director._mist_boss_defeated = true
+	if z.is_boss():
+		director.boss_fallen(z)
 	make_noise(z.position, 6.0)
 	if Net.is_host():
 		Net.zombie_died(z, z.last_hitter)
@@ -1925,7 +2591,8 @@ func on_player_died(p: Player) -> void:
 
 ## Sunrise burns away everything still standing.
 func on_dawn() -> void:
-	if mist_storm: mist_storm.queue_free()
+	for storm: MistStorm in mist_storms.duplicate():
+		storm.end_now()
 	_dawn_done = true
 	_apply_sky(1.0)
 	for p: Player in local_players():
@@ -1956,7 +2623,7 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z):
+		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null and in_reach(at):
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -1992,14 +2659,16 @@ func spawn_pickup_random(kind: int, id: String) -> Pickup:
 		var c := grid.to_cell(at)
 		if not grid.is_free(c) or terrain.in_water(at.x, at.z):
 			continue
+		if storm_at(at) != null:
+			continue # nothing is left lying inside a Mist Storm
 		if player and at.distance_to(player.global_position) < 4.0:
 			continue
 		if fog and not fog.contains(at, -3.0):
 			continue
 		# Things to find lie apart, not in heaps.
 		at += Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
-		if not grid.is_free(grid.to_cell(at)) or terrain.in_pool(at.x, at.z):
-			continue
+		if not grid.is_free(grid.to_cell(at)) or terrain.in_pool(at.x, at.z) or storm_at(at) != null or not in_reach(at):
+			continue # nor where nobody could walk to it
 		var clash := false
 		for other in pickups:
 			if Vector2(other.global_position.x - at.x, other.global_position.z - at.z).length() < PICKUP_APART:
@@ -2032,13 +2701,14 @@ func _open_ground_near_players() -> Vector3:
 	return Vector3(clampf(at.x, -half_size + 3, half_size - 3), 0, clampf(at.z, -half_size + 3, half_size - 3))
 
 
-func drop_weapon(at: Vector3, id: String) -> void:
+## throws: for a weapon with its own ammunition, what it still has; -1 for a fresh one.
+func drop_weapon(at: Vector3, id: String, throws := -1) -> void:
 	# A class's own weapon never ends up on the ground for someone else to find.
 	if not WeaponDefs.lies_around(id):
 		return
 	var c := grid.nearest_free(grid.to_cell(at))
 	var target := at if grid.is_free(grid.to_cell(at)) else grid.to_world(c)
-	spawn_pickup_at(target, Pickup.Kind.WEAPON, id)
+	spawn_pickup_at(target, Pickup.Kind.WEAPON, id, throws + 1 if throws >= 0 and WeaponDefs.own_ammo(id) > 0 else 0)
 
 
 func remove_pickup(p: Pickup) -> void:
@@ -2064,8 +2734,11 @@ func count_pickups(kind: int) -> int:
 func collect_weapon(who: Player, p: Pickup) -> void:
 	if not who.can_use(p.weapon_id):
 		return
-	who.give_weapon(p.weapon_id)
-	who.add_arrows(p.bonus_arrows)
+	if WeaponDefs.own_ammo(p.weapon_id) > 0:
+		who.give_weapon(p.weapon_id, p.throws())
+	else:
+		who.give_weapon(p.weapon_id)
+		who.add_arrows(p.bonus_arrows)
 	who.sfx("weapon_change")
 	remove_pickup(p)
 
@@ -2080,57 +2753,64 @@ func _scan_pickups_for(who: Player) -> void:
 	if who.dead:
 		return
 	var near: Pickup = null
-	var near_d := 2.0
+	var near_distance_squared := 4.0
 	var here := who.global_position
 	var named: Pickup = null
-	var named_d := 3.5
+	var named_distance_squared := 12.25
 	# A weapon just put down stays down until you have walked away from where it fell.
-	if who.shun_weapon != "" and Vector2(here.x - who.shun_at.x, here.z - who.shun_at.z).length() > Pickup.SHUN_REACH:
+	if who.shun_weapon != "" and Vector2(here.x - who.shun_at.x, here.z - who.shun_at.z).length_squared() > Pickup.SHUN_REACH * Pickup.SHUN_REACH:
 		who.shun_weapon = ""
 	for p: Pickup in pickups.duplicate():
 		if not is_instance_valid(p):
 			continue
-		var d := p.global_position.distance_to(here)
-		if p.kind == Pickup.Kind.WEAPON and p.weapon_id == who.shun_weapon and p.global_position.distance_to(who.shun_at) < 2.5:
+		var distance_squared := p.global_position.distance_squared_to(here)
+		if distance_squared >= 12.25: continue
+		if p.kind == Pickup.Kind.WEAPON and p.weapon_id == who.shun_weapon and p.global_position.distance_squared_to(who.shun_at) < 6.25:
 			continue
-		if d < named_d:
+		if distance_squared < named_distance_squared:
 			named = p
-			named_d = d
-		if d > 2.0:
+			named_distance_squared = distance_squared
+		if distance_squared > 4.0:
 			continue
 		match p.kind:
 			Pickup.Kind.WEAPON:
 				if not who.can_use(p.weapon_id):
 					pass
 				elif who.carries(p.weapon_id):
-					# Spare copy: bows give their arrows, the rest stay on the ground.
-					if p.bonus_arrows > 0:
+					# Spare copy: a Rift Chakram gives its throws, bows give their arrows, the rest stay on the ground.
+					if WeaponDefs.own_ammo(p.weapon_id) > 0:
+						if who.ammo_of(p.weapon_id) < WeaponDefs.own_ammo_max(p.weapon_id) and p.throws() > 0:
+							var got := who.add_own_ammo(p.weapon_id, p.throws())
+							who.say("+%d throws" % got)
+							who.sfx("pickup", -5.0)
+							remove_pickup(p)
+					elif p.bonus_arrows > 0:
 						who.add_arrows(p.bonus_arrows)
 						who.sfx("pickup", -5.0)
 						remove_pickup(p)
 				elif who.has_empty_slot():
 					collect_weapon(who, p)
-				elif d < near_d:
+				elif distance_squared < near_distance_squared:
 					near = p
-					near_d = d
+					near_distance_squared = distance_squared
 			Pickup.Kind.FOOD:
-				if d < 1.6 and who.hp < who.max_hp():
+				if distance_squared < 1.6 * 1.6 and who.hp < who.max_hp():
 					who.heal(float(PowerDefs.FOODS[p.item_id]["heal"]))
 					who.say("+%d %s" % [int(PowerDefs.FOODS[p.item_id]["heal"]), p.display_name()])
 					who.sfx("eat", -2.0)
 					remove_pickup(p)
 			Pickup.Kind.ARROWS:
-				if d < 1.6 and who.arrows < who.max_arrows() and not who.class_def().get("no_weapons", false):
+				if distance_squared < 1.6 * 1.6 and who.arrows < who.max_arrows() and not who.class_def().get("no_weapons", false):
 					who.add_arrows(12)
 					who.say("+12 Arrows")
 					who.sfx("pickup", -5.0)
 					remove_pickup(p)
 			Pickup.Kind.POWER:
-				if d < 1.6:
+				if distance_squared < 1.6 * 1.6 and who.spec_id == str(PowerDefs.ALL[p.item_id].get("spec", who.spec_id)):
 					who.activate_power(p.item_id)
 					remove_pickup(p)
 			Pickup.Kind.WOOD:
-				if d < 1.8 and who.wood < Fort.WOOD_MAX:
+				if distance_squared < 1.8 * 1.8 and who.wood < Fort.WOOD_MAX:
 					who.wood = mini(Fort.WOOD_MAX, who.wood + Fort.WOOD_PER_PICKUP)
 					who.say("Wood: %d" % who.wood)
 					who.sfx("pickup", -5.0, 0.7)
@@ -2171,6 +2851,29 @@ func spawn_ally(kind: String, at: Vector3, seconds: float) -> void:
 	allies.append(a)
 
 
+## A Mist Soldier steps out of the mist at its lane's waystone, to hold the post on that lane.
+func spawn_garrison(kind: String, gate: int, at: Vector3, post: Vector3) -> Ally:
+	var spare: Array = _spare_allies.get(kind, [])
+	var a: Ally
+	if spare.is_empty():
+		a = Ally.new(self, kind)
+		add_child(a)
+	else:
+		a = spare.pop_back()
+	a.activate(INF)
+	a.lane = gate
+	a.post = post
+	if garrison:
+		a.hp *= garrison.power
+	_ally_seq = (_ally_seq + 1) % 250
+	a.net_index = _ally_seq
+	var placed := grid.to_world(grid.nearest_free(grid.to_cell(at)))
+	placed.y = ground_at(placed)
+	a.global_position = placed
+	allies.append(a)
+	return a
+
+
 ## Someone else's summons, as they are right now.
 func net_remote_allies(peer: int, b: PackedByteArray) -> void:
 	var seen := {}
@@ -2181,7 +2884,7 @@ func net_remote_allies(peer: int, b: PackedByteArray) -> void:
 		var a: Ally = _remote_allies.get(key)
 		var pos := Vector3(b.decode_s16(at + 2), b.decode_s16(at + 4), b.decode_s16(at + 6)) * 0.01
 		if a == null:
-			var kind: String = Ally.KINDS[clampi(b.decode_u8(at + 1) & 127, 0, Ally.KINDS.size() - 1)]
+			var kind: String = Ally.KINDS[clampi(b.decode_u8(at + 1) & 31, 0, Ally.KINDS.size() - 1)]
 			var spare: Array = _spare_allies.get(kind, [])
 			if spare.is_empty():
 				a = Ally.new(self, kind)
@@ -2195,6 +2898,7 @@ func net_remote_allies(peer: int, b: PackedByteArray) -> void:
 			allies.append(a)
 			_remote_allies[key] = a
 		a.net_biting = (b.decode_u8(at + 1) & 128) != 0
+		a.net_hand = clampi((b.decode_u8(at + 1) >> 5) & 3, 0, Ally.HANDS.size() - 1)
 		a.net_target = pos
 		a.net_yaw = b.decode_u8(at + 8) / 255.0 * TAU
 		at += 9
@@ -2252,6 +2956,8 @@ func imp_steal(p: Player) -> void:
 			continue
 		if it.kind == Pickup.Kind.FOOD and p.hp >= p.max_hp():
 			continue
+		if it.kind == Pickup.Kind.POWER and str(PowerDefs.ALL[it.item_id].get("spec", p.spec_id)) != p.spec_id:
+			continue
 		var d := it.global_position.distance_squared_to(p.global_position)
 		if d < best_d and d > 4.0:
 			best_d = d
@@ -2306,6 +3012,54 @@ func _dress_puddle(pd: MeshInstance3D, seed_from: int) -> void:
 
 ## shown_only: another player's patch, sent over. It looks the same here, and hurts whoever on this
 ## phone is on the other side from by. Your own patches go out to the others the same way.
+## A patch of the Mistberry Draught's mist (PowerDefs.MIST_TRAIL_RADIUS across, for `life` seconds):
+## pale mist welling up off the ground. Only a look: what it does is the drinker's (Player._tick_mistberry).
+var _mist_patches: Array[CPUParticles3D] = []
+var _next_mist_patch := 0
+const MIST_PATCHES := 16
+
+
+func drop_mist_patch(at: Vector3, life: float, shown_only := false) -> void:
+	if _mist_patches.is_empty():
+		var ramp := Gradient.new()
+		ramp.offsets = PackedFloat32Array([0.0, 0.35, 1.0])
+		ramp.colors = PackedColorArray([Color(0.75, 0.88, 1.0, 0.0), Color(0.78, 0.9, 1.0, 0.55), Color(0.8, 0.92, 1.0, 0.0)])
+		for i in MIST_PATCHES:
+			var p := CPUParticles3D.new()
+			p.mesh = WyvernRig.puff_mesh()
+			p.amount = 8
+			p.lifetime = 1.6
+			p.local_coords = false
+			p.emitting = false
+			p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+			p.emission_sphere_radius = PowerDefs.MIST_TRAIL_RADIUS * 0.6
+			p.direction = Vector3.UP
+			p.spread = 40.0
+			p.gravity = Vector3(0, 0.25, 0)
+			p.initial_velocity_min = 0.1
+			p.initial_velocity_max = 0.35
+			p.scale_amount_min = 2.2
+			p.scale_amount_max = 3.2
+			p.color_ramp = ramp
+			p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(p)
+			p.set_meta("until", -1.0)
+			_mist_patches.append(p)
+	var patch := _mist_patches[_next_mist_patch]
+	_next_mist_patch = (_next_mist_patch + 1) % MIST_PATCHES
+	patch.global_position = Vector3(at.x, ground_at(at) + 0.3, at.z)
+	patch.emitting = true
+	patch.set_meta("until", now + life)
+	if not shown_only and not _warming and Net.active():
+		Net.world_fx(Net.Fx.MIST_PATCH, at, Vector3(life, PowerDefs.MIST_TRAIL_RADIUS, 0))
+
+
+func _tick_mist_patches() -> void:
+	for p: CPUParticles3D in _mist_patches:
+		if p.emitting and now >= float(p.get_meta("until", -1.0)):
+			p.emitting = false
+
+
 func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, shown_only := false, by := 0) -> void:
 	var m := _puddles[_next_puddle]
 	var life := seconds if seconds > 0.0 else PowerDefs.POISON_TIME
@@ -2331,6 +3085,7 @@ func drop_poison(at: Vector3, burning := false, seconds := 0.0, size := 1.6, sho
 
 
 func _tick_poison(delta: float) -> void:
+	_tick_mist_patches()
 	_poison_tick -= delta
 	var tick := _poison_tick <= 0.0
 	if tick:
@@ -2487,7 +3242,7 @@ func _spring_trap(i: int, z: Zombie, at: Vector3) -> void:
 	z.stun(2.0 + p.m("trap_stun"))
 	z.take_damage(p.m("trap_damage"), Vector3.UP, 0.0, z.centre())
 	if p.has_flag("trap_bleed"):
-		z.add_dot(16.0, 4.0, true)
+		z.add_dot(AbilityNumbers.TRAP_BLEED, AbilityNumbers.TRAP_BLEED_TIME, true)
 	if p.has_flag("trap_fire"):
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if p.has_flag("trap_blast"):
@@ -2527,7 +3282,7 @@ func warm_up() -> void:
 	var kinds := ["normal", "clever", "magic", "rider", "wraith", "banshee", "crow", "gargoyle", "mimic", "scarecrow", "hero_infantry", "hero_ranger"]
 	var mist_preview: MistSeal
 	if terrain.has_islands():
-		kinds.append_array(MistModels.KINDS)
+		kinds.append_array(MistModels.BORN)
 		mist_preview = MistSeal.create(self, Vector3(0, ground_at(spot), 6), 3.0, 0.0, 1.5, 0.0, -1)
 		mist_preview.set_physics_process(false)
 		cam.position.y += ground_at(spot)
@@ -3079,6 +3834,16 @@ func fx_blast(at: Vector3, radius: float, col: Color) -> void:
 	_blast.scale = Vector3.ONE * radius * 0.7
 	_blast.visible = true
 	_blast_life = 0.18
+
+
+## Grapeshot leaving the musket, as the one who fired it sees it: the burning powder thrown out along
+## the cone the pellets fly in. (The other phones see a flash of fire at the muzzle instead; up here
+## by the eyes a flash would fill the whole screen.)
+func fx_grapeshot(at: Vector3, dir: Vector3, cone_deg: float, rays: int) -> void:
+	for i in mini(rays, _sparks.size()):
+		var k := float(i) / maxf(1.0, float(rays - 1)) - 0.5
+		var ray := dir.rotated(Vector3.UP, deg_to_rad(cone_deg) * k)
+		fx_spark(at + ray * 0.6, at + ray * randf_range(3.0, 4.5), true)
 
 
 func fx_impact(at: Vector3) -> void:

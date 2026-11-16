@@ -181,8 +181,9 @@ Everything generated is made by the scripts in `tools/`. They need Python 3 with
 
 | Script | Makes |
 |---|---|
-| `tools/make_audio.py` | All sound effects |
-| `tools/make_music.py` | All the music: the Village's three stems (`night`, `hunted`, `dawn`), the Mists' and the Fort's (`mists_*`, `fort_*`) and the menu theme (`menu`). The score is written in this file, and it plays it with the VSCO 2 Community Edition samples. They are 3 GB and not kept here, so clone https://github.com/sgossner/VSCO-2-CE and pass its folder: `python3 tools/make_music.py path/to/VSCO-2-CE [stem ...]`. A sparse checkout of `Strings Brass Woodwinds Percussion` is enough |
+| `tools/make_audio.py` | The sound effects from before 0.22 |
+| `tools/make_beyond_audio.py` | The sound effects added for Beyond the Mists: its classes, the creatures of Mesenlla and Mist Bastion. It rewrites every file it makes, so restore any you did not mean to change (`git checkout -- assets/sounds/...`) |
+| `tools/make_music.py` | All the music: the Village's three stems (`night`, `hunted`, `dawn`), those of the Mists, the Fort, the Valleys of Mesenlla and Mist Bastion (`mists_*`, `fort_*`, `mesenlla_*`, `bastion_*`) and the title-screen theme (`menu_mesenlla`). The score is written in this file, and it plays it with the VSCO 2 Community Edition samples. They are 3 GB and not kept here, so clone https://github.com/sgossner/VSCO-2-CE and pass its folder: `python3 tools/make_music.py path/to/VSCO-2-CE [stem ...]`. A sparse checkout of `Strings Brass Woodwinds Percussion` is enough |
 | `tools/make_icons.py` | Every icon |
 | `tools/make_ui.py` | Discs, slider knob, menu shade, the Botti Doubloon and the wordmark |
 | `tools/make_launcher.py` | Launcher icon and splash |

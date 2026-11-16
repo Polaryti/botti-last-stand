@@ -347,12 +347,135 @@ def crest_adept():
 def crest_commander():
     return lozenge("commander", at(50, 55, 0.68, banner()) + at(50, 23, 0.35, crown()))
 
-CRESTS = [crest_commander, crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
+def crest_bandit():
+    # A plum hood-shaped shield with a masked eye-slit and a dagger point-down through it.
+    return (path(("#a8577f", "#3d1430"), "M50 2 C74 10 92 28 92 52 C92 76 72 92 50 98 C28 92 8 76 8 52 C8 28 26 10 50 2Z", 4)
+        + path(("#2a1020", "#0c0509"), "M18 44 C30 34 70 34 82 44 L78 56 C64 50 36 50 22 56Z", 2)
+        + ell("#f2e2ff", 36, 48, 6, 3, 0, 0) + ell("#f2e2ff", 64, 48, 6, 3, 0, 0)
+        + at(50, 62, 0.5, turn(180, dagger())))
+CRESTS = [crest_bandit, crest_commander, crest_infantry, crest_ranger, crest_heavy, crest_chivalry, crest_magician, crest_revenant, crest_artificer, crest_monk, crest_plague_doctor, crest_adept]
+
+# Beyond the Mists: two-handed and Mesenlla weapons
+def greatsword():
+    # Longer and broader than the Sword: a wide blade with a fuller, a straight bar guard and a two-hand grip.
+    return (poly(STEEL, (50, 0), (61, 10), (61, 54), (39, 54), (39, 10)) + line("#7a859c", 3, (50, 10), (50, 50), ink=False)
+        + rect(DSTEEL, 18, 53, 64, 7) + rect(LEATHER, 45, 60, 10, 28) + line("#2a2f3f", 2, (45, 70), (55, 70), ink=False) + line("#2a2f3f", 2, (45, 78), (55, 78), ink=False) + circ(BRASS, 50, 93, 6))
+def battleaxe():
+    return (line("#c08a52", 7, (64, 96), (40, 6)) + "".join(line("#a22a20", 8, a, b, ink=False) for a, b in [((60, 84), (62, 78)), ((44, 24), (45, 20))])
+        + path(STEEL, "M44 16 C30 8 12 14 8 30 C6 44 14 58 28 66 C24 54 26 44 34 38 L48 34 Z") + poly(DSTEEL, (48, 20), (64, 12), (52, 30)))
+def chakram():
+    teeth = "".join(turn(a, poly(MIST, (50, 2), (56, 14), (44, 14))) for a in (0, 90, 180, 270))
+    return teeth + circ(MIST, 50, 50, 38) + circ("#12141c", 50, 50, 22, 0) + circ("none", 50, 50, 22, 3) + line("#7a4d26", 7, (32, 50), (68, 50)) + circ("#40f0e2", 50, 50, 6, 1.5)
+for g in (greatsword, battleaxe, chakram):
+    PLAIN.append(g)
+
+# Beyond the Mists: the Cartographer and the Pathfinder's finds
+AZURE = ("#9fd6ff", "#2a6fb8")
+def beacon():
+    # A survey post: a pole with a crossbar and a pennant, and a lit lamp on top.
+    return (line("#c08a52", 7, (50, 94), (50, 28)) + line("#c08a52", 5, (34, 50), (66, 50))
+        + path(("#ffe08a", "#e0a020"), "M52 30 L84 38 L52 46Z", 2.4) + circ(AZURE, 50, 20, 13) + circ("#ffffff", 46, 16, 4, 0) + rect(ROCK, 30, 88, 40, 8, 2))
+def link():
+    # Two posts and the line of light between them.
+    return (line("#9fd6ff", 5, (22, 40), (78, 40), ink=False) + line("#ffffff", 2, (22, 40), (78, 40), ink=False)
+        + line("#c08a52", 6, (22, 90), (22, 40)) + line("#c08a52", 6, (78, 90), (78, 40)) + circ(AZURE, 22, 34, 9) + circ(AZURE, 78, 34, 9))
+def waygate():
+    # A stone arch with a swirl of another world inside it.
+    return (path(ROCK, "M14 94 L14 44 C14 14 86 14 86 44 L86 94 L70 94 L70 46 C70 30 30 30 30 46 L30 94Z")
+        + path(("#e2f4ff", "#3d7fd0"), "M30 94 L30 46 C30 30 70 30 70 46 L70 94Z", 2) + curve("#ffffff", 4, "M50 82 C40 80 38 64 50 62 C60 62 60 72 52 72", ink=False))
+def machete():
+    # A broad, slightly hooked chopping blade with a wrapped grip.
+    return (path(STEEL, "M30 70 L74 8 C88 10 92 22 84 34 L44 80Z") + line("#7a859c", 2.4, (42, 66), (78, 20), ink=False)
+        + rect(DSTEEL, 26, 66, 22, 7, 2) + line("#5a3a1e", 9, (32, 74), (14, 94)) + "".join(line("#c08a52", 2.4, (a, b), (a + 6, b + 4), ink=False) for a, b in ((16, 86), (22, 80))))
+def bolas():
+    # Three weighted cords, tied in the middle.
+    return ("".join(curve("#d8c9a6", 4, "M50 50 " + d) for d in ("C40 30 30 24 20 18", "C64 36 74 26 84 20", "C50 66 52 78 52 88"))
+        + circ(ROCK, 20, 18, 11) + circ(ROCK, 84, 20, 11) + circ(ROCK, 52, 86, 11) + circ(LEATHER, 50, 50, 7))
+def lantern():
+    # A brass lantern with a warm light inside.
+    return (curve("#8f5f1e", 5, "M38 22 C38 6 62 6 62 22") + rect(BRASS, 32, 20, 36, 8, 2) + rect(("#fff6c0", "#ffb52e"), 34, 28, 32, 46, 3)
+        + line("#8f5f1e", 3, (50, 28), (50, 74), ink=False) + rect(BRASS, 28, 74, 44, 10, 2) + circ(HOT, 50, 50, 8, 0))
+def compass():
+    return circ(BRASS, 50, 50, 44) + circ("#f6efdc", 50, 50, 34, 2) + poly(RED, (50, 18), (58, 50), (42, 50)) + poly("#59627a", (50, 82), (58, 50), (42, 50)) + circ(BRASS, 50, 50, 5, 1.5)
+for g in (beacon, link, waygate, machete, bolas, lantern, compass):
+    PLAIN.append(g)
+
+def crest_cartographer():
+    # An azure map sheet, folded in three, with a route to a star.
+    return (poly(("#5aa6e8", "#163f78"), (6, 14), (36, 4), (64, 14), (94, 4), (94, 86), (64, 96), (36, 86), (6, 96))
+        + line("#0f2f58", 2, (36, 4), (36, 86), ink=False) + line("#0f2f58", 2, (64, 14), (64, 96), ink=False)
+        + curve("#fff1c8", 4, "M18 80 C30 60 44 74 52 56 C58 42 66 44 72 32", ink=False)
+        + at(76, 26, 0.3, star()) + at(18, 80, 0.16, circ(RED, 50, 50, 40)))
+CRESTS.append(crest_cartographer)
+
+# Beyond the Mists: the creatures of Mesenlla
+def bear():
+    # A bear's head from the front: round ears, a pale muzzle and a dark nose.
+    fur = ("#a5743f", "#4e3018")
+    return (circ(fur, 24, 24, 13) + circ(fur, 76, 24, 13) + circ("#5a3a20", 24, 24, 6, 0) + circ("#5a3a20", 76, 24, 6, 0)
+        + path(fur, "M14 52 C14 26 86 26 86 52 C86 78 70 92 50 92 C30 92 14 78 14 52Z")
+        + ell(("#e2c49a", "#a07850"), 50, 68, 18, 14) + ell(INK, 50, 60, 7, 5, 0, 0) + circ(INK, 36, 46, 4, 0) + circ(INK, 64, 46, 4, 0))
+def eagle():
+    # Wings spread wide, white head, hooked yellow beak.
+    brown = ("#8a5a30", "#3e2410")
+    return (path(brown, "M50 46 C36 30 16 24 2 30 C10 38 14 44 22 46 C14 50 14 54 22 58 C32 60 44 58 50 56Z")
+        + f'<g transform="translate(100 0) scale(-1 1)">{path(brown, "M50 46 C36 30 16 24 2 30 C10 38 14 44 22 46 C14 50 14 54 22 58 C32 60 44 58 50 56Z")}</g>'
+        + path(brown, "M40 50 L60 50 L64 80 L50 90 L36 80Z") + circ(("#ffffff", "#c8ccd6"), 50, 38, 11) + poly(GOLD, (50, 40), (60, 46), (52, 52)) + circ(INK, 46, 35, 2, 0))
+def antlers():
+    # A stag's crown of antlers over a pale head.
+    branch = lambda s: line("#efe6cf", 5, (50, 52), (50 + s * 22, 26), (50 + s * 30, 6)) + line("#efe6cf", 4, (50 + s * 22, 26), (50 + s * 40, 22)) + line("#efe6cf", 4, (50 + s * 14, 38), (50 + s * 30, 40))
+    return branch(-1) + branch(1) + path(("#f4f2ea", "#b8b4a6"), "M38 50 C38 44 62 44 62 50 L58 84 C56 92 44 92 42 84Z") + circ("#5fd4ff", 44, 58, 3, 0) + circ("#5fd4ff", 56, 58, 3, 0)
+def sprout():
+    # A small hooded figure of leaves: two leaves and green eyes in a bark face.
+    return (path(("#7cc456", "#2f6a1e"), "M50 6 C80 14 90 40 84 70 L16 70 C10 40 20 14 50 6Z")
+        + path(("#a07850", "#5a3a20"), "M30 40 C30 30 70 30 70 40 L68 66 C60 74 40 74 32 66Z") + ell("#c8ff8a", 41, 50, 5, 3, 0, 0) + ell("#c8ff8a", 59, 50, 5, 3, 0, 0)
+        + path(("#5aa83a", "#2f6a1e"), "M18 72 C24 92 44 96 50 92 C40 86 30 80 18 72Z") + path(("#5aa83a", "#2f6a1e"), "M82 72 C76 92 56 96 50 92 C60 86 70 80 82 72Z"))
+def boulder():
+    # Stones held together by a band of pale mist, with an amber eye.
+    return (poly(ROCK, (14, 70), (20, 34), (46, 18), (74, 24), (90, 50), (82, 82), (50, 92), (24, 88)) + poly(("#8c8379", "#4a433d"), (46, 18), (60, 40), (90, 50), (74, 24))
+        + path(("#7cc456", "#2f6a1e"), "M30 30 C40 22 52 22 58 28 C48 30 38 32 30 30Z", 2) + curve("#bff3ec", 5, "M10 58 C34 70 66 70 92 56", ink=False) + ell(("#ffe08a", "#e07a10"), 46, 52, 8, 5))
+def storm():
+    # A thundercloud with a bolt beneath it.
+    return (path(("#9aa3b8", "#454c62"), "M18 54 C6 54 6 34 20 32 C22 16 44 10 54 22 C62 12 82 16 82 32 C96 32 96 54 82 54Z")
+        + poly(("#ffffff", "#bfe0ff"), (52, 50), (36, 76), (50, 76), (40, 96), (66, 66), (52, 66), (62, 50)))
+def wyvern():
+    # A wyvern in flight from below: bat wings, a long neck and a barbed tail.
+    green = ("#7ea46a", "#33482a")
+    wing = "M50 44 C40 22 18 12 2 18 C6 30 12 34 8 46 C18 44 22 50 20 58 C32 52 40 54 50 56Z"
+    return (path(("#6f5446", "#3a2a22"), wing) + f'<g transform="translate(100 0) scale(-1 1)">{path(("#6f5446", "#3a2a22"), wing)}</g>'
+        + path(green, "M44 40 C44 26 56 26 56 40 L56 70 C56 76 44 76 44 70Z") + path(green, "M46 30 C46 18 54 18 54 30 L54 34 L46 34Z") + poly(green, (44, 14), (56, 14), (50, 4))
+        + curve("#33482a", 5, "M50 74 C52 84 46 90 50 96", ink=False) + poly(BONE, (50, 98), (44, 90), (56, 90)) + circ("#ffb52e", 47, 12, 2, 0) + circ("#ffb52e", 53, 12, 2, 0))
+for g in (bear, eagle, antlers, sprout, boulder, storm, wyvern):
+    PLAIN.append(g)
+
+# Beyond the Mists: Mist Bastion's garrison
+GLASS = ("#d8fffb", "#3fc4bc")
+MSTEEL = ("#c9d8de", "#5a6c76")
+def mist_infantry():
+    # A rounded sallet with a glowing eye-slit and a crest of three mist-glass fins, over a kite shield.
+    return (path(("#2f7f86", "#123a40"), "M24 54 L76 54 L72 80 L50 96 L28 80Z")
+        + circ("none", 50, 72, 10, 3).replace('stroke="#12141c"', 'stroke="#bff7f2"')
+        + poly(GLASS, (40, 22), (46, 4), (50, 22)) + poly(GLASS, (48, 20), (56, 2), (58, 22)) + poly(GLASS, (56, 22), (66, 8), (64, 26))
+        + path(MSTEEL, "M22 52 C20 22 80 22 78 52 C82 56 84 62 76 62 L24 62 C16 62 18 56 22 52Z")
+        + rect(INK, 30, 42, 40, 8, 2, 0) + rect(GLASS, 33, 44, 34, 4, 1, 0))
+def mist_ranger():
+    # A deep teal hood with a circlet of mist-glass, and a bow drawn across it.
+    return (path(("#2b6b78", "#0f3038"), "M50 6 C80 10 92 44 86 90 L14 90 C8 44 20 10 50 6Z")
+        + ell(INK, 50, 58, 22, 24, 0, 0) + ell(("#bff7f2", "#3fc4bc"), 41, 56, 4, 3, 0, 0) + ell(("#bff7f2", "#3fc4bc"), 59, 56, 4, 3, 0, 0)
+        + curve("#bff7f2", 5, "M24 40 C40 30 60 30 76 40", ink=False) + poly(GLASS, (46, 34), (50, 24), (54, 34))
+        + curve("#c08a52", 5, "M88 10 C64 34 64 66 88 92", ink=False) + line("#e9eef5", 1.6, (88, 10), (88, 92), ink=False))
+def mist_heavy():
+    # A closed great helm with a lit visor, crowned by two curved horns of mist-glass.
+    return (path(GLASS, "M30 30 C20 22 16 10 22 2 C26 12 32 18 40 22Z") + path(GLASS, "M70 30 C80 22 84 10 78 2 C74 12 68 18 60 22Z")
+        + path(MSTEEL, "M24 32 C24 16 76 16 76 32 L78 86 C70 94 30 94 22 86Z")
+        + rect(INK, 26, 46, 48, 9, 2, 0) + rect(GLASS, 30, 48.5, 40, 4, 1, 0) + rect(MSTEEL, 46, 56, 8, 26, 1, 2))
+for g in (mist_infantry, mist_ranger, mist_heavy):
+    PLAIN.append(g)
 
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
-    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368")}
+    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -393,6 +516,13 @@ SPECS = {
     "iron_mountain": ("monk", lambda: at(50, 50, 0.84, mountain())),
     "blade_dancer": ("adept", lambda: at(50, 50, 0.72, spiral()) + at(50, 50, 0.6, turn(35, sword()))),
     "mirror_step": ("adept", lambda: at(32, 50, 0.46, boot()) + at(68, 50, 0.46, f'<g transform="translate(100 0) scale(-1 1)">{boot()}</g>') + at(50, 22, 0.28, swap())),
+    "thief": ("bandit", lambda: at(44, 58, 0.66, hand()) + at(68, 30, 0.42, circ(GOLD, 50, 50, 34) + circ("none", 50, 50, 22, 2)) + at(30, 26, 0.3, dagger())),
+    "mercenary": ("bandit", lambda: path(NIGHT, "M10 76 C14 30 86 30 90 76Z") + at(50, 50, 0.38, moon()) + at(30, 40, 0.14, star()) + at(70, 36, 0.12, star())),
+    "highwayman": ("bandit", lambda: "".join(at(50 + dx, 56, 0.5, turn(a, dagger())) for dx, a in ((-20, -36), (-10, -18), (0, 0), (10, 18), (20, 36)))),
+    "star_reader": ("cartographer", lambda: line("#cfe8ff", 4, (24, 68), (50, 28), (78, 60), (24, 68))
+        + at(24, 68, 0.26, star()) + at(50, 28, 0.3, star()) + at(78, 60, 0.26, star())),
+    "worlds_traveler": ("cartographer", lambda: at(50, 52, 0.78, waygate()) + at(76, 24, 0.24, star())),
+    "pathfinder": ("cartographer", lambda: at(36, 58, 0.62, turn(-20, machete())) + at(68, 40, 0.5, compass())),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),
 }
 

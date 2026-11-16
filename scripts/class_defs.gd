@@ -6,28 +6,32 @@ const MAX_LEVEL := 10
 const XP_TO_NEXT := [45, 65, 80, 110, 160, 220, 270, 330, 420]
 
 const ALL := {
-	"infantry": {"name": "Infantry", "weapon": "dagger", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": true, "kill_heal": 2.0,
+	"infantry": {"two_handed": true, "name": "Infantry", "weapon": "dagger", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": true, "kill_heal": 2.0,
 		"desc": "Fast close fighter. Starts with a Dagger, and heals 2 from each kill. Uses melee and ranged weapons."},
 	"ranger": {"name": "Ranger", "weapon": "bow", "arrows": 30, "hp": 90.0, "speed": 1.05, "ranged": true, "kill_arrows": 2,
 		"desc": "Precise archer. Starts with a Short Bow and 30 arrows, and takes 2 back from each kill. Uses melee and ranged weapons."},
 	"heavy": {"name": "Heavy Infantry", "weapon": "flail", "arrows": 0, "hp": 130.0, "speed": 0.9, "ranged": false, "shield": true,
 		"desc": "Slow wall of iron. Starts with a Flail and a shield that blocks from the front. No ranged weapons."},
-	"chivalry": {"name": "Chivalry", "weapon": "lance", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": false, "horse": true, "hidden": true, "earned": "rider",
+	"chivalry": {"two_handed": true, "name": "Chivalry", "weapon": "lance", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": false, "horse": true, "hidden": true, "earned": "rider",
 		"desc": "Mounted charger. Starts with a Lance. Kills call a horse to ride. No ranged weapons, unless unlocked."},
 	"magician": {"name": "Magician", "weapon": "staff", "arrows": 0, "hp": 70.0, "speed": 1.0, "ranged": true, "mana": true, "hidden": true, "earned": "games",
-		"desc": "Fragile caster. Fights only with a Staff powered by refilling mana. Elements and summoned allies."},
+		"desc": "Fragile caster. Starts with a Staff powered by refilling mana, and can pick up one-handed melee weapons. Elements and summoned allies."},
 	"revenant": {"name": "Revenant", "weapon": "claws", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": false, "mana": true, "mist": true, "mana_regen": 0.75, "kill_mist": 7.0,
 		"no_weapons": true, "hidden": true, "earned": "mists",
 		"desc": "Dead, and not done. No weapons, only claws of Mist, which it spends with every blow."},
-	"monk": {"name": "Monk", "weapon": "fists", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "mana": true, "ki": true, "mana_regen": 0.0, "hidden": true, "price": 920, "one_weapon": true,
+	"monk": {"two_handed": true, "name": "Monk", "weapon": "fists", "arrows": 0, "hp": 95.0, "speed": 1.1, "ranged": true, "mana": true, "ki": true, "mana_regen": 0.0, "hidden": true, "price": 920, "one_weapon": true,
 		"desc": "Master of Ki. Every hit fills the Ki bar, and Ki pays for the Monk's ability. Carries one weapon at a time and punches when it has none. Only a Monk can use the Bo."},
-	"adept": {"name": "Adept", "weapon": "sword", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": false, "hidden": true, "price": 1150, "disabled": true,
+	"adept": {"two_handed": true, "name": "Adept", "weapon": "sword", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": false, "hidden": true, "price": 1150,
 		"desc": "Master of stances. Commit to each stance for 6 seconds; changing takes a moment. Land three blows for +15% melee damage until you switch, and an empowered transition. Wind: 25% faster, and each blow strikes twice for less. Stone: 30% less damage, and blows throw enemies back. Flame: blows burn, and you take 15% more. Starts with a Sword. No ranged weapons."},
 	"plague_doctor": {"name": "Plague Doctor", "weapon": "blowgun", "arrows": 32, "hp": 100.0, "speed": 1.0, "damage_taken": 0.9, "ranged": true, "kill_arrows": 2, "hidden": true, "earned": "poison",
 		"desc": "The beaked mask has seen it all. Starts with a Blowgun and 32 darts. Takes 10% less damage. Cures friends, spreads sickness, or commands the rats."},
-	"artificer": {"name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 598,
+	"artificer": {"two_handed": true, "name": "Artificer", "weapon": "torch", "arrows": 0, "hp": 100.0, "speed": 1.0, "ranged": true, "one_weapon": true, "hidden": true, "price": 598,
 		"desc": "Builds what the night calls for. Carries one weapon at a time, and starts with a Torch. Bombs, a war chariot, or a bag of inventions."},
-	"commander": {"name": "Commander", "weapon": "sword", "arrows": 0, "hp": 110.0, "speed": 1.05, "ranged": true, "hidden": true, "unavailable": true, "unique": true, "no_bots": true,
+	"bandit": {"name": "Bandit", "weapon": "dagger", "second": "longbow", "arrows": 20, "hp": 110.0, "speed": 1.1, "ranged": true, "hidden": true, "price": 860,
+		"desc": "Lives off the road and the dark. Starts with a Dagger, a Long Bow and 20 arrows, and Into the Shadows turns it invisible. Uses melee and ranged weapons."},
+	"cartographer": {"name": "Cartographer", "weapon": "spear", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": true, "hidden": true, "earned": "beyond",
+		"desc": "Maps the way through. Starts with a Spear and plants up to three linked beacons: friends near one run faster, friends on the lines between them mend, and enemies near one are marked. Uses melee and ranged weapons."},
+	"commander": {"two_handed": true, "name": "Commander", "weapon": "sword", "arrows": 0, "hp": 110.0, "speed": 1.05, "ranged": true, "hidden": true, "unavailable": true, "unique": true, "no_bots": true,
 		"desc": "First prize in VRAIN tournaments. Only one Commander per match; never a bot. Command rallies allies, then becomes Last Command at level 10."},
 }
 
@@ -37,12 +41,31 @@ static func icon(id: String) -> String:
 
 static func color(id: String) -> Color:
 	return {"commander": Color(0.78, 0.59, 0.2), "infantry": Color(0.62, 0.2, 0.14), "ranger": Color(0.22, 0.46, 0.26), "heavy": Color(0.36, 0.4, 0.48),
-		"adept": Color(0.3, 0.36, 0.72), "chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22), "monk": Color(0.76, 0.46, 0.14), "plague_doctor": Color(0.26, 0.32, 0.24)}[id]
+		"adept": Color(0.3, 0.36, 0.72), "chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22), "monk": Color(0.76, 0.46, 0.14), "plague_doctor": Color(0.26, 0.32, 0.24),
+		"bandit": Color(0.48, 0.23, 0.36), "cartographer": Color(0.25, 0.56, 0.82)}[id]
 
 
 ## Some classes share a body with another, but not its clothes or its gear.
 static func dress(body: Node3D, id: String) -> void:
 	ClassGear.wear(body, id)
+
+
+## The weapon groups a class can wield, in the order the screens show them: Melee, Two-Handed,
+## Ranged, and Exclusive Weapon when it has one of its own. Codex, Armory and class screens all ask here.
+static func weapon_categories(id: String) -> Array[String]:
+	var d: Dictionary = ALL[id]
+	var out: Array[String] = []
+	var own := WeaponDefs.ALL.keys().any(func(w: String) -> bool: return WeaponDefs.ALL[w].get("only", "") == id) or id == "monk"
+	if not d.get("no_weapons", false):
+		out.append("melee")
+		if d.get("two_handed", false):
+			out.append("two_handed")
+		# The Magician's only ranged weapon is its own Staff.
+		if d.get("ranged", false) and id != "magician":
+			out.append("ranged")
+	if own:
+		out.append("exclusive")
+	return out
 
 
 ## Switched off for now: nobody can play, buy or be given it. Phones that own it keep it, so it

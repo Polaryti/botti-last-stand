@@ -24,6 +24,7 @@ const GRASS_TIP := Color(0.42, 0.56, 0.24)
 const BRASS := Color(0.78, 0.6, 0.24)
 const FORT_PLANK := Color(0.42, 0.28, 0.16)
 
+var look := "village" # which lands: "mesenlla" has rock on its steep slopes
 var w # the World in the game, a MapPreview in the editor
 var terrain: Terrain
 var quality := 1 # 0 low, 1 medium, 2 high
@@ -34,6 +35,8 @@ var _ground_material: ShaderMaterial
 var _road_lines: Array[Dictionary] = []
 var _dirt_patches: Array[Dictionary] = []
 var skip_beyond := false # the menu only needs the village
+var _glow_cells := {} # 24 m square -> SurfaceTool of everything that glows there
+var sight := 1.0 # how far grass and other small things are drawn, as a share of the usual
 var xf := Transform3D.IDENTITY # where the piece being built stands
 var piece_scale := 1.0
 var rng := RandomNumberGenerator.new() # for looks only: phones may disagree about these
@@ -54,6 +57,7 @@ func _init(world: Variant, p_terrain: Terrain) -> void:
 
 ## The whole map, for the game.
 func build(root: MapRoot) -> void:
+	look = root.look
 	_reserve_plants(root, Transform3D.IDENTITY)
 	ground()
 	w.play_half = root.play_half
@@ -112,6 +116,11 @@ func collider(at: Vector3, size: Vector3) -> void:
 	w.add_collider_xf(xf.translated_local(at), size)
 
 
+## A window's opening: stops bodies and blades, not sight or shots.
+func window_gap(at: Vector3, size: Vector3) -> void:
+	w.add_window_xf(xf.translated_local(at), size)
+
+
 func mesh() -> LowPoly:
 	var l := LowPoly.new()
 	l.base = xf
@@ -135,7 +144,25 @@ func cell() -> LowPoly:
 	return l
 
 
+## Things that glow without light (runes, flames, lamps) share one mesh per 24 m square too.
+func shine(l: LowPoly) -> void:
+	var key := Vector2i(int(floor(xf.origin.x / 24.0)), int(floor(xf.origin.z / 24.0)))
+	if not _glow_cells.has(key):
+		var st := SurfaceTool.new()
+		st.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_glow_cells[key] = st
+	(_glow_cells[key] as SurfaceTool).append_from(l.commit(), 0, Transform3D.IDENTITY)
+
+
 func flush() -> void:
+	for key: Vector2i in _glow_cells:
+		var mi := MeshInstance3D.new()
+		mi.mesh = (_glow_cells[key] as SurfaceTool).commit()
+		mi.material_override = MesenllaBuilder.glow_material()
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		w.add_child(mi)
+	_glow_cells.clear()
+	w.flush_glows()
 	for path: String in _props:
 		var list: Array[Transform3D] = []
 		list.assign(_props[path])
@@ -144,7 +171,10 @@ func flush() -> void:
 	for key: String in _trees:
 		var list: Array[Transform3D] = []
 		list.assign(_trees[key])
-		w.add_child(Models.scatter(Models.merged(key.get_slice("|", 0)), list))
+		var source := key.get_slice("|", 0)
+		# "proc:<kind>" are trees drawn by code (MesenllaBuilder.tree_mesh), the rest come from files.
+		var tree_mesh: Mesh = MesenllaBuilder.tree_mesh(source.substr(5)) if source.begins_with("proc:") else Models.merged(source)
+		w.add_child(Models.scatter(tree_mesh, list))
 	_trees.clear()
 	for key: Vector2i in _cells:
 		(_cells[key] as LowPoly).base = Transform3D.IDENTITY
@@ -170,7 +200,11 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() else 0.0)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA else 0.0)
+	if look in SpawnRules.MESENLLA:
+		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
+		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
+		mat.set_shader_parameter("dirt", Vector3(0.24, 0.19, 0.17))
 	_ground_material = mat
 	var j := 0
 	while j < terrain.vertices_per_side - 1:
@@ -474,7 +508,7 @@ func _reeds() -> void:
 		var list: Array[Transform3D] = []
 		list.assign(chunks[key][0])
 		var node := Crops.plant(reed, list, chunks[key][1])
-		node.visibility_range_end = 50.0
+		node.visibility_range_end = 50.0 * sight
 		w.add_child(node)
 
 
@@ -648,6 +682,12 @@ func wall(l: LowPoly, a: Vector2, b: Vector2, h: float, openings: Array, col: Co
 		seg.call(cursor, left, 0.0, h)
 		seg.call(left, right, 0.0, o["sill"])
 		seg.call(left, right, o["top"], h)
+		if float(o["sill"]) > 0.0 and not o.get("bare", false):
+			# A window is looked and shot through, never climbed through or jumped at. (A bare gap
+			# in a ruined wall stays open.)
+			var m := (left + right) * 0.5
+			var gap := Vector3(mid.x + (m if along_x else 0.0), (float(o["sill"]) + float(o["top"])) * 0.5, mid.y + (0.0 if along_x else m))
+			window_gap(gap, Vector3(right - left, float(o["top"]) - float(o["sill"]), t) if along_x else Vector3(t, float(o["top"]) - float(o["sill"]), right - left))
 		if not o.get("bare", false):
 			_frame(l, mid, along_x, left, right, o["sill"], o["top"], t)
 		cursor = right
@@ -965,6 +1005,9 @@ func bonfire() -> void:
 		l.prism(Vector3(cos(a) * 0.72, 0.1, sin(a) * 0.72), Vector3(cos(a) * 0.08, 0.62, sin(a) * 0.08), 0.1, 0.07, 5, Color(0.17, 0.11, 0.07))
 	var at := xf.origin
 	w.add_solid(at + Vector3.UP * 0.5, Vector3(1.9, 1.0, 1.9))
+	# Nobody stands in the flames: an unseen column over the fire keeps everyone off the top of it,
+	# where nothing could reach them.
+	w.add_barrier(at + Vector3.UP * 3.0, Vector3(1.9, 4.0, 1.9))
 	w.add_glow(at + Vector3.UP * 1.0, Color(1.0, 0.6, 0.22), 4.5, 95.0)
 	_flame(at + Vector3.UP * 0.1, 1.0)
 	var light: OmniLight3D = null
@@ -1008,7 +1051,7 @@ func _flame(at: Vector3, size: float) -> void:
 	mi.position = at
 	mi.scale = Vector3.ONE * size
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	mi.visibility_range_end = 90.0
+	mi.visibility_range_end = 90.0 * sight
 	w.add_child(mi)
 
 
@@ -1318,7 +1361,7 @@ func _garden(size: Vector2) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(groups[key][0])
 		var node := Crops.plant(kinds[key.x], list, groups[key][1], key.x != 2)
-		node.visibility_range_end = 60.0
+		node.visibility_range_end = 60.0 * sight
 		w.add_child(node)
 
 
@@ -1356,7 +1399,7 @@ func _grain(size: Vector2, barley: bool) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(chunks[k][0])
 		var node := Crops.plant(Crops.wheat(), list, chunks[k][1])
-		node.visibility_range_end = 58.0
+		node.visibility_range_end = 58.0 * sight
 		w.add_child(node)
 
 
@@ -1385,7 +1428,7 @@ func _corn(size: Vector2) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(chunks[k][0])
 		var node := Crops.plant(Crops.corn(), list, chunks[k][1], true)
-		node.visibility_range_end = 62.0
+		node.visibility_range_end = 62.0 * sight
 		w.add_child(node)
 
 
@@ -1414,11 +1457,11 @@ func _orchard(size: Vector2) -> void:
 			z += 5.0
 		x += 5.0
 	var node := Crops.plant(Crops.apple_tree(), trees, tints, true)
-	node.visibility_range_end = 90.0
+	node.visibility_range_end = 90.0 * sight
 	w.add_child(node)
 	var apples := MeshInstance3D.new()
 	apples.mesh = fallen.commit()
-	apples.visibility_range_end = 40.0
+	apples.visibility_range_end = 40.0 * sight
 	apples.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	w.add_child(apples)
 
@@ -1440,7 +1483,7 @@ func _vines(size: Vector2) -> void:
 			z += 2.0
 		x += 2.6
 	var node := Crops.plant(Crops.vine(), vines, tints, true)
-	node.visibility_range_end = 60.0
+	node.visibility_range_end = 60.0 * sight
 	w.add_child(node)
 
 
@@ -1499,6 +1542,7 @@ func _fort_side(l: LowPoly, side: int, door_at: float) -> void:
 	w.add_collider(over_at, over_gate)
 	var over_door := _box_size(side, 1.9, top - 2.5, t)
 	var door_point := _point(side, door_at, h)
+	w.fort.add_door(door_point, Fort.DIRS[side])
 	l.box(door_point + Vector3.UP * (2.5 + (top - 2.5) * 0.5), over_door, CASTLE_DARK)
 	w.add_collider(door_point + Vector3.UP * (2.5 + (top - 2.5) * 0.5), over_door)
 	# Only players fit through the small door.
@@ -1613,6 +1657,9 @@ func forest_wall(h: float) -> void:
 			apron._tri(a, z, z + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 			apron._tri(a, z + outward * 24, a + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 	add(apron)
+	if look in SpawnRules.MESENLLA:
+		_tall_wall(h)
+		return
 	var step: float = [7.5, 5.5, 4.2][quality]
 	var depth: int = [2, 2, 3][quality]
 	for row in depth:
@@ -1626,6 +1673,26 @@ func forest_wall(h: float) -> void:
 				var file := "res://assets/nature/tree_single_A.gltf" if rng.randf() < 0.72 else "res://assets/nature/tree_single_B.gltf"
 				tree(file, rng.randf_range(5.5, 8.5), rng.randf_range(0.9, 1.15), false)
 			t += step
+
+
+## Beyond the Mists the edge of the land is lined with tall conifers: giant firs and tall pines in
+## rows from just inside the edge outwards, so the land ends in a wall of old forest.
+func _tall_wall(h: float) -> void:
+	var step: float = [8.0, 6.0, 5.0][quality]
+	var depth: int = [3, 3, 4][quality]
+	for row in depth:
+		var off := h - 2.5 + row * 4.2
+		var t := -off
+		while t <= off:
+			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
+				var p := at + Vector3(rng.randf_range(-1.4, 1.4), 0, rng.randf_range(-1.4, 1.4))
+				p.y = terrain.height(p.x, p.z)
+				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
+				if rng.randf() < 0.55:
+					tree("proc:giant_fir", rng.randf_range(7.5, 10.0), rng.randf_range(0.95, 1.15), row == 0)
+				else:
+					tree("proc:tall_pine", rng.randf_range(8.0, 11.0), rng.randf_range(1.0, 1.3), row == 0)
+			t += step + (row % 2) * 0.5
 
 
 ## Grass tufts, in patches so the camera can skip those it cannot see.
@@ -1654,7 +1721,7 @@ func grass(h: float) -> void:
 		var list: Array[Transform3D] = []
 		list.assign(patches[key][0])
 		var node := Crops.plant(tuft, list, patches[key][1])
-		node.visibility_range_end = 46.0
+		node.visibility_range_end = 46.0 * sight
 		w.add_child(node)
 
 
@@ -1709,7 +1776,7 @@ func _warm_ground() -> void:
 			var fire: Dictionary = nearby[i]
 			var at: Vector3 = fire["at"]
 			var radius := 8.0 if fire["heals"] else 5.0
-			hearths[i] = Vector4(at.x, at.y + 1.2, at.z, radius)
+			hearths[i] = Vector4(at.x, at.y + 1.2, at.z, 1.0 / (radius * radius))
 		var material := _ground_material.duplicate() as ShaderMaterial
 		material.set_shader_parameter("hearths", hearths)
 		patch.material_override = material
