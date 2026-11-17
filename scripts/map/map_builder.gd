@@ -202,12 +202,12 @@ func ground() -> void:
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
 	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA else 0.0)
-	mat.set_shader_parameter("shore", SHORE_Y if not terrain.coast.is_empty() else -1000.0)
+	mat.set_shader_parameter("shore", SHORE_Y if not terrain.coast.is_empty() or not terrain.sea.is_empty() else -1000.0)
 	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
 		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
 		mat.set_shader_parameter("dirt", Vector3(0.24, 0.19, 0.17))
-	elif look == "vael":
+	elif look in SpawnRules.VAEL:
 		# Salt grass by the sea, paler and drier, and grey-brown cobble-dust on the streets.
 		mat.set_shader_parameter("tint", Vector3(1.0, 0.97, 0.86))
 		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
@@ -1675,7 +1675,7 @@ func forest_wall(h: float) -> void:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1))
 				p.y = terrain.height(p.x, p.z)
-				if not terrain.coast.is_empty() and p.y < SHORE_Y + 0.4:
+				if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4:
 					continue # no trees in the sea: the coast's edge is open water
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 				var file := "res://assets/nature/tree_single_A.gltf" if rng.randf() < 0.72 else "res://assets/nature/tree_single_B.gltf"
@@ -1719,7 +1719,7 @@ func grass(h: float) -> void:
 			if MapIslands.on_masonry(Vector2(p.x, p.z)): continue
 			if not is_preview and MapIslands._near_gate(w, p, 4.0): continue
 		p.y = terrain.height(p.x, p.z)
-		if not terrain.coast.is_empty() and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
+		if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.z / 24.0)))
 		if not patches.has(key):
 			patches[key] = [[], PackedColorArray()]

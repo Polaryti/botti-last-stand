@@ -130,8 +130,9 @@ func level_now(e: float) -> float:
 # --- What it does -------------------------------------------------------------------------------
 
 ## How deep the water is here: 0 on dry land.
+## How deep the water is here: over the ground, or over what you stand on (the Lantern Barge's deck).
 func depth_at(at: Vector3) -> float:
-	return maxf(0.0, level - world.terrain.height(at.x, at.z))
+	return maxf(0.0, level - maxf(world.terrain.height(at.x, at.z), at.y - 0.1))
 
 
 func flooded(at: Vector3) -> bool:
@@ -154,8 +155,8 @@ func quickens(z: Zombie) -> float:
 ## How much of the view the sea-mist takes: nothing out of the water, up to about half with the
 ## water to your chest at high tide.
 func blind_for(at: Vector3) -> float:
-	if not high():
-		return 0.0
+	if not high() or (world.last_light and world.last_light.in_light(at)):
+		return 0.0 # (on the Lantern Road the barge's light keeps the mist off the water round it)
 	return clampf((depth_at(at) - FLOODED) / (SLOW_DEPTH - FLOODED), 0.0, 1.0) * 0.5
 
 

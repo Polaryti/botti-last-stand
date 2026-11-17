@@ -7,11 +7,14 @@ extends MapPiece
 ## rocks, buoys and a great sunken anchor. Salvage marks a sea chest on a wreck (MistTide). Coast shapes
 ## the shore itself: the harbour wall's line is its z, the flats run size metres out to sea, and the
 ## bay is wide metres either side of the middle (Terrain.set_coast).
+## The Lantern Road (Last Light) adds: sea (the whole map drowned flats at this height,
+## Terrain.set_sea), a road lantern (unlit until the Lantern Barge passes), and a waystation (a stone
+## landing beside the road where the barge stops and a boon is chosen).
 
 const FLATS_TOP := 0.55 # the flats' height at the foot of the harbour wall
 const FLATS_LOW := -0.85 # and where they meet the open sea
 
-@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage") var kind := "wreck":
+@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage", "sea", "road_lantern", "waystation") var kind := "wreck":
 	set(v):
 		kind = v
 		refresh()
@@ -53,6 +56,8 @@ func build(b: MapBuilder) -> void:
 		"sea_rocks": VaelBuilder.sea_rocks(b, size)
 		"buoy": VaelBuilder.buoy(b)
 		"sea_stairs": VaelBuilder.sea_stairs(b, size, wide)
+		"road_lantern": VaelBuilder.road_lantern(b)
+		"waystation": VaelBuilder.waystation(b, size)
 		"salvage":
 			if not b.is_preview:
 				b.w.salvage_spots.append(Transform3D(b.xf.basis, b.xf.origin))
@@ -66,6 +71,11 @@ func land(t: Terrain, at: Transform3D) -> void:
 	match kind:
 		"coast":
 			t.set_coast(at.origin.z, at.origin.z + size, FLATS_TOP, FLATS_LOW, wide)
+		"sea":
+			t.set_sea(at.origin.y)
+		"waystation":
+			# A round stone landing, its top just clear of the high tide.
+			t.level(c, Vector2(size * 0.5, size * 0.5), yaw, at.origin.y, 1.6)
 		"mole":
 			# The causeway's top, its sides falling steeply to the seabed.
 			t.level(c, Vector2(wide * 0.5, size * 0.5), yaw, at.origin.y, 1.2)
@@ -81,7 +91,7 @@ func land(t: Terrain, at: Transform3D) -> void:
 
 
 func shapes_land() -> bool:
-	return kind in ["coast", "mole", "sea_stairs", "lighthouse", "bell_tower"]
+	return kind in ["coast", "mole", "sea_stairs", "lighthouse", "bell_tower", "sea", "waystation"]
 
 
 func follows_land() -> bool:

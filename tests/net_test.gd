@@ -132,7 +132,10 @@ func _as_host() -> void:
 	if rules == "vael":
 		Net.set_night_map("vael")
 		ok(Net.night_map == "vael", "the host picks Port Vael")
-	Net.set_rules({"vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	if rules == "lantern":
+		Net.set_night_map("lantern_road")
+		ok(Net.night_map == "lantern_road", "the host picks the Lantern Road")
+	Net.set_rules({"lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -286,6 +289,8 @@ func _play() -> void:
 		await _bastion()
 	elif rules == "vael":
 		await _vael()
+	elif rules == "lantern":
+		await _lantern()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -1760,6 +1765,96 @@ func _vael() -> void:
 	if not host:
 		pl.powers.erase(PowerDefs.CROWN)
 	await sync(440)
+
+
+## Last Light on two phones: the same barge in the same place, a waystation where each phone chooses
+## its own boon and the host waits for both, the Leviathan rising on both, and the lighthouse lit.
+func _lantern() -> void:
+	var ll := w.last_light
+	ok(w.map_id == "lantern_road" and ll != null and w.tide.high(), "both phones are on the Lantern Road, with its barge, and the tide in")
+	if ll == null:
+		return
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	var beside := func() -> void:
+		var b := ll.barge_at()
+		var at := Vector3(b.x - 5.0, 0, b.z + (-1.5 if host else 1.5))
+		pl.global_position = Vector3(at.x, w.ground_at(at) + 0.05, at.z)
+	beside.call()
+	await wait(2.5)
+	await sync(450)
+	beside.call()
+	await wait(0.5)
+	await sync(451)
+	told.rpc(str(snappedf(ll.progress, 0.01)))
+	await wait(0.4)
+	await sync(452)
+	ok(ll.progress > 2.0 and absf(ll.progress - float(_told)) < 3.0, "the barge goes on, and is in the same place on both phones (%.1f m, %s m)" % [ll.progress, _told])
+	await sync(453)
+	# A waystation: each phone is offered its own boons; the host waits for both to choose.
+	if host:
+		ll.progress = ll.way_at[0] - 0.3
+		ll._place(0.0)
+	await wait(0.6)
+	beside.call()
+	await wait(0.8)
+	await sync(454)
+	ok(ll.docked == 0 and ll.offer.size() == Boons.OFFERED, "both phones stop at the first waystation, and this one is offered %d boons" % ll.offer.size())
+	await sync(455)
+	if not host:
+		ll.choose(ll.offer[0])
+	await wait(0.6)
+	await sync(456)
+	if host:
+		ok(ll.chosen.size() == 1 and ll.docked == 0, "the host knows the other phone has chosen, and waits for its own player")
+		ll.choose(ll.offer[0])
+	await wait(0.8)
+	await sync(457)
+	ok(pl.boons.size() == 1 and ll.docked == -1, "both have chosen (%s here), and the barge leaves on both phones" % ",".join(pl.boons))
+	await sync(458)
+	# The Leviathan douses the barge's light, on both phones.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		ll.douse()
+	await wait(0.6)
+	await sync(459)
+	ok(ll.dim_left > 0.0 and is_equal_approx(ll.light_radius(), LastLight.DIM_RADIUS), "its light shrinks on this phone too")
+	await sync(460)
+	# Out of the light on the other phone, the tide drowns its own player.
+	if not host:
+		var b := ll.barge_at()
+		var far := Vector3(b.x - 25.0, 0, b.z)
+		pl.global_position = Vector3(far.x, w.ground_at(far) + 0.05, far.z)
+		pl.hp = pl.max_hp()
+	await wait(Boons.grace(pl) + 1.5)
+	await sync(461)
+	if not host:
+		ok(pl.hp < pl.max_hp() and pl.hp > 0.0, "out of the light, the tide drowns this phone's player (%.0f lost)" % (pl.max_hp() - pl.hp))
+		pl.hp = pl.max_hp()
+	beside.call()
+	await sync(462)
+	# The Isle of Lamps: the Leviathan rises on both phones; when it falls, the lighthouse burns.
+	if host:
+		ll.progress = ll.length - 0.3
+		ll.ways_done = ll.way_at.size()
+		ll._place(0.0)
+	await wait(0.4)
+	beside.call()
+	await wait(1.2)
+	await sync(463)
+	ok(ll.arrived and w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "leviathan"), "at the Isle of Lamps the Leviathan rises on this phone")
+	await sync(464)
+	if host:
+		w.director._mist_boss_defeated = true
+	await wait(0.8)
+	await sync(465)
+	ok(ll.lit, "and when it falls, the lighthouse burns on this phone")
+	await sync(466)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.

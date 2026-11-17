@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 59
+const PROTOCOL := 60
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -60,7 +60,9 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"siren_song", "siren_shriek", "siren_hum", "siren_death", "press_shout", "net_throw", "net_land", "witch_call", "witch_death",
 	"chain_rattle", "hook_throw", "harbour_bell", "harbour_growl", "lamp_throw", "lamp_smash", "lamp_flare", "lamp_blaze", "keeper_laugh", "keeper_hurt",
 	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
-	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign"]
+	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign",
+	# Last Light
+	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1937,6 +1939,29 @@ func _healed_by_you(healed: int, amount: float) -> void:
 
 
 ## A boss of Beyond the Mists enters: every phone shows its card and rings its bells.
+## Last Light: where the Lantern Barge is on its course, and how it stands (LastLight.state_bits),
+## sent by the host every LastLight.SEND_EVERY.
+func last_light(progress: float, bits: int, dim: float) -> void:
+	_last_light.rpc(progress, bits, dim)
+
+
+@rpc("authority", "unreliable_ordered")
+func _last_light(progress: float, bits: int, dim: float) -> void:
+	if world and is_instance_valid(world) and world.last_light and is_finite(progress) and is_finite(dim):
+		world.last_light.follow(progress, bits, clampf(dim, 0.0, 60.0))
+
+
+## Last Light: this phone's player has chosen a boon at the waystation the barge waits at.
+func boon_chosen() -> void:
+	_boon_chosen.rpc_id(1)
+
+
+@rpc("any_peer", "reliable")
+func _boon_chosen() -> void:
+	if is_host() and world and is_instance_valid(world) and world.last_light:
+		world.last_light.peer_chose(multiplayer.get_remote_sender_id())
+
+
 ## The Hollow Sovereign has called the tide in: from `from` until `until` on the night's clock.
 func tide_surge(from: float, until: float) -> void:
 	_tide_surge.rpc(from, until)
@@ -2418,7 +2443,10 @@ func on_dawn_reached() -> void:
 	_dawn_ending = true
 	match rules:
 		Rules.COOP, Rules.FORT:
-			finish("Dawn!", "You survived the night together.\n" + score_lines())
+			if world and world.last_light:
+				finish("The lighthouse burns!", "You brought the Lantern Barge to the Isle of Lamps together.\n" + score_lines())
+			else:
+				finish("Dawn!", "You survived the night together.\n" + score_lines())
 		Rules.TEAMS:
 			var totals := [0, 0]
 			for p: int in roster:

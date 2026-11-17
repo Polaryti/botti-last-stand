@@ -27,6 +27,15 @@ Through a new portal from the heart of the Mists: the drowned harbour of the kin
 - **Hollow Sovereign** (around 8:30), the boss of Port Vael: waves in a line, the tide called in for 45 s with his court rising round him, and below half health the crown's judgement. The night ends only when he falls.
 - **The Sunken Crown** falls with him. Wear it to hit 25% harder and heal 2 health a second, but everyone can see you. Fall, and it falls with you. In All vs All it washes up at the Drowned Bell at 2:00.
 
+### Last Light, on the Lantern Road
+A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: walk the Lantern Barge to the Isle of Lamps.
+- **The Lantern Barge** goes up its channel only while one of you walks within 7 m of it, and stops while anything of the sea clings to it. Drowned Sailors climb aboard every 30 s it moves.
+- **Its light** reaches 12 m. The Mist Tide never goes out here: outside the light you have 3 s, then the tide drowns you at 6 health a second.
+- **Three waystations** on the way. Everyone is healed 40% of their health and chooses one of three boons; the barge waits up to 25 s. Something waits on the road as you leave each one.
+- **Seven boons:** Salt Ward, Lamplighter's Fury, Sea Legs, Ship's Biscuit, Mended Net, Deep Lungs and Lantern Bearer.
+- **The Leviathan of the Mists** rises at the Isle of Lamps. Step out of its bite, outrun its waves, and keep near the barge when it spits the sea over it (the light shrinks to 6 m for 8 s). Defeat it, and the lighthouse burns again: that is the dawn.
+- Its own music (a pilgrims' hymn), sounds and map.
+
 ### New weapons of the coast
 Found on Port Vael, and later on the Lantern Road.
 - **Cutlass:** each kill quickens your swings by 15%, up to three times, fading 3 s after the last kill.

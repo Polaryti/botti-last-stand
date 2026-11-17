@@ -12,7 +12,7 @@ extends RefCounted
 ## The Drowned Sailors and the Barnacle Brutes are the drowned themselves, on the game's own bodies,
 ## dressed by sailor_gear() and brute_gear().
 
-const KINDS := ["brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm"]
+const KINDS := ["brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan"]
 
 const SKIN := Color(0.17, 0.27, 0.31)
 const SKIN_DARK := Color(0.09, 0.15, 0.19)
@@ -1324,3 +1324,183 @@ static func fall_kraken(root: Node3D, k: float, side: float) -> void:
 		if i < ARM_SEGMENTS - 1:
 			at = at.get_node("Seg%d" % (i + 1)) as Node3D
 	(root.get_node("Foam") as Node3D).scale = Vector3.ONE * (1.0 + k * 0.4)
+
+
+# --- The Leviathan of the Mists ----------------------------------------------------------------
+
+const LEVI_SEGMENTS := 9
+const LEVI_SEGMENT := 1.1
+const LEVI_BURIED := -13.0
+const LEVI_SCALES := Color(0.13, 0.27, 0.3)
+const LEVI_DARK := Color(0.07, 0.15, 0.18)
+const LEVI_BELLY := Color(0.62, 0.7, 0.6)
+const LEVI_FIN := Color(0.22, 0.48, 0.5)
+const LEVI_EYE := Color(0.6, 1.0, 0.85)
+
+
+## The Leviathan of the Mists: a sea serpent vast enough to wrap the Isle of Lamps. Out of the water
+## stands its neck, thick as a tower at the sea and narrowing to its head, dark sea-green scales on its
+## back with a crest of torn fins, pale and ridged beneath (+Z, toward you); its head long as a boat,
+## a jaw lined with teeth, frills behind, and eyes lit like drowned lanterns. Behind it two coils of
+## its body break the water. Nodes: Body (lifted out of the sea as it rises) > Neck0 > ... > Neck8 >
+## Head > Jaw; Coils; Foam.
+static func leviathan_parts(root: Node3D) -> void:
+	var foam_mesh := _mesh("levi_foam", func(l: LowPoly) -> void:
+		for i in 20:
+			var a := TAU * i / 20.0
+			var b := TAU * (i + 1) / 20.0
+			l.prism(Vector3(cos(a), 0, sin(a)) * 2.2, Vector3(cos(b), 0, sin(b)) * 2.2, 0.25, 0.25, 4, Color(0.86, 0.94, 0.92))
+			l.prism(Vector3(cos(a), 0, sin(a)) * 3.0, Vector3(cos(a + 0.15), 0, sin(a + 0.15)) * 3.6, 0.16, 0.0, 3, Color(0.78, 0.88, 0.86)))
+	var foam := MesenllaModels._part(root, foam_mesh, Vector3(0, 0.05, 0), "Foam")
+	foam.material_override = MesenllaModels.ghost_material()
+	var coils := MesenllaModels._pivot(root, Vector3.ZERO, "Coils")
+	MesenllaModels._part(coils, _mesh("levi_coils", func(l: LowPoly) -> void:
+		# Two arches of its body out of the water behind it, finned along the top.
+		for c: Vector3 in [Vector3(-2.0, 0, -6.5), Vector3(2.5, 0, -12.0)]:
+			var r := 2.6 if c.z > -8.0 else 2.1
+			var thick := 0.95 if c.z > -8.0 else 0.8
+			for k in 8:
+				var a0 := PI * k / 8.0
+				var a1 := PI * (k + 1) / 8.0
+				var p0 := c + Vector3(cos(a0) * r, sin(a0) * r - 0.6, 0)
+				var p1 := c + Vector3(cos(a1) * r, sin(a1) * r - 0.6, 0)
+				l.prism(p0, p1, thick, thick, 8, LEVI_SCALES if k % 2 == 0 else LEVI_SCALES.darkened(0.08))
+				if k > 0 and k < 7:
+					var top := c + Vector3(cos((a0 + a1) * 0.5) * (r + thick * 0.9), sin((a0 + a1) * 0.5) * (r + thick * 0.9) - 0.6, 0)
+					l.leaf(top, top + Vector3(cos((a0 + a1) * 0.5), sin((a0 + a1) * 0.5), 0) * 0.8, top + Vector3(0, 0, 0.5), LEVI_FIN)))
+	var body := MesenllaModels._pivot(root, Vector3(0, LEVI_BURIED, 0), "Body")
+	var at := body
+	var where := Vector3(0, -0.6, 0)
+	for i in LEVI_SEGMENTS:
+		var seg := MesenllaModels._pivot(at, where, "Neck%d" % i)
+		var r0 := lerpf(1.3, 0.72, float(i) / LEVI_SEGMENTS)
+		var r1 := lerpf(1.3, 0.72, float(i + 1) / LEVI_SEGMENTS)
+		MesenllaModels._part(seg, _mesh("levi_neck%d" % i, func(l: LowPoly) -> void:
+			l.prism(Vector3.ZERO, Vector3(0, LEVI_SEGMENT, 0), r0, r1, 10, LEVI_SCALES if i % 2 == 0 else LEVI_SCALES.darkened(0.06))
+			# Its pale ridged throat toward +Z.
+			l.prism(Vector3(0, 0.0, r0 * 0.5), Vector3(0, LEVI_SEGMENT, r1 * 0.5), r0 * 0.6, r1 * 0.6, 8, LEVI_BELLY.darkened(0.05 * (i % 2)))
+			l.box(Vector3(0, LEVI_SEGMENT * 0.5, r0 * 0.98), Vector3(r0 * 0.9, 0.08, 0.06), LEVI_BELLY.darkened(0.2))
+			# Scales: darker plates down its sides.
+			for x: float in [-1.0, 1.0]:
+				l.box(Vector3(x * r0 * 0.8, LEVI_SEGMENT * 0.5, -r0 * 0.3), Vector3(0.08, LEVI_SEGMENT * 0.7, r0 * 0.8), LEVI_DARK, Vector3(0, x * 20.0, 0))
+			# The crest of fins down its back (-Z).
+			l.leaf(Vector3(0, 0.0, -r0 * 0.95), Vector3(0, LEVI_SEGMENT * 0.6, -r0 - 0.9 + i * 0.05), Vector3(0, LEVI_SEGMENT, -r1 * 0.95), LEVI_FIN)
+			if i < 3:
+				var rng := RandomNumberGenerator.new()
+				rng.seed = 2601 + i
+				barnacles(l, Vector3(r0 * 0.7, LEVI_SEGMENT * 0.5, -r0 * 0.5), Vector3(1, 0, -0.6), 6, 0.08, rng)
+				kelp(l, Vector3(-r0 * 0.8, LEVI_SEGMENT, 0), 0.9, 3, rng)))
+		at = seg
+		where = Vector3(0, LEVI_SEGMENT, 0)
+	var head := MesenllaModels._pivot(at, where, "Head")
+	MesenllaModels._part(head, _mesh("levi_head", func(l: LowPoly) -> void:
+		# The skull, its long snout forward (+Z), brow ridges, nostrils.
+		l.prism(Vector3(0, 0.1, -0.6), Vector3(0, 0.2, 0.6), 0.85, 0.8, 9, LEVI_SCALES)
+		l.prism(Vector3(0, 0.2, 0.6), Vector3(0, 0.05, 2.8), 0.8, 0.32, 9, LEVI_SCALES.lightened(0.04))
+		for x: float in [-1.0, 1.0]:
+			l.prism(Vector3(x * 0.5, 0.75, -0.2), Vector3(x * 0.45, 0.6, 1.2), 0.2, 0.08, 5, LEVI_DARK) # brow
+			l.box(Vector3(x * 0.2, 0.32, 2.65), Vector3(0.1, 0.06, 0.12), Color(0.02, 0.04, 0.05)) # nostril
+			# Frills behind the jaw, and swept-back horns.
+			l.leaf(Vector3(x * 0.7, 0.2, -0.4), Vector3(x * 1.9, 0.9, -1.4), Vector3(x * 1.2, -0.5, -1.0), LEVI_FIN.lightened(0.08))
+			l.prism(Vector3(x * 0.5, 0.75, -0.5), Vector3(x * 0.9, 1.6, -2.0), 0.14, 0.02, 5, BARNACLE)
+			# The upper teeth.
+			for k in 7:
+				var z := 0.6 + k * 0.32
+				var w := lerpf(0.72, 0.34, float(k) / 7.0)
+				l.prism(Vector3(x * w, -0.2, z), Vector3(x * w * 0.95, -0.55, z + 0.05), 0.07, 0.0, 4, Color(0.9, 0.88, 0.8))
+		l.prism(Vector3(0, -0.25, 0.4), Vector3(0, -0.2, 2.6), 0.6, 0.22, 8, Color(0.3, 0.06, 0.08)))) # the mouth's dark
+	var eyes := MesenllaModels._part(head, _mesh("levi_eyes", func(l: LowPoly) -> void:
+		for x: float in [-1.0, 1.0]:
+			l.prism(Vector3(x * 0.68, 0.48, 0.5), Vector3(x * 0.76, 0.48, 0.5), 0.2, 0.2, 8, LEVI_EYE)))
+	eyes.material_override = MesenllaModels.glow_material()
+	var jaw := MesenllaModels._pivot(head, Vector3(0, -0.15, -0.3), "Jaw")
+	MesenllaModels._part(jaw, _mesh("levi_jaw", func(l: LowPoly) -> void:
+		l.prism(Vector3(0, 0.0, 0.0), Vector3(0, -0.2, 2.6), 0.68, 0.24, 8, LEVI_BELLY.darkened(0.15))
+		for x: float in [-1.0, 1.0]:
+			for k in 6:
+				var z := 0.8 + k * 0.3
+				var w := lerpf(0.6, 0.28, float(k) / 6.0)
+				l.prism(Vector3(x * w, 0.05, z), Vector3(x * w * 0.95, 0.4, z + 0.05), 0.06, 0.0, 4, Color(0.9, 0.88, 0.8))))
+	var light := OmniLight3D.new()
+	light.name = "Light"
+	light.light_color = LEVI_EYE
+	light.light_energy = 1.4
+	light.omni_range = 9.0
+	light.shadow_enabled = false
+	light.visible = Game.quality > 0
+	light.position = Vector3(0, 0.6, 1.0)
+	head.add_child(light)
+
+
+## Each frame: rising out of the sea or sinking, swaying where it stands and watching you; rearing
+## back before it strikes (the tell) and striking down to the ground in front of it, jaws snapping;
+## lifting its head and spitting the sea (m_breath).
+static func animate_leviathan(z: Zombie, root: Node3D, delta: float, state: String, t: float, act: float) -> void:
+	var body := root.get_node("Body") as Node3D
+	var foam := root.get_node("Foam") as Node3D
+	foam.rotation.y = t * 0.4
+	foam.scale = Vector3.ONE * (1.0 + sin(t * 1.8) * 0.05)
+	var up := 1.0
+	match state:
+		"m_rise": up = smoothstep(0.0, VaelMind.RISE_TIME, act)
+		"m_sink": up = 1.0 - smoothstep(0.0, VaelMind.SINK_TIME, act)
+	body.position.y = lerpf(LEVI_BURIED, 0.0, up)
+	(root.get_node("Coils") as Node3D).position.y = lerpf(-4.0, 0.0, up)
+	var k := minf(1.0, delta * 6.0)
+	var head_x := 0.25
+	var jaw_x := 0.1 + sin(t * 1.3) * 0.05
+	var at := body.get_node("Neck0") as Node3D
+	for i in LEVI_SEGMENTS:
+		var f := float(i) / LEVI_SEGMENTS
+		var want_x := sin(t * 0.9 - i * 0.4) * 0.05 + (0.06 if i > 5 else 0.0)
+		var want_z := sin(t * 0.7 - i * 0.3) * 0.05
+		match state:
+			"m_slam":
+				if z.is_warning():
+					var coil := clampf(act / maxf(VaelMind.BITE_TELL_L - 0.3, 0.1), 0.0, 1.0)
+					want_x = lerpf(want_x, -0.12 if i < 6 else 0.2, coil)
+					head_x = lerpf(0.25, 0.9, coil)
+					jaw_x = lerpf(0.1, 0.9, coil)
+				else:
+					var strike := clampf(act / 0.2, 0.0, 1.0)
+					want_x = lerpf(-0.12, 0.2 if i < 7 else 0.05, strike)
+					head_x = lerpf(0.9, 0.2, strike)
+					jaw_x = lerpf(0.9, 0.0, clampf((act - 0.15) / 0.1, 0.0, 1.0))
+					k = minf(1.0, delta * 22.0)
+			"m_bite":
+				var strike := clampf(act / 0.2, 0.0, 1.0)
+				want_x = lerpf(-0.12, 0.2 if i < 7 else 0.05, strike)
+				head_x = lerpf(0.9, 0.2, strike)
+				jaw_x = lerpf(0.9, 0.0, clampf((act - 0.15) / 0.1, 0.0, 1.0))
+				k = minf(1.0, delta * 22.0)
+			"m_breath":
+				var rear := sin(clampf(act / 1.0, 0.0, 1.0) * PI)
+				want_x = -0.06 * rear + 0.03
+				head_x = -0.5 * rear + 0.2
+				jaw_x = 1.0 * rear
+			"m_rise", "m_sink":
+				want_x = sin(t * 3.0 - i * 0.6) * 0.08
+				jaw_x = 0.6
+		at.rotation.x = lerpf(at.rotation.x, want_x, k)
+		at.rotation.z = lerpf(at.rotation.z, want_z, k)
+		at = at.get_node("Neck%d" % (i + 1)) as Node3D if i < LEVI_SEGMENTS - 1 else at
+	var head := at.get_node("Head") as Node3D
+	head.rotation.x = lerpf(head.rotation.x, head_x, k)
+	var jaw := head.get_node("Jaw") as Node3D
+	jaw.rotation.x = lerpf(jaw.rotation.x, jaw_x, minf(1.0, delta * 14.0))
+
+
+## Dying: it screams with its jaws wide, sways, and falls slowly sideways across the water, then sinks.
+static func fall_leviathan(root: Node3D, k: float, side: float) -> void:
+	var body := root.get_node("Body") as Node3D
+	var fall := smoothstep(0.4, 2.2, k)
+	body.rotation.z = side * 1.3 * fall
+	body.position.y = -smoothstep(2.4, 4.0, k) * 9.0
+	var at := body.get_node("Neck0") as Node3D
+	for i in LEVI_SEGMENTS:
+		at.rotation.x = sin(k * 9.0 - i) * 0.05 * (1.0 - fall)
+		at = at.get_node("Neck%d" % (i + 1)) as Node3D if i < LEVI_SEGMENTS - 1 else at
+	var jaw := at.get_node("Head/Jaw") as Node3D
+	jaw.rotation.x = 1.0 * (1.0 - smoothstep(1.2, 2.4, k))
+	(root.get_node("Coils") as Node3D).position.y = -smoothstep(1.0, 3.0, k) * 4.0
+	(root.get_node("Foam") as Node3D).scale = Vector3.ONE * (1.0 + k * 0.5)

@@ -155,7 +155,9 @@ func begin(with_zombies: bool) -> void:
 ## until then. Whatever else the night holds (a boss, a barrage) is not given away here.
 func opening_line() -> String:
 	var opening := "Survive until the dawn"
-	if world.map_id == "bastion":
+	if world.last_light:
+		opening = "Walk with the Lantern Barge to the Isle of Lamps"
+	elif world.map_id == "bastion":
 		opening = "Defend the Great Portal until the dawn"
 	elif world.fort:
 		opening = "Defend the fort until the dawn"
@@ -172,6 +174,7 @@ const BOSS_CARDS := {
 	"veil_regent": {"name": "Veil Regent", "line": "wakes on its throne in the Mists", "color": Color(0.78, 0.62, 1.0), "glow": Color(0.36, 0.16, 0.62), "bells": "boss_bells_regent", "strikes": [0.0, 0.7, 1.4, 2.2, 2.6]},
 	MESENLLA_BOSS: {"name": "Great Revenant Elemental", "line": "rises at the Ring of Stones", "color": Color(0.45, 0.95, 0.88), "glow": Color(0.15, 0.55, 0.62), "bells": "boss_bells_revenant", "strikes": [0.0, 0.55, 1.1, 1.75]},
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
+	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "rises at the Isle of Lamps", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
 	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
 }
 const BOSS_CARD_TIME := 7.0 # long enough to read what it says
@@ -264,6 +267,9 @@ func night_left() -> float:
 func dawn_amount() -> float:
 	if not running or Net.fog_rules():
 		return 0.0
+	if world.last_light:
+		# No clock on the Lantern Road: the sky pales a little as the Isle of Lamps comes near.
+		return 1.0 if world.last_light.lit else clampf(world.last_light.progress / world.last_light.length, 0.0, 1.0) * 0.3
 	var dawn := clampf(1.0 - night_left() / DAWN_GLOW, 0.0, 1.0)
 	return minf(dawn, 0.45) if requires_regent() and not _mist_boss_defeated else dawn
 
@@ -359,7 +365,8 @@ func _process(delta: float) -> void:
 		_far_timer = 4.0
 		if world.fort == null:
 			_clear_far_zombies()
-	if elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules() and (not requires_regent() or _mist_boss_defeated):
+	var dawned := world.last_light.lit if world.last_light else elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules() and (not requires_regent() or _mist_boss_defeated)
+	if dawned:
 		_won = true
 		_sound("rooster", 0.0)
 		if Net.is_host():
@@ -407,8 +414,8 @@ func _spawn_familiar() -> void:
 
 ## The last two minutes: the sky starts to change, and everything still standing wants you dead.
 func _tick_last_stand(delta: float) -> void:
-	if Net.fog_rules():
-		return
+	if Net.fog_rules() or world.last_light:
+		return # (no dawn to sense on the Lantern Road, only the lighthouse)
 	if not _last_stand:
 		if elapsed >= LAST_STAND:
 			_last_stand = true
@@ -559,6 +566,8 @@ func _tick_court() -> void:
 			if came > 0:
 				_sound("press_shout", 2.0)
 				show_banner("A Press Gang is looking for hands...", 3.0)
+	if world.map_id != "vael":
+		return # on the Lantern Road the court waits at the waystations instead (LastLight)
 	if Net.fog_rules():
 		# All vs All: no court, but the Sunken Crown washes up for whoever can take it and keep it.
 		if not _crown_washed and elapsed >= CROWN_AT and world.map_id == "vael":

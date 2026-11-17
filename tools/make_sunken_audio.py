@@ -700,6 +700,92 @@ SOUNDS.update({
 })
 
 
+# --- Last Light ---------------------------------------------------------------------------------
+LEVIATHAN = ((160, 0.45, 1.0), (380, 0.35, 0.6), (900, 0.25, 0.25))
+
+
+def leviathan_rise():
+    """The Leviathan surfacing: the sea heaving up and pouring off a vast body, and a groan under it all."""
+    m = n(2.8)
+    t = t_(m)
+    heave = band(noise(m), 60, 900) * np.sin(np.pi * np.clip(t / 2.2, 0, 1)) ** 1.5 * 1.0
+    pour = water(m, 250, 3200, 90) * np.clip((t - 0.6) / 0.8, 0, 1) * env(m, 0.8, 0.9) * 0.7
+    groan = throat(m, curve(m, (0, 34), (0.5, 42), (1, 30)), LEVIATHAN, breath=0.3, rough=1.0, sub=1.0) * env(m, 0.5, 1.0) * 0.7
+    return reverb(heave + pour + groan, 2.4, 0.45)
+
+
+def leviathan_roar():
+    """The Leviathan's roar: a huge, rough bellow that shakes the water, with a sea-wind hiss over it."""
+    m = n(2.6)
+    v = np.zeros(m)
+    for f in (40, 61, 93):
+        v += throat(m, curve(m, (0, f * 0.8), (0.25, f * 1.2), (1, f * 0.85)), LEVIATHAN, breath=0.5, rough=1.0, sub=0.9) * 0.6
+    v *= env(m, 0.15, 1.1)
+    hiss = band(noise(m), 1500, 6000) * env(m, 0.2, 1.5) * 0.25
+    return reverb(lowp(v, 2600) + hiss, 2.6, 0.45)
+
+
+def leviathan_bite():
+    """The jaws coming down: a rush of air, a crunching snap of teeth as long as oars, and a wave thrown up."""
+    m = n(1.5)
+    rush = band(noise(m), 200, 1800) * curve(m, (0, 0.2), (0.25, 1.0), (0.3, 0.1), (1, 0.0)) * 0.7
+    snap = band(noise(m), 600, 5000) * at(env(n(0.2), 0.001, 12), 0.38, 1.5) * 1.4
+    crash = band(noise(m), 120, 2500) * at(env(n(1.1), 0.01, 3), 0.4, 1.5) * 0.9
+    return rush + snap + crash + thud(m, 0.38, 1.4, 45)
+
+
+def leviathan_hurt():
+    """The Leviathan struck: a deep, angry bellow through the water."""
+    m = n(1.1)
+    v = throat(m, curve(m, (0, 60), (0.3, 72), (1, 44)), LEVIATHAN, breath=0.4, rough=1.0, sub=0.9) * env(m, 0.03, 2.2)
+    return reverb(lowp(v, 1800) + bubbles(m, 25, 120, 450, 0.09) * 0.4, 1.4, 0.4)
+
+
+def leviathan_death():
+    """The Leviathan dying: a long falling cry, the great body crashing into the sea, and the water
+    closing over it, settling, still."""
+    m = n(4.6)
+    v = np.zeros(m)
+    for f in (56, 84, 126):
+        v += throat(m, curve(m, (0, f * 1.1), (1, f * 0.35)), LEVIATHAN, breath=0.5, rough=0.9, sub=0.8) * 0.55
+    v *= env(m, 0.1, 0.8) * curve(m, (0, 1), (0.6, 0.8), (1, 0))
+    crash = band(noise(m), 80, 2500) * at(env(n(2.8), 0.01, 1.6), 1.8, 4.6) * 1.1
+    settle = water(m, 200, 2400, 80) * curve(m, (0, 0), (0.45, 0), (0.6, 0.7), (1, 0)) * 0.5
+    return reverb(lowp(v, 2200) + crash + settle + thud(m, 1.8, 1.5, 38), 2.8, 0.45)
+
+
+def waystation():
+    """Reaching a waystation: the barge bumping the jetty, a ship's bell rung twice, and a brazier catching."""
+    m = n(2.4)
+    bump = thud(m, 0.0, 0.7, 90) + band(noise(m), 200, 1200) * env(m, 0.005, 10) * 0.5
+    bell = at(harbour_bell(523, 1.6), 0.35, 2.4) * 0.45 + at(harbour_bell(523, 1.6), 0.85, 2.4) * 0.4
+    fire = band(noise(m), 300, 4000) * curve(m, (0, 0), (0.45, 0), (0.55, 0.5), (1, 0.15))
+    for _ in range(30):
+        c = band(noise(n(0.01)), 2000, 7000) * rng.uniform(0.1, 0.3)
+        s = rng.integers(n(1.0), m - n(0.01))
+        fire[s:s + len(c)] += c
+    return reverb(bump + bell + fire * 0.5, 1.6, 0.35)
+
+
+def lighthouse_lit():
+    """The lighthouse lit: a roar of flame climbing the tower, the lens ringing, and bells across the sea."""
+    m = n(4.0)
+    t = t_(m)
+    roar = band(noise(m), 150, 3500) * np.clip(t / 1.2, 0, 1) * env(m, 0.4, 0.8) * 0.8
+    lens = np.zeros(m)
+    for i, f in enumerate((587, 880, 1175, 1480)):
+        lens += at(glass(f, 2.6) * 0.18, 0.9 + i * 0.18, 4.0)
+    bells = sum(at(harbour_bell(f, 2.5), 1.4 + k * 0.5, 4.0) * 0.3 for k, f in enumerate((294, 370, 440)))
+    return reverb(roar + lens + bells, 2.6, 0.45)
+
+
+SOUNDS.update({
+    "leviathan_rise": (leviathan_rise, 0.95), "leviathan_roar": (leviathan_roar, 0.95), "leviathan_bite": (leviathan_bite, 0.9),
+    "leviathan_hurt": (leviathan_hurt, 0.8), "leviathan_death": (leviathan_death, 0.95),
+    "waystation": (waystation, 0.75), "lighthouse_lit": (lighthouse_lit, 0.85),
+})
+
+
 if __name__ == "__main__":
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
     for name, (make, gain) in SOUNDS.items():

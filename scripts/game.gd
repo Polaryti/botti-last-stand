@@ -30,6 +30,7 @@ var doubloons := 0
 var board_prizes := {} # week -> doubloons, for leaderboard prizes already paid
 var finished_games := 0
 var mists_wins := 0
+var lighthouses_lit := 0 # Last Light won: the Isle of Lamps' lighthouse burning again
 var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
 var bastion_wins := 0
 var changelog_seen := "" # ChangelogPanel.signature() when the notes were last opened
@@ -43,7 +44,8 @@ var fort_map := "fort"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
 	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."},
-	"vael": {"name": "Port Vael", "desc": "A drowned harbour. The Mist Tide comes in and goes out."}}
+	"vael": {"name": "Port Vael", "desc": "A drowned harbour. The Mist Tide comes in and goes out."},
+	"lantern_road": {"name": "The Lantern Road", "desc": "Last Light: walk with the Lantern Barge to the Isle of Lamps."}}
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
 const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
 	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
@@ -224,6 +226,14 @@ func note_mists_win() -> void:
 	save_settings()
 
 
+## Last Light won: the Lantern Barge brought to the Isle of Lamps and the lighthouse lit again.
+func note_last_light() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	lighthouses_lit += 1
+	save_settings()
+
+
 ## A match won beyond the Mists: dawn reached in the Valleys of Mesenlla or at Mist Bastion, or a
 ## versus match won in the Valleys. Three wins in each earn the Cartographer.
 func note_beyond_win() -> void:
@@ -359,6 +369,14 @@ func zombie_pool_plan() -> Dictionary:
 		return BASTION_POOLS.duplicate()
 	if mode == Mode.NIGHT and current_map() in SpawnRules.MESENLLA:
 		return MESENLLA_POOLS.duplicate()
+	if mode == Mode.NIGHT and current_map() == "lantern_road":
+		# Last Light: no Hollow Sovereign, no Kraken; the Leviathan at the end, and Drowned climbing aboard.
+		var road := VAEL_POOLS.duplicate()
+		road.erase("hollow_sovereign")
+		road.erase("kraken_arm")
+		road["drowned"] = 22
+		road["leviathan"] = 1
+		return road
 	if mode == Mode.NIGHT and current_map() in SpawnRules.VAEL:
 		return VAEL_POOLS.duplicate()
 	var plan := _zombie_pools()
@@ -368,6 +386,7 @@ func zombie_pool_plan() -> Dictionary:
 			plan[model] = mini(int(MESENLLA_POOLS[model]), 4)
 		for model: String in VAEL_POOLS:
 			plan[model] = mini(int(VAEL_POOLS[model]), 4)
+		plan["leviathan"] = 1
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent
@@ -431,6 +450,7 @@ func load_settings() -> void:
 	board_prizes = _saved(c, "progress", "board_prizes", {})
 	finished_games = maxi(0, _saved(c, "progress", "finished_games", 0))
 	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
+	lighthouses_lit = maxi(0, _saved(c, "progress", "lighthouses_lit", 0))
 	mesenlla_wins = maxi(0, _saved(c, "progress", "mesenlla_wins", 0))
 	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
 	changelog_seen = str(_saved(c, "progress", "changelog_seen", ""))
@@ -478,6 +498,7 @@ func save_settings() -> void:
 	c.set_value("progress", "board_prizes", board_prizes)
 	c.set_value("progress", "finished_games", finished_games)
 	c.set_value("progress", "mists_wins", mists_wins)
+	c.set_value("progress", "lighthouses_lit", lighthouses_lit)
 	c.set_value("progress", "mesenlla_wins", mesenlla_wins)
 	c.set_value("progress", "bastion_wins", bastion_wins)
 	c.set_value("progress", "changelog_seen", changelog_seen)

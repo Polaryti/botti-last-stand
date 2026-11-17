@@ -42,6 +42,7 @@ func _ready() -> void:
 	await _vael_weapons()
 	await _port_vael()
 	await _drowned_court()
+	await _last_light()
 	await _feedback_and_numbers()
 	await _wilds_of_mesenlla()
 	_text_audit()
@@ -2121,6 +2122,151 @@ func _drowned_court() -> void:
 	vael.tide.level = MistTide.level_at(400.0)
 	d._tick_court()
 	check(vael.count_type("siren") == 1 and vael.count_type("press_gang") == int(ZombieDefs.ALL["press_gang"]["pack"]), "Sirens come to the water's edge, and the Press Gang in threes")
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+	await get_tree().process_frame
+
+
+func _last_light() -> void:
+	# The map, and how it is known.
+	check(Game.MAPS.has("lantern_road") and Places.ALL.has("lantern_road") and Places.ORDER.has("lantern_road") and WorldAtlas.SPOTS.has("lantern_road") and Icons.exists("map_lantern_road"), "the Lantern Road is a map of its own, in the Places, on the atlas, with its icon")
+	check(ResourceLoader.exists("res://maps/lantern_road.tscn") and Sfx.MUSIC_SETS.has("lantern") and (Sfx.MUSIC_SETS["lantern"] as Array).all(func(m: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % m)), "with its own music")
+	var levi: Dictionary = ZombieDefs.ALL["leviathan"]
+	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 6, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
+	var voices: Array = [Zombie.MESENLLA_VOICES.get("leviathan", ""), Zombie.MESENLLA_HURT.get("leviathan", ""), Zombie.MESENLLA_DEATHS.get("leviathan", ""), "leviathan_bite", "leviathan_rise", "waystation", "lighthouse_lit", "boss_bells_leviathan"]
+	check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "it and the road have sounds of their own")
+	check(Director.BOSS_CARDS.has("leviathan"), "it enters with its own card")
+	check(Boons.ALL.size() >= Boons.OFFERED * 2 and Boons.ALL.values().all(func(b: Dictionary) -> bool: return Icons.exists(str(b["icon"]).get_slice("+", 0)) and str(b["desc"]).length() > 10), "the waystations' boons, each with an icon and words")
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "lantern_road"
+	Game.mode = Game.Mode.NIGHT
+	var road := World.new()
+	space.add_child(road)
+	road.setup(Game.Mode.NIGHT)
+	road.director.running = false
+	for z: Zombie in road.zombies.duplicate(): z.release()
+	var ll := road.last_light
+	check(ll != null and ll.length > 300.0, "Last Light: the barge's course runs %d m" % int(ll.length if ll else 0.0))
+	if ll == null:
+		space.queue_free()
+		Game.night_map = was_map
+		Game.mode = was_mode
+		return
+	ll.set_physics_process(false)
+	check(ll.way_at.size() == 3 and road.road_lanterns.size() >= 20 and road.lighthouse_top != Vector3.INF, "three waystations, %d road lanterns, and the lighthouse at the end" % road.road_lanterns.size())
+	check(road.tide.level >= MistTide.HIGH_Y - 0.01, "the tide is in, and stays in")
+	var you := road.player
+	you.set_physics_process(false)
+	var dt := 1.0 / 30.0
+	var step := func(seconds: float) -> void:
+		for i in int(seconds / dt):
+			ll._physics_process(dt)
+	var start := ll.barge_at()
+	check(road.terrain.is_walkable(start.x + 5.4, start.z) or road.terrain.is_walkable(start.x - 5.4, start.z) or road.terrain.is_walkable(start.x, start.z), "the barge sets out beside the quay")
+	# Walk with it, and it goes; leave it, and it stops.
+	you.global_position = start + Vector3(-5.0, 0.6, 0)
+	step.call(2.0)
+	check(ll.moving and ll.progress > LastLight.BARGE_SPEED * 1.5, "with you beside it, the barge goes on (%.1f m in 2 s)" % ll.progress)
+	you.global_position = ll.barge_at() + Vector3(-30.0, 0.6, 0)
+	var was := ll.progress
+	step.call(1.0)
+	check(not ll.moving and is_equal_approx(ll.progress, was), "with nobody near it, it stops")
+	# Out of its light, the tide drowns you after a few seconds' grace.
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	ll._out.clear()
+	you.global_position = ll.barge_at() + Vector3(-30.0, 0.6, 0)
+	you.hp = you.max_hp()
+	step.call(LastLight.OUT_GRACE - 0.5)
+	check(is_equal_approx(you.hp, you.max_hp()), "%d s out of the light before the tide takes you" % int(LastLight.OUT_GRACE))
+	step.call(1.5)
+	var lost := you.max_hp() - you.hp
+	check(lost > LastLight.DROWN * 0.5 and lost < LastLight.DROWN * 1.6, "then %d health a second (%.1f lost)" % [int(LastLight.DROWN), lost])
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	you.hp = you.max_hp()
+	step.call(1.0)
+	check(is_equal_approx(you.hp, you.max_hp()) and ll.out_for(you) == 0.0, "back in the light, you are safe")
+	# Something of the sea in the barge holds it.
+	road.spawn_zombie("drowned_sailor", ll.barge_at() + Vector3(0, 0.5, 0))
+	var sailor: Zombie = road.zombies.back()
+	sailor.set_physics_process(false)
+	sailor.position = ll.barge_at() + Vector3(0, 0.5, 0)
+	was = ll.progress
+	step.call(1.0)
+	check(ll.held and not ll.moving and is_equal_approx(ll.progress, was), "a Drowned Sailor aboard holds the barge where it is")
+	sailor.release()
+	step.call(0.5)
+	check(ll.moving, "throw it off, and it goes on")
+	# The lanterns it passes light up.
+	ll.progress = 40.0
+	ll._place(0.0)
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	step.call(0.5)
+	check(ll.lanterns_lit() >= 1, "it lights the road's lanterns as it passes (%d)" % ll.lanterns_lit())
+	# The first waystation: healed, three boons, and the barge waits.
+	ll.progress = ll.way_at[0] - 0.5
+	ll._place(0.0)
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	you.hp = you.max_hp() * 0.3
+	step.call(0.6)
+	check(ll.docked == 0 and not ll.moving, "at a waystation the barge stops")
+	check(you.hp >= you.max_hp() * (0.3 + LastLight.WAY_HEAL) - 1.0, "everyone there is healed %d%% of their health" % int(LastLight.WAY_HEAL * 100.0))
+	check(ll.offer.size() == Boons.OFFERED and ll.offer == Boons.offer_for(you, 0), "and offered %d boons" % Boons.OFFERED)
+	ll.choose("salt_ward") if ll.offer.has("salt_ward") else ll.choose(ll.offer[0])
+	var took := you.boons[0] if not you.boons.is_empty() else ""
+	check(took != "" and ll.offer.is_empty() and not Boons.offer_for(you, 1).has(took), "one is chosen (%s), and never offered again" % took)
+	Boons.grant(you, "salt_ward")
+	Boons.grant(you, "lamplighter")
+	check(is_equal_approx(float(you.mods["damage_taken"]), 0.8) and is_equal_approx(float(you.mods["melee_damage"]), 1.2), "Salt Ward takes a fifth off every blow; Lamplighter's Fury adds a fifth to yours")
+	step.call(0.2)
+	check(ll.docked == -1 and road.count_type(LastLight.WAY_FOES[0][0]) == int(LastLight.WAY_FOES[0][1]), "once all have chosen it leaves, and a Press Gang waits on the road ahead")
+	for z: Zombie in road.zombies.duplicate(): z.release()
+	# Deep Lungs and the Lantern Bearer.
+	Boons.grant(you, "deep_lungs")
+	Boons.grant(you, "lantern_bearer")
+	check(Boons.grace(you) == Boons.DEEP_GRACE and Boons.drown_share(you) == Boons.DEEP_SHARE and Boons.light_bonus(you) == Boons.BEARER_REACH, "Deep Lungs: %d s of grace and half the drowning; the Lantern Bearer: the light %d m further" % [int(Boons.DEEP_GRACE), int(Boons.BEARER_REACH)])
+	you.global_position = ll.barge_at() + Vector3(-(LastLight.LIGHT_RADIUS + 2.0), 0.6, 0)
+	you.hp = you.max_hp()
+	step.call(1.0)
+	check(ll.out_for(you) == 0.0, "so %d m from the barge is still in its light for them" % int(LastLight.LIGHT_RADIUS + 2.0))
+	# The Isle of Lamps: the Leviathan rises.
+	ll.progress = ll.length - 0.3
+	ll.ways_done = ll.way_at.size()
+	ll._place(0.0)
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	step.call(0.5)
+	check(ll.arrived and road.count_type("leviathan") == 1, "at the Isle of Lamps the Leviathan rises from the sea")
+	var beast: Zombie = road.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "leviathan").front()
+	check(beast._custom and beast._visual.has_node("Body/Neck0") and beast.is_boss(), "a sea-serpent's neck of its own, and a boss")
+	check(road.director.dawn_amount() < 0.5, "and it is still night")
+	# It douses the barge's light.
+	var mind: VaelMind = beast.mesenlla_mind
+	mind.phase = ""
+	mind._cooldown_d = 99.0
+	mind._cooldown_e = 0.0
+	mind._leviathan(beast, you, 0.01)
+	check(ll.dim_left > 0.0 and is_equal_approx(ll.light_radius(), LastLight.DIM_RADIUS), "it spits the sea over the barge: the light shrinks to %d m for %d s" % [int(LastLight.DIM_RADIUS), int(LastLight.DIM_TIME)])
+	# It sinks, and rises somewhere else with Drowned Sailors.
+	var first := beast.position
+	mind.phase = "sink"
+	mind.left = 0.0
+	mind._leviathan(beast, you, 0.01)
+	check(beast.position.distance_to(first) > 3.0 and road.count_type("drowned_sailor") >= 1, "it dives and comes up elsewhere round the isle, with Drowned Sailors")
+	# It falls, and the lighthouse burns: the dawn.
+	road.director._mist_boss_defeated = true
+	step.call(0.2)
+	road.director.running = true
+	var dawn := road.director.dawn_amount()
+	road.director.running = false
+	check(ll.lit and dawn >= 1.0, "when it falls, the lighthouse burns again, and that is the dawn")
+	var counted := Game.lighthouses_lit
+	Game.note_last_light()
+	check(Game.lighthouses_lit == counted + 1, "and it is counted (%d)" % Game.lighthouses_lit)
+	Game.lighthouses_lit = counted
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode

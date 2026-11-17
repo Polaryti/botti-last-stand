@@ -232,6 +232,8 @@ static func lighthouse(b: MapBuilder, high: float, lit: bool) -> void:
 		b.add(lamp)
 	b.solid(Vector3(0, high * 0.5, 0), Vector3(5.2, high, 5.2))
 	b.w.perches.append(b.xf * Vector3(0, high + 0.6, 2.6))
+	if not b.is_preview:
+		b.w.lighthouse_top = b.xf * Vector3(0, high + 2.0, 0)
 	MesenllaBuilder._feature(b, "lighthouse", 6.0)
 
 
@@ -650,3 +652,66 @@ static func sea_stairs(b: MapBuilder, length: float, drop: float) -> void:
 		l.box(Vector3(side * 1.5, -drop * 0.5 + 0.2, length * 0.5), Vector3(0.4, drop + 0.4, length), QUAY_DARK)
 		b.solid(Vector3(side * 1.5, -drop * 0.5 + 0.2, length * 0.5), Vector3(0.4, drop + 0.4, length))
 	b.add(l)
+
+
+
+## One of the old lanterns of the Lantern Road: a squat stone post with an iron crook, its lantern
+## hanging cold and dark. The Lantern Barge lights each as it passes (LastLight).
+static func road_lantern(b: MapBuilder) -> void:
+	var rng := b.seeded()
+	var l := b.cell()
+	var tide := _tide_line(b)
+	l.prism(Vector3(0, -0.4, 0), Vector3(0, 0.5, 0), 0.34, 0.3, 6, _stone_col(0.0, tide, QUAY_STONE, rng))
+	l.prism(Vector3(0, 0.5, 0), Vector3(0, 2.3, 0), 0.2, 0.17, 6, _stone_col(1.4, tide, QUAY_STONE, rng))
+	l.prism(Vector3(0, 2.3, 0), Vector3(0, 2.45, 0), 0.26, 0.26, 6, QUAY_DARK)
+	l.prism(Vector3(0, 2.45, 0), Vector3(0, 2.7, 0), 0.04, 0.04, 4, IRON)
+	l.prism(Vector3(0, 2.7, 0), Vector3(0.55, 2.75, 0), 0.035, 0.035, 4, IRON)
+	l.prism(Vector3(0.55, 2.75, 0), Vector3(0.55, 2.6, 0), 0.02, 0.02, 3, IRON)
+	# The lantern: an iron cage, cold glass, a pointed cap.
+	l.prism(Vector3(0.55, 2.6, 0), Vector3(0.55, 2.55, 0), 0.16, 0.16, 6, IRON)
+	l.prism(Vector3(0.55, 2.55, 0), Vector3(0.55, 2.18, 0), 0.13, 0.13, 6, Color(0.12, 0.15, 0.16))
+	l.prism(Vector3(0.55, 2.18, 0), Vector3(0.55, 2.12, 0), 0.16, 0.16, 6, IRON)
+	l.prism(Vector3(0.55, 2.6, 0), Vector3(0.55, 2.78, 0), 0.17, 0.02, 6, BRONZE_GREEN)
+	VaelModels.barnacles(l, Vector3(0, minf(0.3, tide - 0.2), 0.25), Vector3(0, 0, 1), 4, 0.05, rng)
+	VaelModels.kelp(l, Vector3(0.3, minf(0.4, tide), 0), 0.4, 2, rng)
+	b.solid(Vector3(0, 1.0, 0), Vector3(0.6, 2.6, 0.6))
+	if not b.is_preview:
+		b.w.road_lanterns.append(b.xf * Vector3(0.55, 2.36, 0))
+
+
+## A waystation of the Lantern Road: a round landing of stone beside the road, steps down into the
+## water, mooring posts, and a shrine at its middle (a stone plinth under an iron brazier) where the
+## Lantern Barge stops and the voyagers choose a boon (LastLight). `wide` is the landing's breadth.
+static func waystation(b: MapBuilder, wide: float) -> void:
+	var rng := b.seeded()
+	var l := b.mesh()
+	var tide := _tide_line(b)
+	var r := wide * 0.5
+	l.prism(Vector3(0, -1.6, 0), Vector3(0, 0.0, 0), r + 0.4, r, 14, _stone_col(-0.8, tide, QUAY_STONE, rng))
+	# Its top in rings of worn flagstones.
+	for ring in 3:
+		var ra := r * (1.0 - ring * 0.3)
+		l.prism(Vector3(0, 0.0, 0), Vector3(0, 0.06 + ring * 0.01, 0), ra, ra - 0.2, 14, QUAY_STONE.darkened(0.04 * ring + rng.randf_range(0.0, 0.05)))
+	# Steps down to the water on its far side (-Z).
+	for k in 4:
+		l.box(Vector3(0, -0.2 - k * 0.3, -r - 0.35 - k * 0.45), Vector3(2.6, 0.3, 0.9), _stone_col(-0.3 - k * 0.3, tide, QUAY_STONE, rng))
+	# Mooring posts.
+	for a: float in [0.9, 2.3, 4.0, 5.4]:
+		var at := Vector3(cos(a) * (r - 0.4), 0, sin(a) * (r - 0.4))
+		l.prism(at, at + Vector3(0, 0.8, 0), 0.16, 0.13, 6, WOOD_DARK)
+		l.prism(at + Vector3(0, 0.55, 0), at + Vector3(0, 0.62, 0), 0.19, 0.19, 6, ROPE)
+	# The shrine: a stepped plinth, and on it an iron brazier on a post.
+	l.prism(Vector3(0, 0.06, 0), Vector3(0, 0.4, 0), 1.1, 1.0, 8, QUAY_DARK)
+	l.prism(Vector3(0, 0.4, 0), Vector3(0, 0.95, 0), 0.7, 0.62, 8, QUAY_STONE)
+	l.prism(Vector3(0, 0.95, 0), Vector3(0, 2.4, 0), 0.08, 0.07, 6, IRON)
+	l.prism(Vector3(0, 2.4, 0), Vector3(0, 2.75, 0), 0.22, 0.48, 8, IRON)
+	l.prism(Vector3(0, 2.6, 0), Vector3(0, 2.72, 0), 0.4, 0.4, 8, Color(0.12, 0.1, 0.09)) # cold coals
+	for k in 4:
+		var a := TAU * k / 4.0 + 0.4
+		l.prism(Vector3(cos(a) * 0.46, 2.72, sin(a) * 0.46), Vector3(cos(a) * 0.6, 3.0, sin(a) * 0.6), 0.03, 0.01, 3, IRON)
+	VaelModels.barnacles(l, Vector3(r * 0.8, -0.5, r * 0.5), Vector3(1, 0, 0.6), 6, 0.07, rng)
+	VaelModels.kelp(l, Vector3(-r, -0.2, 0.4), 0.7, 3, rng)
+	b.add(l)
+	b.solid(Vector3(0, 0.6, 0), Vector3(1.4, 1.2, 1.4))
+	if not b.is_preview:
+		b.w.waystations.append(Transform3D(b.xf.basis, b.xf.origin))

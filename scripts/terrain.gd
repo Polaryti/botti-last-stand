@@ -200,6 +200,9 @@ func bake() -> void:
 func _natural(x: float, z: float) -> float:
 	var d := Vector2(x, z).length()
 	var h := (_noise.get_noise_2d(x, z) * roughness + _detail.get_noise_2d(x, z) * 0.5) * smoothstep(calm_radius, calm_radius + 48.0, d)
+	if not sea.is_empty():
+		# All of it the seabed, rippled with sand bars, and the hills islands standing out of it.
+		h = float(sea["floor"]) + _detail.get_noise_2d(x * 0.6, z * 0.6) * 0.22 + _noise.get_noise_2d(x * 1.7 + 300.0, z * 1.7) * 0.25
 	for g in _hills:
 		var dx := x - g.x
 		var dz := z - g.y
@@ -209,6 +212,13 @@ func _natural(x: float, z: float) -> float:
 	for p: Dictionary in _pads:
 		h = _apply_pad(p, x, z, h)
 	return h
+
+
+## The Lantern Road: the whole map is drowned flats at this height, with no shore at all. Hills are
+## islands standing out of it, and roads cut across it are causeways.
+var sea := {}
+func set_sea(floor_y: float) -> void:
+	sea = {"floor": floor_y}
 
 
 ## Sets the shore (see coast).

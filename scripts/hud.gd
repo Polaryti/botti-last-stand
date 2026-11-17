@@ -134,6 +134,11 @@ func _input(event: InputEvent) -> void:
 		return
 	if player == null or get_tree().paused or menu_open or not visible:
 		return
+	if event is InputEventKey and (event as InputEventKey).pressed and player.world.last_light and not player.world.last_light.offer.is_empty():
+		var k := (event as InputEventKey).keycode - KEY_1
+		if k >= 0 and k < player.world.last_light.offer.size():
+			player.world.last_light.choose(player.world.last_light.offer[k])
+			return
 	if player.dead:
 		if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 			var at: Vector2 = (event as InputEventScreenTouch).position
@@ -152,6 +157,10 @@ func _input(event: InputEvent) -> void:
 
 
 func _touch_down(index: int, at: Vector2) -> void:
+	for i in _boon_cards.size():
+		if _boon_cards[i].has_point(at) and player.world.last_light and i < player.world.last_light.offer.size():
+			player.world.last_light.choose(player.world.last_light.offer[i])
+			return
 	var best := ""
 	var best_d := INF
 	for id: String in _buttons:
@@ -372,6 +381,7 @@ func _draw() -> void:
 		for i in 6:
 			var band := r + i * minf(s.x, s.y) * 0.08
 			draw_arc(centre, band + 60.0, 0.0, TAU, 64, Color(dark, 0.16 + i * 0.06), 120.0)
+	_draw_boons(s)
 	var cross := 40.0
 	draw_texture_rect(_crosshair, Rect2(centre - Vector2.ONE * cross * 0.5, Vector2.ONE * cross), false, Color(1, 1, 1, 0.85))
 	if player.hit_marker > 0.0:
@@ -593,7 +603,11 @@ func _draw_status(s: Vector2) -> void:
 		_text("%d" % int(player.mana), Vector2(x + 9, 70), HUD_SMALL - 2, Color.WHITE)
 	var y := card.end.y + 6.0
 	var cx := _pad - 10.0
-	if Game.is_night() and director:
+	if Game.is_night() and director and player.world.last_light:
+		var ll := player.world.last_light
+		_clock(s, "The lighthouse burns" if ll.lit else "The Isle of Lamps" if ll.arrived else "Isle of Lamps: %d m" % ceili(ll.left()))
+		cx += _chip("%d kills" % player.kills, "skull", UiTheme.BONE, Vector2(cx, y)) + 6.0
+	elif Game.is_night() and director:
 		_clock(s, Game.clock(director.night_left()))
 		cx += _chip("%d kills" % player.kills, "skull", UiTheme.BONE, Vector2(cx, y)) + 6.0
 	elif Game.mode == Game.Mode.SANDBOX:
@@ -603,6 +617,49 @@ func _draw_status(s: Vector2) -> void:
 	elif player.has_mount():
 		_chip("%s %d/%d" % [player.mount_name(), player.horse_progress, player.horses_needed()], player.mount_kind(), UiTheme.EMBER if player.horse_ready() else UiTheme.BONE, Vector2(cx, y))
 	_status_bottom = y + CHIP_H
+
+
+## Last Light: the three boons offered at a waystation, as cards across the middle of the screen,
+## each its icon, name and what it does. A tap on one (or 1, 2, 3) chooses it.
+var _boon_cards: Array[Rect2] = []
+func _draw_boons(s: Vector2) -> void:
+	_boon_cards.clear()
+	var ll := player.world.last_light
+	if ll == null or ll.offer.is_empty():
+		return
+	var w := minf(260.0, (s.x - 80.0) / 3.0)
+	var h := 128.0
+	var gap := 16.0
+	var x0 := s.x * 0.5 - (w * 3.0 + gap * 2.0) * 0.5
+	var y := s.y * 0.5 + 48.0 # below the middle and the crosshair, under the waystation's banner
+	_text("Choose a boon", Vector2(s.x * 0.5 - font.get_string_size("Choose a boon", HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_TOAST).x * 0.5, y - 14.0), HUD_TOAST, UiTheme.EMBER)
+	for i in ll.offer.size():
+		var d: Dictionary = Boons.ALL[ll.offer[i]]
+		var r := Rect2(x0 + i * (w + gap), y, w, h)
+		_boon_cards.append(r)
+		draw_rect(r, Color(0.04, 0.05, 0.08, 0.86))
+		draw_rect(r, Color(UiTheme.EMBER, 0.75), false, 2.0)
+		Icons.draw(self, Rect2(r.position.x + 12, r.position.y + 12, 46, 46), str(d["icon"]), UiTheme.EMBER)
+		_text("%d  %s" % [i + 1, d["name"]], Vector2(r.position.x + 66, r.position.y + 40), HUD_TEXT, UiTheme.BONE)
+		var lines := _wrap(str(d["desc"]), w - 24.0, HUD_SMALL)
+		for k in lines.size():
+			_text(lines[k], Vector2(r.position.x + 12, r.position.y + 80 + k * 20.0), HUD_SMALL, Color(UiTheme.BONE, 0.9))
+
+
+## Words broken into lines no wider than `width`.
+func _wrap(t: String, width: float, fs: int) -> Array[String]:
+	var out: Array[String] = []
+	var line := ""
+	for word in t.split(" "):
+		var next := word if line == "" else line + " " + word
+		if font.get_string_size(next, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > width and line != "":
+			out.append(line)
+			line = word
+		else:
+			line = next
+	if line != "":
+		out.append(line)
+	return out
 
 
 ## A small rounded label sitting on the world: an icon and a few words. Drawn from its left edge (or
@@ -649,7 +706,24 @@ func _draw_chips(s: Vector2) -> void:
 		if is_instance_valid(storm) and storm.hud_line != "":
 			chips.append([storm.hud_line, "storm", Color(0.85, 0.7, 1.0)])
 	var tide := player.world.tide
-	if tide:
+	var ll := player.world.last_light
+	if ll and not ll.lit:
+		# Last Light: the barge's light, and whether the barge is going on.
+		var out := ll.out_for(player)
+		if out > Boons.grace(player):
+			chips.append(["Outside the light: the tide is drowning you!", "tide", UiTheme.BLOOD.lightened(0.3)])
+			draw_rect(Rect2(Vector2.ZERO, s), Color(0.05, 0.25, 0.3, 0.22))
+		elif out > 0.0:
+			chips.append(["Outside the light! Back to the barge", "lantern", UiTheme.BLOOD.lightened(0.45)])
+		else:
+			chips.append(["In the barge's light", "lantern", UiTheme.EMBER])
+		if ll.docked >= 0:
+			chips.append(["The barge waits at the waystation", "anchor", UiTheme.BONE])
+		elif ll.held:
+			chips.append(["Something clings to the barge!", "anchor", UiTheme.BLOOD.lightened(0.3)])
+		elif not ll.moving and not ll.arrived:
+			chips.append(["Walk with the barge to move it", "anchor", UiTheme.BONE])
+	elif tide:
 		var state := tide.status()
 		var when := float(state["turns_in"])
 		var words: String = state["text"]

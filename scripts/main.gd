@@ -2108,6 +2108,8 @@ func _on_dawn() -> void:
 	_run_over = true
 	Game.note_mists_win()
 	Game.note_beyond_win()
+	if world.last_light:
+		Game.note_last_light()
 	close_tree()
 	if hud:
 		hud.release_all()
@@ -2117,13 +2119,15 @@ func _on_dawn() -> void:
 	var earned := Game.award_doubloons(Game.NIGHT_LENGTH, kills, true, false)
 	var current := world
 	var line := "%s survived the night: %d kills, level %d.%s" % [_character_name(world.player), kills, world.player.level, _earned_line(earned)]
+	if world.last_light:
+		line = "%s brought the Lantern Barge to the Isle of Lamps: %d kills, level %d.%s" % [_character_name(world.player), kills, world.player.level, _earned_line(earned)]
 	# The Mists can run past ten minutes, until the Regent falls.
 	line += _board_line(maxf(Game.NIGHT_LENGTH, world.director.elapsed), kills, true)
 	# Let the sunrise and the burning zombies play first.
 	await get_tree().create_timer(3.5).timeout
 	if world != current or not is_inside_tree():
 		return
-	_end_screen("Dawn!", line)
+	_end_screen("The lighthouse burns!" if world.last_light else "Dawn!", line)
 
 
 func _on_fort_lost() -> void:
@@ -2208,6 +2212,8 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 	var won := reached_dawn or Net.last_winner == Net.my_id()
 	if reached_dawn:
 		Game.note_mists_win()
+		if world.last_light:
+			Game.note_last_light()
 	if won:
 		Game.note_beyond_win()
 	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp() and Net.humans() > 1))
@@ -3158,7 +3164,7 @@ func _note_pending(mine: Label) -> void:
 
 
 static func _map_word(map: String) -> String:
-	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael"}.get(map, map.capitalize())
+	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael", "lantern_road": "Lantern Road"}.get(map, map.capitalize())
 
 
 ## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort",

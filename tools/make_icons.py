@@ -714,6 +714,21 @@ def sunken_crown():
 for g in (siren, press_gang, tide_witch, harbourmaster, lighthouse_keeper, kraken_arm, hollow_sovereign, sunken_crown):
     PLAIN.append(g)
 
+# Last Light (stage 4)
+LEVI = ("#3a6a78", "#0e2630"); LEVI_BELLY = ("#b8d8c8", "#4a6a60")
+def leviathan():
+    # The Leviathan of the Mists: a great sea-serpent's neck rearing out of the waves, a finned crest,
+    # jaws open over rows of teeth, and two cold green eyes.
+    return (path(LEVI, "M20 96 C18 72 26 52 40 40 C48 32 52 24 50 16 L74 10 C86 14 92 24 88 34 L70 40 C58 46 50 58 46 72 C44 82 46 90 48 96Z")
+        + path(LEVI_BELLY, "M30 94 C30 74 36 58 46 48 L52 52 C44 62 40 76 40 94Z", 1.6)
+        + path(("#5aa0a8", "#163a44"), "M50 16 L44 4 L56 12 L58 2 L64 10 L70 0 L74 10Z", 1.6)
+        + path(("#2a0a10", "#0a0204"), "M70 40 L94 46 L88 34Z", 1.6)
+        + "".join(poly(("#f4f0e4", "#8a8474"), (x, 38 + (x - 70) * 0.25), (x + 2, 44 + (x - 70) * 0.25), (x + 4, 39 + (x - 70) * 0.25), w=1) for x in (72, 78, 84))
+        + ell(("#e8fff6", "#5ff0c8"), 70, 24, 4.4, 2.6, -20, 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z")
+        + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
+PLAIN.append(leviathan)
+
 for g in (mist_infantry, mist_ranger, mist_heavy):
     PLAIN.append(g)
 

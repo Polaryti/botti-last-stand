@@ -102,6 +102,12 @@ var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
 var cache_spots: Array[Vector3] = [] # where the ruins keep better things than lie about elsewhere
 var salvage_spots: Array[Transform3D] = [] # Port Vael: the wrecks' sea chests (MistTide)
+# The Lantern Road (Last Light): its road lanterns (where each flame hangs), its waystations, the top
+# of its lighthouse, and the run itself.
+var road_lanterns: Array[Vector3] = []
+var waystations: Array[Transform3D] = []
+var lighthouse_top := Vector3.INF
+var last_light: LastLight
 var tide: MistTide # Port Vael's Mist Tide, or null
 var _tide_fog := 1.0 # how much thicker the tide makes the fog
 var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
@@ -256,7 +262,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "lantern" if file.contains("lantern") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
@@ -320,7 +326,7 @@ func setup(game_mode: int) -> void:
 		_mists_look()
 	elif map_id in SpawnRules.MESENLLA:
 		_mesenlla_look()
-	elif map_id == "vael":
+	elif map_id in SpawnRules.VAEL:
 		_vael_look()
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
 		var atmosphere := MistAtmosphere.new()
@@ -612,6 +618,8 @@ func _map_file() -> String:
 				return "res://maps/mesenlla.tscn"
 			if Game.current_map() == "vael":
 				return "res://maps/vael.tscn"
+			if Game.current_map() == "lantern_road":
+				return "res://maps/lantern_road.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -1080,8 +1088,11 @@ func _vael_look() -> void:
 	atmosphere.world = self
 	atmosphere.place = MistAtmosphere.Place.VAEL
 	add_child(atmosphere)
-	tide = MistTide.new(self)
+	tide = MistTide.new(self, map_id == "lantern_road") # on the Lantern Road the tide never goes out
 	add_child(tide)
+	if map_id == "lantern_road" and mode == Game.Mode.NIGHT:
+		last_light = LastLight.new(self)
+		add_child(last_light)
 	for spot: Transform3D in salvage_spots:
 		tide.add_salvage(Vector3(spot.origin.x, ground_at(spot.origin), spot.origin.z), spot.basis.get_euler().y)
 	_sky_value = -1.0

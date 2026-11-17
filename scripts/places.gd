@@ -3,7 +3,7 @@ class_name Places
 ## screen and the world atlas. Each has a name, an icon, a colour, its lore, what is played there and
 ## a few hints about it for the loading screen.
 
-const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael"]
+const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael", "lantern_road"]
 
 const ALL := {
 	"village": {"name": "The Village", "icon": "map_village", "color": Color("efe8d8"), "plays": "Survive the Night, Co-op, All vs All and Teams",
@@ -36,6 +36,11 @@ const ALL := {
 		"tips": ["Low tide bares the seabed. Open the sea chests on the wrecks before the water comes back.",
 			"At high tide the flats flood: wading slows you and the sea-mist half blinds you. Keep to the quay and the moles.",
 			"The Drowned are quicker while the tide is high. The harbour bells ring before it turns."]},
+	"lantern_road": {"name": "The Lantern Road", "icon": "map_lantern_road", "color": Color("ffd36e"), "plays": "Last Light, alone or in Co-op",
+		"lore": "Beyond Port Vael an old causeway runs out across the drowned Sound to the Isle of Lamps, where the ferrymen once rowed the dead. Its lanterns went out when the Mists rose. Only the Lantern Barge still carries a light along it, and the Mist Tide never goes out.",
+		"tips": ["Keep inside the barge's light. Outside it, the tide starts to drown you after a few seconds.",
+			"The barge only moves while one of you walks beside it, and stops while anything clings to it.",
+			"At each waystation, choose a boon. They last until you reach the lighthouse."]},
 }
 
 
