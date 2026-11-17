@@ -64,4 +64,4 @@ static func power(id: String) -> String:
 	return {"speed": "boot", "sensor": "eye", "fire_arrows": "flame+arrow", "bounce_arrows": "swap+arrow", "angel": "wings",
 		"daemon": "daemon", "archer": "bow", "thunder": "bolt", "raven": "raven", "ghost": "ghost", "imp": "grab",
 		"bell_spirit": "bell", "rat": "rat", "lantern": "lantern", "stone_sprite": "boulder", "mistberry_draught": "potion+mist",
-		"antler_charm": "antlers"}.get(id, "potion")
+		"antler_charm": "antlers", "sunken_crown": "sunken_crown"}.get(id, "potion")

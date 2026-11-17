@@ -1218,6 +1218,7 @@ func take_path_budget() -> bool:
 
 func _process(delta: float) -> void:
 	_tick_fx(delta)
+	VaelMind.sing(self) # any Siren singing draws this phone's players in (at Port Vael, or in the Sandbox)
 	for s: Dictionary in _spinners:
 		(s["node"] as Node3D).rotate_object_local(s["axis"], float(s["speed"]) * delta)
 	_tick_fires(delta)
@@ -2012,7 +2013,7 @@ func set_up_stands() -> void:
 						entries.append([Pickup.Kind.WEAPON, id])
 			"item":
 				for id: String in PowerDefs.ALL:
-					if not PowerDefs.ALL[id]["familiar"] and not PowerDefs.ALL[id].has("spec"):
+					if not PowerDefs.ALL[id]["familiar"] and not PowerDefs.ALL[id].has("spec") and not PowerDefs.ALL[id].get("relic", false):
 						entries.append([Pickup.Kind.POWER, id])
 				for id: String in PowerDefs.FOODS:
 					entries.append([Pickup.Kind.FOOD, id])
@@ -2590,6 +2591,46 @@ func spawn_angler() -> bool:
 	var at := spawn_point_near(random_player_position(), 12.0, 40.0, func(p: Vector3) -> bool:
 		return terrain.height(p.x, p.z) < MistTide.HIGH_Y + 0.4 and (tide == null or not tide.flooded(p)))
 	return at != Vector3.INF and spawn_zombie("angler", at)
+
+
+## Port Vael: a Siren at the water's edge, down on the flats a way off from someone.
+func spawn_siren() -> bool:
+	var at := spawn_point_near(random_player_position(), 18.0, 34.0, func(p: Vector3) -> bool:
+		return terrain.height(p.x, p.z) < MistTide.HIGH_Y + 0.4 and not terrain.open_sea(p.x, p.z))
+	return at != Vector3.INF and spawn_zombie("siren", at)
+
+
+## Port Vael: the Kraken's arms, up out of the flooded flats around whoever is nearest the water, in a
+## ring (VaelMind.ARMS of them, as many as there is flooded ground for). Returns how many rose.
+const KRAKEN_RING := 5.5
+func raise_kraken() -> int:
+	if tide == null:
+		return 0
+	var centre := Vector3.INF
+	var flooded := func(p: Vector3) -> bool: return tide.flooded(p)
+	for reach: Vector2 in [Vector2(3.0, 10.0), Vector2(8.0, 24.0), Vector2(16.0, 44.0)]:
+		for p: Target in players:
+			if p.dead:
+				continue
+			centre = spawn_point_near(p.global_position, reach.x, reach.y, flooded)
+			if centre != Vector3.INF:
+				break
+		if centre != Vector3.INF:
+			break
+	if centre == Vector3.INF:
+		return 0
+	var risen := 0
+	var turn := randf() * TAU
+	for i in VaelMind.ARMS:
+		var a := turn + TAU * i / float(VaelMind.ARMS)
+		var at := centre + Vector3(cos(a), 0, sin(a)) * KRAKEN_RING
+		if absf(at.x) > play_half - 3.0 or absf(at.z) > play_half - 3.0 or not terrain.is_walkable(at.x, at.z) or not tide.flooded(at):
+			continue
+		at.y = ground_at(at)
+		if spawn_zombie("kraken_arm", at):
+			risen += 1
+			fx_water(at, 2.4, Color(0.72, 0.9, 0.92), true)
+	return risen
 
 
 func spawn_mimic() -> bool:
@@ -4123,6 +4164,30 @@ func fx_impact(at: Vector3) -> void:
 	_next_impact = (_next_impact + 1) % _impacts.size()
 	s.global_position = at
 	s.visible = true
+
+
+## Sea water thrown up and falling back: something rising out of the tide, a wave breaking. On the
+## host, `share` shows the spray on every phone too.
+func fx_water(at: Vector3, size: float, col := Color(0.72, 0.9, 0.92), share := false) -> void:
+	fx_gore(at + Vector3.UP * 0.3, col.lightened(0.35))
+	fx_mist(at + Vector3.UP * 0.4, size * 0.6)
+	if share and Net.is_host():
+		Net.gore(at + Vector3.UP * 0.3, col.lightened(0.35))
+
+
+## Burning oil spread over the ground for a moment (a Lighthouse Keeper's lamp breaking).
+func fx_fire_patch(at: Vector3, radius: float) -> void:
+	var fire := make_flames()
+	fire.amount = 26
+	fire.emission_box_extents = Vector3(radius * 0.7, 0.15, radius * 0.7)
+	fire.lifetime = 0.7
+	add_child(fire)
+	fire.global_position = Vector3(at.x, ground_at(at) + 0.2, at.z)
+	fire.emitting = true
+	get_tree().create_timer(1.4).timeout.connect(func() -> void:
+		if is_instance_valid(fire):
+			fire.emitting = false
+			get_tree().create_timer(0.8).timeout.connect(fire.queue_free))
 
 
 func fx_gore(at: Vector3, col: Color) -> void:

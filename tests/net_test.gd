@@ -1663,6 +1663,103 @@ func _vael() -> void:
 	if not host:
 		ok(pl.hp < hp_before and stunned > MistSeal.STING_STUN * 0.8, "staying inside hurts and stuns the player on this phone (%.0f, %.2f s)" % [hp_before - pl.hp, stunned])
 	await sync(427)
+	# The drowned court. A Siren sings on the host, and draws the other phone's player in.
+	pl.frozen_left = 0.0
+	pl._status_immune = 0.0
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("siren", them + Vector3(0, 0, -9))
+		var siren: Zombie = w.zombies.back()
+		siren.set_physics_process(false)
+		siren.mesenlla_mind.phase = "song"
+		siren.mesenlla_mind.left = 99.0
+		siren._current_anim = "m_song"
+		siren.mesenlla_warning = false
+	await wait(0.5)
+	await sync(428)
+	var start := pl.global_position
+	var lured := false
+	var sirens: Array = []
+	if not host:
+		until = Time.get_ticks_msec() + 1500
+		while Time.get_ticks_msec() < until:
+			lured = lured or pl.is_lured()
+			await get_tree().process_frame
+		sirens = w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "siren")
+		ok(sirens.size() == 1 and sirens[0]._current_anim == "m_song", "the Siren sings on this phone too")
+		ok(lured and pl.global_position.distance_to(sirens[0].position) < start.distance_to(sirens[0].position) - 0.5, "and her song draws this phone's player toward her (%.1f m)" % (start.distance_to(sirens[0].position) - pl.global_position.distance_to(sirens[0].position)))
+	await sync(429)
+	# A Press Gang's net holds the other phone's player where they stand.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("press_gang", them + Vector3(6, 0, 0))
+		var press: Zombie = w.zombies.back()
+		press.set_physics_process(false)
+		MistSeal.cast(press, them, VaelMind.NET_RADIUS, 0.6, 1.0, 0.0, MistSeal.Style.NET)
+	await wait(0.3)
+	await sync(430)
+	var held := 0.0
+	until = Time.get_ticks_msec() + 1400
+	while Time.get_ticks_msec() < until:
+		held = maxf(held, pl.rooted_left)
+		await get_tree().process_frame
+	await sync(431)
+	if not host:
+		ok(held > VaelMind.NET_HOLD * 0.8, "caught in the net on this phone (%.2f s)" % held)
+	await sync(432)
+	# The Harbourmaster's hook hauls the other phone's player across to him.
+	pl.frozen_left = 0.0
+	pl.rooted_left = 0.0
+	pl._status_immune = 0.0
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		var spot := w.spawn_point_near(them, 11.0, 14.0)
+		w.spawn_zombie("harbourmaster", spot if spot != Vector3.INF else them + Vector3(12, 0, 0))
+		var harbour: Zombie = w.zombies.back()
+		harbour.set_physics_process(false)
+		MistSeal.cast(harbour, them, VaelMind.HOOK_RADIUS, 0.6, 1.0, 0.0, MistSeal.Style.HOOK)
+	await wait(0.3)
+	await sync(433)
+	var hooked := false
+	var hm: Array = w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "harbourmaster")
+	var far := pl.global_position.distance_to(hm[0].position) if not hm.is_empty() else 0.0
+	until = Time.get_ticks_msec() + 2200
+	while Time.get_ticks_msec() < until:
+		hooked = hooked or pl.is_dragged()
+		await get_tree().process_frame
+	await sync(434)
+	if not host:
+		var near := pl.global_position.distance_to(hm[0].position) if not hm.is_empty() else 99.0
+		ok(hooked and near < far - 4.0, "hooked on this phone, and hauled from %.0f m to %.1f m" % [far, near])
+	await sync(435)
+	# The Hollow Sovereign calls the tide in, out of its turn, on both phones.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		w.director.elapsed = MistTide.TURN * 2.0 + MistTide.RISE + 3.0 # low tide
+		await wait(0.2)
+		w.tide.surge(VaelMind.SURGE)
+	await wait(1.2)
+	await sync(436)
+	ok(w.tide.surging() and w.tide.high() and is_equal_approx(w.tide.surge_until - w.tide.surge_from, VaelMind.SURGE), "the Sovereign's decree calls the tide in on this phone")
+	await sync(437)
+	# The Sunken Crown: whoever wears it is seen wearing it on the other phone.
+	if not host:
+		pl.activate_power(PowerDefs.CROWN)
+	await wait(0.8)
+	await sync(438)
+	if host:
+		ok(_avatar().wears_crown(), "the other phone's player wears the Sunken Crown here")
+	await sync(439)
+	if not host:
+		pl.powers.erase(PowerDefs.CROWN)
+	await sync(440)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.

@@ -391,6 +391,315 @@ SOUNDS.update({
 })
 
 
+# --- The drowned court (stage 3) ------------------------------------------------------------------
+
+SOPRANO = ((800, 0.2, 1.0), (1150, 0.18, 0.6), (2900, 0.12, 0.35), (3900, 0.1, 0.15))
+
+
+def sung(m, notes, vib=5.5, depth=0.012):
+    """A wordless high voice through notes [(share of the sound, Hz)...], gliding between them, with
+    vibrato, breath, and no roughness at all."""
+    pitch = curve(m, *notes) * (1 + depth * np.sin(2 * np.pi * vib * t_(m)))
+    return throat(m, pitch, SOPRANO, breath=0.18, rough=0.0, sub=0.0)
+
+
+def siren_song():
+    """A Siren's song (and her breath before it): a drawn breath through water, then a slow wordless
+    melody, sweet and wrong, sung in two voices a sixth apart, with the sea under it. 4.3 s: the
+    breath for the 0.8 s tell, and 3.5 s of song."""
+    total = 4.3
+    br = n(0.75)
+    breath = band(noise(br), 600, 4000) * np.linspace(0.0, 1.0, br) ** 2 * 0.35
+    x = at(breath, 0.0, total)
+    m = n(3.5)
+    melody = ((0, 587), (0.12, 587), (0.22, 698), (0.38, 659), (0.5, 659), (0.62, 523), (0.78, 554), (1.0, 440))
+    voice = sung(m, melody) * env(m, 0.25, 1.0)
+    voice *= np.minimum(1.0, (1 - t_(m) / 3.5) * 4.0)
+    second = sung(m, [(p, f * 0.6) for p, f in melody], 5.0, 0.015) * env(m, 0.35, 1.0) * 0.45
+    second *= np.minimum(1.0, (1 - t_(m) / 3.5) * 4.0)
+    x += at(voice + second, 0.8, total)
+    x += water(n(total), 200, 900, 20) * 0.08
+    return reverb(x, 2.4, 0.5, 4500)
+
+
+def siren_hum():
+    """A Siren somewhere near: a few low hummed notes over the water."""
+    m = n(2.0)
+    v = sung(m, ((0, 392), (0.4, 440), (0.7, 349), (1, 330)), 4.5, 0.01) * env(m, 0.3, 1.2) * 0.6
+    return reverb(lowp(v, 3000) + water(m, 200, 800, 10) * 0.1, 2.0, 0.5)
+
+
+def siren_shriek():
+    """A Siren's song broken off, or a Siren struck: a shriek that cracks and drops."""
+    m = n(0.7)
+    v = throat(m, curve(m, (0, 1100), (0.3, 1350), (1, 520)), SOPRANO, breath=0.5, rough=0.8, sub=0.1) * env(m, 0.01, 3)
+    return reverb(v + highp(noise(m), 3000) * env(m, 0.01, 6) * 0.2, 0.9, 0.3)
+
+
+def siren_death():
+    """A Siren dying: a long falling wail that sinks into bubbles."""
+    m = n(1.8)
+    v = throat(m, curve(m, (0, 900), (0.3, 1000), (1, 260)), SOPRANO, breath=0.4, rough=0.3, sub=0.0) * env(m, 0.03, 1.4)
+    return reverb(v + bubbles(m, 40, 250, 900, 0.07) * 0.5, 1.5, 0.4)
+
+
+def press_shout():
+    """A Press Gang man: a hoarse drowned bark, "haul!", through water in the throat."""
+    m = n(0.7)
+    v = throat(m, curve(m, (0, 150), (0.3, 175), (1, 120)), ((600, 0.3, 1.0), (1100, 0.25, 0.6), (2400, 0.2, 0.2)), breath=0.5, rough=0.9, sub=0.2) * env(m, 0.02, 2.5)
+    return v + bubbles(m, 8, 300, 800, 0.05) * 0.3
+
+
+def net_throw():
+    """A weighted net flung: a broad whoosh of rope, and the weights clacking."""
+    m = n(0.6)
+    x = sweep_filter(noise(m), 500, 1600, 0.6) * bell_env(m, 1.6) * 0.8
+    for i in range(6):
+        x += at(band(noise(n(0.02)), 1500, 4000) * 0.3, 0.05 + i * 0.07, 0.6)
+    return x
+
+
+def net_land():
+    """The net coming down: a soft slap of wet rope and lead weights thumping round you."""
+    m = n(0.6)
+    x = band(noise(m), 300, 1800) * env(m, 0.003, 7) * 0.8
+    for i in range(8):
+        x += at(thud(n(0.12), 0.0, 0.25, 160 + i * 9), rng.uniform(0.0, 0.08), 0.6)
+    return x + water(m, 400, 2500, 10) * env(m, 0.01, 6) * 0.4
+
+
+def witch_call():
+    """A Tide Witch calling the sea: a crone's rising chant and the water answering with a swell."""
+    m = n(1.4)
+    v = throat(m, curve(m, (0, 220), (0.5, 330), (1, 260)), ((700, 0.3, 1.0), (1200, 0.25, 0.7), (2600, 0.2, 0.25)), breath=0.6, rough=0.5, sub=0.1) * env(m, 0.1, 1.5) * 0.7
+    swell = band(noise(m), 150, 900) * np.sin(np.pi * t_(m) / 1.4) ** 2 * 0.6
+    return reverb(v + swell, 1.4, 0.35)
+
+
+def witch_death():
+    """A Tide Witch dying: a hissing curse, and the sea she called pouring off her."""
+    m = n(1.4)
+    v = throat(m, curve(m, (0, 300), (1, 120)), ((700, 0.3, 1.0), (1200, 0.25, 0.7)), breath=0.8, rough=0.7, sub=0.1) * env(m, 0.02, 2)
+    return v + water(m, 300, 3000, 40) * env(m, 0.05, 2) * 0.6
+
+
+def chain_rattle():
+    """The Harbourmaster swinging his hook round: a chain running out and whirring."""
+    m = n(0.6)
+    x = chain(m, 12, 2200) * 0.8
+    whirr = band(noise(m), 600, 1500) * (0.5 + 0.5 * np.sin(2 * np.pi * 7 * t_(m))) * bell_env(m, 1.0) * 0.4
+    return x + whirr
+
+
+def hook_throw():
+    """The hook flung on its chain: a heavy whoosh and the chain paying out fast behind it."""
+    m = n(0.7)
+    x = sweep_filter(noise(m), 400, 1500, 0.5) * bell_env(m, 2.0)
+    return x + chain(m, 16, 2600) * np.linspace(1, 0.3, m) * 0.6
+
+
+def harbour_bell_ring():
+    """The Harbourmaster's handbell, rung hard: a bright clanging, over and over."""
+    m = n(2.0)
+    x = np.zeros(m)
+    for i in range(6):
+        x += at(metal(880 + (i % 2) * 40, 3.0, 0.5) * env(n(0.5), 0.001, 3.0) * 0.6, i * 0.28, 2.0)
+    return reverb(x, 1.2, 0.3)
+
+
+def harbour_growl():
+    """The Harbourmaster: a deep, drowned old man's growl."""
+    m = n(1.0)
+    v = throat(m, curve(m, (0, 85), (0.5, 95), (1, 70)), ((450, 0.3, 1.0), (900, 0.25, 0.6), (2000, 0.2, 0.2)), breath=0.4, rough=1.0, sub=0.6) * env(m, 0.03, 2)
+    return v + bubbles(m, 12, 200, 600, 0.06) * 0.3
+
+
+def lamp_throw():
+    """An oil lamp thrown: a whoosh, its flame fluttering, oil sloshing."""
+    m = n(0.6)
+    x = sweep_filter(noise(m), 700, 2200, 0.5) * bell_env(m, 1.8) * 0.6
+    flutter = band(noise(m), 300, 1200) * (0.5 + 0.5 * np.sin(2 * np.pi * 18 * t_(m))) * env(m, 0.05, 2) * 0.4
+    return x + flutter
+
+
+def lamp_smash():
+    """An oil lamp bursting: glass breaking and the oil going up in a roar of flame."""
+    m = n(1.2)
+    x = np.zeros(m)
+    for i in range(10):
+        x += at(glass(rng.uniform(2500, 6000), 0.35, 12.0) * rng.uniform(0.2, 0.5), rng.uniform(0.0, 0.05), 1.2)
+    roar = band(noise(m), 150, 1400) * env(m, 0.04, 2.2) * 0.9
+    crackle = np.zeros(m)
+    for _ in range(40):
+        k = n(0.006)
+        s = rng.integers(0, m - k)
+        crackle[s:s + k] += highp(noise(k), 2500) * rng.uniform(0.2, 0.6)
+    return x + roar + crackle * np.exp(-t_(m) * 1.5) * 0.6 + thud(m, 0.0, 0.4, 120)
+
+
+def lamp_flare():
+    """The great lamp lifted: a rising hum and roar of the flame as it is turned up and up."""
+    m = n(1.3)
+    t = t_(m)
+    rise = (np.sin(2 * np.pi * np.cumsum(curve(m, (0, 110), (1, 330))) / SR) * 0.3 + band(noise(m), 300, 2500) * 0.6) * (t / 1.3) ** 2
+    return reverb(rise, 1.0, 0.3)
+
+
+def lamp_blaze():
+    """The lamp blazing: a bright, hard flash of sound, like a sheet of fire going up."""
+    m = n(1.0)
+    x = band(noise(m), 800, 7000) * env(m, 0.002, 5) * 1.1 + glide(2400, 800, m) * np.exp(-t_(m) * 7) * 0.3
+    return reverb(x + thud(m, 0.0, 0.6, 90), 1.2, 0.35)
+
+
+def keeper_laugh():
+    """The Mad Lighthouse Keeper: a cracked old man's cackle, too long, too loud."""
+    m = n(1.8)
+    x = np.zeros(m)
+    for i in range(7):
+        k = n(0.16)
+        f = 260 + i * 12 + rng.uniform(-20, 20)
+        h = throat(k, curve(k, (0, f * 1.2), (1, f)), ((700, 0.3, 1.0), (1300, 0.25, 0.7), (2700, 0.2, 0.3)), breath=0.7, rough=0.6, sub=0.0) * env(k, 0.01, 2.5)
+        x += at(h, i * 0.2, 1.8)
+    return reverb(x, 1.3, 0.35)
+
+
+def keeper_hurt():
+    """The Keeper struck, or falling: a shriek of outrage that breaks into a wheeze."""
+    m = n(0.9)
+    v = throat(m, curve(m, (0, 420), (0.3, 520), (1, 190)), ((700, 0.3, 1.0), (1300, 0.25, 0.7)), breath=0.7, rough=0.8, sub=0.0) * env(m, 0.01, 2.5)
+    return v
+
+
+def kraken_rise():
+    """The Kraken's arm rising out of the sea: a great rush and pour of water, and a deep groan below."""
+    m = n(1.8)
+    t = t_(m)
+    rush = band(noise(m), 120, 1800) * np.sin(np.pi * np.clip(t / 1.8, 0, 1)) ** 1.2 * 0.9
+    pour = water(m, 300, 3500, 60) * np.clip(t / 0.6, 0, 1) * 0.6
+    groan = throat(m, curve(m, (0, 45), (1, 38)), ((180, 0.4, 1.0), (420, 0.3, 0.5)), breath=0.3, rough=1.0, sub=0.8) * env(m, 0.3, 1.0) * 0.6
+    return reverb(rush + pour + groan, 1.6, 0.35)
+
+
+def kraken_slam():
+    """An arm coming down: a heavy wet slap that throws water everywhere."""
+    m = n(1.2)
+    slap = band(noise(m), 200, 3000) * env(m, 0.002, 9) * 1.2
+    return slap + thud(m, 0.0, 1.3, 55) + water(m, 300, 3500, 50) * env(m, 0.02, 2.5) * 0.7
+
+
+def kraken_hurt():
+    """An arm struck: a deep, bubbling bellow from under the water."""
+    m = n(0.8)
+    v = throat(m, curve(m, (0, 70), (1, 50)), ((200, 0.4, 1.0), (500, 0.3, 0.5)), breath=0.4, rough=1.0, sub=0.8) * env(m, 0.02, 2.5)
+    return lowp(v, 1500) + bubbles(m, 20, 150, 500, 0.08) * 0.5
+
+
+def kraken_death():
+    """An arm dying: it thrashes, a long bellow sinks away, and the sea closes over it."""
+    m = n(2.6)
+    v = throat(m, curve(m, (0, 80), (1, 30)), ((200, 0.4, 1.0), (500, 0.3, 0.5)), breath=0.4, rough=1.0, sub=0.8) * env(m, 0.05, 1.2)
+    return reverb(lowp(v, 1500) + water(m, 200, 2500, 60) * env(m, 0.4, 1.0) * 0.6 + thud(m, 0.4, 1.0, 50), 1.8, 0.35)
+
+
+def wave_rise():
+    """A wave being called up: water gathering and rising."""
+    m = n(1.0)
+    t = t_(m)
+    return band(noise(m), 200, 1500) * (t / 1.0) ** 1.5 * 0.6 + water(m, 400, 2000, 10) * 0.2
+
+
+def wave_crash():
+    """A wave breaking over you: the crash, and the foam hissing out."""
+    m = n(1.4)
+    crash = band(noise(m), 150, 3000) * env(m, 0.01, 3.5) * 1.1
+    hiss = highp(noise(m), 2500) * env(m, 0.05, 1.8) * 0.4
+    return crash + hiss + thud(m, 0.0, 0.8, 80)
+
+
+def crown_toll():
+    """The Sunken Crown's judgement coming: one deep bell tolled under the water."""
+    m = n(2.4)
+    return reverb(lowp(harbour_bell(98, 2.4), 1500) + bubbles(m, 20, 150, 500, 0.08) * 0.3, 2.2, 0.5)
+
+
+def crown_fall():
+    """The judgement falling: a crash of water and a ringing of gold."""
+    m = n(1.6)
+    x = band(noise(m), 200, 3000) * env(m, 0.002, 5) + thud(m, 0.0, 1.2, 60)
+    for f in (1318, 1568, 1976):
+        x += metal(f, 3.0, 1.6) * env(m, 0.002, 2.5) * 0.15
+    return reverb(x, 1.6, 0.35)
+
+
+def crown_take():
+    """The Sunken Crown taken up: a gold chime, low and wrong, and water running off it."""
+    m = n(1.6)
+    x = np.zeros(m)
+    for i, f in enumerate((392, 466, 587, 698)):
+        x += at(metal(f, 2.0, 1.2) * env(n(1.2), 0.002, 2.5) * 0.25, i * 0.12, 1.6)
+    return reverb(x + water(m, 400, 3000, 20) * env(m, 0.05, 3) * 0.3, 1.8, 0.4)
+
+
+SOVEREIGN = ((300, 0.35, 1.0), (750, 0.3, 0.55), (2200, 0.2, 0.15))
+
+
+def sovereign_voice():
+    """The Hollow Sovereign: a vast, hollow voice from inside an empty hood, a chord of drowned voices."""
+    m = n(2.6)
+    v = np.zeros(m)
+    for k, f in enumerate((55, 82, 110)):
+        v += throat(m, curve(m, (0, f), (0.6, f * 1.05), (1, f * 0.9)), SOVEREIGN, breath=0.5, rough=0.6, sub=0.4) * (0.6 if k else 1.0)
+    v *= env(m, 0.3, 1.0)
+    return reverb(lowp(v, 2400) + bubbles(m, 30, 150, 500, 0.08) * 0.3, 2.6, 0.55)
+
+
+def sovereign_decree():
+    """His decree: the voice raised in one great word, and the sea answering with a roar."""
+    m = n(2.4)
+    v = np.zeros(m)
+    for f in (65, 98, 130):
+        v += throat(m, curve(m, (0, f * 0.9), (0.2, f * 1.15), (1, f)), SOVEREIGN, breath=0.5, rough=0.7, sub=0.4)
+    v *= env(m, 0.1, 1.2) * 0.7
+    roar = band(noise(m), 120, 1600) * np.sin(np.pi * np.clip(t_(m) / 2.4, 0, 1)) * 0.8
+    return reverb(v + roar, 2.4, 0.5)
+
+
+def sovereign_hurt():
+    """The Sovereign struck: a hollow grunt, as if from far down a well."""
+    m = n(0.8)
+    v = throat(m, curve(m, (0, 75), (1, 60)), SOVEREIGN, breath=0.4, rough=0.8, sub=0.5) * env(m, 0.01, 3)
+    return reverb(lowp(v, 1800), 1.2, 0.45)
+
+
+def sovereign_death():
+    """The Sovereign falling: the voices inside the hood cry out and fall away to nothing, the robe
+    collapses, and something golden rolls on the ground."""
+    m = n(3.2)
+    v = np.zeros(m)
+    for f in (70, 104, 140, 210):
+        v += throat(m, curve(m, (0, f), (1, f * 0.4)), SOVEREIGN, breath=0.6, rough=0.6, sub=0.3) * 0.5
+    v *= env(m, 0.05, 1.0)
+    roll = np.zeros(m)
+    for i in range(6):
+        roll += at(metal(1568 - i * 40, 3.0, 0.3) * env(n(0.3), 0.001, 4) * (0.3 - i * 0.04), 2.0 + i * 0.12, 3.2)
+    return reverb(lowp(v, 2200) + roll + thud(m, 1.4, 0.8, 70), 2.4, 0.45)
+
+
+SOUNDS.update({
+    "siren_song": (siren_song, 0.75), "siren_hum": (siren_hum, 0.5), "siren_shriek": (siren_shriek, 0.75), "siren_death": (siren_death, 0.75),
+    "press_shout": (press_shout, 0.7), "net_throw": (net_throw, 0.7), "net_land": (net_land, 0.75),
+    "witch_call": (witch_call, 0.7), "witch_death": (witch_death, 0.75),
+    "chain_rattle": (chain_rattle, 0.65), "hook_throw": (hook_throw, 0.75), "harbour_bell": (harbour_bell_ring, 0.7), "harbour_growl": (harbour_growl, 0.75),
+    "lamp_throw": (lamp_throw, 0.65), "lamp_smash": (lamp_smash, 0.8), "lamp_flare": (lamp_flare, 0.7), "lamp_blaze": (lamp_blaze, 0.85),
+    "keeper_laugh": (keeper_laugh, 0.75), "keeper_hurt": (keeper_hurt, 0.75),
+    "kraken_rise": (kraken_rise, 0.85), "kraken_slam": (kraken_slam, 0.9), "kraken_hurt": (kraken_hurt, 0.8), "kraken_death": (kraken_death, 0.85),
+    "wave_rise": (wave_rise, 0.6), "wave_crash": (wave_crash, 0.85),
+    "crown_toll": (crown_toll, 0.8), "crown_fall": (crown_fall, 0.85), "crown_take": (crown_take, 0.75),
+    "sovereign_voice": (sovereign_voice, 0.85), "sovereign_decree": (sovereign_decree, 0.9), "sovereign_hurt": (sovereign_hurt, 0.8), "sovereign_death": (sovereign_death, 0.9),
+})
+
+
 if __name__ == "__main__":
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
     for name, (make, gain) in SOUNDS.items():

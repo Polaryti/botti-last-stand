@@ -646,6 +646,74 @@ def tide():
 for g in (drowned_sailor, barnacle_brute, brine_hound, lantern_jelly, angler, tide):
     PLAIN.append(g)
 
+# The drowned court (stage 3)
+PALE = ("#c8dcd8", "#5a7a78"); GOLDD = ("#e8c060", "#7a5418"); NAVY = ("#3a4c74", "#141c30"); OIL = ("#f2cc40", "#8a6410")
+ROYAL = ("#6a3a7a", "#2a1032"); KRAK = ("#9a3c54", "#3a1020"); SUCK = ("#f2c8bc", "#a07068")
+def _song(x, y):
+    return "".join(curve("#bff7ec", 3, f"M{x - r} {y - r * 0.6} C{x - r * 0.3} {y - r} {x + r * 0.3} {y - r} {x + r} {y - r * 0.6}", ink=False) for r in (10, 16))
+def siren():
+    # A Siren singing: a thin pale face thrown back, mouth open, hair of kelp, rings of song rising.
+    return (curve("#5a8a3a", 5, "M30 30 C18 50 26 70 16 94", ink=False) + curve("#3e6a26", 5, "M70 30 C82 50 74 70 84 94", ink=False)
+        + path(PALE, "M32 40 C32 18 68 18 68 40 L66 64 C62 80 56 88 50 88 C44 88 38 80 34 64Z")
+        + path(("#4a7a3a", "#1e3a14"), "M28 42 C26 16 40 8 50 8 C62 8 74 16 72 42 C64 30 36 30 28 42Z")
+        + ell("#0e2228", 41, 50, 6, 3.6, 8, 0) + ell("#0e2228", 59, 50, 6, 3.6, -8, 0)
+        + ell(("#e8fff6", "#5ff0c8"), 41, 50, 3.2, 2, 8, 0) + ell(("#e8fff6", "#5ff0c8"), 59, 50, 3.2, 2, -8, 0)
+        + ell("#2a0a10", 50, 72, 5, 7, 0, 2) + _song(50, 10))
+def press_gang():
+    # A press-gang man: a tarred round hat, a drowned face, and a weighted net slung over a shoulder.
+    return (path(("#a08458", "#4a3a20"), "M58 60 C80 56 94 70 92 92 L56 92Z") + "".join(circ(("#c49058", "#5a3a18"), x, y, 4, 1.6) for x, y in ((62, 64), (74, 62), (86, 70), (90, 84)))
+        + line("#6a5434", 1.6, (60, 66), (90, 90)) + line("#6a5434", 1.6, (72, 62), (70, 92)) + line("#6a5434", 1.6, (84, 66), (58, 88))
+        + path(SEA_SKIN, "M22 44 C22 24 62 24 62 44 L60 66 C56 80 50 86 42 86 C34 86 28 80 24 66Z")
+        + path(("#2a2622", "#0a0806"), "M8 40 L76 40 L74 46 L10 46Z", 2.4) + path(("#3a3430", "#100c0a"), "M20 40 C20 18 64 18 64 40Z")
+        + rect(("#8a2a20", "#3a0e08"), 20, 33, 44, 5, 1, 1.6)
+        + ell(("#e8fff6", "#5ff0c8"), 34, 56, 3.4, 2.2, 8, 1.2) + ell(("#e8fff6", "#5ff0c8"), 50, 56, 3.4, 2.2, -8, 1.2)
+        + path("#0e2228", "M34 72 C40 76 46 76 52 72", 2.6))
+def tide_witch():
+    # A Tide Witch: a crown of shells over kelp hair, a hooded drowned face, and her glowing float.
+    return (path(("#3a5a2a", "#162a10"), "M18 92 C14 50 24 20 46 18 C68 20 78 50 74 92Z")
+        + path(PALE, "M32 48 C32 32 60 32 60 48 L58 66 C54 78 38 78 34 66Z")
+        + "".join(poly(("#f2e6d4", "#8a7a64"), (x - 5, 22), (x, 6 + abs(x - 46) * 0.3), (x + 5, 22), w=1.6) for x in (30, 46, 62))
+        + ell(("#e8fff6", "#5ff0c8"), 40, 54, 3, 2, 0, 1.2) + ell(("#e8fff6", "#5ff0c8"), 52, 54, 3, 2, 0, 1.2)
+        + line("#a8987a", 5, (86, 94), (80, 34)) + circ("#5ff0c8", 80, 24, 14, 0).replace("/>", ' opacity="0.35"/>') + circ(("#d8fff4", "#3ac4a4"), 80, 24, 8, 2))
+def harbourmaster():
+    # The Harbourmaster: a peaked cap with an anchor badge over grey whiskers, a hook on a chain.
+    return (path(SEA_SKIN, "M26 46 C26 26 70 26 70 46 L68 68 C64 82 56 88 48 88 C40 88 32 82 28 68Z")
+        + path(NAVY, "M22 42 C20 18 76 18 74 42Z") + path(("#1a1a1a", "#000"), "M18 42 L78 42 L70 50 L26 50Z", 2)
+        + rect(GOLDD, 22, 36, 52, 5, 1, 1.4) + line("#e8c060", 3, (48, 22), (48, 34)) + line("#e8c060", 3, (43, 28), (53, 28))
+        + path(("#d8dcd8", "#6a6e6a"), "M26 58 C24 74 32 84 38 84 L36 66Z", 1.8) + path(("#d8dcd8", "#6a6e6a"), "M70 58 C72 74 64 84 58 84 L60 66Z", 1.8)
+        + ell(("#e8fff6", "#5ff0c8"), 40, 56, 3.4, 2.2, 8, 1.2) + ell(("#e8fff6", "#5ff0c8"), 56, 56, 3.4, 2.2, -8, 1.2)
+        + line("#8a8e94", 3, (86, 4), (86, 14), (84, 22), (86, 30), (86, 58))
+        + curve(("#c8ccd2"), 6, "M86 58 C86 78 70 80 68 66", ink=True) + poly(("#e8ecf0", "#6a6e74"), (66, 70), (68, 60), (72, 68), w=1.4))
+def lighthouse_keeper():
+    # The Mad Lighthouse Keeper: a yellow sou'wester, a wild white beard, lit spectacles, and his lamp held up.
+    return (circ("#ffe08a", 80, 20, 18, 0).replace("/>", ' opacity="0.35"/>') + rect(GOLDD, 72, 8, 16, 4, 1, 1.4) + rect(("#fff6c0", "#ffc040"), 73, 12, 14, 16, 2, 1.6) + rect(GOLDD, 72, 28, 16, 4, 1, 1.4)
+        + path(PALE, "M26 46 C26 28 66 28 66 46 L64 62 C60 72 32 72 28 62Z")
+        + path(OIL, "M10 48 C14 24 28 14 46 14 C64 14 76 26 80 46 C70 40 22 40 10 48Z")
+        + path(("#f4f4ee", "#9a9a94"), "M28 60 C26 84 38 96 46 96 C54 96 66 84 64 60 C58 68 34 68 28 60Z", 2)
+        + circ(("#fff6c0", "#ffc040"), 37, 52, 6, 2) + circ(("#fff6c0", "#ffc040"), 55, 52, 6, 2) + line("#7a5418", 2, (43, 52), (49, 52)))
+def kraken_arm():
+    # A kraken's arm curling up out of the waves, suckers along its inner side.
+    return (path(KRAK, "M30 96 C26 70 30 46 46 30 C58 18 76 16 84 26 C90 34 84 44 76 40 C70 36 74 30 68 30 C58 32 50 46 48 62 C46 76 50 88 54 96Z")
+        + "".join(circ(SUCK, x, y, r, 1.4) for x, y, r in ((50, 86, 4), (49, 74, 3.8), (50, 62, 3.5), (54, 50, 3.2), (60, 40, 2.8), (68, 34, 2.4)))
+        + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z")
+        + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
+def hollow_sovereign():
+    # The Hollow Sovereign: a deep royal hood with nothing inside it but two points of gold light.
+    return (path(ROYAL, "M10 96 C8 56 22 18 50 16 C78 18 92 56 90 96Z")
+        + path(("#ece8dc", "#8a867a"), "M12 90 C26 82 74 82 88 90 L90 98 L10 98Z", 2) + "".join(rect("#1a1a1a", x, 90, 3, 4, 0.5, 0) for x in (22, 36, 50, 64, 78))
+        + path("#050508", "M30 74 C26 50 34 34 50 32 C66 34 74 50 70 74 C62 80 38 80 30 74Z", 2.4)
+        + circ("#ffd070", 42, 54, 7, 0).replace("/>", ' opacity="0.35"/>') + circ("#ffd070", 58, 54, 7, 0).replace("/>", ' opacity="0.35"/>')
+        + circ(("#fff6c0", "#ffc040"), 42, 54, 2.8, 0) + circ(("#fff6c0", "#ffc040"), 58, 54, 2.8, 0))
+def sunken_crown():
+    # The Sunken Crown: gold gone dull, pearl-tipped points, coral grown through it, a green stone.
+    return (path(GOLDD, "M14 78 L12 34 L28 54 L36 22 L50 50 L64 22 L72 54 L88 34 L86 78Z")
+        + rect(GOLDD, 12, 72, 76, 14, 2, 3) + rect(("#7ac8a8", "#2a5a48"), 14, 76, 72, 5, 1, 0)
+        + "".join(circ(("#fbf6ec", "#a09888"), x, y, 4.2, 1.6) for x, y in ((12, 32), (36, 20), (64, 20), (88, 32)))
+        + ell(("#7ff0b0", "#1a8a50"), 50, 66, 6, 7, 0, 2)
+        + path(("#f08a78", "#8a2a20"), "M80 74 L86 52 L88 62 L94 50 L90 70Z", 1.6) + _barnacles([(22, 80), (30, 82)], 3))
+for g in (siren, press_gang, tide_witch, harbourmaster, lighthouse_keeper, kraken_arm, hollow_sovereign, sunken_crown):
+    PLAIN.append(g)
+
 for g in (mist_infantry, mist_ranger, mist_heavy):
     PLAIN.append(g)
 

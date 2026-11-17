@@ -11,6 +11,9 @@ extends Node3D
 ##   QUICKEN.
 ## Everything follows the night's clock (Director.elapsed), which the host sends to every phone, so
 ## the tide is the same everywhere. Salvage is opened on each phone for itself, like the Mists' caches.
+## The Hollow Sovereign can call the tide in out of its turn (surge): the host sends when, and from then
+## it stands high for as long as he said, then goes back to keeping its own time.
+## (The Sirens' songs are VaelMind.sing, run by the world on every phone.)
 
 const TURN := 90.0
 const RISE := 12.0
@@ -35,6 +38,8 @@ var _water: MeshInstance3D
 var _was_high := false
 var _warned_turn := -1
 var _salvage: Array[Dictionary] = []
+var surge_from := -1.0 # the night's clock when the Hollow Sovereign called the tide in, or -1
+var surge_until := -1.0
 
 static var _chest_mesh: ArrayMesh
 static var _lid_mesh: ArrayMesh
@@ -89,7 +94,37 @@ func elapsed() -> float:
 
 
 func high() -> bool:
-	return always_high or is_high_at(elapsed())
+	return always_high or is_high_at(elapsed()) or surging()
+
+
+## Whether the tide stands in at the Sovereign's word right now.
+func surging() -> bool:
+	var e := elapsed()
+	return surge_from >= 0.0 and e >= surge_from and e < surge_until
+
+
+## Calls the tide in now, for `seconds` (the host; every phone is told).
+func surge(seconds: float) -> void:
+	var e := elapsed()
+	set_surge(e, e + seconds)
+	if Net.is_host():
+		Net.tide_surge(e, e + seconds)
+
+
+func set_surge(from: float, until: float) -> void:
+	surge_from = from
+	surge_until = until
+	Sfx.play("tide_in", -2.0)
+
+
+## The water's height now: the tide's own, or risen at the Sovereign's word (coming in over RISE
+## seconds, and going back out over as long when the surge is over).
+func level_now(e: float) -> float:
+	var own := level_at(e)
+	if surge_from < 0.0 or e < surge_from:
+		return own
+	var k := smoothstep(surge_from, surge_from + RISE, e) * (1.0 - smoothstep(surge_until, surge_until + RISE, e))
+	return lerpf(own, HIGH_Y, k)
 
 
 # --- What it does -------------------------------------------------------------------------------
@@ -142,20 +177,20 @@ func status() -> Dictionary:
 
 func _process(delta: float) -> void:
 	var e := elapsed()
-	var want := HIGH_Y if always_high else level_at(e)
+	var want := HIGH_Y if always_high else level_now(e)
 	level = want if absf(want - level) > 1.0 else move_toward(level, want, delta * 2.0)
 	if _mat:
 		_mat.set_shader_parameter("level", level)
 	world.set_tide_fog(fog_scale())
 	if always_high:
 		return
-	var h := is_high_at(e)
+	var h := is_high_at(e) or surging()
 	if h != _was_high:
 		_was_high = h
 		_turned(h)
 	# The harbour bells give warning before it turns.
 	var n := turns(e)
-	if turns_in(e) <= WARN and _warned_turn != n:
+	if turns_in(e) <= WARN and _warned_turn != n and not surging():
 		_warned_turn = n
 		world.banner("The tide is about to come in..." if not h else "The tide will soon go out...", 3.0)
 		Sfx.play("tide_bell", -4.0)

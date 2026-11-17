@@ -4,6 +4,12 @@ class_name PowerDefs
 const POTION_TIME := 20.0
 const FAMILIAR_TIME := 20.0
 const SENSOR_RANGE := 20.0
+## The Sunken Crown (Port Vael): dropped by the Hollow Sovereign, or washed up in a versus match. Worn
+## until you fall (CROWN_TIME is "for good"), then it falls where you do.
+const CROWN := "sunken_crown"
+const CROWN_TIME := 99999.0
+const CROWN_DAMAGE := 1.25
+const CROWN_REGEN := 2.0 # health a second
 
 const ALL := {
 	"speed": {"name": "Speed", "desc": "You run 40% faster.", "time": POTION_TIME, "color": Color(1.0, 0.85, 0.25), "familiar": false, "weight": 3.0},
@@ -24,6 +30,8 @@ const ALL := {
 	# Beyond the Mists: found only in the Valleys of Mesenlla and at Mist Bastion.
 	"stone_sprite": {"maps": SpawnRules.MESENLLA, "name": "Stone Sprite", "desc": "A spirit of the Ring of Stones. Every 5 seconds it raises a stone ward that blocks the next hit on you and knocks back whoever struck.", "time": FAMILIAR_TIME, "color": Color(0.6, 0.66, 0.58), "familiar": true, "weight": 1.0},
 	"mistberry_draught": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Mistberry Draught", "desc": "You leave a trail of mist behind you. While you stand in it, enemies cannot see you and you heal 3 health a second.", "time": POTION_TIME, "color": Color(0.62, 0.78, 0.95), "familiar": false, "weight": 2.0},
+	# A relic: never random loot, never in the Sandbox's rows.
+	"sunken_crown": {"maps": ["vael"], "relic": true, "named": true, "name": "Sunken Crown", "desc": "The Hollow Sovereign's crown, dropped where he falls (in All vs All at Port Vael, washed up at the Drowned Bell at 2:00). While you wear it everything you do hits 25% harder and you heal 2 health a second, but everyone can see where you are. Fall, and it falls with you.", "time": CROWN_TIME, "color": Color(0.98, 0.78, 0.3), "familiar": false, "weight": 0.0},
 	"antler_charm": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Antler Charm", "desc": "Vines from the valley: your hits root enemies to the ground for 1.5 seconds. The same enemy cannot be rooted again for 4 seconds after it is caught, and fliers are out of the vines' reach.", "time": POTION_TIME, "color": Color(0.55, 0.78, 0.32), "familiar": false, "weight": 2.0},
 }
 
@@ -94,7 +102,7 @@ static func pick_weighted(table: Dictionary) -> String:
 static func pick_potion(map_id := "") -> String:
 	var t := {}
 	for id: String in ALL:
-		if not ALL[id]["familiar"] and not ALL[id].has("spec") and SpawnRules.allows(ALL[id], map_id):
+		if not ALL[id]["familiar"] and not ALL[id].has("spec") and not ALL[id].get("relic", false) and SpawnRules.allows(ALL[id], map_id):
 			t[id] = ALL[id]
 	return pick_weighted(t)
 
@@ -268,6 +276,9 @@ static func mesh(id: String) -> Mesh:
 			l.box(Vector3(0, -0.1, 0), Vector3(0.1, 0.06, 0.1), Color(0.3, 0.55, 0.22)) # the twine
 			l.prism(Vector3(0, 0.05, 0), Vector3(0, 0.34, -0.02), 0.008, 0.008, 3, Color(0.45, 0.32, 0.2)) # the cord
 			l.box(Vector3(0.07, -0.16, 0.03), Vector3(0.1, 0.02, 0.06), Color(0.36, 0.6, 0.26), Vector3(0, 0, -30))
+		"sunken_crown":
+			# The Sunken Crown, tarnished and crusted from the sea (VaelModels.crown).
+			VaelModels.crown(l, Vector3(0, -0.12, 0), 0.2)
 		_:
 			# A potion bottle, tinted per potion.
 			var col: Color = ALL[id]["color"]

@@ -52,6 +52,8 @@ func setup(k: int, id: String, bonus := 0) -> void:
 	life = WEAPON_LIFE if k == Kind.WEAPON else ITEM_LIFE
 	if k == Kind.POWER and PowerDefs.ALL[id]["familiar"]:
 		life = FAMILIAR_LIFE
+	if k == Kind.POWER and PowerDefs.ALL[id].get("relic", false):
+		life = PowerDefs.CROWN_TIME # a relic lies where it fell until someone takes it
 	if k == Kind.WOOD:
 		life = WOOD_LIFE
 	_spin = Node3D.new()

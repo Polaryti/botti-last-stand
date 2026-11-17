@@ -184,7 +184,22 @@ static func facts() -> Dictionary:
 		# Weapons whose rules are written in code
 		"weapon:flare_pistol": [Flare.BURN_RADIUS, Flare.TIME, Flare.REVEAL_RADIUS],
 		"weapon:blowgun": [pct(Player.POISON_HURT - 1.0)],
+		# Port Vael's foes (their special moves are VaelMind's), and the clock times they come at,
+		# read as minutes and seconds ("around 3:00").
+		"enemy:siren": [VaelMind.SONG_REACH, VaelMind.SONG_PULL],
+		"enemy:press_gang": [VaelMind.NET_HOLD],
+		"enemy:tide_witch": [float(VaelMind.WAVES), VaelMind.WAVE_SLOW, float(VaelMind.RAISE_COUNT)],
+		"enemy:harbourmaster": _clock(Director.HARBOURMASTER_AT),
+		"enemy:lighthouse_keeper": [VaelMind.FLASH_REACH, VaelMind.FLASH_STUN, 2.0] + _clock(Director.KEEPER_AT),
+		"enemy:kraken_arm": _clock(MistTide.TURN * 3.0),
+		"enemy:hollow_sovereign": [float(VaelMind.UNDERTOW_WAVES), VaelMind.SURGE, float(VaelMind.COURT)] + _clock(510.0),
+		"power:sunken_crown": [PowerDefs.CROWN_REGEN] + _clock(Director.CROWN_AT),
 	}
+
+
+## A time on the night's clock, as the words write it ("4:30"): its minutes and its seconds.
+static func _clock(seconds: float) -> Array:
+	return [floorf(seconds / 60.0), fmod(seconds, 60.0)]
 
 
 ## Numbers found in data: as they are, and as the percentages they read as.
@@ -250,6 +265,11 @@ func run() -> Array[String]:
 		var item: Dictionary = ShopDefs.ITEMS[id]
 		# A Map Upgrade's levels, as the Armory lists them, are held to the same numbers.
 		_audit("item:" + id, str(item["desc"]) + " " + " ".join(PackedStringArray(item.get("levels", []))), [item.get("art", {}), item.get("effect", {})])
+	# Port Vael's foes and the Sunken Crown: what the Codex says of them is what they do.
+	for zid: String in ZombieDefs.ALL:
+		if SpawnRules.is_vael(ZombieDefs.ALL[zid]):
+			_audit("enemy:" + zid, str(ZombieDefs.ALL[zid]["desc"]), [ZombieDefs.ALL[zid]])
+	_audit("power:sunken_crown", str(PowerDefs.ALL[PowerDefs.CROWN]["desc"]), [PowerDefs.CROWN_DAMAGE])
 	# Weapons: every number a weapon's words quote (Codex, Armory) is one of its own, or a fact.
 	for wid: String in WeaponDefs.ALL:
 		var wd: Dictionary = WeaponDefs.ALL[wid]

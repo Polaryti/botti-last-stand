@@ -9,7 +9,7 @@ extends RefCounted
 
 ## Also the creatures of Port Vael (VaelModels.KINDS), built and moved through here on the same rigs.
 const KINDS := ["bear", "mist_bear", "eagle", "mist_eagle", "shapeshifter", "earth_elemental", "mist_elemental",
-	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler"]
+	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm"]
 const FLYERS := ["eagle", "mist_eagle", "wyvern", "war_wyvern"]
 const BOSS_NAMES := {"great_revenant_elemental": "GREAT REVENANT ELEMENTAL", "war_wyvern": "WAR WYVERN"}
 
@@ -773,6 +773,10 @@ static func build(id: String) -> Node3D:
 			VaelModels.jelly_parts(root)
 		"angler":
 			VaelModels.angler_parts(root)
+		"siren":
+			VaelModels.siren_parts(root)
+		"kraken_arm":
+			VaelModels.kraken_parts(root)
 	return root
 
 
@@ -857,6 +861,10 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 			VaelModels.animate_jelly(z, root, delta, speed, state, t, float(root.get_meta("act_t", 0.0)))
 		"angler":
 			VaelModels.animate_angler(z, root, delta, speed, state, t, float(root.get_meta("act_t", 0.0)))
+		"siren":
+			VaelModels.animate_siren(z, root, delta, speed, state, t, float(root.get_meta("act_t", 0.0)))
+		"kraken_arm":
+			VaelModels.animate_kraken(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
 	if z.model_id == "war_wyvern":
 		_boss_label(z, root)
 
@@ -1421,6 +1429,8 @@ static func death_time(id: String) -> float:
 			return 3.2
 		"mist_elemental", "storm_elemental":
 			return 1.8
+		"kraken_arm":
+			return 2.8
 	return 2.6
 
 
@@ -1485,6 +1495,11 @@ static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> vo
 		"angler":
 			VaelModels.fall_angler(root, k, side)
 			root.position.y = -sink * 1.0
+		"siren":
+			VaelModels.fall_siren(root, k, side)
+			root.position.y = -sink * 0.8
+		"kraken_arm":
+			VaelModels.fall_kraken(root, k, side)
 		"shapeshifter":
 			match str(root.get_meta("dies_as", "Stag")):
 				"Beast": _fall_upright(root.get_node("Beast") as Node3D, k, side)

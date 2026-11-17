@@ -687,7 +687,7 @@ func _draw_powers(top: float) -> void:
 		var left: float = player.powers[id]
 		Icons.draw(self, Rect2(x, y, 46, 46), Icons.power(id), d["color"])
 		var fs := HUD_SMALL
-		var t := "%d" % ceil(left)
+		var t := "%d" % ceil(left) if left < 900.0 else "" # a relic is worn until you fall
 		var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		_text(t, Vector2(x + 23 - w * 0.5, y + 60), fs, UiTheme.BONE)
 		x += 52.0

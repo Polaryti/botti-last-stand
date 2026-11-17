@@ -41,6 +41,7 @@ func _ready() -> void:
 	await _requests_1116()
 	await _vael_weapons()
 	await _port_vael()
+	await _drowned_court()
 	await _feedback_and_numbers()
 	await _wilds_of_mesenlla()
 	_text_audit()
@@ -1863,6 +1864,263 @@ func _port_vael() -> void:
 	d._tick_vael()
 	var jellies := vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "lantern_jelly")
 	check(jellies.size() == Director.JELLIES_AT_ONCE and jellies.all(func(z: Zombie) -> bool: return vael.tide.flooded(z.position)), "the high tide brings Lantern Jellies in over the water")
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+	await get_tree().process_frame
+
+
+## Stage 3 of The Sunken Crown: the drowned court of Port Vael, the Hollow Sovereign and his crown.
+func _drowned_court() -> void:
+	var court := ["siren", "press_gang", "tide_witch", "harbourmaster", "lighthouse_keeper", "kraken_arm", "hollow_sovereign"]
+	for id: String in court:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(SpawnRules.is_vael(d) and VaelMind.handles(id) and str(d.get("lore", "")).length() > 60 and Icons.exists(str(d["icon"]).get_slice("+", 0)), "%s: of Vael, with its own mind, lore and icon" % id)
+		check(CodexPanel.enemy_group(id) == (6 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
+		var voices: Array = [Zombie.MESENLLA_VOICES.get(id, ""), Zombie.MESENLLA_HURT.get(id, ""), Zombie.MESENLLA_DEATHS.get(id, "")]
+		check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "%s has a voice, a hurt and a death of its own" % id)
+	var wanders := func(id: String) -> bool: return ZombieDefs.roams(id, 999.0, "vael") and float(ZombieDefs.ALL[id]["weight"]) > 0.0
+	check(wanders.call("tide_witch") and court.filter(func(id: String) -> bool: return id != "tide_witch").all(func(id: String) -> bool: return not wanders.call(id)), "Tide Witches roam; Sirens, the Press Gang and the court come when the night sends them")
+	check(["harbourmaster", "lighthouse_keeper", "kraken_arm"].all(func(id: String) -> bool: return ZombieDefs.ALL[id].get("miniboss", false)) and ZombieDefs.ALL["hollow_sovereign"].get("vael_boss", false), "three of the court are minibosses, and the Hollow Sovereign the boss")
+	check(Director.BOSS_CARDS.has("hollow_sovereign") and Sfx.NAMES.has("boss_bells_sovereign") and ResourceLoader.exists("res://assets/sounds/boss_bells_sovereign.ogg"), "he enters with his own card and bells")
+	check(Net.ANIMS.size() <= 64 and ["m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"].all(func(a: String) -> bool: return Net.ANIMS.has(a)), "every phone is sent what they are doing (%d states)" % Net.ANIMS.size())
+	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.LOOKS.size() == 14, "the new rings come after the old on the wire")
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "vael"
+	Game.mode = Game.Mode.NIGHT
+	var vael := World.new()
+	space.add_child(vael)
+	vael.setup(Game.Mode.NIGHT)
+	vael.director.running = false
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	var you := vael.player
+	you.set_physics_process(false)
+	var t := vael.terrain
+	var dt := 1.0 / 60.0
+	var ready_you := func() -> void:
+		you.frozen_left = 0.0
+		you._status_immune = 0.0
+		you.rooted_left = 0.0
+		you.slowed_left = 0.0
+		you.burn_time = 0.0
+		you._drag_left = 0.0
+		you._lure_left = 0.0
+		you.velocity = Vector3.ZERO
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+	var ground := func(x: float, z: float) -> Vector3: return Vector3(x, t.height(x, z), z)
+	var strike := func(at: Vector3, reach: float, kind: int, source: Zombie, amount := 10.0) -> void:
+		var seal := MistSeal.create(vael, at, reach, 0.0, 0.05, amount, source.net_id if source else -1, kind)
+		seal.strike()
+		seal.queue_free()
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.level_at(20.0)
+	# The Siren: her song draws you in, a fifth of her health struck off breaks it.
+	var siren_at: Vector3 = ground.call(0.0, 30.0)
+	check(vael.spawn_zombie("siren", siren_at), "a Siren")
+	var siren: Zombie = vael.zombies.back()
+	check(siren._custom and siren._visual.has_node("Body/Torso/Head/Hair") and siren._visual.has_node("Tail0/Tail1/Tail2") and siren._visual.has_node("Song"), "on her own body: a woman's above, an eel's tail below, her song's rings")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 30.0 + 10.0)
+	siren.mesenlla_mind.phase = "song"
+	siren.mesenlla_mind.left = VaelMind.SONG_TIME
+	siren._current_anim = "m_song"
+	siren.mesenlla_warning = false
+	VaelMind.sing(vael)
+	check(you.is_lured(), "while she sings, she draws you in from %d m" % int(you.global_position.distance_to(siren.position)))
+	var was := you.global_position.distance_to(siren.position)
+	for i in 30:
+		VaelMind.sing(vael)
+		you._physics_step(dt)
+	check(was - you.global_position.distance_to(siren.position) > VaelMind.SONG_PULL * 0.3, "toward her, standing still (%.2f m in half a second)" % (was - you.global_position.distance_to(siren.position)))
+	you.global_position = ground.call(0.0, 30.0 + VaelMind.SONG_REACH + 3.0)
+	you._lure_left = 0.0
+	VaelMind.sing(vael)
+	check(not you.is_lured(), "but not from beyond %d m" % int(VaelMind.SONG_REACH))
+	siren.mesenlla_mind._song_from = siren.hp
+	siren.take_damage(siren.max_hp * VaelMind.SONG_BREAK + 1.0, Vector3(0, 0, -1), 0.0, siren.centre())
+	siren.mesenlla_mind.tick(siren, you, you.global_position - siren.position, 10.0, dt)
+	check(siren.mesenlla_mind.phase == "" and siren._current_anim != "m_song", "a fifth of her health struck off breaks her song")
+	siren.mesenlla_mind.phase = "song"
+	siren._current_anim = "m_song"
+	siren.stun(1.0)
+	check(siren.mesenlla_mind.phase == "", "and so does a stun")
+	siren.release()
+	# The Press Gang's net holds you where you stand.
+	check(vael.spawn_zombie("press_gang", ground.call(4.0, 20.0)), "a Press Gang man")
+	var press: Zombie = vael.zombies.back()
+	check(press.weapon_id == "boarding_hook" and press._parts.size() >= 5, "dressed for the work, a boarding hook in hand")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 20.0)
+	strike.call(you.global_position, VaelMind.NET_RADIUS, MistSeal.Style.NET, press)
+	check(is_equal_approx(you.rooted_left, VaelMind.NET_HOLD), "caught in his net, you cannot move for %.1f s" % VaelMind.NET_HOLD)
+	var stood := you.global_position
+	press.set_physics_process(false)
+	you.input_move = Vector2(0, -1)
+	you.set_physics_process(true)
+	await frames(20)
+	you.set_physics_process(false)
+	you.input_move = Vector2.ZERO
+	check(Vector2(you.global_position.x - stood.x, you.global_position.z - stood.z).length() < 0.05, "however you try to walk")
+	press.release()
+	# The Tide Witch: a line of waves, and the drowned out of the high tide.
+	check(vael.spawn_zombie("tide_witch", ground.call(0.0, 12.0)), "a Tide Witch")
+	var witch: Zombie = vael.zombies.back()
+	ready_you.call()
+	you.global_position = ground.call(0.0, 26.0)
+	var seals := vael.mist_seals.size()
+	(witch.mesenlla_mind as VaelMind)._undertow(witch, you, VaelMind.WAVES, VaelMind.WAVE_RADIUS, VaelMind.WAVE_POWER)
+	check(vael.mist_seals.size() - seals == VaelMind.WAVES, "%d waves roll at you in a line" % (vael.mist_seals.size() - seals))
+	for seal: MistSeal in vael.mist_seals.duplicate(): seal.queue_free()
+	strike.call(you.global_position, VaelMind.WAVE_RADIUS, MistSeal.Style.WAVE, witch)
+	check(you.velocity.z > VaelMind.WAVE_KNOCK * 0.8 and is_equal_approx(you.slowed_left, VaelMind.WAVE_SLOW), "a wave throws you back, away from her, and slows you for %d s" % int(VaelMind.WAVE_SLOW))
+	vael.director.elapsed = MistTide.TURN + MistTide.RISE + 2.0
+	vael.tide.level = MistTide.HIGH_Y
+	var sailors := vael.count_type("drowned_sailor")
+	you.global_position = ground.call(0.0, 50.0)
+	(witch.mesenlla_mind as VaelMind)._raise_drowned(witch, you)
+	check(vael.count_type("drowned_sailor") - sailors == VaelMind.RAISE_COUNT, "at high tide she raises %d Drowned Sailors out of the water" % (vael.count_type("drowned_sailor") - sailors))
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.level_at(20.0)
+	# The Harbourmaster's hook drags you to him; at half health his bell brings a Press Gang.
+	check(vael.spawn_zombie("harbourmaster", ground.call(0.0, 12.0)), "the Harbourmaster")
+	var harbour: Zombie = vael.zombies.back()
+	check(harbour.named_bar() and harbour.is_miniboss() and not harbour.draggable() and is_equal_approx(harbour.max_hp, 900.0 * Game.enemy_health()), "a named foe, too big to drag, %d health" % int(harbour.max_hp))
+	ready_you.call()
+	you.global_position = ground.call(0.0, 26.0)
+	strike.call(you.global_position, VaelMind.HOOK_RADIUS, MistSeal.Style.HOOK, harbour)
+	check(you.is_dragged() and is_equal_approx(you.frozen_left, VaelMind.HOOK_STUN), "his hook catches you")
+	harbour.set_physics_process(false)
+	you.set_physics_process(true)
+	await frames(90)
+	you.set_physics_process(false)
+	var hauled := Vector2(you.global_position.x - harbour.position.x, you.global_position.z - harbour.position.z).length()
+	check(hauled < VaelMind.HOOK_STOP + 0.8 and not you.is_dragged(), "and hauls you to his feet (%.1f m off)" % hauled)
+	harbour.set_physics_process(true)
+	harbour.hp = harbour.max_hp * 0.45
+	var gangs := vael.count_type("press_gang")
+	for i in 80:
+		harbour.mesenlla_mind.tick(harbour, you, you.global_position - harbour.position, 6.0, 1.0 / 30.0)
+	check(vael.count_type("press_gang") - gangs == VaelMind.BELL_GANG, "below half health he rings his bell and a Press Gang answers (%d)" % (vael.count_type("press_gang") - gangs))
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	# The Lighthouse Keeper: oil lamps that set you alight; his great lamp dazzles whoever looks at it.
+	check(vael.spawn_zombie("lighthouse_keeper", ground.call(0.0, 12.0)), "the Mad Lighthouse Keeper")
+	var keeper: Zombie = vael.zombies.back()
+	check(keeper._court_light != null, "his great lamp lit on his back")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 20.0)
+	strike.call(you.global_position, VaelMind.LAMP_RADIUS, MistSeal.Style.LAMP, keeper)
+	check(you.burn_time > 0.0, "his lamps set you alight")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 18.0)
+	you.rotation.y = 0.0 # looking toward -Z: at him
+	you.camera.rotation = Vector3.ZERO
+	strike.call(keeper.position, VaelMind.FLASH_REACH, MistSeal.Style.FLASH, keeper, 0.0)
+	check(is_equal_approx(you.frozen_left, VaelMind.FLASH_STUN), "looking at him as the lamp blazes, you are dazzled for %.1f s" % VaelMind.FLASH_STUN)
+	ready_you.call()
+	you.rotation.y = PI # back turned
+	strike.call(keeper.position, VaelMind.FLASH_REACH, MistSeal.Style.FLASH, keeper, 0.0)
+	check(you.frozen_left == 0.0 and you.hp == you.max_hp(), "with your back to it, nothing")
+	you.rotation.y = 0.0
+	keeper.release()
+	# The Kraken's arms: up out of the flooded flats at high tide, back under when it goes out.
+	vael.director.elapsed = MistTide.TURN * 3.0 + MistTide.RISE + 2.0
+	vael.tide.level = MistTide.HIGH_Y
+	you.global_position = ground.call(-10.0, 40.0)
+	var arms := vael.raise_kraken()
+	check(arms >= 3 and vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "kraken_arm").all(func(z: Zombie) -> bool: return vael.tide.flooded(z.position)), "the Kraken's arms rise out of the flooded flats round you (%d)" % arms)
+	var arm: Zombie = vael.zombies.back()
+	check(arm._visual.has_node("Arm/Seg0/Seg1/Seg2") and arm.named_bar(), "each a great arm of twelve joints, named")
+	var was_at := arm.position
+	arm.take_damage(30.0, Vector3(1, 0, 0), 8.0, arm.centre())
+	for i in 10:
+		arm._physics_process(dt)
+	check(arm.position.distance_to(was_at) < 0.05, "rooted in the sea floor: no blow moves it")
+	ready_you.call()
+	strike.call(you.global_position, VaelMind.KRAKEN_RADIUS, MistSeal.Style.SLAM, arm)
+	check(is_equal_approx(you.frozen_left, VaelMind.KRAKEN_STUN), "its slam stuns")
+	vael.director.elapsed = MistTide.TURN * 4.0 + MistTide.RISE + 2.0 # the tide is out
+	vael.tide.level = MistTide.LOW_Y
+	arm.mesenlla_mind.phase = ""
+	for i in int((VaelMind.SINK_TIME + 0.5) * 30.0):
+		if arm.active:
+			arm.mesenlla_mind.tick(arm, you, you.global_position - arm.position, 8.0, 1.0 / 30.0)
+	check(not arm.active, "when the tide goes out, it sinks back into the sea")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	# The Hollow Sovereign: his decrees call the tide in and raise his court; the crown falls with him.
+	check(vael.director.requires_regent(), "the night at Port Vael ends only when he falls")
+	vael.director.elapsed = 40.0 # low tide
+	vael.tide.level = MistTide.level_at(40.0)
+	check(vael.spawn_zombie("hollow_sovereign", ground.call(0.0, 44.0)), "the Hollow Sovereign rises")
+	var king: Zombie = vael.zombies.back()
+	check(king.is_boss() and king.named_bar() and king._parts.size() >= 6, "the boss, in his robes and his crown")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 30.0)
+	sailors = vael.count_type("drowned_sailor")
+	king.hp = king.max_hp * 0.6
+	for i in 50:
+		king.mesenlla_mind.tick(king, you, you.global_position - king.position, 14.0, 1.0 / 30.0)
+	check(vael.tide.surging() and vael.tide.high() and vael.count_type("drowned_sailor") - sailors == VaelMind.COURT, "at his decree the tide comes in out of its turn, and %d of his court rise" % (vael.count_type("drowned_sailor") - sailors))
+	check(is_equal_approx(vael.tide.surge_until - vael.tide.surge_from, VaelMind.SURGE) and vael.tide.level_now(vael.director.elapsed + MistTide.RISE) > MistTide.HIGH_Y - 0.05, "for %d s" % int(VaelMind.SURGE))
+	king.hp = king.max_hp * 0.45
+	king._sees = true
+	(king.mesenlla_mind as VaelMind)._cooldown_c = 0.0
+	king.mesenlla_mind.phase = ""
+	king.mesenlla_mind.tick(king, you, you.global_position - king.position, 14.0, 1.0 / 30.0)
+	check(vael.mist_seals.any(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.CROWN), "below half health, the crown's judgement")
+	ready_you.call()
+	strike.call(you.global_position, VaelMind.JUDGEMENT_RADIUS, MistSeal.Style.CROWN, king)
+	check(is_equal_approx(you.frozen_left, VaelMind.JUDGEMENT_STUN), "which stuns where it falls")
+	var crowns := func() -> int: return vael.pickups.filter(func(p: Pickup) -> bool: return p.item_id == PowerDefs.CROWN).size()
+	king.take_damage(king.hp + 1.0, Vector3(0, 0, 1), 0.0, king.centre())
+	check(crowns.call() == 1 and vael.director._mist_boss_defeated, "he falls, and the Sunken Crown with him")
+	# The crown: worn until you fall.
+	ready_you.call()
+	var mult := you.damage_multiplier()
+	you.activate_power(PowerDefs.CROWN)
+	check(is_equal_approx(you.damage_multiplier() / mult, PowerDefs.CROWN_DAMAGE) and you.skin_bits() & 2 != 0, "wearing it you hit a quarter harder, and everyone sees it on you")
+	you.hp = 50.0
+	you._tick_powers(1.0)
+	check(is_equal_approx(you.hp, 50.0 + PowerDefs.CROWN_REGEN), "and heal %d a second" % int(PowerDefs.CROWN_REGEN))
+	you._tick_powers(600.0)
+	check(you.has_power(PowerDefs.CROWN), "for as long as you stand")
+	for p: Pickup in vael.pickups.duplicate(): vael.remove_pickup(p)
+	you._kill()
+	check(not you.has_power(PowerDefs.CROWN) and crowns.call() == 1, "fall, and it falls where you do")
+	you.respawn(ground.call(0.0, 0.0))
+	var picked := {}
+	for i in 400:
+		picked[PowerDefs.pick_potion("vael")] = true
+	check(not picked.has(PowerDefs.CROWN), "it is never found lying about as a potion")
+	# The night sends the court at its hours.
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.global_position = ground.call(-10.0, 30.0)
+	var d := vael.director
+	d.elapsed = Director.HARBOURMASTER_AT + 1.0
+	vael.tide.level = MistTide.level_at(d.elapsed)
+	d._tick_court()
+	check(vael.count_type("harbourmaster") == 1, "around %d:00 the Harbourmaster climbs the quay stairs" % int(Director.HARBOURMASTER_AT / 60.0))
+	d._tick_court()
+	check(vael.count_type("harbourmaster") == 1, "once")
+	d.elapsed = Director.KRAKEN_AT
+	vael.tide.level = MistTide.HIGH_Y
+	d._tick_court()
+	check(vael.count_type("kraken_arm") >= 3, "at the high tide after 4:30, the Kraken")
+	d.elapsed = Director.KEEPER_AT + 1.0
+	d._tick_court()
+	check(vael.count_type("lighthouse_keeper") == 1 and vael.zombies.any(func(z: Zombie) -> bool: return z.type_id == "lighthouse_keeper" and z.position.x > 70.0), "and around %d:00 the Lighthouse Keeper, down the East Mole" % int(Director.KEEPER_AT / 60.0))
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	d._next_siren = 0.0
+	d._next_press = 0.0
+	d.elapsed = 400.0
+	vael.tide.level = MistTide.level_at(400.0)
+	d._tick_court()
+	check(vael.count_type("siren") == 1 and vael.count_type("press_gang") == int(ZombieDefs.ALL["press_gang"]["pack"]), "Sirens come to the water's edge, and the Press Gang in threes")
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode
