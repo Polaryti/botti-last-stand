@@ -166,7 +166,7 @@ func _items() -> void:
 	for id: String in PowerDefs.ALL:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if not d["familiar"]:
-			_row(Icons.power(id), Color(d["color"]).darkened(0.35), PowerDefs.title(id), d["desc"], "Base duration: %d seconds" % int(d["time"]))
+			_row(Icons.power(id), Color(d["color"]).darkened(0.35), PowerDefs.title(id), d["desc"], "Worn until you fall" if d.get("relic", false) else "Base duration: %d seconds" % int(d["time"]))
 			_map_badge(d)
 
 

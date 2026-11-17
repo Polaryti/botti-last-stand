@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 58
+const PROTOCOL := 59
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -55,14 +55,22 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"frost_warning", "frost_burst", "owl_screech", "boar_snort",
 	"hook_catch", "harpoon_hit", "flare_burst", "anchor_slam",
 	"dawn_vael", "drowned_moan", "drowned_hurt", "drowned_death", "brute_hurt", "brute_death", "hound_snarl", "hound_bite", "hound_death",
-	"jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death"]
+	"jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death",
+	# The drowned court (Stage 3 of The Sunken Crown).
+	"siren_song", "siren_shriek", "siren_hum", "siren_death", "press_shout", "net_throw", "net_land", "witch_call", "witch_death",
+	"chain_rattle", "hook_throw", "harbour_bell", "harbour_growl", "lamp_throw", "lamp_smash", "lamp_flare", "lamp_blaze", "keeper_laugh", "keeper_hurt",
+	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
+	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
 	"m_swipe", "m_rear", "m_charge", "m_slam", "m_cast", "m_breath", "m_throw", "m_blink", "m_stag", "m_beast", "m_shift",
 	"m_paw", "m_wolf", "m_bite", "m_lunge", "m_howl", "m_owl", "m_dive", "m_boar", "m_gore",
 	# A Woodland Cavalry rider astride its bear.
-	"Ride", "RideCharge", "RideThrust", "RideBrandish"]
+	"Ride", "RideCharge", "RideThrust", "RideBrandish",
+	# Port Vael: a Lantern Jelly's sting, a Siren's song, a Kraken's Arm rising and sinking; and the drowned
+	# court's throws and calls (BodyAnim). Never more than 63 of these: the top bits carry poison and bleeding.
+	"m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"]
 
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
@@ -650,6 +658,8 @@ func _spectator_loaded() -> void:
 	if world.portals:
 		_portals.rpc_id(id, world.portals.state_bits())
 	_spectate_now.rpc_id(id, world.director.elapsed, world.director._mist_boss_spawned, world.director._mist_boss_defeated)
+	if world.tide and world.tide.surge_from >= 0.0:
+		_tide_surge.rpc_id(id, world.tide.surge_from, world.tide.surge_until)
 	_go.rpc_id(id)
 
 
@@ -1927,6 +1937,17 @@ func _healed_by_you(healed: int, amount: float) -> void:
 
 
 ## A boss of Beyond the Mists enters: every phone shows its card and rings its bells.
+## The Hollow Sovereign has called the tide in: from `from` until `until` on the night's clock.
+func tide_surge(from: float, until: float) -> void:
+	_tide_surge.rpc(from, until)
+
+
+@rpc("authority", "reliable")
+func _tide_surge(from: float, until: float) -> void:
+	if world and is_instance_valid(world) and world.tide and is_finite(from) and is_finite(until) and until > from and until - from < 600.0:
+		world.tide.set_surge(from, until)
+
+
 func boss_entrance(kind: String) -> void:
 	_boss_entrance.rpc(kind)
 

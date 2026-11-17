@@ -1182,6 +1182,59 @@ func stun_by_creature(seconds: float) -> void:
 	say("Stunned!")
 
 
+## Caught in a Press Gang's net: you can fight and turn, but not move, for as long as it says.
+func root_by_creature(seconds: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	rooted_left = maxf(rooted_left, seconds)
+	say("Caught in a net!")
+
+
+## Slowed by a creature (a wave knocking you off your feet): for just as long as it says.
+func slow_by_creature(seconds: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	slowed_left = maxf(slowed_left, seconds)
+
+
+## Hooked by the Harbourmaster's chain: hauled across the ground to `at`, stopping `stop` metres short.
+const DRAG_SPEED := 20.0
+const DRAG_MAX := 1.4 # however far it is, the haul ends after this long
+var _drag_to := Vector3.INF
+var _drag_stop := 2.0
+var _drag_left := 0.0
+func drag_to(at: Vector3, stop: float) -> void:
+	if dead or guard_left > 0.0 or is_riding():
+		return
+	_drag_to = at
+	_drag_stop = stop
+	_drag_left = DRAG_MAX
+	say("Hooked!")
+
+
+func is_dragged() -> bool:
+	return _drag_left > 0.0
+
+
+## A Siren's song: drawn toward `at` at `speed` metres a second, on top of your own walking, for as long
+## as it is sung (VaelMind.sing says so again every frame).
+var _lure_at := Vector3.INF
+var _lure_speed := 0.0
+var _lure_left := 0.0
+func lure(at: Vector3, speed: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	if _lure_left <= 0.0:
+		say("The song draws you in...")
+	_lure_at = at
+	_lure_speed = speed
+	_lure_left = 0.15
+
+
+func is_lured() -> bool:
+	return _lure_left > 0.0
+
+
 ## Another player's ability. It does not last as long on a person as on the undead.
 func apply_status(kind: int, seconds: float) -> void:
 	if dead or guard_left > 0.0:
@@ -1287,6 +1340,8 @@ func respawn(at: Vector3) -> void:
 	frozen_left = 0.0
 	slowed_left = 0.0
 	rooted_left = 0.0
+	_drag_left = 0.0
+	_lure_left = 0.0
 	_status_immune = 0.0
 	guard_left = 2.5
 	last_foe = 0
@@ -1340,6 +1395,14 @@ func _kill() -> void:
 	input_fire = false
 	if is_riding():
 		dismount()
+	_drag_left = 0.0
+	_lure_left = 0.0
+	if has_power(PowerDefs.CROWN):
+		# The crown falls where you do, for someone else to take.
+		powers.erase(PowerDefs.CROWN)
+		world.spawn_pickup_at(global_position, Pickup.Kind.POWER, PowerDefs.CROWN)
+		if bot_peer == 0 and world.director:
+			world.director.local_banner("The Sunken Crown falls from your head", 3.0)
 	world.on_player_died(self)
 
 
@@ -1830,8 +1893,9 @@ func dismount() -> void:
 
 
 ## What a rider's look adds to its pose: bit 0, the White Stag in place of the horse.
+## What others see of you beyond your class: the White Stag (1), and the Sunken Crown on your head (2).
 func skin_bits() -> int:
-	return 1 if bot_peer == 0 and ShopDefs.skin_on("stag_steed") else 0
+	return (1 if bot_peer == 0 and ShopDefs.skin_on("stag_steed") else 0) | (2 if has_power(PowerDefs.CROWN) else 0)
 
 
 func _build_horse() -> void:
@@ -1974,6 +2038,11 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 	var d: Dictionary = PowerDefs.ALL[id]
 	var time: float = d["time"]
 	time *= m("familiar_time") if d["familiar"] else m("potion_time")
+	if d.get("relic", false):
+		time = d["time"] # worn until you fall
+		if bot_peer == 0 and world.director:
+			world.director.local_banner("You wear the Sunken Crown. Everyone can see where you are", 3.5)
+		sfx("crown_take", 0.0)
 	if id == "lantern":
 		time += m("lantern_time")
 	if forced_time > 0.0:
@@ -2035,6 +2104,8 @@ func _arrange_familiars() -> void:
 
 
 func _tick_powers(delta: float) -> void:
+	if has_power(PowerDefs.CROWN) and not dead:
+		hp = minf(max_hp(), hp + PowerDefs.CROWN_REGEN * delta)
 	for id: String in powers.keys():
 		powers[id] = float(powers[id]) - delta
 		if float(powers[id]) <= 0.0:
@@ -3510,6 +3581,8 @@ func _summon_revenants() -> void:
 
 func damage_multiplier() -> float:
 	var mult := PowerDefs.DAEMON_MULTIPLIER if has_power("daemon") else 1.0
+	if has_power(PowerDefs.CROWN):
+		mult *= PowerDefs.CROWN_DAMAGE
 	if void_left > 0.0:
 		mult *= 2.0
 	if has_flag("rage"):
@@ -3532,6 +3605,19 @@ func _physics_step(delta: float) -> void:
 	slowed_left = maxf(0.0, slowed_left - delta)
 	rooted_left = maxf(0.0, rooted_left - delta)
 	_status_immune = maxf(0.0, _status_immune - delta)
+	if _drag_left > 0.0:
+		# Hauled in on the chain, whatever else is happening; a stun waits until it is over.
+		_drag_left -= delta
+		var haul := Vector3(_drag_to.x - global_position.x, 0, _drag_to.z - global_position.z)
+		if haul.length() <= _drag_stop or _drag_left <= 0.0:
+			_drag_left = 0.0
+			velocity = Vector3(0, minf(velocity.y, 0.0), 0)
+		else:
+			velocity.x = haul.normalized().x * DRAG_SPEED
+			velocity.z = haul.normalized().z * DRAG_SPEED
+			velocity.y = velocity.y - GRAVITY * delta if not is_on_floor() else 0.0
+			move_and_slide()
+			return
 	if frozen_left > 0.0:
 		frozen_left -= delta
 		if frozen_left <= 0.0:
@@ -3600,6 +3686,12 @@ func _physics_step(delta: float) -> void:
 	if wading and global_position.y < Terrain.WATER_Y + 0.6:
 		var flow := world.terrain.river_flow(global_position.x, global_position.z)
 		move_and_collide(Vector3(flow.x, 0, flow.y) * Terrain.CURRENT * delta)
+	if _lure_left > 0.0:
+		# A Siren's song, drawing you in over the ground whatever way you walk.
+		_lure_left -= delta
+		var pull := Vector3(_lure_at.x - global_position.x, 0, _lure_at.z - global_position.z)
+		if pull.length() > VaelMind.SONG_CLOSE:
+			move_and_collide(pull.normalized() * _lure_speed * delta)
 	# However it happened, nobody stays under the ground.
 	var floor_y := world.terrain.ground_height(global_position.x, global_position.z) if world.terrain.has_islands() else world.terrain.height(global_position.x, global_position.z)
 	if global_position.y < floor_y - 1.0:

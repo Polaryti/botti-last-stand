@@ -95,6 +95,11 @@ const POSES := {
 		[0.35, {"r": [Vector3(-0.45, 0.75, 0.45), Vector3(-0.2, 0.95, 0.2)], "l": [Vector3(0.45, 0.75, 0.45), Vector3(0.2, 0.95, 0.2)], "chest": Vector3(-0.2, 0.0, 0.0)}],
 		[0.9, {"r": [Vector3(-0.45, 0.75, 0.45), Vector3(-0.2, 0.95, 0.2)], "l": [Vector3(0.45, 0.75, 0.45), Vector3(0.2, 0.95, 0.2)], "chest": Vector3(-0.2, 0.0, 0.0)}],
 		[1.2, {}]],
+	# Drawing back to throw (a net, a hook, a lamp), and holding it there: the tell before "Throw".
+	"WindUp": [0.6,
+		[0.0, {}],
+		[0.25, {"r": [Vector3(-0.6, 0.6, -0.5), Vector3(-0.15, 0.95, -0.3)], "l": [Vector3(0.4, 0.1, 0.9), Vector3(0.1, 0.2, 1.0)], "wrist": ALONG, "chest": Vector3(-0.2, -0.6, 0.0), "drop": 0.05}],
+		[0.6, {"r": [Vector3(-0.6, 0.62, -0.52), Vector3(-0.15, 0.96, -0.32)], "l": [Vector3(0.4, 0.12, 0.9), Vector3(0.1, 0.22, 1.0)], "wrist": ALONG, "chest": Vector3(-0.22, -0.62, 0.0), "drop": 0.05}]],
 	# On top of a gate, leaning out over the parapet: a Crossbow in the right hand aimed down at the
 	# foot of the gate, the left steadying it; it kicks as the bolt goes and comes back to the aim.
 	"CrossbowDown": [0.55,

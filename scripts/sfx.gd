@@ -28,7 +28,13 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"anchor_heave", "anchor_slam", "oar_sweep",
 	# Port Vael: the Mist Tide and the drowned
 	"tide_bell", "tide_in", "tide_out", "salvage", "dawn_vael", "drowned_moan", "drowned_hurt", "drowned_death", "brute_hurt", "brute_death",
-	"hound_snarl", "hound_bite", "hound_death", "jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death"]
+	"hound_snarl", "hound_bite", "hound_death", "jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death",
+	# The drowned court: Sirens, the Press Gang, Tide Witches, the Harbourmaster, the Lighthouse Keeper, the
+	# Kraken's arms, the Hollow Sovereign and his crown
+	"siren_song", "siren_hum", "siren_shriek", "siren_death", "press_shout", "net_throw", "net_land", "witch_call", "witch_death",
+	"chain_rattle", "hook_throw", "harbour_bell", "harbour_growl", "lamp_throw", "lamp_smash", "lamp_flare", "lamp_blaze", "keeper_laugh", "keeper_hurt",
+	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
+	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],

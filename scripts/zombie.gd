@@ -19,7 +19,8 @@ const LANE_ENGAGE := 12.0 # and how near they must be: until then the way to the
 const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its height
 ## Bodies that share another's animated model, dressed differently.
 const BODY_FILES := {"woods_child": "normal_b", "fallen_revenant": "clever", # a Fallen Revenant is a Revenant's own body
-	"drowned": "normal_a", "barnacle_brute": "normal_a"} # the drowned of Vael, dressed by VaelModels
+	"drowned": "normal_a", "barnacle_brute": "normal_a", # the drowned of Vael, dressed by VaelModels
+	"press_gang": "normal_b", "tide_witch": "magic", "harbourmaster": "normal_a", "lighthouse_keeper": "clever", "hollow_sovereign": "normal_a"}
 const FAR := 34.0
 const DUMMY_WINDOW := 5.0
 
@@ -39,7 +40,9 @@ const HOP_THINK := 0.4
 const HOP_LOOK := 30.0
 
 var mist_mind: MistMind
-var mesenlla_mind: MesenllaMind
+var mesenlla_mind: MesenllaMind # (a VaelMind for the drowned court of Port Vael)
+var _court_light: OmniLight3D # the Lighthouse Keeper's great lamp
+const KEEPER_LAMP := 1.4 # its light, until he lifts it and it blazes
 var mesenlla_warning := false # a creature of Mesenlla is showing the tell of a special move
 var world: World
 var model_id := ""
@@ -420,6 +423,38 @@ func _build_visual() -> void:
 			for piece in worn:
 				piece.set_meta("own_material", piece.material_override)
 				_parts.append(piece)
+		elif model_id in VaelModels.GEARED:
+			# The drowned court of Vael: each in its own clothes, with what it carries (VaelModels.gear_for).
+			# Pieces keyed "bone:glow" are lit from inside: eyes, a lamp's lens, a witch's float.
+			_eyes.visible = false
+			var gear := VaelModels.gear_for(model_id)
+			var worn: Array[MeshInstance3D] = []
+			for key: String in gear:
+				var piece := _attach(key.get_slice(":", 0), gear[key], Vector3.ZERO)
+				if key.begins_with("handslot"):
+					piece.rotation = VaelModels.HELD_TURN
+				if key.ends_with(":glow"):
+					piece.material_override = MesenllaModels.glow_material()
+				worn.append(piece)
+				if model_id == "lighthouse_keeper" and key == "chest:glow":
+					# The great lamp on his back lights the ground around him, and blazes as he lifts it.
+					_court_light = OmniLight3D.new()
+					_court_light.light_color = Color(1.0, 0.86, 0.5)
+					_court_light.light_energy = KEEPER_LAMP
+					_court_light.omni_range = 9.0
+					_court_light.shadow_enabled = false
+					_court_light.visible = Game.quality > 0
+					_court_light.position = Vector3(0, 0.25, -0.95)
+					piece.get_parent().add_child(_court_light)
+			var eyes_mesh := VaelModels.court_eyes(model_id)
+			if eyes_mesh:
+				var eyes := _attach("head", eyes_mesh, Vector3.ZERO)
+				eyes.material_override = MesenllaModels.glow_material()
+				_eyes = eyes
+				worn.append(eyes)
+			for piece in worn:
+				piece.set_meta("own_material", piece.material_override)
+				_parts.append(piece)
 	_shadow = World.make_blob_shadow(1.0)
 	add_child(_shadow)
 
@@ -500,7 +535,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 			_visual.set_meta("risen", 0.0)
 			VaelModels.bury(_visual) # it lies in wait in the sand
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
-	mesenlla_mind = MesenllaMind.new(id) if MesenllaMind.wants(id) else null
+	mesenlla_mind = VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
@@ -554,7 +589,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		_damage *= harder
 		_armed_damage *= harder
 		_speed *= 1.0 + ZombieDefs.NIGHT_SPEED * minute
-	if is_boss():
+	if is_boss() or def.get("miniboss", false):
 		hp *= 1.0 + 0.55 * maxi(0, (Net.roster.size() if Net.active() else world.players.size()) - 1)
 	hp *= Game.enemy_health()
 	_damage *= Game.enemy_damage()
@@ -970,7 +1005,13 @@ func _play(anim_name: String, speed := 1.0, blend := 0.2) -> void:
 
 ## A boss of the Mists or of Mesenlla: shrugs off long stuns, and grows with the number of players.
 func is_boss() -> bool:
-	return def.get("mist_boss", false) or def.get("mesenlla_boss", false)
+	return def.get("mist_boss", false) or def.get("mesenlla_boss", false) or def.get("vael_boss", false)
+
+
+## The Harbourmaster, the Mad Lighthouse Keeper and the Kraken's Arms: not bosses (the night does not
+## wait for them), but each comes once, grows with the number of players and shrugs off half a stun.
+func is_miniboss() -> bool:
+	return def.get("miniboss", false)
 
 
 func is_alive() -> bool:
@@ -988,7 +1029,7 @@ func is_hunting() -> bool:
 ## The Fallen (the Fallen Heroes, and the Fallen Revenant of the Mists): a long bar with a name over
 ## them while they hunt.
 func named_bar() -> bool:
-	return hero or bool(def.get("fallen", false))
+	return hero or bool(def.get("fallen", false)) or is_miniboss() or def.get("vael_boss", false)
 
 
 func headshot_at(y: float) -> bool:
@@ -1171,7 +1212,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		_dive = 0.0
 		_windup = 0.0
 		_recover = maxf(_recover, 0.8)
-	_knock += Vector3(from_dir.x, 0, from_dir.z).normalized() * knock / _scale
+	if not def.get("rooted", false): # (a Kraken's Arm stands in the sea floor)
+		_knock += Vector3(from_dir.x, 0, from_dir.z).normalized() * knock / _scale
 	world.fx_gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
 	if Net.is_host():
 		Net.gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
@@ -1195,19 +1237,25 @@ const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", 
 	"shapeshifter": "shapeshift", "child_of_woods": "woods_chatter", "woodland_cavalry": "woods_chatter", "earth_elemental": "stone_grind",
 	"mist_elemental": "mist_blink", "storm_elemental": "storm_call", "wyvern": "wyvern_roar", "great_revenant_elemental": "stone_grind",
 	"war_wyvern": "wyvern_roar",
-	"drowned_sailor": "drowned_moan", "barnacle_brute": "drowned_moan", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum"}
+	"drowned_sailor": "drowned_moan", "barnacle_brute": "drowned_moan", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum",
+	"siren": "siren_hum", "press_gang": "press_shout", "tide_witch": "witch_call", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_laugh",
+	"kraken_arm": "kraken_rise", "hollow_sovereign": "sovereign_voice"}
 
 
 ## How each of them sounds when struck, and when it dies.
 const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist_bear": "bear_hurt", "eagle": "eagle_hurt", "mist_eagle": "eagle_hurt",
 	"child_of_woods": "woods_hurt", "woodland_cavalry": "woods_hurt", "earth_elemental": "stone_hit", "great_revenant_elemental": "stone_hit",
 	"mist_elemental": "mist_hurt", "storm_elemental": "storm_hurt", "wyvern": "wyvern_hurt", "war_wyvern": "wyvern_hurt",
-	"drowned_sailor": "drowned_hurt", "barnacle_brute": "brute_hurt", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum", "angler": "angler_bite"}
+	"drowned_sailor": "drowned_hurt", "barnacle_brute": "brute_hurt", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum", "angler": "angler_bite",
+	"siren": "siren_shriek", "press_gang": "drowned_hurt", "tide_witch": "drowned_hurt", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_hurt",
+	"kraken_arm": "kraken_hurt", "hollow_sovereign": "sovereign_hurt"}
 const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
 	"war_wyvern": "wyvern_death",
-	"drowned_sailor": "drowned_death", "barnacle_brute": "brute_death", "brine_hound": "hound_death", "lantern_jelly": "jelly_burst", "angler": "angler_death"}
+	"drowned_sailor": "drowned_death", "barnacle_brute": "brute_death", "brine_hound": "hound_death", "lantern_jelly": "jelly_burst", "angler": "angler_death",
+	"siren": "siren_death", "press_gang": "drowned_death", "tide_witch": "witch_death", "harbourmaster": "brute_death", "lighthouse_keeper": "keeper_hurt",
+	"kraken_arm": "kraken_death", "hollow_sovereign": "sovereign_death"}
 
 
 ## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.
@@ -1305,6 +1353,8 @@ func stun(seconds: float) -> void:
 		return
 	if is_boss():
 		seconds = minf(seconds * 0.35, 0.6)
+	elif is_miniboss():
+		seconds *= 0.5
 	if dormant:
 		_wake()
 	if mesenlla_mind:
@@ -2982,6 +3032,12 @@ func _tick_flash(delta: float) -> void:
 func _process(delta: float) -> void:
 	_anim_accum += delta
 	_frame += 1
+	if _court_light:
+		# The Keeper's lamp swells as he lifts it, and blazes as it is held up (here and on every phone).
+		var lifting := _current_anim == "Raise" and is_alive()
+		var want := KEEPER_LAMP * (6.0 if lifting and is_warning() else 9.0 if lifting else 1.0)
+		_court_light.light_energy = move_toward(_court_light.light_energy, want, delta * 14.0)
+		_court_light.omni_range = 9.0 + (_court_light.light_energy - KEEPER_LAMP) * 0.8
 	var p := world.player
 	var every := 1
 	if p:

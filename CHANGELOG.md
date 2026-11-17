@@ -16,6 +16,16 @@ Through a new portal from the heart of the Mists: the drowned harbour of the kin
 - **Brine Hound:** hunts in packs of three, and lunges.
 - **Lantern Jelly:** drifts in on the high tide. Its threads flare, then it stings everything within 2.4 m, stunning for 0.8 s, and stings once more as it dies.
 - **Angler:** lies buried with only its lure showing, and bursts out to bite.
+- **Siren:** sings at the water's edge. While she sings, everyone within 16 m is drawn toward her. A stun, or a fifth of her health lost, breaks the song.
+- **Press Gang:** comes in threes and throws weighted nets. Caught, you can't move for 1.6 s.
+- **Tide Witch:** sends 3 waves rolling at you in a line; each throws you back and slows you. At high tide she raises 2 Drowned Sailors out of the water.
+
+### The drowned court
+- **Harbourmaster** (around 3:00): throws a hook on a chain that drags you to him. Below half health his bell calls a Press Gang.
+- **Kraken's Arms** (at the high tide after 4:30): four great arms rise from the flooded flats and slam down. Those still standing sink when the tide goes out.
+- **Mad Lighthouse Keeper** (around 6:00): throws burning oil lamps. When he lifts his great lamp, turn your back or be dazzled for 1.5 s.
+- **Hollow Sovereign** (around 8:30), the boss of Port Vael: waves in a line, the tide called in for 45 s with his court rising round him, and below half health the crown's judgement. The night ends only when he falls.
+- **The Sunken Crown** falls with him. Wear it to hit 25% harder and heal 2 health a second, but everyone can see you. Fall, and it falls with you. In All vs All it washes up at the Drowned Bell at 2:00.
 
 ### New weapons of the coast
 Found on Port Vael, and later on the Lantern Road.

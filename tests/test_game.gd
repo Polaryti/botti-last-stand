@@ -3117,8 +3117,9 @@ func test_version_8() -> void:
 	ok(w.count_pickups(Pickup.Kind.WEAPON) == weapon_count, "every weapon is on show (%d)" % w.count_pickups(Pickup.Kind.WEAPON))
 	var missing := 0
 	for id: String in PowerDefs.ALL:
-		# Pathfinder finds are unearthed by its beacons, never set out on a stand.
-		if not items.has(id) and not PowerDefs.ALL[id].has("spec"):
+		# Pathfinder finds are unearthed by its beacons, and a relic (the Sunken Crown) is won from its
+		# keeper: neither is set out on a stand.
+		if not items.has(id) and not PowerDefs.ALL[id].has("spec") and not PowerDefs.ALL[id].get("relic", false):
 			missing += 1
 	for id: String in PowerDefs.FOODS:
 		if not items.has(id):
@@ -4114,7 +4115,7 @@ func test_powers() -> void:
 			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
 			await seconds(0.25)
 		ok(pl.has_power(id), "%s activates" % id)
-		var want := 20.0
+		var want := PowerDefs.CROWN_TIME if PowerDefs.ALL[id].get("relic", false) else 20.0 # a relic is worn until you fall
 		ok(absf(float(pl.powers[id]) - want) < 1.0, "%s lasts %d s" % [id, want])
 		pl.powers.erase(id)
 		if pl._familiars.has(id):

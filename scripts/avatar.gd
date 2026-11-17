@@ -12,7 +12,7 @@ var team := 0
 var display := ""
 var hp_fraction := 1.0
 var level := 1 # as their own phone last said
-var skin := 0 # Player.skin_bits: bit 0, the White Stag
+var skin := 0 # Player.skin_bits: bit 0, the White Stag; bit 1, the Sunken Crown
 var _stag: Node3D
 var down_since := -1.0 # world.now when this player fell, for the countdown beside their name
 var _target := Vector3.ZERO
@@ -116,6 +116,54 @@ func set_skin(bits: int) -> void:
 	if bits != skin:
 		skin = bits
 		_show_seat()
+		_show_crown(bits & 2 != 0)
+
+
+## The Sunken Crown on their head, and a pillar of gold light over them that shows from across the map:
+## whoever wears it can be seen by everyone.
+var _crown: Node3D
+var _crown_beam: MeshInstance3D
+func _show_crown(on: bool) -> void:
+	if on and _crown == null and _skeleton:
+		var at := BoneAttachment3D.new()
+		at.bone_name = "head"
+		_skeleton.add_child(at)
+		_crown = Node3D.new()
+		at.add_child(_crown)
+		var mi := MeshInstance3D.new()
+		mi.mesh = PowerDefs.mesh(PowerDefs.CROWN)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.position = Vector3(0, 0.95, 0)
+		mi.scale = Vector3.ONE * 2.6
+		_crown.add_child(mi)
+		_crown_beam = MeshInstance3D.new()
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 0.12
+		cyl.bottom_radius = 0.45
+		cyl.height = 22.0
+		cyl.radial_segments = 8
+		cyl.rings = 1
+		cyl.cap_top = false
+		cyl.cap_bottom = false
+		_crown_beam.mesh = cyl
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		look.cull_mode = BaseMaterial3D.CULL_DISABLED
+		look.disable_fog = true
+		look.albedo_color = Color(1.0, 0.8, 0.3, 0.22)
+		_crown_beam.material_override = look
+		_crown_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_crown_beam.position.y = 2.2 + 11.0
+		add_child(_crown_beam)
+	if _crown:
+		_crown.visible = on
+		_crown_beam.visible = on
+
+
+func wears_crown() -> bool:
+	return skin & 2 != 0
 
 
 ## Riding: the horse under them if it is theirs, and either way they sit higher.

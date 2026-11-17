@@ -8,7 +8,10 @@ Run from the project root. Writes assets/sounds/boss_bells_revenant.ogg (the Gre
 Elemental: a slow toll falling through E minor, the bell tree shivering after it) and
 boss_bells_wyvern.ogg (the War Wyvern: the citadel's alarm, the bells climbing fast to the octave
 over the gong). Both are in E minor, the key of the Bastion's bells. And boss_bells_regent.ogg (the Veil
-Regent: slow down through D minor to a low D struck twice over the gong, the Mists' key)."""
+Regent: slow down through D minor to a low D struck twice over the gong, the Mists' key), and
+boss_bells_sovereign.ogg (the Hollow Sovereign: Port Vael's G minor, falling slowly from D5 to a low G
+struck twice, as heavy and as slow as the tide; the gong under it like a wave breaking).
+    ONLY=sovereign python3 tools/make_boss_bells.py /path/to/VSCO-2-CE     (just that one)"""
 import glob, os, sys
 import numpy as np
 from scipy.signal import resample_poly
@@ -85,10 +88,21 @@ def wyvern():
     return mix(4.8, parts)
 
 
+def sovereign():
+    # The Hollow Sovereign rises: D5, B-flat 4 and G4 tolled as slowly as the tide turns, then a low D and
+    # a lower G under the gong, and the bell tree drawn down after like water running off him.
+    toll = [(0.0, "D5", 0.55), (0.9, "A#4", 0.65), (1.8, "G4", 0.78), (2.25, "D4", 0.9), (2.7, "G3", 1.0)]
+    parts = [(at, tube(note, 5.0), gain) for at, note, gain in toll]
+    parts.append((2.7, one("Percussion/gongHit_f.wav"), 0.42))
+    parts.append((2.75, one("Percussion/BellTree_Stroke3_*.wav"), 0.3))
+    return mix(6.6, parts)
+
+
 if __name__ == "__main__":
     if not SAMPLES or not glob.glob(os.path.join(SAMPLES, "Percussion/TB_hit_*.wav")):
         raise SystemExit("Give the VSCO-2 CE folder (the soundtrack's samples) as the first argument.")
-    write("assets/sounds/boss_bells_revenant.ogg", revenant(), 0.8, q=4)
-    write("assets/sounds/boss_bells_wyvern.ogg", wyvern(), 0.8, q=4)
-    write("assets/sounds/boss_bells_regent.ogg", regent(), 0.8, q=4)
+    only = [s for s in os.environ.get("ONLY", "").split(",") if s]
+    for name, make in (("revenant", revenant), ("wyvern", wyvern), ("regent", regent), ("sovereign", sovereign)):
+        if not only or name in only:
+            write("assets/sounds/boss_bells_%s.ogg" % name, make(), 0.8, q=4)
     print("boss bells done")

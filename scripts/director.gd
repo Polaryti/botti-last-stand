@@ -43,6 +43,25 @@ const JELLIES_EVERY := 30.0 # while the tide is high
 const JELLIES_AT_ONCE := 2
 const MAX_JELLIES := 6
 const MAX_ANGLERS := 3
+# Port Vael, the drowned court (_tick_court): Sirens at the water's edge and Press Gangs through the
+# night, and three who come once each, at their hour: the Harbourmaster up the quay stairs, the
+# Kraken's four arms out of the flooded flats at the high tide after it, the Lighthouse Keeper down the
+# East Mole. The Hollow Sovereign rises from the flats around 8:30 (_tick_mist_boss), and the night
+# ends only when he falls (in Teams too, where his crown is a prize for either side). In All vs All
+# there is no court: the Sunken Crown washes up at the Drowned Bell instead.
+const SIREN_EVERY := 60.0
+const MAX_SIRENS := 2
+const PRESS_EVERY := 95.0
+const MAX_PRESS := 6
+const HARBOURMASTER_AT := 180.0
+const KRAKEN_AT := 280.0 # the high tide after 4:30
+const KEEPER_AT := 360.0
+const QUAY_STAIRS := [Vector3(-30, 0, 10), Vector3(30, 0, 10)] # the foot of each, on the flats
+const KEEPER_FROM := Vector3(84, 2.0, 62) # on the East Mole, under the lighthouse
+const SOVEREIGN_FROM := Vector3(0, 0, 44) # the middle of the flats
+const CROWN_AT := 120.0 # All vs All: when the Sunken Crown washes up at the Drowned Bell
+const CROWN_SPOT := Vector3(8, 0, 34)
+const VAEL_BOSS := "hollow_sovereign"
 const MESENLLA_BOSS := "great_revenant_elemental"
 const BASTION_BOSS := "war_wyvern"
 
@@ -82,6 +101,10 @@ var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
 var _mist_boss_defeated := false
 var _next_wyvern := FIRST_WYVERN
+var _next_siren := 150.0
+var _next_press := 200.0
+var _court_came := {} # which of the court has come tonight
+var _crown_washed := false
 
 
 func _init(owner_world: World) -> void:
@@ -149,6 +172,7 @@ const BOSS_CARDS := {
 	"veil_regent": {"name": "Veil Regent", "line": "wakes on its throne in the Mists", "color": Color(0.78, 0.62, 1.0), "glow": Color(0.36, 0.16, 0.62), "bells": "boss_bells_regent", "strikes": [0.0, 0.7, 1.4, 2.2, 2.6]},
 	MESENLLA_BOSS: {"name": "Great Revenant Elemental", "line": "rises at the Ring of Stones", "color": Color(0.45, 0.95, 0.88), "glow": Color(0.15, 0.55, 0.62), "bells": "boss_bells_revenant", "strikes": [0.0, 0.55, 1.1, 1.75]},
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
+	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
 }
 const BOSS_CARD_TIME := 7.0 # long enough to read what it says
 var boss_card := "" # the boss whose card shows, while boss_card_time lasts
@@ -412,6 +436,9 @@ func _tick_mist_boss() -> void:
 	if not _follows_host and not sandbox and world.map_id in SpawnRules.MESENLLA and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		_raise_mesenlla_boss()
 		return
+	if not _follows_host and not sandbox and world.map_id == "vael" and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
+		_raise_sovereign()
+		return
 	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		var throne := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3.ZERO)))
 		throne.y = world.ground_at(throne)
@@ -445,7 +472,20 @@ func _raise_mesenlla_boss() -> void:
 		_sound("revenant_roar", 2.0)
 
 
-## A boss has fallen: the Veil Regent, the Great Revenant Elemental or the War Wyvern. Dawn can come now.
+## The Hollow Sovereign rises out of the middle of the flats, the tide pouring off him.
+func _raise_sovereign() -> void:
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(SOVEREIGN_FROM)))
+	spot.y = world.ground_at(spot)
+	if world.spawn_zombie(VAEL_BOSS, spot):
+		_mist_boss_spawned = true
+		world.fx_water(spot, 3.0, Color(0.72, 0.9, 0.92), true)
+		CommandField.visual_impact(world, spot, 10.0, true)
+		if Net.is_host(): Net.command_impact_visual(spot, 10.0, true)
+		_sound("sovereign_voice", 4.0)
+
+
+## A boss has fallen: the Veil Regent, the Great Revenant Elemental, the War Wyvern or the Hollow
+## Sovereign. Dawn can come now.
 func boss_fallen(_z: Zombie) -> void:
 	_mist_boss_defeated = true
 
@@ -497,6 +537,59 @@ func _tick_vael() -> void:
 		_next_ambush = elapsed + AMBUSH_EVERY
 		if world.count_type("angler") < MAX_ANGLERS:
 			world.spawn_angler()
+	_tick_court()
+
+
+## The drowned court of Port Vael (see SIREN_EVERY and what follows it).
+func _tick_court() -> void:
+	if elapsed >= _next_siren and elapsed >= ZombieDefs.ALL["siren"]["from"]:
+		_next_siren = elapsed + SIREN_EVERY
+		if world.count_type("siren") < MAX_SIRENS and world.spawn_siren():
+			_sound("siren_hum", 0.0)
+	if elapsed >= _next_press and elapsed >= ZombieDefs.ALL["press_gang"]["from"]:
+		_next_press = elapsed + PRESS_EVERY
+		var gang := int(ZombieDefs.ALL["press_gang"]["pack"])
+		if world.count_type("press_gang") <= MAX_PRESS - gang:
+			var at := world.spawn_point_near(world.random_player_position(), 24.0, 38.0)
+			var came := 0
+			if at != Vector3.INF:
+				for i in gang:
+					if world.spawn_zombie("press_gang", at + Vector3(randf_range(-1.5, 1.5), 0, randf_range(-1.5, 1.5))):
+						came += 1
+			if came > 0:
+				_sound("press_shout", 2.0)
+				show_banner("A Press Gang is looking for hands...", 3.0)
+	if Net.fog_rules():
+		# All vs All: no court, but the Sunken Crown washes up for whoever can take it and keep it.
+		if not _crown_washed and elapsed >= CROWN_AT and world.map_id == "vael":
+			_crown_washed = true
+			world.spawn_pickup_at(CROWN_SPOT, Pickup.Kind.POWER, PowerDefs.CROWN)
+			world.fx_water(CROWN_SPOT, 2.0, Color(0.95, 0.82, 0.4), true)
+			show_banner("The Sunken Crown has washed up at the Drowned Bell", 4.0)
+			_sound("crown_toll", 4.0)
+		return
+	if not _court_came.has("harbourmaster") and elapsed >= HARBOURMASTER_AT:
+		var stairs: Vector3 = QUAY_STAIRS[0] if world.random_player_position().x < 0.0 else QUAY_STAIRS[1]
+		if _summon("harbourmaster", stairs, "harbour_bell"):
+			show_banner("The Harbourmaster climbs the quay stairs: \u201c%s\u201d" % ZombieDefs.ALL["harbourmaster"]["first_words"], 4.5)
+	if not _court_came.has("kraken_arm") and elapsed >= KRAKEN_AT and world.tide and world.tide.high() and world.tide.level > MistTide.HIGH_Y - 0.3:
+		_court_came["kraken_arm"] = true
+		if world.raise_kraken() > 0:
+			show_banner("The Kraken's arms rise out of the flats!", 4.0)
+	if not _court_came.has("lighthouse_keeper") and elapsed >= KEEPER_AT:
+		if _summon("lighthouse_keeper", KEEPER_FROM, "keeper_laugh"):
+			show_banner("The Mad Lighthouse Keeper comes down the East Mole: \u201c%s\u201d" % ZombieDefs.ALL["lighthouse_keeper"]["first_words"], 4.5)
+
+
+## One of the court, come at its hour where it comes from; once, whether or not it could.
+func _summon(id: String, near: Vector3, sound: String) -> bool:
+	_court_came[id] = true
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(near)))
+	spot.y = world.ground_at(spot)
+	if not world.spawn_zombie(id, spot):
+		return false
+	_sound(sound, 4.0)
+	return true
 
 
 func _tick_specials() -> void:
@@ -590,4 +683,4 @@ func _spawn_roamer() -> void:
 
 ## The Mists end only when the Veil Regent falls, and Mesenlla only when the Great Revenant Elemental does.
 func requires_regent() -> bool:
-	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA) and not sandbox and not Net.fog_rules()
+	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA or world.map_id == "vael") and not sandbox and not Net.fog_rules()
