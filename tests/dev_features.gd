@@ -1733,6 +1733,30 @@ func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
 ## The Sunken Crown: the six weapons of the coast of Vael.
 func _vael_weapons() -> void:
 	var ids := ["cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar"]
+	# The Sandbox lays out every weapon, potion and familiar: all of them inside the play area, now
+	# that there are more weapons than fit in one row (they ran out past the edge of the yard).
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_mode := Game.mode
+	Game.mode = Game.Mode.SANDBOX
+	var yard := World.new()
+	space.add_child(yard)
+	yard.setup(Game.Mode.SANDBOX)
+	yard.player.set_physics_process(false)
+	var laid: Array[Dictionary] = yard._stand_items
+	var weapons_laid := laid.filter(func(s: Dictionary) -> bool: return s["kind"] == Pickup.Kind.WEAPON).map(func(s: Dictionary) -> String: return s["id"])
+	check(WeaponDefs.ALL.keys().filter(func(id: String) -> bool: return WeaponDefs.lies_around(id)).all(func(id: String) -> bool: return weapons_laid.has(id)), "the Sandbox lays out every weapon, the coast's too")
+	check(laid.all(func(s: Dictionary) -> bool: return yard._inside_play(s["at"], 2.0)), "every one of them inside the yard (%d things)" % laid.size())
+	var apart := true
+	for i in laid.size():
+		for j in range(i + 1, laid.size()):
+			if (laid[i]["at"] as Vector3).distance_to(laid[j]["at"]) < 2.0:
+				apart = false
+	check(apart, "and none on top of another")
+	space.queue_free()
+	Game.mode = was_mode
+	await get_tree().process_frame
 	for id: String in ids:
 		var d: Dictionary = WeaponDefs.ALL[id]
 		check(WeaponDefs.lies_around(id) and SpawnRules.allows(d, "vael") and SpawnRules.allows(d, "lantern_road") and not SpawnRules.allows(d, "village") and SpawnRules.names(d) == "Vael", "%s lies about only on the coast of Vael" % id)
@@ -1741,7 +1765,7 @@ func _vael_weapons() -> void:
 	check(WeaponDefs.category("anchor") == "two_handed" and WeaponDefs.category("oar") == "two_handed" and WeaponDefs.category("cutlass") == "melee" and WeaponDefs.category("boarding_hook") == "melee" and WeaponDefs.category("harpoon") == "ranged" and WeaponDefs.category("flare_pistol") == "ranged", "two melee, two ranged, two two-handed")
 	for sound: String in ["cutlass_swing", "hook_swing", "hook_catch", "harpoon_throw", "harpoon_hit", "harpoon_reel", "flare_shot", "flare_burst", "anchor_heave", "anchor_slam", "oar_sweep"]:
 		check(ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound) and Sfx.NAMES.has(sound), "%s sound" % sound)
-	for key: String in ["slam", "hook"]:
+	for key: String in ["slam", "hook", "row"]:
 		check(WeaponAnim.KEYS.has(key + "_a") and WeaponAnim.REST_DIRS.has(key), "a first-person %s" % key)
 	check(BodyAnim.attack_for("anchor") == "Overhead" and BodyAnim.attack_for("boarding_hook") == "Thrust" and BodyAnim.attack_for("flare_pistol") == "Spellcast_Shoot" and BodyAnim.attack_for("harpoon") == "Throw", "and their moves as others see them")
 	var codex := CodexPanel.new()

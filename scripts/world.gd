@@ -1950,7 +1950,16 @@ func spawn_enemy_arrow(at: Vector3, target: Vector3, damage: float, max_range: f
 
 # --- The Sandbox ----------------------------------------------------------------
 
+const STAND_GAP := 3.6 # metres between things on a stand
+const STAND_MARGIN := 3.0 # how far in from the edge of the play area a stand row stops
+
+
+func _inside_play(at: Vector3, margin: float) -> bool:
+	return absf(at.x) <= play_half - margin and absf(at.z) <= play_half - margin
+
+
 ## Lays out one of everything along the rows the map marks, each taken thing coming back soon after.
+## A row that would run past the edge of the play area wraps into further rows, in towards the middle.
 func set_up_stands() -> void:
 	_stand_items.clear()
 	for row: Dictionary in stands:
@@ -1972,9 +1981,18 @@ func set_up_stands() -> void:
 				for id: String in PowerDefs.ALL:
 					if PowerDefs.ALL[id]["familiar"]:
 						entries.append([Pickup.Kind.POWER, id])
+		# As many to a row as fit inside the play area; the rest in rows further in towards the middle.
+		var start: Vector3 = row["at"]
+		var inward := along.cross(Vector3.UP)
+		if inward.dot(-start) < 0.0:
+			inward = -inward
+		var per_row := 1
+		while per_row < entries.size() and _inside_play(start + along * (per_row * STAND_GAP), STAND_MARGIN):
+			per_row += 1
 		for i in entries.size():
-			var at: Vector3 = row["at"] + along * (i * 3.6)
+			var at: Vector3 = start + along * ((i % per_row) * STAND_GAP) + inward * ((i / per_row) * STAND_GAP)
 			_stand_items.append({"kind": entries[i][0], "id": entries[i][1], "at": at, "item": null, "wait": 0.0})
+		var first_row := mini(per_row, entries.size())
 		var sign_post := Label3D.new()
 		sign_post.text = {"weapon": "Weapons", "item": "Potions and food", "familiar": "Familiars"}[str(row["kind"])]
 		sign_post.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -1983,7 +2001,7 @@ func set_up_stands() -> void:
 		sign_post.pixel_size = 0.012
 		sign_post.modulate = UiTheme.BONE
 		sign_post.outline_size = 12
-		sign_post.position = (row["at"] as Vector3) + along * (entries.size() - 1) * 1.8 + Vector3.UP * 3.2
+		sign_post.position = start + along * (first_row - 1) * STAND_GAP * 0.5 - inward * 1.2 + Vector3.UP * 3.2
 		add_child(sign_post)
 
 

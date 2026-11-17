@@ -19,6 +19,7 @@ Found on the coming Port Vael and Lantern Road maps.
 - **Settings:** changing the difficulty no longer jumps to the top, and changing Graphics no longer drops you back to the main menu.
 - **Codex:** an enemy's description stays hidden until you kill your first one. Kills in the Sandbox don't count.
 - The War Wyvern Rider is no longer listed on its own in the Codex or the Sandbox, and the Fallen Revenant is now with the Fallen heroes.
+- **Sandbox:** the weapons are laid out in two rows, so none are left outside the yard.
 
 ### Icons
 - New icons for the Bear, Mist Bear, Mist Eagle, Mist Elemental, Storm Elemental, Woodland Cavalry and the Daemon familiar.
