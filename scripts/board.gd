@@ -23,7 +23,7 @@ const MAX_SECONDS := 3600
 const DIFFICULTY := [0.75, 1.0, 1.25]
 const MAX_PENDING := 300
 const TIMEOUT := 12.0
-const MAPS := ["village", "mists", "fort", "mesenlla", "bastion", "vael"]
+const MAPS := ["village", "mists", "fort", "mesenlla", "bastion", "vael", "lantern_road"]
 ## Every board, by what it counts. "all" holds every match.
 const BOARDS := {"all": "All", "night": "Night", "mists": "Mists", "fort": "Fort", "coop": "Co-op", "versus": "Versus"}
 

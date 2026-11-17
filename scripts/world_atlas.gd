@@ -10,9 +10,9 @@ extends Control
 signal picked(id: String)
 
 ## Where each place lies on the atlas, as a share of its width and height.
-const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.85, 0.78), "bastion": Vector2(0.8, 0.36), "vael": Vector2(0.2, 0.24)}
+const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.85, 0.78), "bastion": Vector2(0.8, 0.36), "vael": Vector2(0.2, 0.24), "lantern_road": Vector2(0.08, 0.08)}
 ## Roads walk; portals open. Each link is [from, to, through a portal].
-const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mists", "vael", true]]
+const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mists", "vael", true], ["vael", "lantern_road", false]]
 const MEDAL := 92.0
 
 var allowed: Array = []

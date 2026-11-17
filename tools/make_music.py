@@ -28,7 +28,8 @@ TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5,
     "fort_night": -15.0, "fort_hunted": -13.5, "fort_dawn": -14.5,
     "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0,
     "bastion_night": -15.5, "bastion_hunted": -13.5, "bastion_dawn": -14.5,
-    "vael_night": -15.5, "vael_hunted": -13.5, "vael_dawn": -14.5}
+    "vael_night": -15.5, "vael_hunted": -13.5, "vael_dawn": -14.5,
+    "lantern_night": -15.5, "lantern_hunted": -13.5, "lantern_dawn": -14.5}
 
 NAMES = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
 SAMPLES = ""
@@ -1526,6 +1527,149 @@ def compose_vael_dawn(o):
     return s
 
 
+# --- The Lantern Road ---------------------------------------------------------------------------
+# D dorian, a processional: the pilgrims' hymn the lamp-keepers sang as they walked the barge out to
+# the Isle of Lamps. Pizzicato basses walk under it, one step to a beat, as the barge creeps on; a
+# celesta-bright glockenspiel is the lantern swinging at the prow. Hunted: the hymn driven on, drums
+# at every step. Dawn: D major, the lighthouse burning over a calm sea.
+
+LANTERN_CHORDS = ["Dm", "C", "Dm", "Am", "Bb", "F", "Gm", "A",
+    "Dm", "C", "F", "C", "Bb", "Gm", "Asus", "A",
+    "Dm", "C", "Dm", "Am", "Bb", "F", "Gm", "A",
+    "Bb", "C", "Dm", "F", "Gm", "Bb", "Asus", "A"]
+LANTERN_DAWN_CHORDS = ["D", "G", "D", "A", "Bm", "G", "Em", "A",
+    "D", "G", "Bm", "F#m", "G", "D", "Esus", "A",
+    "D", "G", "D", "A", "Bm", "G", "Em", "A",
+    "G", "A", "Bm", "D", "G", "Em", "Asus", "D"]
+LANTERN_A = "D4:2 F4:1 G4:1 | E4:2 C4:2 | D4:1 F4:1 A4:1 G4:1 | E4:4 | F4:2 D4:1 F4:1 | A4:2 C5:2 | Bb4:1 A4:1 G4:1 F4:1 | E4:4"
+LANTERN_B = "A4:2 C5:1 D5:1 | E5:2 C5:2 | A4:1 C5:1 F5:1 E5:1 | C5:4 | D5:2 Bb4:1 D5:1 | G5:2 F5:1 E5:1 | D5:1 C5:1 B4:1 C#5:1 | A4:4"
+LANTERN_C = "F5:2 E5:1 D5:1 | E5:2 G5:2 | A5:1 G5:1 F5:1 A5:1 | F5:4 | G5:2 F5:1 E5:1 | D5:2 A4:2 | Bb4:1 D5:1 E5:1 C#5:1 | D5:4"
+LANTERN_DAWN_A = "D5:2 F#5:1 G5:1 | A5:2 E5:2 | F#5:1 A5:1 D6:1 C#6:1 | A5:4 | B5:2 F#5:1 B5:1 | D6:2 B5:2 | G5:1 B5:1 A5:1 G5:1 | E5:4"
+LANTERN_DAWN_C = "F#5:2 E5:1 D5:1 | E5:2 A5:2 | B5:1 A5:1 F#5:1 B5:1 | A5:4 | B5:2 A5:1 G5:1 | E5:2 B4:2 | E5:1 G5:1 F#5:1 E5:1 | D5:4"
+D_DORIAN = (2, 4, 5, 7, 9, 11, 0)
+D_MAJOR = (2, 4, 6, 7, 9, 11, 1)
+
+
+def pilgrim_steps(s, inst, chords, first_bar, vel):
+    """The basses walking, one plucked step to a beat: root, fifth, octave, fifth."""
+    for i, c in enumerate(chords):
+        root = root_in(c, 36)
+        fifth = tones(c, root + 5, root + 9)
+        fifth = fifth[0] if fifth else root + 7
+        beat = (first_bar + i - 1) * 4.0
+        for k, m in enumerate((root, fifth, root + 12, fifth)):
+            s.note(inst, m, beat + k, 0.9, vel * (1.0 if k == 0 else 0.72))
+
+
+def swinging_lamp(s, inst, chords, first_bar, vel):
+    """The lantern at the prow: a high fifth and third rocking on beats two and four."""
+    for i, c in enumerate(chords):
+        notes = tones(c, 74, 89)
+        if len(notes) < 2:
+            continue
+        beat = (first_bar + i - 1) * 4.0
+        s.note(inst, notes[-1], beat + 1.0, 1.0, vel)
+        s.note(inst, notes[-2], beat + 3.0, 1.0, vel * 0.8)
+
+
+def compose_lantern_night(o):
+    s = Score("lantern_night", 241)
+    d = o.drums
+    s.dynamics = [(1, 0.5), (8, 0.56), (9, 0.6), (16, 0.7), (17, 0.84), (24, 0.88), (25, 0.72), (32, 0.56), (33, 0.5)]
+    ch = LANTERN_CHORDS
+    pilgrim_steps(s, o.cel_pizz, ch, 1, 0.62)
+    swinging_lamp(s, o.glock, ch, 1, 0.34)
+    tide_swell(s, o.violas, ch, 1, 0.3, 55, 67)
+    for bar in (1, 17):
+        foghorn(s, o, ch[bar - 1], bar, 0.42)
+    # I. The hymn on a single horn, as the barge leaves the quay.
+    s.play_line(o.horns, LANTERN_A, 1, vel=0.72)
+    play_pad(s, o.cellos, ch[:8], 1, 2, 45, 57, 0.34)
+    # II. The pilgrims take it up: choir and oboe.
+    choir_chords(s, o.choir, ch[8:16], 9, 0.36, lo=57, hi=72, count=3)
+    s.play_line(o.oboe, LANTERN_B, 9, vel=0.5)
+    s.play_line(o.violas, LANTERN_B, 9, shift=-12, vel=0.4, players=2)
+    harp_run(s, o.harp, 62.0, 2.0, 50, 86, 0.5, D_DORIAN)
+    # III. Everyone, strings an octave up, a soft drum on each step.
+    s.play_line(o.violins, LANTERN_A, 17, shift=12, vel=0.78, players=3)
+    s.play_line(o.horns, LANTERN_A, 17, vel=0.56, players=2)
+    pulse_low(s, o, ch[16:24], 17, 0.5)
+    for bar in range(17, 25):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.42)
+    # IV. The light far ahead: the fiddle climbs over the bells.
+    s.play_line(o.solo_violin, LANTERN_C, 25, vel=0.86)
+    choir_chords(s, o.choir, ch[24:32], 25, 0.3, lo=57, hi=72, count=3)
+    toll(s, d, ch[24:32], 25, 2, 0.52, lo=55, hi=67)
+    d.bowed(s, 112.0, 0.4)
+    return s
+
+
+def compose_lantern_hunted(o):
+    s = Score("lantern_hunted", 242)
+    d = o.drums
+    s.dynamics = [(1, 0.82), (8, 0.86), (9, 0.88), (16, 0.94), (17, 1.0), (24, 1.0), (25, 0.9), (32, 0.96), (33, 0.82)]
+    ch = LANTERN_CHORDS
+    drive_strings(s, o, ch[:8], 1, 0.74)
+    drive_strings(s, o, ch[8:], 9, 0.84, violins=True)
+    pilgrim_steps(s, o.cel_pizz, ch, 1, 0.7)
+    for i, c in enumerate(ch):
+        march_bar(s, d, i + 1, 0.5, busy=i >= 16)
+        d.timp(s, root_in(c, 38), i * 4.0, 0.7)
+        d.boom(s, i * 4.0 + 2.0, 0.6)
+    for bar in (8, 16, 24, 32):
+        drum_fill(s, d, ch[bar - 1], bar, 0.82)
+    for bar in (9, 17, 25):
+        d.crash(s, (bar - 1) * 4.0, 0.62)
+    s.play_line(o.horns, LANTERN_A, 1, vel=0.84, players=3)
+    s.play_line(o.trombones, LANTERN_A, 1, shift=-12, vel=0.6, players=2)
+    s.play_line(o.violins, LANTERN_B, 9, vel=0.9, players=3)
+    s.play_line(o.trumpets, LANTERN_B, 9, shift=-12, vel=0.76, players=2)
+    s.play_line(o.violins, LANTERN_A, 17, shift=12, vel=1.0, players=3)
+    s.play_line(o.trombones, LANTERN_A, 17, vel=0.84, players=2)
+    s.play_line(o.piccolo, LANTERN_A, 17, shift=24, vel=0.46)
+    for i in range(24, 32):
+        brass_stabs(s, o, ch[i], i + 1, 0.86)
+    s.play_line(o.violins, LANTERN_C, 25, vel=0.92, players=3)
+    s.play_line(o.horns, LANTERN_C, 25, shift=-12, vel=0.8, players=3)
+    choir_chords(s, o.choir, ch[24:32], 25, 0.5, lo=57, hi=74, count=3)
+    return s
+
+
+def compose_lantern_dawn(o):
+    s = Score("lantern_dawn", 243)
+    d = o.drums
+    s.dynamics = [(1, 0.86), (16, 0.92), (17, 0.72), (24, 0.8), (25, 1.0), (33, 0.88)]
+    ch = LANTERN_DAWN_CHORDS
+    low_strings(s, o, ch, 1, 0.72)
+    tide_swell(s, o.violas, ch, 1, 0.5, 57, 71)
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.68, up_only=True)
+    sparkle(s, o.glock, ch, 1, 2, 0.62, lo=78, hi=93)
+    for bar in (1, 9, 17, 25):
+        harp_run(s, o.harp, (bar - 1) * 4.0 - 2.0, 2.0, 50, 90, 0.58, D_MAJOR)
+        d.belltree(s, (bar - 1) * 4.0, 0.72)
+    s.play_line(o.violins, LANTERN_DAWN_A, 1, vel=0.88, players=3)
+    s.play_line(o.flute, LANTERN_DAWN_A, 1, vel=0.54)
+    s.play_line(o.horns, LANTERN_DAWN_A, 1, shift=-12, vel=0.62, players=2)
+    s.play_line(o.violins, LANTERN_DAWN_C, 9, vel=0.86, players=3)
+    s.play_line(o.oboe, LANTERN_DAWN_C, 9, vel=0.5)
+    play_pad(s, o.trombones, ch[:16], 1, 2, 43, 55, 0.5)
+    for bar in list(range(1, 17)) + list(range(25, 33)):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.56)
+    # The hymn alone on the fiddle, the lighthouse turning above it.
+    s.play_line(o.solo_violin, LANTERN_DAWN_A, 17, vel=0.7)
+    play_pad(s, o.vln_trem, ch[16:24], 17, 3, 69, 83, 0.3)
+    swinging_lamp(s, o.glock, ch[16:24], 17, 0.4)
+    d.swell(s, 96.0, 0.6, "Median")
+    # And the light over the whole sea.
+    s.play_line(o.violins, LANTERN_DAWN_A, 25, vel=0.95, players=3)
+    s.play_line(o.trumpets, LANTERN_DAWN_A, 25, shift=-12, vel=0.82, players=2)
+    s.play_line(o.piccolo, LANTERN_DAWN_A, 25, vel=0.44)
+    play_pad(s, o.trombones, ch[24:32], 25, 2, 43, 55, 0.64)
+    pulse_low(s, o, ch[24:32], 25, 0.68)
+    return s
+
+
 def hall(seconds=2.9, seed=5):
     """The room everything is played in: a big stone hall, bright for a moment, then dark."""
     rng = np.random.default_rng(seed)
@@ -1635,7 +1779,8 @@ COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_d
     "mesenlla_night": compose_mesenlla_night, "mesenlla_hunted": compose_mesenlla_hunted, "mesenlla_dawn": compose_mesenlla_dawn,
     "menu_mesenlla": compose_menu_mesenlla,
     "bastion_night": compose_bastion_night, "bastion_hunted": compose_bastion_hunted, "bastion_dawn": compose_bastion_dawn,
-    "vael_night": compose_vael_night, "vael_hunted": compose_vael_hunted, "vael_dawn": compose_vael_dawn}
+    "vael_night": compose_vael_night, "vael_hunted": compose_vael_hunted, "vael_dawn": compose_vael_dawn,
+    "lantern_night": compose_lantern_night, "lantern_hunted": compose_lantern_hunted, "lantern_dawn": compose_lantern_dawn}
 
 
 def main():

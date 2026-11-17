@@ -1182,6 +1182,22 @@ func stun_by_creature(seconds: float) -> void:
 	say("Stunned!")
 
 
+## Last Light: the boons this player has chosen at the Lantern Road's waystations (Boons).
+var boons: Array[String] = []
+
+
+## Last Light: the Mist Tide drowning you, outside the Lantern Barge's light.
+func drown(amount: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	hp -= amount
+	damaged.emit(amount, "the tide")
+	hurt_flash = maxf(hurt_flash, 0.25)
+	if hp <= 0.0:
+		hit_by = "the Mist Tide"
+		_on_fatal()
+
+
 ## Caught in a Press Gang's net: you can fight and turn, but not move, for as long as it says.
 func root_by_creature(seconds: float) -> void:
 	if dead or guard_left > 0.0:
@@ -3661,9 +3677,9 @@ func _physics_step(delta: float) -> void:
 	if bleed_left > 0.0:
 		speed *= BLEED_SPEED
 	var wading := world.terrain.in_water(global_position.x, global_position.z)
-	if wading:
+	if wading and not has_flag("sea_legs"):
 		speed *= WADE_SPEED
-	if world.tide:
+	if world.tide and not has_flag("sea_legs"):
 		speed *= world.tide.slow_at(global_position) # wading in the Mist Tide, on foot or mounted
 	var accel := 14.0 if is_on_floor() else 5.0
 	velocity.x = move_toward(velocity.x, dir.x * speed, accel * speed * delta)

@@ -20,7 +20,7 @@ extends MesenllaMind
 ## body's own animations (BodyAnim), which other phones are sent like any other; the Siren and the
 ## Kraken's Arm are built of parts (VaelModels) and show theirs as Zombie._current_anim states.
 
-const KINDS := ["siren", "press_gang", "tide_witch", "harbourmaster", "lighthouse_keeper", "kraken_arm", "hollow_sovereign"]
+const KINDS := ["siren", "press_gang", "tide_witch", "harbourmaster", "lighthouse_keeper", "kraken_arm", "hollow_sovereign", "leviathan"]
 
 # The Siren
 const SONG_EVERY := 9.0
@@ -99,7 +99,22 @@ const JUDGEMENT_RADIUS := 3.2
 const JUDGEMENT_POWER := 1.8
 const JUDGEMENT_STUN := 0.6
 
-var _song_from := 0.0 # her health when she began to sing
+# The Leviathan of the Mists (Last Light, at the Isle of Lamps)
+const BITE_EVERY_L := 4.0
+const BITE_TELL_L := 1.3
+const BITE_RADIUS_L := 3.2
+const BITE_REACH_L := 10.0 # as far as its neck comes down
+const BITE_POWER_L := 1.5
+const TIDAL_EVERY := 10.0
+const TIDAL_WAVES := 5
+const DOUSE_EVERY := 22.0
+const DIVE_EVERY := 28.0
+const DIVE_RAISES := 3
+
+var _song_from := 0.0
+var _dives := 0
+var _cooldown_d := DIVE_EVERY
+var _cooldown_e := 12.0 # her health when she began to sing
 var _cooldown_c := 0.0
 var _decreed := 0
 var _raised: Array[Zombie] = []
@@ -127,6 +142,7 @@ func tick(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> 
 		"lighthouse_keeper": return _keeper(z, target, dist, delta)
 		"kraken_arm": return _arm(z, target, dist, delta)
 		"hollow_sovereign": return _sovereign(z, target, dist, delta)
+		"leviathan": return _leviathan(z, target, delta)
 	return false
 
 
@@ -159,12 +175,12 @@ func interrupt(z: Zombie) -> void:
 
 
 func start(z: Zombie) -> void:
-	if kind == "kraken_arm":
+	if kind == "kraken_arm" or kind == "leviathan":
 		# Up out of the water.
 		phase = "rise"
 		left = RISE_TIME
 		_show(z, "m_rise")
-		z.world.sfx_at("kraken_rise", z.position, 0.0)
+		z.world.sfx_at("kraken_rise" if kind == "kraken_arm" else "leviathan_rise", z.position, 0.0)
 
 
 ## The Sirens' songs, on every phone for its own players: while one sings (her state "m_song" once her
@@ -597,3 +613,92 @@ func _furthest(z: Zombie, fallback: Target) -> Target:
 			far = d
 			best = t
 	return best
+
+
+# --- The Leviathan of the Mists ----------------------------------------------------------------
+
+## Rooted in the sea off the Isle of Lamps. Strikes down with its head where you stand, sends waves
+## across the isle, spits the sea over the Lantern Barge to put its light down, and now and then sinks
+## and comes up somewhere else round the isle with Drowned Sailors.
+func _leviathan(z: Zombie, target: Target, delta: float) -> bool:
+	z.velocity = Vector3.ZERO
+	_cooldown_d -= delta
+	_cooldown_e -= delta
+	var dist := Vector2(target.global_position.x - z.position.x, target.global_position.z - z.position.z).length()
+	match phase:
+		"rise":
+			left -= delta
+			if left <= 0.0:
+				phase = ""
+				_show(z, "")
+			z._animate_custom(delta, 0.0)
+			return true
+		"sink":
+			left -= delta
+			if left <= 0.0:
+				# Up again somewhere else round the isle, with Drowned Sailors.
+				_dives += 1
+				var ll := z.world.last_light
+				var at := ll.leviathan_spot(_dives) if ll else z.position
+				z.position = at
+				z.world.fx_water(at, 4.0, Color(0.72, 0.9, 0.92), true)
+				for i in DIVE_RAISES:
+					var spot := z.world.spawn_point_near(target.global_position, 5.0, 11.0)
+					if spot != Vector3.INF and z.world.spawn_zombie("drowned_sailor", spot):
+						z.world.fx_water(spot, 1.4, Color(0.72, 0.9, 0.92), true)
+				phase = "rise"
+				left = RISE_TIME
+				_show(z, "m_rise")
+				z.world.sfx_at("leviathan_rise", z.position, 2.0)
+			z._animate_custom(delta, 0.0)
+			return true
+		"rear":
+			left -= delta
+			_face(z, target.global_position, delta, 2.5)
+			if left <= 0.0:
+				phase = "strike"
+				left = 0.7
+				_show(z, "m_bite")
+				z.world.sfx_at("leviathan_bite", z.position, 3.0)
+			z._animate_custom(delta, 0.0)
+			return true
+		"strike", "spit", "call":
+			left -= delta
+			if left <= 0.0:
+				phase = ""
+				_show(z, "")
+			z._animate_custom(delta, 0.0)
+			return true
+	_face(z, target.global_position, delta, 1.2)
+	if _cooldown_d <= 0.0:
+		_cooldown_d = DIVE_EVERY
+		phase = "sink"
+		left = SINK_TIME
+		_show(z, "m_sink")
+		z.world.sfx_at("leviathan_roar", z.position, 2.0)
+	elif _cooldown_e <= 0.0 and z.world.last_light:
+		# It spits the sea over the barge: the light shrinks for a while.
+		_cooldown_e = DOUSE_EVERY
+		phase = "spit"
+		left = 1.2
+		_show(z, "m_breath")
+		z.world.last_light.douse()
+		z.world.fx_water(z.world.last_light.barge_at(), 3.0, Color(0.72, 0.9, 0.92), true)
+		z.world.sfx_at("leviathan_roar", z.position, 3.0)
+		z.world.director.show_banner("The Leviathan drowns the barge's light!", 3.0)
+	elif cooldown_b <= 0.0 and z._sees:
+		cooldown_b = TIDAL_EVERY
+		phase = "call"
+		left = 1.0
+		_show(z, "m_breath")
+		_undertow(z, target, TIDAL_WAVES, WAVE_RADIUS + 0.4, 1.0)
+		z.world.sfx_at("wave_rise", z.position, 4.0)
+	elif cooldown <= 0.0 and z._sees and dist < BITE_REACH_L:
+		cooldown = BITE_EVERY_L
+		phase = "rear"
+		left = BITE_TELL_L - 0.3
+		_show(z, "m_slam", true)
+		MistSeal.cast(z, _lead(z, target, BITE_TELL_L * 0.4), BITE_RADIUS_L, BITE_TELL_L, z._damage * BITE_POWER_L, 0.0, MistSeal.Style.SLAM)
+		z.world.sfx_at("leviathan_roar", z.position, 0.0)
+	z._animate_custom(delta, 0.0)
+	return true

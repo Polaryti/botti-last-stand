@@ -11,7 +11,7 @@ enum Kind { CLEAR, RAIN, STORM, WINDY } # new kinds at the end: the number trave
 const STORM_CHANCE := 0.05 # of nights
 const RAIN_CHANCE := 0.16 # of nights, besides the storms
 const WINDY_CHANCE := 0.1 # of nights, where the wind blows
-const WINDY_MAPS := ["mesenlla", "bastion", "vael"]
+const WINDY_MAPS := ["mesenlla", "bastion", "vael", "lantern_road"]
 const DRY_MAPS := ["mists"] # no rain and no storms there
 const WIND_SPEED := 13.0
 const WIND_STREAKS := [40, 80, 120]

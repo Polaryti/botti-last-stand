@@ -10,7 +10,9 @@ boss_bells_wyvern.ogg (the War Wyvern: the citadel's alarm, the bells climbing f
 over the gong). Both are in E minor, the key of the Bastion's bells. And boss_bells_regent.ogg (the Veil
 Regent: slow down through D minor to a low D struck twice over the gong, the Mists' key), and
 boss_bells_sovereign.ogg (the Hollow Sovereign: Port Vael's G minor, falling slowly from D5 to a low G
-struck twice, as heavy and as slow as the tide; the gong under it like a wave breaking).
+struck twice, as heavy and as slow as the tide; the gong under it like a wave breaking), and
+boss_bells_leviathan.ogg (the Leviathan of the Mists: the Lantern Road's D minor, a low D struck three
+times like the barge's hull knocking, then D5 and A4 crying out over two gongs).
     ONLY=sovereign python3 tools/make_boss_bells.py /path/to/VSCO-2-CE     (just that one)"""
 import glob, os, sys
 import numpy as np
@@ -98,11 +100,22 @@ def sovereign():
     return mix(6.6, parts)
 
 
+def leviathan():
+    # The Leviathan surfaces off the Isle of Lamps: a low D knocked three times like something under the
+    # hull, then the high D and A cry out over two gongs, the second louder, as it rears.
+    toll = [(0.0, "D4", 0.7), (0.45, "D4", 0.78), (0.9, "D4", 0.86), (1.6, "D5", 0.9), (2.0, "A4", 1.0), (2.5, "D4", 1.0)]
+    parts = [(at, tube(note, 5.0), gain) for at, note, gain in toll]
+    parts.append((1.6, one("Percussion/gongHit_mf.wav"), 0.32))
+    parts.append((2.5, one("Percussion/gongHit_f.wav"), 0.46))
+    parts.append((2.55, one("Percussion/BellTree_Stroke3_*.wav"), 0.3))
+    return mix(6.4, parts)
+
+
 if __name__ == "__main__":
     if not SAMPLES or not glob.glob(os.path.join(SAMPLES, "Percussion/TB_hit_*.wav")):
         raise SystemExit("Give the VSCO-2 CE folder (the soundtrack's samples) as the first argument.")
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
-    for name, make in (("revenant", revenant), ("wyvern", wyvern), ("regent", regent), ("sovereign", sovereign)):
+    for name, make in (("revenant", revenant), ("wyvern", wyvern), ("regent", regent), ("sovereign", sovereign), ("leviathan", leviathan)):
         if not only or name in only:
             write("assets/sounds/boss_bells_%s.ogg" % name, make(), 0.8, q=4)
     print("boss bells done")

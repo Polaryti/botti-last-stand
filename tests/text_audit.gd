@@ -194,6 +194,10 @@ static func facts() -> Dictionary:
 		"enemy:kraken_arm": _clock(MistTide.TURN * 3.0),
 		"enemy:hollow_sovereign": [float(VaelMind.UNDERTOW_WAVES), VaelMind.SURGE, float(VaelMind.COURT)] + _clock(510.0),
 		"power:sunken_crown": [PowerDefs.CROWN_REGEN] + _clock(Director.CROWN_AT),
+		# Last Light
+		"enemy:leviathan": [float(VaelMind.TIDAL_WAVES), LastLight.DIM_RADIUS, LastLight.DIM_TIME, float(VaelMind.DIVE_RAISES)],
+		"boon:deep_lungs": [Boons.DEEP_GRACE],
+		"boon:lantern_bearer": [Boons.BEARER_REACH],
 	}
 
 
@@ -270,6 +274,8 @@ func run() -> Array[String]:
 		if SpawnRules.is_vael(ZombieDefs.ALL[zid]):
 			_audit("enemy:" + zid, str(ZombieDefs.ALL[zid]["desc"]), [ZombieDefs.ALL[zid]])
 	_audit("power:sunken_crown", str(PowerDefs.ALL[PowerDefs.CROWN]["desc"]), [PowerDefs.CROWN_DAMAGE])
+	for bid: String in Boons.ALL:
+		_audit("boon:" + bid, str(Boons.ALL[bid]["desc"]), [Boons.ALL[bid].get("add", {})])
 	# Weapons: every number a weapon's words quote (Codex, Armory) is one of its own, or a fact.
 	for wid: String in WeaponDefs.ALL:
 		var wd: Dictionary = WeaponDefs.ALL[wid]
