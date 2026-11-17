@@ -714,6 +714,20 @@ def sunken_crown():
 for g in (siren, press_gang, tide_witch, harbourmaster, lighthouse_keeper, kraken_arm, hollow_sovereign, sunken_crown):
     PLAIN.append(g)
 
+# The Harpooner (stage 5)
+HEMP = ("#e8d6a8", "#9c7f4a")
+def rope():
+    # A coil of hemp line, three turns flat on the ground, its end trailing off to the side.
+    return (ell(HEMP, 46, 58, 40, 30) + ell("none", 46, 58, 30, 22, 0, 3) + ell("none", 46, 58, 19, 13, 0, 3) + ell(("#4a3a20", "#2a2010"), 46, 58, 10, 6, 0, 2)
+        + curve("#e8d6a8", 9, "M82 50 C92 40 92 22 78 16 C66 10 58 18 62 26") + curve("#9c7f4a", 3, "M84 46 C90 38 88 24 78 20", ink=False))
+def crest_harpooner():
+    # A navy shield shaped like a whale's tail fluke, a harpoon crossing it and a coil of line below.
+    return (path(("#3f74a8", "#102640"), "M50 98 C46 82 44 70 40 62 C26 58 8 50 3 24 C18 28 32 22 42 8 C46 22 48 30 50 36 C52 30 54 22 58 8 C68 22 82 28 97 24 C92 50 74 58 60 62 C56 70 54 82 50 98Z", 4)
+        + at(50, 50, 0.84, turn(-4, harpoon())))
+for g in (rope,):
+    PLAIN.append(g)
+CRESTS.append(crest_harpooner)
+
 # Last Light (stage 4)
 LEVI = ("#3a6a78", "#0e2630"); LEVI_BELLY = ("#b8d8c8", "#4a6a60")
 def leviathan():
@@ -728,6 +742,12 @@ def leviathan():
         + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z")
         + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
 PLAIN.append(leviathan)
+def leviathan_head():
+    # Just the serpent's head and neck rising from a wave, for the Leviathan Hunter's emblem.
+    return (path(LEVI, "M24 96 C22 70 30 50 46 40 C54 34 58 26 56 18 L80 12 C92 16 96 28 90 38 L72 44 C62 50 54 62 50 76 C48 86 50 92 52 96Z")
+        + path(("#5aa0a8", "#163a44"), "M56 18 L50 6 L62 14 L66 4 L72 12Z", 1.6)
+        + ell(("#e8fff6", "#5ff0c8"), 76, 26, 4.4, 2.6, -20, 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z"))
 
 for g in (mist_infantry, mist_ranger, mist_heavy):
     PLAIN.append(g)
@@ -735,7 +755,8 @@ for g in (mist_infantry, mist_ranger, mist_heavy):
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
-    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78")}
+    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78"),
+    "harpooner": ("#3f74a8", "#102640")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -783,6 +804,9 @@ SPECS = {
         + at(24, 68, 0.26, star()) + at(50, 28, 0.3, star()) + at(78, 60, 0.26, star())),
     "worlds_traveler": ("cartographer", lambda: at(50, 52, 0.78, waygate()) + at(76, 24, 0.24, star())),
     "pathfinder": ("cartographer", lambda: at(36, 58, 0.62, turn(-20, machete())) + at(68, 40, 0.5, compass())),
+    "reaver": ("harpooner", lambda: at(46, 54, 0.66, turn(-20, cutlass())) + at(74, 30, 0.34, drop()) + at(26, 30, 0.22, drop())),
+    "rigger": ("harpooner", lambda: line("#e8d6a8", 5, (14, 70), (86, 38)) + rect(WOOD, 10, 62, 8, 30, 2) + rect(WOOD, 82, 30, 8, 30, 2) + at(50, 70, 0.4, rope())),
+    "leviathan_hunter": ("harpooner", lambda: at(42, 60, 0.7, leviathan_head()) + at(60, 42, 0.72, turn(-10, harpoon()))),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),
 }
 

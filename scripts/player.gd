@@ -119,7 +119,9 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"shadow_time": 0.0, "steal_range": 0.0, "steal_damage": 1.0, "steal_hide": 0.0, "night_radius": 0.0, "night_time": 0.0, "night_linger": 0.0,
 	"fan_knives": 0.0, "fan_damage": 1.0, "fan_bounces": 0.0, "plunder": 0.0,
 	"beacons": 0.0, "link_range": 0.0, "beacon_radius": 0.0, "line_heal": 0.0, "mark_range": 0.0, "star_bonus": 0.0, "star_power": 0.0,
-	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0}
+	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0,
+	"haul_range": 0.0, "haul_cd": 1.0, "haul_stun": 0.0, "path_cd": 1.0, "blood_time": 0.0, "line_time": 0.0, "lines": 0.0, "line_reach": 0.0,
+	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
@@ -533,11 +535,11 @@ func status_effects() -> Array[Dictionary]:
 			out.append({"icon": icon, "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left", "night_blind_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
-		if key in ["command_ranged", "command_spell", "shrine_bear_ranged_damage", "shrine_bear_spell_damage"]:
+		if key in ["command_ranged", "command_spell", "shrine_bear_ranged_damage", "shrine_bear_spell_damage", "blood_guard"]:
 			continue
 		var b: Dictionary = _buffs[key]
 		var from_command := key.begins_with("command_")
-		var buff_icon: String = _BUFF_ICONS.get(b["stat"], "star+up")
+		var buff_icon: String = {"blood_water": "drop+up", "lifeline": "boot+rope"}.get(key, _BUFF_ICONS.get(b["stat"], "star+up"))
 		if b["stat"] == "horse_speed":
 			buff_icon = mount_kind() + "+up"
 		out.append({"icon": buff_icon, "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
@@ -1232,6 +1234,32 @@ func is_dragged() -> bool:
 	return _drag_left > 0.0
 
 
+## A Harpooner's Haul on something too big to move: the rope hauls the Harpooner to it instead.
+func haul_self_to(at: Vector3, stop: float) -> void:
+	if dead or is_riding():
+		return
+	_drag_to = at
+	_drag_stop = stop
+	_drag_left = DRAG_MAX
+
+
+## Haul's rope, a Harpooner's own business: what it caught (No Quarter) and what its harpoons
+## marked (Flensing), each until when it counts. And whether the haul ends in a Grapple Slam.
+var hauled := {}
+var hunted := {}
+var slam_on_arrival := false
+
+
+## Hauled in by a rival Harpooner's rope (from their phone).
+func hauled_by_rival(at: Vector3) -> void:
+	if dead or guard_left > 0.0 or is_riding():
+		return
+	_drag_to = at
+	_drag_stop = 0.6
+	_drag_left = DRAG_MAX
+	say("Hauled in!")
+
+
 ## A Siren's song: drawn toward `at` at `speed` metres a second, on top of your own walking, for as long
 ## as it is sung (VaelMind.sing says so again every frame).
 var _lure_at := Vector3.INF
@@ -1357,6 +1385,7 @@ func respawn(at: Vector3) -> void:
 	slowed_left = 0.0
 	rooted_left = 0.0
 	_drag_left = 0.0
+	slam_on_arrival = false
 	_lure_left = 0.0
 	_status_immune = 0.0
 	guard_left = 2.5
@@ -1412,6 +1441,7 @@ func _kill() -> void:
 	if is_riding():
 		dismount()
 	_drag_left = 0.0
+	slam_on_arrival = false
 	_lure_left = 0.0
 	if has_power(PowerDefs.CROWN):
 		# The crown falls where you do, for someone else to take.
@@ -1820,6 +1850,8 @@ func _on_kill(z: Zombie) -> void:
 	add_arrows(int(class_def().get("kill_arrows", 0)))
 	if m("plunder") > 0.0:
 		BanditKit.plunder(self, z.position)
+	if class_id == "harpooner":
+		HarpoonerKit.on_kill(self, z)
 	fire("kill", {"z": z})
 	if _assassin_kill:
 		_assassin_kill = false
@@ -1858,6 +1890,8 @@ func modify_damage(z: Zombie, base: float) -> float:
 		say("✦ Backstab")
 	if has_flag("pack_tactics") and world.ally_near(z.position, AbilityNumbers.PACK_REACH):
 		dmg *= AbilityNumbers.PACK_TACTICS
+	if class_id == "harpooner":
+		dmg *= HarpoonerKit.damage_scale(self, z)
 	return dmg
 
 
@@ -2380,7 +2414,24 @@ func has_path_art() -> bool:
 func path_art_def() -> Dictionary:
 	if class_id == "bandit":
 		return BanditKit.path_art(self)
+	if class_id == "harpooner":
+		return HarpoonerKit.path_art(self)
 	return {}
+
+
+## How much the tree shortens the ability button's wait. The Bandit's tree sharpens its path's
+## ability instead, and the Harpooner's has its own for Haul.
+func art_cd_scale() -> float:
+	if class_id == "bandit":
+		return 1.0
+	if class_id == "harpooner":
+		return m("haul_cd")
+	return m("art_cd")
+
+
+## ...and the second button's.
+func path_cd_scale() -> float:
+	return m("path_cd") if class_id == "harpooner" else m("art_cd")
 
 
 ## Whether the path's ability would do anything if used now (Steal needs someone in reach).
@@ -2394,8 +2445,8 @@ func use_path_art() -> void:
 	var d := path_art_def()
 	if d.is_empty() or _cast_kind != "" or _is_moved_by_mist() or path_art_cd_left > 0.0 or frozen_left > 0.0 or spirit_left > 0.0:
 		return
-	path_art_cd_left = maxf(0.5, float(d["cd"]) * m("art_cd"))
-	_cast_kind = "bandit_path"
+	path_art_cd_left = maxf(0.5, float(d["cd"]) * path_cd_scale())
+	_cast_kind = class_id + "_path"
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -2413,6 +2464,8 @@ func art_def() -> Dictionary:
 		return BanditKit.art(self)
 	if class_id == "cartographer":
 		return CartographerKit.art(self)
+	if class_id == "harpooner":
+		return HarpoonerKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -2596,8 +2649,8 @@ func use_art() -> void:
 		return
 	mana -= art_cost()
 	# The Bandit's paths sharpen their own ability (on the second button), not Into the Shadows.
-	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * (1.0 if class_id == "bandit" else m("art_cd")))
-	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * art_cd_scale())
+	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -3004,6 +3057,8 @@ func _tick_mist(delta: float) -> void:
 		"bandit": BanditKit.cast(self)
 		"bandit_path": BanditKit.cast_path(self)
 		"cartographer": CartographerKit.cast(self)
+		"harpooner": HarpoonerKit.cast(self)
+		"harpooner_path": HarpoonerKit.cast_path(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -3628,6 +3683,9 @@ func _physics_step(delta: float) -> void:
 		if haul.length() <= _drag_stop or _drag_left <= 0.0:
 			_drag_left = 0.0
 			velocity = Vector3(0, minf(velocity.y, 0.0), 0)
+			if slam_on_arrival:
+				slam_on_arrival = false
+				HarpoonerKit.land_slam(self)
 		else:
 			velocity.x = haul.normalized().x * DRAG_SPEED
 			velocity.z = haul.normalized().z * DRAG_SPEED
@@ -4011,7 +4069,7 @@ func _handle_fire() -> void:
 				_fire_arrow(d)
 				if d.has("tethered"):
 					harpoon_out = true
-					_harpoon_back = float(d["tethered"])
+					_harpoon_back = HarpoonerKit.harpoon_return(self, float(d["tethered"]))
 					_vm_mesh.visible = false
 				_spent_weapon()
 		WeaponDefs.Kind.SPELL:
@@ -4049,6 +4107,8 @@ func _start_swing(d: Dictionary) -> void:
 
 func _ranged_mult() -> float:
 	var mult := m("ranged_damage") * damage_multiplier()
+	if class_id == "harpooner" and HarpoonerKit.by_own_line(self):
+		mult *= 1.0 + HarpoonerKit.CROWS_NEST
 	if weapon_def().get("spec", "") == "pathfinder":
 		mult *= 1.0 + m("find_damage")
 	if is_riding():
@@ -4312,6 +4372,8 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 			z.take_damage(melee_stats(d)["damage"], Vector3.ZERO, 0.0, z.centre())
 			say("Backstab!")
 	_antler_root(z)
+	if class_id == "harpooner":
+		HarpoonerKit.on_blow(self)
 	fire("hit", {"z": z})
 
 
@@ -4334,6 +4396,8 @@ func on_melee_rival(peer: int, d: Dictionary) -> void:
 		status_on(peer, Net.Status.SLOW, float(d["slows"]))
 	if has_power("antler_charm"):
 		status_on(peer, Net.Status.ROOT, PowerDefs.ANTLER_ROOT)
+	if class_id == "harpooner":
+		HarpoonerKit.on_blow(self)
 	fire("hit", {"rival": peer})
 
 
@@ -4352,6 +4416,8 @@ func on_shot_rival(peer: int, fire_shot: bool, frost_shot: bool) -> void:
 ## Rules for arrows and bolts that reach a zombie.
 func on_shot_connect(z: Zombie) -> void:
 	gain_ki(KI_PER_SHOT)
+	if class_id == "harpooner":
+		HarpoonerKit.on_blow(self)
 	_antler_root(z)
 	fire("shot", {"z": z})
 

@@ -36,6 +36,14 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 - **The Leviathan of the Mists** rises at the Isle of Lamps. Step out of its bite, outrun its waves, and keep near the barge when it spits the sea over it (the light shrinks to 6 m for 8 s). Defeat it, and the lighthouse burns again: that is the dawn.
 - Its own music (a pilgrims' hymn), sounds and map.
 
+### A new class: the Harpooner
+Earned by being in the match when the Harbourmaster of Port Vael falls. 115 health; starts with a Whaler's Harpoon, which comes back to hand by itself after 4 s, and a Boarding Hook.
+- **Haul:** a hook on a line at the enemy you look at, up to 18 m: it is dragged to you, struck and stunned. Anything too big to move pulls you to it instead.
+- **Reaver:** Blood in the Water on a second button: for 6 s every blow heals 3 and you move 15% faster. What a Reaver hauls takes 30% more damage. At level 10, Red Tide: kills in Blood in the Water haul the next enemy in.
+- **Rigger:** Rig a Line: a rope staked across the ground for 12 s, up to 2 at once. Enemies that cross it are stunned and slowed. At level 10, Cat's Cradle ties new lines to the old.
+- **Leviathan Hunter:** Great Harpoon: an iron through everything in its way for 90 damage, pinning each. Harpoons mark what they strike: 20% more damage from everyone. At level 10, Leviathan's Bane.
+- The Armory shows both starting weapons for classes that start with two.
+
 ### New weapons of the coast
 Found on Port Vael, and later on the Lantern Road.
 - **Cutlass:** each kill quickens your swings by 15%, up to three times, fading 3 s after the last kill.

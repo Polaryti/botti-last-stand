@@ -1075,6 +1075,8 @@ func _draw_weapon(s: Vector2) -> void:
 
 
 var _path_art_useful := true
+var _haul_ready := true # a Harpooner has something in reach to Haul (looked at a few times a second)
+var _haul_looked := 0.0
 
 
 func _draw_controls() -> void:
@@ -1089,6 +1091,9 @@ func _draw_controls() -> void:
 		draw_arc(hint, JOY_R, 0.0, TAU, 40, Color(1, 1, 1, 0.2), 3.0)
 		draw_circle(hint, 36.0, Color(1, 1, 1, 0.12))
 	_path_art_useful = player.has_path_art() and player.path_art_has_use()
+	if player.class_id == "harpooner" and Time.get_ticks_msec() * 0.001 - _haul_looked > 0.15:
+		_haul_looked = Time.get_ticks_msec() * 0.001
+		_haul_ready = HarpoonerKit.haul_target(player) != null
 	for id: String in _buttons:
 		if not _button_visible(id) or (player.dead and id != "pause" and id != "tree"):
 			continue
@@ -1109,6 +1114,8 @@ func _draw_controls() -> void:
 				tint = UiTheme.MIST if player.path_art_cd_left <= 0.0 and _path_art_useful else Color(0.6, 0.6, 0.6)
 			"art":
 				tint = UiTheme.MIST if player.art_cd_left <= 0.0 and player.mana >= player.art_cost() else Color(0.6, 0.6, 0.6)
+				if player.class_id == "harpooner" and not _haul_ready:
+					tint = Color(0.6, 0.6, 0.6)
 				if player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
 					# Planted here, the beacon would link to none of the others.
 					tint = UNLINKED if player.art_cd_left <= 0.0 else UNLINKED.darkened(0.35)
@@ -1138,6 +1145,12 @@ func _draw_controls() -> void:
 			_chip(player.nearby_weapon.display_name(), "grab", UiTheme.BONE, pos + Vector2(0, -r - 18 - CHIP_H), true)
 		if id == "art" and player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
 			_centered("Too far to link", pos + Vector2(0, -r - 14), HUD_SMALL, UNLINKED.lightened(0.3))
+		elif id == "art" and player.class_id == "harpooner":
+			# Haul: a ring of the class's colour when something is in reach, and when not, says so.
+			if _haul_ready and player.art_cd_left <= 0.0:
+				var pulse := 0.55 + sin(Time.get_ticks_msec() * 0.009) * 0.35
+				draw_arc(pos, r + 5.0, 0.0, TAU, 40, Color(UiTheme.EMBER, pulse), 4.0)
+			_centered("Haul" if _haul_ready or player.art_cd_left > 0.0 else "Nothing in reach", pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE if _haul_ready or player.art_cd_left > 0.0 else UiTheme.ASH)
 		elif id == "art" and player.art_label() != "":
 			_centered(player.art_label(), pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE)
 		if id == "path_art":
@@ -1151,14 +1164,14 @@ func _draw_controls() -> void:
 				word = "No one in reach"
 			_centered(word, pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE if _path_art_useful or not ready else UiTheme.ASH)
 			if not ready:
-				var total := maxf(float(player.path_art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
+				var total := maxf(float(player.path_art_def().get("cd", 1.0)) * player.path_cd_scale(), 0.1)
 				draw_arc(pos, r - 5.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(player.path_art_cd_left / total, 0.0, 1.0), 28, Color(0, 0, 0, 0.7), 9.0)
 				_centered("%d" % ceili(player.path_art_cd_left), pos, HUD_TOAST - 2, Color.WHITE)
 		if id == "burst" or id == "art":
 			var left: float = player.burst_cd_left if id == "burst" else player.art_cd_left
 			if id == "art" and player.spirit_left > 0.0:
 				left = 0.0
-			var total: float = player.m("burst_cd") if id == "burst" else maxf(float(player.art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
+			var total: float = player.m("burst_cd") if id == "burst" else maxf(float(player.art_def().get("cd", 1.0)) * player.art_cd_scale(), 0.1)
 			if left > 0.0:
 				draw_arc(pos, r - 5.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(left / total, 0.0, 1.0), 28, Color(0, 0, 0, 0.7), 9.0)
 				_centered("%d" % ceili(left), pos, HUD_TOAST - 2, Color.WHITE)

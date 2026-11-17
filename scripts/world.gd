@@ -1742,6 +1742,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 			shot.hit_sound = "harpoon_hit"
 			shot.pins = float(d.get("pins", 0.0))
 			shot.tether = true
+			shot.harpoon_mark = p.class_id == "harpooner"
 		elif kind == "flare":
 			shot.hit_sound = "flare_burst"
 			shot.blast_radius = 0.01
@@ -1768,6 +1769,74 @@ func familiar_arrow(p: Player, target: Node3D) -> void:
 	var dir := (aim - from).normalized()
 	spawn_player_arrow(p, from, dir * 40.0, 0.0, PowerDefs.ARCHER_RANGE + 5.0, 1.0, WeaponDefs.DAMAGE * p.damage_multiplier(), false)
 	sfx_at("bow", from, -9.0)
+
+
+## A Leviathan Hunter's Great Harpoon: a heavy iron that flies through everything in its way, pinning
+## and marking all it strikes.
+func spawn_great_harpoon(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float) -> void:
+	var shot := _launch(Projectile.Kind.ARROW, great_harpoon_mesh(), at, vel, 2.0, max_range, dmg, 3.0, false, 0)
+	if shot == null:
+		return
+	shot.set_owner_player(p)
+	shot.from_player = true
+	shot.hit_sound = "harpoon_hit"
+	shot.pins = HarpoonerKit.GREAT_PIN
+	shot.pierce = 99
+	shot.harpoon_mark = true
+	if Net.active():
+		Net.shot(10, at, vel, 2.0, max_range, false, Color.WHITE)
+
+
+## The Great Harpoon: the whaler's iron, half as big again, with a broad flued head.
+var _great_harpoon: Mesh
+func great_harpoon_mesh() -> Mesh:
+	if _great_harpoon == null:
+		var l := LowPoly.new()
+		var wood := Color(0.42, 0.3, 0.18)
+		var iron := Color(0.32, 0.34, 0.36)
+		l.prism(Vector3(0, 0, 0.9), Vector3(0, 0, -1.5), 0.04, 0.036, 6, wood)
+		for z: float in [-1.35, -1.25, 0.6, 0.7]:
+			l.prism(Vector3(0, 0, z), Vector3(0, 0, z - 0.05), 0.045, 0.045, 6, Color(0.12, 0.1, 0.09))
+		l.prism(Vector3(0, 0, -1.5), Vector3(0, 0, -1.85), 0.022, 0.02, 5, iron)
+		l.prism(Vector3(0, 0, -1.85), Vector3(0, 0, -2.2), 0.08, 0.0, 4, Color(0.72, 0.75, 0.8))
+		for side: float in [-1.0, 1.0]:
+			l.prism(Vector3(side * 0.05, 0, -1.92), Vector3(side * 0.13, 0, -1.8), 0.02, 0.0, 3, Color(0.62, 0.65, 0.7))
+		_great_harpoon = l.commit()
+	return _great_harpoon
+
+
+## A Rigger's lines on this phone, everyone's.
+var rig_lines: Array[RigLine] = []
+
+
+## A Rigger stakes a line. The oldest of theirs comes up when they have more than they may keep, and with
+## Cat's Cradle the new line also ties itself to the far ends of the others.
+func rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits: int, keep: int, cradle: bool) -> RigLine:
+	var line := RigLine.new(self, owner_peer, from, to, seconds, bits)
+	add_child(line)
+	var own: Array[RigLine] = []
+	for l: RigLine in rig_lines:
+		if is_instance_valid(l) and l.owner_peer == owner_peer and not l.cradle:
+			own.append(l)
+	while own.size() >= keep:
+		remove_rig_line(own.pop_front())
+	rig_lines.append(line)
+	if cradle:
+		for other: RigLine in own:
+			if Vector2(other.b.x - to.x, other.b.z - to.z).length() <= HarpoonerKit.RIG_REACH * 1.5:
+				var tie := RigLine.new(self, owner_peer, to, other.b, minf(seconds, other.left), bits)
+				tie.cradle = true
+				tie.tied_to = line
+				tie.tied_also = other
+				add_child(tie)
+				rig_lines.append(tie)
+	return line
+
+
+func remove_rig_line(line: RigLine) -> void:
+	rig_lines.erase(line)
+	if is_instance_valid(line):
+		line.queue_free()
 
 
 ## A Highwayman's thrown knife.
@@ -2410,6 +2479,8 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = WeaponDefs.harpoon_mesh()
 	elif mesh == 9:
 		m = WeaponDefs.flare_mesh()
+	elif mesh == 10:
+		m = great_harpoon_mesh()
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
@@ -2744,11 +2815,22 @@ func recycle_zombie(z: Zombie) -> void:
 func on_zombie_killed(z: Zombie) -> void:
 	if z.is_boss():
 		director.boss_fallen(z)
+	note_defeated(z)
 	make_noise(z.position, 6.0)
 	if Net.is_host():
 		Net.zombie_died(z, z.last_hitter)
 	elif player and z.last_hitter >= 0:
 		player.on_kill(z)
+
+
+## A foe whose fall earns something for everyone in the match (on every phone, once).
+func note_defeated(z: Zombie) -> void:
+	if z.type_id == "harbourmaster" and player and not Net.spectating and not director.sandbox:
+		Game.note_harbourmaster()
+		if Game.fresh_unlocks.has("harpooner") and not _told_unlock.has("harpooner"):
+			_told_unlock["harpooner"] = true
+			director.show_banner("Harpooner unlocked!", 4.0)
+var _told_unlock := {}
 
 
 func on_player_died(p: Player) -> void:

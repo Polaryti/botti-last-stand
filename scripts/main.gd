@@ -1442,7 +1442,10 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 		_wrap_labels(detail)
 		return
 	var d: Dictionary = ClassDefs.ALL[id]
-	words.add_child(_soft("%s\nStarting weapon: %s · Starting arrows: %d" % [ClassPresentation.stats_line(id), WeaponDefs.ALL[d["weapon"]]["name"], int(d["arrows"])], UiTheme.FS_SMALL))
+	var start := "Starting weapon: %s" % WeaponDefs.ALL[d["weapon"]]["name"]
+	if d.has("second"):
+		start = "Starting weapons: %s and %s" % [WeaponDefs.ALL[d["weapon"]]["name"], WeaponDefs.ALL[d["second"]]["name"]]
+	words.add_child(_soft("%s\n%s · Starting arrows: %d" % [ClassPresentation.stats_line(id), start, int(d["arrows"])], UiTheme.FS_SMALL))
 	words.add_child(ClassPresentation.weapon_tags(id))
 	_armory_tabs(detail, id)
 	var scroll := DragScroll.new()

@@ -786,6 +786,61 @@ SOUNDS.update({
 })
 
 
+# --- The classes of the coast: the Harpooner ----------------------------------------------------
+
+def haul_throw():
+    """Haul: a weighted hook whirled once and flung, its line hissing out after it."""
+    m = n(0.55)
+    whirl = sweep_filter(noise(m), 500, 2200, 0.45) * bell_env(m, 1.8) * 0.7
+    whirl *= 1 + 0.6 * np.sin(2 * np.pi * 9 * t_(m))
+    line = band(noise(m), 2000, 5200) * np.clip(t_(m) / 0.55, 0, 1) * np.linspace(1.0, 0.2, m) * 0.3
+    return whirl + line + chain(m, 4, 2400) * 0.2
+
+
+def blood_water():
+    """Blood in the Water: a great heartbeat, a wash of surf, and a growl rising behind it."""
+    m = n(1.4)
+    x = thud(m, 0.0, 1.0, 55) * 0.9 + thud(m, 0.32, 0.8, 50) * 0.7
+    surf = band(noise(m), 200, 2400) * np.sin(np.pi * np.clip(t_(m) / 1.4, 0, 1)) ** 1.4 * 0.45
+    growl = throat(m, curve(m, (0, 80), (1, 120)), ((300, 0.4, 1.0), (800, 0.3, 0.5)), breath=0.5, rough=1.0, sub=0.4) * env(m, 0.3, 1.8) * 0.3
+    return reverb(x + surf + growl, 1.0, 0.3)
+
+
+def rig_line():
+    """Rig a Line: a stake knocked in, rope paid out and hauled taut with a twang."""
+    m = n(0.9)
+    knock = thud(m, 0.0, 0.8, 140) + band(noise(m), 300, 1500) * env(m, 0.002, 14) * 0.5
+    pay = at(band(noise(n(0.35)), 1500, 4500) * bell_env(n(0.35), 1.2) * 0.35, 0.12, 0.9)
+    tt = t_(n(0.4))
+    twang = np.sin(2 * np.pi * 180 * tt + 3 * np.sin(2 * np.pi * 6 * tt)) * np.exp(-tt * 8) * 0.35
+    return knock + pay + at(twang, 0.5, 0.9)
+
+
+def line_trip():
+    """Something caught by the ankles on a line: the rope snapping taut and a body going down."""
+    m = n(0.6)
+    tt = t_(m)
+    twang = np.sin(2 * np.pi * 150 * tt) * np.exp(-tt * 12) * 0.4
+    fall = thud(m, 0.12, 0.9, 70) + band(noise(m), 150, 900) * at(env(n(0.3), 0.005, 8), 0.12, 0.6) * 0.5
+    return twang + fall
+
+
+def great_harpoon():
+    """The Great Harpoon thrown: a grunt of effort, a heavy iron hurled, and a long line roaring out."""
+    m = n(1.0)
+    heave = band(noise(m), 120, 700) * env(m, 0.02, 7) * 0.6
+    whoosh = sweep_filter(noise(m), 250, 1300, 0.6) * bell_env(m, 1.2)
+    line = band(noise(m), 1800, 5000) * np.clip((t_(m) - 0.1) / 0.3, 0, 1) * np.linspace(1.0, 0.0, m) ** 1.2 * 0.4
+    line *= 1 + 0.5 * np.sin(2 * np.pi * 30 * t_(m))
+    return heave + whoosh + line
+
+
+SOUNDS.update({
+    "haul_throw": (haul_throw, 0.7), "blood_water": (blood_water, 0.8), "rig_line": (rig_line, 0.7),
+    "line_trip": (line_trip, 0.7), "great_harpoon": (great_harpoon, 0.85),
+})
+
+
 if __name__ == "__main__":
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
     for name, (make, gain) in SOUNDS.items():

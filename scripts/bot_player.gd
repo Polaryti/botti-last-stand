@@ -679,6 +679,35 @@ func _bandit_skills(p: Player, has_target: bool, dist: float) -> void:
 		p.use_art()
 
 
+## A Harpooner bot: Haul what it is fighting when it is out of reach (or itself to something big), and
+## its path's ability on the second button.
+func _harpooner_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "":
+		return
+	var low := p.hp < p.max_hp() * 0.4
+	var near := _enemies_within(4.5)
+	if p.has_path_art() and p.path_art_cd_left <= 0.0:
+		match p.spec_id:
+			"reaver":
+				if near >= 2 or (low and near > 0) or (has_target and dist < 3.0):
+					p.use_path_art()
+					return
+			"rigger":
+				if has_target and dist > 5.0 and dist < HarpoonerKit.RIG_REACH:
+					_face(_target_point(), false)
+					p.use_path_art()
+					return
+			"leviathan_hunter":
+				if has_target and dist < HarpoonerKit.GREAT_RANGE * 0.7:
+					_face(_target_point(), false)
+					p.use_path_art()
+					return
+	if p.art_cd_left <= 0.0 and has_target and dist > 4.0 and dist < HarpoonerKit.HAUL_RANGE + p.m("haul_range") - 1.0:
+		_face(_target_point(), false)
+		if HarpoonerKit.haul_target(p) != null:
+			p.use_art()
+
+
 ## The same buttons a person has, pressed when they would help.
 func _use_skills() -> void:
 	var p := pawn
@@ -694,6 +723,9 @@ func _use_skills() -> void:
 		return
 	if p.class_id == "bandit":
 		_bandit_skills(p, has_target, dist)
+		return
+	if p.class_id == "harpooner":
+		_harpooner_skills(p, has_target, dist)
 		return
 	if not p.has_art() or p.art_cd_left > 0.0 or p._cast_kind != "" or p.aiming_art:
 		return

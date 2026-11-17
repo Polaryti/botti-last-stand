@@ -40,6 +40,7 @@ static func tree(class_id: String) -> Dictionary:
 			"commander": _cache[class_id] = _commander()
 			"bandit": _cache[class_id] = _bandit()
 			"cartographer": _cache[class_id] = _cartographer()
+			"harpooner": _cache[class_id] = _harpooner()
 	return _cache[class_id]
 
 
@@ -634,4 +635,52 @@ static func _cartographer() -> Dictionary:
 			[a("old_steel", "Old Steel", "The Machete and Bolas hit 25% harder", "machete+up", {"find_damage": 0.25}),
 			a("long_wick", "Long Wick", "The Lantern burns 10 s longer", "lantern+clock", {"lantern_time": 10.0})]],
 			a("lost_wonders", "Lost Wonders", "Every find unearths two", "compass+crown", {}, [], "find_twice")),
+	]}
+
+
+## The Harpooner keeps Haul on its ability button whatever its path; each path adds an ability of its
+## own on a second button (HarpoonerKit), and the tree sharpens both.
+static func _harpooner() -> Dictionary:
+	var navy := Color(0.14, 0.3, 0.46)
+	return {"core": [
+		[a("salt_hardened", "Salt-Hardened", "+25 max health", "heart+up", {"max_hp": 25.0}),
+		a("deckhands_stride", "Deckhand's Stride", "+10% move speed", "boot+up", {"speed": 0.1})],
+		[a("long_line", "Long Line", "Haul reaches 8 m further", "chain+up", {"haul_range": 8.0}),
+		a("quick_reel", "Quick Reel", "Haul comes back 25% sooner", "chain+clock", {"haul_cd": -0.25})],
+		[a("barbed_irons", "Barbed Irons", "Your harpoons and Haul make what they strike bleed", "drop+harpoon", {}, [], "barbed"),
+		a("whalers_eye", "Whaler's Eye", "+20% ranged damage", "harpoon+up", {"ranged_damage": 0.2})],
+	], "specs": [
+		_spec("reaver", "Reaver", "Boards the fight: hauls them in, and the smell of blood keeps the Reaver on its feet.", navy,
+			a("reaver_entry", "Reaver", "Unlocks Blood in the Water, a second ability beside Haul: for 6 s every blow you land heals you 3, and you move 15% faster. What you Haul takes 30% more damage for 4 s", "drop+cutlass", {}, [], "art_blood"),
+			[[a("frenzy", "Frenzy", "Blood in the Water lasts 3 s longer", "drop+clock", {"blood_time": 3.0}),
+			a("red_sails", "Red Sails", "Blood in the Water comes back 25% sooner", "drop+wind", {"path_cd": -0.25})],
+			[a("cutthroat", "Cutthroat", "+20% melee damage", "cutlass+up", {"melee_damage": 0.2}),
+			a("sea_dog", "Sea Dog", "In Blood in the Water you take 15% less damage", "shield+drop", {}, [], "blood_guard")],
+			[a("keelhaul", "Keelhaul", "What you Haul in is stunned 1 s longer", "star+chain", {"haul_stun": 1.0}),
+			a("grapple_slam", "Grapple Slam", "Hauled to something too big to move, you land in a slam: 40 damage within 3 m", "quake+chain", {}, [], "haul_slam")],
+			[a("no_quarter", "No Quarter", "Killing something you hauled takes 4 s off Haul", "skull+chain", {}, [], "haul_refund"),
+			a("plunderer", "Plunderer", "12% of your kills leave food, arrows or a potion", "crown+plus", {"plunder": 0.12})]],
+			a("red_tide", "Red Tide", "In Blood in the Water, every kill hauls the nearest enemy within 12 m to you", "drop+crown", {}, [], "red_tide")),
+		_spec("rigger", "Rigger", "Strings the shore with rope: lines staked across the ground trip whatever crosses them.", navy,
+			a("rigger_entry", "Rigger", "Unlocks Rig a Line, a second ability beside Haul: a rope staked from your feet to a point up to 14 m ahead, for 12 s. Enemies that cross it trip, stunned for 1 s and slowed for 2 s. Up to 2 lines at a time", "rope+chain", {}, [], "art_rig"),
+			[[a("tarred_rope", "Tarred Rope", "Lines stand 6 s longer", "rope+clock", {"line_time": 6.0}),
+			a("spare_spool", "Spare Spool", "One more line at a time", "rope+plus", {"lines": 1.0})],
+			[a("barbed_line", "Barbed Line", "What trips takes 25 damage and bleeds", "drop+rope", {}, [], "line_barbs"),
+			a("snare_knot", "Snare Knot", "What trips is held where it fell 1.5 s longer", "net+rope", {}, [], "line_snare")],
+			[a("riggers_hands", "Rigger's Hands", "Rig a Line comes back 30% sooner", "hand+rope", {"path_cd": -0.3}),
+			a("long_spool", "Long Spool", "Lines reach 8 m further", "rope+up", {"line_reach": 8.0})],
+			[a("lifeline", "Lifeline", "Friends who cross one of your lines run 25% faster for 3 s", "boot+rope", {}, [], "line_speed"),
+			a("crows_nest", "Crow's Nest", "+25% ranged damage within 4 m of one of your lines", "eye+rope", {}, [], "crows_nest")]],
+			a("cats_cradle", "Cat's Cradle", "Each new line also ties itself to the far ends of your other lines", "rope+crown", {}, [], "cats_cradle")),
+		_spec("leviathan_hunter", "Leviathan Hunter", "Hunts the biggest things in the sea: marks its quarry for everyone, and throws the Great Harpoon.", navy,
+			a("leviathan_hunter_entry", "Leviathan Hunter", "Unlocks Great Harpoon, a second ability beside Haul: a heavy iron that flies through everything in its way for 90 damage, pinning each for 1.5 s, half as long for bosses. What your harpoons strike is marked for 8 s: it takes 20% more damage from everyone", "harpoon+target", {}, [], "art_great"),
+			[[a("whale_oil", "Whale Oil", "+30% damage to bosses and minibosses", "skull+up", {}, [], "big_game"),
+			a("steady_hands", "Steady Hands", "Your Whaler's Harpoon comes back 2 s sooner", "harpoon+clock", {"harpoon_back": -2.0})],
+			[a("deep_wound", "Deep Wound", "What you mark bleeds for as long as the mark lasts", "drop+target", {}, [], "mark_bleed"),
+			a("long_mark", "Long Mark", "Marks last 4 s longer", "target+clock", {"mark_time": 4.0})],
+			[a("second_iron", "Second Iron", "Great Harpoon comes back 30% sooner", "harpoon+wind", {"path_cd": -0.3}),
+			a("heavy_iron", "Heavy Iron", "Great Harpoon strikes 50% harder", "harpoon+plus", {"great_damage": 0.5})],
+			[a("flensing", "Flensing", "Each marked enemy you kill heals you 10", "heart+target", {}, [], "flensing"),
+			a("spotter", "Spotter", "You see what you mark through anything, hidden or not", "eye+target", {}, [], "mark_reveal")]],
+			a("leviathans_bane", "Leviathan's Bane", "Bosses and minibosses you mark take 40% more damage instead", "harpoon+crown", {}, [], "bane")),
 	]}

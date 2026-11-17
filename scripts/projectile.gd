@@ -37,6 +37,7 @@ var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var pins := 0.0 # a Whaler's Harpoon: seconds it holds what it strikes to the spot
 var tether := false # ...and where it ends up, it lies until its owner takes it back
+var harpoon_mark := false # a Harpooner's harpoon: what it strikes is marked and torn (HarpoonerKit)
 var glow := Color.TRANSPARENT: # a Flare: burns bright as it flies, its light on what it passes
 	set(c):
 		glow = c
@@ -116,6 +117,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	poison_trail = false
 	stagger = 0.0
 	pins = 0.0
+	harpoon_mark = false
 	tether = false
 	glow = Color.TRANSPARENT
 	mesh = m
@@ -425,6 +427,8 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		shooter.spark_from(z, sparks, amount)
 	if from_player and shooter:
 		shooter.on_shot_connect(z)
+		if harpoon_mark:
+			HarpoonerKit.on_harpoon_hit(shooter, z)
 	if fire:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if frost:

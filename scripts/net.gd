@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 60
+const PROTOCOL := 61
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -62,7 +62,8 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
 	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign",
 	# Last Light
-	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan"]
+	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
+	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1311,6 +1312,7 @@ func _z_died(net_id: int, killer: int) -> void:
 	if z == null or not z.active:
 		return
 	if z.is_boss(): world.director._mist_boss_defeated = true
+	world.note_defeated(z)
 	z.net_die()
 	_credit(z, killer)
 
@@ -1447,6 +1449,7 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.ROOT: z.root(a)
 		Zombie.Effect.PIN: z.root(a, true)
 		Zombie.Effect.REVEAL: z.reveal(a)
+		Zombie.Effect.HAUL: z.haul_to(Vector3(a, 0.0, b))
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -1616,6 +1619,72 @@ func _disarm(peer: int, by: int, stun: bool) -> void:
 		BanditKit.be_robbed(world.player, stun)
 	elif is_host() and _bots.has(peer) and (_bots[peer] as BotPlayer).pawn:
 		BanditKit.be_robbed((_bots[peer] as BotPlayer).pawn, stun)
+
+
+# --- The Harpooner -------------------------------------------------------------------------------
+
+## Someone or something seen in a game together: a creature by its number, or a player by theirs.
+func _body_of(kind: int, id: int) -> Node3D:
+	if world == null or not is_instance_valid(world):
+		return null
+	if kind == 0:
+		return world.zombie_by_id(id)
+	var body: Node3D = avatar(id)
+	return body if body else local_player(id)
+
+
+## A Harpooner's Haul: every other phone sees the rope fly from their hand to what it caught.
+func haul_rope(owner_peer: int, target: Node3D) -> void:
+	if target is Zombie:
+		_haul_rope.rpc(owner_peer, 0, (target as Zombie).net_id)
+	elif target is Target and world:
+		_haul_rope.rpc(owner_peer, 1, world.peer_of(target as Target))
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _haul_rope(owner_peer: int, kind: int, id: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != owner_peer and not (sender == 1 and is_bot(owner_peer)):
+		return
+	var from := _body_of(1, owner_peer)
+	var to := _body_of(kind, id)
+	if from and to:
+		HarpoonerKit.show_rope(world, from, to)
+
+
+## A rival Harpooner's Haul caught a player: their own phone (or the host, for a bot) hauls them in.
+func hauled(peer: int, at: Vector3, by: int) -> void:
+	if peer == my_id() or (is_host() and is_bot(peer)):
+		_hauled(peer, at, by)
+	else:
+		_hauled.rpc(peer, at, by)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _hauled(peer: int, at: Vector3, by: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != by and not (sender == 1 and is_bot(by)):
+		return
+	if not is_finite(at.x) or not is_finite(at.z) or not bots_foes(by, peer):
+		return
+	var p := local_player(peer)
+	if p and (peer == my_id() or (is_host() and is_bot(peer))):
+		p.hauled_by_rival(at)
+
+
+## A Rigger's line, so every phone has the same rope across the ground.
+func rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits: int, keep: int, cradle: bool) -> void:
+	_rig_line.rpc(owner_peer, from, to, seconds, bits, keep, cradle)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits: int, keep: int, cradle: bool) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != owner_peer and not (sender == 1 and is_bot(owner_peer)):
+		return
+	if world == null or not is_instance_valid(world) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > HarpoonerKit.RIG_REACH + 12.0:
+		return
+	world.rig_line(owner_peer, from, to, clampf(seconds, 1.0, 30.0), bits, clampi(keep, 1, HarpoonerKit.RIG_LINES + 1), cradle)
 
 
 ## A Cartographer's beacon, so every phone has the same markers and lines.

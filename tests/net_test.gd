@@ -90,7 +90,7 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer", "harpooner"]:
 		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
@@ -135,7 +135,7 @@ func _as_host() -> void:
 	if rules == "lantern":
 		Net.set_night_map("lantern_road")
 		ok(Net.night_map == "lantern_road", "the host picks the Lantern Road")
-	Net.set_rules({"lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -217,12 +217,14 @@ func _as_client() -> void:
 		Net.set_my_class("bandit")
 	if rules == "cartographer":
 		Net.set_my_class("cartographer")
+	if rules == "harpooner":
+		Net.set_my_class("harpooner")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer"}.get(rules, "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "harpooner": "harpooner"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -283,6 +285,8 @@ func _play() -> void:
 		await _bandit()
 	elif rules == "cartographer":
 		await _cartographer()
+	elif rules == "harpooner":
+		await _harpooner()
 	elif rules == "mesenlla":
 		await _mesenlla()
 	elif rules == "bastion":
@@ -1529,6 +1533,92 @@ func _cartographer() -> void:
 		ok(under.hp < hp_before, "the other phone's starlight strikes this phone's creature (%.0f)" % (hp_before - under.hp))
 	await sync(305)
 
+
+
+## Two Harpooners: the other phone's Haul drags this phone's creature in, everyone sees the rope, and a
+## Rigger's line stands on both phones and trips what crosses it here.
+func _harpooner() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	var spot := Vector3(base.x + (-6.0 if host else 0.0), 0, base.z + 6.0)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	pl.yaw = 0.0
+	pl.rotation.y = 0.0
+	pl.pitch = 0.0
+	pl.camera.rotation = Vector3.ZERO
+	var mine := -1 # the host's creature at each step
+	await wait(0.6)
+	await sync(600)
+	if not host:
+		ok(pl.class_id == "harpooner" and pl.art_def()["name"] == "Haul", "this phone plays a Harpooner, with Haul")
+	# The host's creature, in front of the other phone's Harpooner.
+	if host:
+		var there := Vector3(base.x, 0, base.z + 6.0 - 13.0)
+		w.spawn_zombie("normal", Vector3(there.x, w.ground_at(there), there.z))
+		var z: Zombie = w.zombies.back()
+		z.hp = 2000.0
+		z.max_hp = 2000.0
+		z.set_physics_process(true)
+		z.stun(3.0)
+		mine = z.net_id
+		told.rpc(str(z.net_id))
+	await wait(0.8)
+	await sync(601)
+	if not host:
+		pl.yaw = 0.0
+		pl.rotation.y = 0.0
+		pl.camera.rotation = Vector3.ZERO
+		var t := HarpoonerKit.haul_target(pl)
+		ok(t != null and t is Zombie and str((t as Zombie).net_id) == _told, "the host's creature is the one in reach of this phone's Haul")
+		HarpoonerKit.haul(pl)
+		ok(w.get_children().any(func(n: Node) -> bool: return n is HaulRope), "the rope flies here")
+	await wait(0.25)
+	if host:
+		ok(w.get_children().any(func(n: Node) -> bool: return n is HaulRope), "and on the other phone, from the Harpooner's hand")
+	await wait(1.6)
+	await sync(602)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		var them := _avatar().global_position
+		var gap := Vector2(z.position.x - them.x, z.position.z - them.z).length()
+		ok(z.hp < 2000.0 and gap < 3.5, "the other phone's Haul dragged this phone's creature to the Harpooner and struck it (%.1f m from them)" % gap)
+		z.release()
+	await sync(603)
+	# A Rigger's line, on both phones.
+	if not host:
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 1 if step == 3 else 0)
+		ok(pl.spec_id == "rigger" and pl.path_art_def()["name"] == "Rig a Line", "the other phone's Harpooner becomes a Rigger")
+		pl.yaw = 0.0
+		pl.rotation.y = 0.0
+		HarpoonerKit.rig_a_line(pl)
+	await wait(0.8)
+	await sync(604)
+	var rigger := Net.my_id() if not host else _other()
+	var lines := w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and l.owner_peer == rigger)
+	ok(lines.size() == 1 and (lines[0] as RigLine).length() > 8.0, "the line stands on this phone too")
+	if host and not lines.is_empty():
+		var line: RigLine = lines[0]
+		var on := (line.a + line.b) * 0.5
+		w.spawn_zombie("normal", Vector3(on.x, w.ground_at(on), on.z))
+		var crosser: Zombie = w.zombies.back()
+		crosser.set_physics_process(false)
+		crosser.hp = 2000.0
+		crosser.max_hp = 2000.0
+		mine = crosser.net_id
+	await wait(1.2)
+	await sync(605)
+	if host:
+		var crosser: Zombie = w.zombie_by_id(mine)
+		ok(crosser != null and crosser._stun > 0.0 and crosser._slow > 0.0, "this phone's creature trips on the other phone's line: stunned and slowed")
+	await sync(606)
 
 
 ## Two phones in the Valleys of Mesenlla: the creatures look and act the same on both, a tell's circle

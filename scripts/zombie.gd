@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL } # new ones go at the end: the number travels
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL, HAUL } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -1807,6 +1807,18 @@ func pull_to(at: Vector3) -> void:
 	_pull_left = 0.7
 
 
+## Hauled in on a Harpooner's rope: dragged all the way to a point, however far (pull_to stops after
+## a few metres), at the pace a rope hauls.
+func haul_to(at: Vector3) -> void:
+	if not is_alive() or not draggable():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.HAUL, at.x, at.z)
+		return
+	_pull_at = at
+	_pull_left = clampf(Vector2(at.x - position.x, at.z - position.z).length() / HarpoonerKit.HAUL_SPEED + 0.1, 0.2, 2.2)
+
+
 func hear(at: Vector3) -> void:
 	if puppet or not is_alive() or state == State.CHASE or dormant:
 		return
@@ -2231,6 +2243,7 @@ func _physics_process(delta: float) -> void:
 			_show_frozen(0.0)
 	if _pull_left > 0.0:
 		_pull_left -= delta
+		_tick_flash(delta) # a blow's flash fades as usual while it is dragged
 		var to_pull := Vector3(_pull_at.x - position.x, 0.0, _pull_at.z - position.z)
 		if to_pull.length() > 1.0:
 			position += to_pull.normalized() * minf(16.0 * delta, to_pull.length())

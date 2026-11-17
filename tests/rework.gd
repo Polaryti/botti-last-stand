@@ -45,6 +45,8 @@ func _ready() -> void:
 	await _path_upgrades()
 	print("REWORK cartographer")
 	await _cartographer()
+	print("REWORK harpooner")
+	await _harpooner()
 	print("REWORK walls")
 	await _walls_protect()
 	print("REWORK statuses")
@@ -1453,6 +1455,222 @@ func _cartographer() -> void:
 		if is_instance_valid(left):
 			left.queue_free()
 	w.surveys.clear()
+
+## A creature of the kind asked for, `ahead` metres in front of the player, standing still.
+func foe(kind: String, ahead: float, side := 0.0, hp := 10000.0) -> Zombie:
+	var at := p.global_position + Vector3(side, 0, -ahead)
+	at.y = w.ground_at(at)
+	w.spawn_zombie(kind, at)
+	var z: Zombie = w.zombies.back()
+	z.position = at
+	z.hp = hp
+	z.max_hp = hp
+	return z
+
+
+func _face_ahead() -> void:
+	p.yaw = 0.0
+	p.rotation.y = 0.0
+	p.pitch = 0.0
+	if p.camera:
+		p.camera.rotation = Vector3.ZERO
+
+
+func _harpooner() -> void:
+	var d: Dictionary = ClassDefs.ALL["harpooner"]
+	check(d["weapon"] == "harpoon" and d["second"] == "boarding_hook" and ClassDefs.price("harpooner") == 0 and not ClassDefs.for_sale().has("harpooner") and d.get("earned", "") == "harbourmaster", "the Harpooner starts with a Whaler's Harpoon and a Boarding Hook, and is earned against the Harbourmaster")
+	check(ClassDefs.weapon_categories("harpooner") == Array(["melee", "two_handed", "ranged"], TYPE_STRING, "", null), "Harpooner wields Melee, Two-Handed and Ranged weapons")
+	var specs: Array = AbilityData.tree("harpooner")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["reaver", "rigger", "leviathan_hunter"], "Reaver, Rigger and Leviathan Hunter")
+	for id: String in ["crest_harpooner", "spec_reaver", "spec_rigger", "spec_leviathan_hunter", "rope", "chain", "drop", "harpoon"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon", "hook_catch"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	check(ClassGear._pieces("harpooner").size() == 3 and Avatar.MODELS.has("harpooner") and ClassPresentation.COPY.has("harpooner"), "dressed, seen by others, and described")
+	# Earned when the Harbourmaster falls in a match you are in.
+	var had: Dictionary = Game.unlocked.duplicate()
+	var beaten := Game.harbourmasters_beaten
+	Game.unlocked.erase("harpooner")
+	check(not Game.owns_class("harpooner") and Game.earn_text("harpooner").begins_with("Defeat the Harbourmaster"), "locked until then, and it says how to earn it")
+	# (This map has no Harbourmaster of its own: a stand-in falls as one, the way every phone hears of it.)
+	var hm := target(p.global_position + Vector3(0, 0, -20))
+	hm.type_id = "harbourmaster"
+	w.note_defeated(hm)
+	hm.type_id = "normal"
+	hm.release()
+	check(Game.owns_class("harpooner") and Game.harbourmasters_beaten == beaten + 1, "the Harbourmaster's fall opens the Harpooner")
+	Game.unlocked = had
+	Game.harbourmasters_beaten = beaten
+	Game.fresh_unlocks.erase("harpooner")
+	# The class: Haul on the button, and its harpoon comes back by itself quickly.
+	pawn("harpooner")
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.weapon_id() == "harpoon" and p.slots.has("boarding_hook"), "it holds its Harpoon, the Hook at its side")
+	check(p.art_def()["name"] == "Haul" and not p.has_path_art(), "its ability is Haul, and no second button yet")
+	check(is_equal_approx(HarpoonerKit.harpoon_return(p, 15.0), HarpoonerKit.RETURN), "a Harpooner's harpoon comes back by itself after %d s" % int(HarpoonerKit.RETURN))
+	HarpoonerKit.haul(p)
+	check(p.art_cd_left <= 0.5, "with nothing in reach, Haul does nothing and comes straight back")
+	var caught := foe("normal", 12.0)
+	var hp0 := caught.hp
+	check(HarpoonerKit.haul_target(p) == caught, "something in front, in reach: Haul finds it")
+	var behind := foe("normal", -6.0)
+	check(HarpoonerKit.haul_target(p) == caught, "and not what is behind")
+	behind.release()
+	HarpoonerKit.haul(p)
+	check(w.get_children().any(func(n: Node) -> bool: return n is HaulRope), "the rope flies from the Harpooner's hand")
+	await frames(60)
+	var gap := Vector2(caught.position.x - p.global_position.x, caught.position.z - p.global_position.z).length()
+	check(gap < 3.2 and caught.hp < hp0 and caught._stun > 0.0, "Haul drags it in on the rope, strikes and stuns it (%.1f m away now)" % gap)
+	caught.release()
+	# Too big to move: the rope hauls the Harpooner to it.
+	_face_ahead()
+	var big := foe("normal", 14.0)
+	big._scale = 1.6 # too big to drag, like a Brute or anything a boss
+	big.set_physics_process(false)
+	var from := p.global_position
+	HarpoonerKit.haul(p)
+	await frames(90)
+	var to_big := Vector2(big.position.x - p.global_position.x, big.position.z - p.global_position.z).length()
+	check(p.global_position.distance_to(from) > 8.0 and to_big < HarpoonerKit.HAUL_STOP + big.body_radius() + 1.0, "something too big to move pulls the Harpooner to it instead (%.1f m from it)" % to_big)
+	big._scale = 1.0
+	big.release()
+	# Reaver: Blood in the Water.
+	pawn("harpooner", 0)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.path_art_def()["name"] == "Blood in the Water", "a Reaver keeps Haul and gets Blood in the Water on a second button")
+	HarpoonerKit.cast_path(p)
+	check(HarpoonerKit.in_blood(p) and is_equal_approx(p.m("speed"), 1.0 + HarpoonerKit.BLOOD_SPEED), "in Blood in the Water the Reaver moves 15% faster")
+	p.hp = 50.0
+	HarpoonerKit.on_blow(p)
+	check(is_equal_approx(p.hp, 50.0 + HarpoonerKit.BLOOD_HEAL), "and every blow that lands heals 3")
+	var mark := foe("normal", 10.0)
+	HarpoonerKit.haul(p)
+	check(is_equal_approx(mark._mark_mult, HarpoonerKit.HAUL_MARK), "what a Reaver hauls takes 30% more damage")
+	mark.release()
+	# Red Tide, No Quarter: with the whole tree, a kill in Blood in the Water hauls the next one in.
+	pawn("harpooner", 0, true)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.has_flag("red_tide") and p.has_flag("haul_refund"), "a Reaver's tree reaches Red Tide")
+	HarpoonerKit.cast_path(p)
+	var victim := foe("normal", 2.0, 0.0, 30.0)
+	var next := foe("normal", 10.0, 3.0)
+	var next_was := next.position.distance_to(p.global_position)
+	p.hauled[victim.get_instance_id()] = w.now + 4.0
+	p.art_cd_left = 6.0
+	victim.next_hitter = -1 # nobody is credited: the kill is handed to the player below
+	victim.take_damage(500.0, Vector3.ZERO, 0.0, victim.centre())
+	p.on_kill(victim)
+	await frames(60)
+	check(next.position.distance_to(p.global_position) < next_was - 4.0, "Red Tide: the kill hauls the nearest enemy in (%.1f m, was %.1f)" % [next.position.distance_to(p.global_position), next_was])
+	check(p.art_cd_left <= 2.0 + 0.01, "No Quarter: killing what it hauled takes 4 s off Haul (%.1f)" % p.art_cd_left)
+	next.release()
+	# Grapple Slam: hauled to something big, the Harpooner lands in a slam.
+	p.flags["haul_slam"] = true
+	_face_ahead()
+	var anchor := foe("normal", 13.0)
+	anchor._scale = 1.6
+	anchor.set_physics_process(false)
+	var bystander := foe("normal", 12.0, 1.5)
+	bystander.set_physics_process(false)
+	var by0 := bystander.hp
+	HarpoonerKit.haul(p)
+	await frames(100)
+	check(bystander.hp < by0 - 1.0, "Grapple Slam strikes what stands round where it lands (%.0f)" % (by0 - bystander.hp))
+	anchor._scale = 1.0
+	anchor.release()
+	bystander.release()
+	# Rigger: Rig a Line.
+	pawn("harpooner", 1)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.path_art_def()["name"] == "Rig a Line", "a Rigger gets Rig a Line")
+	HarpoonerKit.cast_path(p)
+	var mine := w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and l.owner_peer == p.net_id())
+	check(mine.size() == 1 and (mine[0] as RigLine).length() > 10.0, "a line staked from the Rigger's feet ahead (%.1f m)" % ((mine[0] as RigLine).length() if not mine.is_empty() else 0.0))
+	if mine.is_empty():
+		return
+	var line: RigLine = mine[0]
+	var mid := (line.a + line.b) * 0.5
+	var tripper := foe("normal", 0.0)
+	tripper.position = Vector3(mid.x, w.ground_at(mid), mid.z)
+	tripper.set_physics_process(false)
+	await frames(20)
+	check(tripper._stun > 0.0 and tripper._slow > 0.0, "an enemy on the line trips: stunned and slowed")
+	tripper.release()
+	p.path_art_cd_left = 0.0
+	p.global_position += Vector3(4, 0, 0)
+	HarpoonerKit.cast_path(p)
+	p.global_position += Vector3(4, 0, 0)
+	HarpoonerKit.cast_path(p)
+	mine = w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and not l.is_queued_for_deletion() and l.owner_peer == p.net_id())
+	check(mine.size() == HarpoonerKit.RIG_LINES, "only %d lines at a time: the oldest comes up" % HarpoonerKit.RIG_LINES)
+	for l: RigLine in w.rig_lines.duplicate(): w.remove_rig_line(l)
+	pawn("harpooner", 1, true)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.has_flag("cats_cradle") and p.has_flag("line_barbs") and int(p.m("line_time")) == 6, "a Rigger's tree: Tarred Rope, Barbed Line and Cat's Cradle")
+	HarpoonerKit.cast_path(p)
+	p.global_position += Vector3(6, 0, 0)
+	HarpoonerKit.cast_path(p)
+	var ties := w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and l.cradle)
+	check(ties.size() == 1, "Cat's Cradle ties the new line to the far end of the other")
+	var cut := foe("normal", 0.0)
+	var own: RigLine = w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and not l.cradle).front()
+	var on := (own.a + own.b) * 0.5
+	cut.position = Vector3(on.x, w.ground_at(on), on.z)
+	cut.set_physics_process(false)
+	var cut0 := cut.hp
+	await frames(20)
+	check(cut.hp <= cut0 - HarpoonerKit.BARB_DAMAGE + 0.01 and cut.bleed_left > 0.0, "Barbed Line: what trips is cut and bleeds (%.0f)" % (cut0 - cut.hp))
+	check(own.left > HarpoonerKit.RIG_TIME, "Tarred Rope: lines stand longer")
+	cut.release()
+	for l: RigLine in w.rig_lines.duplicate(): w.remove_rig_line(l)
+	await frames(2)
+	# Leviathan Hunter: Great Harpoon through a line of them, pinned and marked.
+	pawn("harpooner", 2)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.path_art_def()["name"] == "Great Harpoon", "a Leviathan Hunter gets Great Harpoon")
+	var first := foe("normal", 8.0)
+	var second := foe("normal", 14.0)
+	first.set_physics_process(false)
+	second.set_physics_process(false)
+	var f0 := first.hp
+	var s0 := second.hp
+	HarpoonerKit.cast_path(p)
+	await frames(80)
+	check(first.hp < f0 and second.hp < s0, "the Great Harpoon flies through both (%.0f, %.0f)" % [f0 - first.hp, s0 - second.hp])
+	check(is_equal_approx(first._mark_mult, HarpoonerKit.MARK) and first._mark_time > 0.0 and first.root_left > 0.0, "and pins and marks what it strikes: 20% more damage from everyone")
+	first.release()
+	second.release()
+	p.flags["big_game"] = true
+	p.flags["bane"] = true
+	var boss := foe("normal", 10.0)
+	boss.def = boss.def.duplicate()
+	boss.def["miniboss"] = true # as the Harbourmaster or the Lighthouse Keeper are
+	boss.set_physics_process(false)
+	HarpoonerKit.mark(p, boss)
+	check(is_equal_approx(boss._mark_mult, HarpoonerKit.BANE), "Leviathan's Bane: a marked miniboss takes 40% more")
+	check(is_equal_approx(p.modify_damage(boss, 100.0), 100.0 * (1.0 + HarpoonerKit.BIG_GAME)), "Whale Oil: the Hunter strikes bosses and minibosses 30% harder")
+	boss.release()
+	p.flags["flensing"] = true
+	var prey := foe("normal", 6.0, 0.0, 20.0)
+	HarpoonerKit.mark(p, prey)
+	p.hp = 40.0
+	prey.next_hitter = -1 # nobody is credited: the kill is handed to the player below
+	prey.take_damage(500.0, Vector3.ZERO, 0.0, prey.centre())
+	p.on_kill(prey)
+	check(is_equal_approx(p.hp, 40.0 + HarpoonerKit.FLENSE_HEAL), "Flensing: killing what you marked heals 10")
+
 
 
 ## A wall between a shot and a body protects the body: an arrow flying along a wall does not graze a

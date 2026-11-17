@@ -50,6 +50,10 @@ const COPY := {
 		"Every road beyond the Mists was drawn by someone first.",
 		"Plant linked beacons that speed, mend and mark, and specialize in constellations, waygates or hidden finds."
 	],
+	"harpooner": [
+		"What climbs out of the sea answers to the rope.",
+		"Haul enemies in on a line, or yourself to the big ones, and specialize in boarding, rigging or great hunts."
+	],
 	"commander": [
 		"A single voice can turn the battle.",
 		"Use Command and unlock a profession-specific Last Command at level ten."
