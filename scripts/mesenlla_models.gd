@@ -7,8 +7,9 @@ extends RefCounted
 ## The state a creature is in (rearing, charging, slamming...) is Zombie._current_anim, which is
 ## also what other phones are sent, so they show the same thing.
 
+## Also the creatures of Port Vael (VaelModels.KINDS), built and moved through here on the same rigs.
 const KINDS := ["bear", "mist_bear", "eagle", "mist_eagle", "shapeshifter", "earth_elemental", "mist_elemental",
-	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern"]
+	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler"]
 const FLYERS := ["eagle", "mist_eagle", "wyvern", "war_wyvern"]
 const BOSS_NAMES := {"great_revenant_elemental": "GREAT REVENANT ELEMENTAL", "war_wyvern": "WAR WYVERN"}
 
@@ -766,6 +767,12 @@ static func build(id: String) -> Node3D:
 		"war_wyvern":
 			_wyvern_parts(root, true)
 			_label(root, 4.4)
+		"brine_hound":
+			_quadruped(root, "brine_hound", VaelModels.hound_look())
+		"lantern_jelly":
+			VaelModels.jelly_parts(root)
+		"angler":
+			VaelModels.angler_parts(root)
 	return root
 
 
@@ -843,6 +850,13 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 			bolts.visible = state == "m_cast" or fmod(t * 3.7, 1.0) > 0.82
 			bolts.rotation.y = floor(t * 9.0) * 1.3
 			(root.get_node("Cloud") as Node3D).position.y = 0.3 if state == "m_cast" else 0.0
+		"brine_hound":
+			# A Brine Hound moves as the Mist Wolf does: the same lope, crouch and lunge.
+			_animate_wolf(z, root, delta, speed, "m_bite" if state == "m_swipe" else state, float(root.get_meta("act_t", 0.0)))
+		"lantern_jelly":
+			VaelModels.animate_jelly(z, root, delta, speed, state, t, float(root.get_meta("act_t", 0.0)))
+		"angler":
+			VaelModels.animate_angler(z, root, delta, speed, state, t, float(root.get_meta("act_t", 0.0)))
 	if z.model_id == "war_wyvern":
 		_boss_label(z, root)
 
@@ -1462,6 +1476,14 @@ static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> vo
 	match z.model_id:
 		"bear", "mist_bear":
 			_fall_quadruped(root, k, side, 0.5)
+			root.position.y = -sink * 1.0
+		"brine_hound":
+			_fall_quadruped(root, k, side, 0.24)
+			root.position.y = -sink * 0.8
+		"lantern_jelly":
+			VaelModels.fall_jelly(root, k, delta)
+		"angler":
+			VaelModels.fall_angler(root, k, side)
 			root.position.y = -sink * 1.0
 		"shapeshifter":
 			match str(root.get_meta("dies_as", "Stag")):

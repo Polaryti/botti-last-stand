@@ -146,6 +146,7 @@ func _process(delta: float) -> void:
 	level = want if absf(want - level) > 1.0 else move_toward(level, want, delta * 2.0)
 	if _mat:
 		_mat.set_shader_parameter("level", level)
+	world.set_tide_fog(fog_scale())
 	if always_high:
 		return
 	var h := is_high_at(e)
@@ -205,6 +206,14 @@ func _build_water() -> void:
 				st.add_vertex(Vector3(c.x, 0.0, c.y))
 	if not any:
 		return
+	if not t.coast.is_empty():
+		# The open sea, out past the edge of the land to the horizon.
+		var far := 900.0
+		for k: int in [0, 1, 2, 0, 2, 3]:
+			var c: Vector2 = [Vector2(-far, half - 1.0), Vector2(far, half - 1.0), Vector2(far, half + far), Vector2(-far, half + far)][k]
+			st.set_uv2(Vector2(Terrain.SEA_Y - 6.0, 0.0))
+			st.set_uv(c * 0.1)
+			st.add_vertex(Vector3(c.x, 0.0, c.y))
 	_water = MeshInstance3D.new()
 	_water.name = "TideWater"
 	_water.mesh = st.commit()

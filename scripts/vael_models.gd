@@ -37,7 +37,7 @@ const TAR := Color(0.12, 0.11, 0.1)
 
 const JELLY_FLOAT := 1.7 # how high its bell drifts
 const JELLY_THREADS := 8
-const ANGLER_BURIED := -0.62 # how far down its body lies, waiting
+const ANGLER_BURIED := -1.05 # how far down its body lies, waiting: only the top of its head and its lure show
 
 
 static func _mesh(key: String, build: Callable) -> ArrayMesh:
@@ -293,6 +293,44 @@ static func animate_jelly(z: Zombie, root: Node3D, delta: float, speed: float, s
 			at = at.get_node("Joint") as Node3D
 
 
+## Dying: the bell crumples and empties, its threads go limp, its lantern gutters out, and what is left
+## drifts down onto the sand.
+static func fall_jelly(root: Node3D, k: float, delta: float) -> void:
+	var float_node := root.get_node("Float") as Node3D
+	var bell := float_node.get_node("Bell") as Node3D
+	var go := smoothstep(0.0, 1.6, k)
+	float_node.position.y = lerpf(float_node.position.y, 0.35, minf(1.0, delta * 1.5))
+	bell.scale = Vector3(1.0 + go * 0.35, maxf(0.05, 1.0 - go * 0.85), 1.0 + go * 0.35)
+	bell.rotation.x = lerpf(bell.rotation.x, 0.5, minf(1.0, delta * 2.0))
+	(bell.get_node("Arcs") as Node3D).visible = k < 0.5 and fmod(k * 11.0, 1.0) > 0.5
+	var light := bell.get_node("Light") as OmniLight3D
+	light.light_energy = maxf(0.0, 1.4 * (1.0 - k / 1.2)) * (0.7 + 0.3 * sin(k * 37.0))
+	(bell.get_node("Lantern") as Node3D).scale = Vector3.ONE * maxf(0.01, 1.0 - k * 0.9)
+	var threads := bell.get_node("Threads") as Node3D
+	for i in JELLY_THREADS:
+		var at := threads.get_node("Thread%d" % i) as Node3D
+		for j in 3:
+			at.rotation.x = lerpf(at.rotation.x, 0.6 + j * 0.3, minf(1.0, delta * 2.0))
+			at = at.get_node("Joint") as Node3D
+
+
+## Dying: it rears back with its jaws wide, then flops over onto its side, its lure drooping and dimming.
+static func fall_angler(root: Node3D, k: float, side: float) -> void:
+	var body := root.get_node("Body") as Node3D
+	var jaw := root.get_node("Body/Head/Jaw") as Node3D
+	var rear := sin(clampf(k / 0.5, 0.0, 1.0) * PI)
+	var over := smoothstep(0.35, 1.0, k)
+	body.rotation.x = -0.5 * rear
+	body.rotation.z = side * 1.4 * over
+	body.position.y = 0.5 - 0.15 * over
+	jaw.rotation.x = 0.9 * rear + 0.5 * over
+	var stalk := root.get_node("Body/Head/Stalk") as Node3D
+	stalk.rotation.x = lerpf(0.2, 1.4, over)
+	var light := stalk.get_node("Stalk2/Lure/Light") as OmniLight3D
+	light.light_energy = maxf(0.0, 1.1 * (1.0 - k / 1.4))
+	root.set_meta("buried", false)
+
+
 # --- Angler -----------------------------------------------------------------------------------
 
 ## A squat fish-thing on short webbed legs: a head as big as its body, all mouth, a lower jaw jutting
@@ -517,38 +555,40 @@ static func sailor_gear() -> Dictionary:
 ## head like armour, weed trailing from them, and a length of anchor chain wound over a shoulder.
 ## It turns its shell to blows (see ZombieDefs "shell").
 static func brute_gear() -> Dictionary:
+	var crust := Color(0.5, 0.5, 0.47)
 	return {
 		"head": _mesh("brute_head", func(l: LowPoly) -> void:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 2351
-			l.prism(Vector3(0, 0.5, -0.15), Vector3(0, 1.0, -0.25), 0.62, 0.42, 8, BARNACLE_DARK)
-			barnacles(l, Vector3(0, 0.95, -0.2), Vector3(0, 1, -0.3), 7, 0.08, rng)
-			barnacles(l, Vector3(0.5, 0.7, -0.2), Vector3(1, 0.4, -0.2), 5, 0.07, rng)
-			barnacles(l, Vector3(-0.5, 0.7, -0.25), Vector3(-1, 0.4, -0.2), 5, 0.07, rng)
+			# A cap of barnacles over the back of its skull, coral growing out of it; the face left bare.
+			l.prism(Vector3(0, 0.75, -0.3), Vector3(0, 1.08, -0.42), 0.55, 0.32, 8, crust.darkened(0.15))
+			barnacles(l, Vector3(0, 1.0, -0.4), Vector3(0, 1, -0.4), 7, 0.075, rng)
+			barnacles(l, Vector3(0.45, 0.8, -0.35), Vector3(1, 0.3, -0.4), 4, 0.065, rng)
+			barnacles(l, Vector3(-0.45, 0.8, -0.35), Vector3(-1, 0.3, -0.4), 4, 0.065, rng)
 			for i in 3:
-				var x := -0.3 + i * 0.3
-				l.prism(Vector3(x, 1.0, -0.3), Vector3(x * 1.3, 1.35, -0.45), 0.05, 0.015, 4, CORAL)
-				l.prism(Vector3(x * 1.2, 1.2, -0.38), Vector3(x * 1.2 + 0.12, 1.3, -0.4), 0.025, 0.01, 4, CORAL.lightened(0.1))
-			kelp(l, Vector3(0, 0.6, -0.55), 0.6, 4, rng)),
+				var x := -0.28 + i * 0.28
+				l.prism(Vector3(x, 1.0, -0.42), Vector3(x * 1.3, 1.4, -0.58), 0.05, 0.015, 4, CORAL)
+				l.prism(Vector3(x * 1.2, 1.22, -0.5), Vector3(x * 1.2 + 0.12, 1.32, -0.52), 0.025, 0.01, 4, CORAL.lightened(0.1))
+			kelp(l, Vector3(0.1, 0.75, -0.6), 0.55, 3, rng)),
 		"chest": _mesh("brute_chest", func(l: LowPoly) -> void:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 2352
-			# The shell over its back and shoulders.
-			l.prism(Vector3(0, 0.55, -0.35), Vector3(0, -0.3, -0.45), 0.75, 0.62, 9, BARNACLE_DARK.darkened(0.1))
+			# The shell over its back and shoulders, white with barnacles, green with weed at the edges.
+			l.prism(Vector3(0, 0.5, -0.38), Vector3(0, -0.25, -0.46), 0.7, 0.58, 9, crust.darkened(0.2))
 			for side: float in [-1.0, 1.0]:
-				l.prism(Vector3(side * 0.55, 0.5, -0.05), Vector3(side * 0.85, 0.35, -0.05), 0.32, 0.22, 7, BARNACLE_DARK)
-				barnacles(l, Vector3(side * 0.75, 0.55, -0.05), Vector3(side, 0.8, 0), 8, 0.07, rng)
-			for i in 14:
-				var a := rng.randf_range(-1.2, 1.2)
-				var y := rng.randf_range(-0.2, 0.55)
-				barnacles(l, Vector3(sin(a) * 0.72, y, -0.35 - cos(a) * 0.32), Vector3(sin(a), 0.2, -cos(a)), 3, 0.07, rng)
-			# Anchor chain round one shoulder.
+				l.prism(Vector3(side * 0.5, 0.48, -0.08), Vector3(side * 0.82, 0.34, -0.08), 0.3, 0.2, 7, crust.darkened(0.1))
+				barnacles(l, Vector3(side * 0.72, 0.52, -0.08), Vector3(side, 0.8, 0), 9, 0.075, rng)
+			for i in 18:
+				var a := rng.randf_range(-1.1, 1.1)
+				var y := rng.randf_range(-0.15, 0.5)
+				barnacles(l, Vector3(sin(a) * 0.66, y, -0.4 - cos(a) * 0.3), Vector3(sin(a), 0.2, -cos(a)), 3, 0.075, rng)
+			# Anchor chain over one shoulder and across its chest.
 			for i in 9:
 				var a := float(i) / 8.0
-				var p := Vector3(lerpf(0.65, -0.5, a), lerpf(0.5, -0.25, a), 0.52 - sin(a * PI) * 0.1)
-				l.box(p, Vector3(0.14, 0.09, 0.05) if i % 2 == 0 else Vector3(0.05, 0.09, 0.14), IRON.lightened(0.1) if i % 3 else RUST)
-			kelp(l, Vector3(0.6, 0.3, -0.3), 0.6, 3, rng)
-			kelp(l, Vector3(-0.6, 0.2, -0.3), 0.55, 3, rng)),
+				var p := Vector3(lerpf(0.62, -0.5, a), lerpf(0.5, -0.22, a), 0.52 - sin(a * PI) * 0.1)
+				l.box(p, Vector3(0.14, 0.09, 0.05) if i % 2 == 0 else Vector3(0.05, 0.09, 0.14), IRON.lightened(0.15))
+			kelp(l, Vector3(0.62, 0.32, -0.3), 0.6, 3, rng)
+			kelp(l, Vector3(-0.62, 0.22, -0.3), 0.55, 3, rng)),
 	}
 
 
@@ -556,4 +596,4 @@ static func brute_gear() -> Dictionary:
 static func drowned_eyes() -> Mesh:
 	return _mesh("drowned_eyes", func(l: LowPoly) -> void:
 		for x: float in [-0.17, 0.17]:
-			l.box(Vector3(x, 0.47, 0.62), Vector3(0.12, 0.06, 0.03), DROWNED_GLOW))
+			l.box(Vector3(x, 0.4, 0.62), Vector3(0.12, 0.06, 0.03), DROWNED_GLOW))

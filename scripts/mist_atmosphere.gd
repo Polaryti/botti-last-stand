@@ -1,7 +1,7 @@
 class_name MistAtmosphere
 extends Node3D
 ## Local night atmosphere. Every profile has a fixed particle budget independent of map size.
-enum Place { MISTS, VILLAGE, FORT, MESENLLA }
+enum Place { MISTS, VILLAGE, FORT, MESENLLA, VAEL }
 var place := Place.MISTS
 var world: World
 var _follow := 0.0
@@ -11,7 +11,7 @@ var _motes: CPUParticles3D
 func _ready() -> void:
 	_wisps = CPUParticles3D.new()
 	_wisps.name = "GroundWisps"
-	_wisps.amount = (8 if Game.quality == 0 else 18) if place in [Place.MISTS, Place.MESENLLA] else (5 if Game.quality == 0 else 10)
+	_wisps.amount = (8 if Game.quality == 0 else 18) if place in [Place.MISTS, Place.MESENLLA, Place.VAEL] else (5 if Game.quality == 0 else 10)
 	_wisps.lifetime = 7.0
 	_wisps.preprocess = 1.0
 	_wisps.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
@@ -32,6 +32,9 @@ func _ready() -> void:
 	if place == Place.MESENLLA:
 		material.set_shader_parameter("tint", Vector3(0.62, 0.5, 0.78))
 		material.set_shader_parameter("opacity", 0.16)
+	elif place == Place.VAEL:
+		material.set_shader_parameter("tint", Vector3(0.48, 0.66, 0.64)) # sea-mist off the water
+		material.set_shader_parameter("opacity", 0.15)
 	elif place != Place.MISTS:
 		material.set_shader_parameter("tint", Vector3(0.27, 0.29, 0.34) if place == Place.VILLAGE else Vector3(0.29, 0.25, 0.21))
 		material.set_shader_parameter("opacity", 0.10)
@@ -62,7 +65,7 @@ func _ready() -> void:
 	mote.rings = 2
 	var glow := StandardMaterial3D.new()
 	glow.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow.albedo_color = Color(0.3, 0.75, 0.8) if place == Place.MISTS else Color(0.8, 0.65, 0.25) if place == Place.VILLAGE else Color(0.65, 0.95, 0.92) if place == Place.MESENLLA else Color(0.85, 0.34, 0.1)
+	glow.albedo_color = Color(0.3, 0.75, 0.8) if place == Place.MISTS else Color(0.8, 0.65, 0.25) if place == Place.VILLAGE else Color(0.65, 0.95, 0.92) if place == Place.MESENLLA else Color(0.55, 1.0, 0.82) if place == Place.VAEL else Color(0.85, 0.34, 0.1)
 	mote.material = glow
 	_motes.mesh = mote
 	_motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

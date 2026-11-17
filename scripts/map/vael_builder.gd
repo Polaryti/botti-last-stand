@@ -43,6 +43,31 @@ static func _stone_col(y_mid: float, tide: float, base: Color, rng: RandomNumber
 	return c
 
 
+## Flagstones over the land: big worn slabs of grey stone in rows along X, on a bed of mortar, with
+## weeds in a few of the joints. The quay and the market square are paved with them.
+static func paving(b: MapBuilder, length: float, deep: float) -> void:
+	var rng := b.seeded()
+	var l := b.mesh()
+	l.box(Vector3(0, -0.02, 0), Vector3(length, 0.1, deep), QUAY_DARK.darkened(0.3))
+	var z := -deep * 0.5
+	var row := 0
+	while z < deep * 0.5 - 0.05:
+		var d := minf(rng.randf_range(1.0, 1.5), deep * 0.5 - z)
+		var x := -length * 0.5 - (rng.randf_range(0.0, 0.8) if row % 2 else 0.0)
+		while x < length * 0.5:
+			var w := rng.randf_range(1.0, 2.0)
+			var x0 := maxf(x, -length * 0.5)
+			var x1 := minf(x + w, length * 0.5)
+			if x1 - x0 > 0.15:
+				var at := Vector3((x0 + x1) * 0.5, 0.06, z + d * 0.5)
+				var y := (b.xf.affine_inverse() * b.on_ground(Vector3(at.x, 0, at.z))).y
+				l.box(Vector3(at.x, maxf(y, 0.0) + 0.06, at.z), Vector3(x1 - x0 - 0.06, 0.1, d - 0.06), QUAY_STONE.lerp(SAND, rng.randf_range(0.0, 0.2)).darkened(rng.randf_range(0.0, 0.14)))
+			x += w
+		z += d
+		row += 1
+	b.add(l)
+
+
 ## The face of a harbour wall along the piece's X axis, from its top (the piece's height) down to the
 ## seabed in front of it (+Z), in courses of dressed stone; a band of weed and barnacles below the
 ## high-water mark; iron mooring rings and stone bollards along the top, and a coping of long slabs.
@@ -111,7 +136,8 @@ static func mole(b: MapBuilder, length: float, wide: float) -> void:
 	var l := b.mesh()
 	var tide := _tide_line(b)
 	var half := wide * 0.5
-	# Paving.
+	# Paving, on a bed of rubble and mortar.
+	l.box(Vector3(0, -0.06, 0), Vector3(wide, 0.14, length), QUAY_DARK.darkened(0.25))
 	var z := -length * 0.5
 	while z < length * 0.5:
 		var d := minf(1.4, length * 0.5 - z)
@@ -209,105 +235,126 @@ static func lighthouse(b: MapBuilder, high: float, lit: bool) -> void:
 	MesenllaBuilder._feature(b, "lighthouse", 6.0)
 
 
-## A ship wrecked on the seabed, lying over on her side along the piece's X axis, bow at +X: the hull
-## of tarred planks on its ribs, stove in amidships so the ribs show, the deck tipped towards you (+Z)
-## with its hatch and rail, the mast snapped and fallen across the flats with its yard and a rag of
-## sail, rigging trailing, and all of it crusted with barnacles and hung with weed. length is from bow
-## to stern. Solid where it is solid: you can climb in through the hole in its side.
+## A ship wrecked on the seabed along the piece's X axis, bow at +X: sunk in the sand to her
+## waterline and listing towards +Z, her hull of tarred planks on ribs with a red band at the wale,
+## the stem rising at the bow and a stern cabin aft. Her deck is planked, broken through amidships
+## where the hold gapes, and her side is stove in towards you (+Z) so you can climb in. The mast has
+## snapped: its stump stands, and the rest lies across the flats with its yard and a rag of sail, the
+## rigging trailing. Barnacles crust her and weed hangs from her, all below the high-water mark.
 static func wreck(b: MapBuilder, length: float) -> void:
 	var rng := b.seeded()
 	var l := b.mesh()
 	var half := length * 0.5
-	var beam := length * 0.28
+	var beam := length * 0.3
 	var depth := length * 0.2
-	var heel := 0.62 # how far she lies over
+	# She lies half sunk: her keel and bilge under the sand, her deck a little above it.
+	var at_rest := b.xf
+	b.xf = b.xf.translated_local(Vector3(0, depth * 0.35, 0))
+	var tide := _tide_line(b)
+	var heel := 0.2
 	var lean := Basis(Vector3(1, 0, 0), heel)
-	var hole := Vector2(-length * 0.08, length * 0.16) # where her side is stove in, along X
-	# Ribs and planks, built as if upright, then tipped over.
+	var hole := Vector2(-length * 0.12, length * 0.12) # where her side is stove in and her deck broken, along X
 	var stations := int(length / 0.9)
-	for k in stations + 1:
-		var s := float(k) / stations
+	# The section of the hull at s (0 stern to 1 bow): half its width and the height of its gunwale.
+	var section := func(s: float) -> Vector2:
+		var fat := sin(clampf(s * 0.92 + 0.04, 0.0, 1.0) * PI) ** 0.55
+		if s > 0.8:
+			fat *= lerpf(1.0, 0.25, (s - 0.8) / 0.2) # the bow draws to a point
+		var sheer := depth * 0.18 + depth * 0.35 * pow(absf(s - 0.45) * 2.0, 2.0)
+		return Vector2(beam * 0.5 * fat, sheer)
+	var rib := func(s: float, side: float) -> Array[Vector3]:
 		var x := lerpf(-half, half, s)
-		# The hull's section narrows to the bow and stern.
-		var fat := sin(clampf(s, 0.04, 0.96) * PI) ** 0.6
-		var wide := beam * 0.5 * fat
-		var keel := -depth * (0.4 + 0.6 * fat)
-		var stove := x > hole.x and x < hole.y
+		var sec: Vector2 = section.call(s)
+		var keel := -depth
+		return [Vector3(x, keel, 0), Vector3(x, keel * 0.6, side * sec.x * 0.75), Vector3(x, keel * 0.15, side * sec.x), Vector3(x, sec.y, side * sec.x * 0.94)]
+	for k in stations:
+		var s0 := float(k) / stations
+		var s1 := float(k + 1) / stations
+		var x0 := lerpf(-half, half, s0)
+		var stove := x0 > hole.x and x0 < hole.y
 		for side: float in [-1.0, 1.0]:
-			# The rib, in three segments from keel to gunwale.
-			var pts := [Vector3(x, keel, 0), Vector3(x, keel * 0.55, side * wide * 0.8), Vector3(x, keel * 0.1, side * wide), Vector3(x, depth * 0.15, side * wide * 0.92)]
+			var r0: Array[Vector3] = rib.call(s0, side)
+			var r1: Array[Vector3] = rib.call(s1, side)
 			for p in 3:
-				var a: Vector3 = lean * pts[p]
-				var e: Vector3 = lean * pts[p + 1]
-				l.prism(a, e, 0.08, 0.08, 4, WOOD_DARK)
-			# Planking between this station and the next, except where she is stove in on her low side.
-			if k < stations and not (stove and side < 0):
-				var s2 := float(k + 1) / stations
-				var x2 := lerpf(-half, half, s2)
-				var fat2 := sin(clampf(s2, 0.04, 0.96) * PI) ** 0.6
-				var wide2 := beam * 0.5 * fat2
-				var keel2 := -depth * (0.4 + 0.6 * fat2)
-				var pts2 := [Vector3(x2, keel2, 0), Vector3(x2, keel2 * 0.55, side * wide2 * 0.8), Vector3(x2, keel2 * 0.1, side * wide2), Vector3(x2, depth * 0.15, side * wide2 * 0.92)]
-				for p in 3:
-					var a0: Vector3 = lean * pts[p]
-					var a1: Vector3 = lean * pts[p + 1]
-					var c0: Vector3 = lean * pts2[p]
-					var c1: Vector3 = lean * pts2[p + 1]
-					var col := HULL_PAINT if p == 2 else WOOD_WET
-					if p == 2 and k % 7 == 3:
-						col = HULL_RED
-					col = col.darkened(rng.randf_range(0.0, 0.15))
-					l.gable(a0, c0, c1, col)
-					l.gable(a0, c1, a1, col)
-	# The deck, tipped, with hatch, rail and a broken bit of bulwark.
+				if k % 2 == 0:
+					l.prism(lean * r0[p], lean * r0[p + 1], 0.07, 0.07, 4, WOOD_DARK)
+				# Planks, except where she is stove in on the side that faces you (and up near the wale).
+				if stove and side > 0 and p >= 1:
+					continue
+				var col := WOOD_WET.darkened(rng.randf_range(0.0, 0.2))
+				if p == 1:
+					col = HULL_PAINT.darkened(rng.randf_range(0.0, 0.2))
+				l.gable(lean * r0[p], lean * r1[p], lean * r1[p + 1], col)
+				l.gable(lean * r0[p], lean * r1[p + 1], lean * r0[p + 1], col)
+			# The wale: a red-painted strake along her side under the gunwale.
+			if not (stove and side > 0):
+				var drop := Vector3(0, -0.35, 0)
+				l.prism(lean * (r0[3] + drop), lean * (r1[3] + drop), 0.09, 0.09, 4, HULL_RED.darkened(rng.randf_range(0.0, 0.2)))
+		# The deck, planked, broken through over the hold.
+		var sec: Vector2 = section.call((s0 + s1) * 0.5)
+		var planks := 6
+		for j in planks:
+			var z := lerpf(-sec.x * 0.9, sec.x * 0.9, (j + 0.5) / planks)
+			if stove and (j >= 2 or rng.randf() < 0.5):
+				continue
+			l.turned_box(lean * Vector3((x0 + lerpf(-half, half, s1)) * 0.5, depth * 0.12, z), Vector3(length / stations + 0.02, 0.08, sec.x * 1.8 / planks - 0.05), WOOD_BLEACHED.darkened(rng.randf_range(0.15, 0.35)), lean)
+	# The stem at the bow and the transom and cabin at the stern.
+	var bow := lean * Vector3(half, (section.call(1.0) as Vector2).y, 0)
+	l.prism(lean * Vector3(half * 0.92, -depth, 0), bow + Vector3(0.6, 0.9, 0), 0.14, 0.1, 5, WOOD_DARK)
+	var stern_sec: Vector2 = section.call(0.0)
+	l.turned_box(lean * Vector3(-half + 0.05, stern_sec.y * 0.5 - depth * 0.3, 0), Vector3(0.16, stern_sec.y + depth * 0.5, beam * 0.7), WOOD_WET, lean)
+	l.turned_box(lean * Vector3(-half * 0.7, depth * 0.12 + 0.85, 0), Vector3(length * 0.18, 1.6, beam * 0.62), WOOD_WET.lightened(0.05), lean)
+	l.turned_box(lean * Vector3(-half * 0.7, depth * 0.12 + 1.72, 0), Vector3(length * 0.2, 0.12, beam * 0.68), WOOD_DARK, lean)
+	l.turned_box(lean * Vector3(-half * 0.7 + length * 0.09, depth * 0.12 + 0.75, 0), Vector3(0.06, 1.2, 0.8), Color(0.05, 0.05, 0.06), lean)
+	# The stump of the mast, and the mast fallen across the flats with its yard and sail.
 	var deck_y := depth * 0.12
-	l.turned_box(lean * Vector3(0, deck_y, 0), Vector3(length * 0.86, 0.12, beam * 0.86), WOOD_BLEACHED.darkened(0.2), lean)
-	l.turned_box(lean * Vector3(length * 0.1, deck_y + 0.3, 0), Vector3(1.6, 0.5, 1.4), WOOD_DARK, lean)
-	l.turned_box(lean * Vector3(-length * 0.32, deck_y + 0.9, 0), Vector3(length * 0.16, 1.6, beam * 0.7), WOOD_WET, lean) # the stern cabin
-	# The stump of the mast, and the mast itself fallen across the flats with its yard and sail.
 	var foot := lean * Vector3(length * 0.05, deck_y, 0)
-	l.prism(foot, lean * Vector3(length * 0.05, deck_y + 2.2, 0), 0.24, 0.2, 7, WOOD_WET)
+	l.prism(foot, lean * Vector3(length * 0.05, deck_y + 2.4, 0), 0.24, 0.2, 7, WOOD_WET)
 	var fall_dir := Vector3(0.35, 0, 1.0).normalized()
-	var mast_from := b.xf.affine_inverse() * b.on_ground(Vector3(length * 0.05, 0, beam * 0.6))
+	var mast_from := b.xf.affine_inverse() * b.on_ground(Vector3(length * 0.05, 0, beam * 0.75))
 	mast_from.y += 0.25
-	var mast_to := b.xf.affine_inverse() * b.on_ground(Vector3(length * 0.05, 0, beam * 0.6) + fall_dir * length * 0.65)
+	var mast_to := b.xf.affine_inverse() * b.on_ground(Vector3(length * 0.05, 0, beam * 0.75) + fall_dir * length * 0.6)
 	mast_to.y += 0.2
 	l.prism(mast_from, mast_to, 0.22, 0.14, 7, WOOD_WET.darkened(0.1))
 	var yard_mid := mast_from.lerp(mast_to, 0.6)
 	var yard_dir := fall_dir.cross(Vector3.UP).normalized()
-	l.prism(yard_mid - yard_dir * length * 0.22, yard_mid + yard_dir * length * 0.22, 0.1, 0.1, 6, WOOD_DARK)
-	# The rag of sail, draped over the yard onto the ground.
-	var drape := yard_mid + fall_dir * 1.6 + Vector3(0, -0.15, 0)
-	l.gable(yard_mid - yard_dir * length * 0.2, yard_mid + yard_dir * length * 0.15, drape + yard_dir * 0.6, SAIL.darkened(0.2))
-	# Rigging trailing.
-	for k in 5:
-		var from := lean * Vector3(rng.randf_range(-half * 0.6, half * 0.6), deck_y + 0.3, rng.randf_range(-beam * 0.3, beam * 0.3))
-		var to := b.xf.affine_inverse() * b.on_ground(Vector3(from.x + rng.randf_range(-2, 2), 0, beam * 0.6 + rng.randf_range(1.0, 4.0)))
-		var mid := from.lerp(to, 0.5) + Vector3(0, -0.3, 0)
+	l.prism(yard_mid - yard_dir * length * 0.2, yard_mid + yard_dir * length * 0.2, 0.1, 0.1, 6, WOOD_DARK)
+	var drape := yard_mid + fall_dir * 1.8 + Vector3(0, -0.1, 0)
+	l.gable(yard_mid - yard_dir * length * 0.18, yard_mid + yard_dir * length * 0.14, drape + yard_dir * 0.6, SAIL.darkened(0.2))
+	# Rigging trailing from the stump to the ground.
+	for k in 4:
+		var from := lean * Vector3(length * 0.05, deck_y + 2.2, 0)
+		var to := b.xf.affine_inverse() * b.on_ground(Vector3(length * 0.05 + rng.randf_range(-4, 4), 0, beam * 0.6 + rng.randf_range(0.5, 3.0)))
+		var mid := from.lerp(to, 0.5) + Vector3(0, -0.4, 0)
 		l.prism(from, mid, 0.025, 0.025, 3, ROPE)
 		l.prism(mid, to, 0.025, 0.025, 3, ROPE.darkened(0.2))
-	# Barnacles and weed all over what lies under the tide.
+	# Barnacles on her hull below the high-water mark, weed hanging along it.
 	for k in int(length * 3.0):
-		var x := rng.randf_range(-half * 0.9, half * 0.9)
-		var up := rng.randf_range(-0.7, 0.4)
-		var at := lean * Vector3(x, up * depth, -beam * 0.48)
-		VaelModels.barnacles(l, at, lean * Vector3(0, -0.4, -1), 3, 0.05, rng)
+		var s := rng.randf_range(0.08, 0.92)
+		var side := -1.0 if rng.randf() < 0.5 else 1.0
+		var r: Array[Vector3] = rib.call(s, side)
+		var at := lean * r[1].lerp(r[2], rng.randf())
+		if at.y < tide:
+			VaelModels.barnacles(l, at, lean * Vector3(0, -0.3, side), 3, 0.05, rng)
 	for k in int(length * 1.2):
-		var x := rng.randf_range(-half * 0.9, half * 0.9)
-		var at := lean * Vector3(x, depth * 0.1, -beam * 0.46)
-		VaelModels.kelp(l, at, rng.randf_range(0.4, 1.0), 2, rng)
+		var s := rng.randf_range(0.1, 0.9)
+		var side := -1.0 if rng.randf() < 0.5 else 1.0
+		var r: Array[Vector3] = rib.call(s, side)
+		var at := lean * r[3]
+		VaelModels.kelp(l, at + Vector3(0, -0.05, side * 0.05), rng.randf_range(0.4, 1.0), 2, rng)
 	b.add(l)
-	# Solid: the hull's high side and its keel, the stern cabin; open where she is stove in.
-	var high_side := lean * Vector3(0, -depth * 0.2, beam * 0.45)
-	b.solid(high_side + Vector3(0, depth * 0.3, 0), Vector3(length * 0.9, depth * 1.2, 0.8))
-	var low_side := lean * Vector3(0, -depth * 0.4, -beam * 0.4)
-	for seg: Vector2 in [Vector2(-half * 0.9, hole.x), Vector2(hole.y, half * 0.9)]:
-		if seg.y - seg.x > 0.5:
-			b.solid(Vector3((seg.x + seg.y) * 0.5, low_side.y + depth * 0.45, low_side.z), Vector3(seg.y - seg.x, depth, 0.8))
-	b.solid(lean * Vector3(-length * 0.32, deck_y + 0.9, 0), Vector3(length * 0.16, 1.8, beam * 0.6))
-	b.solid(mast_from.lerp(mast_to, 0.5), Vector3(0.5, 0.5, 0.5) + (mast_to - mast_from).abs())
-	b.w.perches.append(b.xf * (lean * Vector3(0, deck_y + 1.0, beam * 0.3)))
+	# Solid: her sides (open where she is stove in), her stern and cabin.
+	for side: float in [-1.0, 1.0]:
+		var wall_z := side * beam * 0.45
+		if side > 0:
+			for seg: Vector2 in [Vector2(-half * 0.85, hole.x), Vector2(hole.y, half * 0.85)]:
+				b.solid(lean * Vector3((seg.x + seg.y) * 0.5, 0.0, wall_z), Vector3(seg.y - seg.x, depth * 0.7, 0.7))
+		else:
+			b.solid(lean * Vector3(0, 0.0, wall_z), Vector3(length * 0.85, depth * 0.7, 0.7))
+	b.solid(lean * Vector3(-half * 0.7, deck_y + 0.85, 0), Vector3(length * 0.18, 1.7, beam * 0.62))
+	b.w.perches.append(b.xf * (lean * Vector3(-half * 0.7, deck_y + 1.8, 0)))
 	MesenllaBuilder._feature(b, "wreck", length)
+	b.xf = at_rest
 
 
 ## A small boat drawn up on the shore, keel up, or lying on its side: planks, oars and a coil of rope.
@@ -456,40 +503,85 @@ static func pilings(b: MapBuilder, length: float) -> void:
 	b.add(l)
 
 
-## A ruined bell tower of the drowned town, standing out on the flats: square, of dark stone, its top
-## broken off, leaning; the bell still hangs in the open frame, green with age. Tolls at the tide's
-## turning (see MistTide).
+## A ruined bell tower of the drowned town, standing out on the flats: square, of pale stone gone dark
+## and weeded up to the high-water mark, with quoins at its corners, a door, slit windows, and at the
+## top an open belfry of four pillars under a broken roof, the bell still hanging in it, green with
+## age. The whole tower leans a little, as the seabed has given under it.
 static func bell_tower(b: MapBuilder, high: float) -> void:
 	var rng := b.seeded()
 	var l := b.mesh()
 	var tide := _tide_line(b)
-	var lean := Basis(Vector3(0, 0, 1), 0.08) * Basis(Vector3(1, 0, 0), -0.05)
-	var course := 0.7
-	var y := -0.5
-	while y < high:
+	var lean := Basis(Vector3(0, 0, 1), 0.07) * Basis(Vector3(1, 0, 0), -0.04)
+	var half := 1.8
+	var belfry := high - 3.2 # where the open belfry begins
+	var stone := QUAY_STONE.lightened(0.08)
+	# The plinth, sunk in the sand.
+	l.turned_box(lean * Vector3(0, -0.2, 0), Vector3(half * 2.0 + 0.6, 0.8, half * 2.0 + 0.6), _stone_col(-0.2, tide, QUAY_DARK, rng), lean)
+	# The shaft, in courses, with quoins at the corners.
+	var course := 0.6
+	var y := 0.2
+	var row := 0
+	while y < belfry:
 		var mid := y + course * 0.5
-		for side in 4:
-			var a := side * PI * 0.5
-			var off := Vector3(cos(a), 0, sin(a)) * 1.6
-			var size := Vector3(0.4, course - 0.04, 3.6) if side % 2 == 0 else Vector3(3.6, course - 0.04, 0.4)
-			# The top is broken: some blocks missing near it.
-			if y > high - 2.2 and rng.randf() < 0.35:
-				continue
-			l.turned_box(lean * (off + Vector3(0, mid, 0)), size, _stone_col(mid, tide, QUAY_DARK.lightened(0.05), rng), lean)
+		var col := _stone_col(mid, tide, stone, rng)
+		l.turned_box(lean * Vector3(0, mid, 0), Vector3(half * 2.0, course - 0.03, half * 2.0), col, lean)
+		for cx: float in [-1.0, 1.0]:
+			for cz: float in [-1.0, 1.0]:
+				var long := 0.7 if (row + int(cx) + int(cz)) % 2 == 0 else 0.45
+				l.turned_box(lean * Vector3(cx * (half - long * 0.5 + 0.05), mid, cz * (half + 0.03)), Vector3(long, course - 0.06, 0.12), col.lightened(0.12), lean)
+				l.turned_box(lean * Vector3(cx * (half + 0.03), mid, cz * (half - (1.15 - long) * 0.5 + 0.05)), Vector3(0.12, course - 0.06, 1.15 - long), col.lightened(0.12), lean)
 		y += course
-	# Arches for the bell.
-	var arch_y := high - 2.6
-	l.turned_box(lean * Vector3(0, arch_y + 2.1, 0), Vector3(3.6, 0.35, 3.6), QUAY_DARK, lean)
-	var bell_at := lean * Vector3(0, arch_y + 1.0, 0)
-	l.prism(bell_at + lean * Vector3(0, 0.9, 0), bell_at + lean * Vector3(0, 0.5, 0), 0.25, 0.45, 10, BRONZE_GREEN)
-	l.prism(bell_at + lean * Vector3(0, 0.5, 0), bell_at + lean * Vector3(0, -0.3, 0), 0.45, 0.75, 10, BRONZE_GREEN.darkened(0.1))
-	l.prism(bell_at + lean * Vector3(0, -0.3, 0), bell_at + lean * Vector3(0, -0.4, 0), 0.78, 0.78, 10, BRONZE)
-	l.turned_box(lean * Vector3(0, arch_y + 1.95, 0), Vector3(3.2, 0.18, 0.2), WOOD_DARK, lean)
-	for k in int(high * 2.0):
-		var at := lean * Vector3(rng.randf_range(-1.6, 1.6), rng.randf_range(-0.4, minf(tide, high)), 1.82)
-		VaelModels.barnacles(l, at, lean * Vector3(0, 0, 1), 3, 0.05, rng)
+		row += 1
+	# The door, and slit windows up the faces.
+	l.turned_box(lean * Vector3(0, 1.3, half + 0.02), Vector3(1.2, 2.2, 0.08), Color(0.05, 0.06, 0.07), lean)
+	l.turned_box(lean * Vector3(0, 2.5, half + 0.06), Vector3(1.5, 0.3, 0.16), stone.lightened(0.1), lean)
+	for side in 4:
+		var a := side * PI * 0.5
+		var out := Vector3(sin(a), 0, cos(a))
+		for k in 2:
+			var wy := belfry * (0.45 + k * 0.25)
+			l.turned_box(lean * (out * (half + 0.02) + Vector3(0, wy, 0)), Vector3(0.18 if side % 2 == 0 else 0.08, 0.9, 0.08 if side % 2 == 0 else 0.18), Color(0.05, 0.06, 0.07), lean)
+	# A string course, then the belfry: four pillars, the open arches between them.
+	l.turned_box(lean * Vector3(0, belfry + 0.1, 0), Vector3(half * 2.0 + 0.3, 0.25, half * 2.0 + 0.3), stone.darkened(0.1), lean)
+	for cx: float in [-1.0, 1.0]:
+		for cz: float in [-1.0, 1.0]:
+			l.turned_box(lean * Vector3(cx * (half - 0.3), belfry + 1.45, cz * (half - 0.3)), Vector3(0.6, 2.5, 0.6), stone, lean)
+	l.turned_box(lean * Vector3(0, belfry + 2.85, 0), Vector3(half * 2.0 + 0.2, 0.3, half * 2.0 + 0.2), stone.darkened(0.08), lean)
+	# The roof, mostly fallen in: two slopes and the bare rafters of the others.
+	var top := belfry + 3.0
+	var peak := lean * Vector3(0, top + 1.8, 0)
+	var c0 := lean * Vector3(-half, top, half)
+	var c1 := lean * Vector3(half, top, half)
+	var c2 := lean * Vector3(half, top, -half)
+	var c3 := lean * Vector3(-half, top, -half)
+	l.gable(c0, c1, peak, QUAY_DARK.darkened(0.2))
+	l.gable(c1, c2, peak, QUAY_DARK.darkened(0.3))
+	for c: Vector3 in [c2, c3]:
+		l.prism(c, peak, 0.07, 0.06, 4, WOOD_DARK)
+	l.prism(c3, c3.lerp(peak, 0.5) + Vector3(0.3, -0.2, 0), 0.07, 0.06, 4, WOOD_DARK)
+	# The bell, its yoke on a beam across the belfry.
+	var bell_at := lean * Vector3(0, belfry + 1.5, 0)
+	l.turned_box(lean * Vector3(0, belfry + 2.55, 0), Vector3(half * 2.0 - 0.6, 0.18, 0.2), WOOD_DARK, lean)
+	l.prism(bell_at + lean * Vector3(0, 0.95, 0), bell_at + lean * Vector3(0, 0.55, 0), 0.25, 0.45, 10, BRONZE_GREEN)
+	l.prism(bell_at + lean * Vector3(0, 0.55, 0), bell_at + lean * Vector3(0, -0.25, 0), 0.45, 0.72, 10, BRONZE_GREEN.darkened(0.1))
+	l.prism(bell_at + lean * Vector3(0, -0.25, 0), bell_at + lean * Vector3(0, -0.35, 0), 0.75, 0.75, 10, BRONZE)
+	l.prism(bell_at + lean * Vector3(0, -0.2, 0), bell_at + lean * Vector3(0, -0.6, 0), 0.06, 0.1, 6, BRONZE.darkened(0.2))
+	# Barnacles and weed up to the high-water mark.
+	for k in int(high * 3.0):
+		var side := rng.randi() % 4
+		var a := side * PI * 0.5
+		var out := Vector3(sin(a), 0, cos(a))
+		var across := out.cross(Vector3.UP)
+		var at := lean * (out * (half + 0.04) + across * rng.randf_range(-half, half) + Vector3(0, rng.randf_range(0.1, minf(tide, belfry)), 0))
+		VaelModels.barnacles(l, at, lean * out, 3, 0.05, rng)
+	for k in 10:
+		var side := rng.randi() % 4
+		var a := side * PI * 0.5
+		var out := Vector3(sin(a), 0, cos(a))
+		var across := out.cross(Vector3.UP)
+		VaelModels.kelp(l, lean * (out * (half + 0.05) + across * rng.randf_range(-half, half) + Vector3(0, minf(tide, belfry) - 0.05, 0)), rng.randf_range(0.4, 0.9), 2, rng)
 	b.add(l)
-	b.solid(Vector3(0, high * 0.5, 0), Vector3(3.6, high, 3.6))
+	b.solid(Vector3(0, belfry * 0.5, 0), Vector3(half * 2.0, belfry, half * 2.0))
 	MesenllaBuilder._feature(b, "bell_tower", 3.6)
 
 

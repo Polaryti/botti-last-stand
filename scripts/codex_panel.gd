@@ -93,7 +93,8 @@ func _classes() -> void:
 ## Families are kept together; alphabetical order is only used within a family.
 static func enemy_group(id: String) -> int:
 	var d: Dictionary = ZombieDefs.ALL[id]
-	if d.get("mist_boss", false) or d.get("mesenlla_boss", false): return 5
+	if d.get("mist_boss", false) or d.get("mesenlla_boss", false) or d.get("vael_boss", false): return 6
+	if SpawnRules.is_vael(d): return 5
 	if SpawnRules.is_mesenlla(d): return 4
 	if d.get("hero", false) or d.get("rider", false) or d.get("fallen", false): return 2
 	if d.get("maps", []).has("mists"): return 3
@@ -115,11 +116,11 @@ func _enemies() -> void:
 	for id: String in order:
 		var group := enemy_group(id)
 		if group != previous:
-			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Creatures of Mesenlla", "Bosses"][group])
+			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Creatures of Mesenlla", "The drowned of Vael", "Bosses"][group])
 			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
 		var locations := PackedStringArray()
-		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
+		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "vael": "Port Vael", "lantern_road": "The Lantern Road", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
 		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
 		if d.get("mist_boss", false) or d.get("mesenlla_boss", false):
@@ -129,6 +130,8 @@ func _enemies() -> void:
 		elif from > 0.0:
 			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
 		var words: String = d["desc"]
+		if d.has("lore"):
+			words += "\n" + str(d["lore"])
 		if d.has("first_words"):
 			# A boss's words: as it comes, and as it falls.
 			words += "\nAs it comes: \u201c%s\u201d\nAs it falls: \u201c%s\u201d" % [d["first_words"], d.get("last_words", "")]

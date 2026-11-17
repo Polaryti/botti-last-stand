@@ -6,6 +6,7 @@ extends RefCounted
 ## The same code draws the preview in the Godot editor, so what you see there is what you get.
 
 const THATCH := Color(0.52, 0.42, 0.22)
+const SHORE_Y := 1.0 # on a coast, ground lower than this is beach and seabed
 const SHINGLE := Color(0.27, 0.2, 0.2)
 const PLASTER := Color(0.68, 0.62, 0.5)
 const PLASTER_B := Color(0.6, 0.55, 0.47)
@@ -201,10 +202,15 @@ func ground() -> void:
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
 	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA else 0.0)
+	mat.set_shader_parameter("shore", SHORE_Y if not terrain.coast.is_empty() else -1000.0)
 	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
 		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
 		mat.set_shader_parameter("dirt", Vector3(0.24, 0.19, 0.17))
+	elif look == "vael":
+		# Salt grass by the sea, paler and drier, and grey-brown cobble-dust on the streets.
+		mat.set_shader_parameter("tint", Vector3(1.0, 0.97, 0.86))
+		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
 	_ground_material = mat
 	var j := 0
 	while j < terrain.vertices_per_side - 1:
@@ -1669,6 +1675,8 @@ func forest_wall(h: float) -> void:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1))
 				p.y = terrain.height(p.x, p.z)
+				if not terrain.coast.is_empty() and p.y < SHORE_Y + 0.4:
+					continue # no trees in the sea: the coast's edge is open water
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 				var file := "res://assets/nature/tree_single_A.gltf" if rng.randf() < 0.72 else "res://assets/nature/tree_single_B.gltf"
 				tree(file, rng.randf_range(5.5, 8.5), rng.randf_range(0.9, 1.15), false)
@@ -1711,6 +1719,7 @@ func grass(h: float) -> void:
 			if MapIslands.on_masonry(Vector2(p.x, p.z)): continue
 			if not is_preview and MapIslands._near_gate(w, p, 4.0): continue
 		p.y = terrain.height(p.x, p.z)
+		if not terrain.coast.is_empty() and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.z / 24.0)))
 		if not patches.has(key):
 			patches[key] = [[], PackedColorArray()]

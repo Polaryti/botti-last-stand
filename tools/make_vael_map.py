@@ -100,7 +100,7 @@ def spot(parent, kind, at, text=None, on_ground=True):
 land = group("Land")
 # The shore: the land falls to the seabed south of the harbour wall (z = 6) and to the open sea
 # beyond z = 82; either side of the bay the headlands stand (see MapVael "coast").
-node("Coast", land, "vael", (0, 0, 6), kind="coast", size=76.0, wide=82.0, on_ground=False)
+node("Coast", land, "vael", (0, 0, 6), kind="coast", size=76.0, wide=96.0, on_ground=False)
 node("UpperTown", land, "level", (0, 5.0, -58), size="Vector2(196, 72)", blend=6.0)
 node("Quayside", land, "level", (0, 2.2, -5), size="Vector2(176, 22)", blend=1.0)
 node("HeadlandWest", land, "hill", (-104, 0, 34), height=11.0, radius=20.0)
@@ -136,6 +136,7 @@ for z in (18, 34, 50):
 
 # --- The quay ------------------------------------------------------------------------------------
 quay = group("Quay")
+node("QuayPaving", quay, "vael", (0, 2.2, -5), kind="paving", size=170.0, wide=21.6, on_ground=False)
 for i, (x, w) in enumerate([(-50, 16.0), (-20, 14.0), (26, 16.0)]):
     house = node("Warehouse", quay, "house", (x, 2.2, -12), width=w, depth=8.0, height=4.4, ridge="x", roof_rise=2.4,
                  walls=STONE, roof=SLATE, beams=True, south="door:-3:3.2:3.6, window:3", north="window:-3, window:3", level_ground=False)
@@ -196,6 +197,7 @@ spot(hm, "loot", (-3, 0, -2), on_ground=False)
 spot(hm, "loot", (3.5, 0, 1.5), on_ground=False)
 node("Table", hm, "thing", (0, 0, -1), kind="table", on_ground=False)
 # The market square.
+node("SquarePaving", town, "vael", (0, 5.0, -52), kind="paving", size=34.0, wide=20.0, on_ground=False)
 node("Well", town, "thing", (0, 5.0, -52), kind="well", on_ground=False)
 node("Stall", town, "thing", (-10, 5.0, -47, 10), kind="stall_blue", on_ground=False)
 node("Stall", town, "thing", (10, 5.0, -47, -10), kind="stall_red", on_ground=False)
@@ -223,8 +225,8 @@ flats = group("Flats")
 wrecks = [((-22, 0, 46, 20), 20.0), ((30, 0, 58, -35), 16.0), ((-48, 0, 68, 70), 12.0)]
 for (at, length) in wrecks:
     w = node("Wreck", flats, "vael", at, kind="wreck", size=length)
-    # The sea chest, inside where her side is stove in.
-    node("Salvage", w, "vael", (length * 0.04, 0.0, -length * 0.08), kind="salvage")
+    # The sea chest, in her hold, under her broken deck: in through the hole in her side.
+    node("Salvage", w, "vael", (0.0, 0.0, 0.0), kind="salvage")
 node("DrownedBell", flats, "vael", (8, 0, 30), kind="bell_tower", size=11.0)
 node("Salvage", flats, "vael", (8, 0, 25.5, 180), kind="salvage")
 node("OldPierWest", flats, "vael", (-10, 0, 9), kind="pilings", size=30.0)

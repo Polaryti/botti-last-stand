@@ -1431,13 +1431,13 @@ def compose_vael_night(o):
     ch = VAEL_CHORDS
     for i, c in enumerate(ch):
         harp_bar(s, o.harp, c, i + 1, 0.6, up_only=i % 2 == 1)
-    tide_swell(s, o.cellos, ch, 1, 0.5, 43, 58)
-    tide_swell(s, o.violas, ch, 1, 0.34, 55, 67)
+    tide_swell(s, o.cellos, ch, 1, 0.4, 43, 58)
+    tide_swell(s, o.violas, ch, 1, 0.3, 55, 67)
     for bar in (1, 9, 17, 25):
         foghorn(s, o, ch[bar - 1], bar, 0.46)
     toll(s, d, ch, 1, 4, 0.5, lo=55, hi=67)
     # I. The fiddle alone over the swell.
-    s.play_line(o.solo_violin, VAEL_A, 1, vel=0.72)
+    s.play_line(o.solo_violin, VAEL_A, 1, vel=0.92)
     # II. The oboe and bassoon answer like a squeezebox in a harbour tavern; strings take the answer.
     s.play_line(o.violins, VAEL_B, 9, vel=0.6, players=2)
     s.play_line(o.oboe, VAEL_B, 9, vel=0.42)
@@ -1452,7 +1452,7 @@ def compose_vael_night(o):
     for bar in (17, 19, 21, 23):
         d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.46)
     # IV. The drowned bells and the choir, and the fiddle going down into the deep.
-    s.play_line(o.solo_violin, VAEL_C, 25, vel=0.66)
+    s.play_line(o.solo_violin, VAEL_C, 25, vel=0.86)
     s.play_line(o.bassoon, VAEL_C, 25, shift=-24, vel=0.4)
     choir_chords(s, o.choir, ch[24:32], 25, 0.3, lo=55, hi=72, count=3)
     toll(s, d, ch[24:32], 25, 2, 0.58, lo=55, hi=67)
