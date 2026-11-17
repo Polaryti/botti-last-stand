@@ -4,7 +4,7 @@ extends Target
 ## body that zombies can hunt and that shots can hit, and anything that hurts them is sent over.
 
 const LAYER_AVATAR := 64
-const MODELS := {"commander": "clever", "monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever", "bandit": "clever", "cartographer": "clever", "harpooner": "clever", "tidecaller": "clever"}
+const MODELS := {"commander": "clever", "monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever", "bandit": "clever", "cartographer": "clever", "harpooner": "clever", "tidecaller": "clever", "ferryman": "clever"}
 
 var world: World
 var peer := 0
@@ -286,6 +286,17 @@ func set_fallen(on: bool) -> void:
 
 
 ## Straight there, without gliding across the map on the way.
+## A Psychopomp's souls, circling this avatar as they circle the player on their own phone.
+var _soul_ring: SoulRing
+func set_souls(n: int) -> void:
+	if _soul_ring == null:
+		if n <= 0:
+			return
+		_soul_ring = SoulRing.new()
+		add_child(_soul_ring)
+	_soul_ring.set_count(n)
+
+
 func teleport(at: Vector3) -> void:
 	_target = at
 	global_position = at

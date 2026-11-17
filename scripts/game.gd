@@ -32,6 +32,8 @@ var finished_games := 0
 var mists_wins := 0
 var lighthouses_lit := 0 # Last Light won: the Isle of Lamps' lighthouse burning again
 const LIGHTHOUSES_FOR_TIDECALLER := 3
+const VAEL_NIGHTS_FOR_FERRYMAN := 3
+var vael_nights := 0 # nights survived to the dawn in Port Vael: three earn the Ferryman
 var harbourmasters_beaten := 0 # the Harbourmaster defeated in a match you played: the first earns the Harpooner
 var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
 var bastion_wins := 0
@@ -204,6 +206,8 @@ func earn_text(id: String) -> String:
 			return "Survive until dawn %d times in The Mists to unlock this class. So far: %d." % [WINS_FOR_REVENANT, mini(mists_wins, WINS_FOR_REVENANT)]
 		"poison":
 			return "Deal %d poison damage to unlock this class. So far: %d." % [POISON_FOR_PLAGUE, mini(int(poison_dealt), POISON_FOR_PLAGUE)]
+		"vael_nights":
+			return "Survive %d nights in Port Vael (reach the dawn there, alone or with friends) to unlock this class. So far: %d." % [VAEL_NIGHTS_FOR_FERRYMAN, mini(vael_nights, VAEL_NIGHTS_FOR_FERRYMAN)]
 		"lighthouses":
 			return "Win Last Light %d times (bring the Lantern Barge to the Isle of Lamps and light the lighthouse) to unlock this class. So far: %d." % [LIGHTHOUSES_FOR_TIDECALLER, mini(lighthouses_lit, LIGHTHOUSES_FOR_TIDECALLER)]
 		"harbourmaster":
@@ -244,6 +248,16 @@ func note_harbourmaster() -> void:
 
 
 ## Last Light won: the Lantern Barge brought to the Isle of Lamps and the lighthouse lit again.
+## Dawn reached in Port Vael. Three nights earn the Ferryman.
+func note_vael_night() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	vael_nights += 1
+	if vael_nights >= VAEL_NIGHTS_FOR_FERRYMAN and not unlocked.has("ferryman"):
+		_earn("ferryman")
+	save_settings()
+
+
 ## Last Light won. Three wins earn the Tidecaller.
 func note_last_light() -> void:
 	if mode == Mode.SANDBOX:
@@ -472,6 +486,7 @@ func load_settings() -> void:
 	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
 	lighthouses_lit = maxi(0, _saved(c, "progress", "lighthouses_lit", 0))
 	harbourmasters_beaten = maxi(0, _saved(c, "progress", "harbourmasters_beaten", 0))
+	vael_nights = maxi(0, _saved(c, "progress", "vael_nights", 0))
 	mesenlla_wins = maxi(0, _saved(c, "progress", "mesenlla_wins", 0))
 	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
 	changelog_seen = str(_saved(c, "progress", "changelog_seen", ""))
@@ -521,6 +536,7 @@ func save_settings() -> void:
 	c.set_value("progress", "mists_wins", mists_wins)
 	c.set_value("progress", "lighthouses_lit", lighthouses_lit)
 	c.set_value("progress", "harbourmasters_beaten", harbourmasters_beaten)
+	c.set_value("progress", "vael_nights", vael_nights)
 	c.set_value("progress", "mesenlla_wins", mesenlla_wins)
 	c.set_value("progress", "bastion_wins", bastion_wins)
 	c.set_value("progress", "changelog_seen", changelog_seen)

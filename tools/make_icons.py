@@ -728,6 +728,29 @@ for g in (rope,):
     PLAIN.append(g)
 CRESTS.append(crest_harpooner)
 
+# The Ferryman (stage 5)
+def coin():
+    # An obol: a worn silver coin stamped with the lamp of Vael.
+    return (circ(("#e8eef6", "#7a8494"), 50, 50, 40, 4) + circ("none", 50, 50, 31, 3)
+        + path(("#fff2b0", "#c08a1e"), "M50 26 C42 38 42 48 50 54 C58 48 58 38 50 26Z", 2) + rect(("#e0b050", "#8f5f1e"), 38, 56, 24, 8, 2)
+        + "".join(circ(("#c8d0dc", "#7a8494"), 50 + 35 * c, 50 + 35 * s, 2.4, 0) for c, s in ((1, 0), (-1, 0), (0, 1), (0, -1))))
+def skiff():
+    # A pale ghostly skiff with a lantern on a pole at its stern, mist curling under it.
+    return (path(("#d6f2ea", "#5a8a84"), "M2 40 C14 52 30 58 50 58 C70 58 86 52 98 40 C92 64 74 76 50 76 C26 76 8 64 2 40Z", 3) + curve("#5a8a84", 3, "M8 48 C26 58 74 58 92 48", ink=False)
+        + line("#4a6a66", 4, (78, 54), (78, 14)) + line("#4a6a66", 3, (78, 16), (66, 16)) + rect(("#fff8c0", "#d0a030"), 60, 18, 12, 14, 3)
+        + curve("#e8f6f4", 5, "M8 88 C22 80 34 94 50 86 C64 80 78 94 92 86", ink=False))
+def soul():
+    # A wisp: a pale flame-shaped soul with a trailing tail and two dark eyes.
+    return (path(("#e8fff8", "#5ac8b0"), "M50 8 C66 26 78 44 72 62 C68 78 56 86 46 84 C30 82 22 66 30 50 C34 40 24 34 20 26 C34 30 42 22 50 8Z", 3)
+        + ell(("#1a3a36", "#1a3a36"), 44, 58, 4, 6, 0, 1) + ell(("#1a3a36", "#1a3a36"), 58, 58, 4, 6, 0, 1))
+def crest_ferryman():
+    # A bone-white lozenge with the ferry's lantern over a coin and the oars crossed behind.
+    return (path(("#e6dfc6", "#5a5240"), "M50 4 L94 50 L50 96 L6 50Z", 4) + at(50, 50, 0.62, turn(45, oar())) + at(50, 50, 0.62, turn(-45, oar()))
+        + at(50, 40, 0.42, lantern()) + at(50, 70, 0.3, coin()))
+for g in (coin, skiff, soul):
+    PLAIN.append(g)
+CRESTS.append(crest_ferryman)
+
 # The Tidecaller (stage 5)
 def song():
     # Two notes of the drowned's song rising out of a curl of water.
@@ -779,7 +802,7 @@ for g in (mist_infantry, mist_ranger, mist_heavy):
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
     "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78"),
-    "harpooner": ("#3f74a8", "#102640"), "tidecaller": ("#36c6b8", "#0d4a46")}
+    "harpooner": ("#3f74a8", "#102640"), "tidecaller": ("#36c6b8", "#0d4a46"), "ferryman": ("#c8bf9e", "#3a3428")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -827,6 +850,9 @@ SPECS = {
         + at(24, 68, 0.26, star()) + at(50, 28, 0.3, star()) + at(78, 60, 0.26, star())),
     "worlds_traveler": ("cartographer", lambda: at(50, 52, 0.78, waygate()) + at(76, 24, 0.24, star())),
     "pathfinder": ("cartographer", lambda: at(36, 58, 0.62, turn(-20, machete())) + at(68, 40, 0.5, compass())),
+    "tollkeeper": ("ferryman", lambda: at(40, 56, 0.6, coin()) + at(64, 40, 0.5, coin()) + at(60, 70, 0.4, coin())),
+    "boatman": ("ferryman", lambda: at(50, 54, 0.9, skiff())),
+    "psychopomp": ("ferryman", lambda: at(50, 52, 0.66, soul()) + at(24, 30, 0.3, soul()) + at(78, 32, 0.3, soul())),
     "wavebreaker": ("tidecaller", lambda: at(50, 56, 0.86, wave()) + "".join(circ(("#ffffff", "#9ad8e8"), x, y, r, 1.4) for x, y, r in ((70, 24, 5), (82, 34, 3.5), (60, 16, 3)))),
     "deepsinger": ("tidecaller", lambda: at(50, 54, 0.86, song())),
     "fogbinder": ("tidecaller", lambda: at(50, 50, 0.8, mist()) + at(50, 52, 0.42, chain())),

@@ -1822,6 +1822,12 @@ func deep_song(owner_peer: int, reach: float, seconds: float, heal: float, bits:
 	return song
 
 
+func black_water(owner_peer: int, from: Vector3, to: Vector3, seconds: float) -> BlackWater:
+	var wake := BlackWater.new(self, owner_peer, from, to, seconds)
+	add_child(wake)
+	return wake
+
+
 func fog_bank(owner_peer: int, at: Vector3, radius: float, blind: float, bits: int) -> FogBank:
 	at.y = ground_at(at)
 	var bank := FogBank.new(self, owner_peer, at, radius, blind, bits)
@@ -2847,8 +2853,12 @@ func on_zombie_killed(z: Zombie) -> void:
 		player.on_kill(z)
 
 
-## A foe whose fall earns something for everyone in the match (on every phone, once).
+## A foe whose fall earns something for everyone in the match (on every phone, once), and whose soul a
+## Psychopomp nearby gathers.
 func note_defeated(z: Zombie) -> void:
+	for p: Player in local_players():
+		if p.class_id == "ferryman":
+			FerrymanKit.gather(p, z.position, z.last_hitter == p.net_id())
 	if z.type_id == "harbourmaster" and player and not Net.spectating and not director.sandbox:
 		Game.note_harbourmaster()
 		if Game.fresh_unlocks.has("harpooner") and not _told_unlock.has("harpooner"):

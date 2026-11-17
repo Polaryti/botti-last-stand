@@ -90,7 +90,7 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer", "harpooner", "tidecaller"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer", "harpooner", "tidecaller", "ferryman"]:
 		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
@@ -135,7 +135,7 @@ func _as_host() -> void:
 	if rules == "lantern":
 		Net.set_night_map("lantern_road")
 		ok(Net.night_map == "lantern_road", "the host picks the Lantern Road")
-	Net.set_rules({"tidecaller": Net.Rules.COOP, "harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"ferryman": Net.Rules.COOP, "tidecaller": Net.Rules.COOP, "harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -221,12 +221,14 @@ func _as_client() -> void:
 		Net.set_my_class("harpooner")
 	if rules == "tidecaller":
 		Net.set_my_class("tidecaller")
+	if rules == "ferryman":
+		Net.set_my_class("ferryman")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "harpooner": "harpooner", "tidecaller": "tidecaller"}.get(rules, "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "harpooner": "harpooner", "tidecaller": "tidecaller", "ferryman": "ferryman"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -291,6 +293,8 @@ func _play() -> void:
 		await _harpooner()
 	elif rules == "tidecaller":
 		await _tidecaller()
+	elif rules == "ferryman":
+		await _ferryman()
 	elif rules == "mesenlla":
 		await _mesenlla()
 	elif rules == "bastion":
@@ -1697,6 +1701,68 @@ func _tidecaller() -> void:
 		var z: Zombie = w.zombie_by_id(mine)
 		ok(z != null and z.blind_left > 0.0 and z._slow > 0.0, "the other phone's fog blinded and slowed this phone's creature")
 	await sync(628)
+
+
+## Two Ferrymen: the other phone's skiff glides here too and strikes this phone's creature; a
+## Psychopomp's souls circle its avatar here; and a Boatman's skiff carries this phone's player along.
+func _ferryman() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	var spot := Vector3(base.x + (-6.0 if host else 0.0), 0, base.z + 6.0)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	pl.yaw = 0.0
+	pl.rotation.y = 0.0
+	var mine := -1
+	await wait(0.6)
+	await sync(640)
+	if host:
+		var there := Vector3(base.x, 0, base.z + 6.0 - 4.5)
+		w.spawn_zombie("normal", Vector3(there.x, w.ground_at(there), there.z))
+		var z: Zombie = w.zombies.back()
+		z.hp = 2000.0
+		z.max_hp = 2000.0
+		z.stun(20.0)
+		mine = z.net_id
+	await wait(0.8)
+	await sync(641)
+	if not host:
+		ok(pl.class_id == "ferryman" and pl.art_def()["name"] == "Crossing", "this phone plays a Ferryman")
+		FerrymanKit.cross(pl)
+	await wait(0.2)
+	ok(w.get_children().any(func(n: Node) -> bool: return n is FerrySkiff), "the skiff glides on this phone")
+	await wait(1.0)
+	await sync(642)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		ok(z != null and z.hp < 2000.0, "the other phone's skiff struck this phone's creature on its way (%.0f)" % (2000.0 - z.hp if z else 0.0))
+		z.release()
+	await sync(643)
+	if not host:
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 2 if step == 3 else 0)
+		pl.set_souls(4)
+	await wait(0.6)
+	await sync(644)
+	if host:
+		var a := _avatar() as Avatar
+		ok(a != null and a._soul_ring != null and a._soul_ring.count == 4, "the Psychopomp's 4 souls circle its avatar on this phone")
+	await sync(645)
+	# A Boatman's skiff carries this phone's player across with it.
+	var before := pl.global_position
+	if host:
+		Net.carried(_other(), _avatar().global_position + Vector3(0, 0, -6), Net.my_id())
+	await wait(1.0)
+	await sync(646)
+	if not host:
+		ok(pl.global_position.distance_to(before) > 4.0, "a friend's skiff carried this phone's player across (%.1f m)" % pl.global_position.distance_to(before))
+	await sync(647)
 
 
 ## Two phones in the Valleys of Mesenlla: the creatures look and act the same on both, a tell's circle

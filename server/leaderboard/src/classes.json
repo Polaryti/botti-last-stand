@@ -5,6 +5,7 @@
   "cartographer": ["star_reader", "worlds_traveler", "pathfinder"],
   "chivalry": ["lancer", "paladin", "horse_archer"],
   "commander": ["warlock", "gunner", "vanguard"],
+  "ferryman": ["tollkeeper", "boatman", "psychopomp"],
   "harpooner": ["reaver", "rigger", "leviathan_hunter"],
   "heavy": ["guardian", "warpriest", "warlord"],
   "infantry": ["duelist", "berserker", "shadow"],

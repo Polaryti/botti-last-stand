@@ -18,7 +18,7 @@ const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
 const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
-	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64), "tidecaller": Vector3(0.24, 0.8, 0.74),
+	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64), "tidecaller": Vector3(0.24, 0.8, 0.74), "ferryman": Vector3(0.86, 0.84, 0.76),
 	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5), "mist_heavy": Vector3(0.66, 0.92, 0.98)}
@@ -105,6 +105,7 @@ static func _pieces(id: String) -> Dictionary:
 			"cartographer": built = _cartographer()
 			"harpooner": built = _harpooner()
 			"tidecaller": built = _tidecaller()
+			"ferryman": built = _ferryman()
 			"mist_infantry": built = _mist_infantry()
 			"mist_ranger": built = _mist_ranger()
 			"mist_heavy": built = _mist_heavy()
@@ -448,6 +449,45 @@ static func _tidecaller() -> Dictionary:
 	hips.prism(Vector3(-0.52, 0.1, 0.18), Vector3(-0.56, -0.06, 0.2), 0.012, 0.012, 4, Color(0.4, 0.34, 0.24))
 	hips.prism(Vector3(-0.62, -0.08, 0.2), Vector3(-0.48, -0.16, 0.2), 0.04, 0.1, 7, SHELL)
 	hips.prism(Vector3(-0.48, -0.16, 0.2), Vector3(-0.42, -0.24, 0.2), 0.1, 0.0, 7, CORAL.lightened(0.3))
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+
+
+## Ferryman: a broad, flat-brimmed boatman's hat of grey felt over the hood, a ragged black mantle over
+## the shoulders with a string of obols across the chest, a lantern hung from a hook on the back, and a
+## rope belt with a coin purse.
+static func _ferryman() -> Dictionary:
+	const FELT := Color(0.32, 0.31, 0.3)
+	const CLOTH := Color(0.1, 0.1, 0.12)
+	const COIN := Color(0.82, 0.84, 0.88)
+	const ROPE := Color(0.56, 0.48, 0.34)
+	var head := LowPoly.new()
+	# The hat: a wide brim, tipped a little forward, and a low round crown with a band.
+	head.prism(Vector3(0, 0.84, 0.04), Vector3(0, 0.88, 0.04), 0.94, 0.92, 16, FELT)
+	head.prism(Vector3(0, 0.88, 0.0), Vector3(0, 1.12, -0.02), 0.62, 0.5, 12, FELT.lightened(0.06))
+	head.prism(Vector3(0, 0.88, 0.0), Vector3(0, 0.95, 0.0), 0.63, 0.63, 12, CLOTH)
+	var chest := LowPoly.new()
+	# The mantle: a short cape over the shoulders, its hem cut ragged.
+	chest.prism(Vector3(0, 0.3, -0.02), Vector3(0, 0.12, -0.04), 0.58, 0.66, 12, CLOTH)
+	for i in 12:
+		var a := TAU * i / 12.0
+		var length := 0.16 + 0.1 * ((i * 5) % 3)
+		chest.box(Vector3(sin(a) * 0.64, 0.12 - length * 0.5, cos(a) * 0.6 - 0.04), Vector3(0.18, length, 0.02), CLOTH.lightened(0.04 * (i % 2)), Vector3(0, rad_to_deg(a), 0))
+	# The string of obols across the chest.
+	for k in 7:
+		var x := -0.3 + k * 0.1
+		var y := 0.06 - (0.3 * 0.3 - x * x) * 0.6
+		_disc(chest, Vector3(x, y, 0.5), Vector3.BACK, 0.05, 0.015, COIN.darkened(0.08 * (k % 2)), 8)
+	# The lantern on the back, hanging from an iron hook.
+	chest.prism(Vector3(0.18, 0.28, -0.52), Vector3(0.18, 0.1, -0.6), 0.015, 0.015, 4, Color(0.2, 0.2, 0.22))
+	chest.box(Vector3(0.18, -0.08, -0.62), Vector3(0.2, 0.26, 0.2), Color(0.18, 0.18, 0.2))
+	chest.box(Vector3(0.18, -0.08, -0.62), Vector3(0.15, 0.2, 0.21), Color(1.0, 0.92, 0.6))
+	chest.prism(Vector3(0.18, 0.05, -0.62), Vector3(0.18, 0.12, -0.62), 0.12, 0.02, 6, Color(0.18, 0.18, 0.2))
+	var hips := LowPoly.new()
+	hips.prism(Vector3(0, 0.08, 0), Vector3(0, 0.16, 0), 0.6, 0.6, 12, ROPE)
+	hips.prism(Vector3(0.18, 0.12, 0.58), Vector3(0.22, -0.16, 0.6), 0.025, 0.02, 4, ROPE)
+	# The coin purse.
+	hips.prism(Vector3(-0.48, 0.08, 0.26), Vector3(-0.5, -0.16, 0.28), 0.1, 0.13, 7, LEATHER)
+	hips.prism(Vector3(-0.48, 0.08, 0.26), Vector3(-0.48, 0.13, 0.26), 0.06, 0.08, 7, LEATHER.darkened(0.2))
 	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
 
 

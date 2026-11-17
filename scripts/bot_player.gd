@@ -727,6 +727,26 @@ func _tidecaller_skills(p: Player, has_target: bool, dist: float) -> void:
 				p.use_art()
 
 
+## A Ferryman bot: crosses to close on what it fights (or away when hurt), demands the toll of a
+## crowd in front, and sends its souls once it has gathered a few.
+func _ferryman_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "" or p.art_cd_left > 0.0 or p.is_crossing():
+		return
+	match p.spec_id:
+		"tollkeeper":
+			if _enemies_within(FerrymanKit.TOLL_REACH) >= 2:
+				if has_target:
+					_face(_target_point(), false)
+				p.use_art()
+		"psychopomp":
+			if p.souls >= 3 and has_target and dist < 14.0:
+				p.use_art()
+		_:
+			if has_target and dist > 4.0 and dist < FerrymanKit.cross_reach(p) + 2.0:
+				_face(_target_point(), false)
+				p.use_art()
+
+
 ## The same buttons a person has, pressed when they would help.
 func _use_skills() -> void:
 	var p := pawn
@@ -748,6 +768,9 @@ func _use_skills() -> void:
 		return
 	if p.class_id == "tidecaller":
 		_tidecaller_skills(p, has_target, dist)
+		return
+	if p.class_id == "ferryman":
+		_ferryman_skills(p, has_target, dist)
 		return
 	if not p.has_art() or p.art_cd_left > 0.0 or p._cast_kind != "" or p.aiming_art:
 		return

@@ -49,6 +49,8 @@ func _ready() -> void:
 	await _harpooner()
 	print("REWORK tidecaller")
 	await _tidecaller()
+	print("REWORK ferryman")
+	await _ferryman()
 	print("REWORK walls")
 	await _walls_protect()
 	print("REWORK statuses")
@@ -1470,6 +1472,16 @@ func foe(kind: String, ahead: float, side := 0.0, hp := 10000.0) -> Zombie:
 	return z
 
 
+## Frames go by until nothing of this kind is left in the world (a wave rolled out, a soul landed):
+## frames come faster or slower with the machine, the game's own clock does not.
+func until_gone(kind: Variant) -> void:
+	for i in 600:
+		if not w.get_children().any(func(n: Node) -> bool: return is_instance_of(n, kind)):
+			break
+		await frames(1)
+	await frames(2)
+
+
 func _face_ahead() -> void:
 	p.yaw = 0.0
 	p.rotation.y = 0.0
@@ -1717,9 +1729,9 @@ func _tidecaller() -> void:
 	var hit_was := hit.position
 	hit.stun(30.0) # so only the wave moves it
 	TidecallerKit.call_the_tide(p)
-	await frames(40)
+	await until_gone(TideWave)
 	check(hit.hp < h0 and hit._slow > 0.0, "the wave strikes what is in its way and slows it (%.0f)" % (h0 - hit.hp))
-	check(hit.position.distance_to(p.global_position) > hit_was.distance_to(p.global_position) + 0.5, "and throws it back")
+	check(hit_was.z - hit.position.z > 0.5, "and throws it back along the wave's way (%.1f m)" % (hit_was.z - hit.position.z))
 	check(is_equal_approx(aside.hp, a0), "but not what stands off to the side")
 	hit.release()
 	aside.release()
@@ -1780,6 +1792,113 @@ func _tidecaller() -> void:
 	late.release()
 	for n: Node in w.get_children():
 		if n is FogBank or n is DeepSong or n is TideWave:
+			n.queue_free()
+
+
+func _ferryman() -> void:
+	var d: Dictionary = ClassDefs.ALL["ferryman"]
+	check(d["weapon"] == "oar" and d.get("earned", "") == "vael_nights" and not ClassDefs.for_sale().has("ferryman"), "the Ferryman starts with the Ferryman's Oar, and is earned in Port Vael")
+	var specs: Array = AbilityData.tree("ferryman")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["tollkeeper", "boatman", "psychopomp"], "Tollkeeper, Boatman and Psychopomp")
+	for id: String in ["crest_ferryman", "spec_tollkeeper", "spec_boatman", "spec_psychopomp", "coin", "skiff", "soul", "oar", "bell", "lantern"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["crossing", "toll_bell", "obol", "souls_go"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	check(ClassGear._pieces("ferryman").size() == 3 and Avatar.MODELS.has("ferryman") and ClassPresentation.COPY.has("ferryman"), "dressed, seen by others, and described")
+	# Earned by the third night survived in Port Vael.
+	var had: Dictionary = Game.unlocked.duplicate()
+	var nights := Game.vael_nights
+	var was_mode := Game.mode
+	Game.unlocked.erase("ferryman")
+	Game.mode = Game.Mode.NIGHT
+	Game.vael_nights = Game.VAEL_NIGHTS_FOR_FERRYMAN - 2
+	Game.note_vael_night()
+	check(not Game.owns_class("ferryman") and Game.earn_text("ferryman").contains("So far: %d" % (Game.VAEL_NIGHTS_FOR_FERRYMAN - 1)), "two nights are not enough, and it says how many so far")
+	Game.note_vael_night()
+	check(Game.owns_class("ferryman"), "the third earns the Ferryman")
+	Game.unlocked = had
+	Game.vael_nights = nights
+	Game.mode = was_mode
+	Game.fresh_unlocks.erase("ferryman")
+	# Crossing: the skiff carries the Ferryman ahead, through what is in the way.
+	pawn("ferryman")
+	await frames(3)
+	_face_ahead()
+	check(p.weapon_id() == "oar" and p.art_def()["name"] == "Crossing", "it holds its Oar, and Crossing")
+	var in_way := foe("normal", 4.5)
+	in_way.stun(30.0)
+	var w0 := in_way.hp
+	var from := p.global_position
+	FerrymanKit.cross(p)
+	check(p.is_crossing() and w.get_children().any(func(n: Node) -> bool: return n is FerrySkiff), "the skiff sets off, and shows")
+	await frames(40)
+	var went := Vector2(p.global_position.x - from.x, p.global_position.z - from.z).length()
+	check(not p.is_crossing() and went > FerrymanKit.CROSS_REACH - 1.5, "it carries the Ferryman %.1f m ahead" % went)
+	check(in_way.hp < w0 and in_way._slow > 0.0, "what it passes is struck and slowed (%.0f)" % (w0 - in_way.hp))
+	in_way.release()
+	# Tollkeeper: debts, obols, Debt Collector.
+	pawn("ferryman", 0, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Demand the Toll" and p.has_flag("debt_collector"), "a Tollkeeper demands the toll, up to Debt Collector")
+	var debtor := foe("normal", 4.0, 0.0, 30.0)
+	var spared := foe("normal", -4.0, 0.0, 30.0)
+	FerrymanKit.demand_the_toll(p)
+	check(FerrymanKit.in_debt(p, debtor) and is_equal_approx(debtor._mark_mult, FerrymanKit.DEBT), "those in front fall in debt, taking 25% more damage")
+	check(FerrymanKit.in_debt(p, spared), "with All Must Pay, those behind too")
+	p.hp = 40.0
+	debtor.next_hitter = -1
+	debtor.take_damage(500.0, Vector3.ZERO, 0.0, debtor.centre())
+	p.on_kill(debtor)
+	check(p.obols == 1 and is_equal_approx(p.hp, 40.0 + FerrymanKit.OBOL_HEAL + p.m("obol_heal")), "a debtor's death pays an obol and heals")
+	check(is_equal_approx(FerrymanKit.blow_scale(p), 1.0 + FerrymanKit.OBOL_DAMAGE), "each obol makes the Tollkeeper's blows 5% harder")
+	spared.release()
+	var low := foe("normal", 3.0, 0.0, 100.0)
+	FerrymanKit.demand_the_toll(p)
+	low.hp = 15.0
+	p.on_melee_connect(low, WeaponDefs.ALL["oar"])
+	check(not low.is_alive(), "Debt Collector: a blow ends a debtor below 20% health")
+	p._kill()
+	check(p.obols == 0, "and the obols are lost when the Tollkeeper falls")
+	# Boatman: Black Water behind the skiff, and the Last Ferry.
+	pawn("ferryman", 1, true)
+	await frames(3)
+	_face_ahead()
+	check(p.has_flag("carry") and p.has_flag("wake") and p.has_flag("last_ferry"), "a Boatman's tree: carry, Black Water, The Last Ferry")
+	var knocked := foe("normal", 4.5)
+	FerrymanKit.cross(p)
+	await frames(40)
+	check(knocked._stun > 0.0, "the Boatman's skiff knocks down what it passes")
+	check(w.get_children().any(func(n: Node) -> bool: return n is BlackWater), "and leaves black water behind")
+	check(p.art_cd_left <= 0.0 and p.second_trip_left > 0.0, "The Last Ferry: a second trip, at once")
+	knocked.release()
+	# Psychopomp: souls of the dead near it; Guide the Souls; Gate of the Dead.
+	pawn("ferryman", 2, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Guide the Souls" and not FerrymanKit.has_use(p), "a Psychopomp guides souls, and has none yet")
+	for i in 3:
+		var dead := foe("normal", 3.0, float(i), 10.0)
+		dead.take_damage(500.0, Vector3.ZERO, 0.0, dead.centre())
+	await frames(2)
+	check(p.souls >= 3 and p._soul_ring != null and p._soul_ring.count == p.souls, "the souls of the dead nearby circle it (%d)" % p.souls)
+	var target_foe := foe("normal", 6.0)
+	var t0 := target_foe.hp
+	FerrymanKit.guide_the_souls(p)
+	check(p.souls == 0, "Guide the Souls sends them all")
+	await until_gone(SoulBolt)
+	check(target_foe.hp < t0 - FerrymanKit.SOUL_DAMAGE, "they strike the enemy near (%.0f)" % (t0 - target_foe.hp))
+	target_foe.release()
+	p.set_souls(FerrymanKit.GATE_SOULS)
+	p.hp = 5.0
+	p._on_fatal()
+	check(not p.dead and p.hp >= p.max_hp() * 0.5 - 0.1 and p.souls == 0, "Gate of the Dead: falling with 6 souls, it comes back at half health")
+	p.hp = 5.0
+	p.set_souls(FerrymanKit.GATE_SOULS)
+	p._on_fatal()
+	check(p.dead, "but only once a minute")
+	for n: Node in w.get_children():
+		if n is BlackWater or n is FerrySkiff or n is SoulBolt:
 			n.queue_free()
 
 

@@ -1119,6 +1119,8 @@ func _draw_controls() -> void:
 				tint = UiTheme.MIST if player.art_cd_left <= 0.0 and player.mana >= player.art_cost() else Color(0.6, 0.6, 0.6)
 				if player.class_id == "harpooner" and not _haul_ready:
 					tint = Color(0.6, 0.6, 0.6)
+				if player.class_id == "ferryman" and not FerrymanKit.has_use(player):
+					tint = Color(0.6, 0.6, 0.6)
 				if player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
 					# Planted here, the beacon would link to none of the others.
 					tint = UNLINKED if player.art_cd_left <= 0.0 else UNLINKED.darkened(0.35)
@@ -1148,6 +1150,12 @@ func _draw_controls() -> void:
 			_chip(player.nearby_weapon.display_name(), "grab", UiTheme.BONE, pos + Vector2(0, -r - 18 - CHIP_H), true)
 		if id == "art" and player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
 			_centered("Too far to link", pos + Vector2(0, -r - 14), HUD_SMALL, UNLINKED.lightened(0.3))
+		elif id == "art" and player.class_id == "ferryman" and player.spec_id in ["tollkeeper", "psychopomp"]:
+			# What the Tollkeeper holds and what the Psychopomp has gathered, over the button.
+			var gathered := player.obols if player.spec_id == "tollkeeper" else player.souls
+			var most := FerrymanKit.obols_max(player) if player.spec_id == "tollkeeper" else FerrymanKit.souls_max(player)
+			var word := "obol" if player.spec_id == "tollkeeper" else "soul"
+			_centered("%d/%d %ss" % [gathered, most, word], pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE if gathered > 0 else UiTheme.ASH)
 		elif id == "art" and player.class_id == "harpooner":
 			# Haul: a ring of the class's colour when something is in reach, and when not, says so.
 			if _haul_ready and player.art_cd_left <= 0.0:
