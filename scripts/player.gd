@@ -1172,6 +1172,16 @@ func ignite(seconds: float) -> void:
 	burn_time = maxf(burn_time, seconds)
 
 
+## A creature's sting or blow that stuns: for just as long as it says (not shortened, as another
+## player's stun is), unless you are already stunned or just shook one off.
+func stun_by_creature(seconds: float) -> void:
+	if dead or guard_left > 0.0 or frozen_left > 0.0 or _status_immune > 0.0:
+		return
+	frozen_left = seconds
+	is_iced = false
+	say("Stunned!")
+
+
 ## Another player's ability. It does not last as long on a person as on the undead.
 func apply_status(kind: int, seconds: float) -> void:
 	if dead or guard_left > 0.0:
@@ -3567,6 +3577,8 @@ func _physics_step(delta: float) -> void:
 	var wading := world.terrain.in_water(global_position.x, global_position.z)
 	if wading:
 		speed *= WADE_SPEED
+	if world.tide:
+		speed *= world.tide.slow_at(global_position) # wading in the Mist Tide, on foot or mounted
 	var accel := 14.0 if is_on_floor() else 5.0
 	velocity.x = move_toward(velocity.x, dir.x * speed, accel * speed * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, accel * speed * delta)

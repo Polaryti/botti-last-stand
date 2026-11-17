@@ -394,6 +394,7 @@ func _draw() -> void:
 	if player.class_id == "adept":
 		_draw_stance(s)
 	_draw_fog(s, centre)
+	_draw_tide_mist(s, centre)
 	if player.frozen_left > 0.0:
 		if player.is_iced:
 			draw_rect(Rect2(Vector2.ZERO, s), Color(0.6, 0.85, 1.0, 0.24))
@@ -482,6 +483,22 @@ func _draw_fog(s: Vector2, centre: Vector2) -> void:
 	draw_rect(Rect2(Vector2.ZERO, s), Color(0.45, 0.62, 0.56, 0.22))
 	_banner_text("Get out of the fog!", Vector2(centre.x, s.y * 0.24), 1.0)
 	_sensor_arrow(centre, (Vector3(fog.centre.x, 0.0, fog.centre.y) - player.global_position).normalized() * 5.0, UiTheme.MOSS)
+
+
+## Wading in the Mist Tide at high water: sea-mist closes in from the edges of sight, half the view at
+## its deepest (MistTide.blind_for).
+func _draw_tide_mist(s: Vector2, centre: Vector2) -> void:
+	var tide := player.world.tide
+	if tide == null or player.dead:
+		return
+	var blind := tide.blind_for(player.global_position)
+	if blind <= 0.0:
+		return
+	var mist := Color(0.42, 0.6, 0.58)
+	draw_rect(Rect2(Vector2.ZERO, s), Color(mist, blind * 0.45))
+	var r := minf(s.x, s.y) * lerpf(0.6, 0.28, blind * 2.0)
+	for i in 6:
+		draw_arc(centre, r + i * minf(s.x, s.y) * 0.09 + 60.0, 0.0, TAU, 64, Color(mist, (0.12 + i * 0.08) * blind * 2.0), 120.0)
 
 
 ## Who else is out there, in a panel under your own: each player's name and level, their health and,
@@ -631,6 +648,14 @@ func _draw_chips(s: Vector2) -> void:
 	for storm: MistStorm in player.world.mist_storms:
 		if is_instance_valid(storm) and storm.hud_line != "":
 			chips.append([storm.hud_line, "storm", Color(0.85, 0.7, 1.0)])
+	var tide := player.world.tide
+	if tide:
+		var state := tide.status()
+		var when := float(state["turns_in"])
+		var words: String = state["text"]
+		if when >= 0.0:
+			words += ", turns in %d:%02d" % [int(when) / 60, int(when) % 60]
+		chips.append([words, "tide", Color(0.55, 1.0, 0.82) if state["high"] else UiTheme.BONE])
 	_centre_y = 64.0
 	if chips.is_empty():
 		return

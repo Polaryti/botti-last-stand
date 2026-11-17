@@ -172,7 +172,7 @@ func _entries() -> void:
 	check(strays == 0, "the Village never picks a creature of Mesenlla to roam (%d)" % strays)
 	var bosses := ["great_revenant_elemental", "war_wyvern"]
 	for id: String in bosses:
-		check(ZombieDefs.ALL[id].get("mesenlla_boss", false) and CodexPanel.enemy_group(id) == 5, "%s is listed with the bosses" % id)
+		check(ZombieDefs.ALL[id].get("mesenlla_boss", false) and CodexPanel.enemy_group(id) == 6, "%s is listed with the bosses" % id)
 	check(CodexPanel.enemy_group("bear") == 4, "the others are Creatures of Mesenlla")
 
 

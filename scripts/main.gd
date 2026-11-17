@@ -3158,7 +3158,7 @@ func _note_pending(mine: Label) -> void:
 
 
 static func _map_word(map: String) -> String:
-	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion"}.get(map, map.capitalize())
+	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael"}.get(map, map.capitalize())
 
 
 ## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort",

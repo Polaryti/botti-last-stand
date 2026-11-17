@@ -43,6 +43,12 @@ var bake_revision := 0
 var _fords: Array[Dictionary] = []
 
 
+## A shore (Port Vael), or empty: from the harbour wall at z = "z" the land falls to tidal flats,
+## sloping from "top" down to "low" at z = "end", beyond which the open sea is deep (SEA_Y). The bay is
+## "half" metres either side of x = 0; past it the headlands keep their own ground until the sea.
+var coast := {}
+const SEA_Y := -3.6
+const SEA_DEEP := -2.2 # past the flats and deeper than this: the open sea, which no one walks into
 var _pools: Array[Vector3] = []
 var _streams: Array = []
 
@@ -198,9 +204,37 @@ func _natural(x: float, z: float) -> float:
 		var dx := x - g.x
 		var dz := z - g.y
 		h += g.z * exp(-(dx * dx + dz * dz) / (2.0 * g.w * g.w))
+	if not coast.is_empty():
+		h = _shore(x, z, h)
 	for p: Dictionary in _pads:
 		h = _apply_pad(p, x, z, h)
 	return h
+
+
+## Sets the shore (see coast).
+func set_coast(wall_z: float, flats_end: float, top: float, low: float, bay_half: float) -> void:
+	coast = {"z": wall_z, "end": flats_end, "top": top, "low": low, "half": bay_half}
+
+
+## The land along the shore: the flats sloping away from the harbour wall, rippled with sand bars and
+## shallow channels; the open sea beyond them; the headlands either side keeping their own ground
+## until they too end in the sea.
+func _shore(x: float, z: float, h: float) -> float:
+	var z0: float = coast["z"]
+	var z1: float = coast["end"]
+	if z <= z0 - 2.0:
+		return h
+	var flats := lerpf(float(coast["top"]), float(coast["low"]), clampf((z - z0) / (z1 - z0), 0.0, 1.0))
+	flats += _detail.get_noise_2d(x * 0.6, z * 0.6) * 0.22 + _noise.get_noise_2d(x * 1.7 + 300.0, z * 1.7) * 0.3
+	var sea := lerpf(flats, SEA_Y, smoothstep(z1, z1 + 10.0, z))
+	var bay := 1.0 - smoothstep(float(coast["half"]), float(coast["half"]) + 12.0, absf(x))
+	var shore := lerpf(h, sea, smoothstep(z0 - 2.0, z0 + 1.0, z) * bay)
+	return lerpf(shore, SEA_Y, smoothstep(z1 + 10.0, z1 + 22.0, z))
+
+
+## Whether this is the open sea beyond the flats.
+func open_sea(x: float, z: float) -> bool:
+	return not coast.is_empty() and z > float(coast["end"]) and height(x, z) < SEA_DEEP
 
 
 func _apply_pad(p: Dictionary, x: float, z: float, h: float) -> float:
@@ -479,7 +513,7 @@ func is_walkable(x: float, z: float) -> bool:
 ## Water too deep to wade: only in the river's own bed. Low ground anywhere else (Mist Bastion has
 ## no river at all) is a dry hollow you walk through.
 func deep_water(x: float, z: float) -> bool:
-	return height(x, z) < WATER_Y - WADE and by_river(x, z)
+	return (height(x, z) < WATER_Y - WADE and by_river(x, z)) or open_sea(x, z)
 
 
 ## Whether this spot is in or beside the river's course.

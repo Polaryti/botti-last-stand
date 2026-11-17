@@ -18,7 +18,8 @@ const LANE_REACH := 7.0 # how far to the side of that road someone may stand and
 const LANE_ENGAGE := 12.0 # and how near they must be: until then the way to them is the road itself
 const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its height
 ## Bodies that share another's animated model, dressed differently.
-const BODY_FILES := {"woods_child": "normal_b", "fallen_revenant": "clever"} # a Fallen Revenant is a Revenant's own body
+const BODY_FILES := {"woods_child": "normal_b", "fallen_revenant": "clever", # a Fallen Revenant is a Revenant's own body
+	"drowned": "normal_a", "barnacle_brute": "normal_a"} # the drowned of Vael, dressed by VaelModels
 const FAR := 34.0
 const DUMMY_WINDOW := 5.0
 
@@ -404,6 +405,21 @@ func _build_visual() -> void:
 			for piece in worn:
 				piece.set_meta("own_material", piece.material_override)
 				_parts.append(piece)
+		elif model_id in ["drowned", "barnacle_brute"]:
+			# One of the drowned of Vael: a sailor's cap, weed and rope, or a Brute's crust of barnacles
+			# and coral, and the pale sea-green eyes of all of them. Their gear flashes and freezes with them.
+			_eyes.visible = false
+			var gear := VaelModels.sailor_gear() if model_id == "drowned" else VaelModels.brute_gear()
+			var worn: Array[MeshInstance3D] = []
+			for bone: String in gear:
+				worn.append(_attach(bone, gear[bone], Vector3.ZERO))
+			var eyes := _attach("head", VaelModels.drowned_eyes(), Vector3.ZERO)
+			eyes.material_override = MesenllaModels.glow_material()
+			_eyes = eyes
+			worn.append(eyes)
+			for piece in worn:
+				piece.set_meta("own_material", piece.material_override)
+				_parts.append(piece)
 	_shadow = World.make_blob_shadow(1.0)
 	add_child(_shadow)
 
@@ -480,6 +496,9 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	if model_id in MesenllaModels.KINDS or model_id == "crow":
 		# Back on its feet after the last time this body fell.
 		MesenllaModels.reset_pose(_visual)
+		if model_id == "angler":
+			_visual.set_meta("risen", 0.0)
+			VaelModels.bury(_visual) # it lies in wait in the sand
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
 	mesenlla_mind = MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
@@ -1175,17 +1194,20 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", "mist_bear": "bear_roar", "eagle": "eagle_cry", "mist_eagle": "eagle_cry",
 	"shapeshifter": "shapeshift", "child_of_woods": "woods_chatter", "woodland_cavalry": "woods_chatter", "earth_elemental": "stone_grind",
 	"mist_elemental": "mist_blink", "storm_elemental": "storm_call", "wyvern": "wyvern_roar", "great_revenant_elemental": "stone_grind",
-	"war_wyvern": "wyvern_roar"}
+	"war_wyvern": "wyvern_roar",
+	"drowned_sailor": "drowned_moan", "barnacle_brute": "drowned_moan", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum"}
 
 
 ## How each of them sounds when struck, and when it dies.
 const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist_bear": "bear_hurt", "eagle": "eagle_hurt", "mist_eagle": "eagle_hurt",
 	"child_of_woods": "woods_hurt", "woodland_cavalry": "woods_hurt", "earth_elemental": "stone_hit", "great_revenant_elemental": "stone_hit",
-	"mist_elemental": "mist_hurt", "storm_elemental": "storm_hurt", "wyvern": "wyvern_hurt", "war_wyvern": "wyvern_hurt"}
+	"mist_elemental": "mist_hurt", "storm_elemental": "storm_hurt", "wyvern": "wyvern_hurt", "war_wyvern": "wyvern_hurt",
+	"drowned_sailor": "drowned_hurt", "barnacle_brute": "brute_hurt", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum", "angler": "angler_bite"}
 const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
-	"war_wyvern": "wyvern_death"}
+	"war_wyvern": "wyvern_death",
+	"drowned_sailor": "drowned_death", "barnacle_brute": "brute_death", "brine_hound": "hound_death", "lantern_jelly": "jelly_burst", "angler": "angler_death"}
 
 
 ## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.
@@ -1247,6 +1269,10 @@ func net_wake() -> void:
 func _show_awake() -> void:
 	dormant = false
 	_special_left = 0.0
+	if model_id == "angler":
+		# Out of the sand in a spray of it (VaelModels.animate_angler plays the rise).
+		world.sfx_at("angler_rise", position, 0.0)
+		world.fx_gore(position + Vector3.UP * 0.3, Color(0.55, 0.5, 0.4))
 	if _lure:
 		_lure.visible = false
 		_beam.visible = false
@@ -1686,6 +1712,8 @@ func _puppet_tick(delta: float) -> void:
 		_animate_custom(delta, pace)
 	elif _lure and dormant:
 		_lure.rotation.y += delta * 1.6
+	elif dormant and model_id == "angler":
+		VaelModels.lure_idle(_visual, world.now + float(net_id) * 0.37) # its lure, swaying over the sand
 	_think -= delta
 	if _think <= 0.0:
 		_think = 0.4
@@ -2724,6 +2752,8 @@ func _desired_speed() -> float:
 		mult *= 2.6
 	if haste_left > 0.0:
 		mult *= HASTE
+	if world.tide:
+		mult *= world.tide.quickens(self) # the Drowned, at high tide
 	if _marching:
 		return _speed * mult
 	match state:

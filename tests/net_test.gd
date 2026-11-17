@@ -129,7 +129,10 @@ func _as_host() -> void:
 	if rules == "bastion":
 		Net.set_fort_map("bastion")
 		ok(Net.fort_map == "bastion", "the host picks Mist Bastion")
-	Net.set_rules({"bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	if rules == "vael":
+		Net.set_night_map("vael")
+		ok(Net.night_map == "vael", "the host picks Port Vael")
+	Net.set_rules({"vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -281,6 +284,8 @@ func _play() -> void:
 		await _mesenlla()
 	elif rules == "bastion":
 		await _bastion()
+	elif rules == "vael":
+		await _vael()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -1601,6 +1606,63 @@ func _mesenlla() -> void:
 	ok(bosses.size() == 1 and (bosses[0]._visual.get_node("BossHealth") as Label3D).text.begins_with("GREAT REVENANT ELEMENTAL"), "the Great Revenant Elemental stands on both phones, its name over it")
 	ok(w.director.boss_card == "great_revenant_elemental" and w.director.boss_card_time > 0.0, "and both see its entrance card")
 	await sync(409)
+
+
+## Two phones in Port Vael: the Mist Tide stands the same on both, a Drowned Sailor carries the same
+## weapon on both, and a Lantern Jelly's sting reaches the other phone and stuns its player there.
+func _vael() -> void:
+	ok(w.map_id == "vael" and w.tide != null and Game.zombie_pool_plan().has("drowned"), "both phones are in Port Vael, with its tide")
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := w.start_spots[0] if not w.start_spots.is_empty() else Vector3.ZERO
+	pl.global_position = Vector3(base.x + (-2.0 if host else 2.0), w.ground_at(base) + 0.05, base.z)
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	await wait(0.6)
+	await sync(420)
+	ok(not w.tide.high(), "the night begins at low tide")
+	if host:
+		w.director.elapsed = MistTide.TURN + MistTide.RISE + 3.0
+	await wait(1.8)
+	await sync(421)
+	await wait(0.3)
+	ok(w.tide.high() and absf(w.tide.level - MistTide.HIGH_Y) < 0.05, "the tide comes in on both phones, to the same height")
+	await sync(422)
+	if host:
+		w.spawn_zombie("drowned_sailor", base + Vector3(0, 0, -6))
+		var sailor: Zombie = w.zombies.back()
+		sailor.set_physics_process(false)
+		told.rpc(sailor.weapon_id)
+	await wait(0.8)
+	await sync(423)
+	if not host:
+		var sailors := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "drowned_sailor")
+		ok(sailors.size() == 1 and sailors[0].weapon_id == _told and _told != "", "the Drowned Sailor holds the same %s here" % _told)
+	await sync(424)
+	var hp_before := pl.hp
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("lantern_jelly", them + Vector3(0, 0, -1.5))
+		var jelly: Zombie = w.zombies.back()
+		jelly.set_physics_process(false)
+		jelly.mesenlla_mind.cooldown = 0.0
+		jelly.mesenlla_mind.tick(jelly, _avatar(), them - jelly.position, jelly.position.distance_to(them), 0.0)
+	await wait(0.4)
+	await sync(425)
+	ok(w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.STING), "the sting's circle shows on this phone")
+	var stunned := 0.0
+	var until := Time.get_ticks_msec() + int((MesenllaMind.STING_TELL + 0.8) * 1000.0)
+	while Time.get_ticks_msec() < until:
+		stunned = maxf(stunned, pl.frozen_left)
+		await get_tree().process_frame
+	await sync(426)
+	if not host:
+		ok(pl.hp < hp_before and stunned > MistSeal.STING_STUN * 0.8, "staying inside hurts and stuns the player on this phone (%.0f, %.2f s)" % [hp_before - pl.hp, stunned])
+	await sync(427)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.

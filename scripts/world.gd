@@ -101,6 +101,9 @@ var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
 var cache_spots: Array[Vector3] = [] # where the ruins keep better things than lie about elsewhere
+var salvage_spots: Array[Transform3D] = [] # Port Vael: the wrecks' sea chests (MistTide)
+var tide: MistTide # Port Vael's Mist Tide, or null
+var _tide_fog := 1.0 # how much thicker the tide makes the fog
 var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
 var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
 var camp_fallen := false # the Valleys' camp, shelled and lost to the mist
@@ -253,7 +256,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
@@ -317,6 +320,8 @@ func setup(game_mode: int) -> void:
 		_mists_look()
 	elif map_id in SpawnRules.MESENLLA:
 		_mesenlla_look()
+	elif map_id == "vael":
+		_vael_look()
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
 		var atmosphere := MistAtmosphere.new()
 		atmosphere.name = "VillageAura" if fort == null else "FortAura"
@@ -527,7 +532,14 @@ func storm_air() -> void:
 func set_fog_thickness(amount: float) -> void:
 	if not is_equal_approx(amount, _fog_thick):
 		_fog_thick = amount
-		_env.fog_density = _fog_now * _fog_thick
+		_env.fog_density = _fog_now * _fog_thick * _tide_fog
+
+
+## The Mist Tide rolling in thickens the fog over all of Port Vael.
+func set_tide_fog(amount: float) -> void:
+	if not is_equal_approx(amount, _tide_fog):
+		_tide_fog = amount
+		_env.fog_density = _fog_now * _fog_thick * _tide_fog
 
 
 ## Lightning lights up the whole world for a moment.
@@ -598,6 +610,8 @@ func _map_file() -> String:
 				return "res://maps/mists.tscn"
 			if Game.current_map() == "mesenlla":
 				return "res://maps/mesenlla.tscn"
+			if Game.current_map() == "vael":
+				return "res://maps/vael.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -1050,6 +1064,30 @@ func _mesenlla_look() -> void:
 	_apply_sky(_last_dawn)
 
 
+## Port Vael: a cold grey-green night over the sea, a low white moon, sea-mist on the ground, and the
+## Mist Tide coming in and going out over the flats (MistTide), the wrecks' sea chests on them.
+func _vael_look() -> void:
+	night_bg = Color(0.03, 0.07, 0.1)
+	night_fog_colour = Color(0.13, 0.21, 0.23)
+	night_fog = 0.012 if Game.quality > 0 else 0.015
+	day_fog = 0.005 if Game.quality > 0 else 0.008
+	night_ambient = Color(0.4, 0.5, 0.56)
+	night_sky_shows = true
+	night_moon_colour = Color(0.8, 0.9, 1.0)
+	night_moon = 0.6
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.name = "VaelAura"
+	atmosphere.world = self
+	atmosphere.place = MistAtmosphere.Place.VAEL
+	add_child(atmosphere)
+	tide = MistTide.new(self)
+	add_child(tide)
+	for spot: Transform3D in salvage_spots:
+		tide.add_salvage(Vector3(spot.origin.x, ground_at(spot.origin), spot.origin.z), spot.basis.get_euler().y)
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
+
+
 ## A violet night with nothing under it.
 func _mists_look() -> void:
 	night_bg = Color(0.012, 0.025, 0.055)
@@ -1127,6 +1165,8 @@ func _apply_sky(dawn: float) -> void:
 	_sky_material.set_shader_parameter("dawn", dawn)
 	if _water_material:
 		_water_material.set_shader_parameter("dawn", bright)
+	if tide:
+		tide.set_dawn(bright)
 	_sky_material.set_shader_parameter("sun_dir", _sun_direction(dawn))
 	_star_material.albedo_color = Color(1, 1, 1, clampf(1.0 - dawn * 1.8, 0.0, 1.0))
 	_night_dome.visible = dawn < 0.56 and not wet and night_sky_shows
@@ -1136,7 +1176,7 @@ func _apply_sky(dawn: float) -> void:
 	_env.ambient_light_energy = _ambient_now
 	_env.fog_light_color = night_fog_colour.lerp(DAWN_FOG, warm)
 	_fog_now = lerpf(night_fog, day_fog, bright) * (1.35 if wet else 1.0)
-	_env.fog_density = _fog_now * _fog_thick
+	_env.fog_density = _fog_now * _fog_thick * _tide_fog
 	_moon.rotation_degrees = Vector3(lerpf(-48.0, -13.0, bright), lerpf(-32.0, -150.0, bright), 0.0)
 	_moon_colour = night_moon_colour.lerp(Color(1.0, 0.68, 0.42), warm)
 	_moon.light_color = _moon_colour
@@ -2519,6 +2559,37 @@ func random_player_position() -> Vector3:
 	if players.is_empty():
 		return Vector3.ZERO
 	return players[randi() % players.size()].global_position
+
+
+## Somewhere open between lo and hi metres from `near`, or Vector3.INF if no try found one.
+func spawn_point_near(near: Vector3, lo: float, hi: float, test := Callable()) -> Vector3:
+	for i in 14:
+		var a := randf() * TAU
+		var at := near + Vector3(cos(a), 0, sin(a)) * randf_range(lo, hi)
+		if absf(at.x) > play_half - 3.0 or absf(at.z) > play_half - 3.0:
+			continue
+		if not terrain.is_walkable(at.x, at.z) or not grid.is_free(grid.to_cell(at)):
+			continue
+		if test.is_valid() and not test.call(at):
+			continue
+		at.y = ground_at(at)
+		return at
+	return Vector3.INF
+
+
+## Port Vael: something the high tide carries in, out over the flooded flats near someone.
+func spawn_on_tide(id: String) -> bool:
+	if tide == null:
+		return false
+	var at := spawn_point_near(random_player_position(), 14.0, 36.0, func(p: Vector3) -> bool: return tide.flooded(p))
+	return at != Vector3.INF and spawn_zombie(id, at)
+
+
+## Port Vael: an Angler buried on the shore or the seabed, its lure showing, a little way from anyone.
+func spawn_angler() -> bool:
+	var at := spawn_point_near(random_player_position(), 12.0, 40.0, func(p: Vector3) -> bool:
+		return terrain.height(p.x, p.z) < MistTide.HIGH_Y + 0.4 and (tide == null or not tide.flooded(p)))
+	return at != Vector3.INF and spawn_zombie("angler", at)
 
 
 func spawn_mimic() -> bool:

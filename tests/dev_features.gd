@@ -40,6 +40,7 @@ func _ready() -> void:
 	await _maps_weather_and_balance()
 	await _requests_1116()
 	await _vael_weapons()
+	await _port_vael()
 	await _feedback_and_numbers()
 	await _wilds_of_mesenlla()
 	_text_audit()
@@ -1731,6 +1732,143 @@ func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
 
 
 ## The Sunken Crown: the six weapons of the coast of Vael.
+## The Sunken Crown, stage 2: Port Vael, its Mist Tide, its salvage and its creatures.
+func _port_vael() -> void:
+	# Everywhere a place is listed, Port Vael is.
+	check(Game.MAPS.has("vael") and "vael" in Game.VERSUS_MAPS and "vael" in Board.MAPS, "Port Vael can be chosen for the night and for versus, and has its boards")
+	check(Places.ORDER.has("vael") and Places.ALL["vael"]["tips"].size() == 3 and str(Places.ALL["vael"]["lore"]).length() > 80, "it has its page, its lore and its tips")
+	check(WorldAtlas.SPOTS.has("vael") and WorldAtlas.LINKS.any(func(l: Array) -> bool: return l[1] == "vael"), "it is on the world atlas, through a portal")
+	check(PlaceVista.LOOKS.has("vael") and Icons.exists("map_vael"), "its loading view and its icon")
+	check(Sfx.MUSIC_SETS.has("vael") and (Sfx.MUSIC_SETS["vael"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
+	check(Director.DAWN_SOUNDS.get("vael", "") == "dawn_vael" and Sfx.NAMES.has("dawn_vael"), "and its own sound at dawn")
+	# The tide's clock.
+	check(is_equal_approx(MistTide.level_at(0.0), MistTide.LOW_Y) and not MistTide.is_high_at(10.0), "the night begins at low tide")
+	check(MistTide.is_high_at(MistTide.TURN + 1.0) and is_equal_approx(MistTide.level_at(MistTide.TURN + MistTide.RISE), MistTide.HIGH_Y), "after %d s it comes in, taking %d s" % [int(MistTide.TURN), int(MistTide.RISE)])
+	check(MistTide.level_at(MistTide.TURN + MistTide.RISE * 0.5) > MistTide.LOW_Y and MistTide.level_at(MistTide.TURN + MistTide.RISE * 0.5) < MistTide.HIGH_Y, "rising in between")
+	check(not MistTide.is_high_at(MistTide.TURN * 2.0 + 1.0) and is_equal_approx(MistTide.turns_in(10.0), MistTide.TURN - 10.0), "and turns again every %d s" % int(MistTide.TURN))
+	check(MistTide.ebb(0.0) == 0 and MistTide.ebb(MistTide.TURN * 2.0 + 1.0) == 1 and MistTide.ebb(MistTide.TURN * 4.0 + 1.0) == 2, "each low tide counted")
+	# The map itself.
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "vael"
+	Game.mode = Game.Mode.NIGHT
+	var vael := World.new()
+	space.add_child(vael)
+	vael.setup(Game.Mode.NIGHT)
+	vael.director.running = false
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	var you := vael.player
+	you.set_physics_process(false)
+	check(vael.map_id == "vael" and vael.tide != null, "Port Vael loads, with its tide")
+	var t := vael.terrain
+	check(absf(t.height(0, -5) - 2.2) < 0.15 and t.height(0, -55) > 4.5, "the quay and the town above it")
+	check(t.height(0, 40) < MistTide.HIGH_Y - 0.3 and t.height(0, 40) > MistTide.LOW_Y + 0.2, "the flats between low and high water")
+	check(t.deep_water(0, 104) and not t.is_walkable(0, 104) and t.is_walkable(0, 40), "the open sea beyond them is no place to walk")
+	check(t.height(-84, 40) > MistTide.HIGH_Y + 0.8 and t.height(84, 40) > MistTide.HIGH_Y + 0.8, "the breakwaters stand out of the highest tide")
+	check(vael.tide.salvage().size() >= 4, "every wreck keeps a sea chest (%d)" % vael.tide.salvage().size())
+	var flats := Vector3(0, t.height(0, 40), 40)
+	# Low tide: dry flats, chests to open.
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.level_at(20.0)
+	check(is_equal_approx(vael.tide.slow_at(flats), 1.0) and vael.tide.blind_for(flats) == 0.0, "at low tide the flats are dry")
+	var chest: Dictionary = vael.tide.salvage()[0]
+	var coins := Game.doubloons
+	you.global_position = chest["at"]
+	vael.tide._tick_salvage(20.0)
+	check(Game.doubloons > coins and int(chest["taken"]) == MistTide.ebb(20.0), "you open a sea chest by walking up to it")
+	coins = Game.doubloons
+	vael.tide._tick_salvage(21.0)
+	check(Game.doubloons == coins and not vael.tide.salvage_open(chest), "once each low tide")
+	# High tide: wading, sea-mist, the Drowned quicker.
+	var high_at := MistTide.TURN + MistTide.RISE + 2.0
+	vael.director.elapsed = high_at
+	vael.tide.level = MistTide.level_at(high_at)
+	var deep := Vector3(0, t.height(0, 70), 70)
+	check(vael.tide.slow_at(flats) < 1.0 and is_equal_approx(vael.tide.slow_at(deep), MistTide.SLOW) == (vael.tide.depth_at(deep) >= MistTide.SLOW_DEPTH), "at high tide wading slows you, to %d%% at its deepest" % roundi(MistTide.SLOW * 100.0))
+	check(vael.tide.blind_for(deep) > 0.0 and vael.tide.blind_for(deep) <= 0.5 and vael.tide.blind_for(Vector3(0, 2.2, -5)) == 0.0, "and the sea-mist half blinds you in it, not on the quay")
+	check(vael.tide.fog_scale() > 1.5, "and the fog over the harbour thickens")
+	check(not vael.tide.salvage_open(chest) or (chest["at"] as Vector3).y > vael.tide.level, "a chest under the water can't be opened")
+	check(vael.tide.status()["text"] == "High tide" and float(vael.tide.status()["turns_in"]) > 0.0, "the HUD shows the tide and when it turns")
+	# The creatures.
+	var ids := ["drowned_sailor", "barnacle_brute", "brine_hound", "lantern_jelly", "angler"]
+	for id: String in ids:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(SpawnRules.is_vael(d) and CodexPanel.enemy_group(id) == 5 and str(d.get("lore", "")).length() > 60 and Icons.exists(str(d["icon"])), "%s: of Vael, in the Codex with its lore and icon" % id)
+		check(ZombieDefs.roams(id, 999.0, "vael") and not ZombieDefs.roams(id, 999.0, "village") and not ZombieDefs.roams(id, 999.0, "mesenlla"), "%s keeps to the coast" % id)
+	check(not ZombieDefs.roams("normal", 999.0, "vael") and not ZombieDefs.roams("child_of_woods", 999.0, "vael"), "and nothing else walks in Port Vael")
+	var at := Vector3(0, t.height(0, 20), 20)
+	check(vael.spawn_zombie("drowned_sailor", at), "a Drowned Sailor comes up")
+	var sailor: Zombie = vael.zombies.back()
+	check(sailor.weapon_id in ["cutlass", "boarding_hook", "dagger"], "with a cutlass, a hook or a knife")
+	sailor.state = Zombie.State.CHASE
+	var quick := sailor._desired_speed()
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.LOW_Y
+	check(is_equal_approx(quick / sailor._desired_speed(), MistTide.QUICKEN), "a quarter quicker while the tide is high")
+	sailor.release()
+	check(vael.spawn_zombie("barnacle_brute", at), "a Barnacle Brute")
+	var brute: Zombie = vael.zombies.back()
+	brute.rotation.y = 0.0
+	var hp := brute.hp
+	brute.take_damage(40.0, Vector3(0, 0, -1), 0.0, brute.centre())
+	var front := hp - brute.hp
+	hp = brute.hp
+	brute.take_damage(40.0, Vector3(0, 0, 1), 0.0, brute.centre())
+	check(is_equal_approx(front, 20.0) and is_equal_approx(hp - brute.hp, 40.0), "its crust takes half a blow from in front (%.0f), none from behind (%.0f)" % [front, hp - brute.hp])
+	brute.release()
+	check(vael.spawn_zombie("brine_hound", at), "a Brine Hound")
+	var hound: Zombie = vael.zombies.back()
+	check(hound._custom and hound._visual.has_node("Rig") and hound.mesenlla_mind != null and int(ZombieDefs.ALL["brine_hound"]["pack"]) == 3, "on its own body, hunting in packs")
+	hound.release()
+	check(vael.spawn_zombie("angler", at), "an Angler")
+	var angler: Zombie = vael.zombies.back()
+	check(angler.dormant and (angler._visual.get_node("Body") as Node3D).position.y < 0.0 and angler._visual.get_meta("buried", false), "lying buried, its lure out of the sand")
+	angler._wake()
+	check(not angler.dormant, "it bursts out when you come close")
+	angler.release()
+	check(vael.spawn_zombie("lantern_jelly", at), "a Lantern Jelly")
+	var jelly: Zombie = vael.zombies.back()
+	check(jelly._visual.has_node("Float/Bell/Lantern") and jelly._visual.has_node("Float/Bell/Threads/Thread0/Joint/Joint"), "a bell with its lantern and its threads")
+	check(is_equal_approx(float(ZombieDefs.ALL["lantern_jelly"]["sting_stun"]), MistSeal.STING_STUN), "its sting stuns for as long as the Codex says")
+	you.global_position = jelly.position + Vector3(1.0, 0, 0)
+	you.frozen_left = 0.0
+	you._status_immune = 0.0
+	var life := you.hp
+	var seal := MistSeal.create(vael, Vector3(jelly.position.x, t.height(jelly.position.x, jelly.position.z), jelly.position.z), float(ZombieDefs.ALL["lantern_jelly"]["sting_reach"]), 0.0, 0.05, 10.0, jelly.net_id, MistSeal.Style.STING)
+	seal.strike()
+	check(you.hp < life and is_equal_approx(you.frozen_left, MistSeal.STING_STUN) and not you.is_iced, "stung: hurt and stunned")
+	seal.queue_free()
+	jelly.release()
+	you.frozen_left = 0.0
+	# What the night brings: hounds in a pack, jellies on the high tide, Anglers buried on the shore.
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.global_position = Vector3(0, t.height(0, 30), 30)
+	var d := vael.director
+	d.elapsed = 400.0 # the tide is low at 400 s
+	vael.tide.level = MistTide.level_at(400.0)
+	d._next_rider = 0.0
+	d._next_wyvern = 0.0
+	d._next_ambush = 0.0
+	d._tick_vael()
+	check(vael.count_type("brine_hound") == int(ZombieDefs.ALL["brine_hound"]["pack"]), "Brine Hounds come up in a pack of %d" % vael.count_type("brine_hound"))
+	check(vael.count_type("lantern_jelly") == 0, "no Lantern Jellies at low tide")
+	var buried := vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "angler")
+	check(buried.size() == 1 and buried[0].dormant and t.height(buried[0].position.x, buried[0].position.z) < MistTide.HIGH_Y + 0.4, "an Angler lies buried on the shore")
+	d.elapsed = MistTide.TURN * 5.0 + MistTide.RISE + 1.0 # high
+	vael.tide.level = MistTide.HIGH_Y
+	d._next_wyvern = 0.0
+	d._tick_vael()
+	var jellies := vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "lantern_jelly")
+	check(jellies.size() == Director.JELLIES_AT_ONCE and jellies.all(func(z: Zombie) -> bool: return vael.tide.flooded(z.position)), "the high tide brings Lantern Jellies in over the water")
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+	await get_tree().process_frame
+
+
 func _vael_weapons() -> void:
 	var ids := ["cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar"]
 	# The Sandbox lays out every weapon, potion and familiar: all of them inside the play area, now

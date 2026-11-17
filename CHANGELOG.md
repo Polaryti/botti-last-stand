@@ -2,8 +2,23 @@
 
 ## Development — The Sunken Crown
 
+### Port Vael, a new map
+Through a new portal from the heart of the Mists: the drowned harbour of the kingdom of Vael. For Survive the Night, Co-op, All vs All and Teams.
+- **The Mist Tide** turns every 90 s. The night begins at low tide, and the water takes 12 s to come in or go out. The harbour bells ring 10 s before each turn.
+- **Low tide:** the seabed is bare. Each wreck, and the drowned bell tower, keeps a sea chest you can open once every low tide: doubloons, and a coast weapon, ship's biscuit or a potion.
+- **High tide:** the flats flood. Wading slows you, down to 60% chest-deep; the sea-mist half blinds you in the water; the fog thickens over the whole harbour; and the Drowned are a quarter quicker.
+- The upper town and its market square, the Harbourmaster's house, the chapel, the quay with its cranes and warehouses, two breakwaters, a lighthouse, three wrecks, a drowned bell tower and the stumps of old piers.
+- Its own music (a sailors' lament), sounds and map.
+
+### The drowned of Vael
+- **Drowned Sailor:** the commonest. A cutlass, a boarding hook or a knife in its hand; sometimes leaves it when it falls.
+- **Barnacle Brute:** its crust takes half of every blow from in front. Get round it.
+- **Brine Hound:** hunts in packs of three, and lunges.
+- **Lantern Jelly:** drifts in on the high tide. Its threads flare, then it stings everything within 2.4 m, stunning for 0.8 s, and stings once more as it dies.
+- **Angler:** lies buried with only its lure showing, and bursts out to bite.
+
 ### New weapons of the coast
-Found on the coming Port Vael and Lantern Road maps.
+Found on Port Vael, and later on the Lantern Road.
 - **Cutlass:** each kill quickens your swings by 15%, up to three times, fading 3 s after the last kill.
 - **Boarding Hook:** drags what it catches 1.6 m towards you and staggers it. Anything too big to drag is only staggered.
 - **Whaler's Harpoon:** pins what it strikes for 2 s, then lies where it lands. Walk over it to take it back, or it returns by itself after 15 s.

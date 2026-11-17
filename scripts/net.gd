@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 57
+const PROTOCOL := 58
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -53,7 +53,9 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death", "dawn_mists", "dawn_valleys", "dawn_bastion",
 	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent",
 	"frost_warning", "frost_burst", "owl_screech", "boar_snort",
-	"hook_catch", "harpoon_hit", "flare_burst", "anchor_slam"]
+	"hook_catch", "harpoon_hit", "flare_burst", "anchor_slam",
+	"dawn_vael", "drowned_moan", "drowned_hurt", "drowned_death", "brute_hurt", "brute_death", "hound_snarl", "hound_bite", "hound_death",
+	"jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).

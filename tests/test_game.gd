@@ -3485,8 +3485,10 @@ func test_beyond_review() -> void:
 	ok(absf(back / maxf(ahead, 0.01) - Player.BACK_SPEED) < 0.03, "walking backwards goes at %d%% of walking on (%.2f against %.2f m/s)" % [int(Player.BACK_SPEED * 100.0), back, ahead])
 	# The Scarecrow belongs to the Village.
 	ok(ZombieDefs.ALL["scarecrow"]["maps"] == ["village"] and SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "village") and not SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "mesenlla"), "the Scarecrow is the Village's alone")
-	# The world atlas: the Mists lead only to Mist Bastion, and the Valleys lie below it.
-	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion"], "on the atlas the Mists connect to the Fort and Mist Bastion only")
+	# The world atlas: the Mists lead to Mist Bastion and, through a second portal, to Port Vael; the
+	# Valleys lie below the Bastion.
+	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion", "vael"], "on the atlas the Mists connect to the Fort, Mist Bastion and Port Vael only")
+	ok(WorldAtlas.LINKS.any(func(l: Array) -> bool: return l[0] == "mists" and l[1] == "vael" and l[2]), "Port Vael is reached through a portal")
 	ok((WorldAtlas.SPOTS["mesenlla"] as Vector2).y > (WorldAtlas.SPOTS["bastion"] as Vector2).y, "and the Valleys of Mesenlla lie below Mist Bastion")
 	m.show_map_picker()
 	await frames(2)

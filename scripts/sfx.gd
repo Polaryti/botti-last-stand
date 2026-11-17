@@ -25,7 +25,10 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent",
 	# The Sunken Crown (tools/make_sunken_audio.py): the weapons of Vael
 	"cutlass_swing", "hook_swing", "hook_catch", "harpoon_throw", "harpoon_hit", "harpoon_reel", "flare_shot", "flare_burst",
-	"anchor_heave", "anchor_slam", "oar_sweep"]
+	"anchor_heave", "anchor_slam", "oar_sweep",
+	# Port Vael: the Mist Tide and the drowned
+	"tide_bell", "tide_in", "tide_out", "salvage", "dawn_vael", "drowned_moan", "drowned_hurt", "drowned_death", "brute_hurt", "brute_death",
+	"hound_snarl", "hound_bite", "hound_death", "jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],
@@ -39,6 +42,7 @@ const MUSIC_SETS := {
 	"fort": ["fort_night", "fort_hunted", "fort_dawn"],
 	"mesenlla": ["mesenlla_night", "mesenlla_hunted", "mesenlla_dawn"],
 	"bastion": ["bastion_night", "bastion_hunted", "bastion_dawn"],
+	"vael": ["vael_night", "vael_hunted", "vael_dawn"],
 	"menu": ["menu_mesenlla", "", ""],
 }
 const MUSIC_BUS := "Music"

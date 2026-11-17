@@ -42,12 +42,13 @@ var night_map := "village"
 var fort_map := "fort"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
-	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."}}
+	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."},
+	"vael": {"name": "Port Vael", "desc": "A drowned harbour. The Mist Tide comes in and goes out."}}
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
 const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
 	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
-const VERSUS_MAPS := ["village", "mesenlla"]
+const VERSUS_MAPS := ["village", "mesenlla", "vael"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
@@ -342,6 +343,10 @@ const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 
 	"earth_elemental": 2, "mist_elemental": 2, "storm_elemental": 2, "wyvern": 2, "great_revenant_elemental": 1, "war_wyvern": 1}
 
 
+## Port Vael: the drowned and what the Mist Tide brings in.
+const VAEL_POOLS := {"drowned": 16, "barnacle_brute": 3, "brine_hound": 6, "lantern_jelly": 6, "angler": 3}
+
+
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
 const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6, "mist_eagle": 3, "shapeshifter": 3,
 	"earth_elemental": 4, "mist_elemental": 3, "storm_elemental": 3, "wyvern": 2, "war_wyvern": 1}
@@ -352,11 +357,15 @@ func zombie_pool_plan() -> Dictionary:
 		return BASTION_POOLS.duplicate()
 	if mode == Mode.NIGHT and current_map() in SpawnRules.MESENLLA:
 		return MESENLLA_POOLS.duplicate()
+	if mode == Mode.NIGHT and current_map() in SpawnRules.VAEL:
+		return VAEL_POOLS.duplicate()
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:
 		plan["dummy"] = 6
 		for model: String in MESENLLA_POOLS:
 			plan[model] = mini(int(MESENLLA_POOLS[model]), 4)
+		for model: String in VAEL_POOLS:
+			plan[model] = mini(int(VAEL_POOLS[model]), 4)
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent

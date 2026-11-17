@@ -23,7 +23,7 @@ const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
 ## What each land sounds like when the dead sense the dawn. The Village and the Fort keep the wolf.
-const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion"}
+const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael"}
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0
@@ -36,6 +36,13 @@ const MAX_RIDERS := 2
 const FIRST_WYVERN := 300.0
 const WYVERN_EVERY := 95.0
 const MAX_WYVERNS := 1
+# Port Vael (_tick_vael)
+const HOUND_PACK_EVERY := 80.0
+const MAX_HOUNDS := 6
+const JELLIES_EVERY := 30.0 # while the tide is high
+const JELLIES_AT_ONCE := 2
+const MAX_JELLIES := 6
+const MAX_ANGLERS := 3
 const MESENLLA_BOSS := "great_revenant_elemental"
 const BASTION_BOSS := "war_wyvern"
 
@@ -465,12 +472,42 @@ func _tick_mesenlla() -> void:
 			show_banner("A wyvern over the valley!", 3.0)
 
 
+## Port Vael: Brine Hounds come up out of the sea in packs; the high tide carries Lantern Jellies in
+## over the flats; and Anglers lie buried on the shore with their lures showing.
+func _tick_vael() -> void:
+	if elapsed >= _next_rider and elapsed >= ZombieDefs.ALL["brine_hound"]["from"]:
+		_next_rider = elapsed + HOUND_PACK_EVERY
+		if world.count_type("brine_hound") <= MAX_HOUNDS - int(ZombieDefs.ALL["brine_hound"]["pack"]):
+			var near := world.random_player_position()
+			var at := world.spawn_point_near(near, 26.0, 40.0)
+			var came := 0
+			for i in int(ZombieDefs.ALL["brine_hound"]["pack"]):
+				if world.spawn_zombie("brine_hound", at + Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0))):
+					came += 1
+			if came > 0:
+				_sound("hound_snarl", 0.0)
+				show_banner("Hounds out of the sea...", 3.0)
+	if elapsed >= _next_wyvern and world.tide and world.tide.high() and elapsed >= ZombieDefs.ALL["lantern_jelly"]["from"]:
+		_next_wyvern = elapsed + JELLIES_EVERY
+		for i in JELLIES_AT_ONCE:
+			if world.count_type("lantern_jelly") >= MAX_JELLIES:
+				break
+			world.spawn_on_tide("lantern_jelly")
+	if elapsed >= _next_ambush and elapsed >= ZombieDefs.ALL["angler"]["from"]:
+		_next_ambush = elapsed + AMBUSH_EVERY
+		if world.count_type("angler") < MAX_ANGLERS:
+			world.spawn_angler()
+
+
 func _tick_specials() -> void:
 	_tick_mist_boss()
 	if world.garrison:
 		world.garrison.tick(elapsed)
 	if world.map_id in SpawnRules.MESENLLA:
 		_tick_mesenlla()
+		return
+	if world.map_id in SpawnRules.VAEL:
+		_tick_vael()
 		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
 		_next_rider = elapsed + RIDER_EVERY

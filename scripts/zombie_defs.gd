@@ -17,6 +17,23 @@ const ALL := {
 		"sight": 28.0, "tint": Color(0.46, 0.62, 0.36), "models": ["normal_a", "normal_b"], "from": 0.0, "weight": 10.0},
 	"clever": {"name": "Clever", "icon": "grab", "desc": "Picks up weapons from the ground and uses them. Drops them when it falls.", "hp": 75.0, "roam_speed": 1.7, "speed": 3.45, "damage": 10.0, "scale": 1.0, "xp": 14,
 		"sight": 30.0, "tint": Color(0.5, 0.56, 0.42), "models": ["clever"], "from": 60.0, "weight": 3.5},
+	# Port Vael: the drowned, and what the Mist Tide brings in with it. Those marked "drowned" are
+	# quicker while the tide is high (MistTide.QUICKEN).
+	"drowned_sailor": {"loot_chance": 0.2, "loot": ["weapon", "food"], "name": "Drowned Sailor", "icon": "drowned_sailor", "desc": "A sailor of Vael come back out of the sea, with a cutlass, a boarding hook or a knife in its hand. A quarter quicker while the tide is high. One time in five it leaves something when it falls: that weapon or some food.", "hp": 75.0, "roam_speed": 1.4, "speed": 3.2, "damage": 10.0, "scale": 1.0, "xp": 14,
+		"sight": 30.0, "tint": Color(0.42, 0.56, 0.58), "models": ["drowned"], "from": 0.0, "weight": 10.0, "maps": ["vael", "lantern_road"], "weapons": ["cutlass", "boarding_hook", "dagger"], "weapon_odds": [3, 2, 2], "drowned": true,
+		"lore": "The crews of Vael went down with their harbour on the night the crown was lost. The tide brings them home every night, and every night they look for the ships they sailed."},
+	"barnacle_brute": {"name": "Barnacle Brute", "icon": "barnacle_brute", "desc": "A drowned dock-hand grown over with barnacles and coral. Its crust takes half of every blow struck from in front: get round it. Its blows throw you back. A quarter quicker while the tide is high.", "hp": 380.0, "roam_speed": 1.2, "speed": 2.5, "damage": 22.0, "scale": 1.4, "xp": 44,
+		"sight": 30.0, "tint": Color(0.5, 0.52, 0.48), "models": ["barnacle_brute"], "from": 120.0, "weight": 1.8, "maps": ["vael", "lantern_road"], "shoves": true, "shielded": true, "drowned": true,
+		"lore": "Some of the drowned stood so long on the harbour floor that the sea built on them. They still carry the anchor chains they were hauling when the water came."},
+	"brine_hound": {"name": "Brine Hound", "icon": "brine_hound", "desc": "A hound the sea took back. Hunts in a pack of three: crouches, then lunges at you from a few metres off. A quarter quicker while the tide is high.", "hp": 90.0, "roam_speed": 2.4, "speed": 6.2, "damage": 12.0, "scale": 1.0, "xp": 20,
+		"sight": 36.0, "models": ["brine_hound"], "from": 150.0, "weight": 0.0, "custom": true, "maps": ["vael", "lantern_road"], "drowned": true, "pack": 3, "radius": 0.5, "tall": 1.0,
+		"lore": "The harbour's dogs swam out after their masters' boats. What swims back is longer and slicker, with gills in its neck and a mouth full of needles."},
+	"lantern_jelly": {"name": "Lantern Jelly", "icon": "lantern_jelly", "desc": "Drifts in on the high tide with a ship's lantern still burning inside it. Its threads flare, then it stings everything within 2.4 m, stunning for 0.8 s. When it dies it stings once more. Back away when the threads flare.", "hp": 60.0, "roam_speed": 1.0, "speed": 1.8, "damage": 14.0, "scale": 1.0, "xp": 18,
+		"sight": 26.0, "models": ["lantern_jelly"], "from": 60.0, "weight": 0.0, "custom": true, "maps": ["vael", "lantern_road"], "sting_reach": 2.4, "sting_stun": 0.8, "radius": 0.6, "tall": 2.4,
+		"lore": "Jellies drifted into the drowned harbour and grew round its lanterns, which never went out. Sailors once steered home by those lights. Now the lights come looking for them."},
+	"angler": {"name": "Angler", "icon": "angler", "desc": "Lies buried in the sand with only its lure showing, like a lamp someone left on the shore. Come close and it bursts out to bite.", "hp": 160.0, "roam_speed": 0.0, "speed": 3.0, "damage": 28.0, "scale": 1.0, "xp": 30,
+		"sight": 4.0, "models": ["angler"], "from": 90.0, "weight": 0.0, "custom": true, "dormant": true, "maps": ["vael", "lantern_road"], "radius": 0.65, "tall": 1.4,
+		"lore": "The fishermen of Vael told of a fish that lit its own lamp to bring the boats in. On the flats of Port Vael there are a great many lamps."},
 	"magic": {"name": "Magic", "icon": "flame", "desc": "Keeps its distance and throws fireballs that set you alight.", "hp": 50.0, "roam_speed": 1.2, "speed": 2.2, "damage": 8.0, "scale": 1.0, "xp": 16,
 		"sight": 34.0, "tint": Color(0.42, 0.5, 0.66), "models": ["magic"], "from": 120.0, "weight": 2.2, "caster": true},
 	"beast": {"name": "Beast", "icon": "claw", "desc": "Arrives with a howl. Fast, clawed, and it tracks by scent, so hiding only delays it.", "hp": 150.0, "roam_speed": 6.2, "speed": 6.4, "damage": 20.0, "scale": 1.2, "xp": 40,
@@ -116,7 +133,7 @@ static func roams(id: String, elapsed: float, map_id: String) -> bool:
 	var d: Dictionary = ALL[id]
 	if elapsed < float(d.get("from", 9999.0)):
 		return false
-	if map_id in SpawnRules.MESENLLA:
+	if map_id in SpawnRules.MESENLLA or map_id in SpawnRules.VAEL:
 		return d.get("maps", []).has(map_id)
 	if d.get("only_islands", false) and map_id != "mists":
 		return false
@@ -137,4 +154,4 @@ static func pick_roamer(elapsed: float, map_id := "village") -> String:
 			r -= w
 			if r <= 0.0:
 				return id
-	return "child_of_woods" if map_id in SpawnRules.MESENLLA else "normal"
+	return "child_of_woods" if map_id in SpawnRules.MESENLLA else "drowned_sailor" if map_id in SpawnRules.VAEL else "normal"
