@@ -18,7 +18,7 @@ const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
 const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
-	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64),
+	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64), "tidecaller": Vector3(0.24, 0.8, 0.74),
 	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5), "mist_heavy": Vector3(0.66, 0.92, 0.98)}
@@ -104,6 +104,7 @@ static func _pieces(id: String) -> Dictionary:
 			"bandit": built = _bandit()
 			"cartographer": built = _cartographer()
 			"harpooner": built = _harpooner()
+			"tidecaller": built = _tidecaller()
 			"mist_infantry": built = _mist_infantry()
 			"mist_ranger": built = _mist_ranger()
 			"mist_heavy": built = _mist_heavy()
@@ -399,6 +400,54 @@ static func _harpooner() -> Dictionary:
 	hips.box(Vector3(-0.5, -0.06, 0.16), Vector3(0.07, 0.36, 0.14), LEATHER, Vector3(0, 0, -10))
 	hips.prism(Vector3(-0.47, 0.12, 0.16), Vector3(-0.45, 0.3, 0.16), 0.035, 0.035, 6, WOOD)
 	hips.prism(Vector3(-0.45, 0.3, 0.16), Vector3(-0.45, 0.33, 0.16), 0.045, 0.045, 6, BRASS)
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+
+
+## Tidecaller: a circlet of shells and branching coral with a pearl at the brow, a mantle of kelp over
+## the shoulders hanging in ragged strips, and at the hips a sash of fishing net with a conch horn.
+static func _tidecaller() -> Dictionary:
+	const CORAL := Color(0.94, 0.48, 0.42)
+	const SHELL := Color(0.95, 0.9, 0.8)
+	const KELP := Color(0.24, 0.42, 0.22)
+	const PEARL := Color(0.9, 0.96, 1.0)
+	var head := LowPoly.new()
+	# The circlet: a band of twisted cord round the brow of the hood, low over the forehead.
+	head.prism(Vector3(0, 0.6, 0.0), Vector3(0, 0.65, 0.0), 0.575, 0.57, 16, Color(0.44, 0.36, 0.26))
+	for i in 7:
+		var a := -1.5 + i * 0.5
+		var at := Vector3(sin(a) * 0.58, 0.62, cos(a) * 0.58)
+		var turned := Vector3(0, rad_to_deg(a), 0)
+		if i % 2 == 1:
+			# A scallop shell standing on the band, ribs fanning up from its hinge.
+			for k in 3:
+				head.box(at + Vector3(0, 0.05 + k * 0.025, 0), Vector3(0.11 - k * 0.025, 0.03, 0.025), SHELL.darkened(0.06 * k), turned)
+		else:
+			# A little branch of coral, forking.
+			var up := at + Vector3(0, 0.14, 0)
+			head.prism(at, up, 0.02, 0.012, 4, CORAL)
+			head.prism(at + Vector3(0, 0.07, 0), at + Vector3(cos(a) * 0.05, 0.13, -sin(a) * 0.05), 0.013, 0.008, 4, CORAL.lightened(0.12))
+	# A pearl at the brow, in a little bronze setting.
+	head.prism(Vector3(0, 0.625, 0.57), Vector3(0, 0.625, 0.6), 0.05, 0.05, 8, Color(0.62, 0.5, 0.26))
+	head.prism(Vector3(0, 0.625, 0.59), Vector3(0, 0.625, 0.63), 0.035, 0.015, 8, PEARL)
+	var chest := LowPoly.new()
+	# The kelp mantle: a collar round the shoulders, ragged strips hanging from it, longer at the back.
+	chest.prism(Vector3(0, 0.1, -0.02), Vector3(0, 0.2, -0.02), 0.62, 0.56, 12, KELP)
+	for i in 14:
+		var a := TAU * i / 14.0
+		var front := cos(a) > 0.3
+		var length := (0.14 if front else 0.3) + 0.08 * ((i * 7) % 3)
+		var top := Vector3(sin(a) * 0.6, 0.12, cos(a) * 0.54 - 0.02)
+		chest.box(top + Vector3(0, -length * 0.5, 0), Vector3(0.1, length, 0.025), KELP.lightened(0.06 * (i % 3)), Vector3(0, rad_to_deg(a), 0))
+	var hips := LowPoly.new()
+	# A sash of netting, knotted at the side.
+	hips.prism(Vector3(0, 0.06, 0), Vector3(0, 0.18, 0), 0.6, 0.6, 12, Color(0.62, 0.56, 0.42))
+	for i in 6:
+		var a := -1.2 + i * 0.48
+		hips.box(Vector3(sin(a) * 0.61, 0.12, cos(a) * 0.61), Vector3(0.02, 0.13, 0.02), Color(0.4, 0.34, 0.24), Vector3(0, rad_to_deg(a), 0))
+	# The conch horn, hanging by a cord.
+	hips.prism(Vector3(-0.52, 0.1, 0.18), Vector3(-0.56, -0.06, 0.2), 0.012, 0.012, 4, Color(0.4, 0.34, 0.24))
+	hips.prism(Vector3(-0.62, -0.08, 0.2), Vector3(-0.48, -0.16, 0.2), 0.04, 0.1, 7, SHELL)
+	hips.prism(Vector3(-0.48, -0.16, 0.2), Vector3(-0.42, -0.24, 0.2), 0.1, 0.0, 7, CORAL.lightened(0.3))
 	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
 
 

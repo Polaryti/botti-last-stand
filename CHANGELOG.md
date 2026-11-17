@@ -36,6 +36,14 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 - **The Leviathan of the Mists** rises at the Isle of Lamps. Step out of its bite, outrun its waves, and keep near the barge when it spits the sea over it (the light shrinks to 6 m for 8 s). Defeat it, and the lighthouse burns again: that is the dawn.
 - Its own music (a pilgrims' hymn), sounds and map.
 
+### A new class: the Tidecaller
+Earned by winning Last Light 3 times. 95 health; spends tide, which its own Trident draws (5 with every blow that lands) and which slowly rises by itself.
+- **Call the Tide:** a wave rolls 14 m ahead, throwing back and slowing what it strikes.
+- **Wavebreaker:** Breaking Wave, 2 m wider and 50% harder. Riptide, Breakers, Salt Spray, Drowning. At level 10, every third wave is a Tsunami.
+- **Deepsinger:** Deep Song: for 6 s enemies within 9 m are drawn toward you and slowed, and friends in it heal 4 a second. At level 10, Requiem of the Deep.
+- **Fogbinder:** Bind the Fog: everything within 4.5 m of a point ahead is blinded for 4 s and slowed. At level 10, Mistbound Sea keeps the fog there.
+- The Tidecaller's Trident: long thrusts through up to two in a line.
+
 ### A new class: the Harpooner
 Earned by being in the match when the Harbourmaster of Port Vael falls. 115 health; starts with a Whaler's Harpoon, which comes back to hand by itself after 4 s, and a Boarding Hook.
 - **Haul:** a hook on a line at the enemy you look at, up to 18 m: it is dragged to you, struck and stunned. Anything too big to move pulls you to it instead.

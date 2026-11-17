@@ -31,6 +31,7 @@ var board_prizes := {} # week -> doubloons, for leaderboard prizes already paid
 var finished_games := 0
 var mists_wins := 0
 var lighthouses_lit := 0 # Last Light won: the Isle of Lamps' lighthouse burning again
+const LIGHTHOUSES_FOR_TIDECALLER := 3
 var harbourmasters_beaten := 0 # the Harbourmaster defeated in a match you played: the first earns the Harpooner
 var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
 var bastion_wins := 0
@@ -203,6 +204,8 @@ func earn_text(id: String) -> String:
 			return "Survive until dawn %d times in The Mists to unlock this class. So far: %d." % [WINS_FOR_REVENANT, mini(mists_wins, WINS_FOR_REVENANT)]
 		"poison":
 			return "Deal %d poison damage to unlock this class. So far: %d." % [POISON_FOR_PLAGUE, mini(int(poison_dealt), POISON_FOR_PLAGUE)]
+		"lighthouses":
+			return "Win Last Light %d times (bring the Lantern Barge to the Isle of Lamps and light the lighthouse) to unlock this class. So far: %d." % [LIGHTHOUSES_FOR_TIDECALLER, mini(lighthouses_lit, LIGHTHOUSES_FOR_TIDECALLER)]
 		"harbourmaster":
 			return "Defeat the Harbourmaster of Port Vael to unlock this class: be in the match when he falls."
 		"beyond":
@@ -241,10 +244,13 @@ func note_harbourmaster() -> void:
 
 
 ## Last Light won: the Lantern Barge brought to the Isle of Lamps and the lighthouse lit again.
+## Last Light won. Three wins earn the Tidecaller.
 func note_last_light() -> void:
 	if mode == Mode.SANDBOX:
 		return
 	lighthouses_lit += 1
+	if lighthouses_lit >= LIGHTHOUSES_FOR_TIDECALLER and not unlocked.has("tidecaller"):
+		_earn("tidecaller")
 	save_settings()
 
 

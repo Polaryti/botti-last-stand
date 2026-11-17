@@ -90,7 +90,7 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer", "harpooner"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer", "harpooner", "tidecaller"]:
 		Game.unlocked[id] = true
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
@@ -135,7 +135,7 @@ func _as_host() -> void:
 	if rules == "lantern":
 		Net.set_night_map("lantern_road")
 		ok(Net.night_map == "lantern_road", "the host picks the Lantern Road")
-	Net.set_rules({"harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"tidecaller": Net.Rules.COOP, "harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -219,12 +219,14 @@ func _as_client() -> void:
 		Net.set_my_class("cartographer")
 	if rules == "harpooner":
 		Net.set_my_class("harpooner")
+	if rules == "tidecaller":
+		Net.set_my_class("tidecaller")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "harpooner": "harpooner"}.get(rules, "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "harpooner": "harpooner", "tidecaller": "tidecaller"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -287,6 +289,8 @@ func _play() -> void:
 		await _cartographer()
 	elif rules == "harpooner":
 		await _harpooner()
+	elif rules == "tidecaller":
+		await _tidecaller()
 	elif rules == "mesenlla":
 		await _mesenlla()
 	elif rules == "bastion":
@@ -1619,6 +1623,80 @@ func _harpooner() -> void:
 		var crosser: Zombie = w.zombie_by_id(mine)
 		ok(crosser != null and crosser._stun > 0.0 and crosser._slow > 0.0, "this phone's creature trips on the other phone's line: stunned and slowed")
 	await sync(606)
+
+
+## Two Tidecallers: the other phone's wave rolls on this phone too and strikes this phone's creature;
+## its Deep Song rings round it here; and as a Fogbinder its fog blinds this phone's creature.
+func _tidecaller() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	var spot := Vector3(base.x + (-6.0 if host else 0.0), 0, base.z + 6.0)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	pl.yaw = 0.0
+	pl.rotation.y = 0.0
+	pl.pitch = 0.0
+	pl.camera.rotation = Vector3.ZERO
+	var mine := -1
+	await wait(0.6)
+	await sync(620)
+	if host:
+		var there := Vector3(base.x, 0, base.z + 6.0 - 7.0)
+		w.spawn_zombie("normal", Vector3(there.x, w.ground_at(there), there.z))
+		var z: Zombie = w.zombies.back()
+		z.hp = 2000.0
+		z.max_hp = 2000.0
+		z.stun(20.0)
+		mine = z.net_id
+	await wait(0.8)
+	await sync(621)
+	if not host:
+		ok(pl.class_id == "tidecaller" and pl.art_def()["name"] == "Call the Tide", "this phone plays a Tidecaller")
+		TidecallerKit.call_the_tide(pl)
+	await wait(0.15)
+	ok(w.get_children().any(func(n: Node) -> bool: return n is TideWave), "the wave rolls on this phone")
+	await wait(1.4)
+	await sync(622)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		ok(z != null and z.hp < 2000.0, "the other phone's wave struck this phone's creature (%.0f)" % (2000.0 - z.hp if z else 0.0))
+	await sync(623)
+	if not host:
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 1 if step == 3 else 0)
+		pl.mana = pl.max_mana()
+		TidecallerKit.deep_song(pl)
+	await wait(0.6)
+	ok(w.get_children().any(func(n: Node) -> bool: return n is DeepSong and (n as DeepSong).owner_peer == (Net.my_id() if not host else _other())), "the Deepsinger's song rings round them on this phone")
+	await sync(624)
+	if not host:
+		for n: Node in w.get_children():
+			if n is DeepSong:
+				n.queue_free()
+	await wait(0.4)
+	await sync(625)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		told.rpc(var_to_str(z.position))
+	await wait(0.5)
+	await sync(626)
+	if not host:
+		var at: Vector3 = str_to_var(_told)
+		w.fog_bank(pl.net_id(), at, TidecallerKit.FOG_RADIUS, TidecallerKit.FOG_BLIND, 0)
+		Net.fog_bank(pl.net_id(), at, TidecallerKit.FOG_RADIUS, TidecallerKit.FOG_BLIND, 0)
+	await wait(0.8)
+	await sync(627)
+	ok(w.get_children().any(func(n: Node) -> bool: return n is FogBank), "the fog bank stands on this phone")
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		ok(z != null and z.blind_left > 0.0 and z._slow > 0.0, "the other phone's fog blinded and slowed this phone's creature")
+	await sync(628)
 
 
 ## Two phones in the Valleys of Mesenlla: the creatures look and act the same on both, a tell's circle

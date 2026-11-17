@@ -121,7 +121,8 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"beacons": 0.0, "link_range": 0.0, "beacon_radius": 0.0, "line_heal": 0.0, "mark_range": 0.0, "star_bonus": 0.0, "star_power": 0.0,
 	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0,
 	"haul_range": 0.0, "haul_cd": 1.0, "haul_stun": 0.0, "path_cd": 1.0, "blood_time": 0.0, "line_time": 0.0, "lines": 0.0, "line_reach": 0.0,
-	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0}
+	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0,
+	"wave_damage": 0.0, "wave_range": 0.0, "song_reach": 0.0, "song_time": 0.0, "song_heal": 0.0, "fog_radius": 0.0, "fog_time": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
@@ -1247,6 +1248,7 @@ func haul_self_to(at: Vector3, stop: float) -> void:
 ## marked (Flensing), each until when it counts. And whether the haul ends in a Grapple Slam.
 var hauled := {}
 var hunted := {}
+var waves_called := 0 # a Wavebreaker's waves, for Tsunami's every third
 var slam_on_arrival := false
 
 
@@ -1316,6 +1318,10 @@ func apply_status(kind: int, seconds: float) -> void:
 				invis_left = 0.0
 				say("Revealed!")
 			invis_lockout = maxf(invis_lockout, seconds)
+		Net.Status.BLIND:
+			# Bound in a rival Fogbinder's fog: the edges of sight close in, as in a Nightfall.
+			night_blind_left = maxf(night_blind_left, secs)
+			say("Lost in the fog!")
 
 
 ## The deadly fog: no armour or dodge helps against it, though a moment of invincibility does.
@@ -1852,6 +1858,8 @@ func _on_kill(z: Zombie) -> void:
 		BanditKit.plunder(self, z.position)
 	if class_id == "harpooner":
 		HarpoonerKit.on_kill(self, z)
+	if class_id == "tidecaller":
+		TidecallerKit.on_kill(self)
 	fire("kill", {"z": z})
 	if _assassin_kill:
 		_assassin_kill = false
@@ -2466,6 +2474,8 @@ func art_def() -> Dictionary:
 		return CartographerKit.art(self)
 	if class_id == "harpooner":
 		return HarpoonerKit.art(self)
+	if class_id == "tidecaller":
+		return TidecallerKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -2598,7 +2608,7 @@ func art_cost() -> float:
 
 ## What the bar is full of, for "Not enough...".
 func _art_fuel() -> String:
-	return "Ki" if class_def().get("ki", false) else "mist"
+	return "Ki" if class_def().get("ki", false) else "tide" if class_id == "tidecaller" else "mist"
 
 
 ## Mist Burst: gather the mist for a moment, then let it go.
@@ -2650,7 +2660,7 @@ func use_art() -> void:
 	mana -= art_cost()
 	# The Bandit's paths sharpen their own ability (on the second button), not Into the Shadows.
 	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * art_cd_scale())
-	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "tidecaller" if class_id == "tidecaller" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -3059,6 +3069,7 @@ func _tick_mist(delta: float) -> void:
 		"cartographer": CartographerKit.cast(self)
 		"harpooner": HarpoonerKit.cast(self)
 		"harpooner_path": HarpoonerKit.cast_path(self)
+		"tidecaller": TidecallerKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -4341,6 +4352,8 @@ func _harpoon_home(in_hand: bool) -> void:
 ## Rules applied to every zombie a melee swing connects with.
 func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 	_ki_from_blow()
+	if d.has("tide") and class_id == "tidecaller":
+		TidecallerKit.on_trident_hit(self, z)
 	if stance == "flame":
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if has_flag("void_walker") and STANCES.has(stance):

@@ -728,6 +728,29 @@ for g in (rope,):
     PLAIN.append(g)
 CRESTS.append(crest_harpooner)
 
+# The Tidecaller (stage 5)
+def song():
+    # Two notes of the drowned's song rising out of a curl of water.
+    return (path(ICE, "M6 86 C20 70 36 66 50 74 C62 80 76 80 94 68 L94 94 L6 94Z")
+        + circ(("#9ff5e2", "#2a8a7a"), 30, 58, 10) + rect(("#9ff5e2", "#2a8a7a"), 37, 18, 6, 42, 2)
+        + circ(("#9ff5e2", "#2a8a7a"), 66, 46, 10) + rect(("#9ff5e2", "#2a8a7a"), 73, 8, 6, 40, 2)
+        + path(("#9ff5e2", "#2a8a7a"), "M40 18 L79 8 L79 18 L40 28Z", 2))
+def trident_upright():
+    # Upright: a coral-crusted haft, a bronze collar, and three barbed tines, the middle one longer.
+    green = ("#8fe0c0", "#24584a")
+    return (line("#6a5640", 7, (50, 98), (50, 44)) + "".join(circ(("#f07a6a", "#8a3028"), 50 + dx, y, 3.6, 1.4) for dx, y in ((-3, 86), (3, 76), (-3, 66)))
+        + rect(("#d0aa52", "#6a4c1c"), 30, 38, 40, 9, 3)
+        + line(green[0], 6, (34, 40), (34, 14)) + line(green[0], 6, (66, 40), (66, 14)) + line(green[0], 6, (50, 40), (50, 8))
+        + poly(green, (28, 16), (34, 2), (40, 16)) + poly(green, (60, 16), (66, 2), (72, 16)) + poly(green, (44, 10), (50, -4), (56, 10)))
+def trident():
+    return at(50, 50, 0.92, turn(35, trident_upright()))
+def crest_tidecaller():
+    # A sea-green round shield with a wave curling over it and three tines rising from the crest.
+    return (circ(("#36c6b8", "#0d4a46"), 50, 52, 44, 4) + at(50, 44, 0.62, trident_upright()) + at(50, 70, 0.6, wave()))
+for g in (song, trident):
+    PLAIN.append(g)
+CRESTS.append(crest_tidecaller)
+
 # Last Light (stage 4)
 LEVI = ("#3a6a78", "#0e2630"); LEVI_BELLY = ("#b8d8c8", "#4a6a60")
 def leviathan():
@@ -756,7 +779,7 @@ for g in (mist_infantry, mist_ranger, mist_heavy):
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
     "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78"),
-    "harpooner": ("#3f74a8", "#102640")}
+    "harpooner": ("#3f74a8", "#102640"), "tidecaller": ("#36c6b8", "#0d4a46")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -804,6 +827,9 @@ SPECS = {
         + at(24, 68, 0.26, star()) + at(50, 28, 0.3, star()) + at(78, 60, 0.26, star())),
     "worlds_traveler": ("cartographer", lambda: at(50, 52, 0.78, waygate()) + at(76, 24, 0.24, star())),
     "pathfinder": ("cartographer", lambda: at(36, 58, 0.62, turn(-20, machete())) + at(68, 40, 0.5, compass())),
+    "wavebreaker": ("tidecaller", lambda: at(50, 56, 0.86, wave()) + "".join(circ(("#ffffff", "#9ad8e8"), x, y, r, 1.4) for x, y, r in ((70, 24, 5), (82, 34, 3.5), (60, 16, 3)))),
+    "deepsinger": ("tidecaller", lambda: at(50, 54, 0.86, song())),
+    "fogbinder": ("tidecaller", lambda: at(50, 50, 0.8, mist()) + at(50, 52, 0.42, chain())),
     "reaver": ("harpooner", lambda: at(46, 54, 0.66, turn(-20, cutlass())) + at(74, 30, 0.34, drop()) + at(26, 30, 0.22, drop())),
     "rigger": ("harpooner", lambda: line("#e8d6a8", 5, (14, 70), (86, 38)) + rect(WOOD, 10, 62, 8, 30, 2) + rect(WOOD, 82, 30, 8, 30, 2) + at(50, 70, 0.4, rope())),
     "leviathan_hunter": ("harpooner", lambda: at(42, 60, 0.7, leviathan_head()) + at(60, 42, 0.72, turn(-10, harpoon()))),

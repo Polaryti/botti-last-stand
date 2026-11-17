@@ -1805,6 +1805,30 @@ func great_harpoon_mesh() -> Mesh:
 	return _great_harpoon
 
 
+## A Tidecaller's wave, a Deepsinger's song, a Fogbinder's fog: each phone has its own copy, and the
+## caster's phone (or the host, for a bot) does the sums.
+func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, damage: float, bits: int) -> TideWave:
+	var wave := TideWave.new(self, owner_peer, from, dir, width, length, damage, bits)
+	add_child(wave)
+	return wave
+
+
+func deep_song(owner_peer: int, reach: float, seconds: float, heal: float, bits: int) -> DeepSong:
+	for n: Node in get_children():
+		if n is DeepSong and (n as DeepSong).owner_peer == owner_peer:
+			n.queue_free() # a new song takes over from the last
+	var song := DeepSong.new(self, owner_peer, reach, seconds, heal, bits)
+	add_child(song)
+	return song
+
+
+func fog_bank(owner_peer: int, at: Vector3, radius: float, blind: float, bits: int) -> FogBank:
+	at.y = ground_at(at)
+	var bank := FogBank.new(self, owner_peer, at, radius, blind, bits)
+	add_child(bank)
+	return bank
+
+
 ## A Rigger's lines on this phone, everyone's.
 var rig_lines: Array[RigLine] = []
 

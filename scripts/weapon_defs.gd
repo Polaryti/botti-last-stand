@@ -72,6 +72,9 @@ const ALL := {
 		"knock": 1.0, "weight": 0.8, "pos": Vector3(0.15, -0.16, -0.27), "scale": 0.85},
 	"anchor": {"maps": ["vael", "lantern_road"], "swing_sound": "anchor_heave", "two_handed": true, "power": 2.3, "name": "Ship's Anchor", "quake": 4.5, "quake_share": 0.5, "quake_stagger": 0.6, "burden": 0.9, "desc": "A ship's anchor on a short chain, swung with both hands. Very slow, but each slam shakes the ground: everything within 4.5 m takes half the blow and staggers for 0.6 s. You move at 90% speed while you carry it.", "lore": "Torn from a wreck in the harbour mud. Whoever first swung it at the Drowned found that they, too, remember what an anchor means.", "kind": Kind.MELEE, "rate": 1.5, "range": 2.7, "cone": 120.0, "max_hits": 6,
 		"knock": 3.0, "swing": "slam", "weight": 0.8, "pos": Vector3(0.26, -0.44, -0.52), "scale": 0.5},
+	"trident": {"only": "tidecaller", "power": 1.1, "name": "Tidecaller's Trident", "tide": 5.0, "desc": "Tidecaller only. Long thrusts that strike up to two in a line; each blow that lands draws 5 tide.",
+		"lore": "Coral has grown over the haft where the sea held it. The tines still taste of salt.", "kind": Kind.MELEE, "rate": 0.55, "range": 3.9, "cone": 22.0, "max_hits": 2,
+		"knock": 2.0, "swing": "thrust", "weight": 0.0, "pos": Vector3(0.22, -0.24, 0.05), "scale": 1.0},
 	"oar": {"maps": ["vael", "lantern_road"], "swing_sound": "oar_sweep", "two_handed": true, "power": 1.05, "name": "Ferryman's Oar", "slows": 1.0, "desc": "A long black oar from the ferries of Vael. Wide sweeps through up to eight that shove everything hit far back and slow it for 1 s.", "lore": "The ferrymen rowed the dead across the Sound to the Isle of Lamps. Their oars were blessed to keep the drowned from climbing aboard.", "kind": Kind.MELEE, "rate": 0.85, "range": 3.5, "cone": 200.0, "max_hits": 8,
 		"knock": 5.5, "swing": "row", "arc": 1.15, "weight": 1.0, "pos": Vector3(0.44, -0.5, -0.72), "scale": 0.6},
 	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.4, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
@@ -218,6 +221,7 @@ static func mesh(id: String) -> Mesh:
 		"flare_pistol": m = _flare_pistol()
 		"anchor": m = _anchor()
 		"oar": m = _oar()
+		"trident": m = _trident()
 	_meshes[id] = m
 	return m
 
@@ -393,6 +397,34 @@ static func _anchor() -> Mesh:
 
 ## A ferryman's oar: a black-lacquered loom with a silver-capped handle, a broad blade edged in
 ## silver with the lamp of Vael painted on it and coins nailed along its spine.
+## The Tidecaller's Trident: a sea-worn haft crusted with coral and barnacles, a bronze collar with a
+## shell on it, and three barbed tines, the middle one longer. Points along -Z, like the Spear.
+static func _trident() -> Mesh:
+	var l := LowPoly.new()
+	var haft := Color(0.36, 0.3, 0.24)
+	var bronze := Color(0.62, 0.5, 0.26)
+	var verdigris := Color(0.36, 0.62, 0.52)
+	var coral := Color(0.92, 0.46, 0.4)
+	l.prism(Vector3(0, 0, 0.5), Vector3(0, 0, -1.2), 0.02, 0.018, 6, haft)
+	l.prism(Vector3(0, 0, 0.5), Vector3(0, 0, 0.56), 0.026, 0.02, 6, bronze)
+	# Coral and barnacles, grown over where the sea held it.
+	for k in 6:
+		var z := -0.2 - k * 0.12
+		var a := k * 2.1
+		l.prism(Vector3(cos(a) * 0.018, sin(a) * 0.018, z), Vector3(cos(a) * 0.05, sin(a) * 0.05, z - 0.05), 0.012, 0.004, 4, coral if k % 2 == 0 else Color(0.86, 0.84, 0.76))
+	# The collar, and a scallop shell on it.
+	l.prism(Vector3(0, 0, -1.2), Vector3(0, 0, -1.3), 0.035, 0.04, 8, bronze)
+	l.box(Vector3(0, 0.03, -1.25), Vector3(0.06, 0.012, 0.05), Color(0.95, 0.88, 0.78), Vector3(0, 0, 0))
+	l.box(Vector3(0, 0, -1.32), Vector3(0.24, 0.03, 0.035), verdigris)
+	# The tines: the middle one longer, each with a barb.
+	for x: float in [-0.11, 0.0, 0.11]:
+		var tip := -1.72 if x == 0.0 else -1.62
+		l.prism(Vector3(x, 0, -1.32), Vector3(x, 0, tip + 0.1), 0.014, 0.012, 5, verdigris.lightened(0.15))
+		l.prism(Vector3(x, 0, tip + 0.1), Vector3(x, 0, tip), 0.022, 0.0, 4, Color(0.78, 0.84, 0.8))
+		l.prism(Vector3(x, 0, tip + 0.1), Vector3(x + (0.035 if x >= 0.0 else -0.035), 0, tip + 0.18), 0.008, 0.0, 3, verdigris.lightened(0.25))
+	return l.commit()
+
+
 static func _oar() -> Mesh:
 	var l := LowPoly.new()
 	l.prism(Vector3(0, -0.7, 0), Vector3(0, -0.56, 0), 0.028, 0.03, 6, SILVER.darkened(0.2))

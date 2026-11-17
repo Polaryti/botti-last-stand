@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL, HAUL } # new ones go at the end: the number travels
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL, HAUL, DRIFT, BLIND } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -1807,6 +1807,31 @@ func pull_to(at: Vector3) -> void:
 	_pull_left = 0.7
 
 
+## Drawn by a Deepsinger's song: carried slowly toward a point for a moment, while it still walks and
+## fights as it would (unlike a pull, which takes it off its feet).
+func drift_to(at: Vector3, speed: float) -> void:
+	if not is_alive() or not draggable():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.DRIFT, at.x, at.z)
+		return
+	var to := Vector3(at.x - position.x, 0, at.z - position.z)
+	_drift = to.normalized() * speed if to.length() > 0.1 else Vector3.ZERO
+	_drift_left = 0.35
+var _drift := Vector3.ZERO
+var _drift_left := 0.0
+
+
+## Bound in a Fogbinder's fog: it sees only a few metres for a while (on every phone, by way of the host).
+func blind_for(seconds: float) -> void:
+	if not is_alive():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.BLIND, seconds, 0.0)
+		return
+	blind(seconds)
+
+
 ## Hauled in on a Harpooner's rope: dragged all the way to a point, however far (pull_to stops after
 ## a few metres), at the pace a rope hauls.
 func haul_to(at: Vector3) -> void:
@@ -2244,6 +2269,7 @@ func _physics_process(delta: float) -> void:
 	if _pull_left > 0.0:
 		_pull_left -= delta
 		_tick_flash(delta) # a blow's flash fades as usual while it is dragged
+		_drift_left = 0.0
 		var to_pull := Vector3(_pull_at.x - position.x, 0.0, _pull_at.z - position.z)
 		if to_pull.length() > 1.0:
 			position += to_pull.normalized() * minf(16.0 * delta, to_pull.length())
@@ -2293,6 +2319,11 @@ func _physics_process(delta: float) -> void:
 	revealed_left = maxf(0.0, revealed_left - delta)
 	blind_left = maxf(0.0, blind_left - delta)
 	_tick_flash(delta)
+	if _drift_left > 0.0:
+		_drift_left -= delta
+		position += _drift * delta
+		if not flies:
+			position.y = world.ground_at(position)
 	if _airborne:
 		# A leap always finishes, even if something stuns it in mid-air.
 		_tick_leap(target, delta)

@@ -54,6 +54,10 @@ const COPY := {
 		"What climbs out of the sea answers to the rope.",
 		"Haul enemies in on a line, or yourself to the big ones, and specialize in boarding, rigging or great hunts."
 	],
+	"tidecaller": [
+		"The sea comes when it is called.",
+		"Spend tide on waves that throw them back, and specialize in breakers, the drowned's song or binding fog."
+	],
 	"commander": [
 		"A single voice can turn the battle.",
 		"Use Command and unlock a profession-specific Last Command at level ten."

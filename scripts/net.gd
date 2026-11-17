@@ -22,13 +22,13 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 61
+const PROTOCOL := 62
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
 enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH, FLARE, HARPOON_LIE, HARPOON_GONE, QUAKE }
-enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT, REVEAL }
+enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT, REVEAL, BLIND } # new ones go at the end: the number travels
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
 const SNAPSHOT_EVERY := 0.08
@@ -63,7 +63,8 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign",
 	# Last Light
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
-	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon"]
+	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
+	"call_tide", "tsunami", "deep_song", "bind_fog"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1450,6 +1451,8 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.PIN: z.root(a, true)
 		Zombie.Effect.REVEAL: z.reveal(a)
 		Zombie.Effect.HAUL: z.haul_to(Vector3(a, 0.0, b))
+		Zombie.Effect.DRIFT: z.drift_to(Vector3(a, 0.0, b), TidecallerKit.SONG_PULL)
+		Zombie.Effect.BLIND: z.blind_for(clampf(a, 0.0, 20.0))
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -1685,6 +1688,49 @@ func _rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits
 	if world == null or not is_instance_valid(world) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > HarpoonerKit.RIG_REACH + 12.0:
 		return
 	world.rig_line(owner_peer, from, to, clampf(seconds, 1.0, 30.0), bits, clampi(keep, 1, HarpoonerKit.RIG_LINES + 1), cradle)
+
+
+# --- The Tidecaller --------------------------------------------------------------------------------
+
+func _from_tidecaller(owner_peer: int) -> bool:
+	var sender := multiplayer.get_remote_sender_id()
+	return (sender == owner_peer or (sender == 1 and is_bot(owner_peer))) and world != null and is_instance_valid(world)
+
+
+## A Tidecaller's wave, so every phone sees it roll (and mends its own people with Salt Spray).
+func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, bits: int) -> void:
+	_tide_wave.rpc(owner_peer, from, dir, width, length, bits)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, bits: int) -> void:
+	if not _from_tidecaller(owner_peer) or not is_finite(from.x) or not is_finite(dir.x):
+		return
+	world.tide_wave(owner_peer, from, dir, clampf(width, 1.0, 12.0), clampf(length, 1.0, 30.0), 0.0, bits)
+
+
+## A Deepsinger's song, round the singer on every phone.
+func deep_song(owner_peer: int, reach: float, seconds: float, heal: float, bits: int) -> void:
+	_deep_song.rpc(owner_peer, reach, seconds, heal, bits)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _deep_song(owner_peer: int, reach: float, seconds: float, heal: float, bits: int) -> void:
+	if not _from_tidecaller(owner_peer):
+		return
+	world.deep_song(owner_peer, clampf(reach, 1.0, 20.0), clampf(seconds, 0.5, 15.0), clampf(heal, 0.0, 12.0), bits)
+
+
+## A Fogbinder's fog bank, on every phone.
+func fog_bank(owner_peer: int, at: Vector3, radius: float, blind: float, bits: int) -> void:
+	_fog_bank.rpc(owner_peer, at, radius, blind, bits)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _fog_bank(owner_peer: int, at: Vector3, radius: float, blind: float, bits: int) -> void:
+	if not _from_tidecaller(owner_peer) or not is_finite(at.x):
+		return
+	world.fog_bank(owner_peer, at, clampf(radius, 1.0, 12.0), clampf(blind, 0.5, 12.0), bits)
 
 
 ## A Cartographer's beacon, so every phone has the same markers and lines.

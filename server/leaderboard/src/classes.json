@@ -12,5 +12,6 @@
   "monk": ["bo_master", "spirit_walker", "iron_mountain"],
   "plague_doctor": ["apothecary", "pestilence", "rat_king"],
   "ranger": ["sharpshooter", "trapper", "beastmaster"],
-  "revenant": ["leaper", "rift", "summoner"]
+  "revenant": ["leaper", "rift", "summoner"],
+  "tidecaller": ["wavebreaker", "deepsinger", "fogbinder"]
 }

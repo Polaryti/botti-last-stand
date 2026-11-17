@@ -841,6 +841,53 @@ SOUNDS.update({
 })
 
 
+# --- The Tidecaller ------------------------------------------------------------------------------
+
+def call_tide():
+    """Call the Tide: a breath drawn in, then the sea answering: a wave gathering and rolling away."""
+    m = n(1.5)
+    tt = t_(m)
+    draw = band(noise(m), 600, 3000) * np.clip(tt / 0.3, 0, 1) * np.clip((0.4 - tt) / 0.1, 0, 1) * 0.3
+    roll = band(noise(m), 120, 1800) * np.clip((tt - 0.25) / 0.3, 0, 1) * np.exp(-np.clip(tt - 0.6, 0, 9) * 2.4) * 0.9
+    hiss = band(noise(m), 2500, 7000) * np.clip((tt - 0.35) / 0.2, 0, 1) * np.exp(-np.clip(tt - 0.5, 0, 9) * 3) * 0.3
+    return reverb(draw + roll + hiss + thud(m, 0.3, 0.6, 60), 1.0, 0.3)
+
+
+def tsunami():
+    """A Tsunami: the same call, but the whole sea stands up and comes down like a cliff falling."""
+    m = n(2.6)
+    tt = t_(m)
+    swell = band(noise(m), 60, 1200) * np.clip(tt / 0.8, 0, 1) ** 1.5 * np.exp(-np.clip(tt - 1.0, 0, 9) * 1.6)
+    crash = band(noise(m), 150, 5000) * at(env(n(1.6), 0.01, 2.2), 0.9, 2.6) * 0.9
+    return reverb(swell + crash + thud(m, 0.9, 1.4, 42), 2.0, 0.4)
+
+
+def deep_song():
+    """Deep Song: a wordless chord of low voices under the water, swelling and slowly beating."""
+    m = n(3.0)
+    tt = t_(m)
+    v = np.zeros(m)
+    for f, w in ((110, 1.0), (165, 0.7), (220, 0.5), (277, 0.35)):
+        vib = 1 + 0.006 * np.sin(2 * np.pi * 4.6 * tt + f)
+        v += (np.sin(2 * np.pi * f * tt * vib) + 0.3 * np.sin(4 * np.pi * f * tt * vib)) * w
+    v *= np.sin(np.pi * np.clip(tt / 3.0, 0, 1)) ** 0.8 * 0.18
+    return reverb(lowp(v, 1800) + bubbles(m, 30, 160, 520, 0.05) * 0.3, 2.2, 0.5)
+
+
+def bind_fog():
+    """Bind the Fog: a cold breath, and fog rolling in thick with a low moan inside it."""
+    m = n(1.8)
+    tt = t_(m)
+    breath = band(noise(m), 400, 2600) * np.sin(np.pi * np.clip(tt / 1.8, 0, 1)) ** 1.2 * 0.6
+    moan = np.sin(2 * np.pi * curve(m, (0, 140), (1, 110)).cumsum() / SR) * np.sin(np.pi * np.clip(tt / 1.8, 0, 1)) * 0.12
+    return reverb(breath + moan, 1.8, 0.5)
+
+
+SOUNDS.update({
+    "call_tide": (call_tide, 0.8), "tsunami": (tsunami, 0.9), "deep_song": (deep_song, 0.7), "bind_fog": (bind_fog, 0.7),
+})
+
+
 if __name__ == "__main__":
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
     for name, (make, gain) in SOUNDS.items():

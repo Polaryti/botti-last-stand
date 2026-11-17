@@ -33,6 +33,8 @@ const ALL := {
 		"desc": "Maps the way through. Starts with a Spear and plants up to three linked beacons: friends near one run faster, friends on the lines between them mend, and enemies near one are marked. Uses melee and ranged weapons."},
 	"harpooner": {"two_handed": true, "name": "Harpooner", "weapon": "harpoon", "second": "boarding_hook", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "hidden": true, "earned": "harbourmaster",
 		"desc": "Hunts what climbs out of the sea. Starts with a Whaler's Harpoon, which comes back to hand by itself after 4 s, and a Boarding Hook. Haul drags an enemy to you, or you to anything too big to move. Uses melee and ranged weapons."},
+	"tidecaller": {"name": "Tidecaller", "weapon": "trident", "arrows": 0, "hp": 95.0, "speed": 1.0, "ranged": true, "mana": true, "mana_regen": 0.5, "hidden": true, "earned": "lighthouses",
+		"desc": "Speaks for the sea. Starts with a Trident: every blow it lands draws 5 tide, and the tide also rises slowly by itself. Call the Tide spends it on a wave that throws enemies back and slows them. Uses melee and ranged weapons."},
 	"commander": {"two_handed": true, "name": "Commander", "weapon": "sword", "arrows": 0, "hp": 110.0, "speed": 1.05, "ranged": true, "hidden": true, "unavailable": true, "unique": true, "no_bots": true,
 		"desc": "First prize in VRAIN tournaments. Only one Commander per match; never a bot. Command rallies allies, then becomes Last Command at level 10."},
 }
@@ -44,7 +46,7 @@ static func icon(id: String) -> String:
 static func color(id: String) -> Color:
 	return {"commander": Color(0.78, 0.59, 0.2), "infantry": Color(0.62, 0.2, 0.14), "ranger": Color(0.22, 0.46, 0.26), "heavy": Color(0.36, 0.4, 0.48),
 		"adept": Color(0.3, 0.36, 0.72), "chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22), "monk": Color(0.76, 0.46, 0.14), "plague_doctor": Color(0.26, 0.32, 0.24),
-		"bandit": Color(0.48, 0.23, 0.36), "cartographer": Color(0.25, 0.56, 0.82), "harpooner": Color(0.14, 0.3, 0.46)}[id]
+		"bandit": Color(0.48, 0.23, 0.36), "cartographer": Color(0.25, 0.56, 0.82), "harpooner": Color(0.14, 0.3, 0.46), "tidecaller": Color(0.18, 0.66, 0.62)}[id]
 
 
 ## Some classes share a body with another, but not its clothes or its gear.

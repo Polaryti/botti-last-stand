@@ -708,6 +708,25 @@ func _harpooner_skills(p: Player, has_target: bool, dist: float) -> void:
 			p.use_art()
 
 
+## A Tidecaller bot: a wave at what it fights when it is a few steps off, the song when it is crowded
+## or friends are hurt, the fog when enemies close in.
+func _tidecaller_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "" or p.art_cd_left > 0.0 or p.mana < p.art_cost():
+		return
+	match p.spec_id:
+		"deepsinger":
+			if _enemies_within(TidecallerKit.SONG_REACH) >= 3 or (p.hp < p.max_hp() * 0.5 and _enemies_within(6.0) > 0):
+				p.use_art()
+		"fogbinder":
+			if has_target and dist < TidecallerKit.FOG_AHEAD and _enemies_within(TidecallerKit.FOG_AHEAD) >= 2:
+				_face(_target_point(), false)
+				p.use_art()
+		_:
+			if has_target and dist > 2.5 and dist < TidecallerKit.WAVE_RANGE * 0.8:
+				_face(_target_point(), false)
+				p.use_art()
+
+
 ## The same buttons a person has, pressed when they would help.
 func _use_skills() -> void:
 	var p := pawn
@@ -726,6 +745,9 @@ func _use_skills() -> void:
 		return
 	if p.class_id == "harpooner":
 		_harpooner_skills(p, has_target, dist)
+		return
+	if p.class_id == "tidecaller":
+		_tidecaller_skills(p, has_target, dist)
 		return
 	if not p.has_art() or p.art_cd_left > 0.0 or p._cast_kind != "" or p.aiming_art:
 		return

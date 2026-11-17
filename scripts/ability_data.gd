@@ -41,6 +41,7 @@ static func tree(class_id: String) -> Dictionary:
 			"bandit": _cache[class_id] = _bandit()
 			"cartographer": _cache[class_id] = _cartographer()
 			"harpooner": _cache[class_id] = _harpooner()
+			"tidecaller": _cache[class_id] = _tidecaller()
 	return _cache[class_id]
 
 
@@ -683,4 +684,51 @@ static func _harpooner() -> Dictionary:
 			[a("flensing", "Flensing", "Each marked enemy you kill heals you 10", "heart+target", {}, [], "flensing"),
 			a("spotter", "Spotter", "You see what you mark through anything, hidden or not", "eye+target", {}, [], "mark_reveal")]],
 			a("leviathans_bane", "Leviathan's Bane", "Bosses and minibosses you mark take 40% more damage instead", "harpoon+crown", {}, [], "bane")),
+	]}
+
+
+## The Tidecaller has one ability, fed by tide; each path makes the call its own (TidecallerKit).
+static func _tidecaller() -> Dictionary:
+	var sea := Color(0.18, 0.66, 0.62)
+	return {"core": [
+		[a("deep_breath", "Deep Breath", "+25 tide", "wave+plus", {"mana": 25.0}),
+		a("salt_skin", "Salt Skin", "+20 max health", "heart+up", {"max_hp": 20.0})],
+		[a("rising_tide", "Rising Tide", "Tide rises 50% faster by itself", "wave+clock", {"mana_regen": 0.25}),
+		a("tidal_pull", "Tidal Pull", "Each kill draws 8 tide", "skull+wave", {}, [], "tidal_pull")],
+		[a("wave_rider", "Wave Rider", "+10% move speed", "boot+up", {"speed": 0.1}),
+		a("brine", "Brine", "Trident blows slow what they strike for 1 s", "trident+drop", {}, [], "brine")],
+	], "specs": [
+		_spec("wavebreaker", "Wavebreaker", "The sea at its loudest: bigger waves, thrown harder, dragging the shore back with them.", sea,
+			a("wavebreaker_entry", "Wavebreaker", "Call the Tide becomes Breaking Wave: 2 m wider, and it strikes 50% harder", "wave", {}, [], "art_breaking"),
+			[[a("heavy_water", "Heavy Water", "Waves strike 30% harder", "wave+up", {"wave_damage": 0.3}),
+			a("high_water", "High Water", "Waves roll 6 m further", "wave+boot", {"wave_range": 6.0})],
+			[a("riptide", "Riptide", "Waves drag what they strike back toward you instead of throwing it away", "wave+chain", {}, [], "riptide"),
+			a("breakers", "Breakers", "Waves stun what they strike for 0.8 s", "wave+star", {}, [], "breakers")],
+			[a("spring_tide", "Spring Tide", "Breaking Wave costs 30% less tide", "wave+feather", {"art_cost": -0.3}),
+			a("swell", "Swell", "Breaking Wave comes back 30% sooner", "wave+clock", {"art_cd": -0.3})],
+			[a("salt_spray", "Salt Spray", "Friends a wave passes over are healed 12", "heart+wave", {}, [], "spray"),
+			a("drowning", "Drowning", "What a wave strikes takes 6 damage a second for 4 s", "drop+wave", {}, [], "drowning")]],
+			a("tsunami", "Tsunami", "Every third wave is a Tsunami: twice as wide, and it strikes twice as hard", "wave+crown", {}, [], "tsunami")),
+		_spec("deepsinger", "Deepsinger", "Sings with the voice of the drowned: draws enemies in, slows them, and mends friends.", sea,
+			a("deepsinger_entry", "Deepsinger", "Call the Tide becomes Deep Song: for 6 s, enemies within 9 m of you are drawn slowly toward you and slowed, and friends within it heal 4 a second", "song", {}, [], "art_song"),
+			[[a("long_song", "Long Song", "Deep Song lasts 3 s longer", "song+clock", {"song_time": 3.0}),
+			a("carrying_voice", "Carrying Voice", "Deep Song reaches 3 m further", "song+up", {"song_reach": 3.0})],
+			[a("sirens_mark", "Siren's Mark", "Enemies in the song take 20% more damage", "song+target", {}, [], "song_mark"),
+			a("hymn", "Hymn of the Deep", "Friends in the song heal 3 more a second", "heart+song", {"song_heal": 3.0})],
+			[a("lullaby", "Lullaby", "When the song ends, enemies still in it fall asleep for 2 s", "song+star", {}, [], "lullaby"),
+			a("chorus", "Chorus", "Friends in the song take 15% less damage", "shield+song", {}, [], "chorus")],
+			[a("echo", "Echo", "Deep Song costs 30% less tide", "song+feather", {"art_cost": -0.3}),
+			a("drowned_voices", "Drowned Voices", "The song deals 8 damage a second to enemies in it", "skull+song", {}, [], "song_dps")]],
+			a("requiem", "Requiem of the Deep", "When the song ends, a wave bursts out of you through it: 60 damage to every enemy in it", "song+crown", {}, [], "requiem")),
+		_spec("fogbinder", "Fogbinder", "Binds the sea-fog round its enemies: they lose their way, slow and blind, while it slips off.", sea,
+			a("fogbinder_entry", "Fogbinder", "Call the Tide becomes Bind the Fog: fog wraps everything within 4.5 m of a point up to 9 m ahead. Blinded for 4 s, they lose whoever they hunt, and they are slowed for 2 s", "mist", {}, [], "art_fog"),
+			[[a("thick_fog", "Thick Fog", "The fog blinds 2 s longer", "mist+clock", {"fog_time": 2.0}),
+			a("wide_fog", "Wide Fog", "The fog binds 2 m further round", "mist+up", {"fog_radius": 2.0})],
+			[a("fog_chains", "Fog Chains", "What the fog binds is held where it stands for 1.5 s", "mist+chain", {}, [], "fog_root"),
+			a("cold_mist", "Cold Mist", "What the fog binds takes 20% more damage while blind", "mist+target", {}, [], "fog_mark")],
+			[a("mist_veil", "Mist Veil", "Binding the fog turns you invisible for 3 s", "eye+mist", {}, [], "fog_hide"),
+			a("fog_walker", "Fog Walker", "Binding the fog makes you 20% faster for 4 s", "boot+mist", {}, [], "fog_speed")],
+			[a("seafog", "Seafog", "Bind the Fog costs 30% less tide", "mist+feather", {"art_cost": -0.3}),
+			a("mistform", "Mistform", "15% chance to avoid any hit", "shield+mist", {"dodge": 0.15})]],
+			a("mistbound_sea", "Mistbound Sea", "The fog stays where it was bound for 8 s, and binds whatever walks into it", "mist+crown", {}, [], "fog_field")),
 	]}

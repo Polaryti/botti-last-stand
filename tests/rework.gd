@@ -47,6 +47,8 @@ func _ready() -> void:
 	await _cartographer()
 	print("REWORK harpooner")
 	await _harpooner()
+	print("REWORK tidecaller")
+	await _tidecaller()
 	print("REWORK walls")
 	await _walls_protect()
 	print("REWORK statuses")
@@ -1670,6 +1672,115 @@ func _harpooner() -> void:
 	prey.take_damage(500.0, Vector3.ZERO, 0.0, prey.centre())
 	p.on_kill(prey)
 	check(is_equal_approx(p.hp, 40.0 + HarpoonerKit.FLENSE_HEAL), "Flensing: killing what you marked heals 10")
+
+
+func _tidecaller() -> void:
+	var d: Dictionary = ClassDefs.ALL["tidecaller"]
+	check(d["weapon"] == "trident" and d.get("mana", false) and d.get("earned", "") == "lighthouses" and not ClassDefs.for_sale().has("tidecaller"), "the Tidecaller starts with its Trident, spends tide, and is earned on the Lantern Road")
+	check(WeaponDefs.ALL["trident"].get("only", "") == "tidecaller" and WeaponDefs.mesh("trident") != null, "the Trident is the Tidecaller's alone")
+	var specs: Array = AbilityData.tree("tidecaller")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["wavebreaker", "deepsinger", "fogbinder"], "Wavebreaker, Deepsinger and Fogbinder")
+	for id: String in ["crest_tidecaller", "spec_wavebreaker", "spec_deepsinger", "spec_fogbinder", "song", "trident", "wave", "mist", "feather"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["call_tide", "tsunami", "deep_song", "bind_fog", "wave_crash"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	check(ClassGear._pieces("tidecaller").size() == 3 and Avatar.MODELS.has("tidecaller") and ClassPresentation.COPY.has("tidecaller"), "dressed, seen by others, and described")
+	# Earned by the third Last Light won.
+	var had: Dictionary = Game.unlocked.duplicate()
+	var lit := Game.lighthouses_lit
+	var was_mode := Game.mode
+	Game.unlocked.erase("tidecaller")
+	Game.mode = Game.Mode.NIGHT
+	Game.lighthouses_lit = Game.LIGHTHOUSES_FOR_TIDECALLER - 2
+	Game.note_last_light()
+	check(not Game.owns_class("tidecaller") and Game.earn_text("tidecaller").contains("So far: %d" % (Game.LIGHTHOUSES_FOR_TIDECALLER - 1)), "two lighthouses lit are not enough, and it says how many so far")
+	Game.note_last_light()
+	check(Game.owns_class("tidecaller"), "the third earns the Tidecaller")
+	Game.unlocked = had
+	Game.lighthouses_lit = lit
+	Game.mode = was_mode
+	Game.fresh_unlocks.erase("tidecaller")
+	# The class: tide from the Trident, and Call the Tide.
+	pawn("tidecaller")
+	await frames(3)
+	_face_ahead()
+	check(p.weapon_id() == "trident" and p.max_mana() > 0.0 and p.art_def()["name"] == "Call the Tide", "it holds its Trident, has tide, and Call the Tide")
+	p.mana = 0.0
+	var poked := foe("normal", 2.0)
+	p.on_melee_connect(poked, WeaponDefs.ALL["trident"])
+	check(is_equal_approx(p.mana, TidecallerKit.TRIDENT_TIDE), "a Trident blow that lands draws %d tide" % int(TidecallerKit.TRIDENT_TIDE))
+	poked.release()
+	var hit := foe("normal", 6.0)
+	var aside := foe("normal", 6.0, 6.0)
+	var h0 := hit.hp
+	var a0 := aside.hp
+	var hit_was := hit.position
+	hit.stun(30.0) # so only the wave moves it
+	TidecallerKit.call_the_tide(p)
+	await frames(40)
+	check(hit.hp < h0 and hit._slow > 0.0, "the wave strikes what is in its way and slows it (%.0f)" % (h0 - hit.hp))
+	check(hit.position.distance_to(p.global_position) > hit_was.distance_to(p.global_position) + 0.5, "and throws it back")
+	check(is_equal_approx(aside.hp, a0), "but not what stands off to the side")
+	hit.release()
+	aside.release()
+	# Wavebreaker: wider and harder; Riptide drags back; every third a Tsunami.
+	pawn("tidecaller", 0, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Breaking Wave" and p.has_flag("riptide") and p.has_flag("tsunami"), "a Wavebreaker's tree: Breaking Wave, Riptide, Tsunami")
+	var widths: Array[float] = []
+	for i in 3:
+		TidecallerKit.call_the_tide(p)
+		var waves := w.get_children().filter(func(n: Node) -> bool: return n is TideWave)
+		widths.append((waves.back() as TideWave).width)
+	check(is_equal_approx(widths[0], TidecallerKit.WAVE_WIDTH + TidecallerKit.BREAK_WIDE) and is_equal_approx(widths[2], widths[0] * 2.0), "Breaking Wave is %d m wider, and every third is a Tsunami twice as wide" % int(TidecallerKit.BREAK_WIDE))
+	await frames(40)
+	var dragged := foe("normal", 10.0)
+	TidecallerKit.call_the_tide(p)
+	await frames(60)
+	check(dragged.position.distance_to(p.global_position) < 6.0, "Riptide drags what the wave strikes back toward the Wavebreaker (%.1f m)" % dragged.position.distance_to(p.global_position))
+	dragged.release()
+	# Deepsinger: Deep Song draws them in and mends friends; Lullaby and Requiem when it ends.
+	pawn("tidecaller", 1, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Deep Song" and p.has_flag("requiem"), "a Deepsinger sings Deep Song, up to Requiem of the Deep")
+	var lured := foe("normal", 8.0)
+	lured.stun(30.0) # it would walk in anyway: stood still, only the song moves it
+	var lured_was := lured.position.distance_to(p.global_position)
+	var l0 := lured.hp
+	p.hp = 40.0
+	TidecallerKit.deep_song(p)
+	await frames(30)
+	check(lured.position.distance_to(p.global_position) < lured_was - 0.5 and lured._slow > 0.0, "the song draws an enemy in and slows it (%.1f m, was %.1f)" % [lured.position.distance_to(p.global_position), lured_was])
+	check(p.hp > 40.0, "and mends the singer")
+	lured._stun = 0.0
+	var song: DeepSong = w.get_children().filter(func(n: Node) -> bool: return n is DeepSong).front()
+	song.left = 0.01
+	await frames(4)
+	check(lured.hp < l0 - TidecallerKit.REQUIEM * 0.5 and lured._stun > 0.0, "when it ends: Lullaby puts it to sleep and Requiem strikes it (%.0f)" % (l0 - lured.hp))
+	lured.release()
+	# Fogbinder: Bind the Fog blinds and slows; Mistbound Sea stays and binds what walks in.
+	pawn("tidecaller", 2, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Bind the Fog" and p.has_flag("fog_field") and p.has_flag("fog_root"), "a Fogbinder binds the fog, up to Mistbound Sea")
+	var spot := TidecallerKit.fog_point(p)
+	check(Vector2(spot.x - p.global_position.x, spot.z - p.global_position.z).length() > 2.0, "the fog lands ahead of it")
+	var lost := foe("normal", 0.0)
+	lost.position = spot + Vector3(1.0, 0, 0)
+	TidecallerKit.bind_the_fog(p)
+	await frames(3)
+	check(lost.blind_left > 0.0 and lost._slow > 0.0 and lost.root_left > 0.0, "what is in the fog is blinded, slowed, and with Fog Chains held")
+	var late := foe("normal", 0.0)
+	late.position = spot + Vector3(-1.0, 0, 0)
+	await frames(20)
+	check(late.blind_left > 0.0, "Mistbound Sea: the fog stays and binds what walks into it")
+	lost.release()
+	late.release()
+	for n: Node in w.get_children():
+		if n is FogBank or n is DeepSong or n is TideWave:
+			n.queue_free()
 
 
 

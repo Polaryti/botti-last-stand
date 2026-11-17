@@ -599,7 +599,7 @@ func _draw_status(s: Vector2) -> void:
 		xp_f = float(player.xp) / float(player.xp_needed())
 	_bar(Rect2(x, 43, BAR_W, 7), xp_f, UiTheme.EMBER)
 	if has_mana:
-		_bar(Rect2(x, 56, BAR_W, 16), player.mana / maxf(player.max_mana(), 1.0), KI_COLOUR if player.class_def().get("ki", false) else UiTheme.MIST)
+		_bar(Rect2(x, 56, BAR_W, 16), player.mana / maxf(player.max_mana(), 1.0), KI_COLOUR if player.class_def().get("ki", false) else TidecallerKit.TIDE if player.class_id == "tidecaller" else UiTheme.MIST)
 		_text("%d" % int(player.mana), Vector2(x + 9, 70), HUD_SMALL - 2, Color.WHITE)
 	var y := card.end.y + 6.0
 	var cx := _pad - 10.0
@@ -1052,6 +1052,9 @@ func _draw_weapon(s: Vector2) -> void:
 	elif player.class_def().get("ki", false):
 		extra = "%d Ki" % int(player.mana)
 		extra_col = KI_COLOUR
+	elif player.class_id == "tidecaller":
+		extra = "%d tide" % int(player.mana)
+		extra_col = TidecallerKit.TIDE
 	elif WeaponDefs.own_ammo(player.weapon_id()) > 0:
 		var throws := player.ammo_of(player.weapon_id())
 		extra = "%d throws" % throws
