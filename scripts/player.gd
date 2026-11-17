@@ -215,6 +215,10 @@ var _flail_idle := 0.0
 var _cleave_count := 0 # Battleaxe blows in a row
 var _cleave_idle := 0.0
 var _axe_out := false
+var harpoon_out := false # your Whaler's Harpoon lies somewhere: walk over it to take it back
+var _harpoon_back := 0.0 # seconds until it comes back to your hand by itself
+var _fervour := 0 # Cutlass kills in a row
+var _fervour_left := 0.0
 var _trampled := {}
 
 var input_move := Vector2.ZERO
@@ -615,6 +619,11 @@ func readiness() -> Array[Dictionary]:
 	if class_id == "adept" and STANCES.has(stance):
 		out.append({"key": "stance_mastery", "name": "Stance Mastery", "icon": "lotus+up", "color": col, "button": "",
 			"need": 3, "have": stance_hits, "primed": false, "active": _stance_mastered})
+	if d.has("fervour") and _fervour > 0:
+		out.append({"key": "fervour", "name": "Fervour", "icon": "cutlass+up", "color": Color(0.95, 0.75, 0.5), "button": "",
+			"need": int(d["fervour"]), "have": _fervour, "primed": false, "active": true})
+	if d.has("tethered") and harpoon_out:
+		armed.call("harpoon", {"name": "Harpoon thrown: walk over it", "icon": "harpoon", "color": Color(0.85, 0.72, 0.45)}, "fire", false, true)
 	if d.get("momentum", false) and _flail_stacks > 0:
 		out.append({"key": "momentum", "name": "Momentum", "icon": "flail+up", "color": Color(0.95, 0.75, 0.5), "button": "",
 			"need": 3, "have": _flail_stacks, "primed": false, "active": true})
@@ -1009,7 +1018,7 @@ func _equip() -> void:
 		return
 	_vm_mesh.equip(weapon_id(), true)
 	_vm_mesh.rotation.y = float(d.get("mesh_yaw", 0.0))
-	_vm_mesh.visible = not (d.get("returning", false) and _axe_out)
+	_vm_mesh.visible = not (d.get("returning", false) and _axe_out) and not (d.has("tethered") and harpoon_out)
 	_vm_root.scale = Vector3.ONE * float(d["scale"])
 	_vm_left.visible = WeaponAnim.both_hands(d)
 	if _vm_left.visible:
@@ -1194,6 +1203,12 @@ func apply_status(kind: int, seconds: float) -> void:
 		Net.Status.ROOT:
 			rooted_left = maxf(rooted_left, secs)
 			say("Rooted!")
+		Net.Status.REVEAL:
+			# A flare's light: no hiding in it.
+			if invis_left > 0.0:
+				invis_left = 0.0
+				say("Revealed!")
+			invis_lockout = maxf(invis_lockout, seconds)
 
 
 ## The deadly fog: no armour or dodge helps against it, though a moment of invincibility does.
@@ -1682,6 +1697,10 @@ func on_kill(z: Zombie) -> void:
 
 
 func _on_kill(z: Zombie) -> void:
+	var held := weapon_def()
+	if held.has("fervour"):
+		_fervour = mini(int(held["fervour"]), _fervour + 1)
+		_fervour_left = float(held["fervour_time"])
 	kills += 1
 	if z.poison_left > 0.0 and has_flag("plague_burst"):
 		world.drop_poison(z.position)
@@ -3531,7 +3550,7 @@ func _physics_step(delta: float) -> void:
 	var dir := global_basis * Vector3(input_move.x, 0, input_move.y)
 	if _cast_kind == "sharpshooter":
 		dir = Vector3.ZERO
-	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (CartographerKit.LANTERN_SPEED if has_power("lantern") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
+	var speed := WALK_SPEED * m("speed") * float(weapon_def().get("burden", 1.0)) * (1.4 if has_power("speed") else 1.0) * (CartographerKit.LANTERN_SPEED if has_power("lantern") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
 	if is_riding():
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
 	elif input_move.y > 0.0:
@@ -3780,6 +3799,12 @@ func _process_step(delta: float) -> void:
 			_do_melee_hit()
 	_flail_idle += delta
 	_cleave_idle += delta
+	if _fervour > 0:
+		_fervour_left -= delta
+		if _fervour_left <= 0.0:
+			_fervour = 0
+	if harpoon_out:
+		_tick_harpoon(delta)
 	if _flail_idle > 1.4:
 		_flail_stacks = 0
 	_handle_fire()
@@ -3801,6 +3826,8 @@ func attack_interval(d: Dictionary) -> float:
 		rate /= m("melee_rate")
 		if d.get("momentum", false):
 			rate /= 1.0 + _flail_stacks * 0.35
+		if d.has("fervour") and _fervour > 0:
+			rate /= 1.0 + _fervour * float(d["fervour_rate"])
 		if has_flag("blood_frenzy") and hp < max_hp() * AbilityNumbers.FRENZY_BELOW:
 			rate /= AbilityNumbers.FRENZY_RATE
 	elif d["kind"] == WeaponDefs.Kind.SPELL:
@@ -3830,6 +3857,8 @@ func _handle_fire() -> void:
 		mana -= float(d["cost"])
 	if d.get("returning", false) and _axe_out:
 		return
+	if d.has("tethered") and harpoon_out:
+		return
 	invis_left = 0.0
 	_cooldown = attack_interval(d)
 	attack_count += 1
@@ -3845,7 +3874,9 @@ func _handle_fire() -> void:
 			_flail_idle = 0.0
 			if d.get("momentum", false):
 				_flail_stacks = mini(3, _flail_stacks + 1)
-			if WeaponDefs.is_two_handed(weapon_id()):
+			if d.has("swing_sound"):
+				sfx(str(d["swing_sound"]), -3.0, randf_range(0.94, 1.06))
+			elif WeaponDefs.is_two_handed(weapon_id()):
 				sfx("heavy_swing", -3.0, randf_range(0.92, 1.05))
 			else:
 				sfx("swing", -3.0, 1.15 if weapon_id() == "dagger" else 1.0)
@@ -3858,6 +3889,10 @@ func _handle_fire() -> void:
 				elif WeaponDefs.own_ammo(weapon_id()) > 0:
 					own_ammo[weapon_id()] = ammo_of(weapon_id()) - 1
 				_fire_arrow(d)
+				if d.has("tethered"):
+					harpoon_out = true
+					_harpoon_back = float(d["tethered"])
+					_vm_mesh.visible = false
 				_spent_weapon()
 		WeaponDefs.Kind.SPELL:
 			mana -= float(d["cost"]) * m("spell_cost")
@@ -3940,11 +3975,17 @@ func _fire_arrow(d: Dictionary) -> void:
 	if d.get("silent", false):
 		sfx("bow", -16.0, 1.6)
 		return
+	if d.get("gun", false):
+		sfx("flare_shot", -2.0, randf_range(0.96, 1.04))
+		_noise(10.0)
+		return
 	if d.has("shot"):
 		_swing_time = 0.3
 		_swing = 0.0
 		_swing_keys = "throw"
-		if d["shot"] == "chakram":
+		if d["shot"] == "harpoon":
+			sfx("harpoon_throw", -2.0, randf_range(0.95, 1.05))
+		elif d["shot"] == "chakram":
 			sfx("chakram_throw", -3.0, randf_range(0.95, 1.05))
 		elif d["shot"] == "bolas":
 			sfx("bolas_throw", -3.0, randf_range(0.95, 1.05))
@@ -4032,6 +4073,8 @@ func _do_melee_hit() -> void:
 			world.fx_blast(global_position + Vector3.UP * 0.3 - global_basis.z * 1.6, 1.4, Color(0.95, 0.75, 0.5, 0.45))
 			sfx("cleave", -1.0, randf_range(0.95, 1.05))
 	var hits := world.melee_hit(self, d, stats)
+	if d.has("quake") and d != BASH:
+		hits += _anchor_quake(d, stats)
 	if hits > 0 and d != BASH:
 		fire("melee_swing", {})
 	_next_hit_mult = 1.0
@@ -4054,6 +4097,67 @@ func _do_melee_hit() -> void:
 		_noise(float(d.get("loud", 9.0)))
 
 
+## A Ship's Anchor meeting the ground: everything within its reach that the blow itself missed takes
+## a share of it and staggers. Returns how many it caught.
+func _anchor_quake(d: Dictionary, stats: Dictionary) -> int:
+	var at := global_position - global_basis.z * 1.4
+	at.y = world.ground_at(at)
+	var reach := float(d["quake"])
+	var caught := 0
+	var was := world.begin_act(self)
+	for z: Zombie in world.zombies_near(at, reach, 24):
+		if not z.is_alive() or z.flies or world.last_melee.has(z):
+			continue
+		var flat := Vector3(z.position.x - at.x, 0, z.position.z - at.z)
+		if flat.length() > reach + z.body_radius():
+			continue
+		world.damage_zombie(z, modify_damage(z, float(stats["damage"]) * float(d["quake_share"])), flat.normalized(), 1.5, z.centre(), false)
+		z.stun(float(d["quake_stagger"]))
+		caught += 1
+	if Net.pvp():
+		for t: Target in world.rivals_near(at, reach):
+			if t.global_position.distance_to(at) <= reach:
+				world.hit_rival(t, float(stats["damage"]) * float(d["quake_share"]), at)
+				status_on(world.peer_of(t), Net.Status.STUN, float(d["quake_stagger"]))
+				caught += 1
+	world.end_act(was)
+	world.anchor_quake_fx(at, reach)
+	if Net.active():
+		Net.world_fx(Net.Fx.QUAKE, at, Vector3(reach, 0, 0))
+	shake(0.55)
+	_noise(18.0)
+	return caught
+
+
+## Your Whaler's Harpoon, out in the world: taken back when you walk over it, or back in your hand
+## by itself once its time is up. If you no longer carry the harpoon, it is simply gone.
+func _tick_harpoon(delta: float) -> void:
+	var lying: Node3D = world.harpoons.get(net_id(), null)
+	if not slots.has("harpoon"):
+		_harpoon_home(false)
+		return
+	_harpoon_back -= delta
+	if lying and is_instance_valid(lying) and lying.global_position.distance_to(global_position) < HARPOON_REACH:
+		_harpoon_home(true)
+	elif _harpoon_back <= 0.0:
+		_harpoon_home(true)
+
+
+const HARPOON_REACH := 1.8 # metres from your thrown harpoon at which you take it back
+
+
+func _harpoon_home(in_hand: bool) -> void:
+	harpoon_out = false
+	world.take_harpoon(net_id())
+	if Net.active():
+		Net.world_fx(Net.Fx.HARPOON_GONE, Vector3.ZERO, Vector3.ZERO, net_id())
+	if in_hand:
+		sfx("harpoon_reel", -4.0)
+		if weapon_id() == "harpoon":
+			_vm_mesh.visible = true
+			_switch_anim = 0.18
+
+
 ## Rules applied to every zombie a melee swing connects with.
 func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 	_ki_from_blow()
@@ -4074,6 +4178,12 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		z.stun(float(d["stun"]))
 	if d.get("bleed", false):
 		z.add_dot(8.0, 3.0, true)
+	if d.has("drags"):
+		# Caught on the hook: dragged in (world.melee_hit pulls it), or, too big for that, only staggered.
+		z.stun(float(d["drag_stagger"]))
+		world.sfx_at("hook_catch", z.centre(), -3.0)
+	if d.has("slows"):
+		z.slow(float(d["slows"]))
 	if rage_left > 0.0:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if d.get("backstab", false) and z.is_alive():
@@ -4098,6 +4208,10 @@ func on_melee_rival(peer: int, d: Dictionary) -> void:
 		status_on(peer, Net.Status.STUN, float(d["stun"]))
 	if d.get("bleed", false):
 		status_on(peer, Net.Status.BLEED, 3.0)
+	if d.has("drags"):
+		status_on(peer, Net.Status.STUN, float(d["drag_stagger"]))
+	if d.has("slows"):
+		status_on(peer, Net.Status.SLOW, float(d["slows"]))
 	if has_power("antler_charm"):
 		status_on(peer, Net.Status.ROOT, PowerDefs.ANTLER_ROOT)
 	fire("hit", {"rival": peer})
@@ -4225,7 +4339,11 @@ func _pose_shot(d: Dictionary, pos: Vector3, q: Quaternion) -> void:
 	var loosed := 1.0 - smoothstep(0.0, 0.32, r)
 	var drawing := smoothstep(0.3, 0.72, r) * (1.0 - smoothstep(0.8, 1.0, r))
 	var aim := Quaternion.IDENTITY
-	if weapon_id() in ["crossbow", "musket"]:
+	if d.get("gun", false):
+		# A pistol bucks up when it fires, then dips as the next cartridge goes in.
+		pos += Vector3(0, loosed * 0.03 - drawing * 0.08, loosed * 0.025)
+		aim = Quaternion(Vector3(0, 1, 0), -0.22) * Quaternion(Vector3(1, 0, 0), loosed * 0.45 - drawing * 0.4 - 0.04)
+	elif weapon_id() in ["crossbow", "musket"]:
 		pos += Vector3(0, loosed * 0.03 - drawing * 0.14, loosed * 0.09 + drawing * 0.06)
 		aim = Quaternion(Vector3(1, 0, 0), loosed * 0.32 - drawing * 0.55)
 	else:

@@ -214,11 +214,14 @@ static func attack_for(weapon: String, count := 0) -> String:
 		WeaponDefs.Kind.SPELL:
 			return "Spellcast_Shoot"
 		WeaponDefs.Kind.RANGED:
+			if d.get("gun", false):
+				return "Spellcast_Shoot" # a pistol, held out at arm's length
 			return "Throw" if d.has("shot") or d.get("returning", false) else "2H_Ranged_Shoot"
 	match str(d.get("swing", "")):
 		"thrust", "stab": return "Thrust"
-		"overhead", "smash": return "Overhead"
-		"reap": return "Sweep"
+		"overhead", "smash", "slam": return "Overhead"
+		"hook": return "Thrust"
+		"reap", "row": return "Sweep"
 		"flail": return "Overhead"
 		"slash": return "Sweep" if count % 2 == 0 else "1H_Melee_Attack_Chop"
 		"bo": return "BoSpin" if count % 3 == 0 else "Sweep"

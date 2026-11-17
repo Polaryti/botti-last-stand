@@ -11,9 +11,18 @@ static func is_mesenlla(data: Dictionary) -> bool:
 	var maps: Array = data.get("maps", [])
 	return not maps.is_empty() and maps.all(func(m: String) -> bool: return m in MESENLLA)
 
+## The two maps of the coast of Vael share one name on badges.
+const VAEL := ["vael", "lantern_road"]
+
+static func is_vael(data: Dictionary) -> bool:
+	var maps: Array = data.get("maps", [])
+	return not maps.is_empty() and maps.all(func(m: String) -> bool: return m in VAEL)
+
 static func names(data: Dictionary) -> String:
 	if is_mesenlla(data):
 		return "Mesenlla"
+	if is_vael(data):
+		return "Vael"
 	var names := PackedStringArray()
 	for id: String in data.get("maps", []):
 		names.append({"village": "The Village", "fort": "The Fort", "mists": "The Mists"}.get(id, id.capitalize()))

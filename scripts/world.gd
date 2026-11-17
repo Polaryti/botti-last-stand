@@ -1567,6 +1567,7 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 	var cos_limit := cos(half_cone)
 	var left: int = stats["hits"]
 	var hits := 0
+	last_melee.clear()
 	for z: Zombie in zombies.duplicate():
 		if left <= 0:
 			break
@@ -1585,7 +1586,14 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 		# A blade cannot reach through a wall, nor through a window.
 		if not _reachable(origin, centre):
 			continue
-		damage_zombie(z, attacker.modify_damage(z, float(stats["damage"])), forward, float(stats["knock"]), centre, false)
+		var push := forward
+		var knock := float(stats["knock"])
+		if d.has("drags"):
+			# A Boarding Hook pulls what it catches towards you: about drags metres, if it can be dragged.
+			push = Vector3(origin.x - centre.x, 0, origin.z - centre.z).normalized()
+			knock = float(d["drags"]) * 8.0 * z._scale if z.draggable() else 0.0
+		damage_zombie(z, attacker.modify_damage(z, float(stats["damage"])), push, knock, centre, false)
+		last_melee.append(z)
 		attacker.on_melee_connect(z, d)
 		hits += 1
 		left -= 1
@@ -1631,6 +1639,10 @@ func _shot_mesh(id: String) -> Mesh:
 			return WeaponDefs.chakram_mesh()
 		"bolas":
 			return WeaponDefs.bolas_mesh()
+		"harpoon":
+			return WeaponDefs.harpoon_mesh()
+		"flare":
+			return WeaponDefs.flare_mesh()
 		"stone":
 			if _stone_mesh == null:
 				var l := LowPoly.new()
@@ -1674,6 +1686,16 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 			shot.hit_sound = "chakram_hit"
 		elif kind == "bolas":
 			shot.hit_sound = "bolas_wrap"
+		elif kind == "harpoon":
+			shot.hit_sound = "harpoon_hit"
+			shot.pins = float(d.get("pins", 0.0))
+			shot.tether = true
+		elif kind == "flare":
+			shot.hit_sound = "flare_burst"
+			shot.blast_radius = 0.01
+			shot.glow = Flare.COLOR
+			var by := p
+			shot.on_burst = func(at: Vector3) -> void: flare(at, by)
 		shot.slow_secs = float(d.get("slows", 0.0))
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
@@ -1684,7 +1706,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(6 if look == "pellet" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+			Net.shot(6 if look == "pellet" else 8 if kind == "harpoon" else 9 if kind == "flare" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
 	return shot
 
 
@@ -2314,9 +2336,15 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = _shot_mesh("pellet")
 	elif mesh == 7:
 		m = _shot_mesh("keg")
+	elif mesh == 8:
+		m = WeaponDefs.harpoon_mesh()
+	elif mesh == 9:
+		m = WeaponDefs.flare_mesh()
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
+		if mesh == 9:
+			shot.glow = Flare.COLOR
 		shot.spins = mesh == 3 or mesh == 4 or mesh == 5 or mesh == 7
 		if mesh == 4:
 			shot.spin_axis = Vector3.RIGHT
@@ -3018,8 +3046,159 @@ func _dress_puddle(pd: MeshInstance3D, seed_from: int) -> void:
 ## A patch of the Mistberry Draught's mist (PowerDefs.MIST_TRAIL_RADIUS across, for `life` seconds):
 ## pale mist welling up off the ground. Only a look: what it does is the drinker's (Player._tick_mistberry).
 var _mist_patches: Array[CPUParticles3D] = []
+var harpoons := {} # thrown Whaler's Harpoons lying in the world, by their owner's peer (0 alone)
+var last_melee: Array[Zombie] = [] # what the last melee swing struck
 var _next_mist_patch := 0
 const MIST_PATCHES := 16
+
+
+## A Flare Pistol's flare, landed. On the phone of whoever fired it, it burns and shows; elsewhere it
+## is only seen.
+func flare(at: Vector3, by: Player, shown_only := false) -> void:
+	var f := Flare.new(self, by, shown_only)
+	f.position = Vector3(at.x, maxf(at.y, ground_at(at)), at.z) # set before it enters: it burns round it on _ready
+	add_child(f)
+	sfx_at("flare_burst", at, -2.0)
+	if not shown_only and Net.active():
+		Net.world_fx(Net.Fx.FLARE, at)
+
+
+## A thrown Whaler's Harpoon, stuck where it landed (`dir` the way it flew), with a little lamp of
+## light round it so its owner can find it again.
+func lay_harpoon(peer: int, at: Vector3, dir: Vector3, shown_only := false) -> void:
+	take_harpoon(peer)
+	var root := Node3D.new()
+	root.name = "ThrownHarpoon"
+	var mi := MeshInstance3D.new()
+	mi.mesh = WeaponDefs.harpoon_mesh()
+	mi.position = Vector3(0, 0, 1.22) # the head 0.3 m in; the shaft standing out behind it
+	root.add_child(mi)
+	add_child(root)
+	var fly := dir.normalized() if dir.length_squared() > 0.001 else Vector3.FORWARD
+	# Stuck in at a slant, its head a little way into the ground or the wall.
+	if at.y <= ground_at(at) + 0.25:
+		# In the ground it stands up steeply, shaft high, so it can be seen from any side.
+		var flat := Vector2(fly.x, fly.z).normalized() if Vector2(fly.x, fly.z).length() > 0.01 else Vector2(0, -1)
+		fly = Vector3(flat.x * 0.5, -0.87, flat.y * 0.5)
+	if absf(fly.y) > 0.98:
+		fly = Vector3(0.2, fly.y, 0).normalized()
+	root.global_position = at
+	root.look_at(root.global_position + fly, Vector3.UP if absf(fly.y) < 0.98 else Vector3.RIGHT)
+	var glow := OmniLight3D.new()
+	glow.light_color = Color(0.95, 0.8, 0.5)
+	glow.light_energy = 0.6
+	glow.omni_range = 2.2
+	glow.position = Vector3(0, 0, 0.9)
+	root.add_child(glow)
+	harpoons[peer] = root
+	if not shown_only and Net.active():
+		Net.world_fx(Net.Fx.HARPOON_LIE, at, dir, peer)
+
+
+func take_harpoon(peer: int) -> void:
+	var lying: Node3D = harpoons.get(peer, null)
+	harpoons.erase(peer)
+	if lying and is_instance_valid(lying):
+		lying.queue_free()
+
+
+## A Ship's Anchor's slam, seen: a ring of dust running out over the ground, cracks under it, a blast.
+func anchor_quake_fx(at: Vector3, reach: float) -> void:
+	fx_blast(at + Vector3.UP * 0.3, reach * 0.6, Color(0.7, 0.62, 0.5, 0.4))
+	sfx_at("anchor_slam", at, 0.0)
+	var dust := CPUParticles3D.new()
+	dust.mesh = WyvernRig.puff_mesh()
+	dust.one_shot = true
+	dust.explosiveness = 0.95
+	dust.amount = 26
+	dust.lifetime = 1.1
+	dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	dust.emission_ring_axis = Vector3.UP
+	dust.emission_ring_radius = 0.6
+	dust.emission_ring_inner_radius = 0.3
+	dust.emission_ring_height = 0.1
+	dust.direction = Vector3(1, 0.25, 0)
+	dust.spread = 180.0
+	dust.flatness = 0.85
+	dust.gravity = Vector3(0, -0.6, 0)
+	dust.initial_velocity_min = reach * 1.6
+	dust.initial_velocity_max = reach * 2.2
+	dust.damping_min = reach * 1.2
+	dust.damping_max = reach * 1.6
+	dust.scale_amount_min = 1.2
+	dust.scale_amount_max = 2.2
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	ramp.colors = PackedColorArray([Color(0.7, 0.62, 0.5, 0.0), Color(0.62, 0.56, 0.46, 0.6), Color(0.5, 0.46, 0.4, 0.0)])
+	dust.color_ramp = ramp
+	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(dust)
+	dust.global_position = at + Vector3.UP * 0.15
+	dust.emitting = true
+	# Stones and clods thrown up where it struck.
+	var clods := CPUParticles3D.new()
+	var clod := BoxMesh.new()
+	clod.size = Vector3(0.09, 0.07, 0.08)
+	var clod_mat := StandardMaterial3D.new()
+	clod_mat.vertex_color_use_as_albedo = true
+	clod.material = clod_mat
+	clods.mesh = clod
+	clods.one_shot = true
+	clods.explosiveness = 1.0
+	clods.amount = 14
+	clods.lifetime = 0.9
+	clods.direction = Vector3.UP
+	clods.spread = 40.0
+	clods.gravity = Vector3(0, -14.0, 0)
+	clods.initial_velocity_min = 3.0
+	clods.initial_velocity_max = 5.5
+	clods.angular_velocity_min = -400.0
+	clods.angular_velocity_max = 400.0
+	clods.scale_amount_min = 0.6
+	clods.scale_amount_max = 1.4
+	var clod_ramp := Gradient.new()
+	clod_ramp.set_color(0, Color(0.42, 0.34, 0.26))
+	clod_ramp.set_color(1, Color(0.3, 0.26, 0.22))
+	clods.color_ramp = clod_ramp
+	add_child(clods)
+	clods.global_position = at + Vector3.UP * 0.1
+	clods.emitting = true
+	# Cracks: dark jagged lines out from where it struck, widest at the middle, fading away.
+	var l := LowPoly.new()
+	var crack_col := Color(0.2, 0.15, 0.11, 0.85)
+	for i in 9:
+		var a := TAU * i / 9.0 + randf() * 0.35
+		var p0 := Vector3(cos(a), 0, sin(a)) * 0.3
+		var turn := a
+		for j in 4:
+			turn += randf_range(-0.5, 0.5)
+			var p1 := p0 + Vector3(cos(turn), 0, sin(turn)) * randf_range(0.12, 0.34)
+			var wide := 0.045 - j * 0.009
+			l.box((p0 + p1) * 0.5, Vector3(p0.distance_to(p1) + wide, 0.02, wide), crack_col, Vector3(0, -rad_to_deg(turn), 0))
+			if j == 1 and randf() < 0.6:
+				# A side crack splitting off.
+				var fork := turn + (0.7 if randf() < 0.5 else -0.7)
+				var p2 := p1 + Vector3(cos(fork), 0, sin(fork)) * randf_range(0.15, 0.25)
+				l.box((p1 + p2) * 0.5, Vector3(p1.distance_to(p2), 0.02, 0.018), crack_col, Vector3(0, -rad_to_deg(fork), 0))
+			p0 = p1
+	# The dent the crown of the anchor left.
+	l.prism(Vector3(0, -0.005, 0), Vector3(0, 0.01, 0), 0.42, 0.36, 10, crack_col.lightened(0.08))
+	var cracks := MeshInstance3D.new()
+	cracks.mesh = l.commit()
+	var crack_mat := StandardMaterial3D.new()
+	crack_mat.vertex_color_use_as_albedo = true
+	crack_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cracks.material_override = crack_mat
+	cracks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(cracks)
+	cracks.global_position = Vector3(at.x, ground_at(at) + 0.03, at.z)
+	cracks.rotation.y = randf() * TAU
+	var gone := create_tween()
+	gone.tween_interval(1.4)
+	gone.tween_property(crack_mat, "albedo_color:a", 0.0, 0.9)
+	gone.tween_callback(cracks.queue_free)
+	get_tree().create_timer(1.4).timeout.connect(clods.queue_free)
+	get_tree().create_timer(1.4).timeout.connect(dust.queue_free)
 
 
 func drop_mist_patch(at: Vector3, life: float, shown_only := false) -> void:

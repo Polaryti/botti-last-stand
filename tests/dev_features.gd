@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _together_store_and_dawn()
 	await _maps_weather_and_balance()
 	await _requests_1116()
+	await _vael_weapons()
 	await _feedback_and_numbers()
 	await _wilds_of_mesenlla()
 	_text_audit()
@@ -1726,3 +1727,177 @@ func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
 		if z.active and (best == null or z.position.distance_to(at) < best.position.distance_to(at)):
 			best = z
 	return best
+
+
+
+## The Sunken Crown: the six weapons of the coast of Vael.
+func _vael_weapons() -> void:
+	var ids := ["cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar"]
+	for id: String in ids:
+		var d: Dictionary = WeaponDefs.ALL[id]
+		check(WeaponDefs.lies_around(id) and SpawnRules.allows(d, "vael") and SpawnRules.allows(d, "lantern_road") and not SpawnRules.allows(d, "village") and SpawnRules.names(d) == "Vael", "%s lies about only on the coast of Vael" % id)
+		check(WeaponDefs.mesh(id) != null and Icons.weapon(id) == id and ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s has its own model and icon" % id)
+		check(str(d.get("lore", "")).length() > 40 and not RegEx.create_from_string("\\d").search(str(d["lore"])), "%s has a story of its own, with no numbers in it" % id)
+	check(WeaponDefs.category("anchor") == "two_handed" and WeaponDefs.category("oar") == "two_handed" and WeaponDefs.category("cutlass") == "melee" and WeaponDefs.category("boarding_hook") == "melee" and WeaponDefs.category("harpoon") == "ranged" and WeaponDefs.category("flare_pistol") == "ranged", "two melee, two ranged, two two-handed")
+	for sound: String in ["cutlass_swing", "hook_swing", "hook_catch", "harpoon_throw", "harpoon_hit", "harpoon_reel", "flare_shot", "flare_burst", "anchor_heave", "anchor_slam", "oar_sweep"]:
+		check(ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound) and Sfx.NAMES.has(sound), "%s sound" % sound)
+	for key: String in ["slam", "hook"]:
+		check(WeaponAnim.KEYS.has(key + "_a") and WeaponAnim.REST_DIRS.has(key), "a first-person %s" % key)
+	check(BodyAnim.attack_for("anchor") == "Overhead" and BodyAnim.attack_for("boarding_hook") == "Thrust" and BodyAnim.attack_for("flare_pistol") == "Spellcast_Shoot" and BodyAnim.attack_for("harpoon") == "Throw", "and their moves as others see them")
+	var codex := CodexPanel.new()
+	add_child(codex)
+	codex._list = VBoxContainer.new()
+	codex.add_child(codex._list)
+	codex._weapons()
+	var texts: Array = codex._list.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(ids.all(func(id: String) -> bool: return texts.has(WeaponDefs.ALL[id]["desc"] + "\n" + WeaponDefs.ALL[id]["lore"])), "the Codex tells what each does and where it comes from")
+	codex.queue_free()
+	p.setup_class("infantry")
+	p.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
+	p.rotation = Vector3.ZERO
+	p.camera.rotation = Vector3.ZERO
+	var at_front := func(dist: float, kind := "normal") -> Zombie:
+		w.spawn_zombie(kind, p.global_position + Vector3(0, 0, -dist))
+		var zz: Zombie = w.zombies.back()
+		zz.set_physics_process(false)
+		zz.position = p.global_position + Vector3(0, 0, -dist)
+		zz.hp = 5000.0
+		zz.max_hp = 5000.0
+		return zz
+	# Cutlass: each kill quickens the swings, up to three times, fading 3 s after the last.
+	p.slots = ["cutlass", null]
+	p.current = 0
+	p._equip()
+	var cut: Dictionary = WeaponDefs.ALL["cutlass"]
+	var base := p.attack_interval(cut)
+	for i in 4:
+		p._on_kill(at_front.call(30.0 + i))
+	check(p._fervour == 3 and is_equal_approx(p.attack_interval(cut), base / (1.0 + 3 * 0.15)), "four kills with a Cutlass: three times quicker by 15%% (%.3f s a swing, from %.3f)" % [p.attack_interval(cut), base])
+	check(p.readiness().any(func(r: Dictionary) -> bool: return r["key"] == "fervour" and r["have"] == 3), "the HUD shows it")
+	for i in 200:
+		p._process(1.0 / 60.0)
+	check(p._fervour == 0 and is_equal_approx(p.attack_interval(cut), base), "and it fades a few seconds after the last kill")
+	for zz: Zombie in w.zombies.duplicate(): zz.release()
+	# Boarding Hook: drags one in about 1.6 m, staggered; a boss is only staggered.
+	p.slots = ["boarding_hook", null]
+	p._equip()
+	var hooked: Zombie = at_front.call(2.8)
+	p._do_melee_hit()
+	check(hooked._stun > 0.2, "hooked, it is off balance")
+	# Knock fades at 8 a second, so a knock of K carries a body about K / 8 metres.
+	var pull := hooked._knock
+	check(pull.z > 0.0 and absf(pull.length() / 8.0 - 1.6) < 0.05, "and dragged towards you, about 1.6 m (%.2f m)" % (pull.length() / 8.0))
+	hooked.set_physics_process(true)
+	var was := hooked.position.distance_to(p.global_position)
+	for i in 20:
+		await get_tree().physics_frame
+	check(was - hooked.position.distance_to(p.global_position) > 0.8, "and it really comes")
+	hooked.release()
+	var big: Zombie = at_front.call(2.8)
+	big.def = big.def.duplicate()
+	big.def["mesenlla_boss"] = true # the village keeps no boss bodies: this one stands in for one
+	p._do_melee_hit()
+	check(not big.draggable() and big._knock.length() < 0.01 and big._stun > 0.0, "a boss is too big to drag, only staggered")
+	big.release()
+	# Whaler's Harpoon: pins what it strikes, lies where it lands, comes back when you walk over it.
+	p.slots = ["harpoon", "sword"]
+	p.current = 0
+	p.own_ammo.clear()
+	p._equip()
+	var whale: Zombie = at_front.call(10.0)
+	var arrows_before := p.arrows
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(p.harpoon_out and p.arrows == arrows_before and not p._vm_mesh.visible, "thrown: it is out of your hand, and spent no arrows")
+	for i in 60:
+		await get_tree().physics_frame
+	check(whale.root_left > 1.5 and whale.hp < 5000.0, "it struck and pinned what it hit (%.1f s)" % whale.root_left)
+	var lying: Node3D = w.harpoons.get(p.net_id(), null)
+	check(lying != null and lying.global_position.distance_to(whale.position) < 2.0, "and lies by it")
+	p._cooldown = 0.0
+	var flying := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size()
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() == flying, "with it out, there is nothing to throw")
+	p.global_position = lying.global_position + Vector3(0.5, 0, 0)
+	p._tick_harpoon(0.02)
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p._vm_mesh.visible, "walking over it takes it back")
+	p.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
+	whale.release()
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	for i in 90:
+		await get_tree().physics_frame
+	check(p.harpoon_out and w.harpoons.has(p.net_id()), "thrown at nothing, it lies on the ground")
+	p._tick_harpoon(16.0)
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()), "and after 15 s it is back in your hand by itself")
+	# Flare Pistol: 6 flares a pistol; a flare burns all within 3 m and shows all within 7 m for 8 s.
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	p.slots = ["sword", null]
+	p._equip()
+	var gun := w.spawn_pickup_at(p.global_position + Vector3(0.6, 0, 0), Pickup.Kind.WEAPON, "flare_pistol")
+	check(gun.throws() == 6, "a Flare Pistol found lying about brings 6 flares")
+	w._scan_pickups_for(p)
+	check(p.carries("flare_pistol") and p.ammo_of("flare_pistol") == 6, "picked up, 6 flares")
+	p.current = p.slots.find("flare_pistol")
+	p._equip()
+	var near: Zombie = at_front.call(12.0)
+	var side: Zombie = at_front.call(12.0)
+	side.position += Vector3(2.0, 0, 0)
+	var far_one: Zombie = at_front.call(12.0)
+	far_one.position += Vector3(5.5, 0, 0)
+	p.camera.rotation.x = -0.12
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(p.ammo_of("flare_pistol") == 5, "a shot spends one flare")
+	var flares := []
+	for i in 90:
+		await get_tree().physics_frame
+		flares = w.find_children("Flare", "Flare", false, false)
+		if not flares.is_empty():
+			break
+	check(flares.size() == 1, "the flare lands and burns")
+	if flares.size() == 1:
+		var f: Flare = flares[0]
+		var burning := [near, side].filter(func(zz: Zombie) -> bool: return zz.burn_time > 0.0 and zz.position.distance_to(f.global_position) <= Flare.BURN_RADIUS + 0.8)
+		check(not burning.is_empty(), "setting alight what is close by")
+		for i in 40:
+			await get_tree().process_frame
+		check(far_one.position.distance_to(f.global_position) < Flare.REVEAL_RADIUS and far_one.revealed_left > 0.0, "and showing what stands in its light")
+	for zz: Zombie in [near, side, far_one]: zz.release()
+	p.own_ammo["flare_pistol"] = 1
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(not p.carries("flare_pistol"), "the last flare fired, the pistol is gone")
+	# Ship's Anchor: the slam shakes everything within 4.5 m, and you walk slower carrying it.
+	p.slots = ["anchor", null]
+	p.current = 0
+	p._equip()
+	check(p.can_use("anchor"), "an Infantry can wield it")
+	var front: Zombie = at_front.call(1.8)
+	var behind: Zombie = at_front.call(-3.0)
+	p._do_melee_hit()
+	check(front.hp < 5000.0, "the anchor's blow lands")
+	check(behind.hp < 5000.0 and behind._stun > 0.3 and 5000.0 - behind.hp < (5000.0 - front.hp) * 0.75, "and the ground shakes behind you too: a share of the blow, staggered")
+	for zz: Zombie in [front, behind]: zz.release()
+	var slow_speed: float = p.weapon_def().get("burden", 1.0)
+	check(is_equal_approx(slow_speed, 0.9), "carrying it, 90% speed")
+	# Ferryman's Oar: wide, shoves far and slows.
+	p.slots = ["oar", null]
+	p._equip()
+	var rowed: Zombie = at_front.call(2.2)
+	p._do_melee_hit()
+	check(rowed._slow > 0.5, "struck by the oar, it is slowed")
+	rowed.release()
+	p.setup_class("infantry")
+	p.slots = ["sword", null]
+	p._equip()

@@ -180,7 +180,11 @@ func _weapons() -> void:
 				note = "Range %d m, %.1f shots a second" % [int(d["range"]), 1.0 / float(d["rate"])]
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
-		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
+		# What it does, and, for the weapons of the lands beyond, where it comes from.
+		var words: String = d["desc"]
+		if d.has("lore"):
+			words += "\n" + str(d["lore"])
+		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], words, note)
 		var tags := HFlowContainer.new()
 		tags.add_theme_constant_override("h_separation", 8)
 		var cat := WeaponDefs.category(id)

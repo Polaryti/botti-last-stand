@@ -22,13 +22,13 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 56
+const PROTOCOL := 57
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
-enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH }
-enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT }
+enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH, FLARE, HARPOON_LIE, HARPOON_GONE, QUAKE }
+enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT, REVEAL }
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
 const SNAPSHOT_EVERY := 0.08
@@ -52,7 +52,8 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter", "mist_muster", "portal_wound",
 	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death", "dawn_mists", "dawn_valleys", "dawn_bastion",
 	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent",
-	"frost_warning", "frost_burst", "owl_screech", "boar_snort"]
+	"frost_warning", "frost_burst", "owl_screech", "boar_snort",
+	"hook_catch", "harpoon_hit", "flare_burst", "anchor_slam"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1113,6 +1114,10 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 		Fx.SPARK: world.fx_spark(a, b)
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
 		Fx.MIST_PATCH: world.drop_mist_patch(a, b.x, true)
+		Fx.FLARE: world.flare(a, null, true)
+		Fx.HARPOON_LIE: world.lay_harpoon(by, a, b, true)
+		Fx.HARPOON_GONE: world.take_harpoon(by)
+		Fx.QUAKE: world.anchor_quake_fx(a, b.x)
 
 
 func set_night_map(id: String) -> void:
@@ -1426,6 +1431,8 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.DISARM: z.disarm(a > 0.5)
 		Zombie.Effect.FLINCH: z.flinch(a)
 		Zombie.Effect.ROOT: z.root(a)
+		Zombie.Effect.PIN: z.root(a, true)
+		Zombie.Effect.REVEAL: z.reveal(a)
 
 
 func noise(at: Vector3, radius: float) -> void:

@@ -75,6 +75,7 @@ const TAG_STYLES := {
 	"map_green": [Color("1d3c2c"), Color("7fc08a"), Color("b2e8b5")],
 	"map_mists": [Color("193e4b"), Color("6fb6d6"), Color("a5f0ec")],
 	"map_mesenlla": [Color("2a1f4d"), UiTheme.TWILIGHT, Color("e2d8ff")], # the twilight violet of the lands beyond the Mists
+	"map_vael": [Color("102a3c"), Color("d9a24a"), Color("f4dfb0")], # deep harbour water and the brass of Vael's lamps
 }
 
 
@@ -106,7 +107,7 @@ static func weapon_tags(id: String) -> HFlowContainer:
 
 ## "Map Exclusive · …" in the colour of the maps it belongs to.
 static func map_tag(data: Dictionary) -> PanelContainer:
-	var style := "map_mesenlla" if SpawnRules.is_mesenlla(data) else ("map_green" if data.get("maps", []).has("village") or data.get("maps", []).has("fort") else "map_mists")
+	var style := "map_mesenlla" if SpawnRules.is_mesenlla(data) else "map_vael" if SpawnRules.is_vael(data) else ("map_green" if data.get("maps", []).has("village") or data.get("maps", []).has("fort") else "map_mists")
 	return tag("Map Exclusive · " + SpawnRules.names(data), style)
 
 static func profession(spec: Dictionary) -> String:

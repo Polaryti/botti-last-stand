@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT } # new ones go at the end: the number travels
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -468,6 +468,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	element = ""
 	haste_left = 0.0
 	root_left = 0.0
+	revealed_left = 0.0
 	_root_again = -100.0
 	if _vines:
 		_vines.visible = false
@@ -996,6 +997,20 @@ func is_behind(from: Vector3) -> bool:
 	return to.length() > 0.01 and look.dot(to.normalized()) < -0.25
 
 
+## Shown by a flare's light: nothing hidden stays hidden in it (Anglers lying in wait, for one).
+var revealed_left := 0.0
+func reveal(seconds: float) -> void:
+	if puppet:
+		Net.effect_zombie(self, Effect.REVEAL, seconds)
+		return
+	revealed_left = maxf(revealed_left, seconds)
+
+
+## Small enough for a Boarding Hook to drag: not a boss, nor anything much bigger than a person.
+func draggable() -> bool:
+	return not is_boss() and not def.get("miniboss", false) and _scale < 1.5 and not flies and carrier == null
+
+
 func mark(mult: float, seconds: float) -> void:
 	if puppet:
 		Net.effect_zombie(self, Effect.MARK, mult, seconds)
@@ -1442,23 +1457,27 @@ func _show_death() -> void:
 		world.sfx_at(_death_sound(), position, -6.0)
 
 
-## Caught by an Antler Charm's vines (PowerDefs.ANTLER_ROOT).
-func root(seconds: float) -> void:
+## Caught by an Antler Charm's vines (PowerDefs.ANTLER_ROOT), or pinned by a harpoon (pinned: no
+## wait between one and the next).
+func root(seconds: float, pinned := false) -> void:
 	if not is_alive() or flies or carrier:
 		return
 	if puppet:
-		Net.effect_zombie(self, Effect.ROOT, seconds)
+		Net.effect_zombie(self, Effect.PIN if pinned else Effect.ROOT, seconds)
 		return
-	if world.now < _root_again:
+	if world.now < _root_again and not pinned:
 		return
 	if is_boss():
 		seconds *= 0.5
-	root_left = seconds
-	_root_again = world.now + PowerDefs.ANTLER_AGAIN
+	root_left = maxf(root_left, seconds)
+	if not pinned:
+		_root_again = world.now + PowerDefs.ANTLER_AGAIN
 	velocity = Vector3.ZERO
 	# A charge or a lunge ends where the vines catch it.
 	if mesenlla_mind and mesenlla_mind.phase in ["charge", "leap"]:
 		mesenlla_mind.interrupt(self)
+	if pinned:
+		return # held by the harpoon in it: no vines
 	show_roots(seconds)
 	if Net.is_host():
 		Net.zombie_rooted(self, seconds)
@@ -2180,6 +2199,7 @@ func _physics_process(delta: float) -> void:
 		root_left -= delta
 		if root_left <= 0.0:
 			show_roots(0.0)
+	revealed_left = maxf(0.0, revealed_left - delta)
 	blind_left = maxf(0.0, blind_left - delta)
 	_tick_flash(delta)
 	if _airborne:

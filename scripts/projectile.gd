@@ -35,6 +35,24 @@ var slow_secs := 0.0
 var close_from := Vector3.INF # Point Blank: half as strong again within 6 m of here
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
+var pins := 0.0 # a Whaler's Harpoon: seconds it holds what it strikes to the spot
+var tether := false # ...and where it ends up, it lies until its owner takes it back
+var glow := Color.TRANSPARENT: # a Flare: burns bright as it flies, its light on what it passes
+	set(c):
+		glow = c
+		if c.a > 0.0 and _glow_light == null:
+			_glow_light = OmniLight3D.new()
+			_glow_light.omni_range = 5.0
+			_glow_light.shadow_enabled = false
+			add_child(_glow_light)
+		if _glow_light:
+			_glow_light.visible = c.a > 0.0
+			_glow_light.light_color = c
+			_glow_light.light_energy = 2.4
+		if c.a > 0.0:
+			_flame.visible = true
+			_flame.modulate = c.lightened(0.2)
+var _glow_light: OmniLight3D
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
 var garrison := false
 var _through_wall := false # a returning axe that has passed through a wall # shot by a Mist Soldier: nobody's, and nobody is credited with what it kills
@@ -97,6 +115,9 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	poison = Vector2.ZERO
 	poison_trail = false
 	stagger = 0.0
+	pins = 0.0
+	tether = false
+	glow = Color.TRANSPARENT
 	mesh = m
 	position = pos
 	_vel = vel
@@ -197,6 +218,9 @@ func _fly(delta: float) -> void:
 	var step := _vel * delta
 	_left -= step.length()
 	if _left <= 0.0:
+		if tether and not visual:
+			_lay_tether(Vector3(position.x, world.ground_at(position), position.z))
+			return
 		if kind == Kind.AXE and not _returning:
 			_turn_back()
 		elif kind == Kind.BOLT and blast_radius > 0.0:
@@ -289,9 +313,12 @@ func _fly(delta: float) -> void:
 		stop()
 		return
 	world.fx_impact(at)
-	world.sfx_at("thunk", at, -6.0)
+	world.sfx_at(hit_sound if tether else "thunk", at, -6.0)
 	if _is_friendly() and not visual:
 		world.make_noise(at, 8.0)
+	if tether and not visual:
+		_lay_tether(at)
+		return
 	if kind == Kind.AXE:
 		_turn_back()
 	elif blast_radius > 0.0:
@@ -335,6 +362,14 @@ func _grazed_body(from: Vector3, step: Vector3, ray_hit: Dictionary) -> Dictiona
 func _walled(a: Vector3, b: Vector3) -> bool:
 	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.LAYER)
 	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+
+## A thrown harpoon comes to rest here, and lies until its owner walks over it.
+func _lay_tether(at: Vector3) -> void:
+	var shooter := _owner()
+	if shooter:
+		world.lay_harpoon(shooter.net_id(), at, _vel)
+	stop()
 
 
 func _turn_back() -> void:
@@ -404,7 +439,13 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		z.add_dot(bleed.x, bleed.y, true)
 	if slow_secs > 0.0:
 		z.slow(slow_secs)
+	if pins > 0.0:
+		z.root(pins, true)
 	world.sfx_at(hit_sound if hit_sound != "" else "thunk", at, -3.0)
+	if tether:
+		# The harpoon stays in it, then drops at its feet when it pulls free.
+		_lay_tether(Vector3(z.position.x, world.ground_at(z.position), z.position.z) + _vel.normalized() * 0.3)
+		return
 	_exclude.append(z.get_rid())
 	if blast_radius > 0.0:
 		_explode(at)

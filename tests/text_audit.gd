@@ -181,6 +181,9 @@ static func facts() -> Dictionary:
 		"item:tesla_coil": [float(PathUpgrades.TESLA_TARGETS), PathUpgrades.TESLA_REACH, PathUpgrades.TESLA_EVERY, PathUpgrades.TESLA_TIME, PathUpgrades.TESLA_DAMAGE],
 		"item:grapeshot": [float(PathUpgrades.GRAPESHOT_PELLETS), PathUpgrades.GRAPESHOT_DAMAGE],
 		"item:shield_wall": [PathUpgrades.SHIELD_WALL_RADIUS, PathUpgrades.SHIELD_WALL_AMOUNT, PathUpgrades.SHIELD_WALL_TIME],
+		# Weapons whose rules are written in code
+		"weapon:flare_pistol": [Flare.BURN_RADIUS, Flare.TIME, Flare.REVEAL_RADIUS],
+		"weapon:blowgun": [pct(Player.POISON_HURT - 1.0)],
 	}
 
 
@@ -247,4 +250,8 @@ func run() -> Array[String]:
 		var item: Dictionary = ShopDefs.ITEMS[id]
 		# A Map Upgrade's levels, as the Armory lists them, are held to the same numbers.
 		_audit("item:" + id, str(item["desc"]) + " " + " ".join(PackedStringArray(item.get("levels", []))), [item.get("art", {}), item.get("effect", {})])
+	# Weapons: every number a weapon's words quote (Codex, Armory) is one of its own, or a fact.
+	for wid: String in WeaponDefs.ALL:
+		var wd: Dictionary = WeaponDefs.ALL[wid]
+		_audit("weapon:" + wid, str(wd.get("desc", "")), [wd])
 	return failures

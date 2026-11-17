@@ -4,7 +4,7 @@ class_name WeaponDefs
 enum Kind { MELEE, RANGED, SPELL }
 
 const DAMAGE := 25.0
-const ALIGNED_HELD := ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword"]
+const ALIGNED_HELD := ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword", "oar", "anchor"]
 const HAND_TURN := PI * 0.5
 const TORCH_FIRE := 0.575 # how high up a torch the fire starts
 
@@ -61,6 +61,19 @@ const ALL := {
 		"knock": 1.8, "swing": "slash", "weight": 0.0, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.46},
 	"bolas": {"only": "cartographer", "spec": "pathfinder", "power": 0.9, "name": "Pathfinder's Bolas", "shot": "bolas", "slows": 2.5, "free_ammo": true, "desc": "Pathfinder only, unearthed by its beacons. Weighted cords that tangle the legs: everything they hit is slowed for 2.5 s. No arrows needed.", "kind": Kind.RANGED, "rate": 0.7, "range": 24.0, "speed": 26.0, "gravity": 3.0,
 		"knock": 1.2, "weight": 0.0, "pos": Vector3(0.24, -0.26, -0.46), "scale": 0.5},
+	# The Sunken Crown: found on the coast of Vael (Port Vael and the Lantern Road).
+	"cutlass": {"maps": ["vael", "lantern_road"], "swing_sound": "cutlass_swing", "power": 0.9, "name": "Cutlass", "fervour": 3, "fervour_rate": 0.15, "fervour_time": 3.0, "desc": "A sailor's curved blade, quick, cutting up to two. Each kill quickens your swings by 15%, up to 3 times; it fades 3 s after your last kill.", "lore": "Every deckhand of Vael carried one. The salt never quite came off the blades, and neither did the habit of fighting in a hurry.", "kind": Kind.MELEE, "rate": 0.5, "range": 2.6, "cone": 105.0, "max_hits": 2,
+		"knock": 1.8, "swing": "slash", "weight": 1.2, "pos": Vector3(0.26, -0.3, -0.46), "scale": 0.5},
+	"boarding_hook": {"maps": ["vael", "lantern_road"], "swing_sound": "hook_swing", "power": 0.8, "name": "Boarding Hook", "drags": 1.6, "drag_stagger": 0.4, "desc": "An iron hook on a short haft, for pulling ships together. Catches one enemy and drags it 1.6 m towards you, off balance for 0.4 s. Anything too big to drag is only staggered.", "lore": "Thrown over the rail of a rival ship, a hook like this ended most arguments on the Sound of Vael before a blade was drawn.", "kind": Kind.MELEE, "rate": 0.65, "range": 3.1, "cone": 40.0, "max_hits": 1,
+		"knock": 0.0, "swing": "hook", "weight": 1.0, "pos": Vector3(0.24, -0.3, -0.46), "scale": 0.55},
+	"harpoon": {"maps": ["vael", "lantern_road"], "power": 2.6, "name": "Whaler's Harpoon", "shot": "harpoon", "pins": 2.0, "tethered": 15.0, "desc": "A barbed whaling iron on a rope. Pins what it strikes to the spot for 2 s (half as long for bosses). There is only one: it lies where it lands until you walk over it, or comes back to your hand by itself after 15 s.", "lore": "The whalers of Vael hunted things under the mist long before the mist came ashore. Their irons were made to hold whatever they struck.", "kind": Kind.RANGED, "rate": 1.1, "range": 26.0, "speed": 30.0, "gravity": 5.0,
+		"knock": 2.5, "weight": 0.9, "pos": Vector3(0.22, -0.22, -0.1), "scale": 1.0},
+	"flare_pistol": {"maps": ["vael", "lantern_road"], "power": 0.8, "name": "Flare Pistol", "shot": "flare", "gun": true, "flare": true, "own_ammo": 6, "own_ammo_max": 12, "desc": "A brass signal pistol. Its flare sets alight what it hits and everything within 3 m of where it lands, then burns there for 8 s, showing every enemy within 7 m, hidden ones and invisible rivals too. Each Flare Pistol picked up gives 6 flares, up to 12; when the last is fired it is gone.", "lore": "Harbour pilots fired these to guide ships in through the fog. Fired into the mist now, they show what has come ashore.", "kind": Kind.RANGED, "rate": 1.2, "range": 34.0, "speed": 32.0, "gravity": 7.0,
+		"knock": 1.0, "weight": 0.8, "pos": Vector3(0.15, -0.16, -0.27), "scale": 0.85},
+	"anchor": {"maps": ["vael", "lantern_road"], "swing_sound": "anchor_heave", "two_handed": true, "power": 2.3, "name": "Ship's Anchor", "quake": 4.5, "quake_share": 0.5, "quake_stagger": 0.6, "burden": 0.9, "desc": "A ship's anchor on a short chain, swung with both hands. Very slow, but each slam shakes the ground: everything within 4.5 m takes half the blow and staggers for 0.6 s. You move at 90% speed while you carry it.", "lore": "Torn from a wreck in the harbour mud. Whoever first swung it at the Drowned found that they, too, remember what an anchor means.", "kind": Kind.MELEE, "rate": 1.5, "range": 2.7, "cone": 120.0, "max_hits": 6,
+		"knock": 3.0, "swing": "slam", "weight": 0.8, "pos": Vector3(0.26, -0.44, -0.52), "scale": 0.5},
+	"oar": {"maps": ["vael", "lantern_road"], "swing_sound": "oar_sweep", "two_handed": true, "power": 1.05, "name": "Ferryman's Oar", "slows": 1.0, "desc": "A long black oar from the ferries of Vael. Wide sweeps through up to eight that shove everything hit far back and slow it for 1 s.", "lore": "The ferrymen rowed the dead across the Sound to the Isle of Lamps. Their oars were blessed to keep the drowned from climbing aboard.", "kind": Kind.MELEE, "rate": 0.85, "range": 3.5, "cone": 200.0, "max_hits": 8,
+		"knock": 5.5, "swing": "row", "arc": 1.15, "weight": 1.0, "pos": Vector3(0.44, -0.5, -0.72), "scale": 0.6},
 	"war_staff": {"only": "commander", "hidden": true, "name": "War Staff", "desc": "Melee staff; every fifth attack fires battle magic.", "kind": Kind.MELEE, "rate": 0.5, "range": 3.1, "cone": 100.0, "max_hits": 3, "power": 1.4, "knock": 2.5, "swing": "bo", "weight": 0.0, "pos": Vector3(0.26, -0.32, -0.5), "scale": 0.65},
 	"musket": {"only": "commander", "hidden": true, "name": "Musket", "desc": "Fire shoots; Melee thrusts the bayonet. Powder replenishes while reloading.", "kind": Kind.RANGED, "rate": 1.25, "range": 55.0, "speed": 90.0, "gravity": 0.0, "power": 2.4, "free_ammo": true, "knock": 3.0, "weight": 0.0, "pos": Vector3(0.17, -0.22, -0.4), "scale": 0.8},
 
@@ -119,7 +132,7 @@ static func pick_rare(map_id := "") -> String:
 ## How a weapon sits in a character's hand. Poles and bows are drawn along their length, so they need
 ## a quarter turn to point where the character is looking.
 static func hand_rotation(id: String) -> Vector3:
-	if id in ["spear", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow", "musket"]:
+	if id in ["spear", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow", "musket", "harpoon", "flare_pistol"]:
 		return Vector3(HAND_TURN, 0.0, 0.0)
 	return Vector3.ZERO
 
@@ -155,7 +168,7 @@ static func is_ranged(id: String) -> bool:
 
 
 static func uses_arrows(d: Dictionary) -> bool:
-	return d["kind"] == Kind.RANGED and not d.get("returning", false) and not d.get("free_ammo", false) and not d.has("own_ammo")
+	return d["kind"] == Kind.RANGED and not d.get("returning", false) and not d.get("free_ammo", false) and not d.has("own_ammo") and not d.has("tethered")
 
 
 ## Throws that come with one weapon picked up, for a weapon with its own ammunition (the Rift
@@ -199,8 +212,210 @@ static func mesh(id: String) -> Mesh:
 		"chakram": m = chakram_mesh()
 		"machete": m = _machete()
 		"bolas": m = bolas_mesh()
+		"cutlass": m = _cutlass()
+		"boarding_hook": m = _boarding_hook()
+		"harpoon": m = harpoon_mesh()
+		"flare_pistol": m = _flare_pistol()
+		"anchor": m = _anchor()
+		"oar": m = _oar()
 	_meshes[id] = m
 	return m
+
+
+const SEA_IRON := Color(0.36, 0.38, 0.4) # iron long in salt water
+const RUST := Color(0.52, 0.3, 0.18)
+const TAR := Color(0.12, 0.1, 0.09) # tarred rope and black lacquer
+const ROPE := Color(0.72, 0.62, 0.42)
+const SILVER := Color(0.8, 0.82, 0.86)
+const VAEL_BLUE := Color(0.16, 0.3, 0.42)
+
+
+## A curved blade along a bend: a run of short plates, each turned a little more than the last.
+static func _curved_blade(l: LowPoly, from: Vector3, length: float, width: float, thick: float, bend: float, plates: int, col: Color, taper := 0.55) -> Vector3:
+	var at := from
+	var dir := Vector3.UP
+	var step := length / plates
+	for i in plates:
+		var k := float(i) / plates
+		var w := width * lerpf(1.0, taper, k)
+		var turn := bend * (k + 0.5 / plates)
+		dir = Vector3(sin(turn), cos(turn), 0)
+		var mid := at + dir * step * 0.5
+		l.box(mid, Vector3(w, step * 1.08, thick), col.lightened(0.04 * (i % 2)), Vector3(0, 0, -rad_to_deg(turn)))
+		at += dir * step
+	return at
+
+
+## A sailor's cutlass: a brass basket that cups the hand, a tarred grip bound in brass wire and a broad
+## curved blade with a fuller, clipped at the point.
+static func _cutlass() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.24, 0), Vector3(0, -0.02, 0), 0.026, 0.03, 6, TAR)
+	for i in 5:
+		var y := -0.21 + i * 0.04
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.012, 0), 0.032, 0.032, 6, BRASS.darkened(0.2))
+	l.box(Vector3(0, -0.27, 0), Vector3(0.06, 0.05, 0.06), BRASS)
+	# The basket: a shell plate before the hand, a knuckle bow and two side bars.
+	l.box(Vector3(0.0, -0.01, 0.0), Vector3(0.17, 0.03, 0.11), BRASS)
+	l.box(Vector3(0.0, 0.0, 0.06), Vector3(0.15, 0.06, 0.012), BRASS.lightened(0.1))
+	l.prism(Vector3(0.07, -0.01, 0.0), Vector3(0.08, -0.26, 0.0), 0.012, 0.012, 5, BRASS)
+	for z: float in [-0.045, 0.045]:
+		l.prism(Vector3(0.06, -0.01, z), Vector3(0.05, -0.17, z * 0.6), 0.009, 0.009, 4, BRASS.darkened(0.1))
+	# The blade, curving back towards the spine, with a darker fuller and a clipped point.
+	var steel := STEEL.lightened(0.04)
+	var tip := _curved_blade(l, Vector3(0, 0.0, 0), 0.62, 0.085, 0.016, 0.38, 9, steel, 0.8)
+	_curved_blade(l, Vector3(-0.012, 0.03, 0.009), 0.46, 0.012, 0.004, 0.36, 7, STEEL.darkened(0.3), 1.0)
+	l.prism(tip, tip + Vector3(0.09, 0.06, 0), 0.03, 0.0, 4, steel.lightened(0.1))
+	return l.commit()
+
+
+## A boarding hook: an ash haft wound with tarred cord, an iron ferrule, a hooked iron head with a back
+## spike, and a ring at its foot with a short chain.
+static func _boarding_hook() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.36, 0), Vector3(0, 0.34, 0), 0.024, 0.022, 6, LIGHT_WOOD.darkened(0.08))
+	for y: float in [-0.3, -0.24, -0.18, -0.12]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.03, 0), 0.028, 0.028, 6, TAR)
+	l.prism(Vector3(0, 0.32, 0), Vector3(0, 0.42, 0), 0.03, 0.028, 6, SEA_IRON)
+	# The hook: up out of the ferrule, over and down into a sharp barbed point.
+	var iron := SEA_IRON.lightened(0.05)
+	var at := Vector3(0, 0.42, 0)
+	var turns := [0.0, 0.5, 1.1, 1.8, 2.5, 3.05]
+	for i in turns.size():
+		var a: float = turns[i]
+		var next := at + Vector3(sin(a), cos(a), 0) * 0.07
+		l.prism(at, next, 0.022 - i * 0.002, 0.02 - i * 0.002, 5, iron if i % 2 == 0 else RUST.lerp(iron, 0.6))
+		at = next
+	l.prism(at, at + Vector3(-0.02, -0.06, 0), 0.016, 0.0, 4, iron.lightened(0.2))
+	l.prism(at + Vector3(0.0, -0.02, 0), at + Vector3(0.03, -0.01, 0), 0.01, 0.0, 3, iron.lightened(0.2))
+	l.prism(Vector3(0, 0.44, 0), Vector3(-0.1, 0.52, 0), 0.016, 0.0, 4, iron)
+	# A ring and three links of chain at the foot of the haft.
+	l.prism(Vector3(0, -0.38, 0), Vector3(0, -0.4, 0), 0.03, 0.03, 8, SEA_IRON)
+	for i in 3:
+		l.box(Vector3(0.0, -0.44 - i * 0.04, 0.0), Vector3(0.025 if i % 2 == 0 else 0.008, 0.04, 0.008 if i % 2 == 0 else 0.025), SEA_IRON.darkened(0.15))
+	return l.commit()
+
+
+## A whaler's iron: an ash shaft, a barbed toggling head lashed on with tarred cord, and a coil of rope
+## at its tail. Lies along -Z, in the hand and in flight.
+static func harpoon_mesh() -> Mesh:
+	if _meshes.has("_harpoon"):
+		return _meshes["_harpoon"]
+	var l := LowPoly.new()
+	l.prism(Vector3(0, 0, 0.62), Vector3(0, 0, -1.05), 0.026, 0.024, 6, LIGHT_WOOD.darkened(0.18))
+	for z: float in [-0.95, -0.88, -0.81]:
+		l.prism(Vector3(0, 0, z), Vector3(0, 0, z - 0.03), 0.024, 0.024, 6, TAR)
+	l.prism(Vector3(0, 0, -1.05), Vector3(0, 0, -1.3), 0.014, 0.012, 5, SEA_IRON)
+	l.prism(Vector3(0, 0, -1.3), Vector3(0, 0, -1.52), 0.045, 0.0, 4, STEEL)
+	for side: float in [-1.0, 1.0]:
+		l.prism(Vector3(side * 0.03, 0, -1.36), Vector3(side * 0.07, 0, -1.28), 0.012, 0.0, 3, STEEL.darkened(0.1))
+		l.prism(Vector3(0, side * 0.025, -1.42), Vector3(0, side * 0.06, -1.35), 0.01, 0.0, 3, STEEL.darkened(0.1))
+	# The line, coiled at the tail and tied off.
+	for i in 3:
+		l.prism(Vector3(0, 0, 0.42 + i * 0.05), Vector3(0, 0, 0.45 + i * 0.05), 0.05, 0.05, 8, ROPE.darkened(0.05 * i))
+	l.prism(Vector3(0, 0, 0.58), Vector3(0.03, -0.08, 0.66), 0.01, 0.01, 4, ROPE)
+	var m := l.commit()
+	_meshes["_harpoon"] = m
+	return m
+
+
+## A harbour pilot's flare pistol: a wide brass barrel with a flared muzzle, a hammer and a curved
+## walnut grip with a brass butt cap. Barrel along -Z.
+static func _flare_pistol() -> Mesh:
+	var l := LowPoly.new()
+	var walnut := WOOD.darkened(0.12)
+	l.prism(Vector3(0, 0.0, 0.02), Vector3(0, 0.0, -0.19), 0.036, 0.032, 8, BRASS)
+	l.prism(Vector3(0, 0.0, -0.19), Vector3(0, 0.0, -0.24), 0.034, 0.042, 8, BRASS.lightened(0.1))
+	l.prism(Vector3(0, 0.0, -0.236), Vector3(0, 0.0, -0.244), 0.03, 0.03, 8, TAR)
+	l.prism(Vector3(0, 0, -0.03), Vector3(0, 0, -0.045), 0.04, 0.04, 8, BRASS.darkened(0.25))
+	# A sight bead along the top of the barrel.
+	l.box(Vector3(0, 0.038, -0.2), Vector3(0.008, 0.012, 0.02), SEA_IRON)
+	l.box(Vector3(0, -0.03, 0.03), Vector3(0.05, 0.05, 0.1), BRASS.darkened(0.1))
+	l.box(Vector3(0, 0.035, 0.07), Vector3(0.018, 0.05, 0.02), SEA_IRON, Vector3(-30, 0, 0))
+	l.prism(Vector3(0, -0.03, 0.06), Vector3(0, -0.15, 0.12), 0.032, 0.036, 6, walnut)
+	l.prism(Vector3(0, -0.15, 0.12), Vector3(0, -0.2, 0.15), 0.036, 0.04, 6, walnut.lightened(0.05))
+	l.box(Vector3(0, -0.21, 0.155), Vector3(0.05, 0.02, 0.06), BRASS)
+	l.prism(Vector3(0, -0.04, -0.01), Vector3(0, -0.09, 0.02), 0.008, 0.008, 4, BRASS)
+	l.prism(Vector3(0, -0.09, 0.02), Vector3(0, -0.07, 0.07), 0.008, 0.008, 4, BRASS)
+	l.box(Vector3(0, -0.02, 0.0), Vector3(0.01, 0.03, 0.01), SEA_IRON)
+	# A red flare cartridge showing at the breech.
+	l.prism(Vector3(0, 0.0, 0.03), Vector3(0, 0.0, 0.05), 0.028, 0.028, 8, Color(0.75, 0.16, 0.12))
+	return l.commit()
+
+
+## The flare in flight: a red paper cartridge with a burning white-gold head.
+static func flare_mesh() -> Mesh:
+	if _meshes.has("_flare"):
+		return _meshes["_flare"]
+	var l := LowPoly.new()
+	l.prism(Vector3(0, 0, 0.06), Vector3(0, 0, -0.04), 0.022, 0.022, 8, Color(0.75, 0.16, 0.12))
+	l.prism(Vector3(0, 0, -0.04), Vector3(0, 0, -0.08), 0.03, 0.01, 8, Color(1.0, 0.92, 0.6))
+	var m := l.commit()
+	_meshes["_flare"] = m
+	return m
+
+
+## A ship's anchor swung by its shank: the ring and a few links of chain at the hand end with a
+## wooden stock across it, a long iron shank, and at the far end the crown with two curved arms
+## ending in broad flukes. Weed and rust from years in the harbour mud.
+static func _anchor() -> Mesh:
+	var l := LowPoly.new()
+	var iron := SEA_IRON.darkened(0.08)
+	# Ring and chain wound round the grip.
+	l.prism(Vector3(0, -0.5, -0.05), Vector3(0, -0.5, 0.05), 0.07, 0.07, 10, iron)
+	l.prism(Vector3(0, -0.5, -0.03), Vector3(0, -0.5, 0.03), 0.045, 0.045, 10, TAR)
+	for i in 6:
+		var y := -0.38 + i * 0.05
+		l.box(Vector3(0, y, 0), Vector3(0.07 if i % 2 == 0 else 0.03, 0.05, 0.03 if i % 2 == 0 else 0.07), iron.lightened(0.05), Vector3(0, 30.0 * i, 0))
+	# The stock: a wooden bar through the shank, bound with iron bands.
+	l.box(Vector3(0, -0.06, 0), Vector3(0.05, 0.06, 0.62), LIGHT_WOOD.darkened(0.25))
+	for z: float in [-0.27, 0.27]:
+		l.box(Vector3(0, -0.06, z), Vector3(0.06, 0.07, 0.03), iron)
+	# The shank.
+	l.prism(Vector3(0, -0.02, 0), Vector3(0, 0.82, 0), 0.04, 0.05, 6, iron)
+	l.box(Vector3(0, 0.3, 0.04), Vector3(0.06, 0.1, 0.02), Color(0.22, 0.34, 0.2)) # a trail of weed
+	l.box(Vector3(0.02, 0.55, -0.04), Vector3(0.04, 0.14, 0.02), RUST)
+	# The crown and two arms curving back down, each ending in a fluke with a sharp bill.
+	l.prism(Vector3(0, 0.82, 0), Vector3(0, 0.9, 0), 0.07, 0.06, 6, iron.lightened(0.05))
+	for side: float in [-1.0, 1.0]:
+		# Out sideways from the crown, then curving back towards the hand.
+		var at := Vector3(0, 0.88, 0)
+		for i in 5:
+			var a := side * (1.45 + i * 0.3)
+			var next := at + Vector3(sin(a), cos(a), 0) * 0.1
+			l.prism(at, next, 0.042 - i * 0.004, 0.04 - i * 0.004, 6, iron if i % 2 == 0 else iron.lightened(0.06))
+			at = next
+		# The fluke: a broad spade-shaped palm, its bill pointing back up the shank.
+		l.box(at + Vector3(side * -0.015, 0.06, 0), Vector3(0.04, 0.16, 0.15), iron.lightened(0.12), Vector3(0, 0, side * -25.0))
+		l.prism(at + Vector3(side * -0.03, 0.12, 0), at + Vector3(side * -0.07, 0.22, 0), 0.03, 0.0, 4, STEEL.darkened(0.2))
+	return l.commit()
+
+
+## A ferryman's oar: a black-lacquered loom with a silver-capped handle, a broad blade edged in
+## silver with the lamp of Vael painted on it and coins nailed along its spine.
+static func _oar() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.7, 0), Vector3(0, -0.56, 0), 0.028, 0.03, 6, SILVER.darkened(0.2))
+	l.prism(Vector3(0, -0.56, 0), Vector3(0, 0.62, 0), 0.03, 0.026, 6, TAR)
+	for y: float in [-0.48, -0.1, 0.3]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.03, 0), 0.034, 0.034, 6, SILVER.darkened(0.3))
+	# The blade widens from the throat to a rounded tip.
+	var widths := [0.06, 0.12, 0.16, 0.17, 0.17, 0.16, 0.12]
+	for i in widths.size():
+		var y := 0.66 + i * 0.1
+		l.box(Vector3(0, y, 0), Vector3(widths[i], 0.105, 0.02), TAR.lightened(0.06 * (i % 2)))
+		if i > 0:
+			for side: float in [-1.0, 1.0]:
+				l.box(Vector3(side * float(widths[i]) * 0.5, y, 0), Vector3(0.012, 0.105, 0.024), SILVER.darkened(0.15))
+	l.prism(Vector3(0, 1.36, 0), Vector3(0, 1.42, 0), 0.06, 0.0, 6, SILVER.darkened(0.15))
+	# The lamp of Vael on both faces: a pale flame over a little bowl.
+	for face: float in [-1.0, 1.0]:
+		l.box(Vector3(0, 0.98, face * 0.012), Vector3(0.05, 0.03, 0.004), Color(0.85, 0.72, 0.4))
+		l.prism(Vector3(0, 1.0, face * 0.012), Vector3(0, 1.1, face * 0.012), 0.025, 0.0, 4, Color(0.95, 0.88, 0.6))
+	# Obols nailed along the spine of the blade.
+	for i in 4:
+		l.prism(Vector3(0, 0.74 + i * 0.12, 0.012), Vector3(0, 0.74 + i * 0.12, 0.018), 0.018, 0.018, 8, SILVER)
+	return l.commit()
 
 
 ## A long two-hand blade: leather grip for both hands, a broad crossguard and a fullered blade.

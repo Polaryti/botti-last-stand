@@ -1,5 +1,16 @@
 # Changelog
 
+## Development — The Sunken Crown
+
+### New weapons of the coast
+Found on the coming Port Vael and Lantern Road maps.
+- **Cutlass:** each kill quickens your swings by 15%, up to three times, fading 3 s after the last kill.
+- **Boarding Hook:** drags what it catches 1.6 m towards you and staggers it. Anything too big to drag is only staggered.
+- **Whaler's Harpoon:** pins what it strikes for 2 s, then lies where it lands. Walk over it to take it back, or it returns by itself after 15 s.
+- **Flare Pistol:** a flare sets alight everything within 3 m where it lands, then burns for 8 s, showing every enemy within 7 m, hidden and invisible ones too. 6 flares a pistol, up to 12.
+- **Ship's Anchor:** a slow two-handed slam that shakes the ground: everything within 4.5 m takes half the blow and staggers. You walk at 90% speed carrying it.
+- **Ferryman's Oar:** a wide two-handed sweep through up to eight, shoving them far back and slowing them for 1 s.
+
 ## Development — Fixes and polish after Beyond the Mists
 
 ### Screens

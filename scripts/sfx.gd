@@ -22,7 +22,10 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	# The Commander's battle cry
 	"command",
 	# The bosses of Beyond the Mists enter to the soundtrack's bells (tools/make_boss_bells.py)
-	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent"]
+	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent",
+	# The Sunken Crown (tools/make_sunken_audio.py): the weapons of Vael
+	"cutlass_swing", "hook_swing", "hook_catch", "harpoon_throw", "harpoon_hit", "harpoon_reel", "flare_shot", "flare_burst",
+	"anchor_heave", "anchor_slam", "oar_sweep"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],
