@@ -91,9 +91,9 @@ func _place(now: float) -> void:
 	var pop := clampf(now / 0.25, 0.0, 1.0) * clampf(_left / 0.3, 0.0, 1.0)
 	var base := _z.global_position
 	global_position = base
-	_coin.position = Vector3.UP * (_z.height + 0.55 + 0.08 * sin(now * 3.0))
+	_coin.position = Vector3.UP * (_z.height + 0.75 + 0.08 * sin(now * 3.0))
 	_coin.rotation = Vector3(0, now * 2.2, 0)
-	_coin.scale = Vector3.ONE * maxf(0.02, pop) * (1.0 + 0.4 * (1.0 - clampf(now / 0.25, 0.0, 1.0)))
+	_coin.scale = Vector3.ONE * 1.5 * maxf(0.02, pop) * (1.0 + 0.4 * (1.0 - clampf(now / 0.25, 0.0, 1.0)))
 	var r := maxf(0.6, _z.body_radius() * 1.3)
 	_ring.position = Vector3.UP * 0.06
 	_ring.scale = Vector3(r, 1.0, r) * (1.0 + 0.06 * sin(now * 4.0))

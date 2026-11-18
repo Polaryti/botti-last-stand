@@ -42,7 +42,7 @@ var harpoon_mark := false # a Harpooner's harpoon: what it strikes is marked and
 var toll := false:
 	set(on):
 		toll = on
-		material_overlay = _toll_glow() if on else null
+		material_override = _toll_glow() if on else null
 static var _toll_mat: StandardMaterial3D
 var glow := Color.TRANSPARENT: # a Flare: burns bright as it flies, its light on what it passes
 	set(c):
@@ -485,11 +485,12 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 
 static func _toll_glow() -> StandardMaterial3D:
 	if _toll_mat == null:
+		# Gilded steel that catches the light, and gleams a little of itself in the dark.
 		_toll_mat = StandardMaterial3D.new()
-		_toll_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_toll_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_toll_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-		_toll_mat.albedo_color = Color(CrownUpgrades.COIN, 0.55)
-		_toll_mat.grow = true
-		_toll_mat.grow_amount = 0.015
+		_toll_mat.albedo_color = CrownUpgrades.COIN
+		_toll_mat.metallic = 0.8
+		_toll_mat.roughness = 0.25
+		_toll_mat.emission_enabled = true
+		_toll_mat.emission = CrownUpgrades.COIN
+		_toll_mat.emission_energy_multiplier = 0.6
 	return _toll_mat

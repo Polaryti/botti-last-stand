@@ -799,7 +799,7 @@ static func _build_toll(s: UpgradeShowcase) -> void:
 		var mi := s._piece(knife)
 		mi.visible = false
 		if i >= TOLL_KNIVES * 2:
-			mi.material_overlay = s._glow(CrownUpgrades.COIN, 0.6)
+			mi.material_override = Projectile._toll_glow()
 		knives.append(mi)
 	s._parts["knives"] = knives
 	var chains: Array[MeshInstance3D] = []

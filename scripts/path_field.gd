@@ -262,7 +262,7 @@ static func blaze_model() -> Node3D:
 	root.add_child(stake)
 	var mark := MeshInstance3D.new()
 	mark.mesh = _blaze_meshes[1]
-	mark.material_override = _flat(Color(0.45, 0.78, 1.0, 0.55), true)
+	mark.material_override = _flat(Color(0.35, 0.68, 1.0, 0.7), false)
 	mark.position.y = 0.07
 	mark.name = "Mark"
 	root.add_child(mark)
@@ -354,7 +354,7 @@ func _look(_delta: float) -> void:
 	if _blaze:
 		var stand := clampf(now / 0.2, 0.0, 1.0) * clampf(_left / 0.8, 0.0, 1.0)
 		_blaze.scale = Vector3(1.0, maxf(0.02, stand), 1.0)
-		((_blaze.get_node("Mark") as MeshInstance3D).material_override as StandardMaterial3D).albedo_color.a = 0.55 * stand * (0.8 + 0.2 * sin(now * 4.0))
+		((_blaze.get_node("Mark") as MeshInstance3D).material_override as StandardMaterial3D).albedo_color.a = 0.7 * stand * (0.8 + 0.2 * sin(now * 4.0))
 		return
 	if _coil:
 		_coil.scale = Vector3.ONE * clampf((_life - _left) / 0.25, 0.05, 1.0)
