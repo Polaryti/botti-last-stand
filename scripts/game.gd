@@ -14,7 +14,14 @@ const CODES := {"c734137a1f7468ebdb5cf20deae67c89b15dc5de26ff06b497548a4a62a3370
 	"28e314800565692691a7af4606286f26fc0f53b2201fe1fb4c8feaa018e3a6ad": "artificer",
 	"d9bd0d6b1b8a6dc2c11e699df4d908344b17a609e2064940b19008fa3e1419be": "adept",
 	"4a5310c45bc88862d35f592b3cb4f69b664f0b651a56b3503e99539386f7edb3": "bandit",
-	"feaeebd2dba326079890fb1cac967ee57f83292db887f82f4a1d8e54161dff7f": "cartographer"}
+	"feaeebd2dba326079890fb1cac967ee57f83292db887f82f4a1d8e54161dff7f": "cartographer",
+	"8134ddbc51238f953f50369be83a1f67d15ff1a9bf15af44fc9da01b9b8f9c19": "harpooner",
+	"b467740d07272196d7ca893ee099a0f27cf2b91ea0c6f5826b3cc12862cba55c": "tidecaller",
+	"198dc481de37e02396478059dbf04e3edbb784f5b86f4e8cbc75989ae71b5c3f": "ferryman",
+	"0737b22b9c93c1bbf0a043d938dfb28e119d6c542908f2003d191607b5f03275": "revenant",
+	"7d81bbae5f2dc15cbe7ef6021dad08e08235c315458fde23654b3a3fc88e2031": "artificer",
+	"851722ee3f2991091bcf1a11d634ff05ea3ea54ed49811ef83a8b7b4d2026312": "chivalry",
+	"5bcc253292a148a30155854fa4b4e72aeeb81c3cacbc35fd77c0aeed845eb305": "magician"}
 ## Codes that pay Doubloons, every time they are entered (also kept only as hashes).
 const DOUBLOON_CODES := {"56adbe46b05e15e74db8a9d637126086b142ac23ed9740786457771953e93791": 2000}
 

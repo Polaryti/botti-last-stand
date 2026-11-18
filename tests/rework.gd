@@ -45,6 +45,7 @@ func _ready() -> void:
 	await _path_upgrades()
 	print("REWORK cartographer")
 	await _cartographer()
+	_class_codes()
 	print("REWORK harpooner")
 	await _harpooner()
 	print("REWORK tidecaller")
@@ -1490,6 +1491,16 @@ func _face_ahead() -> void:
 		p.camera.rotation = Vector3.ZERO
 
 
+func _class_codes() -> void:
+	# Every class that is not free from the start can be opened with a code (the codes themselves are
+	# kept out of the repository: only their hashes are in the game).
+	var coded := Game.CODES.values()
+	for id: String in ClassDefs.ALL:
+		var d: Dictionary = ClassDefs.ALL[id]
+		if d.get("hidden", false) and not ClassDefs.disabled(id):
+			check(coded.has(id), "%s can be opened with a code" % d["name"])
+
+
 func _harpooner() -> void:
 	var d: Dictionary = ClassDefs.ALL["harpooner"]
 	check(d["weapon"] == "harpoon" and d["second"] == "boarding_hook" and ClassDefs.price("harpooner") == 0 and not ClassDefs.for_sale().has("harpooner") and d.get("earned", "") == "harbourmaster", "the Harpooner starts with a Whaler's Harpoon and a Boarding Hook, and is earned against the Harbourmaster")
@@ -1729,9 +1740,18 @@ func _tidecaller() -> void:
 	var hit_was := hit.position
 	hit.stun(30.0) # so only the wave moves it
 	TidecallerKit.call_the_tide(p)
-	await until_gone(TideWave)
+	# How far along the wave's way it was thrown, at the furthest: frames come at the machine's pace.
+	var thrown := 0.0
+	for i in 600:
+		thrown = maxf(thrown, hit_was.z - hit.position.z)
+		if not w.get_children().any(func(n: Node) -> bool: return n is TideWave):
+			break
+		await frames(1)
+	for i in 10:
+		thrown = maxf(thrown, hit_was.z - hit.position.z)
+		await frames(1)
 	check(hit.hp < h0 and hit._slow > 0.0, "the wave strikes what is in its way and slows it (%.0f)" % (h0 - hit.hp))
-	check(hit_was.z - hit.position.z > 0.5, "and throws it back along the wave's way (%.1f m)" % (hit_was.z - hit.position.z))
+	check(thrown > 0.5, "and throws it back along the wave's way (%.1f m)" % thrown)
 	check(is_equal_approx(aside.hp, a0), "but not what stands off to the side")
 	hit.release()
 	aside.release()
