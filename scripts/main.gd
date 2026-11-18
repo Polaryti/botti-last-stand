@@ -2113,6 +2113,8 @@ func _on_dawn() -> void:
 	Game.note_beyond_win()
 	if world.last_light:
 		Game.note_last_light()
+	if world.map_id == "vael":
+		Game.note_vael_night()
 	close_tree()
 	if hud:
 		hud.release_all()
@@ -2217,6 +2219,8 @@ func _on_net_over(title: String, line: String, reached_dawn: bool) -> void:
 		Game.note_mists_win()
 		if world.last_light:
 			Game.note_last_light()
+		if world.map_id == "vael":
+			Game.note_vael_night()
 	if won:
 		Game.note_beyond_win()
 	line += _earned_line(Game.award_doubloons(world.director.elapsed, world.player.kills, won, not Net.pvp() and Net.humans() > 1))

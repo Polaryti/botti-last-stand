@@ -42,6 +42,7 @@ static func tree(class_id: String) -> Dictionary:
 			"cartographer": _cache[class_id] = _cartographer()
 			"harpooner": _cache[class_id] = _harpooner()
 			"tidecaller": _cache[class_id] = _tidecaller()
+			"ferryman": _cache[class_id] = _ferryman()
 	return _cache[class_id]
 
 
@@ -653,9 +654,9 @@ static func _harpooner() -> Dictionary:
 	], "specs": [
 		_spec("reaver", "Reaver", "Boards the fight: hauls them in, and the smell of blood keeps the Reaver on its feet.", navy,
 			a("reaver_entry", "Reaver", "Unlocks Blood in the Water, a second ability beside Haul: for 6 s every blow you land heals you 3, and you move 15% faster. What you Haul takes 30% more damage for 4 s", "drop+cutlass", {}, [], "art_blood"),
-			[[a("frenzy", "Frenzy", "Blood in the Water lasts 3 s longer", "drop+clock", {"blood_time": 3.0}),
+			[[a("reaver_frenzy", "Frenzy", "Blood in the Water lasts 3 s longer", "drop+clock", {"blood_time": 3.0}),
 			a("red_sails", "Red Sails", "Blood in the Water comes back 25% sooner", "drop+wind", {"path_cd": -0.25})],
-			[a("cutthroat", "Cutthroat", "+20% melee damage", "cutlass+up", {"melee_damage": 0.2}),
+			[a("reaver_cutthroat", "Cutthroat", "+20% melee damage", "cutlass+up", {"melee_damage": 0.2}),
 			a("sea_dog", "Sea Dog", "In Blood in the Water you take 15% less damage", "shield+drop", {}, [], "blood_guard")],
 			[a("keelhaul", "Keelhaul", "What you Haul in is stunned 1 s longer", "star+chain", {"haul_stun": 1.0}),
 			a("grapple_slam", "Grapple Slam", "Hauled to something too big to move, you land in a slam: 40 damage within 3 m", "quake+chain", {}, [], "haul_slam")],
@@ -676,7 +677,7 @@ static func _harpooner() -> Dictionary:
 		_spec("leviathan_hunter", "Leviathan Hunter", "Hunts the biggest things in the sea: marks its quarry for everyone, and throws the Great Harpoon.", navy,
 			a("leviathan_hunter_entry", "Leviathan Hunter", "Unlocks Great Harpoon, a second ability beside Haul: a heavy iron that flies through everything in its way for 90 damage, pinning each for 1.5 s, half as long for bosses. What your harpoons strike is marked for 8 s: it takes 20% more damage from everyone", "harpoon+target", {}, [], "art_great"),
 			[[a("whale_oil", "Whale Oil", "+30% damage to bosses and minibosses", "skull+up", {}, [], "big_game"),
-			a("steady_hands", "Steady Hands", "Your Whaler's Harpoon comes back 2 s sooner", "harpoon+clock", {"harpoon_back": -2.0})],
+			a("hunter_steady_hands", "Steady Hands", "Your Whaler's Harpoon comes back 2 s sooner", "harpoon+clock", {"harpoon_back": -2.0})],
 			[a("deep_wound", "Deep Wound", "What you mark bleeds for as long as the mark lasts", "drop+target", {}, [], "mark_bleed"),
 			a("long_mark", "Long Mark", "Marks last 4 s longer", "target+clock", {"mark_time": 4.0})],
 			[a("second_iron", "Second Iron", "Great Harpoon comes back 30% sooner", "harpoon+wind", {"path_cd": -0.3}),
@@ -691,7 +692,7 @@ static func _harpooner() -> Dictionary:
 static func _tidecaller() -> Dictionary:
 	var sea := Color(0.18, 0.66, 0.62)
 	return {"core": [
-		[a("deep_breath", "Deep Breath", "+25 tide", "wave+plus", {"mana": 25.0}),
+		[a("tide_deep_breath", "Deep Breath", "+25 tide", "wave+plus", {"mana": 25.0}),
 		a("salt_skin", "Salt Skin", "+20 max health", "heart+up", {"max_hp": 20.0})],
 		[a("rising_tide", "Rising Tide", "Tide rises 50% faster by itself", "wave+clock", {"mana_regen": 0.25}),
 		a("tidal_pull", "Tidal Pull", "Each kill draws 8 tide", "skull+wave", {}, [], "tidal_pull")],
@@ -731,4 +732,52 @@ static func _tidecaller() -> Dictionary:
 			[a("seafog", "Seafog", "Bind the Fog costs 30% less tide", "mist+feather", {"art_cost": -0.3}),
 			a("mistform", "Mistform", "15% chance to avoid any hit", "shield+mist", {"dodge": 0.15})]],
 			a("mistbound_sea", "Mistbound Sea", "The fog stays where it was bound for 8 s, and binds whatever walks into it", "mist+crown", {}, [], "fog_field")),
+	]}
+
+
+## The Ferryman has one ability button: Crossing, which a Tollkeeper and a Psychopomp trade for their
+## own and a Boatman makes greater (FerrymanKit).
+static func _ferryman() -> Dictionary:
+	var bone := Color(0.72, 0.68, 0.56)
+	return {"core": [
+		[a("grave_calm", "Grave Calm", "+25 max health", "heart+up", {"max_hp": 25.0}),
+		a("steady_oar", "Steady Oar", "+15% melee damage", "oar+up", {"melee_damage": 0.15})],
+		[a("far_shore", "Far Shore", "Crossing goes 4 m further", "skiff+up", {"cross_reach": 4.0}),
+		a("quick_oars", "Quick Oars", "Crossing comes back 25% sooner", "skiff+clock", {"art_cd": -0.25})],
+		[a("toll_bell", "Toll Bell", "What the skiff shoves aside is stunned for 0.5 s", "bell+skiff", {}, [], "cross_stun"),
+		a("ferrymans_due", "Ferryman's Due", "Each kill heals you 4", "heart+skull", {}, [], "ferry_due")],
+	], "specs": [
+		_spec("tollkeeper", "Tollkeeper", "Every soul pays for its passage: the Tollkeeper puts enemies in debt and collects from the dead.", bone,
+			a("tollkeeper_entry", "Tollkeeper", "Your ability becomes Demand the Toll: enemies within 7 m in front of you fall in debt for 8 s and take 25% more damage. Each that dies in debt pays you an obol: you heal 10, and each obol you hold makes your blows 5% harder, up to 5. You lose them when you fall", "coin", {}, [], "art_toll"),
+			[[a("heavy_purse", "Heavy Purse", "Hold up to 3 more obols", "coin+plus", {"obols": 3.0}),
+			a("bright_coin", "Bright Coin", "Each obol paid heals 6 more", "heart+coin", {"obol_heal": 6.0})],
+			[a("interest", "Interest", "Debt grows: enemies in debt take 4 damage a second", "coin+drop", {}, [], "interest"),
+			a("long_debt", "Long Debt", "Debts last 4 s longer", "coin+clock", {"debt_time": 4.0})],
+			[a("all_must_pay", "All Must Pay", "Demand the Toll reaches 3 m further, and all round you", "coin+up", {}, [], "toll_round"),
+			a("prompt_payment", "Prompt Payment", "Demand the Toll comes back 30% sooner", "bell+clock", {"art_cd": -0.3})],
+			[a("ledger", "The Ledger", "You see enemies in debt through anything", "eye+coin", {}, [], "debt_reveal"),
+			a("silver_tongue", "Silver Tongue", "Each obol you hold makes you 3% faster", "boot+coin", {}, [], "obol_speed")]],
+			a("debt_collector", "Debt Collector", "Your blows end anything in debt below 20% health", "coin+crown", {}, [], "debt_collector")),
+		_spec("boatman", "Boatman", "The skiff itself: it carries friends across, knocks enemies down and leaves black water behind.", bone,
+			a("boatman_entry", "Boatman", "Crossing carries friends within 3 m of you along with you, and knocks down what it passes for 1 s", "skiff+plus", {}, [], "carry"),
+			[[a("wide_hull", "Wide Hull", "The skiff strikes 1 m further either side of its path", "skiff+wind", {"cross_width": 1.0}),
+			a("ram", "Ram", "The skiff strikes 50% harder", "skiff+star", {"cross_damage": 0.5})],
+			[a("black_water", "Black Water", "The skiff leaves a wake of black water for 4 s: enemies in it are slowed", "skiff+drop", {}, [], "wake"),
+			a("ferry_fare", "Ferry Fare", "Each enemy the skiff passes heals you 4", "heart+skiff", {}, [], "cross_leech")],
+			[a("oarlock", "Oarlock", "After a Crossing, your next melee blow strikes twice as hard", "oar+star", {}, [], "oarlock"),
+			a("swift_current", "Swift Current", "Crossing comes back 30% sooner", "skiff+clock", {"art_cd": -0.3})],
+			[a("safe_passage", "Safe Passage", "After a Crossing you take 30% less damage for 2 s", "shield+skiff", {}, [], "safe_passage"),
+			a("long_pole", "Long Pole", "Crossing goes 4 m further", "skiff+up", {"cross_reach": 4.0})]],
+			a("the_last_ferry", "The Last Ferry", "After a Crossing, you may cross again at once, within 4 s", "skiff+crown", {}, [], "last_ferry")),
+		_spec("psychopomp", "Psychopomp", "Guides the dead: gathers the souls of those who fall nearby, and sends them on.", bone,
+			a("psychopomp_entry", "Psychopomp", "Every enemy that dies within 8 m of you leaves its soul circling you, up to 6. Your ability becomes Guide the Souls: they fly out at the nearest enemies for 20 damage each, or with none near, mend you 12 each", "soul", {}, [], "art_souls"),
+			[[a("many_souls", "Many Souls", "Up to 3 more souls", "soul+plus", {"souls": 3.0}),
+			a("bright_souls", "Bright Souls", "Souls strike 50% harder", "soul+star", {"soul_damage": 0.5})],
+			[a("soul_ward", "Soul Ward", "Each soul circling you takes 3% off the damage you take", "shield+soul", {}, [], "soul_ward"),
+			a("restless_dead", "Restless Dead", "The souls about you strike enemies within 2 m for 8 damage every second", "skull+soul", {}, [], "soul_aura")],
+			[a("reaping", "Reaping", "Your own kills leave 2 souls", "soul+skull", {}, [], "reaping"),
+			a("quick_release", "Quick Release", "Guide the Souls comes back 30% sooner", "soul+clock", {"art_cd": -0.3})],
+			[a("soul_last_rites", "Last Rites", "Souls that mend you also cure bleeding, poison and burning", "heart+soul", {}, [], "soul_cure"),
+			a("lantern_of_the_dead", "Lantern of the Dead", "+20 max health", "lantern+up", {"max_hp": 20.0})]],
+			a("gate_of_the_dead", "Gate of the Dead", "Falling with 6 souls about you, you come back at half health instead and they are spent. Once a minute", "soul+crown", {}, [], "gate")),
 	]}

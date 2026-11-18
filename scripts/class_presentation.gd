@@ -58,6 +58,10 @@ const COPY := {
 		"The sea comes when it is called.",
 		"Spend tide on waves that throw them back, and specialize in breakers, the drowned's song or binding fog."
 	],
+	"ferryman": [
+		"Every soul pays for its passage.",
+		"Cross the dark in a ghostly skiff, through them, and specialize in tolls, the ferry itself, or the souls of the dead."
+	],
 	"commander": [
 		"A single voice can turn the battle.",
 		"Use Command and unlock a profession-specific Last Command at level ten."

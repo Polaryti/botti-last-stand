@@ -2,7 +2,7 @@ extends Node
 ## The classes of the coast on the screens around a match: picked on the class picker, read in the
 ## Armory, and their skill trees opened in play, one profession after another.
 ##     godot --path . res://tests/sea_class_ui_shots.tscn -- OUT
-const CLASSES := ["harpooner", "tidecaller"]
+const CLASSES := ["harpooner", "tidecaller", "ferryman"]
 var out := ""
 var m: Main
 

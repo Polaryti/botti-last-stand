@@ -888,6 +888,46 @@ SOUNDS.update({
 })
 
 
+# --- The Ferryman ---------------------------------------------------------------------------------
+
+def crossing():
+    """Crossing: one long pull of an oar through still water, the skiff hissing over it, a lantern's creak."""
+    m = n(1.0)
+    tt = t_(m)
+    pull = band(noise(m), 200, 1400) * np.sin(np.pi * np.clip(tt / 0.6, 0, 1)) ** 1.5 * 0.7
+    glide = band(noise(m), 1800, 5200) * np.sin(np.pi * np.clip(tt / 1.0, 0, 1)) * 0.25
+    creak = np.sin(2 * np.pi * curve(m, (0, 420), (0.5, 380), (1, 400)).cumsum() / SR) * at(env(n(0.25), 0.02, 9), 0.55, 1.0) * 0.12
+    return reverb(pull + glide + creak + bubbles(m, 12, 300, 900, 0.05) * 0.4, 1.4, 0.4)
+
+
+def toll_bell():
+    """Demand the Toll: a single cracked iron bell, struck once, long and low."""
+    return reverb(harbour_bell(196, 3.0) * 0.8, 2.4, 0.45)
+
+
+def obol():
+    """An obol paid: a small silver coin dropped and ringing on stone."""
+    m = n(0.7)
+    v = np.zeros(m)
+    for k, (dt, g) in enumerate(((0.0, 1.0), (0.09, 0.6), (0.15, 0.4), (0.19, 0.25))):
+        v += at(glass(2400 + k * 70, 0.4) * g * 0.25, dt, 0.7)
+    return v
+
+
+def souls_go():
+    """Guide the Souls: a breath of many whispering voices rising and rushing away."""
+    m = n(1.4)
+    tt = t_(m)
+    v = np.zeros(m)
+    for f in (420, 530, 660, 790):
+        v += np.sin(2 * np.pi * curve(m, (0, f), (1, f * 1.6)).cumsum() / SR) * 0.05
+    whoosh = sweep_filter(noise(m), 600, 3400, 0.6) * bell_env(m, 1.2) * 0.6
+    return reverb((v + whoosh) * np.sin(np.pi * np.clip(tt / 1.4, 0, 1)), 1.8, 0.45)
+
+
+SOUNDS.update({"crossing": (crossing, 0.8), "toll_bell": (toll_bell, 0.8), "obol": (obol, 0.6), "souls_go": (souls_go, 0.75)})
+
+
 if __name__ == "__main__":
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
     for name, (make, gain) in SOUNDS.items():

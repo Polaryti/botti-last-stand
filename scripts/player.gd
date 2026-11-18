@@ -122,7 +122,8 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0,
 	"haul_range": 0.0, "haul_cd": 1.0, "haul_stun": 0.0, "path_cd": 1.0, "blood_time": 0.0, "line_time": 0.0, "lines": 0.0, "line_reach": 0.0,
 	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0,
-	"wave_damage": 0.0, "wave_range": 0.0, "song_reach": 0.0, "song_time": 0.0, "song_heal": 0.0, "fog_radius": 0.0, "fog_time": 0.0}
+	"wave_damage": 0.0, "wave_range": 0.0, "song_reach": 0.0, "song_time": 0.0, "song_heal": 0.0, "fog_radius": 0.0, "fog_time": 0.0,
+	"cross_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
@@ -1085,7 +1086,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if stone_ward:
 		_ward_breaks(attacker)
 		return
-	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0)
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0) * FerrymanKit.ward(self)
 	if Net.active():
 		# A Guardian nearby takes part of it.
 		var cover: Target = world.best_cover(global_position)
@@ -1249,7 +1250,85 @@ func haul_self_to(at: Vector3, stop: float) -> void:
 var hauled := {}
 var hunted := {}
 var waves_called := 0 # a Wavebreaker's waves, for Tsunami's every third
+# The Ferryman (FerrymanKit): the Crossing under way, a Tollkeeper's obols and debtors, a Psychopomp's
+# souls, and the timers of the Last Ferry and the Gate of the Dead.
+var obols := 0
+var debtors := {}
+var souls := 0
+var oarlock := false
+var second_trip_left := 0.0
+var death_gate_left := 0.0
+var _cross_t := -1.0
+var _cross_from := Vector3.ZERO
+var _cross_to := Vector3.ZERO
+var _cross_struck := {}
+var _soul_ring: SoulRing
+var _aura_tick := 0.0
+
+
+func start_cross(from: Vector3, to: Vector3) -> void:
+	_cross_from = from
+	_cross_to = to
+	_cross_t = 0.0
+	_cross_struck.clear()
+	guard_left = maxf(guard_left, FerrymanKit.CROSS_TIME)
+
+
+## The skiff glides over the ground, the Ferryman in it; whatever it passes is shoved aside.
+func _tick_cross(delta: float) -> void:
+	_cross_t += delta / FerrymanKit.CROSS_TIME
+	var f := minf(_cross_t, 1.0)
+	var at := _cross_from.lerp(_cross_to, f)
+	at.y = world.ground_at(at) + 0.3 + sin(f * PI) * 0.15
+	global_position = at
+	velocity = Vector3.ZERO
+	FerrymanKit.on_cross_step(self, _cross_from, at, _cross_struck)
+	if _cross_t >= 1.0:
+		_cross_t = -1.0
+		global_position = _cross_to + Vector3.UP * 0.04
+		_was_on_floor = true
+		_land_dip = 0.6
+		FerrymanKit.on_cross_end(self, _cross_from, _cross_to)
+
+
+func is_crossing() -> bool:
+	return _cross_t >= 0.0
+
+
+func set_souls(n: int) -> void:
+	if n == souls and (_soul_ring == null or _soul_ring.count == n):
+		return
+	souls = n
+	if _soul_ring == null and n > 0:
+		_soul_ring = SoulRing.new()
+		add_child(_soul_ring)
+	if _soul_ring:
+		_soul_ring.set_count(n)
+	if Net.active():
+		Net.souls(net_id(), n)
+
+
+func _tick_ferryman(delta: float) -> void:
+	second_trip_left = maxf(0.0, second_trip_left - delta)
+	death_gate_left = maxf(0.0, death_gate_left - delta)
+	if has_flag("obol_speed") and obols > 0:
+		_buffs["obol_speed"] = {"stat": "speed", "val": FerrymanKit.OBOL_SPEED * obols, "left": 0.3, "stacks": 1}
+	_aura_tick -= delta
+	if _aura_tick <= 0.0:
+		_aura_tick = 1.0
+		FerrymanKit.soul_aura(self)
 var slam_on_arrival := false
+
+
+## Carried by a friend's skiff, a Boatman's: moved with it to where it grounds.
+func carried_to(at: Vector3) -> void:
+	if dead or is_riding():
+		return
+	_drag_to = at
+	_drag_stop = 0.3
+	_drag_left = DRAG_MAX
+	guard_left = maxf(guard_left, FerrymanKit.CROSS_TIME)
+	say("Ferried!")
 
 
 ## Hauled in by a rival Harpooner's rope (from their phone).
@@ -1338,6 +1417,8 @@ func fog_hurt(amount: float) -> void:
 
 
 func _on_fatal() -> void:
+	if class_id == "ferryman" and FerrymanKit.gate_of_the_dead(self):
+		return
 	_kill()
 
 
@@ -1443,6 +1524,10 @@ func _kill() -> void:
 		return
 	hp = 0.0
 	dead = true
+	obols = 0
+	set_souls(0)
+	debtors.clear()
+	oarlock = false
 	input_fire = false
 	if is_riding():
 		dismount()
@@ -1860,6 +1945,8 @@ func _on_kill(z: Zombie) -> void:
 		HarpoonerKit.on_kill(self, z)
 	if class_id == "tidecaller":
 		TidecallerKit.on_kill(self)
+	if class_id == "ferryman":
+		FerrymanKit.on_kill(self, z)
 	fire("kill", {"z": z})
 	if _assassin_kill:
 		_assassin_kill = false
@@ -1900,6 +1987,8 @@ func modify_damage(z: Zombie, base: float) -> float:
 		dmg *= AbilityNumbers.PACK_TACTICS
 	if class_id == "harpooner":
 		dmg *= HarpoonerKit.damage_scale(self, z)
+	if class_id == "ferryman":
+		dmg *= FerrymanKit.blow_scale(self)
 	return dmg
 
 
@@ -2366,6 +2455,8 @@ func _familiar_mark(reach: float, need_sight: bool) -> Node3D:
 
 
 func _tick_ability_timers(delta: float) -> void:
+	if class_id == "ferryman":
+		_tick_ferryman(delta)
 	if _banner != null:
 		_banner.rotation.z = sin(world.now * (12.0 if _cast_kind == "command" else 2.0)) * (0.18 if _cast_kind == "command" else 0.025)
 	for key: String in _buffs.keys():
@@ -2476,6 +2567,8 @@ func art_def() -> Dictionary:
 		return HarpoonerKit.art(self)
 	if class_id == "tidecaller":
 		return TidecallerKit.art(self)
+	if class_id == "ferryman":
+		return FerrymanKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -2660,7 +2753,7 @@ func use_art() -> void:
 	mana -= art_cost()
 	# The Bandit's paths sharpen their own ability (on the second button), not Into the Shadows.
 	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * art_cd_scale())
-	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "tidecaller" if class_id == "tidecaller" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "tidecaller" if class_id == "tidecaller" else "ferryman" if class_id == "ferryman" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -3070,6 +3163,7 @@ func _tick_mist(delta: float) -> void:
 		"harpooner": HarpoonerKit.cast(self)
 		"harpooner_path": HarpoonerKit.cast_path(self)
 		"tidecaller": TidecallerKit.cast(self)
+		"ferryman": FerrymanKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -3470,7 +3564,7 @@ func decoy_burst(at: Vector3) -> void:
 func take_shared(amount: float) -> void:
 	if dead or guard_left > 0.0:
 		return
-	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (1.0 - minf(0.6, m("shield")))
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (1.0 - minf(0.6, m("shield"))) * FerrymanKit.ward(self)
 	hp -= dmg
 	hurt_flash = maxf(hurt_flash, 0.4)
 	sfx("block", -8.0, 1.0, 0.15)
@@ -3717,6 +3811,9 @@ func _physics_step(delta: float) -> void:
 		return
 	if ride_behind != 0:
 		_tick_seat(delta)
+		return
+	if _cross_t >= 0.0:
+		_tick_cross(delta)
 		return
 	if _leap_t >= 0.0:
 		_tick_leap(delta)
@@ -4354,6 +4451,8 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 	_ki_from_blow()
 	if d.has("tide") and class_id == "tidecaller":
 		TidecallerKit.on_trident_hit(self, z)
+	if class_id == "ferryman":
+		FerrymanKit.on_blow(self, z)
 	if stance == "flame":
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if has_flag("void_walker") and STANCES.has(stance):

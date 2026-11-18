@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 62
+const PROTOCOL := 63
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -64,7 +64,8 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	# Last Light
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
 	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
-	"call_tide", "tsunami", "deep_song", "bind_fog"]
+	"call_tide", "tsunami", "deep_song", "bind_fog",
+	"crossing", "toll_bell", "obol", "souls_go"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1688,6 +1689,89 @@ func _rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits
 	if world == null or not is_instance_valid(world) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > HarpoonerKit.RIG_REACH + 12.0:
 		return
 	world.rig_line(owner_peer, from, to, clampf(seconds, 1.0, 30.0), bits, clampi(keep, 1, HarpoonerKit.RIG_LINES + 1), cradle)
+
+
+# --- The Ferryman --------------------------------------------------------------------------------
+
+func _from_owner(owner_peer: int) -> bool:
+	var sender := multiplayer.get_remote_sender_id()
+	return (sender == owner_peer or (sender == 1 and is_bot(owner_peer))) and world != null and is_instance_valid(world)
+
+
+## A Ferryman's Crossing: every other phone sees the skiff glide.
+func crossing(owner_peer: int, from: Vector3, to: Vector3) -> void:
+	_crossing.rpc(owner_peer, from, to)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _crossing(owner_peer: int, from: Vector3, to: Vector3) -> void:
+	if not _from_owner(owner_peer) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > 30.0:
+		return
+	FerrySkiff.create(world, avatar(owner_peer), from, to, FerrymanKit.CROSS_TIME)
+
+
+## A Boatman's skiff carries a friend: their own phone (or the host, for a bot) moves them with it.
+func carried(peer: int, at: Vector3, by: int) -> void:
+	if peer == my_id() or (is_host() and is_bot(peer)):
+		_carried(peer, at, by)
+	else:
+		_carried.rpc(peer, at, by)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _carried(peer: int, at: Vector3, by: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != by and not (sender == 1 and is_bot(by)):
+		return
+	if not is_finite(at.x) or not is_finite(at.z) or bots_foes(by, peer):
+		return
+	var p := local_player(peer)
+	if p and (peer == my_id() or (is_host() and is_bot(peer))):
+		p.carried_to(at)
+
+
+## A Boatman's wake of black water, on every phone.
+func black_water(owner_peer: int, from: Vector3, to: Vector3, seconds: float) -> void:
+	_black_water.rpc(owner_peer, from, to, seconds)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _black_water(owner_peer: int, from: Vector3, to: Vector3, seconds: float) -> void:
+	if not _from_owner(owner_peer) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > 30.0:
+		return
+	world.black_water(owner_peer, from, to, clampf(seconds, 0.5, 10.0))
+
+
+## A Psychopomp's soul flying out: every other phone sees it go.
+func soul_bolt(owner_peer: int, target: Node3D, index: int) -> void:
+	if target is Zombie:
+		_soul_bolt.rpc(owner_peer, 0, (target as Zombie).net_id, index)
+	elif target is Target and world:
+		_soul_bolt.rpc(owner_peer, 1, world.peer_of(target as Target), index)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _soul_bolt(owner_peer: int, kind: int, id: int, index: int) -> void:
+	if not _from_owner(owner_peer):
+		return
+	var from := _body_of(1, owner_peer)
+	var to := _body_of(kind, id)
+	if from and to:
+		SoulBolt.create(world, from, to, clampi(index, 0, 12), false)
+
+
+## How many souls circle a Psychopomp, so their avatar shows them.
+func souls(owner_peer: int, count: int) -> void:
+	_souls.rpc(owner_peer, count)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _souls(owner_peer: int, count: int) -> void:
+	if not _from_owner(owner_peer):
+		return
+	var a := avatar(owner_peer)
+	if a:
+		a.set_souls(clampi(count, 0, 12))
 
 
 # --- The Tidecaller --------------------------------------------------------------------------------

@@ -36,6 +36,13 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 - **The Leviathan of the Mists** rises at the Isle of Lamps. Step out of its bite, outrun its waves, and keep near the barge when it spits the sea over it (the light shrinks to 6 m for 8 s). Defeat it, and the lighthouse burns again: that is the dawn.
 - Its own music (a pilgrims' hymn), sounds and map.
 
+### A new class: the Ferryman
+Earned by surviving 3 nights in Port Vael. 120 health; starts with the Ferryman's Oar.
+- **Crossing:** a ghostly skiff carries you 9 m ahead, through enemies: they are struck, shoved aside and slowed, and friends it passes are healed 15.
+- **Tollkeeper:** Demand the Toll puts enemies in front in debt for 8 s (25% more damage). Each that dies in debt pays an obol: heal 10, and 5% harder blows per obol, up to 5. At level 10, Debt Collector ends debtors below 20% health.
+- **Boatman:** the skiff carries friends with you and knocks down what it passes; Black Water, Oarlock, Safe Passage. At level 10, The Last Ferry: cross again at once.
+- **Psychopomp:** the souls of enemies dying near you circle you, up to 6. Guide the Souls sends them out for 20 damage each. At level 10, Gate of the Dead brings you back once a minute.
+
 ### A new class: the Tidecaller
 Earned by winning Last Light 3 times. 95 health; spends tide, which its own Trident draws (5 with every blow that lands) and which slowly rises by itself.
 - **Call the Tide:** a wave rolls 14 m ahead, throwing back and slowing what it strikes.

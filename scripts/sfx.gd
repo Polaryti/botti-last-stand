@@ -38,7 +38,8 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	# Last Light: the Leviathan of the Mists, a waystation's brazier, the lighthouse lit again
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
 	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
-	"call_tide", "tsunami", "deep_song", "bind_fog"]
+	"call_tide", "tsunami", "deep_song", "bind_fog",
+	"crossing", "toll_bell", "obol", "souls_go"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],
