@@ -37,6 +37,8 @@ var _lines: Array[Node3D] = []
 var _tick := 0.0
 var _star_clock := 0.0
 var _fall_clock := 0.0
+var _shower_n := -1 # Star Shower: the star falling next (of CrownUpgrades.SHOWER_STARS), or -1
+var _shower_clock := 0.0
 static var _glow: StandardMaterial3D
 static var _line_mat: StandardMaterial3D
 static var _star_line_mat: StandardMaterial3D
@@ -93,6 +95,11 @@ func add(at: Vector3, settings: Dictionary, yaw: float) -> void:
 	if owner_is_here():
 		world.show_ring(at, float(cfg.get("radius", CartographerKit.RADIUS)), Color(AZURE, 0.5))
 		world.sfx_at("beacon_plant", at, -3.0)
+		# Star Shower: a constellation closed with this stone brings stars down across it.
+		var who := owner_player()
+		if kind() == "stars" and closes_constellation(beacons.size() - 1) and who and who.has_item("star_shower"):
+			_shower_n = 0
+			_shower_clock = 0.35
 
 
 ## The Cartographer learned something: the beacons already standing work the new way too (a gate
@@ -142,6 +149,14 @@ func links() -> Array[Vector2i]:
 
 
 ## Three stones, each linked to the other two.
+## Whether the beacon at i is a corner of a constellation.
+func closes_constellation(i: int) -> bool:
+	for tri in triangles():
+		if tri.x == i or tri.y == i or tri.z == i:
+			return true
+	return false
+
+
 func triangles() -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
 	if kind() != "stars":
@@ -199,6 +214,14 @@ func _physics_process(delta: float) -> void:
 	if _tick <= 0.0:
 		_tick = TICK
 		_mark()
+	if _shower_n >= 0:
+		_shower_clock -= delta
+		if _shower_clock <= 0.0:
+			_shower_clock = CrownUpgrades.SHOWER_EVERY
+			CrownUpgrades.shower_star(self, CrownUpgrades.shower_spot(self, _shower_n), owner_player())
+			_shower_n += 1
+			if _shower_n >= CrownUpgrades.SHOWER_STARS:
+				_shower_n = -1
 	if kind() == "stars":
 		_stars(delta)
 	elif kind() == "gates" and has("rift_road") and (Net.is_host() or not Net.active()):
@@ -267,7 +290,7 @@ func _starlight() -> void:
 	var who := owner_player() if dealing else null
 	var dmg := float(cfg.get("power", CartographerKit.STAR_DAMAGE))
 	var struck := 0
-	for z: Zombie in _zombies_in_sky():
+	for z: Zombie in creatures_starlit():
 		show_starlight(world, z.position, z.centre().y - z.position.y)
 		struck += 1
 		if dealing:
@@ -288,7 +311,7 @@ func _starlight() -> void:
 		world.sfx_at("starlight", _centre(), -6.0)
 
 
-func _zombies_in_sky() -> Array[Zombie]:
+func creatures_starlit() -> Array[Zombie]:
 	var out: Array[Zombie] = []
 	for z: Zombie in world.zombies_near(_centre(), _span() + 2.0, 40):
 		if z.is_alive() and starlit(z.position):
@@ -299,7 +322,7 @@ func _zombies_in_sky() -> Array[Zombie]:
 ## The toughest creature under the stars has one fall on it.
 func _falling_star() -> void:
 	var best: Zombie = null
-	for z: Zombie in _zombies_in_sky():
+	for z: Zombie in creatures_starlit():
 		if best == null or z.max_hp > best.max_hp:
 			best = z
 	if best == null:
@@ -653,6 +676,31 @@ func _post(at: Vector3, yaw: float) -> Node3D:
 	light.omni_range = 5.0
 	light.position.y = _lamp_height()
 	root.add_child(light)
+	return root
+
+
+## A marker as the Store's scenes show it (CrownScenes): the body, its lamp, and a Waygate's swirl,
+## without the lights and the pillar a night gives it.
+static func marker_model(k: String) -> Node3D:
+	var root := Node3D.new()
+	var body := MeshInstance3D.new()
+	body.mesh = _body_mesh(k)
+	root.add_child(body)
+	var lamp := MeshInstance3D.new()
+	lamp.mesh = _lamp_mesh(k)
+	lamp.material_override = _glow_material()
+	root.add_child(lamp)
+	if k == "gates":
+		var swirl := MeshInstance3D.new()
+		var disc := QuadMesh.new()
+		disc.size = Vector2(1.3, 1.9)
+		swirl.mesh = disc
+		swirl.material_override = _portal_material()
+		swirl.position = Vector3(0, 1.05, 0)
+		swirl.name = "Swirl"
+		root.add_child(swirl)
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
+		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return root
 
 

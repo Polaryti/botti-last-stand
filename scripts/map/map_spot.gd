@@ -14,8 +14,13 @@ extends MapPiece
 ## step out of the mist, and post where they wait before the gate.
 ## barge: a point of the Lantern Barge's course on the Lantern Road (Last Light), numbered in order by
 ## gate.
+## The Trappers' Guild of the Valleys (TrappersGuild): snare, the middle of a line of snares running
+## along the spot's X, with gate snares in it; hunter, where a Lodge hunter stands guard (gate 2: where
+## the towers' hunters fall back to when the camp is lost; gate 4: the fallback camp's own); trap_cache,
+## where the hunters leave a cache (gate 0 by the camp's fire, gate 1 once the camp is lost);
+## guild_camp, the fallback camp's fire.
 
-@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way", "barge") var kind := "loot":
+@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way", "barge", "snare", "hunter", "trap_cache", "guild_camp") var kind := "loot":
 	set(v):
 		kind = v
 		refresh()
@@ -45,6 +50,7 @@ func build(b: MapBuilder) -> void:
 		"dummy": b.w.dummy_spots.append(at)
 		"place": b.w.map_marks.append({"name": text, "at": Vector2(at.x, at.z)})
 		"lane", "lane_way", "muster", "post", "barge": b.w.lane_marks.append({"kind": kind, "gate": gate, "at": at})
+		"snare", "hunter", "trap_cache", "guild_camp": b.w.guild_marks.append({"kind": kind, "gate": gate, "at": at, "yaw": b.xf.basis.get_euler().y})
 		"weapon", "item", "familiar": b.w.stands.append({"kind": kind, "at": at, "yaw": b.xf.basis.get_euler().y})
 	if b.is_preview:
 		b.w.show_spot(kind, text, at)

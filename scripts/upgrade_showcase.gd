@@ -8,7 +8,7 @@ extends Node3D
 ## side it is best seen from.
 
 ## Each scene and how long one round of it lasts.
-## (The other paths' upgrades are PathScenes, played on this same stage.)
+## (The other paths' upgrades are PathScenes and CrownScenes, played on this same stage.)
 const LOOP := {"lance_charge": 3.2, "consecration": 3.6, "grave_call": 3.8, "frost_nova": 3.4,
 	"hall_of_mirrors": 3.4, "stag_steed": 4.0, "mount_horse": 4.0}
 const RIDE_HEIGHT := 2.5 # a rider on a horse, from the hooves to the top of the head
@@ -28,13 +28,15 @@ var _played := {} # the last animation asked of each AnimationPlayer, so a loop 
 
 
 static func shows(id: String) -> bool:
-	return LOOP.has(id) or PathScenes.LOOP.has(id)
+	return LOOP.has(id) or PathScenes.LOOP.has(id) or CrownScenes.LOOP.has(id)
 
 
 ## How tall the stage must be to hold the scene.
 static func stage_height(id: String) -> float:
 	if PathScenes.LOOP.has(id):
 		return PathScenes.stage_height(id)
+	if CrownScenes.LOOP.has(id):
+		return CrownScenes.stage_height(id)
 	match id:
 		"lance_charge": return 3.1
 		"stag_steed", "mount_horse", "consecration": return 3.0
@@ -47,6 +49,8 @@ static func stage_height(id: String) -> float:
 static func camera_tilt(id: String) -> float:
 	if PathScenes.LOOP.has(id):
 		return PathScenes.camera_tilt(id)
+	if CrownScenes.LOOP.has(id):
+		return CrownScenes.camera_tilt(id)
 	match id:
 		"grave_call", "consecration", "frost_nova", "hall_of_mirrors": return 0.24
 		"lance_charge": return 0.08
@@ -57,6 +61,8 @@ static func camera_tilt(id: String) -> float:
 static func view_turn(id: String) -> float:
 	if PathScenes.LOOP.has(id):
 		return PathScenes.view_turn(id)
+	if CrownScenes.LOOP.has(id):
+		return CrownScenes.view_turn(id)
 	match id:
 		"lance_charge": return PI * 0.5 + 0.38 # side on, riding to the left
 		"stag_steed", "mount_horse": return PI * 0.5 + 0.5
@@ -69,6 +75,10 @@ func configure(id: String) -> void:
 	if PathScenes.LOOP.has(id):
 		_length = PathScenes.LOOP[id]
 		PathScenes.build(self, id)
+		return
+	if CrownScenes.LOOP.has(id):
+		_length = CrownScenes.LOOP[id]
+		CrownScenes.build(self, id)
 		return
 	_length = LOOP[id]
 	_ground_shadow(1.0 if id in ["stag_steed", "mount_horse", "lance_charge"] else 0.6)
@@ -87,6 +97,9 @@ func _process(delta: float) -> void:
 	var t := fmod(clock, _length)
 	if PathScenes.LOOP.has(item):
 		PathScenes.play(self, item, t)
+		return
+	if CrownScenes.LOOP.has(item):
+		CrownScenes.play(self, item, t)
 		return
 	match item:
 		"lance_charge": _charge(t, delta)

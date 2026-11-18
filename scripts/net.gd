@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 63
+const PROTOCOL := 64
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -65,7 +65,9 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
 	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
 	"call_tide", "tsunami", "deep_song", "bind_fog",
-	"crossing", "toll_bell", "obol", "souls_go"]
+	"crossing", "toll_bell", "obol", "souls_go",
+	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
+	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1879,6 +1881,32 @@ func path_field(owner_peer: int, kind: String, at: Vector3) -> void:
 func _path_field(owner_peer: int, kind: String, at: Vector3) -> void:
 	if world and is_instance_valid(world) and PathField.KINDS.has(kind):
 		world.spawn_path_field(owner_peer, kind, at)
+
+
+## A snare of the Trappers' Guild sprung, told by the host to the other phones.
+func snare(i: int) -> void:
+	if is_host():
+		_snare.rpc(i)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _snare(i: int) -> void:
+	if world and is_instance_valid(world) and world.guild:
+		world.guild.spring_snare(i)
+
+
+## A Mercenary's Contract, shown over its creature on every phone.
+func contract(z: Zombie, secs: float) -> void:
+	if z.net_id >= 0:
+		_contract.rpc(z.net_id, clampf(secs, 0.0, 30.0))
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _contract(net_id: int, secs: float) -> void:
+	if world and is_instance_valid(world):
+		var z: Zombie = world.zombie_by_id(net_id)
+		if z:
+			world.show_contract(z, clampf(secs, 0.0, 30.0))
 
 
 func rat_tide(from: Vector3, dir: Vector3) -> void:

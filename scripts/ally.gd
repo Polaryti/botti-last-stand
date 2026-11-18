@@ -9,14 +9,16 @@ extends Target
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
 const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0,
-	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0}
+	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0, "lodge_hunter": 90.0}
 const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger",
-	"mist_infantry", "mist_ranger", "mist_heavy"] # new kinds go at the end: their index travels between phones
+	"mist_infantry", "mist_ranger", "mist_heavy", "lodge_hunter"] # new kinds go at the end: their index travels between phones
 ## Mist Bastion's garrison: who they are, what they hit for (a weapon blow is 1) and how far from
 ## their post they will go after an enemy.
-const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy"]
+## The Lodge hunters of the Trappers' Guild (TrappersGuild) keep watch the same way, bow in hand.
+const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy", "lodge_hunter"]
+const ARCHERS := ["mist_ranger", "lodge_hunter"] # the garrison's bowmen: they shoot from where they stand
 const GARRISON_BLOW := {"mist_infantry": 0.65, "mist_heavy": 1.04}
-const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2}
+const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2, "lodge_hunter": 5.4}
 const GARRISON_SIGHT := 18.0
 const GARRISON_THERE := 1.5 # metres from a spot a Mist Soldier walking to it counts as there
 const GARRISON_LEASH := 16.0
@@ -125,7 +127,7 @@ func _init(owner_world: World, ally_kind: String) -> void:
 		_build_beast(_visual_root())
 		return
 	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever", "ranger": "clever",
-		"mist_infantry": "clever", "mist_ranger": "clever", "mist_heavy": "beast"}.get(ally_kind, "skeleton")
+		"mist_infantry": "clever", "mist_ranger": "clever", "mist_heavy": "beast", "lodge_hunter": "clever"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
 		_scenes[model] = load("res://assets/characters/%s.glb" % model)
 	_visual = (_scenes[model] as PackedScene).instantiate()
@@ -168,7 +170,7 @@ func activate(seconds: float) -> void:
 	arrow_kind = ""
 	net_hand = 0
 	_close_foe = null
-	if kind == "mist_ranger":
+	if kind in ARCHERS:
 		arm("bow")
 		_lean = 0.0
 		if _visual:
@@ -376,7 +378,7 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, net_yaw, minf(1.0, delta * 9.0))
 		var moving := was.distance_squared_to(global_position) > 0.000004
 		_attack_left = 0.25 if net_biting else 0.0
-		if kind == "mist_ranger":
+		if kind in ARCHERS:
 			arm(HANDS[net_hand])
 			_tick_lean(delta)
 			if hand == "crossbow":
@@ -524,7 +526,10 @@ func _tick_garrison(delta: float) -> void:
 	if _foe and not _foe.is_alive():
 		_foe = null
 	if perch != Vector3.INF:
-		_tick_perch(delta)
+		if kind == "lodge_hunter":
+			_tick_watch(delta)
+		else:
+			_tick_perch(delta)
 		return
 	var home := _garrison_home()
 	var fort := world.fort
@@ -544,7 +549,7 @@ func _tick_garrison(delta: float) -> void:
 	if _foe:
 		var to := _foe.position - position
 		to.y = 0.0
-		if kind == "mist_ranger":
+		if kind in ARCHERS:
 			if _cooldown <= 0.0:
 				_cooldown = 1.1
 				world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power())
@@ -625,6 +630,31 @@ func _tick_perch(delta: float) -> void:
 		_play(_shoot_anim(), 1.0 if close else 1.5)
 
 
+## A Lodge hunter keeping watch from a tower (TrappersGuild): it stays up there and shoots its Long
+## Bow at the nearest creature it can see within PERCH_REACH.
+func _tick_watch(_delta: float) -> void:
+	global_position = perch
+	velocity = Vector3.ZERO
+	if _think <= 0.0:
+		_think = 0.3
+		_foe = world.nearest_zombie(global_position + Vector3.UP, PERCH_REACH, true)
+		if _foe and not world.has_line_of_sight(global_position + Vector3.UP * 1.4, _foe.centre()):
+			_foe = null
+	arm("longbow")
+	if _foe == null or not _foe.is_alive():
+		if _attack_left <= 0.0:
+			_play("Idle")
+		return
+	var to := _foe.position - position
+	rotation.y = atan2(to.x, to.z)
+	if _cooldown <= 0.0:
+		_cooldown = LONGBOW_EVERY
+		world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * LONGBOW_SHOT * _garrison_power(), "", "longbow")
+		_attack_left = 0.35
+		_current = ""
+		_play(_shoot_anim(), 1.5)
+
+
 ## Where a Ranger on a gate shoots down from: leaning out beyond the parapet.
 func _lean_point() -> Vector3:
 	return perch + perch_out * LEAN_OUT + Vector3.UP * 1.0
@@ -652,7 +682,7 @@ func _foe_below() -> Zombie:
 func _shoot_anim() -> String:
 	if hand == "crossbow":
 		return "CrossbowDown"
-	return "2H_Ranged_Shoot" if kind in ["ranger", "mist_ranger"] else "Spellcast_Shoot"
+	return "2H_Ranged_Shoot" if kind in ["ranger", "mist_ranger", "lodge_hunter"] else "Spellcast_Shoot"
 
 
 ## Holds this bow in its hand; on a gate, the other one is slung on its back. With the Crossbow it
@@ -790,7 +820,7 @@ func _equip_retinue() -> void:
 	var attachment := BoneAttachment3D.new()
 	attachment.bone_name = bone
 	skeleton.add_child(attachment)
-	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind in ["ranger", "mist_ranger"] else "battleaxe" if kind == "mist_heavy" else "sword"
+	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind in ["ranger", "mist_ranger", "lodge_hunter"] else "battleaxe" if kind == "mist_heavy" else "sword"
 	var held: MeshInstance3D
 	if weapon == "bow":
 		# Bows (and a gate's Crossbow) at a player's size, one in the hand at a time.

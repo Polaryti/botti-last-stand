@@ -31,6 +31,7 @@ static var _arrow_mesh: Mesh
 static var _stone_mesh: Mesh
 static var _pellet_mesh: Mesh
 static var _keg_mesh: Mesh
+static var _shard_mesh: Mesh
 var _ember_spark_mat: StandardMaterial3D
 static var _fireball_mesh: Mesh
 static var _bolt_mesh: ArrayMesh
@@ -70,6 +71,8 @@ var dummy_spots: Array[Vector3] = []
 var rival_spots: Array[Vector3] = []
 ## On a stronghold with lanes: {kind: lane, muster or post, gate, at} (see MapSpot).
 var lane_marks: Array[Dictionary] = []
+var guild_marks: Array[Dictionary] = [] # the Trappers' Guild's places on the Valleys (MapSpot)
+var guild: TrappersGuild
 ## Mist Bastion's Mist Soldiers (null on every other map).
 var garrison: Garrison
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
@@ -113,6 +116,8 @@ var _tide_fog := 1.0 # how much thicker the tide makes the fog
 var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
 var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
 var camp_fallen := false # the Valleys' camp, shelled and lost to the mist
+var fallen_camp := Vector3.INF # where it was, and how far it reached (w: radius)
+var fallen_radius := 0.0
 const PICKUP_APART := 6.0
 const WOOD_GATE_CLEARANCE := 18.0 # forest wood: out of the gates' approaches
 const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itself
@@ -359,6 +364,11 @@ func setup(game_mode: int) -> void:
 		garrison = Garrison.new(self)
 		for kind: String in Garrison.ORDER:
 			prepare_allies(kind, 3)
+	if TrappersGuild.wanted(self):
+		guild = TrappersGuild.new(self, ShopDefs.map_upgrade_level(TrappersGuild.ID))
+		add_child(guild)
+		if guild.level >= 2:
+			prepare_allies("lodge_hunter", 4 if guild.level >= 4 else 2)
 	player = Player.new(self)
 	add_child(player)
 	var start: Vector3 = start_spots[0] if not start_spots.is_empty() else Vector3.ZERO
@@ -442,6 +452,8 @@ func fall_camp(centre: Vector3, radius: float) -> void:
 	if camp_fallen:
 		return
 	camp_fallen = true
+	fallen_camp = centre
+	fallen_radius = radius
 	for tower: Dictionary in watchtowers:
 		var at: Vector3 = tower["at"]
 		if not tower.get("ruined", false) and Vector2(at.x - centre.x, at.z - centre.z).length() <= radius + 4.0:
@@ -1713,6 +1725,14 @@ func _shot_mesh(id: String) -> Mesh:
 				l.box(Vector3(0.035, 0.235, 0), Vector3(0.035, 0.035, 0.035), Color(1.0, 0.75, 0.25))
 				_keg_mesh = l.commit()
 			return _keg_mesh
+		"shard":
+			# Shattered Mirror: a long sliver of silvered glass, pale blue at its bright edge.
+			if _shard_mesh == null:
+				var l := LowPoly.new()
+				l.prism(Vector3(0, 0, 0.16), Vector3(0, 0, -0.2), 0.045, 0.0, 3, Color(0.78, 0.92, 1.0))
+				l.prism(Vector3(0, 0, 0.16), Vector3(0, 0, 0.22), 0.045, 0.02, 3, Color(0.55, 0.7, 0.85))
+				_shard_mesh = l.commit()
+			return _shard_mesh
 		"pellet":
 			# Grapeshot: a lump of hot iron, a little star of two crossed cubes glowing like a coal.
 			if _pellet_mesh == null:
@@ -1759,7 +1779,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(6 if look == "pellet" else 8 if kind == "harpoon" else 9 if kind == "flare" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+			Net.shot(6 if look == "pellet" else 11 if look == "shard" else 8 if kind == "harpoon" else 9 if kind == "flare" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
 	return shot
 
 
@@ -1870,7 +1890,7 @@ func remove_rig_line(line: RigLine) -> void:
 
 
 ## A Highwayman's thrown knife.
-func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float, bounce: int, bleed: bool, slows: bool, close: bool) -> void:
+func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float, bounce: int, bleed: bool, slows: bool, close: bool, toll := false) -> void:
 	var shot := _launch(Projectile.Kind.ARROW, WeaponDefs.mesh("dagger"), at, vel, 0.0, max_range, dmg, 1.0, false, bounce)
 	if shot == null:
 		return
@@ -1884,8 +1904,12 @@ func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: fl
 		shot.slow_secs = AbilityNumbers.FAN_SLOW
 	if close:
 		shot.close_from = at
+	if toll:
+		# The Toll: the knife pins what it strikes, and gleams gold as it flies.
+		shot.pins = CrownUpgrades.TOLL_PIN
+		shot.toll = true
 	if Net.active():
-		Net.shot(4, at, vel, 0.0, max_range, false, Color.WHITE)
+		Net.shot(4, at, vel, 0.0, max_range, false, CrownUpgrades.COIN if toll else Color.WHITE)
 
 
 ## A Mercenary's Nightfall, on this phone.
@@ -1900,6 +1924,25 @@ func plant_beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> 
 	at.y = ground_at(at)
 	survey.add(at, cfg, yaw)
 	return survey
+
+
+## A Cartographer's beacons, if it has any standing, else null.
+func survey_of(owner_peer: int) -> SurveyNet:
+	var found: Variant = surveys.get(owner_peer)
+	return found if found != null and is_instance_valid(found) else null
+
+
+## A Mercenary's Contract on a creature, as this phone shows it: a gold seal turning over its head.
+func show_contract(z: Zombie, secs: float) -> void:
+	if z == null or not z.is_alive():
+		return
+	var old := z.get_node_or_null("ContractSeal")
+	if old:
+		old.queue_free()
+	var seal := ContractSeal.new(z, secs)
+	seal.name = "ContractSeal"
+	z.add_child(seal)
+	sfx_at("contract_seal", z.position, -3.0)
 
 
 ## A Cartographer's beacons take up its new settings.
@@ -1923,7 +1966,14 @@ func spawn_path_field(owner_peer: int, kind: String, at: Vector3) -> PathField:
 	at.y = ground_at(at)
 	var f := PathField.new(self, owner_peer, kind, at)
 	add_child(f)
+	if kind == "blaze":
+		# A trail mark points on from the one before it, on every phone alike.
+		var last: Variant = _last_blaze.get(owner_peer)
+		if last != null and (last as Vector3).distance_to(at) < CrownUpgrades.BLAZE_GAP * 2.5:
+			f.turn_to(at - (last as Vector3))
+		_last_blaze[owner_peer] = at
 	return f
+var _last_blaze := {} # peer -> where that Pathfinder's last trail mark went down
 
 
 ## A Rat King's Rat Tide, as seen on this phone.
@@ -2511,6 +2561,8 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = WeaponDefs.flare_mesh()
 	elif mesh == 10:
 		m = great_harpoon_mesh()
+	elif mesh == 11:
+		m = _shot_mesh("shard")
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
@@ -2519,6 +2571,7 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		shot.spins = mesh == 3 or mesh == 4 or mesh == 5 or mesh == 7
 		if mesh == 4:
 			shot.spin_axis = Vector3.RIGHT
+			shot.toll = col.is_equal_approx(CrownUpgrades.COIN)
 		if mesh == 0 and col.g > col.r + 0.3:
 			shot.poison_trail = true
 

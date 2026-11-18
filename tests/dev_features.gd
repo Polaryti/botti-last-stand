@@ -839,7 +839,7 @@ func _together_store_and_dawn() -> void:
 	var knob := m.panel.find_child("MapSwitch_mist_reinforcements", true, false) as Button
 	check(m.panel.find_child("MapUpgradesRow", true, false) != null and knob != null and (knob.find_child("Switch", true, false) as UiSwitch).on, "the Armory has a Map Upgrades section, with an On switch for Mist Reinforcements")
 	var level_lines: Array = m.panel.find_children("*", "Label", true, false).filter(func(l: Label) -> bool: return l.text.begins_with("Level "))
-	check(level_lines.size() == ShopDefs.MAP_LEVELS, "it lists all %d levels" % ShopDefs.MAP_LEVELS)
+	check(level_lines.size() == ShopDefs.MAP_LEVELS * ShopDefs.in_section("maps").size(), "it lists all %d levels of each Map Upgrade (%d lines)" % [ShopDefs.MAP_LEVELS, level_lines.size()])
 	knob.pressed.emit()
 	check(not Game.item_active("mist_reinforcements") and Game.owns_item("mist_reinforcements") and not (knob.find_child("Switch", true, false) as UiSwitch).on and Game.map_upgrades_on().is_empty(), "switched Off there, it stays owned but you do not bring it")
 	knob.pressed.emit()

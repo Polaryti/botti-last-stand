@@ -928,6 +928,102 @@ def souls_go():
 SOUNDS.update({"crossing": (crossing, 0.8), "toll_bell": (toll_bell, 0.8), "obol": (obol, 0.6), "souls_go": (souls_go, 0.75)})
 
 
+# --- Stage 6: Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild -----
+
+def mirror_shatter():
+    """Shattered Mirror: a pane of glass bursting, bright shards ringing as they fly."""
+    m = n(0.9)
+    crack = highp(noise(m), 2500) * env(m, 0.001, 18.0) * 0.7
+    v = np.zeros(m)
+    for k in range(9):
+        f = rng.uniform(2600, 5200)
+        v += at(glass(f, 0.5, 7.0) * rng.uniform(0.08, 0.2), rng.uniform(0.0, 0.25), 0.9)
+    return reverb(crack + v, 1.0, 0.3)
+
+
+def encore():
+    """Encore: the blade ringing out wide, with a low swell under it as everything is thrown down."""
+    m = n(0.9)
+    tt = t_(m)
+    whoosh = sweep_filter(noise(m), 400, 3000, 0.35) * bell_env(m, 1.4) * 0.6
+    ring = metal(1650, 9, 0.9) * env(m, 0.05, 3.5) * 0.12
+    swell = np.sin(2 * np.pi * curve(m, (0, 90), (1, 60)).cumsum() / SR) * np.sin(np.pi * np.clip(tt / 0.9, 0, 1)) * 0.25
+    return reverb(whoosh + ring + swell, 1.2, 0.35)
+
+
+def rift_open():
+    """Event Horizon: a deep tearing hum as the rift opens and starts to draw everything in."""
+    m = n(1.6)
+    tt = t_(m)
+    hum = sum(np.sin(2 * np.pi * curve(m, (0, f), (1, f * 0.8)).cumsum() / SR) * a for f, a in ((55, 0.35), (82, 0.2), (110, 0.1)))
+    tear = sweep_filter(noise(m), 3000, 300, 0.7) * env(m, 0.01, 2.2) * 0.5
+    suck = sweep_filter(noise(m), 200, 1600, 0.5) * np.clip(tt / 1.6, 0, 1) * 0.25
+    return reverb((hum * np.sin(np.pi * np.clip(tt / 1.6, 0, 1)) + tear + suck), 1.8, 0.45)
+
+
+def rift_collapse():
+    """The horizon falls in on itself: a sharp inward rush, then a heavy, muffled boom."""
+    m = n(1.2)
+    rush = sweep_filter(noise(m), 4000, 200, 0.2) * at(env(n(0.25), 0.2, 1.0), 0.0, 1.2) * 0.6
+    boom = thud(m, 0.22, 1.2, 70)
+    return reverb(rush + boom, 1.5, 0.4)
+
+
+def coin_flip():
+    """Lucky Fingers: a coin thumbed into the air, spinning, and caught."""
+    m = n(0.6)
+    flick = at(metal(3600, 60, 0.05) * 0.4, 0.0, 0.6)
+    spin = np.zeros(m)
+    for k in range(7):
+        spin += at(glass(2900 + k * 25, 0.12, 9.0) * 0.08 * (1 - k / 8), 0.04 + k * 0.045, 0.6)
+    catch = at(band(noise(n(0.04)), 800, 3000) * env(n(0.04), 0.001, 30.0) * 0.5, 0.42, 0.6)
+    return flick + spin + catch
+
+
+def contract_seal():
+    """Contract: a seal pressed into warm wax and a purse of coin shaken once, low and certain."""
+    m = n(1.0)
+    press = thud(m, 0.02, 0.6, 140) * 0.8
+    v = np.zeros(m)
+    for k in range(6):
+        v += at(metal(rng.uniform(2400, 3400), 50, 0.12) * 0.07, 0.18 + k * 0.035 + rng.uniform(0, 0.015), 1.0)
+    low = np.sin(2 * np.pi * 98 * t_(m)) * env(m, 0.02, 3.0) * 0.12
+    return reverb(press + v + low, 1.2, 0.35)
+
+
+def snare_snap():
+    """A trapper's snare sprung: a sapling whipping up and the noose snapping tight."""
+    m = n(0.5)
+    whip = sweep_filter(noise(m), 500, 2600, 0.12) * env(m, 0.005, 9.0) * 0.6
+    snap = at(band(noise(n(0.03)), 1200, 5000) * env(n(0.03), 0.001, 40.0), 0.08, 0.5)
+    creak = np.sin(2 * np.pi * curve(m, (0, 300), (1, 240)).cumsum() / SR) * at(env(n(0.2), 0.02, 10), 0.1, 0.5) * 0.1
+    return whip + snap + creak
+
+
+def trapper_horn():
+    """The Trappers' Guild arrives: a hunting horn of the Valleys, two long notes from the woods."""
+    m = n(2.4)
+    v = np.zeros(m)
+    for start, f, d in ((0.0, 196, 0.9), (1.0, 262, 1.3)):
+        k = n(d)
+        tt = t_(k)
+        note = sum(np.sin(2 * np.pi * f * h * tt) * a for h, a in ((1, 1), (2, 0.5), (3, 0.3), (4, 0.15)))
+        note *= np.minimum(1, tt / 0.12) * np.exp(-np.maximum(0, tt - d * 0.6) * 4)
+        v += at(lowp(note, 1800) * 0.25, start, 2.4)
+    return reverb(v, 2.2, 0.5)
+
+
+def cache_drop():
+    """A hunters' cache set down: a pack thumped onto the ground, its straps and tins settling."""
+    m = n(0.6)
+    return thud(m, 0.02, 0.9, 120) + at(metal(1800, 45, 0.15) * 0.06, 0.08, 0.6) + at(band(noise(n(0.15)), 600, 2400) * env(n(0.15), 0.01, 12) * 0.2, 0.05, 0.6)
+
+
+SOUNDS.update({"mirror_shatter": (mirror_shatter, 0.75), "encore": (encore, 0.75), "rift_open": (rift_open, 0.75), "rift_collapse": (rift_collapse, 0.8),
+               "coin_flip": (coin_flip, 0.6), "contract_seal": (contract_seal, 0.7), "snare_snap": (snare_snap, 0.75), "trapper_horn": (trapper_horn, 0.7),
+               "cache_drop": (cache_drop, 0.7)})
+
+
 if __name__ == "__main__":
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
     for name, (make, gain) in SOUNDS.items():

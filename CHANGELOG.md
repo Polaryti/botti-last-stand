@@ -36,6 +36,26 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 - **The Leviathan of the Mists** rises at the Isle of Lamps. Step out of its bite, outrun its waves, and keep near the barge when it spits the sea over it (the light shrinks to 6 m for 8 s). Defeat it, and the lighthouse burns again: that is the dawn.
 - Its own music (a pilgrims' hymn), sounds and map.
 
+### Class Upgrades for the Adept, the Cartographer and the Bandit
+One for each path, in the Store.
+- **Encore** (Blade Dancer): every third stance change, the sweep reaches 2 m further, strikes 50% harder and knocks everything down for 0.8 s.
+- **Shattered Mirror** (Mirror Step): an undone hit sends 6 shards at the nearest enemies within 10 m, 25 damage each, and they bleed.
+- **Event Horizon** (Void Walker): leaving Void stance opens a rift for 4 s that draws enemies in and hurts them, then falls in for 60.
+- **Star Shower** (Star Reader): a stone that closes a constellation brings 5 stars down across it, 40 damage each.
+- **Open Door** (Worlds Traveler): a hit that would leave you under 30% health is never taken: you step out of your farthest Waygate instead. Once a minute.
+- **Trailblazer** (Pathfinder): stakes along your way; friends on the trail move 20% faster, enemies on it are slowed.
+- **Lucky Fingers** (Thief): every Steal picks a pocket; every fourth is ready again at once.
+- **Contract** (Mercenary): Nightfall names the toughest creature inside; it takes 50% more, and its death heals everyone inside and brings Nightfall back sooner.
+- **Toll Road** (Highwayman): every third Dagger Fan pins what it hits, and what dies pinned always leaves plunder.
+- The second ability button now shows the marks counting to its special use.
+
+### The Trappers' Guild, for the Valleys
+A new Map Upgrade for the Valleys of Mesenlla. It stacks up to Level 4 with each player who brings it.
+- **Level 1:** snare lines across the ways into the camp and up to the Ring of Stones. A snare holds a creature for 2.5 s.
+- **Level 2:** two Lodge hunters keep watch from the camp's towers, and fall back to the Ring of Stones when the camp is lost.
+- **Level 3:** a hunters' cache by the fire every 60 s.
+- **Level 4:** a fallback camp at the Ring of Stones, with a mending fire, snares and two more hunters.
+
 ### A new class: the Ferryman
 Earned by surviving 3 nights in Port Vael. 120 health; starts with the Ferryman's Oar.
 - **Crossing:** a ghostly skiff carries you 9 m ahead, through enemies: they are struck, shoved aside and slowed, and friends it passes are healed 15.

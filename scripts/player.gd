@@ -191,6 +191,17 @@ var ward_hp := 0.0 # Shield Wall: harm still to be stopped
 var ward_left := 0.0
 var bombs_thrown := 0 # for the Great Keg
 var musket_shots := 0 # for Grapeshot
+# The Class Upgrades of the Adept, the Cartographer and the Bandit (CrownUpgrades)
+var encore_count := 0 # stance changes, for the Encore
+var open_door_cd := 0.0
+var blaze_from := Vector3.INF # where the last Trailblazer mark was left
+var lucky_steals := 0
+var contract_on: Variant = null # the Zombie a Mercenary's Contract is on
+var contract_until := 0.0
+var contract_at := Vector3.ZERO
+var contract_radius := 0.0
+var fans_thrown := 0 # for the Toll
+var toll_fan := false # the fan just thrown was the Toll
 var _mended_by := {} # friend's net id -> healing their fields gave since the last report
 var _mended_wait := 0.0
 var grapeshot_flash := 0.0 # 1 when Grapeshot has just gone off, fading: the HUD's burst round the crosshair
@@ -601,7 +612,17 @@ func readiness() -> Array[Dictionary]:
 				every.call("nth_" + str(e.get("from", event)), {"name": e.get("from_name", ""), "icon": e.get("from_icon", "star+up")}, "fire", int(e["nth"]), int(e["count"]) % int(e["nth"]))
 	if spec_id == "pyromaniac" and has_item("great_keg"):
 		every.call("great_keg", _item_look("great_keg", UiTheme.EMBER), "art", PathUpgrades.GREAT_KEG_EVERY, bombs_thrown % PathUpgrades.GREAT_KEG_EVERY)
+	if spec_id == "blade_dancer" and has_item("encore"):
+		every.call("encore", _item_look("encore", col), "art", CrownUpgrades.ENCORE_EVERY, CrownUpgrades.encore_have(self))
+	if spec_id == "thief" and has_item("lucky_fingers"):
+		every.call("lucky_fingers", _item_look("lucky_fingers", CrownUpgrades.COIN), "path_art", CrownUpgrades.LUCKY_ONE_IN, CrownUpgrades.lucky_have(self))
+	if spec_id == "highwayman" and has_item("toll_road"):
+		every.call("toll_road", _item_look("toll_road", col), "path_art", CrownUpgrades.TOLL_EVERY, CrownUpgrades.toll_have(self))
 	# Armed and waiting for the next one.
+	if spec_id == "worlds_traveler" and has_item("open_door"):
+		armed.call("open_door", _item_look("open_door", col), "", CrownUpgrades.door_ready(self))
+	if contract_on != null and is_instance_valid(contract_on):
+		armed.call("contract", _item_look("contract", CrownUpgrades.COIN), "", false, true)
 	if kind == WeaponDefs.Kind.RANGED and has_flag("killing_shot"):
 		armed.call("killing_shot", _ability_look("killing_shot"), "fire", _kill_shot_cd <= 0.0)
 	if _next_hit_mult > 1.0 and kind == WeaponDefs.Kind.MELEE:
@@ -1106,6 +1127,8 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 			oath_reserve = minf(20.0, oath_reserve + 4.0)
 		fire("block", {"attacker": attacker})
 	if UpgradeKit.mirror_dodges(self, dmg):
+		return
+	if CrownUpgrades.open_door(self, dmg):
 		return
 	if has_flag("mana_shield") and mana > 0.0:
 		var drained := minf(mana, dmg * 0.5)
@@ -1939,8 +1962,8 @@ func _on_kill(z: Zombie) -> void:
 			void_left += AbilityNumbers.WALKER_BETWEEN
 			invis_left = maxf(invis_left, void_left)
 	add_arrows(int(class_def().get("kill_arrows", 0)))
-	if m("plunder") > 0.0:
-		BanditKit.plunder(self, z.position)
+	if m("plunder") > 0.0 or z.tolled():
+		BanditKit.plunder(self, z.position, z.tolled())
 	if class_id == "harpooner":
 		HarpoonerKit.on_kill(self, z)
 	if class_id == "tidecaller":
@@ -2469,6 +2492,7 @@ func _tick_ability_timers(delta: float) -> void:
 	friend_heal_left = maxf(0.0, friend_heal_left - delta)
 	night_blind_left = maxf(0.0, night_blind_left - delta)
 	gate_rest_left = maxf(0.0, gate_rest_left - delta)
+	open_door_cd = maxf(0.0, open_door_cd - delta)
 	find_rest_left = maxf(0.0, find_rest_left - delta)
 	guard_left = maxf(0.0, guard_left - delta)
 	dome_left = maxf(0.0, dome_left - delta)
@@ -3009,13 +3033,22 @@ func _change_stance() -> void:
 		_next_hit_mult = maxf(_next_hit_mult, AbilityNumbers.MIRROR_NEXT_BLOW)
 		_undo_hit()
 	if has_flag("blade_dancer"):
-		_dance_sweep()
+		var encore := CrownUpgrades.next_is_encore(self)
+		_dance_sweep(CrownUpgrades.ENCORE_POWER if encore else 1.0)
+		if encore:
+			CrownUpgrades.encore(self, STANCE_COLOURS[stance])
 		if has_flag("storm_of_steel"):
 			_second_sweep = 0.25
 
 
-func _dance_sweep() -> void:
-	var hits := _sweep(SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0), (AbilityNumbers.WHIRL if has_flag("whirl") else 1.0) * _transition_power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
+## How far a Blade Dancer's sweep reaches.
+func sweep_reach() -> float:
+	return SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0)
+
+
+func _dance_sweep(power := 1.0) -> void:
+	var reach := sweep_reach() + (CrownUpgrades.ENCORE_REACH if power > 1.0 else 0.0)
+	var hits := _sweep(reach, (AbilityNumbers.WHIRL if has_flag("whirl") else 1.0) * _transition_power * power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
 	if hits <= 0:
 		return
 	if hp < max_hp():
@@ -3049,6 +3082,7 @@ func _undo_hit() -> void:
 		world.stun_around(global_position, AbilityNumbers.BLINDING_STEP_REACH, AbilityNumbers.BLINDING_STEP_STUN)
 	if has_flag("patient_blade"):
 		_act({"do": "buff", "key": "patient_blade", "stat": "melee_damage", "val": AbilityNumbers.PATIENT_BLADE, "secs": AbilityNumbers.PATIENT_BLADE_TIME}, {})
+	CrownUpgrades.shatter(self)
 	if has_flag("perfect_reflection"):
 		const REACH := AbilityNumbers.PERFECT_REFLECTION_REACH
 		world.fx_ring(global_position, REACH, Color(0.7, 0.85, 1.0))
@@ -3062,6 +3096,7 @@ func _undo_hit() -> void:
 func _left_void() -> void:
 	if has_flag("aftermath"):
 		world.stun_around(global_position, AbilityNumbers.AFTERMATH_REACH, AbilityNumbers.AFTERMATH_STUN)
+	CrownUpgrades.event_horizon(self)
 	invis_left = 0.0
 
 
@@ -3129,6 +3164,7 @@ func _tick_mist(delta: float) -> void:
 	path_art_cd_left = maxf(0.0, path_art_cd_left - delta)
 	mirror_hall_left = maxf(0.0, mirror_hall_left - delta)
 	PathUpgrades.tick(self, delta)
+	CrownUpgrades.tick(self, delta)
 	if _cast_kind == "":
 		return
 	if _cast_kind == "sharpshooter":

@@ -92,6 +92,10 @@ func _ready() -> void:
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
 	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer", "harpooner", "tidecaller", "ferryman"]:
 		Game.unlocked[id] = true
+	if rules == "mesenlla":
+		# Both phones bring the Trappers' Guild into the Valleys: Level 2.
+		Game.owned_items[TrappersGuild.ID] = true
+		Game.switched_off.erase(TrappersGuild.ID)
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await wait(0.3)
@@ -1411,6 +1415,40 @@ func _bandit() -> void:
 	else:
 		ok(pl.invis_left > 0.0 and pl.night_blind_left <= 0.0, "the Mercenary is hidden, not darkened")
 	await sync(205)
+	# Contract: the Mercenary's next Nightfall names a creature of the host's; its seal shows on both
+	# phones, and the host's creature takes the extra damage.
+	for n: Node in w.get_children():
+		if n is NightfallDome:
+			n.queue_free()
+	if host:
+		var merc := _avatar().global_position
+		w.spawn_zombie("normal", merc + Vector3(2, 0, 0))
+		var named: Zombie = w.zombies.back()
+		named.position = merc + Vector3(2, 0, 0)
+		named.set_physics_process(false)
+		named.max_hp = 900.0
+		named.hp = 900.0
+	await wait(1.0)
+	await sync(710)
+	if not host:
+		Game.owned_items["contract"] = true
+		pl.path_art_cd_left = 0.0
+		pl.invis_lockout = 0.0
+		pl.use_path_art()
+	await wait(1.2)
+	await sync(711)
+	var sealed := w.zombies.filter(func(z: Zombie) -> bool: return z.get_node_or_null("ContractSeal") != null)
+	ok(sealed.size() == 1, "the Contract's seal hangs over the creature on this phone")
+	if host:
+		ok(sealed.size() == 1 and sealed[0]._mark_time > 0.0 and is_equal_approx(sealed[0]._mark_mult, CrownUpgrades.CONTRACT_MARK), "and the host's creature is marked to take 50% more")
+	for z: Zombie in w.zombies.duplicate():
+		if host:
+			z.release()
+	for n: Node in w.get_children():
+		if n is NightfallDome:
+			n.queue_free()
+	await wait(0.5)
+	await sync(712)
 	# A Highwayman's Dagger Fan, from 6 m away.
 	if host:
 		pl.guard_left = 0.0
@@ -1845,6 +1883,37 @@ func _mesenlla() -> void:
 	ok(bosses.size() == 1 and (bosses[0]._visual.get_node("BossHealth") as Label3D).text.begins_with("GREAT REVENANT ELEMENTAL"), "the Great Revenant Elemental stands on both phones, its name over it")
 	ok(w.director.boss_card == "great_revenant_elemental" and w.director.boss_card_time > 0.0, "and both see its entrance card")
 	await sync(409)
+	# The Trappers' Guild, brought by both: Level 2 on both phones, the same snares, the host's hunters
+	# on the camp's towers, and a snare the host springs shown sprung on the other phone too.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	await wait(0.5)
+	await sync(700)
+	ok(w.guild != null and w.guild.level == 2, "the Trappers' Guild is at Level 2 on this phone (%s)" % str(w.guild.level if w.guild else -1))
+	if host:
+		told.rpc(str(w.guild.snares.size()))
+	await wait(0.4)
+	await sync(701)
+	if not host:
+		ok(str(w.guild.snares.size()) == _told and w.guild.snares.size() > 10, "the same %s snares lie here" % _told)
+	await until(func() -> bool: return w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead).size() >= 2, 4.0)
+	var hunters := w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead)
+	if host:
+		ok(hunters.size() == 2 and hunters.all(func(a: Ally) -> bool: return a.remote_owner == 0 and a.perch != Vector3.INF), "the host sends two hunters up the camp's towers")
+	else:
+		ok(hunters.size() == 2 and hunters.all(func(a: Ally) -> bool: return a.remote_owner == 1), "and they keep watch on this phone too, as the host's")
+		ok(hunters.all(func(a: Ally) -> bool: return a.global_position.y > w.ground_at(a.global_position) + 3.0), "up on the towers here as well")
+	await sync(702)
+	if host:
+		var snare: Vector3 = w.guild.snares[0]["at"]
+		w.spawn_zombie("child_of_woods", snare)
+		var caught: Zombie = w.zombies.back()
+		caught.position = snare
+		caught.set_physics_process(false)
+	await until(func() -> bool: return float(w.guild.snares[0]["armed_at"]) > w.now, 4.0)
+	ok(float(w.guild.snares[0]["armed_at"]) > w.now and (w.guild.snares[0]["node"] as MeshInstance3D).mesh == TrappersGuild.snare_mesh(true), "the first snare is sprung on this phone")
+	await sync(703)
 
 
 ## Two phones in Port Vael: the Mist Tide stands the same on both, a Drowned Sailor carries the same

@@ -38,6 +38,12 @@ var stagger := 0.0
 var pins := 0.0 # a Whaler's Harpoon: seconds it holds what it strikes to the spot
 var tether := false # ...and where it ends up, it lies until its owner takes it back
 var harpoon_mark := false # a Harpooner's harpoon: what it strikes is marked and torn (HarpoonerKit)
+## A Highwayman's Toll knife (CrownUpgrades): it gleams gold, and what it pins pays when it dies.
+var toll := false:
+	set(on):
+		toll = on
+		material_overlay = _toll_glow() if on else null
+static var _toll_mat: StandardMaterial3D
 var glow := Color.TRANSPARENT: # a Flare: burns bright as it flies, its light on what it passes
 	set(c):
 		glow = c
@@ -119,6 +125,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	pins = 0.0
 	harpoon_mark = false
 	tether = false
+	toll = false
 	glow = Color.TRANSPARENT
 	mesh = m
 	position = pos
@@ -445,6 +452,8 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		z.slow(slow_secs)
 	if pins > 0.0:
 		z.root(pins, true)
+		if toll:
+			z.toll_until = world.now + pins + 0.25
 	world.sfx_at(hit_sound if hit_sound != "" else "thunk", at, -3.0)
 	if tether:
 		# The harpoon stays in it, then drops at its feet when it pulls free.
@@ -472,3 +481,15 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 			_orient()
 			return
 	stop()
+
+
+static func _toll_glow() -> StandardMaterial3D:
+	if _toll_mat == null:
+		_toll_mat = StandardMaterial3D.new()
+		_toll_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_toll_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_toll_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_toll_mat.albedo_color = Color(CrownUpgrades.COIN, 0.55)
+		_toll_mat.grow = true
+		_toll_mat.grow_amount = 0.015
+	return _toll_mat

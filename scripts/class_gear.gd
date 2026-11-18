@@ -19,7 +19,7 @@ const RED := Color(0.75, 0.13, 0.12)
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
 const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
 	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64), "tidecaller": Vector3(0.24, 0.8, 0.74), "ferryman": Vector3(0.86, 0.84, 0.76),
-	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6)}
+	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6), "lodge_hunter": Vector3(0.36, 0.48, 0.22)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5), "mist_heavy": Vector3(0.66, 0.92, 0.98)}
 ## Mist-glass on the Mist Soldiers, which glows in the dark. Pieces named "bone:glow" are made of it.
@@ -109,6 +109,7 @@ static func _pieces(id: String) -> Dictionary:
 			"mist_infantry": built = _mist_infantry()
 			"mist_ranger": built = _mist_ranger()
 			"mist_heavy": built = _mist_heavy()
+			"lodge_hunter": built = _lodge_hunter()
 		_made[id] = built
 	return _made[id]
 
@@ -538,6 +539,36 @@ static func _mist_ranger() -> Dictionary:
 		chest.prism(Vector3(0.28, 0.5, -0.5) + off, top, 0.018, 0.018, 4, Color(0.8, 0.8, 0.82))
 		glints.box(top + Vector3(0, 0.05, 0), Vector3(0.1, 0.18, 0.02), MIST_GLASS)
 	return {"head": head.commit(), "head:glow": glass.commit(), "chest": chest.commit(), "chest:glow": glints.commit()}
+
+
+## A Lodge hunter of the Valleys (the Trappers' Guild): a moss-green hood with a ruff of pale fur round
+## its edge, a fur mantle over the shoulders, a quiver of grey-fletched arrows, a hunting horn slung on a
+## strap across the chest, and a coil of snare-cord at the belt.
+static func _lodge_hunter() -> Dictionary:
+	const HOOD := Color(0.24, 0.32, 0.15)
+	const FUR := Color(0.78, 0.7, 0.55)
+	var head := LowPoly.new()
+	head.prism(Vector3(0, 0.6, -0.08), Vector3(0, 1.12, -0.12), 0.74, 0.3, 8, HOOD)
+	head.prism(Vector3(0, 1.1, -0.14), Vector3(0, 1.3, -0.4), 0.3, 0.0, 6, HOOD.darkened(0.15))
+	head.prism(Vector3(0, 0.6, 0.02), Vector3(0, 0.72, 0.02), 0.8, 0.76, 10, FUR)
+	var chest := LowPoly.new()
+	# The fur mantle, and the quiver on the back with its arrows.
+	chest.prism(Vector3(0, 0.38, -0.02), Vector3(0, 0.0, -0.1), 0.4, 0.7, 9, FUR.darkened(0.25))
+	chest.prism(Vector3(0.24, -0.42, -0.42), Vector3(0.3, 0.56, -0.5), 0.15, 0.18, 8, DARK_LEATHER)
+	for i in 4:
+		var off := Vector3(0.05 * i, 0.0, 0.03 * (i % 2))
+		var top := Vector3(0.34, 1.02, -0.52) + off
+		chest.prism(Vector3(0.28, 0.5, -0.5) + off, top, 0.018, 0.018, 4, Color(0.8, 0.68, 0.45))
+		chest.box(top + Vector3(0, 0.05, 0), Vector3(0.1, 0.18, 0.02), Color(0.55, 0.55, 0.58))
+	# The horn: a curved cone of pale horn with brass bands, on a strap across the chest.
+	chest.box(Vector3(0, -0.02, 0.36), Vector3(0.1, 0.9, 0.04), LEATHER, Vector3(0, 0, -32))
+	chest.prism(Vector3(-0.3, -0.34, 0.42), Vector3(-0.04, -0.2, 0.46), 0.03, 0.07, 6, Color(0.92, 0.86, 0.7))
+	chest.prism(Vector3(-0.04, -0.2, 0.46), Vector3(0.14, -0.04, 0.44), 0.07, 0.13, 6, Color(0.95, 0.9, 0.76))
+	chest.prism(Vector3(-0.16, -0.28, 0.44), Vector3(-0.13, -0.26, 0.44), 0.06, 0.06, 6, BRASS)
+	var hips := LowPoly.new()
+	hips.prism(Vector3(-0.42, 0.1, 0.0), Vector3(-0.42, 0.26, 0.0), 0.16, 0.16, 8, Color(0.66, 0.56, 0.38))
+	hips.prism(Vector3(-0.42, 0.14, 0.0), Vector3(-0.42, 0.22, 0.0), 0.1, 0.1, 8, Color(0.5, 0.4, 0.26))
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
 
 
 ## Mist Heavy: a closed great helm crowned by two curved mist-glass horns, round pauldrons rimmed with

@@ -45,6 +45,9 @@ func _ready() -> void:
 	await _path_upgrades()
 	print("REWORK cartographer")
 	await _cartographer()
+	print("REWORK crown upgrades")
+	await _crown_upgrades()
+	await _trappers_guild()
 	_class_codes()
 	print("REWORK harpooner")
 	await _harpooner()
@@ -1332,6 +1335,289 @@ func _clear_fields() -> void:
 
 
 ## Beacons straight in front of the Cartographer, at the given offsets, each faced north.
+## The Class Upgrades of the Adept, the Cartographer and the Bandit (CrownUpgrades).
+func _crown_upgrades() -> void:
+	var owned_before: Dictionary = Game.owned_items.duplicate()
+	var ids := ["encore", "shattered_mirror", "event_horizon", "star_shower", "open_door", "trailblazer", "lucky_fingers", "contract", "toll_road"]
+	for id: String in ids:
+		Game.owned_items[id] = true
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		check(d["section"] == "upgrades" and int(d["price"]) >= 260 and int(d["price"]) <= 320, "%s is a Class Upgrade at the usual price (%d)" % [id, int(d["price"])])
+		check(Icons.exists(str(d["icon"]).split("+")[0]) and Icons.exists(str(d["icon"]).split("+")[1]), "%s has its icons" % id)
+		check(UpgradeShowcase.shows(id), "%s has a scene of its own in the Store" % id)
+	for cls: String in ["adept", "cartographer", "bandit"]:
+		for spec: Dictionary in AbilityData.tree(cls)["specs"]:
+			check(ShopDefs.ITEMS.values().filter(func(i: Dictionary) -> bool: return i.get("spec", "") == spec["id"]).size() == 1, "%s's %s path has one Class Upgrade" % [cls, spec["id"]])
+	var names: Array = ids.map(func(id: String) -> String: return ShopDefs.ITEMS[id]["name"])
+	var clashes: Array[String] = []
+	for cls: String in ClassDefs.ALL:
+		for spec: Dictionary in AbilityData.tree(cls).get("specs", []):
+			for row: Array in spec["path"]:
+				for ab: Dictionary in row:
+					if names.has(ab["name"]):
+						clashes.append("%s (%s)" % [ab["name"], cls])
+			if names.has(spec["final"]["name"]):
+				clashes.append("%s (%s)" % [spec["final"]["name"], cls])
+	check(clashes.is_empty(), "no upgrade shares its name with a talent: %s" % ", ".join(clashes))
+	for sound: String in ["mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal"]:
+		check(Sfx.NAMES.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# Encore: every third change of stance, a wider, harder sweep that knocks everything down.
+	pawn("adept", 0)
+	var out_of_reach := target(p.global_position + Vector3(p.sweep_reach() + 1.2, 0, 0))
+	var have: Array[int] = []
+	for k in 3:
+		have.append(CrownUpgrades.encore_have(p))
+		var before := out_of_reach.hp
+		p._change_stance()
+		if k < 2:
+			check(is_equal_approx(out_of_reach.hp, before), "change %d: the sweep does not reach %.1f m" % [k + 1, p.sweep_reach() + 1.2])
+	check(have == Array([0, 1, 2], TYPE_INT, "", null) and p.readiness().any(func(e: Dictionary) -> bool: return e["key"] == "encore" and e["button"] == "art"), "the marks over the ability button count to it: %s" % str(have))
+	check(out_of_reach.hp < out_of_reach.max_hp and out_of_reach._stun >= CrownUpgrades.ENCORE_DOWN - 0.05, "the third is the Encore: it reaches 2 m further and knocks down (%.0f, %.1f s)" % [out_of_reach.max_hp - out_of_reach.hp, out_of_reach._stun])
+	out_of_reach.release()
+	# Shattered Mirror: an undone hit sends shards at the nearest, and they bleed.
+	pawn("adept", 1)
+	var near_a := target(p.global_position + Vector3(3, 0, -2))
+	var near_b := target(p.global_position + Vector3(-4, 0, -4))
+	var too_far := target(p.global_position + Vector3(0, 0, CrownUpgrades.SHARD_REACH + 4.0))
+	p._last_hit = 10.0
+	p._last_hit_left = 1.0
+	p._undo_hit()
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.mesh == w._shot_mesh("shard")).size() == CrownUpgrades.SHARDS, "the mirror breaks into 6 shards")
+	await frames(40)
+	var cut := (near_a.max_hp - near_a.hp) + (near_b.max_hp - near_b.hp)
+	check(cut >= CrownUpgrades.SHARD_DAMAGE * CrownUpgrades.SHARDS * 0.9 and near_a.bleed_left > 0.0 and near_b.bleed_left > 0.0, "they strike the two nearest, 25 each, and leave them bleeding (%.0f)" % cut)
+	check(is_equal_approx(too_far.hp, too_far.max_hp), "and nothing beyond 10 m")
+	for z: Zombie in [near_a, near_b, too_far]:
+		z.release()
+	# Event Horizon: leaving Void stance opens a rift that pulls, bites and then collapses.
+	pawn("adept", 2)
+	var drawn := foe("normal", 5.0)
+	drawn.stun(30.0)
+	var start_gap := Vector2(drawn.position.x - p.global_position.x, drawn.position.z - p.global_position.z).length()
+	var hp0 := drawn.hp
+	p._left_void()
+	var rift: PathField = w.get_children().filter(func(n: Node) -> bool: return n is PathField and n.kind == "horizon").back()
+	check(rift != null, "leaving Void stance tears a rift open where the Adept stood")
+	await frames(90)
+	var gap := Vector2(drawn.position.x - rift.position.x, drawn.position.z - rift.position.z).length()
+	check(gap < start_gap - 1.0 and drawn.hp < hp0, "it draws in what is within 7 m and hurts it (%.1f m from %.1f, %.0f)" % [gap, start_gap, hp0 - drawn.hp])
+	var mid := drawn.hp
+	await until_gone(PathField)
+	check(mid - drawn.hp >= CrownUpgrades.HORIZON_COLLAPSE * 0.9, "and falls in on itself for 60 (%.0f)" % (mid - drawn.hp))
+	drawn.release()
+	# Star Shower: a stone that closes a constellation brings five stars down across it.
+	pawn("cartographer", 0)
+	var under := target(p.global_position + Vector3(0, 0, CartographerKit.PLANT_AHEAD - 6.0))
+	var survey := plant_at([Vector3(-8, 0, 0), Vector3(8, 0, 0)])
+	await frames(30)
+	check(is_equal_approx(under.hp, under.max_hp), "two stones bring nothing down")
+	plant_at([Vector3(0, 0, -14)])
+	check(survey.triangles().size() == 1 and survey.in_constellation(under.position), "the third closes the constellation over it")
+	await frames(150)
+	check(under.max_hp - under.hp >= CrownUpgrades.SHOWER_DAMAGE, "the first star falls on it, the toughest inside (%.0f)" % (under.max_hp - under.hp))
+	check(survey._shower_n == -1, "and all five have fallen")
+	under.release()
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	await frames(1)
+	# Open Door: a hit that would leave you low is never taken; you are at the farthest gate instead.
+	pawn("cartographer", 1)
+	survey = plant_at([Vector3(0, 0, 0), Vector3(24, 0, 0)])
+	var home := p.global_position
+	check(CrownUpgrades.door_ready(p) and p.readiness().any(func(e: Dictionary) -> bool: return e["key"] == "open_door" and e["primed"]), "with a gate far off, the door is ready, and the HUD says so")
+	var full := p.hp
+	p.hurt(p.max_hp() * 0.85 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	var far_gate: Vector3 = survey.beacons[1]["at"]
+	check(is_equal_approx(p.hp, minf(p.max_hp(), full + CrownUpgrades.DOOR_HEAL)) and Vector2(p.global_position.x - far_gate.x, p.global_position.z - far_gate.z).length() < 2.5, "the hit is never taken: the Traveler steps out of the far gate (%.1f m from it, %.0f health)" % [Vector2(p.global_position.x - far_gate.x, p.global_position.z - far_gate.z).length(), p.hp])
+	check(p.guard_left > 0.0 and is_equal_approx(p.open_door_cd, CrownUpgrades.DOOR_REST), "untouchable for a moment, and not again for 60 s")
+	p.guard_left = 0.0
+	full = p.hp
+	p.hurt(p.max_hp() * 0.85 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	check(p.hp < full, "the next one lands")
+	p.hp = p.max_hp()
+	p.global_position = home
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	await frames(1)
+	# Trailblazer: marks every 3 m while on the move, that speed friends and slow enemies.
+	pawn("cartographer", 2)
+	await frames(3)
+	var from := p.global_position
+	for k in 14:
+		p.global_position = from + Vector3(0, 0, -0.8 * k)
+		p.global_position.y = w.ground_at(p.global_position) + 0.02
+		await frames(3)
+	var marks := w.get_children().filter(func(n: Node) -> bool: return n is PathField and n.kind == "blaze")
+	check(marks.size() >= 3, "a mark every 3 m along the way (%d over 10 m)" % marks.size())
+	var first_mark: PathField = marks[0]
+	var slowed := target(first_mark.position)
+	p.global_position = first_mark.position + Vector3.UP * 0.05
+	await frames(20)
+	check(p._buffs.has("trailblazer") and slowed._slow > 0.0, "on the trail a friend runs faster, and an enemy is slowed")
+	slowed.release()
+	_clear_fields()
+	# Lucky Fingers: every Steal picks a pocket, and every fourth is ready again at once.
+	pawn("bandit", 0)
+	w.spawn_zombie("clever", p.global_position + Vector3(0, 0, -8))
+	var mark: Zombie = w.zombies.back()
+	mark.set_physics_process(false)
+	mark.hp = 5000.0
+	mark.max_hp = 5000.0
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	var ready_after: Array[bool] = []
+	for k in 4:
+		p.path_art_cd_left = 5.0
+		mark.weapon_id = ""
+		BanditKit.cast_path(p)
+		ready_after.append(p.path_art_cd_left <= 0.0)
+	check(w.pickups.size() >= 4, "each Steal leaves food, arrows or a potion (%d)" % w.pickups.size())
+	check(ready_after == Array([false, false, false, true], TYPE_BOOL, "", null), "and the fourth is lucky: ready again at once %s" % str(ready_after))
+	mark.release()
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	# Contract: Nightfall names the toughest inside, it takes more, and its death pays.
+	pawn("bandit", 1)
+	var tough := target(p.global_position + Vector3(2, 0, -2))
+	tough.max_hp = 600.0
+	tough.hp = 600.0
+	var small := target(p.global_position + Vector3(-2, 0, -1))
+	small.max_hp = 75.0
+	small.hp = 75.0
+	BanditKit.nightfall(p)
+	check(p.contract_on == tough and tough.get_node_or_null("ContractSeal") != null and small.get_node_or_null("ContractSeal") == null, "the Contract goes on the toughest, and its seal shows over it")
+	var was_hp := tough.hp
+	tough.take_damage(20.0, Vector3.ZERO, 0.0, tough.centre())
+	check(is_equal_approx(was_hp - tough.hp, 20.0 * CrownUpgrades.CONTRACT_MARK), "it takes 50%% more (%.0f of 20)" % (was_hp - tough.hp))
+	p.hp = 40.0
+	p.path_art_cd_left = 20.0
+	tough.next_hitter = -1
+	tough.take_damage(10000.0, Vector3.ZERO, 0.0, tough.centre())
+	await frames(2)
+	check(is_equal_approx(p.hp, 40.0 + CrownUpgrades.CONTRACT_HEAL) and p.path_art_cd_left <= 20.0 - CrownUpgrades.CONTRACT_REFUND + 0.1, "its death heals 25 and brings Nightfall 8 s sooner (%.0f, %.1f s)" % [p.hp, p.path_art_cd_left])
+	small.release()
+	_clear_fields()
+	for n: Node in w.get_children():
+		if n is NightfallDome:
+			n.queue_free()
+	# Toll Road: every third fan pins, and what dies pinned always pays.
+	pawn("bandit", 2)
+	_face_ahead()
+	var tolled := target(p.global_position + Vector3(0, 0, -6))
+	var counted: Array[int] = []
+	for k in 3:
+		counted.append(CrownUpgrades.toll_have(p))
+		BanditKit.dagger_fan(p)
+	check(counted == Array([0, 1, 2], TYPE_INT, "", null) and p.readiness().any(func(e: Dictionary) -> bool: return e["key"] == "toll_road" and e["button"] == "path_art"), "marks over the second button count the fans: %s" % str(counted))
+	var gold := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.toll)
+	check(gold.size() == BanditKit.FAN_KNIVES + int(p.m("fan_knives")) and p.toll_fan, "the third fan is the Toll: its knives gleam gold (%d)" % gold.size())
+	await frames(30)
+	check(tolled.root_left > 0.0 and tolled.tolled(), "and pin what they strike")
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	p.mods["plunder"] = 0.0
+	tolled.next_hitter = -1
+	p.on_kill(tolled)
+	check(w.pickups.size() == 1, "a creature killed while pinned always leaves plunder")
+	tolled.release()
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	Game.owned_items = owned_before
+
+
+## The Trappers' Guild, with the Valleys' marks laid out on the test ground: its snares, its hunters,
+## its caches and its fallback camp, by level.
+func _trappers_guild() -> void:
+	var d: Dictionary = ShopDefs.ITEMS[TrappersGuild.ID]
+	check(d["section"] == "maps" and d["map"] == "mesenlla" and (d["levels"] as Array).size() == ShopDefs.MAP_LEVELS and Icons.exists(str(d["icon"])) and UpgradeShowcase.shows(TrappersGuild.ID), "the Trappers' Guild is a Map Upgrade of the Valleys, with four levels, its icon and its scene")
+	check(Ally.KINDS.back() == "lodge_hunter" and Ally.GARRISON.has("lodge_hunter"), "the Lodge hunter is a new kind at the end of the list, and keeps watch like the garrison")
+	for sound: String in ["snare_snap", "trapper_horn", "cache_drop"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound, heard on every phone" % sound)
+	var tscn := FileAccess.get_file_as_string("res://maps/mesenlla.tscn")
+	for kind: String in ["snare", "hunter", "trap_cache", "guild_camp"]:
+		check(tscn.contains('kind = "%s"' % kind), "the Valleys mark where the Guild's %s goes" % kind)
+	pawn("ranger")
+	await frames(3)
+	var home := p.global_position
+	var marks_before := w.guild_marks.duplicate()
+	w.guild_marks.assign([
+		{"kind": "snare", "gate": 3, "at": home + Vector3(0, 0, -10), "yaw": 0.0},
+		{"kind": "hunter", "gate": 2, "at": home + Vector3(-6, 0, 4), "yaw": 0.0},
+		{"kind": "hunter", "gate": 4, "at": home + Vector3(8, 0, 4), "yaw": 0.0},
+		{"kind": "hunter", "gate": 4, "at": home + Vector3(10, 0, 6), "yaw": 0.0},
+		{"kind": "trap_cache", "gate": 0, "at": home + Vector3(3, 0, 3), "yaw": 0.0},
+		{"kind": "trap_cache", "gate": 1, "at": home + Vector3(-3, 0, 3), "yaw": 0.0},
+		{"kind": "guild_camp", "gate": 0, "at": home + Vector3(12, 0, 0), "yaw": 0.0}])
+	# Level 1: snares only.
+	var guild := TrappersGuild.new(w, 1)
+	w.add_child(guild)
+	w.guild = guild
+	check(guild.snares.size() == 3 and guild.camp_at == Vector3.INF, "Level 1 lays its line of 3 snares, and no camp")
+	var line_gap: float = (guild.snares[0]["at"] as Vector3).distance_to(guild.snares[1]["at"])
+	check(absf(line_gap - TrappersGuild.SNARE_GAP * 1.0) < 0.3, "2 m apart along the line (%.1f)" % line_gap)
+	var walker := foe("normal", 10.0, 0.0, 200.0)
+	walker.position = guild.snares[1]["at"]
+	await frames(4)
+	check(walker.root_left > 0.0 and is_equal_approx(walker.hp, 200.0 - TrappersGuild.SNARE_DAMAGE), "a creature that steps in a snare is held and cut for 15 (%.0f)" % walker.hp)
+	check(float(guild.snares[1]["armed_at"]) > w.now + TrappersGuild.SNARE_REARM - 0.5 and (guild.snares[1]["node"] as MeshInstance3D).mesh == TrappersGuild.snare_mesh(true), "the snare shows sprung, and is set again in 12 s")
+	walker.root_left = 0.0
+	walker.position = guild.snares[1]["at"] + Vector3(0.1, 0, 0)
+	var held_hp := walker.hp
+	await frames(4)
+	check(is_equal_approx(walker.hp, held_hp), "a sprung snare catches nothing until it is set again")
+	walker.release()
+	check(w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead).is_empty(), "no hunters at Level 1")
+	guild.queue_free()
+	await frames(1)
+	# Level 4: hunters at their posts (no towers on this ground), caches, and the camp's fire and snares.
+	w.prepare_allies("lodge_hunter", 4)
+	guild = TrappersGuild.new(w, 4)
+	w.add_child(guild)
+	w.guild = guild
+	await frames(3)
+	check(guild.camp_at != Vector3.INF and guild.snares.size() == 3 + TrappersGuild.CAMP_SNARES, "Level 4 makes the fallback camp, ringed with 6 snares")
+	var hunters := w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead)
+	check(hunters.size() == 2 and hunters.all(func(a: Ally) -> bool: return a.is_garrison() and a.perch == Vector3.INF), "its two hunters stand guard by the camp (%d)" % hunters.size())
+	var prey := foe("normal", 0.0, 0.0, 5000.0)
+	prey.position = home + Vector3(4, 0, 1)
+	prey.position.y = w.ground_at(prey.position)
+	prey.stun(30.0)
+	await frames(200)
+	check(prey.hp < 5000.0, "the hunters shoot what comes near (%.0f)" % (5000.0 - prey.hp))
+	prey.release()
+	p.global_position = guild.camp_at + Vector3(1.5, 0.05, 0)
+	p.hp = p.max_hp() * 0.5
+	var low := p.hp
+	await frames(60)
+	check(p.hp > low + TrappersGuild.FIRE_HEAL * 0.6, "a friend by the camp fire mends 3 a second (%.1f)" % (p.hp - low))
+	p.global_position = home
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	w.director.elapsed = TrappersGuild.CACHE_EVERY + 0.5
+	await frames(2)
+	var first_cache := w.pickups.filter(func(i: Pickup) -> bool: return i.global_position.distance_to(guild.cache_spot()) < 1.0)
+	check(first_cache.size() == 1 and (first_cache[0] as Pickup).kind == Pickup.Kind.FOOD, "after 60 s a cache by the fire: food first")
+	w.director.elapsed = TrappersGuild.CACHE_EVERY * 2.0 + 1.0
+	await frames(2)
+	check(w.pickups.size() == 1, "and none on top of it while it is still lying there")
+	w.remove_pickup(first_cache[0])
+	w.director.elapsed = TrappersGuild.CACHE_EVERY * 3.0 + 1.5
+	await frames(2)
+	check(w.pickups.size() == 1 and w.pickups[0].kind == Pickup.Kind.ARROWS, "once taken, the next: arrows")
+	# A hunter struck down is replaced from the Lodge after a while.
+	var fallen: Ally = hunters[0]
+	fallen.hurt(10000.0, fallen.global_position)
+	await frames(2)
+	var spot: Dictionary = guild.hunters.filter(func(h: Dictionary) -> bool: return h["ally"] == fallen)[0]
+	check(float(spot["back_at"]) > w.now, "a hunter struck down is missed")
+	spot["back_at"] = w.now - 0.1
+	await frames(2)
+	check(spot["ally"] != fallen and (spot["ally"] as Ally).kind == "lodge_hunter" and not (spot["ally"] as Ally).dead, "and another comes from the Lodge in its place")
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	w.director.elapsed = 0.0
+	guild.queue_free()
+	w.guild = null
+	for ally: Ally in w.allies.duplicate():
+		w.remove_ally(ally)
+	w.guild_marks.assign(marks_before)
+	await frames(1)
+
+
 func plant_at(spots: Array) -> SurveyNet:
 	var start := p.global_position
 	for spot: Vector3 in spots:
@@ -1741,14 +2027,16 @@ func _tidecaller() -> void:
 	hit.stun(30.0) # so only the wave moves it
 	TidecallerKit.call_the_tide(p)
 	# How far along the wave's way it was thrown, at the furthest: frames come at the machine's pace.
+	# The throw is the push the wave gives it (a rock behind it in the test world can stop it short),
+	# or the ground it covered, whichever shows more.
 	var thrown := 0.0
 	for i in 600:
-		thrown = maxf(thrown, hit_was.z - hit.position.z)
+		thrown = maxf(thrown, maxf(hit_was.z - hit.position.z, -hit._knock.z))
 		if not w.get_children().any(func(n: Node) -> bool: return n is TideWave):
 			break
 		await frames(1)
 	for i in 10:
-		thrown = maxf(thrown, hit_was.z - hit.position.z)
+		thrown = maxf(thrown, maxf(hit_was.z - hit.position.z, -hit._knock.z))
 		await frames(1)
 	check(hit.hp < h0 and hit._slow > 0.0, "the wave strikes what is in its way and slows it (%.0f)" % (h0 - hit.hp))
 	check(thrown > 0.5, "and throws it back along the wave's way (%.1f m)" % thrown)

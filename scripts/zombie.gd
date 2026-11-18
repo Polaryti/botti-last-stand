@@ -150,6 +150,7 @@ var _gate_wait := 0.0
 var _stun_fx: CPUParticles3D
 var shown_debuffs := 0 # on another phone: which of them the host last told us about
 var _mark_time := 0.0
+var toll_until := 0.0 # pinned by a Highwayman's Toll: its plunder is sure while this lasts
 var _mark_mult := 1.0
 var _airborne := false
 var _air_vel := Vector3.ZERO
@@ -1069,6 +1070,11 @@ func reveal(seconds: float) -> void:
 ## Small enough for a Boarding Hook to drag: not a boss, nor anything much bigger than a person.
 func draggable() -> bool:
 	return not is_boss() and not def.get("miniboss", false) and _scale < 1.5 and not flies and carrier == null
+
+
+## Pinned by a Toll knife, on this phone (only the Highwayman's phone counts it).
+func tolled() -> bool:
+	return world != null and world.now < toll_until
 
 
 func mark(mult: float, seconds: float) -> void:

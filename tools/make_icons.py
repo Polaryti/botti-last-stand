@@ -798,6 +798,19 @@ def leviathan_head():
 for g in (mist_infantry, mist_ranger, mist_heavy):
     PLAIN.append(g)
 
+def lodge_hunter():
+    # A hunter of the Lodge in the Valleys: a moss-green hood trimmed with fur, a hunting horn on a
+    # strap across the chest, and a bow drawn up behind.
+    return (curve("#c08a52", 5, "M86 8 C62 32 62 66 86 92", ink=False) + line("#e9eef5", 1.6, (86, 8), (86, 92), ink=False)
+        + path(("#5d7a3a", "#243a17"), "M50 6 C80 10 92 44 86 90 L14 90 C8 44 20 10 50 6Z")
+        + path(("#d8c4a0", "#7a6040"), "M18 40 C30 26 70 26 82 40 C76 36 70 38 64 34 C58 38 52 32 46 36 C40 32 34 38 28 34 C24 38 20 38 18 40Z", 1.6)
+        + ell(INK, 50, 60, 21, 23, 0, 0) + ell(("#fff1c8", "#d9a441"), 42, 58, 3.6, 2.6, 0, 0) + ell(("#fff1c8", "#d9a441"), 58, 58, 3.6, 2.6, 0, 0)
+        + curve("#6b4426", 4, "M16 76 C36 92 64 92 84 74", ink=False)
+        + path(("#f2e6c8", "#9a7a4a"), "M26 84 C40 84 54 78 62 66 L72 74 C62 88 44 92 26 88Z", 1.6)
+        + ell(("#fff4d8", "#b08850"), 67, 70, 6.5, 4, -50, 1.6) + ell(INK, 67, 70, 3.2, 1.8, -50, 0)
+        + line("#c9a24a", 2.6, (40, 82), (42, 89), ink=False) + line("#c9a24a", 2.6, (52, 77), (56, 84), ink=False))
+PLAIN.append(lodge_hunter)
+
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),

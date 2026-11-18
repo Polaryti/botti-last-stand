@@ -39,7 +39,9 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
 	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
 	"call_tide", "tsunami", "deep_song", "bind_fog",
-	"crossing", "toll_bell", "obol", "souls_go"]
+	"crossing", "toll_bell", "obol", "souls_go",
+	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
+	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],

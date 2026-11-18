@@ -970,7 +970,7 @@ func _draw_readiness(centre: Vector2) -> void:
 	var y := 34.0
 	var rows := 0
 	for r: Dictionary in _readiness():
-		if r["button"] == "art" or rows >= READY_ROWS:
+		if r["button"] in ["art", "path_art"] or rows >= READY_ROWS:
 			continue
 		var col: Color = r["color"]
 		var lit: bool = r["primed"] or r["active"]
@@ -999,7 +999,7 @@ func _draw_readiness(centre: Vector2) -> void:
 		draw_arc(centre, 24.0, 0.0, TAU, 40, Color(primed["color"], pulse * 0.6), 2.5, true)
 
 
-## The first thing primed on a button ("fire" or "art"), or {}.
+## The first thing primed on a button ("fire", "art" or "path_art"), or {}.
 func _primed_on(button: String) -> Dictionary:
 	for r: Dictionary in _readiness():
 		if r["button"] == button and r["primed"]:
@@ -1011,8 +1011,8 @@ func _primed_on(button: String) -> Dictionary:
 ## on a badge at the corner. A counter on the art button counts its uses above it.
 func _draw_button_readiness(id: String, pos: Vector2, r: float) -> void:
 	var pulse := 0.6 + sin(Time.get_ticks_msec() * 0.01) * 0.4
-	if id == "art":
-		var counted: Array = _readiness().filter(func(e: Dictionary) -> bool: return e["button"] == "art" and int(e["need"]) > 0)
+	if id == "art" or id == "path_art":
+		var counted: Array = _readiness().filter(func(e: Dictionary) -> bool: return e["button"] == id and int(e["need"]) > 0)
 		if not counted.is_empty():
 			var e: Dictionary = counted[0]
 			var need: int = e["need"]
@@ -1140,7 +1140,7 @@ func _draw_controls() -> void:
 		var inset := r * 0.42
 		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color.WHITE)
 		draw_texture_rect(_ring, rect, false, Color(1, 1, 1, 0.6) if not held else UiTheme.EMBER)
-		if id == "fire" or id == "art":
+		if id == "fire" or id == "art" or id == "path_art":
 			_draw_button_readiness(id, pos, r)
 		if id == "drop" and held and _drop_held >= 0.0:
 			draw_arc(pos, r - 4.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(_drop_held / DROP_HOLD, 0.0, 1.0), 32, UiTheme.EMBER, 7.0)

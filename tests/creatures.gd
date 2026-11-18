@@ -968,7 +968,7 @@ func _bastion_map() -> void:
 	var hp_full := heavy.hp
 	heavy.hurt(100.0, heavy.global_position)
 	check(is_equal_approx(hp_full - heavy.hp, 100.0 * (1.0 - Ally.HEAVY_GUARD)), "the Mist Heavy's shield takes %d%% off every blow" % int(Ally.HEAVY_GUARD * 100.0))
-	check(Ally.KINDS.slice(-3) == Garrison.ORDER, "the soldiers travel to other phones by their place among the summons")
+	check(Ally.KINDS.find(Garrison.ORDER[0]) == 15 and Ally.KINDS.slice(15, 18) == Garrison.ORDER, "the soldiers travel to other phones by their place among the summons, which never changes")
 	# The Great Portal: what lands on it hurts it.
 	var portal_hp := fort.heart_hp
 	var seal := MistSeal.create(w, fort.heart_at, 3.0, 0.0, 0.1, 20.0, -1, MistSeal.Style.FIRE)
