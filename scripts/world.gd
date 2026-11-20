@@ -120,6 +120,7 @@ var fallen_camp := Vector3.INF # where it was, and how far it reached (w: radius
 var fallen_radius := 0.0
 const PICKUP_APART := 6.0
 const WOOD_GATE_CLEARANCE := 18.0 # forest wood: out of the gates' approaches
+const STEEP_RISE := 0.9 # metres a metre: steeper than this, mobs cannot walk up it (they slide at 45°)
 const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itself
 ## Where new Fort wood lies: by the walls (6 to 15 m out), in the field (15 to 30 m) or in the woods.
 const WOOD_BANDS := {"near": 0.45, "field": 0.3, "forest": 0.25}
@@ -324,6 +325,9 @@ func setup(game_mode: int) -> void:
 			elif mark["kind"] == "lane_way":
 				fort.add_lane_way(int(mark["gate"]), mark["at"])
 		fort.lay_ways()
+	if not terrain.coast.is_empty() or not terrain.sea.is_empty():
+		grid.block_steep(terrain, STEEP_RISE)
+		grid.fine_only = true
 	grid.astar.update()
 	grid.build_far_grid()
 	prepare_forest_wood()
@@ -586,15 +590,28 @@ const MENU_TOUR := [
 	[Vector3(-34, 34, 28), Vector3(-8, 2, 58)],
 	[Vector3(-14, 13, 60), Vector3(20, 8, 30)],
 ]
+## The title screen of The Sunken Crown flies over Port Vael: in from the open sea toward the Tide
+## King's statue, over the whale bones on the flats, up over the roofs to look out at the drowned
+## city's spires under the aurora, round by the Sea Gate in the west and low over the fallen king.
+const MENU_TOUR_VAEL := [
+	[Vector3(0, 9, 104), Vector3(0, 6, -24)],
+	[Vector3(46, 13, 64), Vector3(6, 4, 12)],
+	[Vector3(42, 22, -18), Vector3(-8, 4, 70)],
+	[Vector3(-6, 30, -82), Vector3(0, 10, 60)],
+	[Vector3(-62, 18, -22), Vector3(-48, 2, 48)],
+	[Vector3(-58, 10, 66), Vector3(14, 10, 170)],
+	[Vector3(-24, 9, 98), Vector3(4, 6, -10)],
+]
 const MENU_LEG := 22.0 # seconds from one point of the tour to the next
 
 
 func _menu_view() -> void:
-	if map_id != "mesenlla":
+	var tour := _menu_tour()
+	if tour.is_empty():
 		menu_camera.position = Vector3(cos(_orbit) * 38.0, 24.0, sin(_orbit) * 38.0)
 		menu_camera.look_at(Vector3(0, 18.0, 0))
 		return
-	var n := MENU_TOUR.size()
+	var n := tour.size()
 	var t := fmod(_orbit / 0.05 / MENU_LEG, float(n))
 	var i := int(t)
 	var f := t - i
@@ -605,13 +622,21 @@ func _menu_view() -> void:
 	menu_camera.look_at(look)
 
 
+func _menu_tour() -> Array:
+	match map_id:
+		"mesenlla": return MENU_TOUR
+		"vael": return MENU_TOUR_VAEL
+	return []
+
+
 ## A Catmull-Rom curve through the tour, so it passes through every point smoothly.
 func _tour_point(i: int, f: float, which: int) -> Vector3:
-	var n := MENU_TOUR.size()
-	var p0: Vector3 = MENU_TOUR[posmod(i - 1, n)][which]
-	var p1: Vector3 = MENU_TOUR[i % n][which]
-	var p2: Vector3 = MENU_TOUR[(i + 1) % n][which]
-	var p3: Vector3 = MENU_TOUR[(i + 2) % n][which]
+	var tour := _menu_tour()
+	var n := tour.size()
+	var p0: Vector3 = tour[posmod(i - 1, n)][which]
+	var p1: Vector3 = tour[i % n][which]
+	var p2: Vector3 = tour[(i + 1) % n][which]
+	var p3: Vector3 = tour[(i + 2) % n][which]
 	return 0.5 * ((2.0 * p1) + (-p0 + p2) * f + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * f * f + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * f * f * f)
 
 
@@ -620,7 +645,7 @@ func _map_file() -> String:
 	if Game.test_map != "":
 		return Game.test_map
 	match mode:
-		Game.Mode.MENU: return "res://maps/mesenlla.tscn"
+		Game.Mode.MENU: return "res://maps/vael.tscn" # the title screen of The Sunken Crown
 		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
@@ -1100,6 +1125,14 @@ func _vael_look() -> void:
 	atmosphere.world = self
 	atmosphere.place = MistAtmosphere.Place.VAEL
 	add_child(atmosphere)
+	# The Mists glow green over the drowned kingdom: out to sea (south) at Port Vael, all round on
+	# the Lantern Road.
+	_sky_material.set_shader_parameter("sea", 1.0)
+	# The drowned city stands far out at sea: the sky has to be further away than its spires.
+	_sky_root.scale = Vector3.ONE * 2.85 # 274 m: inside the camera's 300
+	_sky_material.set_shader_parameter("sea_dir", Vector3(0, 0, 1) if map_id == "vael" else Vector3(0, 0, -1))
+	if Ambience.wanted(self):
+		add_child(Ambience.new(self))
 	tide = MistTide.new(self, map_id == "lantern_road") # on the Lantern Road the tide never goes out
 	add_child(tide)
 	if map_id == "lantern_road" and mode == Game.Mode.NIGHT:

@@ -73,7 +73,7 @@ def group(name, parent="."):
     return name if parent == "." else parent + "/" + name
 
 
-def road(name, parent, points, width, cut=False, draw=True):
+def road(name, parent, points, width, cut=False, draw=True, blend=None):
     cid = "Curve_%d" % (len(curves) + 1)
     flat = ", ".join("0, 0, 0, 0, 0, 0, %s, %s, %s" % (p[0], p[1], p[2]) for p in points)
     curves.append('[sub_resource type="Curve3D" id="%s"]\n_data = {\n"points": PackedVector3Array(%s),\n"tilts": PackedFloat32Array(%s)\n}\npoint_count = %d'
@@ -84,6 +84,8 @@ def road(name, parent, points, width, cut=False, draw=True):
         lines.append("cut = true")
     if not draw:
         lines.append("draw = false")
+    if blend is not None:
+        lines.append("cut_blend = %s" % blend)
     nodes.append("\n".join(lines))
 
 
@@ -120,14 +122,25 @@ road("EastSteps", roads, [(62, 2.2, -12), (62, 3.6, -19), (62, 5.0, -27)], 3.4, 
 
 # --- The harbour ---------------------------------------------------------------------------------
 harbour = group("Harbour")
-# The harbour wall, in three lengths with stairs down between them.
-node("WallWest", harbour, "vael", (-55.4, 2.2, 6), kind="quay_wall", size=47.2, on_ground=False)
-node("WallMiddle", harbour, "vael", (0, 2.2, 6), kind="quay_wall", size=56.8, on_ground=False)
-node("WallEast", harbour, "vael", (55.4, 2.2, 6), kind="quay_wall", size=47.2, on_ground=False)
-for x in (-30.0, 30.0):
-    node("SeaStairs", harbour, "vael", (x, 2.2, 6.2), kind="sea_stairs", size=6.0, wide=1.6, on_ground=False)
+# The harbour wall, in lengths with ways down between them: stairs at x = -55, -30, 30 and 55, and
+# two broad slipways either side of the middle, so whatever the tide brings in can always get up.
+WALL_ENDS = (-79.0, 79.0)
+WAYS = [(-55.0, "stairs"), (-30.0, "stairs"), (-12.0, "slip"), (12.0, "slip"), (30.0, "stairs"), (55.0, "stairs")]
+GAP = {"stairs": 1.7, "slip": 3.6}
+edges = [WALL_ENDS[0]]
+for (x, k) in WAYS:
+    edges += [x - GAP[k], x + GAP[k]]
+edges.append(WALL_ENDS[1])
+for i in range(0, len(edges), 2):
+    a, b = edges[i], edges[i + 1]
+    node("Wall", harbour, "vael", ((a + b) * 0.5, 2.2, 6), kind="quay_wall", size=round(b - a, 2), on_ground=False)
+for (x, k) in WAYS:
+    if k == "stairs":
+        node("SeaStairs", harbour, "vael", (x, 2.2, 6.2), kind="sea_stairs", size=6.0, wide=1.6, on_ground=False)
+    else:
+        node("Slipway", harbour, "vael", (x, 2.2, 6.0), kind="slipway", size=10.0, wide=6.0, on_ground=False)
 # The breakwaters and the lighthouse.
-node("WestMole", harbour, "vael", (-84, 2.0, 40), kind="mole", size=68.0, wide=7.0, on_ground=False)
+node("WestMole", harbour, "vael", (-84, 2.0, 40, 180), kind="mole", size=68.0, wide=7.0, on_ground=False) # its parapet to the sea
 node("EastMole", harbour, "vael", (84, 2.0, 40), kind="mole", size=68.0, wide=7.0, on_ground=False)
 node("Lighthouse", harbour, "vael", (84, 2.0, 70), kind="lighthouse", size=17.0, on_ground=False)
 for z in (18, 34, 50):
@@ -146,7 +159,7 @@ for i, (x, w) in enumerate([(-50, 16.0), (-20, 14.0), (26, 16.0)]):
     node("Barrel", house, "prop", (-5.0, 0, -2.4), kind="barrel", on_ground=False)
     node("Barrel", house, "prop", (-5.8, 0, -1.4), kind="barrel", on_ground=False)
     node("Sack", house, "prop", (0.5, 0, -2.6), kind="sack", on_ground=False)
-for x in (-35.0, 12.0, 48.0):
+for x in (-35.0, 21.0, 48.0):
     node("Crane", quay, "vael", (x, 2.2, 3.4), kind="crane", size=6.5, on_ground=False)
 for x in range(-72, 80, 16):
     node("QuayLamp", quay, "vael", (x, 2.2, 4.2, 180), kind="lamp_post", on_ground=False)
@@ -155,7 +168,7 @@ node("Nets", quay, "vael", (-72, 2.2, -10), kind="net_rack", size=8.0, on_ground
 for (x, z) in [(-8, 1.0), (38, -1.0), (-62, 1.5), (68, 0.5)]:
     node("Pots", quay, "vael", (x, 2.2, z, x * 7 % 180), kind="pots", on_ground=False)
 for (x, z, k) in [(-44, 1.5, "barrel"), (-43, 2.6, "barrel"), (-41, 1.2, "crate_big"), (5, 1.6, "crate_long"), (6.5, -0.2, "crate_small"),
-                  (18, 2.0, "barrel"), (33, 1.8, "sack"), (34, 0.9, "sack"), (52, 2.4, "crate_big"), (-14, -0.5, "wheelbarrow"),
+                  (16, 0.5, "barrel"), (33, 1.8, "sack"), (34, 0.9, "sack"), (52, 2.4, "crate_big"), (-14, -0.5, "wheelbarrow"),
                   (-25, 2.4, "lumber"), (22, -8.5, "barrel"), (-4, -8.0, "crate_small")]:
     node("QuayProp", quay, "prop", (x, 2.2, z, x * 13 % 360), kind=k, on_ground=False)
 node("Boat", quay, "vael", (-76, 2.2, 0, 80), kind="upturned_boat", size=4.6, on_ground=False)
@@ -244,6 +257,82 @@ for (x, z) in [(-20, 30), (20, 50), (0, 66), (-50, 50), (50, 50)]:
     spot(flats, "poi", (x, 0, z))
 for (x, z) in [(-40, -60), (40, -60), (0, -40), (-60, -20), (60, -20), (-70, -80), (70, -80)]:
     spot(town, "poi", (x, 5.0, z))
+
+# --- What makes it Vael ----------------------------------------------------------------------------
+dress = group("Dressing")
+# The Tide King at the head of Harbour Street, looking out to sea, braziers either side.
+node("TideKing", dress, "vael", (0, 5.0, -39), kind="statue", size=4.5, on_ground=False)
+for x in (-3.4, 3.4):
+    node("Brazier", dress, "vael", (x, 5.0, -36.5), kind="brazier", on_ground=False)
+# Fires along the quay and in the square.
+for (x, y, z) in [(-24, 2.2, 3.0), (36, 2.2, 3.0), (-66, 2.2, 2.4), (66, 2.2, 2.4), (-13, 5.0, -63), (13, 5.0, -63), (-80, 2.0, 74), (80, 2.0, 66)]:
+    node("Brazier", dress, "vael", (x, y, z), kind="brazier", on_ground=False)
+# Banners of Vael.
+for (x, y, z, yaw) in [(-40, 2.2, 4.6, 0), (40, 2.2, 4.6, 0), (0, 2.2, 4.4, 0), (-16, 5.0, -44, 0), (16, 5.0, -44, 0), (-16, 5.0, -60, 180), (16, 5.0, -60, 180),
+                       (-44, 5.0, -66.5, 0), (-36, 5.0, -66.5, 0), (-84, 2.0, 8, 0), (84, 2.0, 8, 0)]:
+    node("Banner", dress, "vael", (x, y, z, yaw), kind="banner", size=5.5, on_ground=False)
+# Bunting over the streets and the quay.
+for (x, y, z, yaw, length) in [(-20, 5.0, -52, 90, 8.0), (20, 5.0, -52, 90, 8.0), (0, 5.0, -31, 0, 7.0), (-50, 2.2, -2, 0, 10.0), (50, 2.2, -2, 0, 10.0)]:
+    node("Bunting", dress, "vael", (x, y, z, yaw), kind="bunting", size=length, wide=1.0, on_ground=False)
+# Cargo, and fish drying.
+for (x, z, yaw) in [(-9, -13.5, 0), (10, -13.5, 180), (-62, -9, 90), (72, -9, -90), (-28, 0.5, 10)]:
+    node("Cargo", dress, "vael", (x, 2.2, z, yaw), kind="cargo", on_ground=False)
+for (x, z, yaw) in [(-60, 2.2, 0), (44, -14.5, 0), (-76, -5, 90)]:
+    node("FishRack", dress, "vael", (x, 2.2, z, yaw), kind="fish_rack", size=4.0, on_ground=False)
+# Shrines of the Tide.
+for (x, y, z, yaw) in [(-40, 5.0, -60, 90), (40, 5.0, -60, -90), (-79, 2.0, 10, 90), (79, 2.0, 10, -90), (-62, 5.0, -29, 0), (64, 5.0, -29, 0)]:
+    node("Shrine", dress, "vael", (x, y, z, yaw), kind="shrine", on_ground=False)
+# On the seabed: a fallen king, the gates of old Vael, a whale, masts of ships, kelp, pools, lights.
+node("FallenKing", dress, "vael", (-38, 0, 56, 30), kind="fallen_statue", size=5.0)
+node("SeaGate", dress, "vael", (-62, 0, 40, -30), kind="arch", size=7.0)
+node("BrokenGate", dress, "vael", (14, 0, 64, 20), kind="broken_arch", size=8.0)
+node("WhaleBones", dress, "vael", (52, 0, 48, 70), kind="whale_bones", size=12.0)
+for (x, z, h) in [(-8, 78, 8.0), (64, 78, 10.0), (-68, 26, 7.0)]:
+    node("Mast", dress, "vael", (x, 0, z, x * 7 % 360), kind="mast", size=h)
+for (x, z, r) in [(-14, 36, 4.0), (24, 24, 3.5), (-52, 58, 4.0), (40, 70, 4.0), (2, 50, 3.0), (70, 40, 3.0)]:
+    node("Kelp", dress, "vael", (x, 0, z), kind="kelp_bed", size=r)
+for (x, z, r) in [(-62, 16, 2.2), (-26, 22, 2.0), (58, 30, 2.4), (32, 16, 1.8)]:
+    node("TidePool", dress, "vael", (x, 0, z), kind="tide_pool", size=r)
+node("DrownedHead", dress, "vael", (-72, 0, 80), kind="statue_head", size=2.2)
+for (x, z, sz) in [(0, 62, 22.0), (-50, 70, 14.0), (40, 56, 14.0), (8, 30, 8.0)]:
+    node("GhostLights", dress, "vael", (x, 0, z), kind="ghost_lights", size=sz)
+# The town lived in: every house with its chimney smoking and a lamp by the door, a bench, and behind
+# it a garden, a washing line or a boat laid up for mending; paved streets; a drystone wall along the
+# brow above the quay; paper lanterns strung over Market Row; and the wet, glowing tracks of things
+# that have come up out of the sea.
+for i, (x, z, w, d, door) in enumerate(houses):
+    yaw = (i * 37) % 7 - 3
+    a = math.radians(yaw)
+    def at(lx, lz, ly=5.0, turn=0.0):
+        return (x + lx * math.cos(a) + lz * math.sin(a), ly, z - lx * math.sin(a) + lz * math.cos(a), yaw + turn)
+    front = 1.0 if door == "s" else -1.0
+    turn = 0.0 if door == "s" else 180.0
+    node("Chimney", dress, "vael", at(w * 0.3 * (1 if i % 2 else -1), 0), kind="chimney", size=6.4, on_ground=False)
+    node("PorchLamp", dress, "vael", at(1.25, front * d * 0.5, turn=turn), kind="porch_lamp", on_ground=False)
+    node("Bench", dress, "vael", at(-2.6 if door == "s" else 2.6, front * (d * 0.5 + 0.35), turn=turn), kind="bench", on_ground=False)
+    back = at(0, -front * (d * 0.5 + 4.0), turn=turn)
+    if i % 3 == 0:
+        node("Garden", dress, "vael", back, kind="garden", size=float(min(w, 9)), wide=6.0, on_ground=False)
+    elif i % 3 == 1:
+        node("Laundry", dress, "vael", at(0, -front * (d * 0.5 + 2.5), turn=turn), kind="laundry", size=float(w - 1), on_ground=False)
+    else:
+        node("LaidUpBoat", dress, "vael", back, kind="upturned_boat", size=4.6, on_ground=False)
+        node("Pots", dress, "vael", at(2.8, -front * (d * 0.5 + 2.0), turn=turn), kind="pots", on_ground=False)
+for (cx, z, length, yaw) in [(-74.5, -52, 23.0, 0), (-51.5, -52, 23.0, 0), (-28.5, -52, 23.0, 0), (28.5, -52, 23.0, 0), (51.5, -52, 23.0, 0),
+                             (74.5, -52, 23.0, 0), (-40, -69, 30.0, 90), (40, -69, 30.0, 90), (0, -36, 16.0, 90)]:
+    node("StreetPaving", dress, "vael", (cx, 5.0, z, yaw), kind="paving", size=length, wide=4.0 if yaw else 5.0, on_ground=False)
+for (a, b) in [(-86, -64), (-56, -6), (6, 58), (66, 86)]:
+    node("BrowWall", dress, "vael", ((a + b) * 0.5, 5.0, -23.5), kind="drystone", size=float(b - a))
+for x in (-64, -36, 24, 50, 78):
+    node("Lanterns", dress, "vael", (x, 5.0, -52, 90), kind="lantern_string", size=12.0, wide=1.0, on_ground=False)
+for (x, z, yaw, length) in [(-55, 0, 90, 7.0), (-30, -1, 80, 6.0), (30, 0, 100, 6.0), (55, -1, 90, 7.0), (-12, -2, 95, 9.0), (12, -1, 85, 9.0),
+                            (0, -24, 90, 8.0), (-60, -24, 92, 7.0), (2, -46, 70, 6.0), (-52, -52, 10, 8.0)]:
+    node("SeaTrail", dress, "vael", (x, 0, z, yaw), kind="sea_trail", size=length)
+for (x, z, k, sz) in [(-48, -42, "broad", 6.0), (62, -44, "broad", 5.5), (-48, -74, "dead", 5.5), (4, -80, "broad", 6.5), (25, -71, "broad", 6.0), (-82, -74, "dead", 5.0)]:
+    node("Tree", dress, "tree", (x, 5.0, z), kind=k, size=sz)
+# The drowned city, far out at sea.
+for (x, z, h) in [(-40, 150, 46.0), (30, 172, 62.0), (92, 142, 38.0), (-112, 166, 52.0), (-4, 205, 74.0)]:
+    node("Spire", dress, "vael", (x, -3.6, z, x * 3 % 360), kind="spire", size=h, on_ground=False)
 
 # --- Versus: where rivals begin ------------------------------------------------------------------
 rivals = group("Rivals")

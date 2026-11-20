@@ -29,12 +29,25 @@ Through a new portal from the heart of the Mists: the drowned harbour of the kin
 
 ### Last Light, on the Lantern Road
 A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: walk the Lantern Barge to the Isle of Lamps.
-- **The Lantern Barge** goes up its channel only while one of you walks within 7 m of it, and stops while anything of the sea clings to it. Drowned Sailors climb aboard every 30 s it moves.
-- **Its light** reaches 12 m. The Mist Tide never goes out here: outside the light you have 3 s, then the tide drowns you at 6 health a second.
+- **The Lantern Barge** goes up its channel only while one of you walks within 13 m of it, and stops while anything of the sea clings to it. Drowned Sailors climb aboard every 30 s it moves.
+- **Its light** reaches 15 m. The Mist Tide never goes out here: outside the light you have 3 s, then the tide drowns you at 6 health a second.
 - **Three waystations** on the way. Everyone is healed 40% of their health and chooses one of three boons; the barge waits up to 25 s. Something waits on the road as you leave each one.
 - **Seven boons:** Salt Ward, Lamplighter's Fury, Sea Legs, Ship's Biscuit, Mended Net, Deep Lungs and Lantern Bearer.
-- **The Leviathan of the Mists** rises at the Isle of Lamps. Step out of its bite, outrun its waves, and keep near the barge when it spits the sea over it (the light shrinks to 6 m for 8 s). Defeat it, and the lighthouse burns again: that is the dawn.
+- **The Leviathan of the Mists** rises at the Isle of Lamps. Step out of its bite, outrun its waves, and keep near the barge when it spits the sea over it (the light shrinks to 10 m for 8 s). Defeat it, and the lighthouse burns again: that is the dawn.
 - Its own music (a pilgrims' hymn), sounds and map.
+
+### The coast of Vael, dressed
+- **The Drowned climb out of the flats** by the stairs and slipways, at any tide, and no longer stick at the foot of the quay or the breakwaters. Two broad slipways now lead up from the flats either side of Harbour Street.
+- **The Lantern Barge keeps to its channel** of deep water the whole way to the Isle of Lamps.
+- **Port Vael:** the Tide King's statue over the harbour, braziers, banners, bunting and lantern strings, cargo and drying fish on the quay, smoking chimneys, gardens and washing lines in the town, paved streets, and the wet, glowing tracks of the Drowned. On the flats: a fallen king, the old sea gates, a whale's bones, sunk masts with corpse-lights, kelp beds and tide pools that glow.
+- **The Lantern Road:** pilgrim arches over the road, shrines, sunk gates, masts, kelp and ghost-lights along the way.
+- **The drowned city:** its spires stand far out at sea round both maps, green light in their windows, under an aurora.
+- Salt-burnt grass, and wisps and sea-glow drifting round you.
+
+### The Sunken Crown title screen
+- **A new app icon:** the bell, crowned, under the aurora of Vael.
+- **The main menu** flies over Port Vael and the drowned city, to a new theme, "The Sunken Crown".
+- A new splash screen.
 
 ### Class Upgrades for the Adept, the Cartographer and the Bandit
 One for each path, in the Store.

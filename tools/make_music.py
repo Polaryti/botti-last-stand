@@ -26,7 +26,7 @@ OUT = "assets/music/"
 TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5,
     "mists_night": -16.0, "mists_hunted": -13.5, "mists_dawn": -14.5,
     "fort_night": -15.0, "fort_hunted": -13.5, "fort_dawn": -14.5,
-    "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0,
+    "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0, "menu_vael": -16.0,
     "bastion_night": -15.5, "bastion_hunted": -13.5, "bastion_dawn": -14.5,
     "vael_night": -15.5, "vael_hunted": -13.5, "vael_dawn": -14.5,
     "lantern_night": -15.5, "lantern_hunted": -13.5, "lantern_dawn": -14.5}
@@ -1550,6 +1550,60 @@ D_DORIAN = (2, 4, 5, 7, 9, 11, 0)
 D_MAJOR = (2, 4, 6, 7, 9, 11, 1)
 
 
+# --- The main menu of The Sunken Crown ------------------------------------------------------------
+# G minor, the drowned kingdom's own key: a new tune, "The Sunken Crown", that rises out of the deep
+# low in the cellos under a wordless choir and the harp's tide, is answered high by the fiddle of
+# Port Vael, is sung out by the whole orchestra with the horns, and sinks back to the bells.
+
+CROWN_CHORDS = ["Gm", "Eb", "Bb", "F", "Gm", "Cm", "D", "D",
+    "Eb", "Bb", "Cm", "Gm", "Eb", "F", "Dsus", "D",
+    "Gm", "Eb", "Bb", "F", "Gm", "Cm", "D", "D",
+    "Eb", "Bb", "Cm", "Gm", "Eb", "Cm", "D", "D"]
+CROWN_A = "G4:2 D5:2 | Eb5:1.5 D5:.5 C5:1 Bb4:1 | D5:3 F5:1 | C5:2 A4:2 | Bb4:1.5 C5:.5 D5:1 G5:1 | Eb5:2 C5:1 G4:1 | A4:1.5 Bb4:.5 C5:1 A4:1 | F#4:2 A4:1 D5:1"
+CROWN_B = "G5:3 Eb5:1 | F5:2 D5:1 Bb4:1 | Eb5:1.5 D5:.5 C5:2 | D5:3 Bb4:1 | C5:1 Eb5:1 G5:1 Bb5:1 | A5:2 F5:1 C5:1 | G5:2 A5:1 G5:1 | F#5:3 A4:1"
+CROWN_CLOSE = "Bb4:3 G4:1 | F4:2 D4:1 F4:1 | G4:1.5 Eb4:.5 C5:2 | Bb4:4 | G4:2 Bb4:1 Eb5:1 | C5:2 Eb5:1 G4:1 | A4:2 F#4:2 | D4:4"
+
+
+def compose_menu_vael(o):
+    """The main menu of The Sunken Crown, over Port Vael and the drowned city."""
+    s = Score("menu_vael", 241)
+    d = o.drums
+    s.dynamics = [(1, 0.46), (8, 0.56), (9, 0.6), (16, 0.72), (17, 0.9), (24, 0.94), (25, 0.64), (32, 0.48), (33, 0.46)]
+    ch = CROWN_CHORDS
+    for i, c in enumerate(ch):
+        harp_bar(s, o.harp, c, i + 1, 0.62, up_only=i % 2 == 1)
+    tide_swell(s, o.violas, ch[:16], 1, 0.3, 55, 67)
+    # I. Out of the deep: the cellos carry the tune low, the choir breathes under it.
+    s.play_line(o.cellos, CROWN_A, 1, shift=-12, vel=0.78, players=2)
+    choir_chords(s, o.choir, ch[:8], 1, 0.3, lo=55, hi=70, count=3)
+    foghorn(s, o, ch[0], 1, 0.42)
+    d.belltree(s, 0.0, 0.5)
+    # II. The fiddle of Port Vael answers, high and alone; violins hold the light under it.
+    s.play_line(o.solo_violin, CROWN_B, 9, vel=0.86)
+    play_pad(s, o.violins, ch[8:16], 9, 3, 65, 77, 0.3)
+    sparkle(s, o.glock, ch[8:16], 9, 2, 0.5, lo=79, hi=91)
+    toll(s, d, ch[8:16], 9, 4, 0.48, lo=55, hi=67)
+    harp_run(s, o.harp, 62.0, 2.0, 55, 86, 0.52, (7, 9, 10, 0, 2, 3, 6)) # G harmonic minor, up to the D
+    d.swell(s, 64.0, 0.46, "Median")
+    # III. The crown raised: everyone, the tune in the violins and the horns, the choir up high.
+    s.play_line(o.violins, CROWN_A, 17, shift=12, vel=0.88, players=3)
+    s.play_line(o.horns, CROWN_A, 17, vel=0.62, players=3)
+    s.play_line(o.trombones, CROWN_A, 17, shift=-12, vel=0.4, players=2)
+    pulse_low(s, o, ch[16:24], 17, 0.52)
+    choir_chords(s, o.choir, ch[16:24], 17, 0.44, lo=60, hi=76, count=4)
+    d.crash(s, 64.0, 0.5)
+    for bar in (17, 19, 21, 23):
+        d.timp(s, root_in(ch[bar - 1], 38), (bar - 1) * 4.0, 0.5)
+    # IV. Sinking back: the fiddle low, the drowned bells, and the swell going out, round to the start.
+    s.play_line(o.solo_violin, CROWN_CLOSE, 25, vel=0.78)
+    tide_swell(s, o.cellos, ch[24:32], 25, 0.36, 43, 58)
+    choir_chords(s, o.choir, ch[24:32], 25, 0.26, lo=55, hi=70, count=3)
+    toll(s, d, ch[24:32], 25, 2, 0.52, lo=55, hi=67)
+    foghorn(s, o, ch[24], 25, 0.36)
+    d.bowed(s, 112.0, 0.36)
+    return s
+
+
 def pilgrim_steps(s, inst, chords, first_bar, vel):
     """The basses walking, one plucked step to a beat: root, fifth, octave, fifth."""
     for i, c in enumerate(chords):
@@ -1780,7 +1834,8 @@ COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_d
     "menu_mesenlla": compose_menu_mesenlla,
     "bastion_night": compose_bastion_night, "bastion_hunted": compose_bastion_hunted, "bastion_dawn": compose_bastion_dawn,
     "vael_night": compose_vael_night, "vael_hunted": compose_vael_hunted, "vael_dawn": compose_vael_dawn,
-    "lantern_night": compose_lantern_night, "lantern_hunted": compose_lantern_hunted, "lantern_dawn": compose_lantern_dawn}
+    "lantern_night": compose_lantern_night, "lantern_hunted": compose_lantern_hunted, "lantern_dawn": compose_lantern_dawn,
+    "menu_vael": compose_menu_vael}
 
 
 def main():

@@ -117,6 +117,13 @@ func collider(at: Vector3, size: Vector3) -> void:
 	w.add_collider_xf(xf.translated_local(at), size)
 
 
+## Ground nothing should plan to walk over, though nothing solid stands on it: the foot of a sea wall,
+## where the climb is too high (PathGrid only, no collision).
+func no_walk(at: Vector3, size: Vector3) -> void:
+	if w.grid:
+		w.grid.block_turned(xf.translated_local(at), size)
+
+
 ## A window's opening: stops bodies and blades, not sight or shots.
 func window_gap(at: Vector3, size: Vector3) -> void:
 	w.add_window_xf(xf.translated_local(at), size)
@@ -179,7 +186,9 @@ func flush() -> void:
 	_trees.clear()
 	for key: Vector2i in _cells:
 		(_cells[key] as LowPoly).base = Transform3D.IDENTITY
-		add(_cells[key])
+		var mi := add(_cells[key])
+		if mi.mesh.get_surface_count() == 0: # a square asked for but left empty
+			mi.queue_free()
 	_cells.clear()
 
 
@@ -208,8 +217,9 @@ func ground() -> void:
 		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
 		mat.set_shader_parameter("dirt", Vector3(0.24, 0.19, 0.17))
 	elif look in SpawnRules.VAEL:
-		# Salt grass by the sea, paler and drier, and grey-brown cobble-dust on the streets.
-		mat.set_shader_parameter("tint", Vector3(1.0, 0.97, 0.86))
+		# Salt grass by the sea, burnt dun and grey-green by the wind and spray, and grey-brown
+		# cobble-dust on the streets.
+		mat.set_shader_parameter("tint", Vector3(1.12, 0.86, 0.7))
 		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
 	_ground_material = mat
 	var j := 0
@@ -1705,6 +1715,8 @@ func _tall_wall(h: float) -> void:
 
 ## Grass tufts, in patches so the camera can skip those it cannot see.
 func grass(h: float) -> void:
+	# By the sea the tufts are salt-burnt like the ground under them.
+	var tuft_tint := Color(1.0, 0.8, 0.64) if look in SpawnRules.VAEL else Color.WHITE
 	var patches := {}
 	var tuft := _grass_tuft()
 	# The same thickness of grass on any size of map.
@@ -1725,7 +1737,7 @@ func grass(h: float) -> void:
 			patches[key] = [[], PackedColorArray()]
 		var s := rng.randf_range(1.0, 1.9)
 		(patches[key][0] as Array).append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s, s)), p))
-		patches[key][1] = (patches[key][1] as PackedColorArray) + PackedColorArray([Color.WHITE.darkened(rng.randf() * 0.2)])
+		patches[key][1] = (patches[key][1] as PackedColorArray) + PackedColorArray([tuft_tint.darkened(rng.randf() * 0.2)])
 	for key: Vector2i in patches:
 		var list: Array[Transform3D] = []
 		list.assign(patches[key][0])

@@ -8,6 +8,8 @@ uniform float cloud = 0.0; // how overcast it is
 uniform float flash = 0.0; // lightning
 uniform vec3 tint = vec3(1.0); // the Mists are teal
 uniform float dusk = 0.0; // Mesenlla: a luminous twilight, still glowing where the sun went down
+uniform float sea = 0.0; // the drowned kingdom of Vael: the Mists glowing green over the sea, and its veil in the sky
+uniform vec3 sea_dir = vec3(0.0, 0.0, 1.0);
 
 varying vec3 dir;
 
@@ -31,6 +33,19 @@ void fragment() {
 		vec3 twilight = mix(low, mid, smoothstep(0.0, 0.22, h));
 		twilight = mix(twilight, top, smoothstep(0.18, 0.75, h));
 		night = mix(night, twilight, dusk);
+	}
+	if (sea > 0.0) {
+		// Over the sea, the Mists glow: a cold green light low along the horizon, strongest out to sea,
+		// and above it a veil hanging in the sky, slow folds of it drifting along.
+		vec3 flat_d = normalize(vec3(d.x, 0.0, d.z) + vec3(0.0001));
+		float seaward = 0.35 + 0.65 * max(dot(flat_d, normalize(sea_dir)), 0.0);
+		float band = exp(-h * 9.0) * seaward;
+		night += vec3(0.06, 0.24, 0.22) * band * sea;
+		float az = atan(d.x, d.z);
+		float folds = 0.5 + 0.5 * sin(az * 7.0 + TIME * 0.05 + sin(az * 3.0 - TIME * 0.03) * 2.0);
+		folds *= 0.6 + 0.4 * sin(az * 17.0 - TIME * 0.08);
+		float veil = smoothstep(0.08, 0.2, h) * (1.0 - smoothstep(0.32, 0.62, h)) * seaward;
+		night += mix(vec3(0.05, 0.3, 0.22), vec3(0.12, 0.2, 0.36), smoothstep(0.15, 0.5, h)) * veil * folds * 0.55 * sea;
 	}
 	vec3 day_top = vec3(0.28, 0.44, 0.68);
 	vec3 day_mid = vec3(0.74, 0.62, 0.62);

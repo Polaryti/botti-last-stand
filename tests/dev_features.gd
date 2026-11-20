@@ -1625,7 +1625,9 @@ func _requests_1116() -> void:
 	var saved_map := Game.fort_map
 	Game.fort_map = "bastion"
 	Game.mode = Game.Mode.FORT
-	var space := Node3D.new()
+	# A world of its own, so nothing of the title screen's map behind it gets in the way.
+	var space := SubViewport.new()
+	space.own_world_3d = true
 	add_child(space)
 	var bw := World.new()
 	space.add_child(bw)
@@ -1743,6 +1745,9 @@ func _port_vael() -> void:
 	check(PlaceVista.LOOKS.has("vael") and Icons.exists("map_vael"), "its loading view and its icon")
 	check(Sfx.MUSIC_SETS.has("vael") and (Sfx.MUSIC_SETS["vael"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
 	check(Director.DAWN_SOUNDS.get("vael", "") == "dawn_vael" and Sfx.NAMES.has("dawn_vael"), "and its own sound at dawn")
+	# The Sunken Crown's title screen: Port Vael under its aurora, and a theme of its own.
+	check(Sfx.MUSIC_SETS["menu"][0] == "menu_vael" and ResourceLoader.exists("res://assets/music/menu_vael.ogg"), "the main menu has The Sunken Crown's own theme")
+	check(World.MENU_TOUR_VAEL.size() >= 6 and World.MENU_TOUR_VAEL.all(func(p: Array) -> bool: return absf(p[0].x) < 110.0 and absf(p[0].z) < 110.0), "and its camera tours Port Vael, inside the map")
 	# The tide's clock.
 	check(is_equal_approx(MistTide.level_at(0.0), MistTide.LOW_Y) and not MistTide.is_high_at(10.0), "the night begins at low tide")
 	check(MistTide.is_high_at(MistTide.TURN + 1.0) and is_equal_approx(MistTide.level_at(MistTide.TURN + MistTide.RISE), MistTide.HIGH_Y), "after %d s it comes in, taking %d s" % [int(MistTide.TURN), int(MistTide.RISE)])
@@ -1769,6 +1774,28 @@ func _port_vael() -> void:
 	check(absf(t.height(0, -5) - 2.2) < 0.15 and t.height(0, -55) > 4.5, "the quay and the town above it")
 	check(t.height(0, 40) < MistTide.HIGH_Y - 0.3 and t.height(0, 40) > MistTide.LOW_Y + 0.2, "the flats between low and high water")
 	check(t.deep_water(0, 104) and not t.is_walkable(0, 104) and t.is_walkable(0, 40), "the open sea beyond them is no place to walk")
+	# Out of the tide flats the Drowned climb by the stairs and slipways, never up the face of the
+	# quay or the moles, which the path grid shuts wherever the ground rises too steeply.
+	var face := 0
+	var shut := 0
+	for x in range(-78, 79):
+		if [-55, -30, -12, 12, 30, 55].any(func(w: int) -> bool: return absi(x - w) <= 4):
+			continue
+		face += 1
+		if vael.grid.astar.is_point_solid(vael.grid.to_cell(Vector3(x, 0, 7.0))):
+			shut += 1
+	check(vael.grid.fine_only and vael.grid.closed_steep > 0 and shut == face, "the face of the quay is shut to paths all along, but for its stairs and slipways (%d of %d m; %d steep cells)" % [shut, face, vael.grid.closed_steep])
+	for trip: Array in [[Vector3(0, 0, 40), Vector3(0, 0, -6), "the quay"], [Vector3(-30, 0, 60), Vector3(0, 0, -55), "the market square"],
+			[Vector3(60, 0, 40), Vector3(84, 0, 45), "the east mole"], [Vector3(-60, 0, 40), Vector3(-84, 0, 45), "the west mole"]]:
+		var from: Vector3 = trip[0]
+		var to: Vector3 = trip[1]
+		var way := vael.grid.route(from, to)
+		var steepest := 0.0
+		for i in range(1, way.size()):
+			var rise := absf(t.height(way[i].x, way[i].z) - t.height(way[i - 1].x, way[i - 1].z))
+			steepest = maxf(steepest, rise / maxf(0.5, Vector2(way[i].x - way[i - 1].x, way[i].z - way[i - 1].z).length()))
+		var reaches := way.size() > 1 and Vector2(way[-1].x - to.x, way[-1].z - to.z).length() < 2.5
+		check(reaches and steepest < 0.95, "from the flats a path climbs to %s, by stairs or a slipway (%d points, steepest %.2f)" % [trip[2], way.size(), steepest])
 	check(t.height(-84, 40) > MistTide.HIGH_Y + 0.8 and t.height(84, 40) > MistTide.HIGH_Y + 0.8, "the breakwaters stand out of the highest tide")
 	check(vael.tide.salvage().size() >= 4, "every wreck keeps a sea chest (%d)" % vael.tide.salvage().size())
 	var flats := Vector3(0, t.height(0, 40), 40)
@@ -2158,6 +2185,25 @@ func _last_light() -> void:
 		Game.mode = was_mode
 		return
 	ll.set_physics_process(false)
+	# The barge floats: every metre of its course, under it, beside it and just ahead of it, is under
+	# the Lantern Road's sea, which never goes out, and none of it crosses the road.
+	var dry := 0
+	var worst := -9.0
+	var d := 0.0
+	while d < ll.length:
+		var at := ll.path.sample_baked(d)
+		var ahead := ll.path.sample_baked(minf(ll.length, d + 1.0))
+		var dir := Vector3(ahead.x - at.x, 0, ahead.z - at.z).normalized()
+		if dir == Vector3.ZERO:
+			dir = Vector3.FORWARD
+		var side := dir.cross(Vector3.UP)
+		for off: Vector3 in [Vector3.ZERO, side * 2.1, -side * 2.1, dir * 4.0 + side * 2.1, dir * 4.0 - side * 2.1]:
+			var g := road.terrain.height(at.x + off.x, at.z + off.z)
+			worst = maxf(worst, g)
+			if g > MistTide.HIGH_Y - 0.3:
+				dry += 1
+		d += 1.0
+	check(road.tide.always_high and dry == 0, "the barge's whole course is water, never land (highest ground under it %.2f m, the sea %.2f m)" % [worst, MistTide.HIGH_Y])
 	check(ll.way_at.size() == 3 and road.road_lanterns.size() >= 20 and road.lighthouse_top != Vector3.INF, "three waystations, %d road lanterns, and the lighthouse at the end" % road.road_lanterns.size())
 	check(road.tide.level >= MistTide.HIGH_Y - 0.01, "the tide is in, and stays in")
 	var you := road.player

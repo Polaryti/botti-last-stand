@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_root.gd" id="root"]
 [ext_resource type="Script" path="res://scripts/map/map_level.gd" id="level"]
@@ -27,19 +27,26 @@ point_count = 3
 
 [sub_resource type="Curve3D" id="Curve_3"]
 _data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 9.41, -1.0, 133.33, 0, 0, 0, 0, 0, 0, 10.53, -1.0, 126.95, 0, 0, 0, 0, 0, 0, 10.86, -1.0, 114.52, 0, 0, 0, 0, 0, 0, 5.21, -1.0, 103.04, 0, 0, 0, 0, 0, 0, -1.99, -1.0, 96.03, 0, 0, 0, 0, 0, 0, -10.25, -1.0, 89.8, 0, 0, 0, 0, 0, 0, -18.95, -1.0, 83.96, 0, 0, 0, 0, 0, 0, -27.18, -1.0, 79.5, 0, 0, 0, 0, 0, 0, -35.65, -1.0, 75.8, 0, 0, 0, 0, 0, 0, -43.38, -1.0, 72.32, 0, 0, 0, 0, 0, 0, -49.36, -1.0, 68.84, 0, 0, 0, 0, 0, 0, -53.99, -1.0, 64.48, 0, 0, 0, 0, 0, 0, -58.72, -1.0, 58.38, 0, 0, 0, 0, 0, 0, -62.3, -1.0, 51.93, 0, 0, 0, 0, 0, 0, -64.22, -1.0, 46.07, 0, 0, 0, 0, 0, 0, -64.39, -1.0, 41.19, 0, 0, 0, 0, 0, 0, -62.96, -1.0, 35.22, 0, 0, 0, 0, 0, 0, -60.0, -1.0, 28.91, 0, 0, 0, 0, 0, 0, -55.95, -1.0, 23.35, 0, 0, 0, 0, 0, 0, -51.69, -1.0, 19.59, 0, 0, 0, 0, 0, 0, -45.93, -1.0, 16.57, 0, 0, 0, 0, 0, 0, -38.46, -1.0, 13.85, 0, 0, 0, 0, 0, 0, -30.08, -1.0, 11.44, 0, 0, 0, 0, 0, 0, -21.69, -1.0, 9.22, 0, 0, 0, 0, 0, 0, -14.21, -1.0, 7.67, 0, 0, 0, 0, 0, 0, -6.22, -1.0, 6.67, 0, 0, 0, 0, 0, 0, 2.43, -1.0, 5.72, 0, 0, 0, 0, 0, 0, 11.65, -1.0, 4.29, 0, 0, 0, 0, 0, 0, 20.25, -1.0, 2.2, 0, 0, 0, 0, 0, 0, 28.51, -1.0, 0.06, 0, 0, 0, 0, 0, 0, 37.17, -1.0, -2.46, 0, 0, 0, 0, 0, 0, 45.81, -1.0, -5.64, 0, 0, 0, 0, 0, 0, 54.05, -1.0, -9.86, 0, 0, 0, 0, 0, 0, 61.98, -1.0, -16.11, 0, 0, 0, 0, 0, 0, 69.2, -1.0, -24.38, 0, 0, 0, 0, 0, 0, 74.87, -1.0, -33.74, 0, 0, 0, 0, 0, 0, 78.56, -1.0, -43.83, 0, 0, 0, 0, 0, 0, 79.58, -1.0, -54.45, 0, 0, 0, 0, 0, 0, 77.82, -1.0, -65.07, 0, 0, 0, 0, 0, 0, 73.97, -1.0, -75.25, 0, 0, 0, 0, 0, 0, 68.33, -1.0, -84.49, 0, 0, 0, 0, 0, 0, 60.87, -1.0, -92.08, 0, 0, 0, 0, 0, 0, 52.13, -1.0, -97.19, 0, 0, 0, 0, 0, 0, 43.2, -1.0, -100.82, 0, 0, 0, 0, 0, 0, 34.88, -1.0, -103.79, 0, 0, 0, 0, 0, 0, 27.93, -1.0, -106.65, 0, 0, 0, 0, 0, 0, 11.0, -1.0, -116.5),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 47
+
+[sub_resource type="Curve3D" id="Curve_4"]
+_data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, -70.98828125, 1.15, 55.77734375, 0, 0, 0, 0, 0, 0, -80.13082672423268, 1.15, 59.82874625426781),
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
 
-[sub_resource type="Curve3D" id="Curve_4"]
+[sub_resource type="Curve3D" id="Curve_5"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, 1.2592592592592569, 1.15, -3.7037037037037033, 0, 0, 0, 0, 0, 0, 0.02520784183085434, 1.15, -13.627267433490648),
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
 
-[sub_resource type="Curve3D" id="Curve_5"]
+[sub_resource type="Curve3D" id="Curve_6"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, 65.4296875, 1.15, -71.083984375, 0, 0, 0, 0, 0, 0, 56.44134497463305, 1.15, -66.70109735310677),
 "tilts": PackedFloat32Array(0, 0)
@@ -179,6 +186,7 @@ script = ExtResource("road")
 curve = SubResource("Curve_1")
 width = 6.0
 cut = true
+cut_blend = 2.5
 
 [node name="IsleStair" type="Path3D" parent="Roads"]
 script = ExtResource("road")
@@ -356,510 +364,483 @@ script = ExtResource("vael")
 kind = "road_lantern"
 on_ground = false
 
+[node name="BargeChannel" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_3")
+width = 3.0
+cut = true
+draw = false
+cut_blend = 1.5
+
 [node name="BargeLane" type="Node3D" parent="."]
 
 [node name="Barge" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.35, 0, 132.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.41, 0, 133.33)
 script = ExtResource("spot")
 kind = "barge"
 gate = 0
 on_ground = false
 
 [node name="Barge2" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.48, 0, 126.3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.53, 0, 126.95)
 script = ExtResource("spot")
 kind = "barge"
 gate = 1
 on_ground = false
 
 [node name="Barge3" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.84, 0, 115.3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.86, 0, 114.52)
 script = ExtResource("spot")
 kind = "barge"
 gate = 2
 on_ground = false
 
 [node name="Barge4" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.82, 0, 109.57)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.49, 0, 107.73)
 script = ExtResource("spot")
 kind = "barge"
 gate = 3
 on_ground = false
 
 [node name="Barge5" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.06, 0, 102.35)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.79, 0, 99.4)
 script = ExtResource("spot")
 kind = "barge"
 gate = 4
 on_ground = false
 
 [node name="Barge6" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.62, 0, 99.18)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.99, 0, 96.03)
 script = ExtResource("spot")
 kind = "barge"
 gate = 5
 on_ground = false
 
 [node name="Barge7" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.5, 0, 96.12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.04, 0, 92.85)
 script = ExtResource("spot")
 kind = "barge"
 gate = 6
 on_ground = false
 
 [node name="Barge8" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16.82, 0, 90.27)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.54, 0, 86.87)
 script = ExtResource("spot")
 kind = "barge"
 gate = 7
 on_ground = false
 
 [node name="Barge9" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21.13, 0, 87.43)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.95, 0, 83.96)
 script = ExtResource("spot")
 kind = "barge"
 gate = 8
 on_ground = false
 
 [node name="Barge10" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.87, 0, 85.23)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.92, 0, 81.62)
 script = ExtResource("spot")
 kind = "barge"
 gate = 9
 on_ground = false
 
 [node name="Barge11" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28.93, 0, 83.21)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27.18, 0, 79.5)
 script = ExtResource("spot")
 kind = "barge"
 gate = 10
 on_ground = false
 
 [node name="Barge12" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -37.28, 0, 79.56)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -35.65, 0, 75.8)
 script = ExtResource("spot")
 kind = "barge"
 gate = 11
 on_ground = false
 
 [node name="Barge13" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -41.35, 0, 77.79)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39.67, 0, 74.05)
 script = ExtResource("spot")
 kind = "barge"
 gate = 12
 on_ground = false
 
 [node name="Barge14" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45.21, 0, 75.99)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -43.38, 0, 72.32)
 script = ExtResource("spot")
 kind = "barge"
 gate = 13
 on_ground = false
 
 [node name="Barge15" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -51.78, 0, 72.15)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49.36, 0, 68.84)
 script = ExtResource("spot")
 kind = "barge"
 gate = 14
 on_ground = false
 
 [node name="Barge16" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -54.32, 0, 70.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -51.52, 0, 67.05)
 script = ExtResource("spot")
 kind = "barge"
 gate = 15
 on_ground = false
 
 [node name="Barge17" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -59.7, 0, 64.04)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56.46, 0, 61.53)
 script = ExtResource("spot")
 kind = "barge"
 gate = 16
 on_ground = false
 
 [node name="Barge18" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -62.14, 0, 60.65)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -58.72, 0, 58.38)
 script = ExtResource("spot")
 kind = "barge"
 gate = 17
 on_ground = false
 
 [node name="Barge19" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -64.28, 0, 57.13)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60.69, 0, 55.14)
 script = ExtResource("spot")
 kind = "barge"
 gate = 18
 on_ground = false
 
 [node name="Barge20" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -67.39, 0, 50.12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63.49, 0, 48.86)
 script = ExtResource("spot")
 kind = "barge"
 gate = 19
 on_ground = false
 
 [node name="Barge21" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -68.25, 0, 46.83)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -64.22, 0, 46.07)
 script = ExtResource("spot")
 kind = "barge"
 gate = 20
 on_ground = false
 
 [node name="Barge22" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -68.47, 0, 40.74)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -64.39, 0, 41.19)
 script = ExtResource("spot")
 kind = "barge"
 gate = 21
 on_ground = false
 
 [node name="Barge23" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -67.87, 0, 37.37)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63.88, 0, 38.32)
 script = ExtResource("spot")
 kind = "barge"
 gate = 22
 on_ground = false
 
 [node name="Barge24" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -65.36, 0, 30.29)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -61.65, 0, 32.03)
 script = ExtResource("spot")
 kind = "barge"
 gate = 23
 on_ground = false
 
 [node name="Barge25" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63.53, 0, 26.82)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -60, 0, 28.91)
 script = ExtResource("spot")
 kind = "barge"
 gate = 24
 on_ground = false
 
 [node name="Barge26" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -61.39, 0, 23.56)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -58.07, 0, 25.97)
 script = ExtResource("spot")
 kind = "barge"
 gate = 25
 on_ground = false
 
 [node name="Barge27" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56.44, 0, 18.06)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53.74, 0, 21.14)
 script = ExtResource("spot")
 kind = "barge"
 gate = 26
 on_ground = false
 
 [node name="Barge28" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -53.97, 0, 16.19)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -51.69, 0, 19.59)
 script = ExtResource("spot")
 kind = "barge"
 gate = 27
 on_ground = false
 
 [node name="Barge29" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47.56, 0, 12.81)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -45.93, 0, 16.57)
 script = ExtResource("spot")
 kind = "barge"
 gate = 28
 on_ground = false
 
 [node name="Barge30" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -43.76, 0, 11.31)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42.36, 0, 15.16)
 script = ExtResource("spot")
 kind = "barge"
 gate = 29
 on_ground = false
 
 [node name="Barge31" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -39.7, 0, 9.94)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38.46, 0, 13.85)
 script = ExtResource("spot")
 kind = "barge"
 gate = 30
 on_ground = false
 
 [node name="Barge32" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31.15, 0, 7.48)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30.08, 0, 11.44)
 script = ExtResource("spot")
 kind = "barge"
 gate = 31
 on_ground = false
 
 [node name="Barge33" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -26.83, 0, 6.34)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -25.78, 0, 10.3)
 script = ExtResource("spot")
 kind = "barge"
 gate = 32
 on_ground = false
 
 [node name="Barge34" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22.69, 0, 5.24)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21.69, 0, 9.22)
 script = ExtResource("spot")
 kind = "barge"
 gate = 33
 on_ground = false
 
 [node name="Barge35" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.85, 0, 3.62)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.21, 0, 7.67)
 script = ExtResource("spot")
 kind = "barge"
 gate = 34
 on_ground = false
 
 [node name="Barge36" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.81, 0, 3.06)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.3, 0, 7.13)
 script = ExtResource("spot")
 kind = "barge"
 gate = 35
 on_ground = false
 
 [node name="Barge37" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.41, 0, 2.14)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.97, 0, 6.22)
 script = ExtResource("spot")
 kind = "barge"
 gate = 36
 on_ground = false
 
 [node name="Barge38" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.93, 0, 1.66)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.43, 0, 5.72)
 script = ExtResource("spot")
 kind = "barge"
 gate = 37
 on_ground = false
 
 [node name="Barge39" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.35, 0, 1.05)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.98, 0, 5.1)
 script = ExtResource("spot")
 kind = "barge"
 gate = 38
 on_ground = false
 
 [node name="Barge40" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15.28, 0, -0.75)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.25, 0, 3.23)
 script = ExtResource("spot")
 kind = "barge"
 gate = 39
 on_ground = false
 
 [node name="Barge41" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19.23, 0, -1.77)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20.25, 0, 2.2)
 script = ExtResource("spot")
 kind = "barge"
 gate = 40
 on_ground = false
 
 [node name="Barge42" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.44, 0, -3.89)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.51, 0, 0.06)
 script = ExtResource("spot")
 kind = "barge"
 gate = 41
 on_ground = false
 
 [node name="Barge43" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.67, 0, -5.07)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 32.81, 0, -1.13)
 script = ExtResource("spot")
 kind = "barge"
 gate = 42
 on_ground = false
 
 [node name="Barge44" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40.1, 0, -7.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.52, 0, -3.95)
 script = ExtResource("spot")
 kind = "barge"
 gate = 43
 on_ground = false
 
 [node name="Barge45" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44.19, 0, -9.41)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45.81, 0, -5.64)
 script = ExtResource("spot")
 kind = "barge"
 gate = 44
 on_ground = false
 
 [node name="Barge46" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 51.87, 0, -13.34)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.05, 0, -9.86)
 script = ExtResource("spot")
 kind = "barge"
 gate = 45
 on_ground = false
 
 [node name="Barge47" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55.35, 0, -15.76)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 57.89, 0, -12.54)
 script = ExtResource("spot")
 kind = "barge"
 gate = 46
 on_ground = false
 
 [node name="Barge48" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.68, 0, -22.78)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65.77, 0, -20.08)
 script = ExtResource("spot")
 kind = "barge"
 gate = 47
 on_ground = false
 
 [node name="Barge49" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65.89, 0, -26.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 69.2, 0, -24.38)
 script = ExtResource("spot")
 kind = "barge"
 gate = 48
 on_ground = false
 
 [node name="Barge50" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 68.74, 0, -31.08)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 72.25, 0, -28.95)
 script = ExtResource("spot")
 kind = "barge"
 gate = 49
 on_ground = false
 
 [node name="Barge51" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 71.18, 0, -35.53)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 74.87, 0, -33.74)
 script = ExtResource("spot")
 kind = "barge"
 gate = 50
 on_ground = false
 
 [node name="Barge52" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 74.57, 0, -44.79)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 78.56, 0, -43.83)
 script = ExtResource("spot")
 kind = "barge"
 gate = 51
 on_ground = false
 
 [node name="Barge53" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75.38, 0, -49.48)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 79.46, 0, -49.09)
 script = ExtResource("spot")
 kind = "barge"
 gate = 52
 on_ground = false
 
 [node name="Barge54" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 74.95, 0, -59.12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 79, 0, -59.79)
 script = ExtResource("spot")
 kind = "barge"
 gate = 53
 on_ground = false
 
 [node name="Barge55" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 73.87, 0, -63.99)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 77.82, 0, -65.07)
 script = ExtResource("spot")
 kind = "barge"
 gate = 54
 on_ground = false
 
 [node name="Barge56" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 72.3, 0, -68.79)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 76.13, 0, -70.24)
 script = ExtResource("spot")
 kind = "barge"
 gate = 55
 on_ground = false
 
 [node name="Barge57" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 67.86, 0, -77.89)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 71.36, 0, -80.02)
 script = ExtResource("spot")
 kind = "barge"
 gate = 56
 on_ground = false
 
 [node name="Barge58" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65.06, 0, -82.02)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 68.33, 0, -84.49)
 script = ExtResource("spot")
 kind = "barge"
 gate = 57
 on_ground = false
 
 [node name="Barge59" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 61.86, 0, -85.77)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 64.8, 0, -88.64)
 script = ExtResource("spot")
 kind = "barge"
 gate = 58
 on_ground = false
 
 [node name="Barge60" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54.51, 0, -91.34)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 56.57, 0, -94.89)
 script = ExtResource("spot")
 kind = "barge"
 gate = 59
 on_ground = false
 
 [node name="Barge61" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.38, 0, -93.48)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 52.13, 0, -97.19)
 script = ExtResource("spot")
 kind = "barge"
 gate = 60
 on_ground = false
 
 [node name="Barge62" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 41.78, 0, -96.97)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 43.2, 0, -100.82)
 script = ExtResource("spot")
 kind = "barge"
 gate = 61
 on_ground = false
 
 [node name="Barge63" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 37.52, 0, -98.49)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38.91, 0, -102.35)
 script = ExtResource("spot")
 kind = "barge"
 gate = 62
 on_ground = false
 
 [node name="Barge64" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 29.69, 0, -101.39)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31.25, 0, -105.18)
 script = ExtResource("spot")
 kind = "barge"
 gate = 63
 on_ground = false
 
 [node name="Barge65" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.24, 0, -102.92)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.93, 0, -106.65)
 script = ExtResource("spot")
 kind = "barge"
 gate = 64
 on_ground = false
 
 [node name="Barge66" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.64, 0, -105.06)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.34, 0, -108.79)
 script = ExtResource("spot")
 kind = "barge"
 gate = 65
 on_ground = false
 
 [node name="Barge67" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16.82, 0, -107.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0, -116.5)
 script = ExtResource("spot")
 kind = "barge"
 gate = 66
-on_ground = false
-
-[node name="Barge68" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.77, 0, -111.26)
-script = ExtResource("spot")
-kind = "barge"
-gate = 67
-on_ground = false
-
-[node name="Barge69" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.04, 0, -113.11)
-script = ExtResource("spot")
-kind = "barge"
-gate = 68
-on_ground = false
-
-[node name="Barge70" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.26, 0, -114.72)
-script = ExtResource("spot")
-kind = "barge"
-gate = 69
-on_ground = false
-
-[node name="Barge71" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.26, 0, -115.87)
-script = ExtResource("spot")
-kind = "barge"
-gate = 70
-on_ground = false
-
-[node name="Barge72" type="Node3D" parent="BargeLane"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.16, 0, -124)
-script = ExtResource("spot")
-kind = "barge"
-gate = 71
 on_ground = false
 
 [node name="Waystations" type="Node3D" parent="."]
@@ -884,7 +865,7 @@ kind = "loot"
 
 [node name="Spur" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_3")
+curve = SubResource("Curve_4")
 width = 4.0
 cut = true
 
@@ -908,7 +889,7 @@ kind = "loot"
 
 [node name="Spur2" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_4")
+curve = SubResource("Curve_5")
 width = 4.0
 cut = true
 
@@ -932,7 +913,7 @@ kind = "loot"
 
 [node name="Spur3" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_5")
+curve = SubResource("Curve_6")
 width = 4.0
 cut = true
 
@@ -1075,7 +1056,7 @@ kind = "sea_rocks"
 size = 3.5
 
 [node name="IslePier" type="Node3D" parent="IsleOfLamps2"]
-transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 8, 0, -118)
+transform = Transform3D(-0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, -0.93969, -9, 0, -118)
 script = ExtResource("vael")
 kind = "pilings"
 size = 10.0
@@ -1494,3 +1475,359 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -74, 1.15, 44)
 script = ExtResource("spot")
 kind = "place"
 text = "The Lantern Road"
+
+[node name="Dressing" type="Node3D" parent="."]
+
+[node name="PilgrimArch" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.55775, 0, 0.83001, 0, 1, 0, -0.83001, 0, 0.55775, -19.84, 1.15, 94.75)
+script = ExtResource("vael")
+kind = "arch"
+size = 8.6
+on_ground = false
+
+[node name="PilgrimArch2" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.86163, 0, -0.50754, 0, 1, 0, 0.50754, 0, 0.86163, -68.18, 1.15, 24.08)
+script = ExtResource("vael")
+kind = "arch"
+size = 8.6
+on_ground = false
+
+[node name="PilgrimArch3" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.2605, 0, -0.96547, 0, 1, 0, 0.96547, 0, 0.2605, 26.03, 1.15, -9.11)
+script = ExtResource("vael")
+kind = "arch"
+size = 8.6
+on_ground = false
+
+[node name="PilgrimArch4" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.37622, 0, 0.92653, 0, 1, 0, -0.92653, 0, 0.37622, 44.07, 1.15, -90.32)
+script = ExtResource("vael")
+kind = "arch"
+size = 8.6
+on_ground = false
+
+[node name="Shrine" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.81815, 0, -0.57501, 0, 1, 0, 0.57501, 0, 0.81815, -18.36, 1.15, 101.33)
+script = ExtResource("vael")
+kind = "shrine"
+on_ground = false
+
+[node name="Shrine2" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.61153, 0, -0.79122, 0, 1, 0, 0.79122, 0, 0.61153, -67.61, 1.15, 70.16)
+script = ExtResource("vael")
+kind = "shrine"
+on_ground = false
+
+[node name="Shrine3" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.5892, 0, -0.80799, 0, 1, 0, 0.80799, 0, -0.5892, -69.47, 1.15, 17.67)
+script = ExtResource("vael")
+kind = "shrine"
+on_ground = false
+
+[node name="Shrine4" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.98769, 0, -0.15643, 0, 1, 0, 0.15643, 0, -0.98769, -16.41, 1.15, -6.26)
+script = ExtResource("vael")
+kind = "shrine"
+on_ground = false
+
+[node name="Shrine5" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.93849, 0, -0.3453, 0, 1, 0, 0.3453, 0, -0.93849, 36.65, 1.15, -17.18)
+script = ExtResource("vael")
+kind = "shrine"
+on_ground = false
+
+[node name="Shrine6" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.04536, 0, -0.99897, 0, 1, 0, 0.99897, 0, 0.04536, 65.49, 1.15, -53.8)
+script = ExtResource("vael")
+kind = "shrine"
+on_ground = false
+
+[node name="Shrine7" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.94147, 0, -0.3371, 0, 1, 0, 0.3371, 0, 0.94147, 34.15, 1.15, -89.08)
+script = ExtResource("vael")
+kind = "shrine"
+on_ground = false
+
+[node name="DrownedHead" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36, 0, 30)
+script = ExtResource("vael")
+kind = "statue_head"
+size = 2.4
+
+[node name="DrownedHead2" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 0, -24)
+script = ExtResource("vael")
+kind = "statue_head"
+size = 2.0
+
+[node name="DrownedHead3" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -80, 0, -64)
+script = ExtResource("vael")
+kind = "statue_head"
+size = 2.8
+
+[node name="DrownedHead4" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 0, 92)
+script = ExtResource("vael")
+kind = "statue_head"
+size = 2.2
+
+[node name="DrownedHead5" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0, 118)
+script = ExtResource("vael")
+kind = "statue_head"
+size = 1.8
+
+[node name="FallenKing" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, -0.5, -30, 0, 48)
+script = ExtResource("vael")
+kind = "fallen_statue"
+size = 3.5
+
+[node name="WhaleBones" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.86603, 0, -0.5, 0, 1, 0, 0.5, 0, 0.86603, 24, 0, -54)
+script = ExtResource("vael")
+kind = "whale_bones"
+size = 10.0
+
+[node name="SunkGate" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, 0.5, -86, 0, 2)
+script = ExtResource("vael")
+kind = "broken_arch"
+size = 8.0
+
+[node name="SunkGate2" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.93969, 84, 0, -40)
+script = ExtResource("vael")
+kind = "arch"
+size = 7.0
+
+[node name="Mast" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.76604, 0, 0.64279, 0, 1, 0, -0.64279, 0, -0.76604, -20, 0, 96)
+script = ExtResource("vael")
+kind = "mast"
+size = 8.0
+
+[node name="Mast2" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.99756, 0, -0.06976, 0, 1, 0, 0.06976, 0, 0.99756, 52, 0, 12)
+script = ExtResource("vael")
+kind = "mast"
+size = 9.0
+
+[node name="Mast3" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.80902, 0, 0.58779, 0, 1, 0, -0.58779, 0, -0.80902, -72, 0, -22)
+script = ExtResource("vael")
+kind = "mast"
+size = 7.5
+
+[node name="Mast4" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.52992, 0, 0.84805, 0, 1, 0, -0.84805, 0, -0.52992, 34, 0, -84)
+script = ExtResource("vael")
+kind = "mast"
+size = 9.5
+
+[node name="Mast5" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.61566, 0, -0.78801, 0, 1, 0, 0.78801, 0, 0.61566, -44, 0, -112)
+script = ExtResource("vael")
+kind = "mast"
+size = 8.0
+
+[node name="Mast6" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.46947, 0, 0.88295, 0, 1, 0, -0.88295, 0, 0.46947, 94, 0, 40)
+script = ExtResource("vael")
+kind = "mast"
+size = 10.0
+
+[node name="Kelp" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 0, 112)
+script = ExtResource("vael")
+kind = "kelp_bed"
+size = 4.0
+
+[node name="Kelp2" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 92)
+script = ExtResource("vael")
+kind = "kelp_bed"
+size = 3.5
+
+[node name="Kelp3" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0, 44)
+script = ExtResource("vael")
+kind = "kelp_bed"
+size = 3.0
+
+[node name="Kelp4" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, 0, 28)
+script = ExtResource("vael")
+kind = "kelp_bed"
+size = 3.5
+
+[node name="Kelp5" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, -36)
+script = ExtResource("vael")
+kind = "kelp_bed"
+size = 4.0
+
+[node name="Kelp6" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 98, 0, -12)
+script = ExtResource("vael")
+kind = "kelp_bed"
+size = 4.5
+
+[node name="Kelp7" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 0, -82)
+script = ExtResource("vael")
+kind = "kelp_bed"
+size = 3.5
+
+[node name="GhostLights" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 80)
+script = ExtResource("vael")
+kind = "ghost_lights"
+size = 18.0
+
+[node name="GhostLights2" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0, 50)
+script = ExtResource("vael")
+kind = "ghost_lights"
+size = 16.0
+
+[node name="GhostLights3" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 0, -10)
+script = ExtResource("vael")
+kind = "ghost_lights"
+size = 18.0
+
+[node name="GhostLights4" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, -70)
+script = ExtResource("vael")
+kind = "ghost_lights"
+size = 16.0
+
+[node name="GhostLights5" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, -90)
+script = ExtResource("vael")
+kind = "ghost_lights"
+size = 14.0
+
+[node name="GhostLights6" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 110)
+script = ExtResource("vael")
+kind = "ghost_lights"
+size = 14.0
+
+[node name="Brazier" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1.25, 135)
+script = ExtResource("vael")
+kind = "brazier"
+on_ground = false
+
+[node name="Brazier2" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1.25, 135)
+script = ExtResource("vael")
+kind = "brazier"
+on_ground = false
+
+[node name="Brazier3" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 2, -127)
+script = ExtResource("vael")
+kind = "brazier"
+on_ground = false
+
+[node name="Brazier4" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 2, -127)
+script = ExtResource("vael")
+kind = "brazier"
+on_ground = false
+
+[node name="Banner" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.5, 1.25, 141.5)
+script = ExtResource("vael")
+kind = "banner"
+size = 6.0
+on_ground = false
+
+[node name="Banner2" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 1.25, 141.5)
+script = ExtResource("vael")
+kind = "banner"
+size = 6.0
+on_ground = false
+
+[node name="Banner3" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 2, -131)
+script = ExtResource("vael")
+kind = "banner"
+size = 6.0
+on_ground = false
+
+[node name="Banner4" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, -131)
+script = ExtResource("vael")
+kind = "banner"
+size = 6.0
+on_ground = false
+
+[node name="Bunting" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 143)
+script = ExtResource("vael")
+kind = "bunting"
+size = 11.0
+wide = 0.0
+on_ground = false
+
+[node name="TideKing" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, -7, 2, -126)
+script = ExtResource("vael")
+kind = "statue"
+size = 3.6
+on_ground = false
+
+[node name="Spire" type="Node3D" parent="Dressing"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -150, -3, -175)
+script = ExtResource("vael")
+kind = "spire"
+size = 70.0
+on_ground = false
+
+[node name="Spire2" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.96593, 0, -0.25882, 0, 1, 0, 0.25882, 0, -0.96593, 175, -3, -120)
+script = ExtResource("vael")
+kind = "spire"
+size = 55.0
+on_ground = false
+
+[node name="Spire3" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.86603, 0, 0.5, 0, 1, 0, -0.5, 0, -0.86603, 190, -3, 60)
+script = ExtResource("vael")
+kind = "spire"
+size = 48.0
+on_ground = false
+
+[node name="Spire4" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.86603, 0, -0.5, 0, 1, 0, 0.5, 0, -0.86603, -190, -3, 40)
+script = ExtResource("vael")
+kind = "spire"
+size = 62.0
+on_ground = false
+
+[node name="Spire5" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, -0.5, 40, -3, -215)
+script = ExtResource("vael")
+kind = "spire"
+size = 84.0
+on_ground = false
+
+[node name="Spire6" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.86603, 0, -0.5, 0, 1, 0, 0.5, 0, -0.86603, -70, -3, 205)
+script = ExtResource("vael")
+kind = "spire"
+size = 46.0
+on_ground = false
+
+[node name="Spire7" type="Node3D" parent="Dressing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 120, -3, 190)
+script = ExtResource("vael")
+kind = "spire"
+size = 52.0
+on_ground = false

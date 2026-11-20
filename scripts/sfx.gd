@@ -57,7 +57,7 @@ const MUSIC_SETS := {
 	"bastion": ["bastion_night", "bastion_hunted", "bastion_dawn"],
 	"vael": ["vael_night", "vael_hunted", "vael_dawn"],
 	"lantern": ["lantern_night", "lantern_hunted", "lantern_dawn"],
-	"menu": ["menu_mesenlla", "", ""],
+	"menu": ["menu_vael", "", ""],
 }
 const MUSIC_BUS := "Music"
 const SOUND_BUS := "Sounds"

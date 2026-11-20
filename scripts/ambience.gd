@@ -3,7 +3,8 @@ extends Node3D
 ## The air of the lands beyond the Mists, around whoever is looking: long wisps of mist drifting
 ## through the trees on the wind, motes of mist light hanging and wandering in the twilight, and in the
 ## Valleys of Mesenlla leaves coming down from the forest; at Mist Bastion fine mist sifting down and
-## sparks of the Great Portal carried up on the wind. It follows the camera, so it costs the same
+## sparks of the Great Portal carried up on the wind; over the sea of Vael, low sea-mist and the deep's
+## green light rising off the water. It follows the camera, so it costs the same
 ## wherever you are, and it is only drawn on this phone.
 
 const WISPS := 9
@@ -14,7 +15,15 @@ var world: World
 var _wisps: Array[MeshInstance3D] = []
 var _motes: CPUParticles3D
 var _falling: CPUParticles3D
+var _sea := false
 static var _wisp_material: ShaderMaterial
+
+
+## Where it is drawn: the lands beyond the Mists (World adds it itself there), and the drowned
+## kingdom of Vael, where it is the sea's: low banks of sea-mist on the water and the green light of
+## the deep rising off it.
+static func wanted(w: World) -> bool:
+	return w.map_id in SpawnRules.VAEL
 
 
 func _init(w: World) -> void:
@@ -26,6 +35,7 @@ func _ready() -> void:
 	var r := RandomNumberGenerator.new()
 	r.seed = 9157
 	var quiet := Game.quality == 0
+	_sea = world.map_id in SpawnRules.VAEL
 	for i in (WISPS / 2 if quiet else WISPS):
 		var wisp := MeshInstance3D.new()
 		wisp.mesh = _wisp_mesh(r.randf_range(7.0, 13.0), r.randf_range(0.8, 1.6), r)
@@ -33,7 +43,9 @@ func _ready() -> void:
 		wisp.material_override = _wisp_look().duplicate()
 		wisp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		wisp.set_meta("drift", r.randf_range(0.6, 1.3))
-		wisp.set_meta("height", r.randf_range(1.2, 6.0))
+		wisp.set_meta("height", r.randf_range(0.5, 2.6) if _sea else r.randf_range(1.2, 6.0))
+		if _sea:
+			(wisp.material_override as ShaderMaterial).set_shader_parameter("mist", Vector3(0.66, 0.84, 0.84))
 		wisp.set_meta("phase", r.randf() * TAU)
 		wisp.position = Vector3(r.randf_range(-WISP_REACH, WISP_REACH), 0, r.randf_range(-WISP_REACH, WISP_REACH))
 		wisp.rotation.y = atan2(WIND.x, WIND.z) + r.randf_range(-0.4, 0.4)
@@ -47,7 +59,15 @@ func _ready() -> void:
 	_motes.initial_velocity_max = 0.3
 	_motes.spread = 180.0
 	add_child(_motes)
-	if bastion:
+	if _sea:
+		# The light of the deep, rising off the water in slow green sparks; nothing falls.
+		_motes.color = Color(0.4, 1.0, 0.8, 0.85)
+		_motes.gravity = Vector3(0.05, 0.12, 0.02)
+		_motes.amount = 30 if quiet else 90
+		_motes.emitting = true
+		_motes.emission_box_extents = Vector3(24, 2.5, 24)
+		_falling = _particles(0, Vector3.ONE, 0.1, 1.0)
+	elif bastion:
 		# Fine mist sifting down on the mountaintop.
 		_falling = _particles(40 if quiet else 110, Vector3(18, 2, 18), 0.09, 9.0)
 		_falling.color = Color(0.85, 0.92, 1.0, 0.7)
@@ -114,6 +134,8 @@ func _process(delta: float) -> void:
 		return
 	var eye := cam.global_position
 	_motes.global_position = eye
+	if _sea and world.tide:
+		_motes.global_position.y = maxf(world.ground_at(eye), world.tide.level) + 1.6
 	_falling.global_position = eye + Vector3.UP * 7.0
 	var t := world.now
 	for wisp in _wisps:
@@ -126,6 +148,8 @@ func _process(delta: float) -> void:
 		if absf(off.z) > WISP_REACH:
 			wisp.global_position.z = eye.z - signf(off.z) * WISP_REACH * 0.95
 		var ground := world.ground_at(wisp.global_position)
+		if _sea and world.tide:
+			ground = maxf(ground, world.tide.level) # on the water, not the seabed under it
 		wisp.global_position.y = ground + float(wisp.get_meta("height")) + sin(t * 0.3 + float(wisp.get_meta("phase"))) * 0.6
 		# Thin near the eye, so one never fills the screen, and fading at the edge of its reach.
 		var flat := Vector2(off.x, off.z).length()

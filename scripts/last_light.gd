@@ -13,9 +13,9 @@ extends Node3D
 ## own players. A boon is chosen on each phone for its own player; the host is told who has chosen.
 
 const BARGE_SPEED := 1.7 # metres a second
-const NEAR := 7.0 # how close to the barge's middle one of you must be for it to go on
-const LIGHT_RADIUS := 12.0
-const DIM_RADIUS := 6.0 # while the Leviathan has doused it
+const NEAR := 13.0 # how close to the barge's middle one of you must be for it to go on
+const LIGHT_RADIUS := 15.0
+const DIM_RADIUS := 10.0 # while the Leviathan has doused it
 const DIM_TIME := 8.0
 const OUT_GRACE := 3.0 # seconds outside the light before the tide starts to drown you
 const DROWN := 6.0 # health a second, outside the light, after that

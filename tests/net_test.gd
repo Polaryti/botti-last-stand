@@ -1441,6 +1441,9 @@ func _bandit() -> void:
 	ok(sealed.size() == 1, "the Contract's seal hangs over the creature on this phone")
 	if host:
 		ok(sealed.size() == 1 and sealed[0]._mark_time > 0.0 and is_equal_approx(sealed[0]._mark_mult, CrownUpgrades.CONTRACT_MARK), "and the host's creature is marked to take 50% more")
+	# Both phones have looked before the host clears up: the host can pass a step the moment it
+	# reaches it, and its next message would otherwise reach the other phone before that phone looks.
+	await sync(712)
 	for z: Zombie in w.zombies.duplicate():
 		if host:
 			z.release()
@@ -1448,7 +1451,7 @@ func _bandit() -> void:
 		if n is NightfallDome:
 			n.queue_free()
 	await wait(0.5)
-	await sync(712)
+	await sync(713)
 	# A Highwayman's Dagger Fan, from 6 m away.
 	if host:
 		pl.guard_left = 0.0

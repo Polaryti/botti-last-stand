@@ -668,6 +668,9 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 			var near := Vector2(clampf(p.x, -half_extent, half_extent), clampf(p.y, -half_extent, half_extent))
 			var out := p.distance_to(near)
 			var y := ground_height(near.x, near.y) + out * 0.16 + (_noise.get_noise_2d(p.x, p.y) + 0.5) * minf(out * 0.2, 14.0)
+			if not sea.is_empty() or (not coast.is_empty() and ground_height(near.x, near.y) < SEA_DEEP):
+				# Out to sea the world goes on as open water, not as hills: the seabed stays deep.
+				y = SEA_Y - 2.0
 			points[Vector2i(u, v)] = Vector3(p.x, y, p.y)
 	for u in along:
 		for v in RINGS:

@@ -14,7 +14,7 @@ extends MapPiece
 const FLATS_TOP := 0.55 # the flats' height at the foot of the harbour wall
 const FLATS_LOW := -0.85 # and where they meet the open sea
 
-@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage", "sea", "road_lantern", "waystation") var kind := "wreck":
+@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage", "sea", "road_lantern", "waystation", "slipway", "spire", "statue", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "brazier", "shrine", "banner", "bunting", "cargo", "fish_rack", "ghost_lights", "drystone", "garden", "lantern_string", "laundry", "bench", "chimney", "sea_trail", "porch_lamp") var kind := "wreck":
 	set(v):
 		kind = v
 		refresh()
@@ -58,6 +58,32 @@ func build(b: MapBuilder) -> void:
 		"sea_stairs": VaelBuilder.sea_stairs(b, size, wide)
 		"road_lantern": VaelBuilder.road_lantern(b)
 		"waystation": VaelBuilder.waystation(b, size)
+		"slipway": VaelBuilder.slipway(b, size, wide)
+		"spire": VaelDressing.spire(b, size)
+		"statue": VaelDressing.statue(b, size, false)
+		"fallen_statue": VaelDressing.statue(b, size, true)
+		"statue_head": VaelDressing.statue_head(b, size)
+		"arch": VaelDressing.arch(b, size, false)
+		"broken_arch": VaelDressing.arch(b, size, true)
+		"whale_bones": VaelDressing.whale_bones(b, size)
+		"mast": VaelDressing.mast(b, size)
+		"kelp_bed": VaelDressing.kelp_bed(b, size)
+		"tide_pool": VaelDressing.tide_pool(b, size)
+		"brazier": VaelDressing.brazier(b)
+		"shrine": VaelDressing.shrine(b)
+		"banner": VaelDressing.banner(b, size)
+		"bunting": VaelDressing.bunting(b, size, wide > 0.0)
+		"cargo": VaelDressing.cargo(b)
+		"fish_rack": VaelDressing.fish_rack(b, size)
+		"ghost_lights": VaelDressing.ghost_lights(b, size)
+		"drystone": VaelDressing.drystone(b, size)
+		"garden": VaelDressing.garden(b, size, wide)
+		"lantern_string": VaelDressing.lantern_string(b, size, wide > 0.0)
+		"laundry": VaelDressing.laundry(b, size)
+		"bench": VaelDressing.bench(b)
+		"chimney": VaelDressing.chimney(b, size)
+		"sea_trail": VaelDressing.sea_trail(b, size)
+		"porch_lamp": VaelDressing.porch_lamp(b)
 		"salvage":
 			if not b.is_preview:
 				b.w.salvage_spots.append(Transform3D(b.xf.basis, b.xf.origin))
@@ -86,13 +112,19 @@ func land(t: Terrain, at: Transform3D) -> void:
 			var foot := at.origin + down * size + Vector3(0, -wide, 0)
 			var pts: Array[Vector3] = [top - down * 0.5, foot + down * 0.8]
 			t.cut(pts, 1.3, 0.4)
+		"slipway":
+			# A broad ramp from the top of the wall (at the piece) down to the seabed `size` along +Z.
+			var down := at.basis.z.normalized()
+			var foot_y := float(t.coast.get("top", 0.55)) if not t.coast.is_empty() else at.origin.y - 1.6
+			var pts: Array[Vector3] = [at.origin - down * 1.0, Vector3(at.origin.x, foot_y, at.origin.z) + down * (size + 0.5)]
+			t.cut(pts, wide * 0.5 + 0.4, 0.8)
 		"lighthouse", "bell_tower":
 			t.level_auto(c, Vector2(4.5, 4.5) if kind == "lighthouse" else Vector2(2.4, 2.4), yaw, 2.0)
 
 
 func shapes_land() -> bool:
-	return kind in ["coast", "mole", "sea_stairs", "lighthouse", "bell_tower", "sea", "waystation"]
+	return kind in ["coast", "mole", "sea_stairs", "lighthouse", "bell_tower", "sea", "waystation", "slipway"]
 
 
 func follows_land() -> bool:
-	return kind in ["wreck", "pilings", "sea_rocks", "quay_wall", "mole"]
+	return kind in ["wreck", "pilings", "sea_rocks", "quay_wall", "mole", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "ghost_lights"]

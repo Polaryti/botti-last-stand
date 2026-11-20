@@ -126,6 +126,8 @@ static func quay_wall(b: MapBuilder, length: float) -> void:
 		bx += every
 	b.add(l)
 	b.collider(Vector3(0, (bottom - 0.2) * 0.5, front - 0.1), Vector3(length, -bottom + 0.4, 0.8))
+	# The seabed at its foot leads nowhere: what comes in from the flats goes round by the stairs.
+	b.no_walk(Vector3(0, 0, front + 1.1), Vector3(length - 0.4, 1.0, 1.4))
 	MesenllaBuilder._feature(b, "quay", length)
 
 
@@ -169,7 +171,10 @@ static func mole(b: MapBuilder, length: float, wide: float) -> void:
 		var d := minf(3.0, length * 0.5 - z)
 		l.box(Vector3(half - 0.3, 0.55, z + d * 0.5), Vector3(0.6, 1.1, d - 0.08), QUAY_DARK.lightened(rng.randf_range(0.0, 0.1)))
 		z += d
-	b.collider(Vector3(half - 0.3, 0.55, 0), Vector3(0.6, 1.1, length))
+	b.solid(Vector3(half - 0.3, 0.55, 0), Vector3(0.6, 1.1, length))
+	# Its faces are walls to whatever is down on the seabed: the way up is from the quay, at its root.
+	for side: float in [-1.0, 1.0]:
+		b.no_walk(Vector3(side * (half + 1.1), 0, 0.6), Vector3(1.8, 1.0, length - 1.2))
 	b.add(l)
 	MesenllaBuilder._feature(b, "mole", length)
 
@@ -653,6 +658,56 @@ static func sea_stairs(b: MapBuilder, length: float, drop: float) -> void:
 		b.solid(Vector3(side * 1.5, -drop * 0.5 + 0.2, length * 0.5), Vector3(0.4, drop + 0.4, length))
 	b.add(l)
 
+
+
+## A slipway down the harbour wall: a broad ramp of stone setts from the quay to the seabed along +Z,
+## `length` long and `wide` across, timber kerbs either side, a winch at the top with its rope run
+## down the ramp, and weed and barnacles below the high-water mark. Boats were hauled up it; now
+## whatever comes in on the tide walks up it. The ramp itself is the land (MapVael.land).
+static func slipway(b: MapBuilder, length: float, wide: float) -> void:
+	var rng := b.seeded()
+	var l := b.cell()
+	var tide := _tide_line(b)
+	var rows := int(length / 0.7)
+	for k in rows:
+		var z := (k + 0.5) * length / rows
+		var y := (b.xf.affine_inverse() * b.on_ground(Vector3(0, 0, z))).y
+		var x := -wide * 0.5 + (0.35 if k % 2 else 0.0)
+		while x < wide * 0.5 - 0.2:
+			var w := minf(rng.randf_range(0.55, 0.85), wide * 0.5 - x)
+			var col := _stone_col(y, tide, QUAY_STONE.darkened(0.08), rng)
+			l.box(Vector3(x + w * 0.5, y + 0.02, z), Vector3(w - 0.05, 0.12, length / rows - 0.06), col)
+			x += w
+		if y < tide - 0.1 and rng.randf() < 0.5:
+			VaelModels.kelp(l, Vector3(rng.randf_range(-wide * 0.4, wide * 0.4), y + 0.05, z), rng.randf_range(0.3, 0.6), 2, rng)
+	for side: float in [-1.0, 1.0]:
+		var x := side * (wide * 0.5 + 0.18)
+		for k in rows:
+			var z0 := float(k) * length / rows
+			var z1 := float(k + 1) * length / rows
+			var y0 := (b.xf.affine_inverse() * b.on_ground(Vector3(x, 0, z0))).y
+			var y1 := (b.xf.affine_inverse() * b.on_ground(Vector3(x, 0, z1))).y
+			var col := WOOD_WET if (y0 + y1) * 0.5 < tide else WOOD_BLEACHED.darkened(0.25)
+			l.prism(Vector3(x, y0 + 0.12, z0), Vector3(x, y1 + 0.12, z1), 0.16, 0.16, 4, col)
+		# Mooring posts at the head and foot.
+		for z: float in [0.3, length - 0.4]:
+			var y := (b.xf.affine_inverse() * b.on_ground(Vector3(x, 0, z))).y
+			l.prism(Vector3(x, y - 0.2, z), Vector3(x, y + 1.0, z), 0.16, 0.13, 6, WOOD_DARK)
+			b.solid(Vector3(x, y + 0.4, z), Vector3(0.3, 1.2, 0.3))
+	# The winch on the quay above, and its rope down the ramp to a rusted ring at the foot.
+	var top := (b.xf.affine_inverse() * b.on_ground(Vector3(0, 0, -1.6))).y
+	for side: float in [-0.7, 0.7]:
+		l.box(Vector3(side, top + 0.45, -1.6), Vector3(0.14, 0.9, 0.5), WOOD_DARK)
+	l.prism(Vector3(-0.75, top + 0.75, -1.6), Vector3(0.75, top + 0.75, -1.6), 0.22, 0.22, 8, ROPE)
+	l.prism(Vector3(0.75, top + 0.75, -1.6), Vector3(1.1, top + 0.95, -1.4), 0.04, 0.04, 4, IRON)
+	l.box(Vector3(0, top + 0.12, -1.6), Vector3(1.7, 0.18, 0.9), WOOD_DARK.darkened(0.2))
+	b.solid(Vector3(0, top + 0.5, -1.6), Vector3(1.7, 1.0, 0.9))
+	var foot := (b.xf.affine_inverse() * b.on_ground(Vector3(0.6, 0, length - 0.6))).y
+	l.prism(Vector3(0, top + 0.6, -1.4), Vector3(0.6, foot + 0.12, length - 0.6), 0.03, 0.03, 4, ROPE.darkened(0.25))
+	for s in 6:
+		var a0 := TAU * s / 6.0
+		var a1 := TAU * (s + 1) / 6.0
+		l.prism(Vector3(0.6 + cos(a0) * 0.18, foot + 0.1 + sin(a0) * 0.18, length - 0.6), Vector3(0.6 + cos(a1) * 0.18, foot + 0.1 + sin(a1) * 0.18, length - 0.6), 0.03, 0.03, 4, RUST)
 
 
 ## One of the old lanterns of the Lantern Road: a squat stone post with an iron crook, its lantern

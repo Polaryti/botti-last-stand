@@ -24,7 +24,9 @@ node, group, road, spot = m.node, m.group, m.road, m.spot
 
 ROAD_Y = 1.15 # the causeway's top, a little above the high tide (0.85)
 SEA_FLOOR = -0.55
-LANE = 5.4 # how far east of the road (as you go) the barge's channel runs
+LANE = 9.5 # how far east of the road (as you go) the barge's channel runs: clear of the causeway's foot
+CHANNEL_Y = -1.0 # the channel's bed, dredged below the flats so the barge always has water under it
+ROAD_BLEND = 2.5 # how far the causeway's sides run out to the flats (gentle enough to climb out of the water)
 ROUTE = [(0, 132), (0, 112), (-24, 92), (-58, 74), (-74, 44), (-60, 14), (-24, 0), (14, -6), (52, -20), (70, -50),
          (58, -82), (24, -98), (-4, -112), (0, -122)]
 
@@ -78,7 +80,7 @@ for (x, z, h, r) in islets:
 
 # --- The Lantern Road ----------------------------------------------------------------------------
 roads = group("Roads")
-road("LanternRoad", roads, [(x, ROAD_Y, z) for (x, z) in line[::2]] + [(line[-1][0], ROAD_Y, line[-1][1])], 6.0, cut=True)
+road("LanternRoad", roads, [(x, ROAD_Y, z) for (x, z) in line[::2]] + [(line[-1][0], ROAD_Y, line[-1][1])], 6.0, cut=True, blend=ROAD_BLEND)
 road("IsleStair", roads, [(0, ROAD_Y, -122), (0, 1.6, -126), (0, 2.0, -129)], 5.0, cut=True)
 lights = group("RoadLanterns")
 d = 0.0
@@ -93,19 +95,45 @@ for i in range(1, len(line)):
         node("RoadLantern", lights, "vael", (x, ROAD_Y, z, yaw), kind="road_lantern", on_ground=False)
 
 # --- The barge's channel -------------------------------------------------------------------------
+# Dredged along the barge's course: open water from the Harbour Gate to the Isle, wherever the road
+# bends, whatever islet stands near.
+DOCK = (11.0, -116.5) # where the barge comes to rest: in the water off the Isle's landing
+
+
+def clear_of_road(p):
+    """A point of the channel well off the causeway (inside a bend, the offset can come back over it)."""
+    return min(math.dist(p, q) for q in line) >= LANE - 0.8 and math.dist(p, (0, -136)) > 16.0
+
+
+def toward_dock(points):
+    """The channel's course up to where it turns in for the dock: nothing past it, nothing doubling back."""
+    out = []
+    for q in points:
+        if math.dist(q, DOCK) < 10.0:
+            break
+        if clear_of_road(q):
+            out.append(q)
+    return out
+
+
+chan = toward_dock([side(line, i, LANE) for i in range(0, len(line) - 1, 2)]) + [DOCK]
+road("BargeChannel", roads, [(round(x, 2), CHANNEL_Y, round(z, 2)) for (x, z) in chan], 3.0, cut=True, draw=False, blend=1.5)
 lane = group("BargeLane")
 step = 6.0
 d = 0.0
 next_at = 0.0
 k = 0
+marks = []
 for i in range(len(line)):
     if i > 0:
         d += math.dist(line[i - 1], line[i])
-    if d >= next_at or i == len(line) - 1:
+    if d >= next_at:
         next_at += step
-        x, z = side(line, i, LANE) if i < len(line) - 1 else (line[i][0] + LANE * 0.4, line[i][1] - 2.0)
-        node("Barge", lane, "spot", (round(x, 2), 0, round(z, 2)), kind="barge", gate=k, on_ground=False)
-        k += 1
+        marks.append(side(line, i, LANE))
+for q in toward_dock(marks):
+    node("Barge", lane, "spot", (round(q[0], 2), 0, round(q[1], 2)), kind="barge", gate=k, on_ground=False)
+    k += 1
+node("Barge", lane, "spot", (DOCK[0], 0, DOCK[1]), kind="barge", gate=k, on_ground=False) # it ends off the Isle's landing
 
 # --- Waystations, off the road's west side -------------------------------------------------------
 ways = group("Waystations")
@@ -141,7 +169,7 @@ isle = group("IsleOfLamps")
 node("Lighthouse", isle, "vael", (0, 2.0, -138), kind="lighthouse", size=19.0, on_ground=False)
 node("IsleRocks", isle, "vael", (-9, 0, -142, 40), kind="sea_rocks", size=4.0)
 node("IsleRocks", isle, "vael", (10, 0, -132, 200), kind="sea_rocks", size=3.5)
-node("IslePier", isle, "vael", (8, 0, -118, 160), kind="pilings", size=10.0)
+node("IslePier", isle, "vael", (-9, 0, -118, 200), kind="pilings", size=10.0)
 spot(isle, "place", (0, 2.0, -136), text="Isle of Lamps")
 for (x, z) in [(-6, -130), (6, -131)]:
     spot(isle, "loot", (x, 2.0, z))
@@ -170,6 +198,57 @@ for (x, z) in [(-40, 114), (36, 98), (-96, 72), (-30, 50), (30, 32), (96, -14), 
 for (x, z) in [(-30, 100), (-70, 60), (-40, 10), (30, -14), (64, -60), (30, -100), (-60, 40), (40, 60)]:
     spot(flats, "poi", (x, 0, z))
 spot(flats, "place", (-74, ROAD_Y, 44), text="The Lantern Road")
+
+# --- What makes it the road to the Isle -------------------------------------------------------------
+dress = group("Dressing")
+
+
+def heading(i):
+    a = line[max(0, i - 1)]
+    b = line[min(len(line) - 1, i + 1)]
+    return b[0] - a[0], b[1] - a[1]
+
+
+# Pilgrims' arches across the road, where the road passes under them.
+for f in (0.1, 0.34, 0.58, 0.84):
+    i = next(j for j in range(len(line)) if length_to(line, j) >= f * total)
+    tx, tz = heading(i)
+    yaw = math.degrees(math.atan2(tx, -tz))
+    node("PilgrimArch", dress, "vael", (round(line[i][0], 2), ROAD_Y, round(line[i][1], 2), round(yaw, 1)), kind="arch", size=8.6, on_ground=False)
+# Shrines of the Tide by the road, on its west side between the lanterns.
+d = 0.0
+next_at = 40.0
+for i in range(1, len(line)):
+    d += math.dist(line[i - 1], line[i])
+    if d >= next_at and d < total - 20:
+        next_at += 55.0
+        x, z = side(line, i, -4.6)
+        tx, tz = heading(i)
+        yaw = math.degrees(math.atan2(tx, -tz)) + 90.0
+        node("Shrine", dress, "vael", (round(x, 2), ROAD_Y, round(z, 2), round(yaw, 1)), kind="shrine", on_ground=False)
+# The drowned: heads of statues out of the water, a fallen king on an islet, masts with corpse-lights.
+for (x, z, sz) in [(-36, 30, 2.4), (44, -24, 2.0), (-80, -64, 2.8), (66, 92, 2.2), (-16, 118, 1.8)]:
+    node("DrownedHead", dress, "vael", (x, 0, z), kind="statue_head", size=sz)
+node("FallenKing", dress, "vael", (-30, 0, 48, 120), kind="fallen_statue", size=3.5)
+node("WhaleBones", dress, "vael", (24, 0, -54, 30), kind="whale_bones", size=10.0)
+node("SunkGate", dress, "vael", (-86, 0, 2, 60), kind="broken_arch", size=8.0)
+node("SunkGate", dress, "vael", (84, 0, -40, -20), kind="arch", size=7.0)
+for (x, z, h) in [(-20, 96, 8.0), (52, 12, 9.0), (-72, -22, 7.5), (34, -84, 9.5), (-44, -112, 8.0), (94, 40, 10.0)]:
+    node("Mast", dress, "vael", (x, 0, z, x * 7 % 360), kind="mast", size=h)
+for (x, z, r) in [(-44, 112, 4.0), (40, 92, 3.5), (-34, 44, 3.0), (28, 28, 3.5), (-24, -36, 4.0), (98, -12, 4.5), (-50, -82, 3.5)]:
+    node("Kelp", dress, "vael", (x, 0, z), kind="kelp_bed", size=r)
+for (x, z, sz) in [(-40, 80, 18.0), (30, 50, 16.0), (-50, -10, 18.0), (60, -70, 16.0), (-10, -90, 14.0), (0, 110, 14.0)]:
+    node("GhostLights", dress, "vael", (x, 0, z), kind="ghost_lights", size=sz)
+# Fires and banners at the Harbour Gate and on the Isle, and the Tide King watching the road's end.
+for (x, y, z) in [(-12, 1.25, 135), (12, 1.25, 135), (-5, 2.0, -127), (5, 2.0, -127)]:
+    node("Brazier", dress, "vael", (x, y, z), kind="brazier", on_ground=False)
+for (x, y, z) in [(-6.5, 1.25, 141.5), (6.5, 1.25, 141.5), (-8, 2.0, -131), (8, 2.0, -131)]:
+    node("Banner", dress, "vael", (x, y, z, 0), kind="banner", size=6.0, on_ground=False)
+node("Bunting", dress, "vael", (0, 1.25, 143), kind="bunting", size=11.0, wide=0.0, on_ground=False)
+node("TideKing", dress, "vael", (-7, 2.0, -126, 160), kind="statue", size=3.6, on_ground=False)
+# The drowned city all round, far out at sea; the tallest behind the Isle.
+for (x, z, h) in [(-150, -175, 70.0), (175, -120, 55.0), (190, 60, 48.0), (-190, 40, 62.0), (40, -215, 84.0), (-70, 205, 46.0), (120, 190, 52.0)]:
+    node("Spire", dress, "vael", (x, -3.0, z, x * 3 % 360), kind="spire", size=h, on_ground=False)
 
 
 def write():

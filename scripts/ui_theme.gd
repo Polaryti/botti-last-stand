@@ -13,6 +13,7 @@ const BLOOD := Color("c8432f") # danger
 const MIST := Color("6fb6d6") # mana and mist
 const MOSS := Color("7fc08a") # safe
 const TWILIGHT := Color("a880ff") # the lands beyond the Mists
+const TIDE := Color("5fdcbc") # the drowned kingdom of Vael
 
 # The type scale. Every piece of text on a menu screen uses one of these sizes, nothing in between.
 const FS_TITLE := 40 # the name of a screen (title font), and the ways to play on the title screen

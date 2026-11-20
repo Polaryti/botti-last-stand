@@ -31,7 +31,8 @@ static func material() -> StandardMaterial3D:
 
 func commit() -> ArrayMesh:
 	var m := _st.commit()
-	m.surface_set_material(0, material())
+	if m.get_surface_count() > 0: # nothing drawn yet gives a mesh with no surface
+		m.surface_set_material(0, material())
 	return m
 
 
