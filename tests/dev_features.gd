@@ -2232,6 +2232,12 @@ func _drowned_court() -> void:
 	check(vael.count_type("harbourmaster") == 1, "once")
 	d.elapsed = Director.KRAKEN_AT
 	vael.tide.level = MistTide.HIGH_Y
+	var clear_rings := 0
+	for i in 16:
+		var sites := vael.vael_sites.kraken_sites(World.KRAKEN_RING, VaelMind.ARMS)
+		if sites.size() == VaelMind.ARMS and sites.all(vael.tide.flooded):
+			clear_rings += 1
+	check(clear_rings == 16, "the Kraken finds a whole flooded ring beside the pier and wrecks")
 	d._tick_court()
 	check(vael.count_type("kraken_arm") >= 3, "at the high tide after 4:30, the Kraken")
 	d.elapsed = Director.KEEPER_AT + 1.0

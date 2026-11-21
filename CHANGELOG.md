@@ -44,7 +44,7 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 - **The Tide Zone** has breaking foam as the water rises and falls. At low tide, follow the exposed stone track from the eastern slipway toward the Drowned Bell.
 - **Explore a working harbour fallen silent.** Visit the Boatwright's Yard, Ropewalk, Fishmarket and Salt House. The coast paths run under the tall firs and pines of Mesenlla to Gullwatch and Pilgrims' Garden and back into town.
 - **Follow the supplies.** Marked racks at Gullwatch, Valley Road, Pilgrims' Garden and the Harbourmaster's House hold weapons and potions. Houses and warehouses have clear entrances, and several now have a second way out.
-- **New routes across the harbour.** Both breakwaters have landings onto the flats, and the quay slipways are clear. Enemies approach along connected routes and packs have room to emerge. Weapons and supplies appear at reachable spots.
+- **New routes across the harbour.** Both breakwaters have landings onto the flats, and the quay slipways are clear. Enemies approach along connected routes and packs have room to emerge. The Kraken comes up where its arms have room to surface. Weapons and supplies appear at reachable spots.
 - **The Lantern Road** keeps its pilgrim arches, shrines and ghost lights.
 
 ### The Sunken Crown title screen

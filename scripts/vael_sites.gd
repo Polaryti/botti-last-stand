@@ -104,6 +104,35 @@ func spawn_pack(id: String, count: int, shore: Shore) -> int:
 	return came
 
 
+## Try different centres and rotations before placing any arms. A wreck or pier can cut off half
+## of one ring, even if its centre is clear. Prefer a complete ring and keep it near the coast party.
+func kraken_sites(radius: float, count: int) -> Array[Vector3]:
+	var best: Array[Vector3] = []
+	var live := _live_players()
+	for reach: Vector2 in [Vector2(3, 15), Vector2(8, 30), Vector2(14, 62), Vector2(22, 110)]:
+		for attempt in 4:
+			var centre := enemy_site(reach.x, reach.y, Shore.FLOODED)
+			if centre == Vector3.INF:
+				break
+			var turn := randf() * TAU
+			for rotation in 3:
+				var ring: Array[Vector3] = []
+				for i in count:
+					var angle := turn + (i + float(rotation) / 3.0) * TAU / count
+					var at := centre + Vector3(cos(angle), 0, sin(angle)) * radius
+					if not accessible(at) or not world.tide.flooded(at) or not _room_for_enemy(at):
+						continue
+					if live.any(func(p: Target) -> bool: return _flat_delta(at, p.global_position).length_squared() < PLAYER_CLEARANCE * PLAYER_CLEARANCE):
+						continue
+					at.y = world.ground_at(at)
+					ring.append(at)
+				if ring.size() == count:
+					return ring
+				if ring.size() > best.size():
+					best = ring
+	return best
+
+
 func _room_for_enemy(at: Vector3) -> bool:
 	for z: Zombie in world.zombies:
 		if z.is_alive() and _flat_delta(z.global_position, at).length_squared() < MOB_CLEARANCE * MOB_CLEARANCE:

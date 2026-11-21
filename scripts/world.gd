@@ -2826,33 +2826,13 @@ func spawn_siren() -> bool:
 	return at != Vector3.INF and spawn_zombie("siren", at)
 
 
-## Port Vael: the Kraken's arms, up out of the flooded flats around whoever is nearest the water, in a
-## ring (VaelMind.ARMS of them, as many as there is flooded ground for). Returns how many rose.
+## Port Vael: the Kraken rises in a ring around a flooded approach.
 const KRAKEN_RING := 5.5
 func raise_kraken() -> int:
-	if tide == null:
-		return 0
-	var centre := Vector3.INF
-	var flooded := func(p: Vector3) -> bool: return tide.flooded(p)
-	for reach: Vector2 in [Vector2(3.0, 10.0), Vector2(8.0, 24.0), Vector2(16.0, 44.0)]:
-		for p: Target in players:
-			if p.dead:
-				continue
-			centre = spawn_point_near(p.global_position, reach.x, reach.y, flooded)
-			if centre != Vector3.INF:
-				break
-		if centre != Vector3.INF:
-			break
-	if centre == Vector3.INF:
+	if not vael_sites:
 		return 0
 	var risen := 0
-	var turn := randf() * TAU
-	for i in VaelMind.ARMS:
-		var a := turn + TAU * i / float(VaelMind.ARMS)
-		var at := centre + Vector3(cos(a), 0, sin(a)) * KRAKEN_RING
-		if absf(at.x) > play_half - 3.0 or absf(at.z) > play_half - 3.0 or not terrain.is_walkable(at.x, at.z) or not tide.flooded(at) or (vael_sites and not vael_sites.accessible(at)):
-			continue
-		at.y = ground_at(at)
+	for at: Vector3 in vael_sites.kraken_sites(KRAKEN_RING, VaelMind.ARMS):
 		if spawn_zombie("kraken_arm", at):
 			risen += 1
 			fx_water(at, 2.4, Color(0.72, 0.9, 0.92), true)
