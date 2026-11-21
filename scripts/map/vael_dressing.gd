@@ -853,3 +853,132 @@ static func porch_lamp(b: MapBuilder) -> void:
 	l.prism(Vector3(0, 2.05, 0.45), Vector3(0, 2.12, 0.45), 0.11, 0.0, 6, IRON)
 	_glow(b, func(g: LowPoly) -> void: g.prism(Vector3(0, 1.86, 0.45), Vector3(0, 2.05, 0.45), 0.08, 0.08, 6, LAMP_WARM))
 	b.w.add_glow(b.xf * Vector3(0, 1.95, 0.45), LAMP_WARM, 1.3)
+
+
+## A clinker-built cutter under repair, with exposed ribs and caulking along the unfinished side.
+## The footprint follows the hull and stocks, leaving the work lanes either side clear.
+static func ship_frame(b: MapBuilder, length: float, rigged := false) -> void:
+	var l := b.cell()
+	var width_scale := 0.77 if rigged else 1.0
+	var gunwale_y := 0.5 if rigged else 1.55
+	var keel_y := -0.42 if rigged else 0.92
+	if not rigged:
+		for x: float in [-length * 0.29, length * 0.26]:
+			l.box(Vector3(x, 0.19, 0), Vector3(0.42, 0.38, 3.8), WOOD_DARK)
+			for side: float in [-1.0, 1.0]:
+				l.prism(Vector3(x, 0.32, side * 1.65), Vector3(x, 1.35, side * 1.08), 0.11, 0.1, 4, WOOD)
+	l.prism(Vector3(-length * 0.48, keel_y, 0), Vector3(length * 0.48, keel_y, 0), 0.16, 0.13, 4, WOOD_DARK)
+	var last := Vector3.ZERO
+	for i in 9:
+		var f := float(i) / 8.0
+		var x := lerpf(-length * 0.5, length * 0.5, f)
+		var width := (0.24 + 1.44 * sin(f * PI)) * width_scale
+		var sheer := 0.9 + 0.35 * absf(f * 2.0 - 1.0)
+		var rim := Vector3(x, gunwale_y + sheer, width)
+		for side: float in [-1.0, 1.0]:
+			var mid := Vector3(x, lerpf(keel_y, rim.y, 0.36), width * side * 0.72)
+			l.prism(Vector3(x, keel_y, 0), mid, 0.105, 0.095, 5, WOOD)
+			l.prism(mid, rim * Vector3(1, 1, side), 0.095, 0.065, 5, ROPE.darkened(0.2))
+			if i > 0:
+				var a := last * Vector3(1, 1, side)
+				var z := rim * Vector3(1, 1, side)
+				l.prism(a, z, 0.086, 0.086, 4, CLOTH_TEAL if rigged else CLOTH_RUST)
+				# Planking on both sides of a finished hull, or one side of the frame on stocks.
+				if rigged or side > 0.0:
+					for row in (6 if rigged else 3):
+						var drop := Vector3(0, -0.22 * (row + 1), -side * 0.14 * row)
+						l.prism(a + drop, z + drop, 0.14, 0.14, 4, WOOD.darkened(row * 0.067))
+		last = rim
+	l.prism(Vector3(length * 0.45, keel_y, 0), Vector3(length * 0.52, gunwale_y + 1.6, 0), 0.17, 0.11, 5, WOOD_DARK)
+	if rigged:
+		l.box(Vector3(0, 0.68, 0), Vector3(length * 0.58, 0.17, 1.48), WOOD)
+		var mast := Vector3(0.35, 6.0, 0)
+		l.prism(Vector3(0.35, 0.7, 0), mast, 0.13, 0.066, 7, WOOD_DARK)
+		l.prism(mast + Vector3(-1.8, -1.0, 0), mast + Vector3(1.75, -0.42, 0), 0.074, 0.062, 6, WOOD)
+		l.prism(mast + Vector3(-1.6, -1.10, 0), mast + Vector3(1.53, -0.58, 0), 0.17, 0.10, 8, LINEN)
+		for x: float in [-length * 0.47, length * 0.44]:
+			l.prism(mast, Vector3(x, 1.37, 0), 0.028, 0.028, 4, ROPE)
+	b.solid(Vector3(0, 0.8 if rigged else 1.2, 0), Vector3(length * 0.95, 1.6 if rigged else 2.4, 3.45 * width_scale))
+
+
+## Benches tell what each building was used for. Their collision matches the table, so a doorway
+## or a route through the room stays open.
+static func trade_bench(b: MapBuilder, trade: String) -> void:
+	var l := b.cell()
+	l.box(Vector3(0, 0.9, 0), Vector3(2.1, 0.13, 0.8), WOOD)
+	for x: float in [-0.85, 0.85]:
+		for z: float in [-0.29, 0.29]:
+			l.box(Vector3(x, 0.44, z), Vector3(0.11, 0.88, 0.11), WOOD_DARK)
+	match trade:
+		"rope_bench":
+			for i in 9:
+				var a := TAU * i / 9.0
+				var next := TAU * (i + 1) / 9.0
+				for row in 3:
+					var y := 0.98 + row * 0.048
+					var r := 0.29 - row * 0.025
+					l.prism(Vector3(-0.43 + cos(a) * r, y, sin(a) * r), Vector3(-0.43 + cos(next) * r, y, sin(next) * r), 0.041, 0.041, 5, ROPE)
+			l.prism(Vector3(0.17, 0.99, -0.19), Vector3(0.82, 0.99, 0.19), 0.055, 0.027, 5, IRON)
+		"sail_bench":
+			l.box(Vector3(-0.18, 0.989, 0.02), Vector3(1.4, 0.04, 0.64), LINEN, Vector3(0, 7, 0))
+			l.prism(Vector3(-0.87, 1.04, -0.30), Vector3(-0.85, 1.035, 0.32), 0.115, 0.115, 9, LINEN.darkened(0.18))
+			for i in 6:
+				l.box(Vector3(-0.53 + i * 0.16, 1.015, 0.09), Vector3(0.072, 0.015, 0.018), CLOTH_RUST)
+		"fish_bench":
+			for i in 4:
+				var x := -0.69 + 0.37 * i
+				var at := Vector3(x, 1.02, 0.05)
+				l.prism(at - Vector3.BACK * 0.24, at + Vector3.BACK * 0.16, 0.045, 0.095, 5, FISH.darkened(0.05 * i))
+				l.leaf(at - Vector3.BACK * 0.19, at + Vector3(-0.09, 0, -0.32), at + Vector3(0.09, 0, -0.32), CLOTH_TEAL)
+			l.box(Vector3(0.79, 1.0, -0.13), Vector3(0.13, 0.055, 0.37), IRON)
+	b.solid(Vector3(0, 0.48, 0), Vector3(2.1, 0.96, 0.8))
+
+
+static func supply_rack(b: MapBuilder) -> void:
+	var l := b.cell()
+	l.box(Vector3(0, 0.37, 0), Vector3(1.65, 0.74, 0.76), WOOD_DARK)
+	l.box(Vector3(0, 0.79, 0), Vector3(1.82, 0.12, 0.85), WOOD)
+	l.box(Vector3(-0.16, 1.16, -0.31), Vector3(1.46, 0.6, 0.09), CLOTH_TEAL)
+	for x: float in [-0.74, 0.61]:
+		l.box(Vector3(x, 0.82, 0.37), Vector3(0.11, 1.65, 0.12), WOOD)
+	l.box(Vector3(-0.17, 1.37, -0.255), Vector3(1.24, 0.065, 0.025), GOLD)
+	l.box(Vector3(-0.17, 1.1, -0.253), Vector3(0.09, 0.33, 0.025), GOLD)
+	l.box(Vector3(-0.17, 1.1, -0.249), Vector3(0.33, 0.09, 0.025), GOLD)
+	b.solid(Vector3(0, 0.54, 0), Vector3(1.8, 1.08, 0.88))
+
+
+## Gullwatch's old signal hoist. The arm, rope and hanging signal flags form a single silhouette.
+static func signal_beacon(b: MapBuilder, high: float) -> void:
+	var l := b.cell()
+	l.prism(Vector3(0, -0.1, 0), Vector3(0, 0.55, 0), 1.35, 1.18, 8, STONE_DARK)
+	l.prism(Vector3(0, 0.55, 0), Vector3(0, 0.75, 0), 1.2, 1.16, 8, STONE)
+	l.prism(Vector3(0, 0.65, 0), Vector3(0, high, 0), 0.2, 0.13, 6, WOOD_DARK)
+	l.prism(Vector3(-1.75, high - 0.35, 0), Vector3(1.75, high - 0.35, 0), 0.10, 0.10, 4, WOOD)
+	for side: float in [-1.0, 1.0]:
+		l.prism(Vector3(0, high - 1.75, 0), Vector3(side * 1.5, high - 0.36, 0), 0.065, 0.065, 4, WOOD)
+		var x := side * 1.31
+		l.prism(Vector3(x, high - 0.36, 0), Vector3(x, 0.98, 0), 0.022, 0.022, 4, ROPE)
+		for i in 3:
+			var at := Vector3(x, high - 0.58 - i * 0.78, 0)
+			l.leaf(at, at + Vector3(0, -0.63, 0), at + Vector3(-0.22, -0.32, 0.76), CLOTH_RUST if (i == 1) == (side > 0.0) else CLOTH_BONE)
+	b.solid(Vector3(0, 0.65, 0), Vector3(2.3, 1.3, 2.3))
+
+
+## Scattered blades and seed heads follow the slope. One scenery batch and no collision.
+static func salt_grass(b: MapBuilder, size: float) -> void:
+	var l := b.cell()
+	var rng := b.seeded()
+	for i in 18:
+		var angle := rng.randf() * TAU
+		var r := sqrt(rng.randf()) * size
+		var x := cos(angle) * r
+		var z := sin(angle) * r
+		var root := Vector3(x, _local_ground(b, x, z), z)
+		var lean := Vector3(0.28, rng.randf_range(0.21, 0.62), -0.13)
+		for k in 3:
+			var side := Vector3.RIGHT.rotated(Vector3.UP, k * TAU / 3.0 + angle)
+			var tip := root + lean + side * rng.randf_range(0.05, 0.3)
+			l.leaf(root - side * 0.055, root + side * 0.055, tip, KELP.lerp(ROPE, rng.randf_range(0.15, 0.65)))
+			if k == 0:
+				var seed_colour := Color(0.47, 0.48, 0.56) if i % 4 == 0 else ROPE
+				l.prism(tip - lean * 0.16, tip + lean * 0.16, 0.026, 0.013, 4, seed_colour)

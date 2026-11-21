@@ -13,8 +13,9 @@ extends MapPiece
 
 const FLATS_TOP := 0.55 # the flats' height at the foot of the harbour wall
 const FLATS_LOW := -0.85 # and where they meet the open sea
+const MOLE_RUN := 11.0
 
-@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage", "sea", "road_lantern", "waystation", "slipway", "spire", "statue", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "brazier", "shrine", "banner", "bunting", "cargo", "fish_rack", "ghost_lights", "drystone", "garden", "lantern_string", "laundry", "bench", "chimney", "sea_trail", "porch_lamp") var kind := "wreck":
+@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage", "sea", "road_lantern", "waystation", "slipway", "spire", "statue", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "brazier", "shrine", "banner", "bunting", "cargo", "fish_rack", "ghost_lights", "drystone", "garden", "lantern_string", "laundry", "bench", "chimney", "sea_trail", "porch_lamp", "ship_frame", "fishing_cutter", "rope_bench", "sail_bench", "fish_bench", "supply_rack", "signal_beacon", "salt_grass") var kind := "wreck":
 	set(v):
 		kind = v
 		refresh()
@@ -30,6 +31,11 @@ const FLATS_LOW := -0.85 # and where they meet the open sea
 	set(v):
 		wide = v
 		refresh()
+## Optional landing on the inner side of a breakwater, measured along its local Z.
+@export var landing := INF:
+	set(v):
+		landing = v
+		refresh()
 ## A lighthouse burning (Last Light's goal, once relit).
 @export var lit := false:
 	set(v):
@@ -41,7 +47,13 @@ func build(b: MapBuilder) -> void:
 	match kind:
 		"paving": VaelBuilder.paving(b, size, wide)
 		"quay_wall": VaelBuilder.quay_wall(b, size)
-		"mole": VaelBuilder.mole(b, size, wide)
+		"mole":
+			VaelBuilder.mole(b, size, wide, landing)
+			if is_finite(landing):
+				var mole_xf := b.xf
+				b.xf = _landing_at(mole_xf)
+				VaelBuilder.slipway(b, MOLE_RUN, VaelBuilder.MOLE_RAMP_WIDTH, false)
+				b.xf = mole_xf
 		"lighthouse": VaelBuilder.lighthouse(b, size, lit)
 		"wreck": VaelBuilder.wreck(b, size)
 		"boat": VaelBuilder.boat(b, size, false)
@@ -84,6 +96,12 @@ func build(b: MapBuilder) -> void:
 		"chimney": VaelDressing.chimney(b, size)
 		"sea_trail": VaelDressing.sea_trail(b, size)
 		"porch_lamp": VaelDressing.porch_lamp(b)
+		"ship_frame": VaelDressing.ship_frame(b, size)
+		"fishing_cutter": VaelDressing.ship_frame(b, size, true)
+		"rope_bench", "sail_bench", "fish_bench": VaelDressing.trade_bench(b, kind)
+		"supply_rack": VaelDressing.supply_rack(b)
+		"signal_beacon": VaelDressing.signal_beacon(b, size)
+		"salt_grass": VaelDressing.salt_grass(b, size)
 		"salvage":
 			if not b.is_preview:
 				b.w.salvage_spots.append(Transform3D(b.xf.basis, b.xf.origin))
@@ -105,6 +123,15 @@ func land(t: Terrain, at: Transform3D) -> void:
 		"mole":
 			# The causeway's top, its sides falling steeply to the seabed.
 			t.level(c, Vector2(wide * 0.5, size * 0.5), yaw, at.origin.y, 1.2)
+			if is_finite(landing):
+				var top := _landing_at(at)
+				var along := top.basis.z
+				var shore_ratio := inverse_lerp(float(t.coast["z"]), float(t.coast["end"]), top.origin.z)
+				var floor_y := lerpf(FLATS_TOP, FLATS_LOW, clampf(shore_ratio, 0.0, 1.0))
+				var foot := top.origin + along * MOLE_RUN
+				foot.y = floor_y
+				var ramp: Array[Vector3] = [top.origin - along * 0.6, foot, foot + along]
+				t.cut(ramp, VaelBuilder.MOLE_RAMP_WIDTH * 0.5 + 0.3, 1.0)
 		"sea_stairs":
 			# A ramp of steps from the top of the wall down to the seabed, along +Z.
 			var down := at.basis.z.normalized()
@@ -120,6 +147,10 @@ func land(t: Terrain, at: Transform3D) -> void:
 			t.cut(pts, wide * 0.5 + 0.4, 0.8)
 		"lighthouse", "bell_tower":
 			t.level_auto(c, Vector2(4.5, 4.5) if kind == "lighthouse" else Vector2(2.4, 2.4), yaw, 2.0)
+
+
+func _landing_at(mole_xf: Transform3D) -> Transform3D:
+	return mole_xf * Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(-wide * 0.5 + 1.4, 0, landing))
 
 
 func shapes_land() -> bool:

@@ -5,6 +5,8 @@ extends RefCounted
 ## colliders, glows and lights it needs. Below the high-water line (MistTide.HIGH_Y) everything is
 ## stained dark and green and crusted with barnacles; above it, salt-bleached.
 
+const MOLE_RAMP_WIDTH := 6.0
+
 const QUAY_STONE := Color(0.46, 0.45, 0.43)
 const QUAY_DARK := Color(0.33, 0.33, 0.33)
 const SLIME := Color(0.2, 0.28, 0.17)
@@ -133,7 +135,7 @@ static func quay_wall(b: MapBuilder, length: float) -> void:
 
 ## A breakwater (a mole) along the piece's Z axis: a causeway of big stone blocks with sloping sides
 ## of tumbled rock, its top paved and walled on the sea side. The top is the land (see MapVael.land).
-static func mole(b: MapBuilder, length: float, wide: float) -> void:
+static func mole(b: MapBuilder, length: float, wide: float, landing := INF) -> void:
 	var rng := b.seeded()
 	var l := b.mesh()
 	var tide := _tide_line(b)
@@ -152,6 +154,9 @@ static func mole(b: MapBuilder, length: float, wide: float) -> void:
 		z = -length * 0.5
 		while z < length * 0.5:
 			var d := minf(rng.randf_range(1.6, 2.6), length * 0.5 - z)
+			if side < 0.0 and absf(z + d * 0.5 - landing) < MOLE_RAMP_WIDTH * 0.5 + d * 0.5:
+				z += d
+				continue
 			var foot := (b.xf.affine_inverse() * b.on_ground(Vector3(side * (half + 2.0), 0, z + d * 0.5))).y
 			var y := foot - 0.4
 			while y < -0.05:
@@ -172,9 +177,16 @@ static func mole(b: MapBuilder, length: float, wide: float) -> void:
 		l.box(Vector3(half - 0.3, 0.55, z + d * 0.5), Vector3(0.6, 1.1, d - 0.08), QUAY_DARK.lightened(rng.randf_range(0.0, 0.1)))
 		z += d
 	b.solid(Vector3(half - 0.3, 0.55, 0), Vector3(0.6, 1.1, length))
-	# Its faces are walls to whatever is down on the seabed: the way up is from the quay, at its root.
-	for side: float in [-1.0, 1.0]:
-		b.no_walk(Vector3(side * (half + 1.1), 0, 0.6), Vector3(1.8, 1.0, length - 1.2))
+	# Keep the rock faces closed to AI, leaving the inner landing open when present.
+	b.no_walk(Vector3(half + 1.1, 0, 0.6), Vector3(1.8, 1.0, length - 1.2))
+	var inner := -half - 1.1
+	if is_finite(landing):
+		var gap := MOLE_RAMP_WIDTH * 0.5 + 0.8
+		for span: Vector2 in [Vector2(-length * 0.5 + 0.6, landing - gap), Vector2(landing + gap, length * 0.5 - 0.6)]:
+			if span.y > span.x:
+				b.no_walk(Vector3(inner, 0, (span.x + span.y) * 0.5), Vector3(1.8, 1.0, span.y - span.x))
+	else:
+		b.no_walk(Vector3(inner, 0, 0.6), Vector3(1.8, 1.0, length - 1.2))
 	b.add(l)
 	MesenllaBuilder._feature(b, "mole", length)
 
@@ -667,7 +679,7 @@ static func sea_stairs(b: MapBuilder, length: float, drop: float) -> void:
 ## `length` long and `wide` across, timber kerbs either side, a winch at the top with its rope run
 ## down the ramp, and weed and barnacles below the high-water mark. Boats were hauled up it; now
 ## whatever comes in on the tide walks up it. The ramp itself is the land (MapVael.land).
-static func slipway(b: MapBuilder, length: float, wide: float) -> void:
+static func slipway(b: MapBuilder, length: float, wide: float, winch := true) -> void:
 	var rng := b.seeded()
 	var l := b.cell()
 	var tide := _tide_line(b)
@@ -697,20 +709,20 @@ static func slipway(b: MapBuilder, length: float, wide: float) -> void:
 			var y := (b.xf.affine_inverse() * b.on_ground(Vector3(x, 0, z))).y
 			l.prism(Vector3(x, y - 0.2, z), Vector3(x, y + 1.0, z), 0.16, 0.13, 6, WOOD_DARK)
 			b.solid(Vector3(x, y + 0.4, z), Vector3(0.3, 1.2, 0.3))
-	# The winch on the quay above, and its rope down the ramp to a rusted ring at the foot.
-	var top := (b.xf.affine_inverse() * b.on_ground(Vector3(0, 0, -1.6))).y
-	for side: float in [-0.7, 0.7]:
-		l.box(Vector3(side, top + 0.45, -1.6), Vector3(0.14, 0.9, 0.5), WOOD_DARK)
-	l.prism(Vector3(-0.75, top + 0.75, -1.6), Vector3(0.75, top + 0.75, -1.6), 0.22, 0.22, 8, ROPE)
-	l.prism(Vector3(0.75, top + 0.75, -1.6), Vector3(1.1, top + 0.95, -1.4), 0.04, 0.04, 4, IRON)
-	l.box(Vector3(0, top + 0.12, -1.6), Vector3(1.7, 0.18, 0.9), WOOD_DARK.darkened(0.2))
-	b.solid(Vector3(0, top + 0.5, -1.6), Vector3(1.7, 1.0, 0.9))
-	var foot := (b.xf.affine_inverse() * b.on_ground(Vector3(0.6, 0, length - 0.6))).y
-	l.prism(Vector3(0, top + 0.6, -1.4), Vector3(0.6, foot + 0.12, length - 0.6), 0.03, 0.03, 4, ROPE.darkened(0.25))
-	for s in 6:
-		var a0 := TAU * s / 6.0
-		var a1 := TAU * (s + 1) / 6.0
-		l.prism(Vector3(0.6 + cos(a0) * 0.18, foot + 0.1 + sin(a0) * 0.18, length - 0.6), Vector3(0.6 + cos(a1) * 0.18, foot + 0.1 + sin(a1) * 0.18, length - 0.6), 0.03, 0.03, 4, RUST)
+	# The winch sits beside the clear approach. Its rope runs down that same side.
+	if winch:
+		var shoulder := wide * 0.5 + 1.25
+		var top := (b.xf.affine_inverse() * b.on_ground(Vector3(shoulder, 0, -1.6))).y
+		for side: float in [-0.7, 0.7]:
+			l.box(Vector3(shoulder + side, top + 0.45, -1.6), Vector3(0.14, 0.9, 0.5), WOOD_DARK)
+		l.prism(Vector3(shoulder - 0.75, top + 0.75, -1.6), Vector3(shoulder + 0.75, top + 0.75, -1.6), 0.22, 0.22, 8, ROPE)
+		l.prism(Vector3(shoulder + 0.75, top + 0.75, -1.6), Vector3(shoulder + 1.1, top + 0.95, -1.4), 0.04, 0.04, 4, IRON)
+		l.box(Vector3(shoulder, top + 0.12, -1.6), Vector3(1.7, 0.18, 0.9), WOOD_DARK.darkened(0.2))
+		b.solid(Vector3(shoulder, top + 0.5, -1.6), Vector3(1.7, 1.0, 0.9))
+		var anchor_x := wide * 0.5 + 0.24
+		var foot := (b.xf.affine_inverse() * b.on_ground(Vector3(anchor_x, 0, length - 0.6))).y
+		l.prism(Vector3(shoulder, top + 0.6, -1.4), Vector3(anchor_x, foot + 0.12, length - 0.6), 0.03, 0.03, 4, ROPE.darkened(0.25))
+	MesenllaBuilder._feature(b, "slipway", length)
 
 
 ## One of the old lanterns of the Lantern Road: a squat stone post with an iron crook, its lantern

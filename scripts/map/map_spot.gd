@@ -2,6 +2,7 @@
 class_name MapSpot
 extends MapPiece
 ## A place on the map that nobody sees in the game, but that the game uses.
+## vael_spawn: a harbour approach where Port Vael may raise enemies.
 ## loot: where items can appear. cache: where ruins keep one of the rarer finds, filled again a while
 ## after it is taken. poi: where zombies wander to. crop: where a Scarecrow can rise, in a field.
 ## wood and yard_wood: where wood appears in the fort. start: where players begin, in order.
@@ -20,7 +21,7 @@ extends MapPiece
 ## where the hunters leave a cache (gate 0 by the camp's fire, gate 1 once the camp is lost);
 ## guild_camp, the fallback camp's fire.
 
-@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way", "barge", "snare", "hunter", "trap_cache", "guild_camp") var kind := "loot":
+@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way", "barge", "snare", "hunter", "trap_cache", "guild_camp", "vael_spawn") var kind := "loot":
 	set(v):
 		kind = v
 		refresh()
@@ -40,6 +41,9 @@ func build(b: MapBuilder) -> void:
 	var at := b.xf.origin
 	match kind:
 		"loot": b.w.loot_spots.append(at)
+		"vael_spawn":
+			if not b.is_preview:
+				b.w.vael_approaches.append(at)
 		"cache": b.w.cache_spots.append(at)
 		"poi": b.w.pois.append(at)
 		"crop": b.w.crop_spots.append(at)

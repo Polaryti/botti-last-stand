@@ -35,7 +35,7 @@ const ALL := {
 		"lore": "The old road descends from the Valleys of Mesenlla to a grey coast. Here the kingdom of Vael kept its harbour, until the night its crown went into the sea and the sea came after it. Every night since, the Mist Tide rolls in over the flats, and the drowned walk in with it.",
 		"tips": ["Low tide bares the seabed. Open the sea chests on the wrecks before the water comes back.",
 			"At high tide the flats flood: wading slows you and the sea-mist half blinds you. Keep to the quay and the moles.",
-			"The Drowned are quicker while the tide is high. The harbour bells ring before it turns."]},
+			"Explore the headland paths and Harbourmaster's House for supplies. The bells warn when the tide is about to turn."]},
 	"lantern_road": {"name": "The Lantern Road", "icon": "map_lantern_road", "color": Color("ffd36e"), "plays": "Last Light, alone or in Co-op",
 		"lore": "Beyond Port Vael an old causeway runs out across the drowned Sound to the Isle of Lamps, where the ferrymen once rowed the dead. Its lanterns went out when the Mists rose. Only the Lantern Barge still carries a light along it, and the Mist Tide never goes out.",
 		"tips": ["Keep inside the barge's light. Outside it, the tide starts to drown you after a few seconds.",

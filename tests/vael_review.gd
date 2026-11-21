@@ -53,6 +53,12 @@ func _ready() -> void:
 	await shot("vael_harbour_terraces", ground(10, -7.0, 3.2), ground(0, -25, 1.4))
 	await shot("vael_valley_road", ground(14, -87, 2.0), ground(10, -108, 3.4))
 	await shot("vael_aurora", ground(71, -19, 3.5), ground(43, 72, 30.0))
+	await shot("vael_boatyard", ground(-80, -4, 2.7), ground(-74, -10, 1.5))
+	await shot("vael_fishmarket", ground(43, -2, 2.0), ground(53, -8, 1.5))
+	await shot("vael_ropewalk", ground(-51.5, -6.0, 1.7), ground(-50.3, -13, 0.9))
+	await shot("vael_gullwatch", ground(-88, -47, 2.1), ground(-94, -56, 2.0))
+	await shot("vael_east_landing", ground(70, 34, 1.8), ground(84, 34, 1.2))
+	await shot("vael_pilgrims_garden", ground(80, -76, 2.5), ground(75, -85, 1.3))
 	await shot("vael_square", ground(-8, -46, 1.7), ground(10, -56, 2.0))
 	await shot("vael_chapel", ground(-30, -60, 1.7), ground(-40, -76, 4.0))
 	await tide_at(MistTide.TURN + MistTide.RISE + 5.0) # high tide

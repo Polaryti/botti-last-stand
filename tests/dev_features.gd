@@ -1822,6 +1822,7 @@ func _port_vael() -> void:
 		var reaches := way.size() > 1 and Vector2(way[-1].x - to.x, way[-1].z - to.z).length() < 2.5
 		check(reaches and steepest < 0.95, "from the flats a path climbs to %s, by stairs or a slipway (%d points, steepest %.2f)" % [trip[2], way.size(), steepest])
 	check(t.height(-84, 40) > MistTide.HIGH_Y + 0.8 and t.height(84, 40) > MistTide.HIGH_Y + 0.8, "the breakwaters stand out of the highest tide")
+	await _vael_districts(vael)
 	check(vael.tide.salvage().size() >= 4, "every wreck keeps a sea chest (%d)" % vael.tide.salvage().size())
 	var flats := Vector3(0, t.height(0, 40), 40)
 	# Low tide: dry flats, chests to open.
@@ -1921,6 +1922,75 @@ func _port_vael() -> void:
 	Game.night_map = was_map
 	Game.mode = was_mode
 	await get_tree().process_frame
+
+
+## The Port Vael districts, supply racks, and routes through the quay and its buildings.
+func _vael_districts(vael: World) -> void:
+	var sites := vael.vael_sites
+	var spawn_failures := 0
+	var you := vael.player
+	var start := you.global_position
+	for z: float in [-8.0, -50.0, -86.0, 30.0]:
+		var at := Vector3(0, 0, z)
+		at.y = vael.ground_at(at)
+		you.global_position = at
+		for i in 8:
+			var found := sites.enemy_site()
+			if found == Vector3.INF or not sites.accessible(found) or found.distance_to(you.global_position) < 25.0:
+				spawn_failures += 1
+	check(spawn_failures == 0, "enemy spawns find connected, unoccupied approaches from the coast, market and back lanes")
+	check(vael.vael_approaches.size() >= 30 and vael.vael_approaches.all(sites.accessible), "all marked enemy approaches are walkable and connected")
+	check(vael.loot_spots.size() >= 60 and vael.loot_spots.all(sites.accessible), "all marked supplies can be reached, including those inside buildings")
+	var highest_floor := -INF
+	for x in range(-56, -40):
+		for z in range(-16, -8):
+			highest_floor = maxf(highest_floor, vael.terrain.height(x + 0.5, z + 0.5))
+	check(highest_floor <= 2.25, "the west steps stay clear of the Ropewalk floor")
+	var roads := [
+		[Vector3(-74, 0, -4), Vector3(-89, 0, -52), "Gullwatch"],
+		[Vector3(-89, 0, -52), Vector3(-78, 0, -52), "Gullwatch's road to Market Row"],
+		[Vector3(80, 0, -4), Vector3(87, 0, -54), "East Headland"],
+		[Vector3(86, 0, -48), Vector3(77.5, 0, -83.9), "Pilgrims' Garden"],
+		[Vector3(77.5, 0, -83.9), Vector3(49, 0, -71), "the garden's return route to town"],
+	]
+	for road: Array in roads:
+		var route := vael.grid.astar.get_id_path(vael.grid.to_cell(road[0]), vael.grid.to_cell(road[1]))
+		check(route.size() >= 2, "a connected route for players and mobs to %s" % road[2])
+	# Check physics as well as the grid, since a route can still hit a model or turn too sharply.
+	you.global_position = Vector3(0, 5, -49)
+	for trip: Array in [
+			[Vector3(-12, 0, 17), Vector3(-12, 0, 2), "the western slipway"],
+			[Vector3(12, 0, 17), Vector3(12, 0, 2), "the eastern slipway"],
+			[Vector3(-70, 0, 34), Vector3(-84, 0, 34), "the West Mole landing"],
+			[Vector3(70, 0, 34), Vector3(84, 0, 34), "the East Mole landing"],
+			[Vector3(-51.5, 0, -6), Vector3(-39, 0, -12), "both Ropewalk doors"],
+			[Vector3(40, 0, -69), Vector3(40, 0, -82), "the Harbourmaster's House"],
+		]:
+		var at: Vector3 = trip[0]
+		at.y = vael.ground_at(at)
+		if not vael.spawn_zombie("drowned_sailor", at):
+			check(false, "spawn a Drowned Sailor for %s" % trip[2])
+			continue
+		var sailor: Zombie = vael.zombies.back()
+		sailor._think = 999.0
+		sailor.state = Zombie.State.INVESTIGATE
+		sailor._set_goal(trip[1])
+		for i in 570:
+			await get_tree().physics_frame
+			if sailor._arrived():
+				break
+		check(sailor._arrived(), "a Drowned Sailor walks through %s" % trip[2])
+		sailor.release()
+	you.global_position = start
+	var old_pickups := vael.pickups.duplicate()
+	vael.director._tick_caches()
+	var caches := vael.pickups.filter(func(item: Pickup) -> bool: return sites.holds_supplies(item.global_position))
+	check(caches.size() == 4 and caches.all(func(item: Pickup) -> bool: return is_inf(item.life)), "exploration keeps a reward waiting at each of the four supply racks")
+	for item: Pickup in caches:
+		if not old_pickups.has(item):
+			vael.remove_pickup(item)
+	vael.director._cache_due.clear()
+	vael.director._cache_look = 0.0
 
 
 ## Stage 3 of The Sunken Crown: the drowned court of Port Vael, the Hollow Sovereign and his crown.

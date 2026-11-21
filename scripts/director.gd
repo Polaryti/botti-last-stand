@@ -240,6 +240,8 @@ func _tick_caches() -> void:
 			continue
 		if elapsed < float(_cache_due.get(i, 0.0)) or world.storm_at(at) != null:
 			continue
+		if world.vael_sites and not world.vael_sites.can_stock(at, false, 3.0):
+			continue
 		_cache_due[i] = elapsed + CACHE_REFILL
 		if randf() < 0.65:
 			var id := WeaponDefs.pick_rare(world.spawn_map())
@@ -525,12 +527,8 @@ func _tick_vael() -> void:
 	if elapsed >= _next_rider and elapsed >= ZombieDefs.ALL["brine_hound"]["from"]:
 		_next_rider = elapsed + HOUND_PACK_EVERY
 		if world.count_type("brine_hound") <= MAX_HOUNDS - int(ZombieDefs.ALL["brine_hound"]["pack"]):
-			var near := world.random_player_position()
-			var at := world.spawn_point_near(near, 26.0, 40.0)
-			var came := 0
-			for i in int(ZombieDefs.ALL["brine_hound"]["pack"]):
-				if world.spawn_zombie("brine_hound", at + Vector3(randf_range(-2.0, 2.0), 0, randf_range(-2.0, 2.0))):
-					came += 1
+			var pack := int(ZombieDefs.ALL["brine_hound"]["pack"])
+			var came := world.vael_sites.spawn_pack("brine_hound", pack, VaelSites.Shore.WATERLINE) if world.vael_sites else _lantern_pack("brine_hound", pack, 26.0, 40.0)
 			if came > 0:
 				_sound("hound_snarl", 0.0)
 				show_banner("Hounds out of the sea...", 3.0)
@@ -557,12 +555,7 @@ func _tick_court() -> void:
 		_next_press = elapsed + PRESS_EVERY
 		var gang := int(ZombieDefs.ALL["press_gang"]["pack"])
 		if world.count_type("press_gang") <= MAX_PRESS - gang:
-			var at := world.spawn_point_near(world.random_player_position(), 24.0, 38.0)
-			var came := 0
-			if at != Vector3.INF:
-				for i in gang:
-					if world.spawn_zombie("press_gang", at + Vector3(randf_range(-1.5, 1.5), 0, randf_range(-1.5, 1.5))):
-						came += 1
+			var came := world.vael_sites.spawn_pack("press_gang", gang, VaelSites.Shore.DRY) if world.vael_sites else _lantern_pack("press_gang", gang, 24.0, 38.0)
 			if came > 0:
 				_sound("press_shout", 2.0)
 				show_banner("A Press Gang is looking for hands...", 3.0)
@@ -588,6 +581,19 @@ func _tick_court() -> void:
 	if not _court_came.has("lighthouse_keeper") and elapsed >= KEEPER_AT:
 		if _summon("lighthouse_keeper", KEEPER_FROM, "keeper_laugh"):
 			show_banner("The Mad Lighthouse Keeper comes down the East Mole: \u201c%s\u201d" % ZombieDefs.ALL["lighthouse_keeper"]["first_words"], 4.5)
+
+
+## The Lantern Road shares these encounters. Check each pack member in its own cell there as well.
+func _lantern_pack(id: String, count: int, near: float, far: float) -> int:
+	var at := world.spawn_point_near(world.random_player_position(), near, far)
+	if at == Vector3.INF:
+		return 0
+	var came := 1 if world.spawn_zombie(id, at) else 0
+	for i in count - 1:
+		var next := world.spawn_point_near(at, 1.6, 3.0)
+		if next != Vector3.INF and world.spawn_zombie(id, next):
+			came += 1
+	return came
 
 
 ## One of the court, come at its hour where it comes from; once, whether or not it could.

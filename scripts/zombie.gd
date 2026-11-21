@@ -1877,7 +1877,7 @@ func _start_chase(at: Vector3) -> void:
 	# The further away it is, the less a small move changes the way there.
 	var spot := at + _flank * 2.5
 	# Coming at someone from the side must not mean stopping on the wrong side of their fence.
-	if not world.grid.line_is_open(at, spot):
+	if not world.grid.line_is_open(at, spot) or (world.vael_sites and not world.vael_sites.accessible(spot)):
 		spot = at
 	var slack := maxf(2.0, position.distance_to(at) * 0.2)
 	if not _has_goal or _goal.distance_squared_to(spot) > slack * slack:
@@ -1926,7 +1926,10 @@ func _arrived() -> bool:
 func _random_spot(radius: float) -> Vector3:
 	for i in 6:
 		var p := position + Vector3(randf_range(-radius, radius), 0, randf_range(-radius, radius))
-		if absf(p.x) < world.half_size - 1.0 and absf(p.z) < world.half_size - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
+		if world.vael_sites:
+			if world.vael_sites.accessible(p):
+				return p
+		elif absf(p.x) < world.half_size - 1.0 and absf(p.z) < world.half_size - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
 			return p
 	return position
 
@@ -2145,7 +2148,8 @@ func _roam(dt: float) -> void:
 			if type_id == "magic" and not world.pois.is_empty():
 				_set_goal(world.pois[randi() % world.pois.size()])
 			else:
-				_set_goal(_random_spot(18.0))
+				var next := world.vael_sites.patrol(position) if world.vael_sites else position
+				_set_goal(next if next != position else _random_spot(18.0))
 
 
 func _nearby_poi() -> Vector3:
@@ -2906,6 +2910,8 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 				# Spreading out to surround you is for open ground. On a bridge there is only the one way.
 				var spread := 0.0 if world.terrain.has_islands() and world.terrain.near_deck(position.x, position.z) else 1.0
 				var approach := to + _flank * clampf(dist - 2.5, 0.0, 4.0) * spread
+				if world.vael_sites and not world.grid.line_is_open(position, position + approach):
+					approach = to # take the doorway or the ramp straight on
 				dir = approach.normalized()
 				_check_blocked(delta)
 			_clear_path_only()

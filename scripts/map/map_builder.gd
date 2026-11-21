@@ -210,7 +210,7 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA else 0.0)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" else 0.0)
 	mat.set_shader_parameter("shore", SHORE_Y if not terrain.coast.is_empty() or not terrain.sea.is_empty() else -1000.0)
 	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
@@ -1673,7 +1673,7 @@ func forest_wall(h: float) -> void:
 			apron._tri(a, z, z + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 			apron._tri(a, z + outward * 24, a + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 	add(apron)
-	if look in SpawnRules.MESENLLA:
+	if look in SpawnRules.MESENLLA or look == "vael":
 		_tall_wall(h)
 		return
 	var step: float = [7.5, 5.5, 4.2][quality]
@@ -1685,8 +1685,6 @@ func forest_wall(h: float) -> void:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1))
 				p.y = terrain.height(p.x, p.z)
-				if look == "vael" and p.z < -h and absf(p.x - 9.0) < 5.0:
-					continue # keep the Mesenlla road visible through the north windbreak
 				if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4:
 					continue # no trees in the sea: the coast's edge is open water
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
@@ -1698,20 +1696,23 @@ func forest_wall(h: float) -> void:
 ## Beyond the Mists the edge of the land is lined with tall conifers: giant firs and tall pines in
 ## rows from just inside the edge outwards, so the land ends in a wall of old forest.
 func _tall_wall(h: float) -> void:
+	var coastal := look == "vael"
 	var step: float = [8.0, 6.0, 5.0][quality]
 	var depth: int = [3, 3, 4][quality]
 	for row in depth:
-		var off := h - 2.5 + row * 4.2
+		var off := h + (1.6 if coastal else -2.5) + row * 4.2
 		var t := -off
 		while t <= off:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1.4, 1.4), 0, rng.randf_range(-1.4, 1.4))
 				p.y = terrain.height(p.x, p.z)
+				if coastal and (p.y < MistTide.HIGH_Y + 0.4 or (p.z < -h and absf(p.x - 9.0) < 6.0)):
+					continue # open sea and the road to Mesenlla
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 				if rng.randf() < 0.55:
-					tree("proc:giant_fir", rng.randf_range(7.5, 10.0), rng.randf_range(0.95, 1.15), row == 0)
+					tree("proc:giant_fir", rng.randf_range(7.5, 10.0), rng.randf_range(0.95, 1.15), row == 0 and not coastal)
 				else:
-					tree("proc:tall_pine", rng.randf_range(8.0, 11.0), rng.randf_range(1.0, 1.3), row == 0)
+					tree("proc:tall_pine", rng.randf_range(8.0, 11.0), rng.randf_range(1.0, 1.3), row == 0 and not coastal)
 			t += step + (row % 2) * 0.5
 
 

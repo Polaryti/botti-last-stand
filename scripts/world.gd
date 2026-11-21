@@ -105,6 +105,8 @@ var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
 var cache_spots: Array[Vector3] = [] # where the ruins keep better things than lie about elsewhere
 var salvage_spots: Array[Transform3D] = [] # Port Vael: the wrecks' sea chests (MistTide)
+var vael_approaches: Array[Vector3] = []
+var vael_sites: VaelSites
 # The Lantern Road (Last Light): its road lanterns (where each flame hangs), its waystations, the top
 # of its lighthouse, and the run itself.
 var road_lanterns: Array[Vector3] = []
@@ -337,6 +339,8 @@ func setup(game_mode: int) -> void:
 		_mesenlla_look()
 	elif map_id in SpawnRules.VAEL:
 		_vael_look()
+		if map_id == "vael" and mode != Game.Mode.MENU:
+			vael_sites = VaelSites.new(self)
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
 		var atmosphere := MistAtmosphere.new()
 		atmosphere.name = "VillageAura" if fort == null else "FortAura"
@@ -487,7 +491,7 @@ func in_reach(at: Vector3) -> bool:
 		var half := grid.half
 		_reach = grid.reach_from(starts, func(c: Vector2i) -> bool:
 			return c.x >= edge and c.y >= edge and c.x < side - edge and c.y < side - edge and terrain.is_walkable(c.x + 0.5 - half, c.y + 0.5 - half))
-		if _reach.count(1) < 400:
+		if _reach.count(1) < 400 and map_id != "vael":
 			_reach.fill(1) # the start itself was on a ledge: better everything than nothing
 	var cell := grid.to_cell(at)
 	return _reach[cell.y * grid.size + cell.x] == 1
@@ -2574,6 +2578,8 @@ func net_spawn_pickup(net_id: int, kind: int, item: String, bonus: int, at: Vect
 	p.setup(kind, item, bonus)
 	add_child(p)
 	p.global_position = at
+	if vael_sites and vael_sites.holds_supplies(at):
+		p.life = INF
 	p.net_id = net_id
 	_pickup_ids[net_id] = p
 	pickups.append(p)
@@ -2791,6 +2797,9 @@ func spawn_point_near(near: Vector3, lo: float, hi: float, test := Callable()) -
 
 ## Port Vael: something the high tide carries in, out over the flooded flats near someone.
 func spawn_on_tide(id: String) -> bool:
+	if vael_sites:
+		var shore := vael_sites.enemy_site(14.0, 80.0, VaelSites.Shore.FLOODED)
+		return shore != Vector3.INF and spawn_zombie(id, shore)
 	if tide == null:
 		return false
 	var at := spawn_point_near(random_player_position(), 14.0, 36.0, func(p: Vector3) -> bool: return tide.flooded(p))
@@ -2799,6 +2808,9 @@ func spawn_on_tide(id: String) -> bool:
 
 ## Port Vael: an Angler buried on the shore or the seabed, its lure showing, a little way from anyone.
 func spawn_angler() -> bool:
+	if vael_sites:
+		var shore := vael_sites.enemy_site(12.0, 75.0, VaelSites.Shore.EXPOSED)
+		return shore != Vector3.INF and spawn_zombie("angler", shore)
 	var at := spawn_point_near(random_player_position(), 12.0, 40.0, func(p: Vector3) -> bool:
 		return terrain.height(p.x, p.z) < MistTide.HIGH_Y + 0.4 and (tide == null or not tide.flooded(p)))
 	return at != Vector3.INF and spawn_zombie("angler", at)
@@ -2806,6 +2818,9 @@ func spawn_angler() -> bool:
 
 ## Port Vael: a Siren at the water's edge, down on the flats a way off from someone.
 func spawn_siren() -> bool:
+	if vael_sites:
+		var shore := vael_sites.enemy_site(18.0, 85.0, VaelSites.Shore.WATERLINE)
+		return shore != Vector3.INF and spawn_zombie("siren", shore)
 	var at := spawn_point_near(random_player_position(), 18.0, 34.0, func(p: Vector3) -> bool:
 		return terrain.height(p.x, p.z) < MistTide.HIGH_Y + 0.4 and not terrain.open_sea(p.x, p.z))
 	return at != Vector3.INF and spawn_zombie("siren", at)
@@ -2835,7 +2850,7 @@ func raise_kraken() -> int:
 	for i in VaelMind.ARMS:
 		var a := turn + TAU * i / float(VaelMind.ARMS)
 		var at := centre + Vector3(cos(a), 0, sin(a)) * KRAKEN_RING
-		if absf(at.x) > play_half - 3.0 or absf(at.z) > play_half - 3.0 or not terrain.is_walkable(at.x, at.z) or not tide.flooded(at):
+		if absf(at.x) > play_half - 3.0 or absf(at.z) > play_half - 3.0 or not terrain.is_walkable(at.x, at.z) or not tide.flooded(at) or (vael_sites and not vael_sites.accessible(at)):
 			continue
 		at.y = ground_at(at)
 		if spawn_zombie("kraken_arm", at):
@@ -2880,6 +2895,8 @@ func banner(text: String, seconds: float) -> void:
 ## Out of sight and far from every player, at the edge of what they can hear. The map is big,
 ## so the search stays around the players: a zombie across the river would never find them.
 func _pick_spawn_point(fort_gate := -1) -> Vector3:
+	if vael_sites and not _warming:
+		return vael_sites.enemy_site()
 	var best := Vector3.INF
 	var best_score := -INF
 	for i in 16:
@@ -3006,7 +3023,10 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null and in_reach(at):
+		if vael_sites:
+			if vael_sites.can_stock(at, false, 3.0):
+				return spawn_pickup_at(at, kind, id)
+		elif absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null and in_reach(at):
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -3019,6 +3039,8 @@ func spawn_pickup_at(at: Vector3, kind: int, id: String, bonus := 0) -> Pickup:
 	p.setup(kind, id, bonus)
 	add_child(p)
 	p.global_position = Vector3(at.x, ground_at(at), at.z)
+	if vael_sites and vael_sites.holds_supplies(at):
+		p.life = INF
 	pickups.append(p)
 	if Net.is_host():
 		p.net_id = _next_pickup_id
@@ -3030,6 +3052,12 @@ func spawn_pickup_at(at: Vector3, kind: int, id: String, bonus := 0) -> Pickup:
 
 ## Half of all supplies land in buildings and yards, so exploring pays off.
 func spawn_pickup_random(kind: int, id: String) -> Pickup:
+	if vael_sites:
+		var site := vael_sites.pickup_site(kind)
+		if site == Vector3.INF:
+			return null
+		var arrows := 8 if kind == Pickup.Kind.WEAPON and WeaponDefs.is_ranged(id) else 0
+		return spawn_pickup_at(site, kind, id, arrows)
 	for i in 14:
 		var at: Vector3
 		if terrain.has_islands() and not loot_spots.is_empty():

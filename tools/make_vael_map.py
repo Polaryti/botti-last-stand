@@ -112,6 +112,11 @@ node("HeadlandWest", land, "hill", (-104, 0, 34), height=11.0, radius=20.0)
 node("HeadlandEast", land, "hill", (104, 0, 28), height=13.0, radius=20.0)
 node("HillNorthWest", land, "hill", (-92, 0, -88), height=7.0, radius=22.0)
 node("HillNorthEast", land, "hill", (90, 0, -92), height=8.0, radius=22.0)
+node("WestCliff", land, "hill", (-108, 0, -44), height=12.0, radius=16.0)
+node("EastCliff", land, "hill", (109, 0, -28), height=10.0, radius=15.0)
+node("GullwatchTerrace", land, "level", (-91, 7.1, -57), size="Vector2(14, 15)", blend=4.0)
+node("PilgrimTerrace", land, "level", (77, 5.0, -82), size="Vector2(17, 14)", blend=3.0)
+node("SaltHouseGround", land, "level", (74, 2.2, -11), size="Vector2(19, 11)", blend=1.8)
 
 # --- Roads ---------------------------------------------------------------------------------------
 roads = group("Roads")
@@ -122,8 +127,17 @@ road("ValleyRoad", roads, [(8, 5.0, -54), (7, 5.0, -68), (12, 5.0, -78),
                           (15, 5.0, -88), (11, 5.3, -98), (5, 7.4, -120)], 4.8, cut=True, blend=3.0)
 road("ChapelLane", roads, [(-40, 5.0, -52), (-40, 5.0, -84)], 4.0)
 road("HillLane", roads, [(40, 5.0, -52), (40, 5.0, -86)], 4.0)
-road("WestSteps", roads, [(-60, 2.2, -12), (-60, 3.6, -19), (-60, 5.0, -27)], 3.4, cut=True)
-road("EastSteps", roads, [(62, 2.2, -12), (62, 3.6, -19), (62, 5.0, -27)], 3.4, cut=True)
+road("WestSteps", roads, [(-62, 2.2, -12), (-62, 3.6, -19), (-62, 5.0, -27)], 4.6, cut=True, blend=2.0)
+road("EastSteps", roads, [(62, 2.2, -12), (62, 3.6, -19), (62, 5.0, -27)], 4.6, cut=True)
+# Two long ways around town. The shoulder roads meet its streets instead of ending in the woods.
+road("WestCliffPath", roads, [(-70, 2.2, -3), (-85, 2.5, -7), (-91, 4.2, -21),
+                            (-89, 5.4, -39), (-89, 7.1, -53), (-85, 6.0, -70),
+                            (-73, 5.2, -87), (-68, 5.0, -91), (-40, 5.0, -91)], 4.8, cut=True, blend=3.0)
+road("NorthLane", roads, [(-40, 5.0, -91), (-24, 5.0, -89), (-14, 5.0, -89), (0, 5.0, -86), (15, 5.0, -87)], 4.2, cut=True)
+road("EastHeadlandPath", roads, [(79, 2.2, -3), (88, 2.35, -9), (91, 3.5, -21), (90, 4.6, -36),
+                                (88, 5.0, -51), (89, 5.0, -67), (85, 5.0, -78),
+                                (77, 5.0, -81), (66, 5.0, -76), (49, 5.0, -71)], 4.8, cut=True, blend=3.0)
+road("WatchCrossing", roads, [(-90, 7.1, -53), (-78, 5.0, -52)], 4.2, cut=True, blend=2.8)
 
 # --- The harbour ---------------------------------------------------------------------------------
 harbour = group("Harbour")
@@ -145,31 +159,52 @@ for (x, k) in WAYS:
     else:
         node("Slipway", harbour, "vael", (x, 2.2, 6.0), kind="slipway", size=10.0, wide=6.0, on_ground=False)
 # The breakwaters and the lighthouse.
-node("WestMole", harbour, "vael", (-84, 2.0, 40, 180), kind="mole", size=68.0, wide=7.0, on_ground=False) # its parapet to the sea
-node("EastMole", harbour, "vael", (84, 2.0, 40), kind="mole", size=68.0, wide=7.0, on_ground=False)
+node("WestMole", harbour, "vael", (-84, 2.0, 40, 180), kind="mole", size=68.0, wide=7.0, landing=6.0, on_ground=False) # its parapet to the sea
+node("EastMole", harbour, "vael", (84, 2.0, 40), kind="mole", size=68.0, wide=7.0, landing=-6.0, on_ground=False)
 node("Lighthouse", harbour, "vael", (84, 2.0, 70), kind="lighthouse", size=17.0, on_ground=False)
-for z in (18, 34, 50):
+for z in (18, 27, 50):
     node("MoleLamp", harbour, "vael", (-81.5, 2.0, z), kind="lamp_post", on_ground=False)
     node("MoleLamp", harbour, "vael", (81.5, 2.0, z, 180), kind="lamp_post", on_ground=False)
 
 # --- The quay ------------------------------------------------------------------------------------
 quay = group("Quay")
-node("QuayPaving", quay, "vael", (0, 2.2, -5), kind="paving", size=170.0, wide=21.6, on_ground=False)
-for i, (x, w) in enumerate([(-50, 16.0), (-20, 14.0), (26, 16.0)]):
-    house = node("Warehouse", quay, "house", (x, 2.2, -12), width=w, depth=8.0, height=4.4, ridge="x", roof_rise=2.4,
-                 walls=STONE, roof=SLATE, beams=True, south="door:-3:3.2:3.6, window:3", north="window:-3, window:3", level_ground=False)
+node("QuayPaving", quay, "vael", (0, 2.2, -1), kind="paving", size=170.0, wide=14.0, on_ground=False)
+for i, (x, w) in enumerate([(-48.5, 16.0), (-20, 14.0), (26, 16.0)]):
+    node("WarehouseFloor", land, "level", (x, 2.2, -12), size=f"Vector2({w + 1.2}, 9.6)", blend=1.6)
+    house = node(("Ropewalk", "SailLoft", "BondedStore")[i], quay, "house", (x, 2.2, -12), width=w, depth=8.0, height=4.4, ridge="x", roof_rise=2.4,
+                 walls=STONE, roof=SLATE, beams=True, south="door:-3:3.6:3.6, window:3", north="window:-3, window:3",
+                 east="door:0:3.4:3.2", level_ground=False)
     spot(house, "loot", (-2.5, 0, 1.0), on_ground=False)
     node("Crate", house, "prop", (2.6, 0, -2.2), kind="crate_big", on_ground=False)
     node("Crate", house, "prop", (3.6, 0, -1.2, 30), kind="crate_small", on_ground=False)
     node("Barrel", house, "prop", (-5.0, 0, -2.4), kind="barrel", on_ground=False)
     node("Barrel", house, "prop", (-5.8, 0, -1.4), kind="barrel", on_ground=False)
     node("Sack", house, "prop", (0.5, 0, -2.6), kind="sack", on_ground=False)
+    node("TradeStation", house, "vael", (-2.5, 0, -2.85), kind=("rope_bench", "sail_bench", "rope_bench")[i], on_ground=False)
+    node("WorkLamp", house, "vael", (-5.4, 0, 3.0), kind="porch_lamp", on_ground=False)
 for x in (-35.0, 21.0, 48.0):
     node("Crane", quay, "vael", (x, 2.2, 3.4), kind="crane", size=6.5, on_ground=False)
 for x in range(-72, 80, 16):
     node("QuayLamp", quay, "vael", (x, 2.2, 4.2, 180), kind="lamp_post", on_ground=False)
 node("Nets", quay, "vael", (60, 2.2, -10), kind="net_rack", size=10.0, on_ground=False)
-node("Nets", quay, "vael", (-72, 2.2, -10), kind="net_rack", size=8.0, on_ground=False)
+node("Nets", quay, "vael", (-66, 2.2, -11, 90), kind="net_rack", size=5.5, on_ground=False)
+node("ShipOnStocks", quay, "vael", (-77, 2.2, -10.5, -8), kind="ship_frame", size=10.0, on_ground=False)
+node("ShipyardTimber", quay, "prop", (-74, 2.2, -5.2, 15), kind="lumber_small", on_ground=False)
+node("ShipyardTools", quay, "vael", (-80, 2.2, -6.4, 90), kind="rope_bench", on_ground=False)
+node("FishStall", quay, "thing", (54, 2.2, -6.5, -90), kind="stall_blue", on_ground=False)
+node("FishStall", quay, "thing", (49, 2.2, -9.5, -90), kind="stall_red", on_ground=False)
+node("FishSortingTable", quay, "vael", (54, 2.2, -10.6), kind="fish_bench", on_ground=False)
+node("FishSortingTable", quay, "vael", (48, 2.2, -4.8, 90), kind="fish_bench", on_ground=False)
+salt = node("SaltHouse", quay, "house", (74, 2.2, -10.5), width=9.0, depth=8.0, height=3.6, ridge="z", roof_rise=2.3,
+            walls=STONE, roof=SLATE_B, south="door:0:3.2:3.3", east="door:0:3.2:3.0",
+            north="slit:-2.2, slit:2.2", west="slit:0", level_ground=False)
+node("SaltRacks", salt, "vael", (0, 0, -2.6), kind="fish_bench", on_ground=False)
+node("SaltSacks", salt, "prop", (-2.5, 0, -1.6), kind="sack", on_ground=False)
+node("SaltBarrel", salt, "prop", (-3, 0, 2.0), kind="barrel", on_ground=False)
+spot(salt, "loot", (-1.7, 0, 0.6), on_ground=False)
+spot(quay, "loot", (53, 2.2, -3))
+spot(quay, "loot", (-72, 2.2, -6.5))
+spot(quay, "loot", (80, 2.2, -7))
 for (x, z) in [(-8, 1.0), (38, -1.0), (-62, 1.5), (68, 0.5)]:
     node("Pots", quay, "vael", (x, 2.2, z, x * 7 % 180), kind="pots", on_ground=False)
 for (x, z, k) in [(-44, 1.5, "barrel"), (-43, 2.6, "barrel"), (-41, 1.2, "crate_big"), (5, 1.6, "crate_long"), (6.5, -0.2, "crate_small"),
@@ -195,25 +230,41 @@ houses = [
 for i, (x, z, w, d, door) in enumerate(houses):
     walls = WHITEWASH if i % 3 else WHITEWASH_B
     roof = SLATE if i % 2 else SLATE_B
+    rear = "door:0:2.8:2.7, window:2.5" if i in (0, 2, 5, 7, 11, 14) else "window:0"
     h = node("House", town, "house", (x, 5.0, z, (i * 37) % 7 - 3), width=float(w), depth=float(d), height=3.2, ridge="x", roof_rise=2.3,
-             walls=walls, roof=roof, beams=i % 4 == 0, south="door:0, window:-2.5" if door == "s" else "window:-2, window:2",
-             north="door:0, window:2.5" if door == "n" else "window:0", east="window:0", west="window:0")
-    if i % 2 == 0:
-        spot(h, "loot", (-1.5, 0, 0.5), on_ground=False)
+             walls=walls, roof=roof, beams=i % 4 == 0, south="door:0:2.8:2.7, window:-2.5" if door == "s" else rear,
+             north="door:0:2.8:2.7, window:2.5" if door == "n" else rear, east="window:0", west="window:0")
+    if i % 3 != 1:
+        spot(h, "loot", (-1.35, 0, 0.45), on_ground=False)
+    if i in (0, 4, 7, 11):
+        node("TradeStation", h, "vael", (2.0, 0, -1.55), kind=("rope_bench" if i < 7 else "sail_bench"), on_ground=False)
+        node("Reel", h, "prop", (2.5, 0, 1.3), kind="bucket", on_ground=False)
+    elif i % 2 == 0:
         node("Table", h, "thing", (1.8, 0, -1.2), kind="table", on_ground=False)
     else:
         node("Bed", h, "thing", (-2.0, 0, -1.6), kind="bed", on_ground=False)
-        node("Barrel", h, "prop", (2.6, 0, 1.6), kind="barrel", on_ground=False)
+        node("Barrel", h, "prop", (min(w * 0.5 - 1.1, 2.6), 0, 1.6), kind="barrel", on_ground=False)
+    if i in (0, 2, 5, 7, 11, 14):
+        side = -1.0 if door == "s" else 1.0
+        node("BackDoorLamp", h, "vael", (1.9, 0, side * d * 0.5, 180.0 if side < 0 else 0.0),
+             kind="porch_lamp", on_ground=False)
 # The chapel: tall, with a bell in its gable; the Harbourmaster's house, big and stone.
 chapel = node("Chapel", town, "house", (-40, 5.0, -76), width=10.0, depth=16.0, height=6.0, ridge="z", roof_rise=4.0,
-              walls=STONE, roof=SLATE, beams=False, south="door:0:2.4:3.6", east="slit:-4, slit:0, slit:4", west="slit:-4, slit:0, slit:4", north="window:0")
+              walls=STONE, roof=SLATE, beams=False, south="door:0:3.2:3.6", east="slit:-4, door:1:3.0:3.4, slit:5", west="slit:-4, slit:0, slit:4", north="window:0")
 spot(chapel, "loot", (0, 0, -5), on_ground=False)
-spot(chapel, "loot", (2.5, 0, 3), on_ground=False)
+spot(chapel, "loot", (1.36, 0, 3), on_ground=False)
+for x in (-3.0, 3.0):
+    for z in (-4.0, -1.6, 3.1):
+        node("ChapelPew", chapel, "vael", (x, 0, z, 180), kind="bench", on_ground=False)
+node("ChapelAltar", chapel, "thing", (0, 0, -6.3), kind="table", on_ground=False)
+node("ChapelCandle", chapel, "vael", (0, 0, -7.6, 180), kind="porch_lamp", on_ground=False)
 hm = node("HarbourmastersHouse", town, "house", (40, 5.0, -76), width=13.0, depth=10.0, height=4.0, ridge="x", roof_rise=2.8,
-          walls=STONE, roof=SLATE, beams=False, south="door:0:2.4:3.0, window:-4, window:4", north="window:-3, window:3", east="window:0", west="window:0")
-spot(hm, "loot", (-3, 0, -2), on_ground=False)
-spot(hm, "loot", (3.5, 0, 1.5), on_ground=False)
-node("Table", hm, "thing", (0, 0, -1), kind="table", on_ground=False)
+          walls=STONE, roof=SLATE, beams=False, south="door:0:3.2:3.0, window:-4, window:4", north="window:-3, door:0:3.0:3.0, window:3", east="window:0", west="window:0")
+spot(hm, "loot", (-2.1, 0, 1.1), on_ground=False)
+spot(hm, "loot", (3.2, 0, 1.5), on_ground=False)
+node("LedgerTable", hm, "vael", (3.6, 0, -2.8, 180), kind="sail_bench", on_ground=False)
+node("LockedCrates", hm, "prop", (-4.2, 0, -2.7), kind="crate_long", on_ground=False)
+node("HouseBench", hm, "vael", (4.4, 0, 3.0, 180), kind="bench", on_ground=False)
 # The market square.
 node("SquarePaving", town, "vael", (0, 5.0, -52), kind="paving", size=34.0, wide=20.0, on_ground=False)
 node("Well", town, "thing", (0, 5.0, -52), kind="well", on_ground=False)
@@ -228,28 +279,63 @@ for (x, z) in [(-80, -50), (-48, -54), (-20, -50), (20, -54), (48, -50), (80, -5
     spot(town, "loot", (x, 5.0, z))
 for (x, z, k, s) in [(-86, -44, "broad", 6.5), (86, -46, "dead", 6.0), (-4, -86, "broad", 7.0), (30, -40, "dead", 5.5), (-30, -40, "broad", 6.0)]:
     node("Tree", town, "tree", (x, 5.0, z), kind=k, size=s)
-# Pines on the headlands and the hills behind the town.
+# Cliffs, woodland walks and hand-placed banks of salt grass outside the streets.
 nature = group("Nature")
-for i in range(18):
-    side = -1 if i % 2 == 0 else 1
-    x = side * (90 + (i * 7) % 12)
-    z = -40 + i * 7.5
-    node("Pine", nature, "tree", (x, 0, z, i * 40), kind="fir", size=6.5 + (i % 3) * 0.8)
-for i in range(10):
-    node("Pine", nature, "tree", (-80 + i * 17, 0, -98 + (i % 3) * 2, i * 50), kind="fir", size=7.0 + (i % 2))
-
-# A wooded approach from Mesenlla. Dark pines close the horizon, with room to follow the road.
 for x, z, r in [(-49, -107, 23), (44, -110, 26), (-105, -68, 16), (105, -58, 18)]:
     node("CoastalRidge", land, "hill", (x, 0, z), height=7.0, radius=float(r))
-for cx, cz in [(-75, -96), (-34, -103), (38, -101), (75, -94), (-98, -21), (98, -30), (-96, 17), (97, 18)]:
-    for dx, dz, height in [(-5, -3, 7.4), (0, -2, 8.8), (6, -6, 6.8), (3, 2, 6.1)]:
-        node("Windbreak", nature, "tree", (cx + dx, 0, cz + dz, cx * 13 + dx * 19), kind="fir", size=height)
-    node("HeadlandStone", nature, "vael", (cx, 0, cz + 4), kind="sea_rocks", size=4.0)
+for cx, cz in [(-95, -8), (-98, -25), (-98, -42), (-98, -70), (-73, -96), (-52, -98), (-30, -98),
+               (30, -96), (53, -97), (77, -96), (97, -72), (97, -48), (97, -31), (97, -12), (-96, 13), (96, 15)]:
+    for i, (dx, dz, height) in enumerate([(-2.5, -3, 8.4), (0.7, 2, 9.8), (3.5, -1, 7.3)]):
+        node("Windbreak", nature, "tree", (cx + dx, 0, cz + dz, cx * 13 + i * 39),
+             kind="giant_fir" if i == 1 else "tall_pine", size=height, tall=1.07)
+for x, z in [(-95, -54), (-92, -59), (71, -81), (81, -79), (-94, -41), (-93, -66), (-90, 2), (-92, 21), (93, -37), (95, -59), (96, -13),
+             (-57, -93), (-24, -92), (27, -90), (60, -92), (83, -87), (81, -75),
+             (-59, -29), (-41, -30), (-20, -27), (21, -28), (47, -30), (68, -26)]:
+    node("CoastalGrasses", nature, "vael", (x, 0, z), kind="salt_grass", size=3.6)
+for x, z, size in [(-96, -31, 1.45), (-97, -49, 2.1), (-95, -77, 1.4), (-57, -95, 1.35),
+                   (95, -54, 1.9), (96, -38, 1.3), (96, 4, 1.7), (65, -94, 1.6), (94, 28, 1.75), (-96, 32, 1.4)]:
+    node("StormBoulder", nature, "prop", (x, 0, z), kind="rock", grow=size)
 for x, z, yaw, length in [(8, -85, -15, 6.0), (21, -86, -15, 6.0), (5, -96, 15, 6.0), (18, -96, 15, 6.0)]:
     node("RoadWall", nature, "vael", (x, 0, z, yaw + 90), kind="drystone", size=length)
 node("OldValleyGate", nature, "vael", (14, 0, -92, 13), kind="arch", size=7.4)
-for x, z in [(8, -76), (21, -89)]:
+for x, z in [(8, -76), (21, -89), (-96, -54), (-84, -55), (-91, -34), (87, -49), (85, -73)]:
     node("RoadLamp", nature, "vael", (x, 0, z), kind="lamp_post")
+
+# Gullwatch was the fleet's signal post. Pilgrims' Garden kept a sheltered stop on the coast road.
+landmarks = group("Districts")
+node("SignalBeacon", landmarks, "vael", (-94, 0, -55, 90), kind="signal_beacon", size=6.0)
+for x, z, yaw, length in [(-96, -59, 90, 8.0), (-94, -62, 0, 5.0),
+                          (75, -87, 0, 9.0), (70, -84, 90, 6.0), (81, -86, 90, 3.0)]:
+    node("ShelterWall", landmarks, "vael", (x, 0, z, yaw), kind="drystone", size=length)
+node("LookoutBench", landmarks, "vael", (-92.5, 0, -61, 180), kind="bench")
+node("Shrine", landmarks, "vael", (74, 0, -85, 0), kind="shrine")
+node("CoastalGarden", landmarks, "vael", (78.5, 0, -83.2), kind="garden", size=5.2, wide=3.2)
+node("PilgrimBench", landmarks, "vael", (72, 0, -83, -90), kind="bench")
+node("MileAnchor", landmarks, "vael", (92, 0, -42, -30), kind="sunk_anchor", size=2.7)
+node("Memorial", landmarks, "thing", (-27, 0, -92.5), kind="grave_stone")
+node("ValleyStones", landmarks, "vael", (-15, 0, -94.5), kind="drystone", size=6.5)
+node("ValleyBench", landmarks, "vael", (-18, 0, -92.4), kind="bench")
+# Open supply racks mark rare finds. The pickups have dedicated clear cells in front of the racks.
+for x, z, yaw, dx, dz in [(-94, -58, 90, 2, 0), (77.5, -86, 0, 0, 2.1),
+                           (-17, -91.8, 0, 0, 2.1), (37.1, -78.0, 0, 0, 2.1)]:
+    node("SupplyRack", landmarks, "vael", (x, 0, z, yaw), kind="supply_rack")
+    spot(landmarks, "cache", (x + dx, 0, z + dz))
+
+# Three circuits for the creatures: the sea approaches, the town back streets and the headland lanes.
+entries = group("EnemyApproaches")
+for x, z in [
+    (-73, 17), (-64, 31), (-55, 46), (-27, 31), (-16, 21), (3, 44), (7, 69),
+    (24, 34), (44, 28), (57, 59), (69, 38), (72, 16), (-39, 74), (33, 74),
+    (-86, -10), (-87, -29), (-84, -58), (-79, -78), (-50, -90), (-32, -88), (-6, -87), (13.8, -95),
+    (30, -87), (63, -89), (82, -79), (87, -65), (88, -47), (84, -27), (82, -9),
+    (-75, -43), (-39, -46), (-29, -58), (16, -57), (38, -47), (71, -49),
+]:
+    spot(entries, "vael_spawn", (x, 0, z))
+for x, z in [(-91, -46), (-82, -57), (-51.5, -89.2), (-17, -86), (27, -85), (74, -77), (88, -61),
+             (88, -28), (-83, -19), (80, -17), (-83.5, 42), (81, 45)]:
+    spot(landmarks, "loot", (x, 0, z))
+for x, z in [(-91, -53), (-81, -74), (-28, -89), (80, -79), (88, -48), (-74, -6), (54, -3)]:
+    spot(landmarks, "poi", (x, 0, z))
 
 # --- The flats -----------------------------------------------------------------------------------
 flats = group("Flats")
@@ -267,6 +353,7 @@ for (x, z, s) in [(-50, 30, 4.0), (54, 22, 3.5), (-6, 70, 5.0), (16, 46, 3.0), (
     node("SeaRocks", flats, "vael", (x, 0, z, x * 11 % 360), kind="sea_rocks", size=s)
 for (x, z) in [(-30, 28), (18, 74), (48, 44), (-60, 74)]:
     node("Buoy", flats, "vael", (x, 0, z, x * 23 % 360), kind="buoy")
+node("StrandedCutter", flats, "vael", (66, 0, 14, 25), kind="fishing_cutter", size=7.5)
 node("Boat", flats, "vael", (20, 0, 14, 40), kind="boat", size=4.2)
 node("Boat", flats, "vael", (-56, 0, 12, -30), kind="upturned_boat", size=4.0)
 for (x, z) in [(-40, 40), (-8, 58), (20, 38), (44, 70), (-30, 74), (0, 16), (-64, 28), (64, 34)]:
@@ -283,7 +370,7 @@ node("TideKing", dress, "vael", (0, 5.0, -39), kind="statue", size=4.5, on_groun
 for x in (-3.4, 3.4):
     node("Brazier", dress, "vael", (x, 5.0, -36.5), kind="brazier", on_ground=False)
 # Fires along the quay and in the square.
-for (x, y, z) in [(-24, 2.2, 3.0), (36, 2.2, 3.0), (-66, 2.2, 2.4), (66, 2.2, 2.4), (-13, 5.0, -63), (13, 5.0, -63), (-80, 2.0, 74), (80, 2.0, 66)]:
+for (x, y, z) in [(-24, 2.2, 3.0), (36, 2.2, 3.0), (-66, 2.2, 2.4), (66, 2.2, 2.4), (-13, 5.0, -63), (13, 5.0, -63), (-83, 2.0, 71), (81, 2.0, 66)]:
     node("Brazier", dress, "vael", (x, y, z), kind="brazier", on_ground=False)
 # Banners of Vael.
 for (x, y, z, yaw) in [(-40, 2.2, 4.6, 0), (40, 2.2, 4.6, 0), (0, 2.2, 4.4, 0), (-16, 5.0, -44, 0), (16, 5.0, -44, 0), (-16, 5.0, -60, 180), (16, 5.0, -60, 180),
@@ -293,9 +380,9 @@ for (x, y, z, yaw) in [(-40, 2.2, 4.6, 0), (40, 2.2, 4.6, 0), (0, 2.2, 4.4, 0), 
 for (x, y, z, yaw, length) in [(-20, 5.0, -52, 90, 8.0), (20, 5.0, -52, 90, 8.0), (0, 5.0, -31, 0, 7.0), (-50, 2.2, -2, 0, 10.0), (50, 2.2, -2, 0, 10.0)]:
     node("Bunting", dress, "vael", (x, y, z, yaw), kind="bunting", size=length, wide=1.0, on_ground=False)
 # Cargo, and fish drying.
-for (x, z, yaw) in [(-9, -13.5, 0), (10, -13.5, 180), (-62, -9, 90), (72, -9, -90), (-28, 0.5, 10)]:
+for (x, z, yaw) in [(-9, -13.5, 0), (10, -13.5, 180), (-59, -9, 90), (68, -13, -90), (-23, -3.6, 10)]:
     node("Cargo", dress, "vael", (x, 2.2, z, yaw), kind="cargo", on_ground=False)
-for (x, z, yaw) in [(-60, 2.2, 0), (44, -14.5, 0), (-76, -5, 90)]:
+for (x, z, yaw) in [(-60, 2.2, 0), (44, -14.0, 0), (-82, -4.5, 90)]:
     node("FishRack", dress, "vael", (x, 2.2, z, yaw), kind="fish_rack", size=4.0, on_ground=False)
 # Shrines of the Tide.
 for (x, y, z, yaw) in [(-40, 5.0, -60, 90), (40, 5.0, -60, -90), (-79, 2.0, 10, 90), (79, 2.0, 10, -90), (-62, 5.0, -29, 0), (64, 5.0, -29, 0)]:
@@ -333,7 +420,10 @@ for i, (x, z, w, d, door) in enumerate(houses):
     node("Bench", dress, "vael", at(-2.6 if door == "s" else 2.6, front * (d * 0.5 + 0.35), turn=turn), kind="bench", on_ground=False)
     back = at(0, -front * (d * 0.5 + 4.0), turn=turn)
     if i % 3 == 0:
-        node("Garden", dress, "vael", back, kind="garden", size=float(min(w, 9)), wide=6.0, on_ground=False)
+        # The market-side cottage has a shallower garden to leave the stall approaches open.
+        garden_at = at(0, -front * (d * 0.5 + 1.75), turn=turn) if i == 3 else back
+        node("Garden", dress, "vael", garden_at, kind="garden",
+             size=4.4 if i == 3 else float(min(w, 9)), wide=3.0 if i == 3 else 6.0, on_ground=False)
     elif i % 3 == 1:
         node("Laundry", dress, "vael", at(0, -front * (d * 0.5 + 2.5), turn=turn), kind="laundry", size=float(w - 1), on_ground=False)
     else:
@@ -342,7 +432,7 @@ for i, (x, z, w, d, door) in enumerate(houses):
 for (cx, z, length, yaw) in [(-74.5, -52, 23.0, 0), (-51.5, -52, 23.0, 0), (-28.5, -52, 23.0, 0), (28.5, -52, 23.0, 0), (51.5, -52, 23.0, 0),
                              (74.5, -52, 23.0, 0), (-40, -69, 30.0, 90), (40, -69, 30.0, 90), (0, -36, 16.0, 90)]:
     node("StreetPaving", dress, "vael", (cx, 5.0, z, yaw), kind="paving", size=length, wide=4.0 if yaw else 5.0, on_ground=False)
-for (a, b) in [(-86, -64), (-56, -6), (6, 58), (66, 86)]:
+for (a, b) in [(-86, -66), (-56, -6), (6, 58), (66, 86)]:
     node("BrowWall", dress, "vael", ((a + b) * 0.5, 5.0, -23.5), kind="drystone", size=float(b - a))
 for x in (-64, -36, 24, 50, 78):
     node("Lanterns", dress, "vael", (x, 5.0, -52, 90), kind="lantern_string", size=12.0, wide=1.0, on_ground=False)
@@ -361,7 +451,9 @@ for (x, y, z) in [(-70, 5.0, -44), (70, 5.0, -44), (-60, 2.2, -2), (60, 2.2, -2)
 places = group("Places")
 for (x, y, z, text) in [(0, 5.0, -52, "Market Square"), (-40, 5.0, -76, "Chapel"), (40, 5.0, -76, "Harbourmaster's House"),
                         (0, 2.2, -4, "The Quay"), (-84, 2.0, 40, "West Mole"), (84, 2.0, 46, "East Mole"), (84, 2.0, 70, "Lighthouse"),
-                        (-22, 0, 46, "Wreck of the Grey Heron"), (8, 0, 30, "Drowned Bell"), (0, 0, 60, "Tide Zone"), (15, 5.0, -91, "Valley Road")]:
+                        (-22, 0, 46, "Wreck of the Grey Heron"), (8, 0, 30, "Drowned Bell"), (0, 0, 60, "Tide Zone"), (15, 5.0, -91, "Valley Road"),
+                        (-76, 2.2, -8, "Boatwright's Yard"), (54, 2.2, -7, "Fishmarket"), (74, 2.2, -21, "Salt House"),
+                        (-93, 7.1, -56, "Gullwatch"), (76, 5.0, -87, "Pilgrims' Garden")]:
     spot(places, "place", (x, y, z), text=text)
 
 
