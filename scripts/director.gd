@@ -240,7 +240,7 @@ func _tick_caches() -> void:
 			continue
 		if elapsed < float(_cache_due.get(i, 0.0)) or world.storm_at(at) != null:
 			continue
-		if world.vael_sites and not world.vael_sites.can_stock(at, false, 3.0):
+		if world.vael_sites and not world.vael_sites.can_stock(at, false, VaelSites.CACHE_CLEARANCE, true):
 			continue
 		_cache_due[i] = elapsed + CACHE_REFILL
 		if randf() < 0.65:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3]
+[gd_scene load_steps=24 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_root.gd" id="root"]
 [ext_resource type="Script" path="res://scripts/map/map_level.gd" id="level"]
@@ -34,61 +34,68 @@ point_count = 2
 
 [sub_resource type="Curve3D" id="Curve_4"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 8, 5.0, -54, 0, 0, 0, 0, 0, 0, 7, 5.0, -68, 0, 0, 0, 0, 0, 0, 12, 5.0, -78, 0, 0, 0, 0, 0, 0, 15, 5.0, -88, 0, 0, 0, 0, 0, 0, 11, 5.3, -98, 0, 0, 0, 0, 0, 0, 5, 7.4, -120),
-"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 8, 5.0, -54, 0, 0, 0, 0, 0, 0, 7, 5.0, -68, 0, 0, 0, 0, 0, 0, 12, 5.0, -78, 0, 0, 0, 0, 0, 0, 13, 5.15, -86, 0, 0, 0, 0, 0, 0, 10, 6.6, -91, 0, 0, 0, 0, 0, 0, 4, 8.9, -95, 0, 0, 0, 0, 0, 0, -2, 11.7, -100, 0, 0, 0, 0, 0, 0, -6, 14.6, -108, 0, 0, 0, 0, 0, 0, 2, 18.4, -120, 0, 0, 0, 0, 0, 0, 15, 21.8, -134),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
-point_count = 6
+point_count = 10
 
 [sub_resource type="Curve3D" id="Curve_5"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -40, 5.0, -52, 0, 0, 0, 0, 0, 0, -40, 5.0, -84),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 10, 6.6, -91, 0, 0, 0, 0, 0, 0, 4, 8.9, -95),
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
 
 [sub_resource type="Curve3D" id="Curve_6"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 40, 5.0, -52, 0, 0, 0, 0, 0, 0, 40, 5.0, -86),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -40, 5.0, -52, 0, 0, 0, 0, 0, 0, -40, 5.0, -84),
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
 
 [sub_resource type="Curve3D" id="Curve_7"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -62, 2.2, -12, 0, 0, 0, 0, 0, 0, -62, 3.6, -19, 0, 0, 0, 0, 0, 0, -62, 5.0, -27),
-"tilts": PackedFloat32Array(0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 40, 5.0, -52, 0, 0, 0, 0, 0, 0, 40, 5.0, -86),
+"tilts": PackedFloat32Array(0, 0)
 }
-point_count = 3
+point_count = 2
 
 [sub_resource type="Curve3D" id="Curve_8"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 62, 2.2, -12, 0, 0, 0, 0, 0, 0, 62, 3.6, -19, 0, 0, 0, 0, 0, 0, 62, 5.0, -27),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -62, 2.2, -12, 0, 0, 0, 0, 0, 0, -62, 3.6, -19, 0, 0, 0, 0, 0, 0, -62, 5.0, -27),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
 
 [sub_resource type="Curve3D" id="Curve_9"]
 _data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 62, 2.2, -12, 0, 0, 0, 0, 0, 0, 62, 3.6, -19, 0, 0, 0, 0, 0, 0, 62, 5.0, -27),
+"tilts": PackedFloat32Array(0, 0, 0)
+}
+point_count = 3
+
+[sub_resource type="Curve3D" id="Curve_10"]
+_data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, -70, 2.2, -3, 0, 0, 0, 0, 0, 0, -85, 2.5, -7, 0, 0, 0, 0, 0, 0, -91, 4.2, -21, 0, 0, 0, 0, 0, 0, -89, 5.4, -39, 0, 0, 0, 0, 0, 0, -89, 7.1, -53, 0, 0, 0, 0, 0, 0, -85, 6.0, -70, 0, 0, 0, 0, 0, 0, -73, 5.2, -87, 0, 0, 0, 0, 0, 0, -68, 5.0, -91, 0, 0, 0, 0, 0, 0, -40, 5.0, -91),
 "tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
 point_count = 9
 
-[sub_resource type="Curve3D" id="Curve_10"]
+[sub_resource type="Curve3D" id="Curve_11"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -40, 5.0, -91, 0, 0, 0, 0, 0, 0, -24, 5.0, -89, 0, 0, 0, 0, 0, 0, -14, 5.0, -89, 0, 0, 0, 0, 0, 0, 0, 5.0, -86, 0, 0, 0, 0, 0, 0, 15, 5.0, -87),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -40, 5.0, -91, 0, 0, 0, 0, 0, 0, -24, 5.0, -89, 0, 0, 0, 0, 0, 0, -14, 5.0, -89, 0, 0, 0, 0, 0, 0, 0, 5.0, -86, 0, 0, 0, 0, 0, 0, 12.4, 5.35, -87),
 "tilts": PackedFloat32Array(0, 0, 0, 0, 0)
 }
 point_count = 5
 
-[sub_resource type="Curve3D" id="Curve_11"]
+[sub_resource type="Curve3D" id="Curve_12"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, 79, 2.2, -3, 0, 0, 0, 0, 0, 0, 88, 2.35, -9, 0, 0, 0, 0, 0, 0, 91, 3.5, -21, 0, 0, 0, 0, 0, 0, 90, 4.6, -36, 0, 0, 0, 0, 0, 0, 88, 5.0, -51, 0, 0, 0, 0, 0, 0, 89, 5.0, -67, 0, 0, 0, 0, 0, 0, 85, 5.0, -78, 0, 0, 0, 0, 0, 0, 77, 5.0, -81, 0, 0, 0, 0, 0, 0, 66, 5.0, -76, 0, 0, 0, 0, 0, 0, 49, 5.0, -71),
 "tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 }
 point_count = 10
 
-[sub_resource type="Curve3D" id="Curve_12"]
+[sub_resource type="Curve3D" id="Curve_13"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, -90, 7.1, -53, 0, 0, 0, 0, 0, 0, -78, 5.0, -52),
 "tilts": PackedFloat32Array(0, 0)
@@ -97,7 +104,7 @@ point_count = 2
 
 [node name="PortVael" type="Node3D"]
 script = ExtResource("root")
-play_half = 100.0
+play_half = 105.0
 land_half = 110
 forest_wall = true
 grass = 0.6
@@ -193,6 +200,42 @@ script = ExtResource("level")
 size = Vector2(19, 11)
 blend = 1.8
 
+[node name="MountainSpur" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -28, 0, -113)
+script = ExtResource("hill")
+height = 18.0
+radius = 15.0
+
+[node name="MountainSpur2" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31, 0, -119)
+script = ExtResource("hill")
+height = 22.0
+radius = 18.0
+
+[node name="MountainSpur3" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -51, 0, -129)
+script = ExtResource("hill")
+height = 13.0
+radius = 20.0
+
+[node name="MountainSpur4" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, -134)
+script = ExtResource("hill")
+height = 19.0
+radius = 22.0
+
+[node name="MountainSpur5" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -16, 0, -101)
+script = ExtResource("hill")
+height = 5.5
+radius = 9.0
+
+[node name="MountainSpur6" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0, -107)
+script = ExtResource("hill")
+height = 6.8
+radius = 11.0
+
 [node name="Roads" type="Node3D" parent="."]
 
 [node name="HarbourStreet" type="Path3D" parent="Roads"]
@@ -214,56 +257,64 @@ width = 5.0
 [node name="ValleyRoad" type="Path3D" parent="Roads"]
 script = ExtResource("road")
 curve = SubResource("Curve_4")
-width = 4.8
+width = 6.0
 cut = true
-cut_blend = 3.0
+cut_blend = 3.6
 
-[node name="ChapelLane" type="Path3D" parent="Roads"]
+[node name="GateShoulders" type="Path3D" parent="Roads"]
 script = ExtResource("road")
 curve = SubResource("Curve_5")
-width = 4.0
+width = 8.6
+cut = true
+draw = false
+cut_blend = 3.1
 
-[node name="HillLane" type="Path3D" parent="Roads"]
+[node name="ChapelLane" type="Path3D" parent="Roads"]
 script = ExtResource("road")
 curve = SubResource("Curve_6")
 width = 4.0
 
-[node name="WestSteps" type="Path3D" parent="Roads"]
+[node name="HillLane" type="Path3D" parent="Roads"]
 script = ExtResource("road")
 curve = SubResource("Curve_7")
+width = 4.0
+
+[node name="WestSteps" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_8")
 width = 4.6
 cut = true
 cut_blend = 2.0
 
 [node name="EastSteps" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_8")
+curve = SubResource("Curve_9")
 width = 4.6
 cut = true
 
 [node name="WestCliffPath" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_9")
+curve = SubResource("Curve_10")
 width = 4.8
 cut = true
 cut_blend = 3.0
 
 [node name="NorthLane" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_10")
+curve = SubResource("Curve_11")
 width = 4.2
 cut = true
 
 [node name="EastHeadlandPath" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_11")
+curve = SubResource("Curve_12")
 width = 4.8
 cut = true
 cut_blend = 3.0
 
 [node name="WatchCrossing" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_12")
+curve = SubResource("Curve_13")
 width = 4.2
 cut = true
 cut_blend = 2.8
@@ -1822,31 +1873,31 @@ kind = "loot"
 [node name="Tree" type="Node3D" parent="Town"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -86, 5, -44)
 script = ExtResource("tree")
-kind = "broad"
+kind = "mossy_oak"
 size = 6.5
 
 [node name="Tree2" type="Node3D" parent="Town"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 86, 5, -46)
 script = ExtResource("tree")
-kind = "dead"
+kind = "tall_pine"
 size = 6.0
 
 [node name="Tree3" type="Node3D" parent="Town"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 5, -86)
 script = ExtResource("tree")
-kind = "broad"
+kind = "mossy_oak"
 size = 7.0
 
 [node name="Tree4" type="Node3D" parent="Town"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 5, -40)
 script = ExtResource("tree")
-kind = "dead"
+kind = "tall_pine"
 size = 5.5
 
 [node name="Tree5" type="Node3D" parent="Town"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 5, -40)
 script = ExtResource("tree")
-kind = "broad"
+kind = "mossy_oak"
 size = 6.0
 
 [node name="Nature" type="Node3D" parent="."]
@@ -2410,34 +2461,74 @@ kind = "rock"
 grow = 1.4
 
 [node name="RoadWall" type="Node3D" parent="Nature"]
-transform = Transform3D(0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, 0.25882, 8, 0, -85)
+transform = Transform3D(0.13917, 0, -0.99027, 0, 1, 0, 0.99027, 0, 0.13917, 17.6, 0, -89)
 script = ExtResource("vael")
 kind = "drystone"
-size = 6.0
+size = 5.0
 
 [node name="RoadWall2" type="Node3D" parent="Nature"]
-transform = Transform3D(0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, 0.25882, 21, 0, -86)
+transform = Transform3D(-0.73135, 0, -0.682, 0, 1, 0, 0.682, 0, -0.73135, 5.7, 0, -88.9)
 script = ExtResource("vael")
 kind = "drystone"
-size = 6.0
-
-[node name="RoadWall3" type="Node3D" parent="Nature"]
-transform = Transform3D(-0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, -0.25882, 5, 0, -96)
-script = ExtResource("vael")
-kind = "drystone"
-size = 6.0
-
-[node name="RoadWall4" type="Node3D" parent="Nature"]
-transform = Transform3D(-0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, -0.25882, 18, 0, -96)
-script = ExtResource("vael")
-kind = "drystone"
-size = 6.0
+size = 4.7
 
 [node name="OldValleyGate" type="Node3D" parent="Nature"]
-transform = Transform3D(0.97437, 0, -0.22495, 0, 1, 0, 0.22495, 0, 0.97437, 14, 0, -92)
+transform = Transform3D(0.5547, 0, -0.83205, 0, 1, 0, 0.83205, 0, 0.5547, 7, 0, -93)
 script = ExtResource("vael")
 kind = "arch"
-size = 7.4
+size = 8.4
+
+[node name="PassOutcrop" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.3, 0, -98)
+script = ExtResource("prop")
+kind = "rock"
+grow = 1.8
+lift = -0.35
+
+[node name="PassOutcrop2" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0, -101)
+script = ExtResource("prop")
+kind = "rock"
+grow = 2.4
+lift = -0.35
+
+[node name="PassOutcrop3" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.7, 0, -97.5)
+script = ExtResource("prop")
+kind = "rock"
+grow = 1.7
+lift = -0.35
+
+[node name="PassOutcrop4" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18, 0, -95)
+script = ExtResource("prop")
+kind = "rock"
+grow = 1.45
+lift = -0.35
+
+[node name="PassGrass" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 0, -96)
+script = ExtResource("vael")
+kind = "salt_grass"
+size = 2.2
+
+[node name="PassGrass2" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.8, 0, -92.4)
+script = ExtResource("vael")
+kind = "salt_grass"
+size = 2.1
+
+[node name="PassGrass3" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 0, -97)
+script = ExtResource("vael")
+kind = "salt_grass"
+size = 2.7
+
+[node name="PassGrass4" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, -96)
+script = ExtResource("vael")
+kind = "salt_grass"
+size = 2.4
 
 [node name="RoadLamp" type="Node3D" parent="Nature"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -76)
@@ -2445,31 +2536,36 @@ script = ExtResource("vael")
 kind = "lamp_post"
 
 [node name="RoadLamp2" type="Node3D" parent="Nature"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0, -89)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8, 0, -94.6)
 script = ExtResource("vael")
 kind = "lamp_post"
 
 [node name="RoadLamp3" type="Node3D" parent="Nature"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, 0, -54)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.5, 0, -90)
 script = ExtResource("vael")
 kind = "lamp_post"
 
 [node name="RoadLamp4" type="Node3D" parent="Nature"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -84, 0, -55)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, 0, -54)
 script = ExtResource("vael")
 kind = "lamp_post"
 
 [node name="RoadLamp5" type="Node3D" parent="Nature"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -91, 0, -34)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -84, 0, -55)
 script = ExtResource("vael")
 kind = "lamp_post"
 
 [node name="RoadLamp6" type="Node3D" parent="Nature"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87, 0, -49)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -91, 0, -34)
 script = ExtResource("vael")
 kind = "lamp_post"
 
 [node name="RoadLamp7" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 87, 0, -49)
+script = ExtResource("vael")
+kind = "lamp_post"
+
+[node name="RoadLamp8" type="Node3D" parent="Nature"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 85, 0, -73)
 script = ExtResource("vael")
 kind = "lamp_post"
@@ -2555,6 +2651,33 @@ size = 6.5
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18, 0, -92.4)
 script = ExtResource("vael")
 kind = "bench"
+
+[node name="Cairn" type="Node3D" parent="Districts"]
+transform = Transform3D(0.76604, 0, -0.64279, 0, 1, 0, 0.64279, 0, 0.76604, 5.8, 0, -99)
+script = ExtResource("vael")
+kind = "pass_cairn"
+size = 1.75
+
+[node name="Cairn2" type="Node3D" parent="Districts"]
+transform = Transform3D(0.86603, 0, 0.5, 0, 1, 0, -0.5, 0, 0.86603, 17.1, 0, -92.2)
+script = ExtResource("vael")
+kind = "pass_cairn"
+size = 1.2
+
+[node name="PassCart" type="Node3D" parent="Districts"]
+transform = Transform3D(0.9703, 0, -0.24192, 0, 1, 0, 0.24192, 0, 0.9703, -9.2, 0, -93.1)
+script = ExtResource("thing")
+kind = "cart"
+
+[node name="CartCargo" type="Node3D" parent="Districts"]
+transform = Transform3D(0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, 0.93969, -8.6, 0, -89.9)
+script = ExtResource("prop")
+kind = "sack"
+
+[node name="CartCargo2" type="Node3D" parent="Districts"]
+transform = Transform3D(0.88295, 0, 0.46947, 0, 1, 0, -0.46947, 0, 0.88295, -11.8, 0, -90.8)
+script = ExtResource("prop")
+kind = "lumber_small"
 
 [node name="SupplyRack" type="Node3D" parent="Districts"]
 transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -94, 0, -58)
@@ -2704,7 +2827,7 @@ script = ExtResource("spot")
 kind = "vael_spawn"
 
 [node name="Vael_spawn22" type="Node3D" parent="EnemyApproaches"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.8, 0, -95)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.6, 0, -92)
 script = ExtResource("spot")
 kind = "vael_spawn"
 
@@ -4184,37 +4307,37 @@ on_ground = false
 [node name="Tree6" type="Node3D" parent="Dressing"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 5, -42)
 script = ExtResource("tree")
-kind = "broad"
+kind = "mossy_oak"
 size = 6.0
 
 [node name="Tree7" type="Node3D" parent="Dressing"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62, 5, -44)
 script = ExtResource("tree")
-kind = "broad"
+kind = "mossy_oak"
 size = 5.5
 
 [node name="Tree8" type="Node3D" parent="Dressing"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 5, -74)
 script = ExtResource("tree")
-kind = "dead"
+kind = "tall_pine"
 size = 5.5
 
 [node name="Tree9" type="Node3D" parent="Dressing"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 5, -80)
 script = ExtResource("tree")
-kind = "broad"
+kind = "mossy_oak"
 size = 6.5
 
 [node name="Tree10" type="Node3D" parent="Dressing"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25, 5, -71)
 script = ExtResource("tree")
-kind = "broad"
+kind = "mossy_oak"
 size = 6.0
 
 [node name="Tree11" type="Node3D" parent="Dressing"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -82, 5, -74)
 script = ExtResource("tree")
-kind = "dead"
+kind = "tall_pine"
 size = 5.0
 
 [node name="Spire" type="Node3D" parent="Dressing"]
@@ -4357,7 +4480,7 @@ kind = "place"
 text = "Tide Zone"
 
 [node name="Place11" type="Node3D" parent="Places"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 5, -91)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 7.8, -93)
 script = ExtResource("spot")
 kind = "place"
 text = "Valley Road"

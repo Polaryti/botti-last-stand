@@ -43,6 +43,8 @@ func _ready() -> void:
 	cam = w.player.camera
 	cam.cull_mask = 5
 	await tide_at(20.0) # low tide
+	for i in 2:
+		await shot("vael_brazier_%d" % i, ground(-3.4, -34.0, 2.0), ground(-3.4, -36.5, 1.9))
 	await shot("vael_quay", ground(-6, -6, 2.0), ground(6, 30, 0.0))
 	await shot("vael_flats_low", ground(0, 4.5, 3.0), ground(-10, 50, 0.0))
 	await shot("vael_wreck_low", ground(-12, 36, 1.7), ground(-22, 46, 1.0))
@@ -51,7 +53,9 @@ func _ready() -> void:
 	await shot("vael_mole", ground(-84, 12, 1.7), ground(-84, 70, 1.0))
 	await shot("vael_town", ground(0, -30, 1.7), ground(0, -60, 3.0))
 	await shot("vael_harbour_terraces", ground(10, -7.0, 3.2), ground(0, -25, 1.4))
-	await shot("vael_valley_road", ground(14, -87, 2.0), ground(10, -108, 3.4))
+	await shot("vael_valley_road", ground(11.3, -89, 1.9), ground(7, -93, 3.4))
+	await shot("vael_valley_descent", ground(-2, -100, 2.0), ground(11, -86, 2.2))
+	await shot("vael_valley_rim", ground(-23, -88, 3.6), ground(-43, -108, 8.0))
 	await shot("vael_aurora", ground(71, -19, 3.5), ground(43, 72, 30.0))
 	await shot("vael_boatyard", ground(-80, -4, 2.7), ground(-74, -10, 1.5))
 	await shot("vael_fishmarket", ground(43, -2, 2.0), ground(53, -8, 1.5))

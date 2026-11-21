@@ -221,6 +221,7 @@ var _hop_left := 0.0
 var _hop_line := -1
 var _hop_i := -1
 var _hop_walk := Vector3.INF
+var _vault_from := Vector3.INF
 var _perch_line := -1
 var _perch_i := -1
 var _perch_lost := 0.0
@@ -564,6 +565,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_hop_up = float(def.get("hop_up", HOP_UP))
 	_hop_cd = randf() * HOP_THINK
 	_hop_left = 0.0
+	_vault_from = Vector3.INF
 	_hop_line = -1
 	_hop_i = -1
 	_hop_walk = Vector3.INF
@@ -2338,7 +2340,10 @@ func _physics_process(delta: float) -> void:
 			position.y = world.ground_at(position)
 	if _airborne:
 		# A leap always finishes, even if something stuns it in mid-air.
-		_tick_leap(target, delta)
+		if _vault_from != Vector3.INF:
+			_tick_vael_vault(delta)
+		else:
+			_tick_leap(target, delta)
 		return
 	if _stun > 0.0:
 		_stun -= delta
@@ -2402,6 +2407,12 @@ func _physics_process(delta: float) -> void:
 			_hop_cd = HOP_THINK
 			_think_hop(target, dist)
 			if _airborne:
+				return
+	elif world.vael_sites and state == State.CHASE and dist < 7.5:
+		_hop_cd -= delta
+		if _hop_cd <= 0.0:
+			_hop_cd = 0.55
+			if _try_vael_vault(to, dist):
 				return
 	_tick_hero(target, dist, delta)
 	_try_leap(target, dist)
@@ -2505,6 +2516,53 @@ func _tick_leap(target: Target, delta: float) -> void:
 			var free := world.grid.to_world(world.grid.nearest_free(c))
 			position.x = free.x
 			position.z = free.z
+
+
+## Drowned walkers vault low obstacles in pursuit. A blocked arc leaves their route alone so they
+## can take a nearby door or the path around a wall.
+func _try_vael_vault(to: Vector3, dist: float) -> bool:
+	if phases or is_boss() or dormant or _hold or _attack_left > 0.0 or root_left > 0.0 or dist < 2.35:
+		return false
+	# Once out of sight, follow the known target position rather than reacting through buildings.
+	var heading := to if _sees else _last_seen - position
+	var there := VaelVault.landing(self, world, heading)
+	if there == Vector3.INF:
+		return false
+	_vault_from = global_position
+	_hop_to = there
+	_hop_left = VaelVault.TIME
+	_airborne = true
+	_tick_every = 1
+	_shadow.visible = false
+	var facing := there - global_position
+	rotation.y = atan2(facing.x, facing.z)
+	_current_anim = ""
+	_play("Running_A", 1.55, 0.05)
+	world.sfx_at("jump_a", position, -7.0)
+	return true
+
+
+func _tick_vael_vault(delta: float) -> void:
+	_hop_left = maxf(0.0, _hop_left - delta)
+	var progress := 1.0 - _hop_left / VaelVault.TIME
+	var there := VaelVault.point(_vault_from, _hop_to, progress)
+	var blocked := move_and_collide(there - global_position) != null
+	blocked = blocked or global_position.distance_squared_to(there) > 0.04
+	if not blocked and _hop_left > 0.0:
+		return
+	if blocked:
+		# A collider changed during the jump: recover on the known safe takeoff side.
+		global_position = _vault_from
+		_walk_around_until = world.now + 2.0
+		_direct = false
+	else:
+		world.sfx_at("land", position, -13.0)
+	_vault_from = Vector3.INF
+	_hop_left = 0.0
+	_airborne = false
+	_hop_cd = 1.1
+	_shadow.visible = true
+	_clear_path_only()
 
 
 # --- Jumping about the Mists --------------------------------------------------

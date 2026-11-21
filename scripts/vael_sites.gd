@@ -6,6 +6,7 @@ extends RefCounted
 enum Shore { ANY, DRY, WATERLINE, EXPOSED, FLOODED }
 const PLAYER_CLEARANCE := 3.5
 const MOB_CLEARANCE := 1.4
+const CACHE_CLEARANCE := 3.0
 
 var world: World
 
@@ -177,9 +178,15 @@ func holds_supplies(at: Vector3) -> bool:
 	return world.cache_spots.any(func(cache: Vector3) -> bool: return _flat_delta(at, cache).length_squared() < 0.01)
 
 
-func can_stock(at: Vector3, supplies: bool, separate := World.PICKUP_APART) -> bool:
+func can_stock(at: Vector3, supplies: bool, separate := World.PICKUP_APART, stocking_cache := false) -> bool:
 	if not accessible(at) or (world.fog and not world.fog.contains(at, -3.0)):
 		return false
+	# Reserve the apron of each supply rack for its own stock. Ordinary loot can otherwise
+	# land beside the rack and prevent the exploration reward from ever appearing.
+	if not stocking_cache and not world.fog:
+		for rack: Vector3 in world.cache_spots:
+			if _flat_delta(at, rack).length_squared() < CACHE_CLEARANCE * CACHE_CLEARANCE:
+				return false
 	var y := world.ground_at(at)
 	if y < (MistTide.HIGH_Y if supplies else world.tide.level) + 0.06:
 		return false

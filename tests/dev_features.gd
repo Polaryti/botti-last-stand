@@ -1782,7 +1782,7 @@ func _port_vael() -> void:
 	var vael := World.new()
 	space.add_child(vael)
 	vael.setup(Game.Mode.NIGHT)
-	vael.director.running = false
+	vael.director.set_process(false)
 	for z: Zombie in vael.zombies.duplicate(): z.release()
 	var you := vael.player
 	you.set_physics_process(false)
@@ -1792,9 +1792,10 @@ func _port_vael() -> void:
 	var lighthouse_hit := vael.get_world_3d().direct_space_state.intersect_ray(
 		PhysicsRayQueryParameters3D.create(Vector3(84, 2.7, 63), Vector3(84, 2.7, 70), 1))
 	check(not lighthouse_hit.is_empty() and (lighthouse_hit["position"] as Vector3).z < 67.0, "the lighthouse plinth stops characters on approach")
-	var road_end := Vector3(14, 0, -89)
+	var road_end := Vector3(-3, 0, -101)
 	var road_route := vael.grid.route(Vector3(0, 0, -53), road_end)
-	check(road_route.size() > 1 and Vector2(road_route[-1].x - road_end.x, road_route[-1].z - road_end.z).length() < 2.5, "the market is linked to Valley Road")
+	check(road_route.size() > 1 and Vector2(road_route[-1].x - road_end.x, road_route[-1].z - road_end.z).length() < 2.5, "the market is linked to the upper switchback on Valley Road")
+	await _vael_pass(vael)
 	check(t.height(40, -18) > 2.4 and t.height(40, -22) > 3.7, "the town terraces grade up from the Quay without a moat")
 	check(absf(t.height(0, -5) - 2.2) < 0.15 and t.height(0, -55) > 4.5, "the quay and the town above it")
 	check(t.height(0, 40) < MistTide.HIGH_Y - 0.3 and t.height(0, 40) > MistTide.LOW_Y + 0.2, "the flats between low and high water")
@@ -1924,6 +1925,73 @@ func _port_vael() -> void:
 	await get_tree().process_frame
 
 
+## The climb towards Mesenlla, the border mesh and the shared obstacle traversal.
+func _vael_pass(vael: World) -> void:
+	var terrain := vael.terrain
+	var arch := Vector3(7, 0, -93)
+	var up := Vector3(-6, 0, -4).normalized()
+	var space := vael.get_world_3d().direct_space_state
+	var a := arch - up * 2.0
+	var b := arch + up * 2.0
+	a.y = vael.ground_at(a) + 1.0
+	b.y = vael.ground_at(b) + 1.0
+	check(space.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.ENEMY_ONLY)).is_empty(), "Valley Road passes through the centre of the stone arch")
+	check(vael.vael_sites.accessible(Vector3(-3, 0, -101)) and terrain.height(-3, -101) > 12.0, "the playable road climbs through the gate into Mesenlla's foothills")
+	var edge := float(terrain.half_extent)
+	var north: PackedVector3Array = terrain.skirt_mesh(0).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var seam_samples := 0
+	var seam_clear := true
+	for v: Vector3 in north:
+		if v.z == -edge:
+			seam_samples += 1
+			seam_clear = seam_clear and is_equal_approx(v.y, terrain.ground_height(v.x, v.z))
+	check(seam_samples >= terrain.vertices_per_side and seam_clear, "northern scenery meets the playable terrain at the exact seam")
+	var you := vael.player
+	var original := you.global_position
+	# The low cargo on the quay is part of the map. The lane around the cargo stays open.
+	var floor_y := vael.ground_at(Vector3(5, 0, 3.7))
+	you.global_position = Vector3(5, floor_y, -2.5)
+	var started := vael.spawn_zombie("drowned_sailor", Vector3(3.93, floor_y, 2.69))
+	check(started, "a Drowned Sailor can start on the quayside of the cargo")
+	if started:
+		var sailor: Zombie = vael.zombies.back()
+		sailor.rotation.y = PI
+		sailor._flank = Vector3.ZERO
+		sailor._start_chase(you.global_position)
+		sailor._sees = true
+		sailor._think = 999.0
+		sailor._hop_cd = 0.0
+		var vaulted := false
+		for i in 150:
+			await get_tree().physics_frame
+			vaulted = vaulted or (sailor._airborne and sailor.global_position.y > floor_y + 0.65)
+			if vaulted and not sailor._airborne and sailor.global_position.z < 1.0:
+				break
+		check(vaulted and sailor.global_position.z < 1.0, "a Drowned Sailor vaults the quay's cargo and lands across it")
+		sailor.release()
+	var old_auto_jump := Game.auto_jump
+	var facing := you.rotation
+	you.global_position = Vector3(5, floor_y + 0.10, 5.7)
+	you.rotation.y = 0.0
+	you.velocity = Vector3.ZERO
+	Game.auto_jump = true
+	you.input_move = Vector2(0, -1)
+	you.set_physics_process(true)
+	var airborne := false
+	for i in 99:
+		await get_tree().physics_frame
+		airborne = airborne or you.global_position.y > floor_y + 0.65
+		if airborne and you.is_on_floor() and you.global_position.z < 0.0:
+			break
+	check(airborne and you.global_position.z < 0.0 and you.is_on_floor(), "player auto-jump carries the player over the quay's cargo")
+	you.set_physics_process(false)
+	you.input_move = Vector2.ZERO
+	you.velocity = Vector3.ZERO
+	you.rotation = facing
+	you.global_position = original
+	Game.auto_jump = old_auto_jump
+
+
 ## The Port Vael districts, supply racks, and routes through the quay and its buildings.
 func _vael_districts(vael: World) -> void:
 	var sites := vael.vael_sites
@@ -1965,6 +2033,7 @@ func _vael_districts(vael: World) -> void:
 			[Vector3(70, 0, 34), Vector3(84, 0, 34), "the East Mole landing"],
 			[Vector3(-51.5, 0, -6), Vector3(-39, 0, -12), "both Ropewalk doors"],
 			[Vector3(40, 0, -69), Vector3(40, 0, -82), "the Harbourmaster's House"],
+			[Vector3(9.5, 0, -90.5), Vector3(-3, 0, -101), "the Valley Road arch"],
 		]:
 		var at: Vector3 = trip[0]
 		at.y = vael.ground_at(at)
@@ -1982,6 +2051,7 @@ func _vael_districts(vael: World) -> void:
 		check(sailor._arrived(), "a Drowned Sailor walks through %s" % trip[2])
 		sailor.release()
 	you.global_position = start
+	check(vael.cache_spots.all(func(at: Vector3) -> bool: return not sites.can_stock(at + Vector3(0.4, 0, 0), false)), "ordinary loot stays out of the supply racks")
 	var old_pickups := vael.pickups.duplicate()
 	vael.director._tick_caches()
 	var caches := vael.pickups.filter(func(item: Pickup) -> bool: return sites.holds_supplies(item.global_position))

@@ -656,6 +656,8 @@ func _all_void(i: int, j: int) -> bool:
 
 ## Land beyond the edge of the map, rising away so the world seems to go on.
 func skirt_mesh(sector: int) -> ArrayMesh:
+	if not coast.is_empty():
+		return _coast_skirt_mesh(sector)
 	const STEP := 10.0
 	const RINGS := 16
 	var st := SurfaceTool.new()
@@ -668,7 +670,7 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 			var near := Vector2(clampf(p.x, -half_extent, half_extent), clampf(p.y, -half_extent, half_extent))
 			var out := p.distance_to(near)
 			var y := ground_height(near.x, near.y) + out * 0.16 + (_noise.get_noise_2d(p.x, p.y) + 0.5) * minf(out * 0.2, 14.0)
-			if not sea.is_empty() or (not coast.is_empty() and ground_height(near.x, near.y) < SEA_DEEP):
+			if not sea.is_empty():
 				# Out to sea the world goes on as open water, not as hills: the seabed stays deep.
 				y = SEA_Y - 2.0
 			points[Vector2i(u, v)] = Vector3(p.x, y, p.y)
@@ -690,6 +692,63 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 					st.set_uv(Vector2(q.x, q.z) / 4.0)
 					st.add_vertex(q)
 	return st.commit()
+
+
+## Scenery outside the playable coast continues the same hills and cut roads as the land inside.
+func coast_scenery_height(x: float, z: float) -> float:
+	if maxf(absf(x), absf(z)) <= float(half_extent):
+		return ground_height(x, z)
+	return _shape(x, z)
+
+
+## Leave room for a cut road continuing through the scenery beyond the land mesh.
+func near_cut_road(at: Vector2, margin: float) -> bool:
+	for cut: Dictionary in _cuts:
+		var pts: Array[Vector3] = cut["p"]
+		var width := float(cut["w"]) + margin
+		for i in pts.size() - 1:
+			var a := Vector2(pts[i].x, pts[i].z)
+			var b := Vector2(pts[i + 1].x, pts[i + 1].z)
+			if Geometry2D.get_closest_point_to_segment(at, a, b).distance_squared_to(at) < width * width:
+				return true
+	return false
+
+
+## Join every baked border vertex exactly, including the corners. Four widening strips take the
+## hills and the sea out beyond the play area without overlapping at the corners.
+func _coast_skirt_mesh(sector: int) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var inner := PackedVector3Array()
+	for step: float in [0.0, 3.0, 7.0, 14.0, 24.0, 40.0, 64.0, 104.0, 156.0]:
+		var edge := float(half_extent) + step
+		var outer := PackedVector3Array()
+		for i in vertices_per_side:
+			var s := (float(i) / float(vertices_per_side - 1) * 2.0 - 1.0) * edge
+			var p := Vector2(s, -edge)
+			match sector:
+				1: p.y = edge
+				2: p = Vector2(-edge, s)
+				3: p = Vector2(edge, s)
+			outer.append(Vector3(p.x, coast_scenery_height(p.x, p.y), p.y))
+		if not inner.is_empty():
+			for i in vertices_per_side - 1:
+				_coast_skirt_triangle(st, inner[i], inner[i + 1], outer[i])
+				_coast_skirt_triangle(st, inner[i + 1], outer[i + 1], outer[i])
+		inner = outer
+	return st.commit()
+
+
+func _coast_skirt_triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	var n := (b - a).cross(c - a).normalized()
+	var points := [a, b, c] if n.y <= 0.0 else [c, b, a]
+	if n.y < 0.0:
+		n = -n
+	for v: Vector3 in points:
+		st.set_normal(n)
+		st.set_color(Color(0.17, 0.27, 0.16).lerp(Color(0.28, 0.33, 0.24), clampf(v.y / 30.0, 0.0, 1.0)))
+		st.set_uv(Vector2(v.x, v.z) / 4.0)
+		st.add_vertex(v)
 
 
 func _skirt_point(sector: int, u: int, v: int, step: float, along: int) -> Vector2:

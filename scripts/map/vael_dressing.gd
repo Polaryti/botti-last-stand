@@ -426,31 +426,12 @@ static func brazier(b: MapBuilder) -> void:
 	for k in 4:
 		var a := TAU * k / 4.0
 		l.prism(Vector3(cos(a) * 0.12, 1.2, sin(a) * 0.12), Vector3(cos(a + 0.6) * 0.2, 1.38, sin(a + 0.6) * 0.2), 0.05, 0.04, 4, Color(0.15, 0.1, 0.08))
-	var rng := b.seeded()
-	_glow(b, func(g: LowPoly) -> void: flames(g, Vector3(0, 1.24, 0), 0.5, rng))
+	b.flame(b.xf * Vector3(0, 1.27, 0), 0.7, WorldLight.brazier_mesh())
 	b.solid(Vector3(0, 0.6, 0), Vector3(0.7, 1.2, 0.7))
 	b.w.add_glow(b.xf * Vector3(0, 1.6, 0), FIRE, 2.2)
 	b.w.add_fire(b.xf.origin, WorldLight.LANTERN_REACH)
 	MesenllaBuilder._light(b, Vector3(0, 1.9, 0), FIRE, 1.8, 10.0)
 	sparks(b, Vector3(0, 1.7, 0), 0.25)
-
-
-## A fire: tongues of flame of different heights leaning a little this way and that, deep orange
-## outside, then yellow, then a white-hot core, and glowing coals round their feet. `size` is its width.
-static func flames(g: LowPoly, at: Vector3, size: float, rng: RandomNumberGenerator) -> void:
-	var layers := [[Color(0.95, 0.35, 0.1), 1.0, 7], [Color(1.0, 0.62, 0.18), 0.72, 5], [Color(1.0, 0.9, 0.55), 0.42, 3]]
-	for layer: Array in layers:
-		var col: Color = layer[0]
-		var k: float = layer[1]
-		for t in int(layer[2]):
-			var a := TAU * t / float(layer[2]) + rng.randf() * 0.6
-			var foot := at + Vector3(cos(a), 0, sin(a)) * size * 0.32 * k
-			var tall := size * k * rng.randf_range(1.1, 2.0)
-			var tip := foot + Vector3(cos(a) * size * 0.12 + rng.randf_range(-0.05, 0.05), tall, sin(a) * size * 0.12 + rng.randf_range(-0.05, 0.05))
-			g.prism(foot, tip, size * 0.22 * k, 0.0, 4, col)
-	for t in 6:
-		var a := TAU * t / 6.0
-		g.box(at + Vector3(cos(a), 0, sin(a)) * size * 0.4 + Vector3(0, 0.02, 0), Vector3.ONE * size * 0.16, Color(1.0, 0.4, 0.12), Vector3(rng.randf() * 40, rng.randf() * 90, 0))
 
 
 ## Sparks going up off a fire: small, bright and quick, few.
@@ -982,3 +963,18 @@ static func salt_grass(b: MapBuilder, size: float) -> void:
 			if k == 0:
 				var seed_colour := Color(0.47, 0.48, 0.56) if i % 4 == 0 else ROPE
 				l.prism(tip - lean * 0.16, tip + lean * 0.16, 0.026, 0.013, 4, seed_colour)
+
+
+## Worn stone waymarks on the mountain road, a route marker above the smaller ballast stones.
+static func pass_cairn(b: MapBuilder, tall: float) -> void:
+	var l := b.cell()
+	var rng := b.seeded()
+	var centre := Vector3.ZERO
+	for i in 5:
+		var scale := 1.0 - i * 0.14
+		var rise := tall * (0.19 if i < 4 else 0.24)
+		var top := centre + Vector3(rng.randf_range(-0.06, 0.06), rise, rng.randf_range(-0.07, 0.07))
+		l.prism(centre, top, tall * 0.33 * scale, tall * 0.29 * scale, 6, STONE.lerp(MOSS, rng.randf_range(0.08, 0.35)))
+		centre = top
+	l.box(Vector3(centre.x, tall * 0.8, tall * 0.135), Vector3(tall * 0.19, tall * 0.065, 0.027), CLOTH_RUST)
+	b.solid(Vector3(0, tall * 0.5, 0), Vector3(tall * 0.6, tall, tall * 0.6))

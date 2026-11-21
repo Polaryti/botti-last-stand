@@ -39,11 +39,12 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 ### The coast of Vael, dressed
 - **The Drowned climb out of the flats** by the stairs and slipways, at any tide, and no longer stick at the foot of the quay or the breakwaters. Two broad slipways now lead up from the flats either side of Harbour Street.
 - **The Lantern Barge keeps to its channel** of deep water the whole way to the Isle of Lamps.
-- **Port Vael** has a coastal aurora, sea mist blowing inland, and dark spires on the horizon. Pines and an old stone gate mark the road to Mesenlla.
+- **Port Vael** has a coastal aurora, sea mist blowing inland, and dark spires on the horizon. Valley Road climbs through the old stone arch into Mesenlla’s foothills. Fir and pine cover the surrounding ridges, and cairns mark the turns by a sheltered cart stop.
+- Harbour braziers flicker in the sea wind. The Drowned can vault low cargo while pursuing you, and auto-jump helps you clear the same obstacles.
 - **The Quay and Market Square** are linked by graded terraces. The lighthouse now blocks passage through its base.
 - **The Tide Zone** has breaking foam as the water rises and falls. At low tide, follow the exposed stone track from the eastern slipway toward the Drowned Bell.
 - **Explore a working harbour fallen silent.** Visit the Boatwright's Yard, Ropewalk, Fishmarket and Salt House. The coast paths run under the tall firs and pines of Mesenlla to Gullwatch and Pilgrims' Garden and back into town.
-- **Follow the supplies.** Marked racks at Gullwatch, Valley Road, Pilgrims' Garden and the Harbourmaster's House hold weapons and potions. Houses and warehouses have clear entrances, and several now have a second way out.
+- **Follow the supplies.** Marked racks at Gullwatch, Valley Road, Pilgrims' Garden and the Harbourmaster's House hold weapons and potions. Ordinary loot no longer blocks their restock. Houses and warehouses have clear entrances, and several now have a second way out.
 - **New routes across the harbour.** Both breakwaters have landings onto the flats, and the quay slipways are clear. Enemies approach along connected routes and packs have room to emerge. The Kraken comes up where its arms have room to surface. Weapons and supplies appear at reachable spots.
 - **The Lantern Road** keeps its pilgrim arches, shrines and ghost lights.
 

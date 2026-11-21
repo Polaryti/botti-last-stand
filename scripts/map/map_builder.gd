@@ -1025,7 +1025,7 @@ func bonfire() -> void:
 	# where nothing could reach them.
 	w.add_barrier(at + Vector3.UP * 3.0, Vector3(1.9, 4.0, 1.9))
 	w.add_glow(at + Vector3.UP * 1.0, Color(1.0, 0.6, 0.22), 4.5, 95.0)
-	_flame(at + Vector3.UP * 0.1, 1.0)
+	flame(at + Vector3.UP * 0.1, 1.0)
 	var light: OmniLight3D = null
 	if quality > 0:
 		light = OmniLight3D.new()
@@ -1047,7 +1047,7 @@ func torch() -> void:
 	var at := xf.origin
 	w.add_solid(at + Vector3.UP, Vector3(0.22, 2.0, 0.22))
 	w.add_glow(at + Vector3.UP * 2.6, Color(1.0, 0.64, 0.26), 2.0, 85.0)
-	_flame(at + Vector3.UP * 2.38, 0.38)
+	flame(at + Vector3.UP * 2.38, 0.38)
 	var light: OmniLight3D = null
 	if quality == 2:
 		light = OmniLight3D.new()
@@ -1061,9 +1061,10 @@ func torch() -> void:
 	w.add_fire(at, WorldLight.TORCH_REACH, light)
 
 
-func _flame(at: Vector3, size: float) -> void:
+func flame(at: Vector3, size: float, geometry: Mesh = null) -> void:
 	var mi := MeshInstance3D.new()
-	mi.mesh = WorldLight.flame_mesh()
+	mi.name = "AnimatedFlame"
+	mi.mesh = geometry if geometry else WorldLight.flame_mesh()
 	mi.position = at
 	mi.scale = Vector3.ONE * size
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1661,6 +1662,9 @@ func fort_keep() -> void:
 
 ## A forest wall outside the playable edge. It needs no collision, so it may depend on quality.
 func forest_wall(h: float) -> void:
+	if look == "vael":
+		_coastal_forest(h)
+		return
 	var apron := LowPoly.new()
 	for side in 4:
 		var outward := Vector3(sin(side * PI * 0.5), 0, cos(side * PI * 0.5))
@@ -1673,7 +1677,7 @@ func forest_wall(h: float) -> void:
 			apron._tri(a, z, z + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 			apron._tri(a, z + outward * 24, a + outward * 24, a - Vector3.UP, DIRT.darkened(0.3))
 	add(apron)
-	if look in SpawnRules.MESENLLA or look == "vael":
+	if look in SpawnRules.MESENLLA:
 		_tall_wall(h)
 		return
 	var step: float = [7.5, 5.5, 4.2][quality]
@@ -1696,24 +1700,42 @@ func forest_wall(h: float) -> void:
 ## Beyond the Mists the edge of the land is lined with tall conifers: giant firs and tall pines in
 ## rows from just inside the edge outwards, so the land ends in a wall of old forest.
 func _tall_wall(h: float) -> void:
-	var coastal := look == "vael"
 	var step: float = [8.0, 6.0, 5.0][quality]
 	var depth: int = [3, 3, 4][quality]
 	for row in depth:
-		var off := h + (1.6 if coastal else -2.5) + row * 4.2
+		var off := h - 2.5 + row * 4.2
 		var t := -off
 		while t <= off:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1.4, 1.4), 0, rng.randf_range(-1.4, 1.4))
 				p.y = terrain.height(p.x, p.z)
-				if coastal and (p.y < MistTide.HIGH_Y + 0.4 or (p.z < -h and absf(p.x - 9.0) < 6.0)):
-					continue # open sea and the road to Mesenlla
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 				if rng.randf() < 0.55:
-					tree("proc:giant_fir", rng.randf_range(7.5, 10.0), rng.randf_range(0.95, 1.15), row == 0 and not coastal)
+					tree("proc:giant_fir", rng.randf_range(7.5, 10.0), rng.randf_range(0.95, 1.15), row == 0)
 				else:
-					tree("proc:tall_pine", rng.randf_range(8.0, 11.0), rng.randf_range(1.0, 1.3), row == 0 and not coastal)
+					tree("proc:tall_pine", rng.randf_range(8.0, 11.0), rng.randf_range(1.0, 1.3), row == 0)
 			t += step + (row % 2) * 0.5
+
+
+## Stagger the firs over the slopes and onto the background rather than lining up against a flat
+## boundary. Open water and the uphill route stay visible.
+func _coastal_forest(h: float) -> void:
+	var step: float = [8.1, 6.6, 5.8][quality]
+	var depth: int = [4, 5, 6][quality]
+	var rows := [-2.0, 4.0, 11.0, 20.0, 31.0, 44.0]
+	for row in depth:
+		var edge := h + float(rows[row])
+		var run := -edge + step * (0.5 if row % 2 == 1 else 0.15)
+		while run < edge:
+			for at: Vector2 in [Vector2(run, -edge), Vector2(-edge, run), Vector2(edge, run)]:
+				var p := at + Vector2(rng.randf_range(-1.45, 1.45), rng.randf_range(-1.45, 1.45))
+				var y := terrain.coast_scenery_height(p.x, p.y)
+				if y < MistTide.HIGH_Y + 0.75 or terrain.near_cut_road(p, 2.25):
+					continue
+				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(p.x, y - 0.12, p.y)))
+				var kind := "proc:tall_pine" if rng.randf() < 0.55 else "proc:giant_fir"
+				tree(kind, rng.randf_range(7.6, 11.0), rng.randf_range(0.92, 1.24), false)
+			run += step
 
 
 ## Grass tufts, in patches so the camera can skip those it cannot see.

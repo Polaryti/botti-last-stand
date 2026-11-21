@@ -4012,6 +4012,8 @@ func _noise(radius: float) -> void:
 
 ## Something low ahead with free space above it, like a fence or a crate.
 func _should_auto_jump(dir: Vector3) -> bool:
+	if world.vael_sites and not is_riding():
+		return rooted_left <= 0.0 and VaelVault.landing(self, world, dir) != Vector3.INF
 	var flat := Vector3(dir.x, 0, dir.z)
 	if flat.length_squared() < 0.01:
 		return false

@@ -246,7 +246,13 @@ func _build_water() -> void:
 		# The open sea, out past the edge of the land to the horizon: to the south off Port Vael, all
 		# round the Lantern Road.
 		var far := 900.0
-		var quads: Array = [[Vector2(-far, half - 1.0), Vector2(far, half - 1.0), Vector2(far, half + far), Vector2(-far, half + far)]]
+		var coast := not t.coast.is_empty()
+		var south := half if coast else half - 1.0
+		var quads: Array = [[Vector2(-far, south), Vector2(far, south), Vector2(far, half + far), Vector2(-far, half + far)]]
+		if coast:
+			var outer_bay := float(t.coast["end"])
+			quads.append([Vector2(-far, outer_bay), Vector2(-half, outer_bay), Vector2(-half, half), Vector2(-far, half)])
+			quads.append([Vector2(half, outer_bay), Vector2(far, outer_bay), Vector2(far, half), Vector2(half, half)])
 		if not t.sea.is_empty():
 			quads.append([Vector2(-far, -half - far), Vector2(far, -half - far), Vector2(far, -half + 1.0), Vector2(-far, -half + 1.0)])
 			quads.append([Vector2(-half - far, -half + 1.0), Vector2(-half + 1.0, -half + 1.0), Vector2(-half + 1.0, half - 1.0), Vector2(-half - far, half - 1.0)])

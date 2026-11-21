@@ -95,6 +95,7 @@ func rebuild_preview() -> void:
 	_preview = MapPreview.new(terrain)
 	_builder = MapBuilder.new(_preview, terrain)
 	_builder.is_preview = true
+	_builder.look = look
 	_builder.quality = 1
 	_builder.grass_tufts = 150
 	_draw_ground()
