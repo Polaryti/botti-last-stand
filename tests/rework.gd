@@ -1798,18 +1798,18 @@ func _harpooner() -> void:
 	for sound: String in ["haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon", "hook_catch"]:
 		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
 	check(ClassGear._pieces("harpooner").size() == 3 and Avatar.MODELS.has("harpooner") and ClassPresentation.COPY.has("harpooner"), "dressed, seen by others, and described")
-	# Earned when the Harbourmaster falls in a match you are in.
+	# The kit remains covered while the class is disabled in the player roster.
 	var had: Dictionary = Game.unlocked.duplicate()
 	var beaten := Game.harbourmasters_beaten
 	Game.unlocked.erase("harpooner")
-	check(not Game.owns_class("harpooner") and Game.earn_text("harpooner").begins_with("Defeat the Harbourmaster"), "locked until then, and it says how to earn it")
+	check(d.get("disabled", false) and not Game.owns_class("harpooner"), "the Harpooner is disabled")
 	# (This map has no Harbourmaster of its own: a stand-in falls as one, the way every phone hears of it.)
 	var hm := target(p.global_position + Vector3(0, 0, -20))
 	hm.type_id = "harbourmaster"
 	w.note_defeated(hm)
 	hm.type_id = "normal"
 	hm.release()
-	check(Game.owns_class("harpooner") and Game.harbourmasters_beaten == beaten + 1, "the Harbourmaster's fall opens the Harpooner")
+	check(not Game.owns_class("harpooner") and Game.harbourmasters_beaten == beaten + 1, "the Harbourmaster kill is counted without unlocking the Harpooner")
 	Game.unlocked = had
 	Game.harbourmasters_beaten = beaten
 	Game.fresh_unlocks.erase("harpooner")
@@ -1993,7 +1993,7 @@ func _tidecaller() -> void:
 		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
 	for sound: String in ["call_tide", "tsunami", "deep_song", "bind_fog", "wave_crash"]:
 		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
-	check(ClassGear._pieces("tidecaller").size() == 3 and Avatar.MODELS.has("tidecaller") and ClassPresentation.COPY.has("tidecaller"), "dressed, seen by others, and described")
+	check(ClassGear._pieces("tidecaller").has("chest:glow") and Avatar.MODELS.has("tidecaller") and ClassPresentation.COPY.has("tidecaller"), "dressed, seen by others, and described")
 	# Earned by the third Last Light won.
 	var had: Dictionary = Game.unlocked.duplicate()
 	var lit := Game.lighthouses_lit
@@ -2112,7 +2112,7 @@ func _ferryman() -> void:
 		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
 	for sound: String in ["crossing", "toll_bell", "obol", "souls_go"]:
 		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
-	check(ClassGear._pieces("ferryman").size() == 3 and Avatar.MODELS.has("ferryman") and ClassPresentation.COPY.has("ferryman"), "dressed, seen by others, and described")
+	check(ClassGear._pieces("ferryman").has("chest:glow") and Avatar.MODELS.has("ferryman") and ClassPresentation.COPY.has("ferryman"), "dressed, seen by others, and described")
 	# Earned by the third night survived in Port Vael.
 	var had: Dictionary = Game.unlocked.duplicate()
 	var nights := Game.vael_nights

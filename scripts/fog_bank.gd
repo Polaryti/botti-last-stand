@@ -46,9 +46,9 @@ func _ready() -> void:
 	_dome.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_dome)
 	_dome.scale = Vector3(radius, radius * 0.45, radius) * 0.2
-	for i in 10:
-		var a := TAU * i / 10.0
-		world.fx_mist(global_position + Vector3(cos(a), 0.3, sin(a)) * radius * randf_range(0.3, 0.8), radius * 0.4)
+	for i in 6:
+		var a := TAU * i / 6.0
+		world.fx_mist(global_position + Vector3(cos(a), 0.0, sin(a)) * radius * 0.72, radius * 0.52)
 	if owner_is_here():
 		_bind_all()
 
@@ -135,7 +135,7 @@ static func fog_material() -> StandardMaterial3D:
 		_fog_mat = StandardMaterial3D.new()
 		_fog_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		_fog_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_fog_mat.albedo_color = Color(0.82, 0.88, 0.9, 0.26)
+		_fog_mat.albedo_color = Color(0.44, 0.72, 0.76, 0.20)
 		_fog_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 		_fog_mat.disable_receive_shadows = true
 	return _fog_mat

@@ -122,8 +122,8 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0,
 	"haul_range": 0.0, "haul_cd": 1.0, "haul_stun": 0.0, "path_cd": 1.0, "blood_time": 0.0, "line_time": 0.0, "lines": 0.0, "line_reach": 0.0,
 	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0,
-	"wave_damage": 0.0, "wave_range": 0.0, "song_reach": 0.0, "song_time": 0.0, "song_heal": 0.0, "fog_radius": 0.0, "fog_time": 0.0,
-	"cross_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0}
+	"wave_damage": 0.0, "wave_range": 0.0, "song_reach": 0.0, "song_time": 0.0, "song_heal": 0.0, "fog_radius": 0.0, "fog_time": 0.0, "fog_reach": 0.0,
+	"cross_reach": 0.0, "ferry_cast_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
@@ -4424,8 +4424,18 @@ func _do_melee_hit() -> void:
 ## A Ship's Anchor meeting the ground: everything within its reach that the blow itself missed takes
 ## a share of it and staggers. Returns how many it caught.
 func _anchor_quake(d: Dictionary, stats: Dictionary) -> int:
-	var at := global_position - global_basis.z * 1.4
-	at.y = world.ground_at(at)
+	# Project the anchor's crown at the authored contact frame onto the actual floor.
+	var strike := WeaponAnim.sample(WeaponAnim.keys_for("slam", true), SWING_HIT, float(d.get("arc", 1.0)))
+	var crown: Vector3 = d["pos"] + strike[0] + (strike[1] as Quaternion) * Vector3(0, 0.9 * float(d["scale"]), 0)
+	var eye := eye_position()
+	var view := camera.global_basis if camera else global_basis
+	var tip := view * crown
+	var at := eye + Vector3(tip.x, 0.0, tip.z)
+	var wall := get_world_3d().direct_space_state.intersect_ray(
+		PhysicsRayQueryParameters3D.create(eye, at, 1 | Terrain.LAYER))
+	if not wall.is_empty():
+		at = Vector3(wall["position"]) + Vector3(wall["normal"]) * 0.06
+	at = world.floor_contact(at)
 	var reach := float(d["quake"])
 	var caught := 0
 	var was := world.begin_act(self)

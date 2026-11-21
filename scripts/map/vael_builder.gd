@@ -235,7 +235,10 @@ static func lighthouse(b: MapBuilder, high: float, lit: bool) -> void:
 		lamp.prism(Vector3(0, high + 1.0, 0), Vector3(0, high + 2.6, 0), 0.6, 0.6, 8, BRONZE)
 		lamp.prism(Vector3(0, high + 1.2, 0), Vector3(0, high + 2.4, 0), 0.7, 0.7, 8, Color(0.5, 0.6, 0.62))
 		b.add(lamp)
-	b.solid(Vector3(0, high * 0.5, 0), Vector3(5.2, high, 5.2))
+	if not b.is_preview:
+		b.w.add_round_solid(b.xf * Vector3(0, 0.48, 0), 3.98, 0.96)
+		b.w.add_round_solid(b.xf * Vector3(0, 1.2, 0), 3.55, 0.54)
+		b.w.add_round_solid(b.xf * Vector3(0, (high + 1.45) * 0.5, 0), 2.84, high - 1.45)
 	b.w.perches.append(b.xf * Vector3(0, high + 0.6, 2.6))
 	if not b.is_preview:
 		b.w.lighthouse_top = b.xf * Vector3(0, high + 2.0, 0)

@@ -2960,7 +2960,7 @@ func test_version_8() -> void:
 	ok(not CodexPanel.TABS.has("Tips") and CodexPanel.TABS[0] == "Classes", "the Codex has classes and no tips")
 	m.show_codex()
 	await frames(2)
-	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
+	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id)).size(), "and shows every enabled class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
 	var unowned := ClassDefs.for_sale().filter(func(c: String) -> bool: return not Game.owns_class(c)).size()
@@ -3486,10 +3486,9 @@ func test_beyond_review() -> void:
 	ok(absf(back / maxf(ahead, 0.01) - Player.BACK_SPEED) < 0.03, "walking backwards goes at %d%% of walking on (%.2f against %.2f m/s)" % [int(Player.BACK_SPEED * 100.0), back, ahead])
 	# The Scarecrow belongs to the Village.
 	ok(ZombieDefs.ALL["scarecrow"]["maps"] == ["village"] and SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "village") and not SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "mesenlla"), "the Scarecrow is the Village's alone")
-	# The world atlas: the Mists lead to Mist Bastion and, through a second portal, to Port Vael; the
-	# Valleys lie below the Bastion.
-	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion", "vael"], "on the atlas the Mists connect to the Fort, Mist Bastion and Port Vael only")
-	ok(WorldAtlas.LINKS.any(func(l: Array) -> bool: return l[0] == "mists" and l[1] == "vael" and l[2]), "Port Vael is reached through a portal")
+	# The coast lies downhill from the Valleys along the same road.
+	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion"], "the Mists connect to the Fort and Mist Bastion")
+	ok(WorldAtlas.LINKS.has(["mesenlla", "vael", false]), "Port Vael is reached by land from the Valleys")
 	ok((WorldAtlas.SPOTS["mesenlla"] as Vector2).y > (WorldAtlas.SPOTS["bastion"] as Vector2).y, "and the Valleys of Mesenlla lie below Mist Bastion")
 	m.show_map_picker()
 	await frames(2)
@@ -5780,7 +5779,7 @@ func test_review() -> void:
 	m.show_class_picker(Game.Mode.NIGHT)
 	await frames(2)
 	var rows: Node = m.panel.get_meta("list")
-	ok(rows.get_child_count() == ClassDefs.ALL.size(), "every class is listed, the Adept too")
+	ok(rows.get_child_count() == ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id)).size(), "every enabled class is listed, the Adept too")
 	(rows.get_child(2) as Button).pressed.emit()
 	await frames(1)
 	await _press("Play as Heavy Infantry")

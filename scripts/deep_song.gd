@@ -85,6 +85,7 @@ func _place() -> void:
 		var r := reach * k
 		_rings[i].global_transform = Transform3D(Basis.IDENTITY.scaled(Vector3(r, 1.0, r)), at + Vector3.UP * (0.2 + 0.9 * k))
 		_rings[i].transparency = k * 0.85
+		_rings[i].rotate_y(_age * 0.45 + i * TAU / RINGS)
 
 
 func _physics_process(delta: float) -> void:
@@ -174,6 +175,8 @@ static func ring_mesh() -> Mesh:
 		for i in n:
 			var a0 := TAU * i / n
 			var a1 := TAU * (i + 1) / n
-			l.prism(Vector3(cos(a0), 0, sin(a0)), Vector3(cos(a1), 0, sin(a1)), 0.012, 0.012, 3, COLOUR)
+			var note := 0.5 + 0.5 * cos(a0 * 4.0)
+			var colour := Color(0.2, 0.5, 0.69).lerp(COLOUR, note)
+			l.prism(Vector3(cos(a0), sin(a0 * 4.0) * 0.1, sin(a0)), Vector3(cos(a1), sin(a1 * 4.0) * 0.1, sin(a1)), 0.012, 0.012, 3, colour)
 		_ring_mesh = l.commit()
 	return _ring_mesh

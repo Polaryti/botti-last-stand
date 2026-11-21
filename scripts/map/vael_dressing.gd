@@ -60,7 +60,8 @@ static func spire(b: MapBuilder, high: float) -> void:
 	var foot := -6.0
 	var tiers := 4
 	var y := foot
-	var windows := b.mesh()
+	var windows := l if b.look == "vael" else b.mesh()
+	var window_colour := STONE_DARK.darkened(0.42) if b.look == "vael" else DEEP_GLOW
 	for t in tiers:
 		var h := (high * (0.78 if broken else 0.62)) / tiers
 		var r0 := r * (1.0 - t * 0.16)
@@ -73,7 +74,7 @@ static func spire(b: MapBuilder, high: float) -> void:
 				continue
 			var a := TAU * (k + 0.5) / 8.0
 			var o := Vector3(sin(a), 0, cos(a))
-			windows.box(o * (r0 * 0.93) + Vector3(0, y + h * 0.5, 0), Vector3(r0 * 0.16, h * 0.42, 0.25), DEEP_GLOW, Vector3(0, rad_to_deg(a), 0))
+			windows.box(o * (r0 * 0.93) + Vector3(0, y + h * 0.5, 0), Vector3(r0 * 0.16, h * 0.42, 0.25), window_colour, Vector3(0, rad_to_deg(a), 0))
 		y += h
 	if broken:
 		# Snapped off: jagged stumps of the last tier.
@@ -84,7 +85,7 @@ static func spire(b: MapBuilder, high: float) -> void:
 		l.prism(Vector3(0, y, 0), Vector3(0, y + high * 0.38, 0), r * 0.5, 0.05, 8, Color(0.2, 0.24, 0.26))
 		var top := Vector3(0, y + high * 0.38, 0)
 		VaelModels.crown(l, top + Vector3.DOWN * r * 0.2, r * 0.32)
-		windows.box(top + Vector3.UP * 0.4, Vector3.ONE * r * 0.18, DEEP_GLOW)
+		windows.box(top + Vector3.UP * 0.4, Vector3.ONE * r * 0.18, window_colour)
 	# Buttresses at its foot, and two lesser turrets.
 	for k in 4:
 		var a := TAU * k / 4.0 + PI * 0.25
@@ -94,15 +95,17 @@ static func spire(b: MapBuilder, high: float) -> void:
 		var at := Vector3(side * r * 2.2, 0, r * 0.6)
 		l.prism(at + Vector3(0, foot, 0), at + Vector3(0, high * 0.3, 0), r * 0.38, r * 0.34, 6, STONE_DARK)
 		l.prism(at + Vector3(0, high * 0.3, 0), at + Vector3(0, high * 0.42, 0), r * 0.42, 0.05, 6, Color(0.2, 0.24, 0.26))
-		windows.box(at + Vector3(0, high * 0.22, r * 0.35), Vector3(r * 0.12, high * 0.06, 0.2), DEEP_GLOW)
+		windows.box(at + Vector3(0, high * 0.22, r * 0.35), Vector3(r * 0.12, high * 0.06, 0.2), window_colour)
 	var mi := b.add(l)
 	mi.visibility_range_end = 400.0
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var glow := MesenllaBuilder._shine(b, windows, true)
-	if glow:
-		glow.visibility_range_end = 400.0
-		glow.material_override = _far_glow()
-	b.w.add_glow(b.xf * Vector3(0, y * 0.55, 0), DEEP_GLOW, high * 0.18, 0.0, true).visibility_range_end = 400.0
+	# Port Vael's windows are dark, part of the silhouette against the aurora.
+	if b.look != "vael":
+		var glow := MesenllaBuilder._shine(b, windows, true)
+		if glow:
+			glow.visibility_range_end = 400.0
+			glow.material_override = _far_glow()
+		b.w.add_glow(b.xf * Vector3(0, y * 0.55, 0), DEEP_GLOW, high * 0.18, 0.0, true).visibility_range_end = 400.0
 
 
 ## Lit windows seen through the fog: unlit and unfogged, so far spires keep their lights.
@@ -357,7 +360,8 @@ static func kelp_bed(b: MapBuilder, radius: float) -> void:
 static func tide_pool(b: MapBuilder, radius: float) -> void:
 	var rng := b.seeded()
 	var l := b.cell()
-	var glows := b.mesh()
+	var coastal := b.look == "vael"
+	var details := l if coastal else b.mesh()
 	var g := _local_ground(b, 0, 0)
 	l.prism(Vector3(0, g - 0.02, 0), Vector3(0, g + 0.04, 0), radius, radius, 12, Color(0.06, 0.12, 0.13))
 	var stones := int(radius * 5.0)
@@ -369,18 +373,21 @@ static func tide_pool(b: MapBuilder, radius: float) -> void:
 		l.box(at, Vector3(s, s * 0.6, s * 0.8), VaelBuilder.ROCK.darkened(rng.randf_range(0.0, 0.3)), Vector3(rng.randf_range(-20, 20), rad_to_deg(a), rng.randf_range(-15, 15)))
 		if rng.randf() < 0.45:
 			var c := DEEP_GLOW if rng.randf() < 0.6 else VIOLET_GLOW
+			if coastal:
+				c = c.darkened(0.65)
 			var p := at * 0.85 + Vector3(0, -0.05, 0)
 			for t in 4:
 				var ta := TAU * t / 4.0
-				glows.prism(p, p + Vector3(cos(ta) * 0.09, 0.14, sin(ta) * 0.09), 0.025, 0.008, 3, c)
+				details.prism(p, p + Vector3(cos(ta) * 0.09, 0.14, sin(ta) * 0.09), 0.025, 0.008, 3, c)
 		if rng.randf() < 0.2:
 			# A starfish on the stone.
 			var p := at + Vector3(0, s * 0.31, 0)
 			for t in 5:
 				var ta := TAU * t / 5.0
 				l.prism(p, p + Vector3(cos(ta) * 0.16, 0.01, sin(ta) * 0.16), 0.04, 0.012, 3, Color(0.8, 0.35, 0.18))
-	MesenllaBuilder._shine(b, glows)
-	b.w.add_glow(b.xf * Vector3(0, g + 0.3, 0), DEEP_GLOW, radius * 0.8)
+	if not coastal:
+		MesenllaBuilder._shine(b, details)
+		b.w.add_glow(b.xf * Vector3(0, g + 0.3, 0), DEEP_GLOW, radius * 0.8)
 
 
 ## A head of a drowned statue standing up out of the sea, crowned, its eyes still faintly lit.

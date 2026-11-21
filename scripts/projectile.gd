@@ -30,6 +30,7 @@ var poison_trail := false
 var spins := false # a thrown ring turns flat as it flies
 var spin_axis := Vector3.UP # ...and a thrown knife tumbles end over end
 var hit_sound := ""
+var is_flare := false
 var bleed := Vector2.ZERO # damage per second and seconds of bleeding, for a Highwayman's knives
 var slow_secs := 0.0
 var close_from := Vector3.INF # Point Blank: half as strong again within 6 m of here
@@ -115,6 +116,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	spins = false
 	spin_axis = Vector3.UP
 	hit_sound = ""
+	is_flare = false
 	bleed = Vector2.ZERO
 	slow_secs = 0.0
 	close_from = Vector3.INF
@@ -454,6 +456,10 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		z.root(pins, true)
 		if toll:
 			z.toll_until = world.now + pins + 0.25
+	if is_flare:
+		stop()
+		world.flare(at, shooter, false, z if z.is_alive() else null)
+		return
 	world.sfx_at(hit_sound if hit_sound != "" else "thunk", at, -3.0)
 	if tether:
 		# The harpoon stays in it, then drops at its feet when it pulls free.

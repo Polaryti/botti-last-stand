@@ -1133,7 +1133,9 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 		Fx.SPARK: world.fx_spark(a, b)
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
 		Fx.MIST_PATCH: world.drop_mist_patch(a, b.x, true)
-		Fx.FLARE: world.flare(a, null, true)
+		Fx.FLARE:
+			var attached := world.zombie_by_id(int(b.x) - 1) if b.x > 0.0 and is_finite(b.x) else null
+			world.flare(a, null, true, attached)
 		Fx.HARPOON_LIE: world.lay_harpoon(by, a, b, true)
 		Fx.HARPOON_GONE: world.take_harpoon(by)
 		Fx.QUAKE: world.anchor_quake_fx(a, b.x)

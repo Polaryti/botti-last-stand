@@ -54,7 +54,8 @@ func _process(delta: float) -> void:
 	_mist -= delta
 	if _mist <= 0.0 and _age < time:
 		_mist = 0.06
-		world.fx_mist(global_position + Vector3(randf_range(-0.4, 0.4), 0.2, randf_range(-0.6, 0.6)), 0.7)
+		var stern := to_global(Vector3(randf_range(-0.5, 0.5), 0.2, 1.35))
+		world.fx_mist(stern, 0.95)
 
 
 func _place() -> void:
@@ -82,15 +83,26 @@ static func hull_mesh() -> Mesh:
 			var z1 := -1.5 + 3.0 * (i + 1) / steps
 			var zm := (z0 + z1) * 0.5
 			var beam := 0.55 * (1.0 - pow(absf(zm) / 1.5, 2.0))
-			var rise := 0.38 + pow(absf(zm) / 1.5, 3.0) * 0.4
 			l.box(Vector3(0, 0.08, zm), Vector3(beam * 1.6, 0.08, z1 - z0 + 0.01), dark)
 			for side: float in [-1.0, 1.0]:
-				l.box(Vector3(side * beam * 0.85, rise * 0.55, zm), Vector3(0.05, rise, z1 - z0 + 0.01), wood, Vector3(0, 0, -side * 14))
+				var width0 := 0.55 * (1.0 - pow(absf(z0) / 1.5, 2.0))
+				var width1 := 0.55 * (1.0 - pow(absf(z1) / 1.5, 2.0))
+				var rim0 := Vector3(side * width0, 0.40 + pow(absf(z0) / 1.5, 3.0) * 0.44, z0)
+				var rim1 := Vector3(side * width1, 0.40 + pow(absf(z1) / 1.5, 3.0) * 0.44, z1)
+				var keel0 := Vector3(side * width0 * 0.72, 0.12 + (rim0.y - 0.4) * 0.7, z0)
+				var keel1 := Vector3(side * width1 * 0.72, 0.12 + (rim1.y - 0.4) * 0.7, z1)
+				l.leaf(keel0, rim0, rim1, wood)
+				l.leaf(keel0, rim1, keel1, wood)
+				l.prism(rim0, rim1, 0.026, 0.026, 4, Color(0.99, 0.88, 0.55))
+				l.prism(keel0, keel1, 0.023, 0.023, 4, dark)
 		for z: float in [-0.5, 0.45]:
 			l.box(Vector3(0, 0.36, z), Vector3(0.9, 0.05, 0.16), wood)
 		l.prism(Vector3(0, 0.1, 1.3), Vector3(0, 1.9, 1.35), 0.025, 0.02, 6, dark)
 		l.prism(Vector3(0, 1.88, 1.35), Vector3(0, 1.88, 1.1), 0.015, 0.015, 4, dark)
 		l.prism(Vector3(0, 1.62, 1.1), Vector3(0, 1.82, 1.1), 0.08, 0.06, 6, Color(0.95, 1.0, 0.9))
+		l.prism(Vector3(0, 0.6, -1.46), Vector3(0, 1.03, -1.53), 0.045, 0.014, 6, wood)
+		l.prism(Vector3(0, 1.0, -1.51), Vector3(0, 0.99, -1.36), 0.015, 0.015, 5, dark)
+		l.prism(Vector3(0, 0.79, -1.36), Vector3(0, 0.98, -1.36), 0.066, 0.05, 6, Color(1.0, 0.83, 0.43))
 		_hull = l.commit()
 	return _hull
 

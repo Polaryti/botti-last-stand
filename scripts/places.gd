@@ -32,7 +32,7 @@ const ALL := {
 			"The War Wyvern makes burning passes at the Great Portal. Bring it down before the portal falls.",
 			"Each gate has a small door beside it that only you fit through."]},
 	"vael": {"name": "Port Vael", "icon": "map_vael", "color": Color("7fd6c2"), "plays": "Survive the Night, Co-op, All vs All and Teams",
-		"lore": "Another portal from the heart of the Mists opens on a grey coast. Here the kingdom of Vael kept its harbour, until the night its crown went into the sea and the sea came after it. Every night since, the Mist Tide rolls in over the flats, and the drowned walk in with it.",
+		"lore": "The old road descends from the Valleys of Mesenlla to a grey coast. Here the kingdom of Vael kept its harbour, until the night its crown went into the sea and the sea came after it. Every night since, the Mist Tide rolls in over the flats, and the drowned walk in with it.",
 		"tips": ["Low tide bares the seabed. Open the sea chests on the wrecks before the water comes back.",
 			"At high tide the flats flood: wading slows you and the sea-mist half blinds you. Keep to the quay and the moles.",
 			"The Drowned are quicker while the tide is high. The harbour bells ring before it turns."]},

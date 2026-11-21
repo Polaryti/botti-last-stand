@@ -41,7 +41,7 @@ var lighthouses_lit := 0 # Last Light won: the Isle of Lamps' lighthouse burning
 const LIGHTHOUSES_FOR_TIDECALLER := 3
 const VAEL_NIGHTS_FOR_FERRYMAN := 3
 var vael_nights := 0 # nights survived to the dawn in Port Vael: three earn the Ferryman
-var harbourmasters_beaten := 0 # the Harbourmaster defeated in a match you played: the first earns the Harpooner
+var harbourmasters_beaten := 0 # Harbourmasters defeated in matches you played
 var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
 var bastion_wins := 0
 var changelog_seen := "" # ChangelogPanel.signature() when the notes were last opened
@@ -244,12 +244,12 @@ func note_mists_win() -> void:
 
 
 ## The Harbourmaster fell in a match this phone's player was in (alone or with friends, whoever struck
-## the last blow). The first time earns the Harpooner.
+## the last blow).
 func note_harbourmaster() -> void:
 	if mode == Mode.SANDBOX:
 		return
 	harbourmasters_beaten += 1
-	if not unlocked.has("harpooner"):
+	if not ClassDefs.disabled("harpooner") and not unlocked.has("harpooner"):
 		_earn("harpooner")
 	save_settings()
 

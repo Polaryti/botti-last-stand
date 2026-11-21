@@ -91,7 +91,11 @@ func _physics_process(delta: float) -> void:
 	if _run >= reach:
 		_run = reach
 		_fading = 0.01
-		world.fx_water(front(), width * 0.5, Color(0.72, 0.9, 0.92))
+		var at := front()
+		var flank := dir.cross(Vector3.UP) * width * 0.27
+		world.fx_water(at, width * 0.5, Color(0.72, 0.9, 0.92))
+		world.fx_mist(at + flank + Vector3.UP * 0.5, width * 0.27)
+		world.fx_mist(at - flank + Vector3.UP * 0.5, width * 0.27)
 	_place()
 	if has("spray"):
 		for p: Player in world.local_players():
@@ -168,10 +172,12 @@ static func crest_mesh() -> Mesh:
 				var tint: Array[Color] = []
 				for x: float in [x0, x1]:
 					var h := 1.0 - pow(absf(x) * 2.0, 4.0) * 0.75
+					h *= 0.95 + 0.05 * cos(x * TAU * 3.0)
 					for q: Vector2 in [profile[k], profile[k + 1]]:
 						quad.append(Vector3(x, q.y * h, q.x * (0.7 + 0.3 * h)))
 						var up := clampf(q.y / 1.1, 0.0, 1.0)
-						tint.append(deep.lerp(sea, up).lerp(foam, clampf((up - 0.8) * 5.0, 0.0, 1.0) if k >= 4 else 0.0))
+						var white := clampf((up - 0.68) * 2.8 + sin(x * 41.0 + q.x * 5.0) * 0.22, 0.0, 1.0)
+						tint.append(deep.lerp(sea, up).lerp(foam, white if k >= 4 else 0.0))
 				# quad: [x0 lower, x0 upper, x1 lower, x1 upper]
 				for i: int in [0, 1, 2, 2, 1, 3]:
 					st.set_color(tint[i])

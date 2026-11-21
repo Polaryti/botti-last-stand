@@ -142,9 +142,9 @@ static func fog_point(p: Player) -> Vector3:
 	var eye := p.eye_position()
 	var look := -p.camera.global_basis.z if p.camera else -p.global_basis.z
 	# Walk the line of sight out until it meets the ground; looking up or level, go the full reach.
-	var reach := FOG_AHEAD
+	var reach := FOG_AHEAD + p.m("fog_reach")
 	var d := 1.0
-	while d <= FOG_AHEAD:
+	while d <= reach:
 		var at := eye + look * d
 		if at.y <= p.world.ground_at(at) + 0.2:
 			reach = d

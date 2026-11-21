@@ -31,7 +31,7 @@ const ALL := {
 		"desc": "Lives off the road and the dark. Starts with a Dagger, a Long Bow and 20 arrows, and Into the Shadows turns it invisible. Uses melee and ranged weapons."},
 	"cartographer": {"name": "Cartographer", "weapon": "spear", "arrows": 0, "hp": 100.0, "speed": 1.05, "ranged": true, "hidden": true, "earned": "beyond",
 		"desc": "Maps the way through. Starts with a Spear and plants up to three linked beacons: friends near one run faster, friends on the lines between them mend, and enemies near one are marked. Uses melee and ranged weapons."},
-	"harpooner": {"two_handed": true, "name": "Harpooner", "weapon": "harpoon", "second": "boarding_hook", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "hidden": true, "earned": "harbourmaster",
+	"harpooner": {"disabled": true, "two_handed": true, "name": "Harpooner", "weapon": "harpoon", "second": "boarding_hook", "arrows": 0, "hp": 115.0, "speed": 1.0, "ranged": true, "hidden": true, "earned": "harbourmaster",
 		"desc": "Hunts what climbs out of the sea. Starts with a Whaler's Harpoon, which comes back to hand by itself after 4 s, and a Boarding Hook. Haul drags an enemy to you, or you to anything too big to move. Uses melee and ranged weapons."},
 	"tidecaller": {"name": "Tidecaller", "weapon": "trident", "arrows": 0, "hp": 95.0, "speed": 1.0, "ranged": true, "mana": true, "mana_regen": 0.5, "hidden": true, "earned": "lighthouses",
 		"desc": "Speaks for the sea. Starts with a Trident: every blow it lands draws 5 tide, and the tide also rises slowly by itself. Call the Tide spends it on a wave that throws enemies back and slows them. Uses melee and ranged weapons."},

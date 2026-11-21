@@ -79,6 +79,8 @@ func _row(icon: String, color: Color, title: String, text: String, note := "") -
 ## Every class, whether or not it is yours yet, with its paths.
 func _classes() -> void:
 	for id: String in ClassDefs.ALL:
+		if ClassDefs.disabled(id):
+			continue
 		var d: Dictionary = ClassDefs.ALL[id]
 		var paths := PackedStringArray()
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:

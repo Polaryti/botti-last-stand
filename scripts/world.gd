@@ -960,6 +960,18 @@ func add_collider(at: Vector3, size: Vector3) -> void:
 	_body.add_child(cs)
 
 
+func add_round_solid(at: Vector3, radius: float, height: float) -> void:
+	var shape := CylinderShape3D.new()
+	shape.radius = radius
+	shape.height = height
+	var collider := CollisionShape3D.new()
+	collider.shape = shape
+	collider.position = at
+	_body.add_child(collider)
+	if at.y - height * 0.5 - ground_at(at) < 1.8:
+		grid.block_box(at, Vector3(radius * 2.0, height, radius * 2.0))
+
+
 func add_solid(at: Vector3, size: Vector3) -> void:
 	add_collider(at, size)
 	if at.y - size.y * 0.5 - ground_at(at) < 1.8:
@@ -1123,11 +1135,12 @@ func _vael_look() -> void:
 	var atmosphere := MistAtmosphere.new()
 	atmosphere.name = "VaelAura"
 	atmosphere.world = self
-	atmosphere.place = MistAtmosphere.Place.VAEL
+	atmosphere.place = MistAtmosphere.Place.VAEL_COAST if map_id == "vael" else MistAtmosphere.Place.VAEL
 	add_child(atmosphere)
 	# The Mists glow green over the drowned kingdom: out to sea (south) at Port Vael, all round on
 	# the Lantern Road.
 	_sky_material.set_shader_parameter("sea", 1.0)
+	_sky_material.set_shader_parameter("aurora", 1.0 if map_id == "vael" else 0.0)
 	# The drowned city stands far out at sea: the sky has to be further away than its spires.
 	_sky_root.scale = Vector3.ONE * 2.85 # 274 m: inside the camera's 300
 	_sky_material.set_shader_parameter("sea_dir", Vector3(0, 0, 1) if map_id == "vael" else Vector3(0, 0, -1))
@@ -1797,7 +1810,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 			shot.tether = true
 			shot.harpoon_mark = p.class_id == "harpooner"
 		elif kind == "flare":
-			shot.hit_sound = "flare_burst"
+			shot.is_flare = true
 			shot.blast_radius = 0.01
 			shot.glow = Flare.COLOR
 			var by := p
@@ -2947,10 +2960,6 @@ func note_defeated(z: Zombie) -> void:
 			FerrymanKit.gather(p, z.position, z.last_hitter == p.net_id())
 	if z.type_id == "harbourmaster" and player and not Net.spectating and not director.sandbox:
 		Game.note_harbourmaster()
-		if Game.fresh_unlocks.has("harpooner") and not _told_unlock.has("harpooner"):
-			_told_unlock["harpooner"] = true
-			director.show_banner("Harpooner unlocked!", 4.0)
-var _told_unlock := {}
 
 
 func on_player_died(p: Player) -> void:
@@ -3395,15 +3404,26 @@ var _next_mist_patch := 0
 const MIST_PATCHES := 16
 
 
-## A Flare Pistol's flare, landed. On the phone of whoever fired it, it burns and shows; elsewhere it
-## is only seen.
-func flare(at: Vector3, by: Player, shown_only := false) -> void:
+## Resolve the surface directly below an impact, including walkable props and structures.
+func floor_contact(at: Vector3) -> Vector3:
+	var floor := ground_at(at)
+	var query := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.15, Vector3(at.x, minf(floor, at.y) - 2.0, at.z), 1 | Terrain.LAYER)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	return Vector3(hit.get("position", Vector3(at.x, floor, at.z)))
+
+
+## Only the firing peer applies the flare's effects.
+func flare(at: Vector3, by: Player, shown_only := false, attached: Zombie = null) -> void:
 	var f := Flare.new(self, by, shown_only)
-	f.position = Vector3(at.x, maxf(at.y, ground_at(at)), at.z) # set before it enters: it burns round it on _ready
+	f.position = at
+	if is_instance_valid(attached) and attached.is_alive():
+		f.attach_to(attached, at)
+	else:
+		f.position = floor_contact(at)
 	add_child(f)
 	sfx_at("flare_burst", at, -2.0)
 	if not shown_only and Net.active():
-		Net.world_fx(Net.Fx.FLARE, at)
+		Net.world_fx(Net.Fx.FLARE, at, Vector3(attached.net_id + 1 if is_instance_valid(attached) else 0, 0, 0))
 
 
 ## A thrown Whaler's Harpoon, stuck where it landed (`dir` the way it flew), with a little lamp of
@@ -3457,15 +3477,15 @@ func anchor_quake_fx(at: Vector3, reach: float) -> void:
 	dust.lifetime = 1.1
 	dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
 	dust.emission_ring_axis = Vector3.UP
-	dust.emission_ring_radius = 0.6
-	dust.emission_ring_inner_radius = 0.3
+	dust.emission_ring_radius = 0.34
+	dust.emission_ring_inner_radius = 0.12
 	dust.emission_ring_height = 0.1
 	dust.direction = Vector3(1, 0.25, 0)
 	dust.spread = 180.0
 	dust.flatness = 0.85
 	dust.gravity = Vector3(0, -0.6, 0)
-	dust.initial_velocity_min = reach * 1.6
-	dust.initial_velocity_max = reach * 2.2
+	dust.initial_velocity_min = reach * 0.85
+	dust.initial_velocity_max = reach * 1.3
 	dust.damping_min = reach * 1.2
 	dust.damping_max = reach * 1.6
 	dust.scale_amount_min = 1.2
@@ -3491,7 +3511,7 @@ func anchor_quake_fx(at: Vector3, reach: float) -> void:
 	clods.amount = 14
 	clods.lifetime = 0.9
 	clods.direction = Vector3.UP
-	clods.spread = 40.0
+	clods.spread = 23.0
 	clods.gravity = Vector3(0, -14.0, 0)
 	clods.initial_velocity_min = 3.0
 	clods.initial_velocity_max = 5.5

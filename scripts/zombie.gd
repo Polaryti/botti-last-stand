@@ -49,6 +49,7 @@ var model_id := ""
 var type_id := ""
 var def: Dictionary = {}
 var active := false
+var spawn_generation := 0
 var hp := 0.0
 var max_hp := 0.0
 var height := HEIGHT
@@ -516,6 +517,7 @@ func _set_enabled(on: bool) -> void:
 
 
 func spawn(id: String, at: Vector3, minute := 0) -> void:
+	spawn_generation += 1
 	type_id = id
 	element = ""
 	haste_left = 0.0
@@ -2790,6 +2792,8 @@ func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 			_dive = 0.0
 	else:
 		var ground := target.global_position if (state == State.CHASE or dist < _sight) else _home
+		if world.map_id == "bastion" and world.fort and (type_id == "eagle" or type_id == "mist_eagle") and not _sees:
+			ground = world.fort.heart_at
 		aim = ground + Vector3(cos(_orbit) * 6.0, high, sin(_orbit) * 6.0)
 		if _clear and _special_cd <= 0.0 and dist < _sight and (_statue or world.take_dive_turn()):
 			_windup = DIVE_WARNING

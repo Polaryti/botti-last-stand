@@ -440,6 +440,16 @@ static func _tidecaller() -> Dictionary:
 		var length := (0.14 if front else 0.3) + 0.08 * ((i * 7) % 3)
 		var top := Vector3(sin(a) * 0.6, 0.12, cos(a) * 0.54 - 0.02)
 		chest.box(top + Vector3(0, -length * 0.5, 0), Vector3(0.1, length, 0.025), KELP.lightened(0.06 * (i % 3)), Vector3(0, rad_to_deg(a), 0))
+	# A pair of ribbed scallop pauldrons and a sea-glass clasp.
+	for side: float in [-1.0, 1.0]:
+		var hinge := Vector3(side * 0.48, 0.17, 0.15)
+		for i in 5:
+			var rim := Vector3(side * (0.60 + i * 0.055), 0.30 - i * 0.045, 0.19 - i * 0.034)
+			chest.prism(hinge, rim, 0.043, 0.073, 5, SHELL.darkened(i * 0.035))
+		chest.prism(hinge, Vector3(side * 0.68, 0.21, 0.2), 0.055, 0.035, 6, CORAL)
+	var glass := LowPoly.new()
+	_disc(chest, Vector3(0, 0.13, 0.54), Vector3.BACK, 0.12, 0.04, BRASS, 8)
+	glass.prism(Vector3(0, 0.034, 0.58), Vector3(0, 0.22, 0.58), 0.025, 0.065, 5, MIST_GLASS)
 	var hips := LowPoly.new()
 	# A sash of netting, knotted at the side.
 	hips.prism(Vector3(0, 0.06, 0), Vector3(0, 0.18, 0), 0.6, 0.6, 12, Color(0.62, 0.56, 0.42))
@@ -450,7 +460,7 @@ static func _tidecaller() -> Dictionary:
 	hips.prism(Vector3(-0.52, 0.1, 0.18), Vector3(-0.56, -0.06, 0.2), 0.012, 0.012, 4, Color(0.4, 0.34, 0.24))
 	hips.prism(Vector3(-0.62, -0.08, 0.2), Vector3(-0.48, -0.16, 0.2), 0.04, 0.1, 7, SHELL)
 	hips.prism(Vector3(-0.48, -0.16, 0.2), Vector3(-0.42, -0.24, 0.2), 0.1, 0.0, 7, CORAL.lightened(0.3))
-	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+	return {"head": head.commit(), "chest": chest.commit(), "chest:glow": glass.commit(), "hips": hips.commit()}
 
 
 ## Ferryman: a broad, flat-brimmed boatman's hat of grey felt over the hood, a ragged black mantle over
@@ -466,6 +476,10 @@ static func _ferryman() -> Dictionary:
 	head.prism(Vector3(0, 0.84, 0.04), Vector3(0, 0.88, 0.04), 0.94, 0.92, 16, FELT)
 	head.prism(Vector3(0, 0.88, 0.0), Vector3(0, 1.12, -0.02), 0.62, 0.5, 12, FELT.lightened(0.06))
 	head.prism(Vector3(0, 0.88, 0.0), Vector3(0, 0.95, 0.0), 0.63, 0.63, 12, CLOTH)
+	head.prism(Vector3(0, 0.836, 0.04), Vector3(0, 0.851, 0.04), 0.95, 0.94, 16, ROPE)
+	_disc(head, Vector3(0.22, 0.92, 0.58), Vector3.BACK, 0.084, 0.035, COIN, 8)
+	for side: float in [-1.0, 1.0]:
+		head.box(Vector3(side * 0.43, 0.53, 0.32), Vector3(0.12, 0.55, 0.24), CLOTH, Vector3(0, side * 16.0, side * 12.0))
 	var chest := LowPoly.new()
 	# The mantle: a short cape over the shoulders, its hem cut ragged.
 	chest.prism(Vector3(0, 0.3, -0.02), Vector3(0, 0.12, -0.04), 0.58, 0.66, 12, CLOTH)
@@ -480,16 +494,21 @@ static func _ferryman() -> Dictionary:
 		_disc(chest, Vector3(x, y, 0.5), Vector3.BACK, 0.05, 0.015, COIN.darkened(0.08 * (k % 2)), 8)
 	# The lantern on the back, hanging from an iron hook.
 	chest.prism(Vector3(0.18, 0.28, -0.52), Vector3(0.18, 0.1, -0.6), 0.015, 0.015, 4, Color(0.2, 0.2, 0.22))
-	chest.box(Vector3(0.18, -0.08, -0.62), Vector3(0.2, 0.26, 0.2), Color(0.18, 0.18, 0.2))
-	chest.box(Vector3(0.18, -0.08, -0.62), Vector3(0.15, 0.2, 0.21), Color(1.0, 0.92, 0.6))
-	chest.prism(Vector3(0.18, 0.05, -0.62), Vector3(0.18, 0.12, -0.62), 0.12, 0.02, 6, Color(0.18, 0.18, 0.2))
+	var iron := Color(0.19, 0.20, 0.22)
+	chest.box(Vector3(0.18, -0.23, -0.66), Vector3(0.27, 0.055, 0.26), iron)
+	chest.prism(Vector3(0.18, 0.07, -0.66), Vector3(0.18, 0.14, -0.66), 0.18, 0.025, 4, iron)
+	for dx: float in [-0.105, 0.105]:
+		for dz: float in [-0.105, 0.105]:
+			chest.box(Vector3(0.18 + dx, -0.08, -0.66 + dz), Vector3(0.025, 0.32, 0.025), iron)
+	var light := LowPoly.new()
+	light.prism(Vector3(0.18, -0.21, -0.66), Vector3(0.18, 0.07, -0.66), 0.12, 0.095, 6, Color(1.0, 0.78, 0.38))
 	var hips := LowPoly.new()
 	hips.prism(Vector3(0, 0.08, 0), Vector3(0, 0.16, 0), 0.6, 0.6, 12, ROPE)
 	hips.prism(Vector3(0.18, 0.12, 0.58), Vector3(0.22, -0.16, 0.6), 0.025, 0.02, 4, ROPE)
 	# The coin purse.
 	hips.prism(Vector3(-0.48, 0.08, 0.26), Vector3(-0.5, -0.16, 0.28), 0.1, 0.13, 7, LEATHER)
 	hips.prism(Vector3(-0.48, 0.08, 0.26), Vector3(-0.48, 0.13, 0.26), 0.06, 0.08, 7, LEATHER.darkened(0.2))
-	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+	return {"head": head.commit(), "chest": chest.commit(), "chest:glow": light.commit(), "hips": hips.commit()}
 
 
 ## Mist Infantry: a rounded sallet with a crest of three mist-glass fins and a glowing eye-slit, a kite

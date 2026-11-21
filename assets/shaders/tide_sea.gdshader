@@ -8,6 +8,7 @@ uniform float dawn = 0.0;
 uniform vec3 deep = vec3(0.03, 0.08, 0.1);
 uniform vec3 shallow = vec3(0.16, 0.3, 0.3);
 uniform vec3 mist = vec3(0.42, 0.62, 0.6);
+uniform float coastal = 0.0;
 uniform vec3 foam = vec3(0.78, 0.9, 0.86);
 
 varying vec2 at;
@@ -38,6 +39,12 @@ void fragment() {
 	float lap = 0.06 + 0.05 * sin(TIME * 1.4 + at.x * 0.35 + at.y * 0.2);
 	float edge = 1.0 - smoothstep(lap * 0.4, lap + 0.12, depth);
 	float froth = 0.6 + 0.4 * sin(at.x * 3.1 + TIME * 2.0) * sin(at.y * 2.7 - TIME * 1.6);
+	if (coastal > 0.0) {
+		float wash = depth - (0.27 + 0.09 * n + 0.08 * sin(TIME * 1.1 + at.y * 0.19));
+		float receding = 1.0 - smoothstep(0.03, 0.15, abs(wash));
+		water = mix(water, vec3(0.12, 0.38, 0.37), 0.32 * (1.0 - smoothstep(0.25, 1.55, depth)));
+		water = mix(water, foam, receding * (0.15 + 0.12 * threads));
+	}
 	water = mix(water, foam, edge * froth);
 	vec3 morning = mix(vec3(0.42, 0.46, 0.5), vec3(0.96, 0.74, 0.55), threads * 0.6 + edge * 0.4);
 	ALBEDO = mix(water, morning, dawn * 0.6);

@@ -104,7 +104,10 @@ land = group("Land")
 # beyond z = 82; either side of the bay the headlands stand (see MapVael "coast").
 node("Coast", land, "vael", (0, 0, 6), kind="coast", size=76.0, wide=96.0, on_ground=False)
 node("UpperTown", land, "level", (0, 5.0, -58), size="Vector2(196, 72)", blend=6.0)
-node("Quayside", land, "level", (0, 2.2, -5), size="Vector2(176, 22)", blend=1.0)
+# Two graded terraces fill the hollow between the waterfront and the upper town.
+node("LowerTerrace", land, "level", (0, 2.9, -17.9), size="Vector2(174, 4)", blend=2.0)
+node("UpperTerrace", land, "level", (0, 4.1, -21.7), size="Vector2(174, 4)", blend=2.0)
+node("Quayside", land, "level", (0, 2.2, -5), size="Vector2(176, 22)", blend=2.0)
 node("HeadlandWest", land, "hill", (-104, 0, 34), height=11.0, radius=20.0)
 node("HeadlandEast", land, "hill", (104, 0, 28), height=13.0, radius=20.0)
 node("HillNorthWest", land, "hill", (-92, 0, -88), height=7.0, radius=22.0)
@@ -115,6 +118,8 @@ roads = group("Roads")
 road("HarbourStreet", roads, [(0, 2.2, -10), (0, 3.4, -18), (0, 5.0, -27), (0, 5.0, -44)], 5.0, cut=True)
 road("QuayStreet", roads, [(-80, 2.2, -4), (80, 2.2, -4)], 6.0)
 road("MarketRow", roads, [(-86, 5.0, -52), (86, 5.0, -52)], 5.0)
+road("ValleyRoad", roads, [(8, 5.0, -54), (7, 5.0, -68), (12, 5.0, -78),
+                          (15, 5.0, -88), (11, 5.3, -98), (5, 7.4, -120)], 4.8, cut=True, blend=3.0)
 road("ChapelLane", roads, [(-40, 5.0, -52), (-40, 5.0, -84)], 4.0)
 road("HillLane", roads, [(40, 5.0, -52), (40, 5.0, -86)], 4.0)
 road("WestSteps", roads, [(-60, 2.2, -12), (-60, 3.6, -19), (-60, 5.0, -27)], 3.4, cut=True)
@@ -233,6 +238,19 @@ for i in range(18):
 for i in range(10):
     node("Pine", nature, "tree", (-80 + i * 17, 0, -98 + (i % 3) * 2, i * 50), kind="fir", size=7.0 + (i % 2))
 
+# A wooded approach from Mesenlla. Dark pines close the horizon, with room to follow the road.
+for x, z, r in [(-49, -107, 23), (44, -110, 26), (-105, -68, 16), (105, -58, 18)]:
+    node("CoastalRidge", land, "hill", (x, 0, z), height=7.0, radius=float(r))
+for cx, cz in [(-75, -96), (-34, -103), (38, -101), (75, -94), (-98, -21), (98, -30), (-96, 17), (97, 18)]:
+    for dx, dz, height in [(-5, -3, 7.4), (0, -2, 8.8), (6, -6, 6.8), (3, 2, 6.1)]:
+        node("Windbreak", nature, "tree", (cx + dx, 0, cz + dz, cx * 13 + dx * 19), kind="fir", size=height)
+    node("HeadlandStone", nature, "vael", (cx, 0, cz + 4), kind="sea_rocks", size=4.0)
+for x, z, yaw, length in [(8, -85, -15, 6.0), (21, -86, -15, 6.0), (5, -96, 15, 6.0), (18, -96, 15, 6.0)]:
+    node("RoadWall", nature, "vael", (x, 0, z, yaw + 90), kind="drystone", size=length)
+node("OldValleyGate", nature, "vael", (14, 0, -92, 13), kind="arch", size=7.4)
+for x, z in [(8, -76), (21, -89)]:
+    node("RoadLamp", nature, "vael", (x, 0, z), kind="lamp_post")
+
 # --- The flats -----------------------------------------------------------------------------------
 flats = group("Flats")
 wrecks = [((-22, 0, 46, 20), 20.0), ((30, 0, 58, -35), 16.0), ((-48, 0, 68, 70), 12.0)]
@@ -282,7 +300,7 @@ for (x, z, yaw) in [(-60, 2.2, 0), (44, -14.5, 0), (-76, -5, 90)]:
 # Shrines of the Tide.
 for (x, y, z, yaw) in [(-40, 5.0, -60, 90), (40, 5.0, -60, -90), (-79, 2.0, 10, 90), (79, 2.0, 10, -90), (-62, 5.0, -29, 0), (64, 5.0, -29, 0)]:
     node("Shrine", dress, "vael", (x, y, z, yaw), kind="shrine", on_ground=False)
-# On the seabed: a fallen king, the gates of old Vael, a whale, masts of ships, kelp, pools, lights.
+# On the seabed: a fallen king, the gates of old Vael, a whale, masts of ships, kelp and pools.
 node("FallenKing", dress, "vael", (-38, 0, 56, 30), kind="fallen_statue", size=5.0)
 node("SeaGate", dress, "vael", (-62, 0, 40, -30), kind="arch", size=7.0)
 node("BrokenGate", dress, "vael", (14, 0, 64, 20), kind="broken_arch", size=8.0)
@@ -294,12 +312,15 @@ for (x, z, r) in [(-14, 36, 4.0), (24, 24, 3.5), (-52, 58, 4.0), (40, 70, 4.0), 
 for (x, z, r) in [(-62, 16, 2.2), (-26, 22, 2.0), (58, 30, 2.4), (32, 16, 1.8)]:
     node("TidePool", dress, "vael", (x, 0, z), kind="tide_pool", size=r)
 node("DrownedHead", dress, "vael", (-72, 0, 80), kind="statue_head", size=2.2)
-for (x, z, sz) in [(0, 62, 22.0), (-50, 70, 14.0), (40, 56, 14.0), (8, 30, 8.0)]:
-    node("GhostLights", dress, "vael", (x, 0, z), kind="ghost_lights", size=sz)
+# Slabs mark the drowned road from the eastern slipway toward the bell. Keep crossings open.
+for x, z, yaw in [(17, 19, -14), (16, 22, -13), (14, 25, -27), (13, 28, -24), (12, 31, -19),
+                  (13, 35, 18), (15, 38, 23), (16, 41, 12)]:
+    node("DrownedRoad", dress, "vael", (x, 0, z, yaw + 90), kind="paving", size=2.0, wide=2.7)
+for x, z, yaw in [(-70, 21, 62), (65, 56, -24), (-15, 59, 40)]:
+    node("BrokenSeaWall", dress, "vael", (x, 0, z, yaw), kind="drystone", size=5.0)
 # The town lived in: every house with its chimney smoking and a lamp by the door, a bench, and behind
 # it a garden, a washing line or a boat laid up for mending; paved streets; a drystone wall along the
-# brow above the quay; paper lanterns strung over Market Row; and the wet, glowing tracks of things
-# that have come up out of the sea.
+# brow above the quay and paper lanterns strung over Market Row.
 for i, (x, z, w, d, door) in enumerate(houses):
     yaw = (i * 37) % 7 - 3
     a = math.radians(yaw)
@@ -325,9 +346,6 @@ for (a, b) in [(-86, -64), (-56, -6), (6, 58), (66, 86)]:
     node("BrowWall", dress, "vael", ((a + b) * 0.5, 5.0, -23.5), kind="drystone", size=float(b - a))
 for x in (-64, -36, 24, 50, 78):
     node("Lanterns", dress, "vael", (x, 5.0, -52, 90), kind="lantern_string", size=12.0, wide=1.0, on_ground=False)
-for (x, z, yaw, length) in [(-55, 0, 90, 7.0), (-30, -1, 80, 6.0), (30, 0, 100, 6.0), (55, -1, 90, 7.0), (-12, -2, 95, 9.0), (12, -1, 85, 9.0),
-                            (0, -24, 90, 8.0), (-60, -24, 92, 7.0), (2, -46, 70, 6.0), (-52, -52, 10, 8.0)]:
-    node("SeaTrail", dress, "vael", (x, 0, z, yaw), kind="sea_trail", size=length)
 for (x, z, k, sz) in [(-48, -42, "broad", 6.0), (62, -44, "broad", 5.5), (-48, -74, "dead", 5.5), (4, -80, "broad", 6.5), (25, -71, "broad", 6.0), (-82, -74, "dead", 5.0)]:
     node("Tree", dress, "tree", (x, 5.0, z), kind=k, size=sz)
 # The drowned city, far out at sea.
@@ -343,7 +361,7 @@ for (x, y, z) in [(-70, 5.0, -44), (70, 5.0, -44), (-60, 2.2, -2), (60, 2.2, -2)
 places = group("Places")
 for (x, y, z, text) in [(0, 5.0, -52, "Market Square"), (-40, 5.0, -76, "Chapel"), (40, 5.0, -76, "Harbourmaster's House"),
                         (0, 2.2, -4, "The Quay"), (-84, 2.0, 40, "West Mole"), (84, 2.0, 46, "East Mole"), (84, 2.0, 70, "Lighthouse"),
-                        (-22, 0, 46, "Wreck of the Grey Heron"), (8, 0, 30, "Drowned Bell"), (0, 0, 60, "The Flats")]:
+                        (-22, 0, 46, "Wreck of the Grey Heron"), (8, 0, 30, "Drowned Bell"), (0, 0, 60, "Tide Zone"), (15, 5.0, -91, "Valley Road")]:
     spot(places, "place", (x, y, z), text=text)
 
 

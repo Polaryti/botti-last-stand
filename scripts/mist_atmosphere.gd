@@ -1,7 +1,7 @@
 class_name MistAtmosphere
 extends Node3D
 ## Local night atmosphere. Every profile has a fixed particle budget independent of map size.
-enum Place { MISTS, VILLAGE, FORT, MESENLLA, VAEL }
+enum Place { MISTS, VILLAGE, FORT, MESENLLA, VAEL, VAEL_COAST }
 var place := Place.MISTS
 var world: World
 var _follow := 0.0
@@ -11,7 +11,7 @@ var _motes: CPUParticles3D
 func _ready() -> void:
 	_wisps = CPUParticles3D.new()
 	_wisps.name = "GroundWisps"
-	_wisps.amount = (8 if Game.quality == 0 else 18) if place in [Place.MISTS, Place.MESENLLA, Place.VAEL] else (5 if Game.quality == 0 else 10)
+	_wisps.amount = (8 if Game.quality == 0 else 18) if place in [Place.MISTS, Place.MESENLLA, Place.VAEL, Place.VAEL_COAST] else (5 if Game.quality == 0 else 10)
 	_wisps.lifetime = 7.0
 	_wisps.preprocess = 1.0
 	_wisps.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
@@ -32,6 +32,13 @@ func _ready() -> void:
 	if place == Place.MESENLLA:
 		material.set_shader_parameter("tint", Vector3(0.62, 0.5, 0.78))
 		material.set_shader_parameter("opacity", 0.16)
+	elif place == Place.VAEL_COAST:
+		quad.size = Vector2(13.0, 1.7)
+		_wisps.direction = Vector3(-0.55, 0.0, -1.0).normalized()
+		_wisps.initial_velocity_min = 0.85
+		_wisps.initial_velocity_max = 1.45
+		material.set_shader_parameter("tint", Vector3(0.54, 0.74, 0.77))
+		material.set_shader_parameter("opacity", 0.20)
 	elif place == Place.VAEL:
 		material.set_shader_parameter("tint", Vector3(0.48, 0.66, 0.64)) # sea-mist off the water
 		material.set_shader_parameter("opacity", 0.15)
@@ -47,6 +54,8 @@ func _ready() -> void:
 	_wisps.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_wisps.emitting = false
 	add_child(_wisps)
+	if place == Place.VAEL_COAST:
+		return
 	_motes = CPUParticles3D.new()
 	_motes.amount = (10 if Game.quality == 0 else 22) if place == Place.MESENLLA else (6 if Game.quality == 0 else 12)
 	_motes.color_ramp = fade
@@ -83,4 +92,5 @@ func _process(delta: float) -> void:
 			if room.has_point(Vector2(at.x, at.z)): outside = false
 		var night := world.director == null or world.director.dawn_amount() < 0.8
 		_wisps.emitting = outside and night
-		_motes.emitting = outside and night
+		if _motes != null:
+			_motes.emitting = outside and night

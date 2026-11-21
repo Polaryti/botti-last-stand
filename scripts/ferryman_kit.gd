@@ -13,7 +13,7 @@ const CROSS_DAMAGE := 15.0
 const CROSS_SLOW := 2.0
 const CROSS_HEAL := 15.0
 const CROSS_SHOVE := 6.0
-const TOLL_BELL := 0.5 # Toll Bell: stuns what the skiff shoves aside
+const TOLL_BELL := 0.5
 const DUE_HEAL := 4.0 # Ferryman's Due: health from each kill
 # Tollkeeper
 const TOLL_REACH := 7.0
@@ -39,6 +39,7 @@ const SAFE_TIME := 2.0
 const SECOND_TRIP := 4.0
 # Psychopomp
 const SOUL_REACH := 8.0
+const SOUL_CAST_REACH := 16.0
 const SOULS := 6
 const SOUL_DAMAGE := 20.0
 const SOUL_HEAL := 12.0
@@ -174,7 +175,7 @@ static func on_cross_end(p: Player, from: Vector3, to: Vector3) -> void:
 # --- Tollkeeper ------------------------------------------------------------------------------
 
 static func toll_reach(p: Player) -> float:
-	return TOLL_REACH + (TOLL_WIDE if p.has_flag("toll_round") else 0.0)
+	return TOLL_REACH + p.m("ferry_cast_reach") + (TOLL_WIDE if p.has_flag("toll_round") else 0.0)
 
 
 static func debt_time(p: Player) -> float:
@@ -194,6 +195,8 @@ static func demand_the_toll(p: Player) -> void:
 		if not round and to.dot(ahead) < limit:
 			continue
 		z.mark(DEBT, debt_time(p))
+		if p.has_flag("cross_stun"):
+			z.stun(TOLL_BELL)
 		if p.has_flag("interest"):
 			z.add_dot(INTEREST, debt_time(p))
 		if p.has_flag("debt_reveal"):
@@ -249,7 +252,7 @@ static func guide_the_souls(p: Player) -> void:
 		p.art_cd_left = 0.5
 		return
 	var foes: Array[Node3D] = []
-	for z: Zombie in p.world.zombies_near(p.global_position, 16.0, 20):
+	for z: Zombie in p.world.zombies_near(p.global_position, SOUL_CAST_REACH + p.m("ferry_cast_reach"), 20):
 		if z.is_alive():
 			foes.append(z)
 	foes.sort_custom(func(a: Node3D, b: Node3D) -> bool: return a.global_position.distance_to(p.global_position) < b.global_position.distance_to(p.global_position))
@@ -280,6 +283,8 @@ static func soul_lands(p: Player, target: Node3D, heals: bool) -> void:
 		return
 	var was := p.world.begin_act(p)
 	p.world.damage_zombie(z, p.modify_damage(z, SOUL_DAMAGE * (1.0 + p.m("soul_damage")) * p.damage_multiplier()), Vector3.ZERO, 0.0, z.centre(), false)
+	if p.has_flag("cross_stun") and z.is_alive():
+		z.stun(TOLL_BELL)
 	p.world.end_act(was)
 
 

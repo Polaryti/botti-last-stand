@@ -3,7 +3,7 @@
 ## Development — The Sunken Crown
 
 ### Port Vael, a new map
-Through a new portal from the heart of the Mists: the drowned harbour of the kingdom of Vael. For Survive the Night, Co-op, All vs All and Teams.
+Follow the road down from the Valleys of Mesenlla to the drowned harbour of Vael. Available in Survive the Night, Co-op, All vs All and Teams.
 - **The Mist Tide** turns every 90 s. The night begins at low tide, and the water takes 12 s to come in or go out. The harbour bells ring 10 s before each turn.
 - **Low tide:** the seabed is bare. Each wreck, and the drowned bell tower, keeps a sea chest you can open once every low tide: doubloons, and a coast weapon, ship's biscuit or a potion.
 - **High tide:** the flats flood. Wading slows you, down to 60% chest-deep; the sea-mist half blinds you in the water; the fog thickens over the whole harbour; and the Drowned are a quarter quicker.
@@ -39,10 +39,10 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 ### The coast of Vael, dressed
 - **The Drowned climb out of the flats** by the stairs and slipways, at any tide, and no longer stick at the foot of the quay or the breakwaters. Two broad slipways now lead up from the flats either side of Harbour Street.
 - **The Lantern Barge keeps to its channel** of deep water the whole way to the Isle of Lamps.
-- **Port Vael:** the Tide King's statue over the harbour, braziers, banners, bunting and lantern strings, cargo and drying fish on the quay, smoking chimneys, gardens and washing lines in the town, paved streets, and the wet, glowing tracks of the Drowned. On the flats: a fallen king, the old sea gates, a whale's bones, sunk masts with corpse-lights, kelp beds and tide pools that glow.
-- **The Lantern Road:** pilgrim arches over the road, shrines, sunk gates, masts, kelp and ghost-lights along the way.
-- **The drowned city:** its spires stand far out at sea round both maps, green light in their windows, under an aurora.
-- Salt-burnt grass, and wisps and sea-glow drifting round you.
+- **Port Vael** has a coastal aurora, sea mist blowing inland, and dark spires on the horizon. Pines and an old stone gate mark the road to Mesenlla.
+- **The Quay and Market Square** are linked by graded terraces. The lighthouse now blocks passage through its base.
+- **The Tide Zone** has breaking foam as the water rises and falls. At low tide, follow the exposed stone track from the eastern slipway toward the Drowned Bell.
+- **The Lantern Road** keeps its pilgrim arches, shrines and ghost lights.
 
 ### The Sunken Crown title screen
 - **A new app icon:** the bell, crowned, under the aurora of Vael.
@@ -72,34 +72,32 @@ A new Map Upgrade for the Valleys of Mesenlla. It stacks up to Level 4 with each
 ### A new class: the Ferryman
 Earned by surviving 3 nights in Port Vael. 120 health; starts with the Ferryman's Oar.
 - **Crossing:** a ghostly skiff carries you 9 m ahead, through enemies: they are struck, shoved aside and slowed, and friends it passes are healed 15.
-- **Tollkeeper:** Demand the Toll puts enemies in front in debt for 8 s (25% more damage). Each that dies in debt pays an obol: heal 10, and 5% harder blows per obol, up to 5. At level 10, Debt Collector ends debtors below 20% health.
-- **Boatman:** the skiff carries friends with you and knocks down what it passes; Black Water, Oarlock, Safe Passage. At level 10, The Last Ferry: cross again at once.
-- **Psychopomp:** the souls of enemies dying near you circle you, up to 6. Guide the Souls sends them out for 20 damage each. At level 10, Gate of the Dead brings you back once a minute.
+- **Tollkeeper:** Demand the Toll puts enemies in front in debt for 9 s (25% more damage). Each that dies in debt pays an obol: heal 10, and 5% harder blows per obol, up to 5. At level 10, Debt Collector ends debtors below 20% health.
+- **Boatman:** the skiff carries friends, hits across a wider path and knocks down enemies; Black Water, Oarlock, Safe Passage. At level 10, The Last Ferry: cross again at once.
+- **Psychopomp:** the souls of enemies dying near you circle you, up to 6. Guide the Souls sends them after enemies up to 18 m away for 20 damage each. At level 10, Gate of the Dead brings you back once a minute.
+
+- **Far Shore** and **Toll Bell** now work with every Ferryman profession. The Ferryman wears a caged lantern and crosses in a rebuilt skiff.
 
 ### A new class: the Tidecaller
 Earned by winning Last Light 3 times. 95 health; spends tide, which its own Trident draws (5 with every blow that lands) and which slowly rises by itself.
 - **Call the Tide:** a wave rolls 14 m ahead, throwing back and slowing what it strikes.
-- **Wavebreaker:** Breaking Wave, 2 m wider and 50% harder. Riptide, Breakers, Salt Spray, Drowning. At level 10, every third wave is a Tsunami.
-- **Deepsinger:** Deep Song: for 6 s enemies within 9 m are drawn toward you and slowed, and friends in it heal 4 a second. At level 10, Requiem of the Deep.
-- **Fogbinder:** Bind the Fog: everything within 4.5 m of a point ahead is blinded for 4 s and slowed. At level 10, Mistbound Sea keeps the fog there.
-- The Tidecaller's Trident: long thrusts through up to two in a line.
-
-### A new class: the Harpooner
-Earned by being in the match when the Harbourmaster of Port Vael falls. 115 health; starts with a Whaler's Harpoon, which comes back to hand by itself after 4 s, and a Boarding Hook.
-- **Haul:** a hook on a line at the enemy you look at, up to 18 m: it is dragged to you, struck and stunned. Anything too big to move pulls you to it instead.
-- **Reaver:** Blood in the Water on a second button: for 6 s every blow heals 3 and you move 15% faster. What a Reaver hauls takes 30% more damage. At level 10, Red Tide: kills in Blood in the Water haul the next enemy in.
-- **Rigger:** Rig a Line: a rope staked across the ground for 12 s, up to 2 at once. Enemies that cross it are stunned and slowed. At level 10, Cat's Cradle ties new lines to the old.
-- **Leviathan Hunter:** Great Harpoon: an iron through everything in its way for 90 damage, pinning each. Harpoons mark what they strike: 20% more damage from everyone. At level 10, Leviathan's Bane.
-- The Armory shows both starting weapons for classes that start with two.
+- **Wavebreaker:** Breaking Wave travels 2 m farther, is 2 m wider and hits 50% harder. Riptide, Breakers, Salt Spray, Drowning. At level 10, every third wave is a Tsunami.
+- **Deepsinger:** Deep Song: for 6 s enemies within 9 m are drawn toward you and slowed, and allies in it heal 5 a second. At level 10, Requiem of the Deep.
+- **Fogbinder:** Bind the Fog: everything within 4.5 m of a point up to 11 m ahead is blinded for 4 s and slowed. At level 10, Mistbound Sea keeps the fog there.
+- The Tidecaller wears shell armour and sea glass. Breaking waves, Deep Song and Bind the Fog have updated effects.
+- The Tidecaller's Trident thrusts through up to two enemies in a line.
 
 ### New weapons of the coast
 Found on Port Vael, and later on the Lantern Road.
 - **Cutlass:** each kill quickens your swings by 15%, up to three times, fading 3 s after the last kill.
 - **Boarding Hook:** drags what it catches 1.6 m towards you and staggers it. Anything too big to drag is only staggered.
 - **Whaler's Harpoon:** pins what it strikes for 2 s, then lies where it lands. Walk over it to take it back, or it returns by itself after 15 s.
-- **Flare Pistol:** a flare sets alight everything within 3 m where it lands, then burns for 8 s, showing every enemy within 7 m, hidden and invisible ones too. 6 flares a pistol, up to 12.
-- **Ship's Anchor:** a slow two-handed slam that shakes the ground: everything within 4.5 m takes half the blow and staggers. You walk at 90% speed carrying it.
+- **Flare Pistol:** a flare sets alight everything within 3 m where it lands, then burns for 8 s, showing every enemy within 7 m, hidden and invisible ones too. A flare lodged in an enemy falls to the ground when it dies. 6 flares a pistol, up to 12.
+- **Ship's Anchor:** a slow two-handed slam that shakes the ground at the point of impact. Everything within 4.5 m takes half the blow and staggers. You walk at 90% speed carrying it.
 - **Ferryman's Oar:** a wide two-handed sweep through up to eight, shoving them far back and slowing them for 1 s.
+
+### Mist Bastion
+- Eagles and Mist Eagles fly toward the fortress when they have no player in sight.
 
 ## Development — Fixes and polish after Beyond the Mists
 

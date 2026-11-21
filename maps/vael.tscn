@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_root.gd" id="root"]
 [ext_resource type="Script" path="res://scripts/map/map_level.gd" id="level"]
@@ -34,26 +34,33 @@ point_count = 2
 
 [sub_resource type="Curve3D" id="Curve_4"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -40, 5.0, -52, 0, 0, 0, 0, 0, 0, -40, 5.0, -84),
-"tilts": PackedFloat32Array(0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 8, 5.0, -54, 0, 0, 0, 0, 0, 0, 7, 5.0, -68, 0, 0, 0, 0, 0, 0, 12, 5.0, -78, 0, 0, 0, 0, 0, 0, 15, 5.0, -88, 0, 0, 0, 0, 0, 0, 11, 5.3, -98, 0, 0, 0, 0, 0, 0, 5, 7.4, -120),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0)
 }
-point_count = 2
+point_count = 6
 
 [sub_resource type="Curve3D" id="Curve_5"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 40, 5.0, -52, 0, 0, 0, 0, 0, 0, 40, 5.0, -86),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -40, 5.0, -52, 0, 0, 0, 0, 0, 0, -40, 5.0, -84),
 "tilts": PackedFloat32Array(0, 0)
 }
 point_count = 2
 
 [sub_resource type="Curve3D" id="Curve_6"]
 _data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 40, 5.0, -52, 0, 0, 0, 0, 0, 0, 40, 5.0, -86),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve_7"]
+_data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, -60, 2.2, -12, 0, 0, 0, 0, 0, 0, -60, 3.6, -19, 0, 0, 0, 0, 0, 0, -60, 5.0, -27),
 "tilts": PackedFloat32Array(0, 0, 0)
 }
 point_count = 3
 
-[sub_resource type="Curve3D" id="Curve_7"]
+[sub_resource type="Curve3D" id="Curve_8"]
 _data = {
 "points": PackedVector3Array(0, 0, 0, 0, 0, 0, 62, 2.2, -12, 0, 0, 0, 0, 0, 0, 62, 3.6, -19, 0, 0, 0, 0, 0, 0, 62, 5.0, -27),
 "tilts": PackedFloat32Array(0, 0, 0)
@@ -86,11 +93,23 @@ script = ExtResource("level")
 size = Vector2(196, 72)
 blend = 6.0
 
+[node name="LowerTerrace" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.9, -17.9)
+script = ExtResource("level")
+size = Vector2(174, 4)
+blend = 2.0
+
+[node name="UpperTerrace" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4.1, -21.7)
+script = ExtResource("level")
+size = Vector2(174, 4)
+blend = 2.0
+
 [node name="Quayside" type="Node3D" parent="Land"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, -5)
 script = ExtResource("level")
 size = Vector2(176, 22)
-blend = 1.0
+blend = 2.0
 
 [node name="HeadlandWest" type="Node3D" parent="Land"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -104, 0, 34)
@@ -134,25 +153,32 @@ script = ExtResource("road")
 curve = SubResource("Curve_3")
 width = 5.0
 
-[node name="ChapelLane" type="Path3D" parent="Roads"]
+[node name="ValleyRoad" type="Path3D" parent="Roads"]
 script = ExtResource("road")
 curve = SubResource("Curve_4")
-width = 4.0
+width = 4.8
+cut = true
+cut_blend = 3.0
 
-[node name="HillLane" type="Path3D" parent="Roads"]
+[node name="ChapelLane" type="Path3D" parent="Roads"]
 script = ExtResource("road")
 curve = SubResource("Curve_5")
 width = 4.0
 
-[node name="WestSteps" type="Path3D" parent="Roads"]
+[node name="HillLane" type="Path3D" parent="Roads"]
 script = ExtResource("road")
 curve = SubResource("Curve_6")
+width = 4.0
+
+[node name="WestSteps" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_7")
 width = 3.4
 cut = true
 
 [node name="EastSteps" type="Path3D" parent="Roads"]
 script = ExtResource("road")
-curve = SubResource("Curve_7")
+curve = SubResource("Curve_8")
 width = 3.4
 cut = true
 
@@ -1630,6 +1656,310 @@ script = ExtResource("tree")
 kind = "fir"
 size = 8.0
 
+[node name="CoastalRidge" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49, 0, -107)
+script = ExtResource("hill")
+height = 7.0
+radius = 23.0
+
+[node name="CoastalRidge2" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 0, -110)
+script = ExtResource("hill")
+height = 7.0
+radius = 26.0
+
+[node name="CoastalRidge3" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -105, 0, -68)
+script = ExtResource("hill")
+height = 7.0
+radius = 16.0
+
+[node name="CoastalRidge4" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 105, 0, -58)
+script = ExtResource("hill")
+height = 7.0
+radius = 18.0
+
+[node name="Windbreak" type="Node3D" parent="Nature"]
+transform = Transform3D(0.98481, 0, -0.17365, 0, 1, 0, 0.17365, 0, 0.98481, -80, 0, -99)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak2" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, -0.25882, -75, 0, -98)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak3" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.77715, 0, 0.62932, 0, 1, 0, -0.62932, 0, -0.77715, -69, 0, -102)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak4" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.95106, 0, -0.30902, 0, 1, 0, 0.30902, 0, -0.95106, -72, 0, -94)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -75, 0, -92)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="Windbreak5" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.99863, 0, 0.05234, 0, 1, 0, -0.05234, 0, -0.99863, -39, 0, -106)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak6" type="Node3D" parent="Nature"]
+transform = Transform3D(0.13917, 0, 0.99027, 0, 1, 0, -0.99027, 0, 0.13917, -34, 0, -105)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak7" type="Node3D" parent="Nature"]
+transform = Transform3D(0.84805, 0, -0.52992, 0, 1, 0, 0.52992, 0, 0.84805, -28, 0, -109)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak8" type="Node3D" parent="Nature"]
+transform = Transform3D(0.90631, 0, 0.42262, 0, 1, 0, -0.42262, 0, 0.90631, -31, 0, -101)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone2" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0, -99)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="Windbreak9" type="Node3D" parent="Nature"]
+transform = Transform3D(0.77715, 0, -0.62932, 0, 1, 0, 0.62932, 0, 0.77715, 33, 0, -104)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak10" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.69466, 0, -0.71934, 0, 1, 0, 0.71934, 0, -0.69466, 38, 0, -103)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak11" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.37461, 0, 0.92718, 0, 1, 0, -0.92718, 0, -0.37461, 44, 0, -107)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak12" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.98163, 0, 0.19081, 0, 1, 0, -0.19081, 0, -0.98163, 41, 0, -99)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone3" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 38, 0, -97)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="Windbreak13" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 70, 0, -97)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak14" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.25882, 0, 0.96593, 0, 1, 0, -0.96593, 0, -0.25882, 75, 0, -96)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak15" type="Node3D" parent="Nature"]
+transform = Transform3D(0.98769, 0, -0.15643, 0, 1, 0, 0.15643, 0, 0.98769, 81, 0, -100)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak16" type="Node3D" parent="Nature"]
+transform = Transform3D(0.66913, 0, 0.74314, 0, 1, 0, -0.74314, 0, 0.66913, 78, 0, -92)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone4" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 75, 0, -90)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="Windbreak17" type="Node3D" parent="Nature"]
+transform = Transform3D(0.32557, 0, -0.94552, 0, 1, 0, 0.94552, 0, 0.32557, -103, 0, -24)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak18" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.9703, 0, -0.24192, 0, 1, 0, 0.24192, 0, -0.9703, -98, 0, -23)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak19" type="Node3D" parent="Nature"]
+transform = Transform3D(0.17365, 0, 0.98481, 0, 1, 0, -0.98481, 0, 0.17365, -92, 0, -27)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak20" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.73135, 0, 0.682, 0, 1, 0, -0.682, 0, -0.73135, -95, 0, -19)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone5" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -98, 0, -17)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="Windbreak21" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.15643, 0, -0.98769, 0, 1, 0, 0.98769, 0, -0.15643, 93, 0, -33)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak22" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.9703, 0, 0.24192, 0, 1, 0, -0.24192, 0, -0.9703, 98, 0, -32)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak23" type="Node3D" parent="Nature"]
+transform = Transform3D(0.61566, 0, 0.78801, 0, 1, 0, -0.78801, 0, 0.61566, 104, 0, -36)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak24" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.32557, 0, 0.94552, 0, 1, 0, -0.94552, 0, -0.32557, 101, 0, -28)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone6" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 98, 0, -26)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="Windbreak25" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.12187, 0, -0.99255, 0, 1, 0, 0.99255, 0, -0.12187, -101, 0, 14)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak26" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.97815, 0, 0.20791, 0, 1, 0, -0.20791, 0, -0.97815, -96, 0, 15)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak27" type="Node3D" parent="Nature"]
+transform = Transform3D(0.58779, 0, 0.80902, 0, 1, 0, -0.80902, 0, 0.58779, -90, 0, 11)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak28" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.35837, 0, 0.93358, 0, 1, 0, -0.93358, 0, -0.35837, -93, 0, 19)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone7" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, 0, 21)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="Windbreak29" type="Node3D" parent="Nature"]
+transform = Transform3D(0.06976, 0, -0.99756, 0, 1, 0, 0.99756, 0, 0.06976, 92, 0, 15)
+script = ExtResource("tree")
+kind = "fir"
+size = 7.4
+
+[node name="Windbreak30" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.99985, 0, 0.01745, 0, 1, 0, -0.01745, 0, -0.99985, 97, 0, 16)
+script = ExtResource("tree")
+kind = "fir"
+size = 8.8
+
+[node name="Windbreak31" type="Node3D" parent="Nature"]
+transform = Transform3D(0.42262, 0, 0.90631, 0, 1, 0, -0.90631, 0, 0.42262, 103, 0, 12)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.8
+
+[node name="Windbreak32" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.52992, 0, 0.84805, 0, 1, 0, -0.84805, 0, -0.52992, 100, 0, 20)
+script = ExtResource("tree")
+kind = "fir"
+size = 6.1
+
+[node name="HeadlandStone8" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 97, 0, 22)
+script = ExtResource("vael")
+kind = "sea_rocks"
+size = 4.0
+
+[node name="RoadWall" type="Node3D" parent="Nature"]
+transform = Transform3D(0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, 0.25882, 8, 0, -85)
+script = ExtResource("vael")
+kind = "drystone"
+size = 6.0
+
+[node name="RoadWall2" type="Node3D" parent="Nature"]
+transform = Transform3D(0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, 0.25882, 21, 0, -86)
+script = ExtResource("vael")
+kind = "drystone"
+size = 6.0
+
+[node name="RoadWall3" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, -0.25882, 5, 0, -96)
+script = ExtResource("vael")
+kind = "drystone"
+size = 6.0
+
+[node name="RoadWall4" type="Node3D" parent="Nature"]
+transform = Transform3D(-0.25882, 0, -0.96593, 0, 1, 0, 0.96593, 0, -0.25882, 18, 0, -96)
+script = ExtResource("vael")
+kind = "drystone"
+size = 6.0
+
+[node name="OldValleyGate" type="Node3D" parent="Nature"]
+transform = Transform3D(0.97437, 0, -0.22495, 0, 1, 0, 0.22495, 0, 0.97437, 14, 0, -92)
+script = ExtResource("vael")
+kind = "arch"
+size = 7.4
+
+[node name="RoadLamp" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -76)
+script = ExtResource("vael")
+kind = "lamp_post"
+
+[node name="RoadLamp2" type="Node3D" parent="Nature"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 0, -89)
+script = ExtResource("vael")
+kind = "lamp_post"
+
 [node name="Flats" type="Node3D" parent="."]
 
 [node name="Wreck" type="Node3D" parent="Flats"]
@@ -2249,29 +2579,79 @@ script = ExtResource("vael")
 kind = "statue_head"
 size = 2.2
 
-[node name="GhostLights" type="Node3D" parent="Dressing"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 62)
+[node name="DrownedRoad" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.24192, 0, -0.9703, 0, 1, 0, 0.9703, 0, 0.24192, 17, 0, 19)
 script = ExtResource("vael")
-kind = "ghost_lights"
-size = 22.0
+kind = "paving"
+size = 2.0
+wide = 2.7
 
-[node name="GhostLights2" type="Node3D" parent="Dressing"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 0, 70)
+[node name="DrownedRoad2" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.22495, 0, -0.97437, 0, 1, 0, 0.97437, 0, 0.22495, 16, 0, 22)
 script = ExtResource("vael")
-kind = "ghost_lights"
-size = 14.0
+kind = "paving"
+size = 2.0
+wide = 2.7
 
-[node name="GhostLights3" type="Node3D" parent="Dressing"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 56)
+[node name="DrownedRoad3" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.45399, 0, -0.89101, 0, 1, 0, 0.89101, 0, 0.45399, 14, 0, 25)
 script = ExtResource("vael")
-kind = "ghost_lights"
-size = 14.0
+kind = "paving"
+size = 2.0
+wide = 2.7
 
-[node name="GhostLights4" type="Node3D" parent="Dressing"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 30)
+[node name="DrownedRoad4" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.40674, 0, -0.91355, 0, 1, 0, 0.91355, 0, 0.40674, 13, 0, 28)
 script = ExtResource("vael")
-kind = "ghost_lights"
-size = 8.0
+kind = "paving"
+size = 2.0
+wide = 2.7
+
+[node name="DrownedRoad5" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.32557, 0, -0.94552, 0, 1, 0, 0.94552, 0, 0.32557, 12, 0, 31)
+script = ExtResource("vael")
+kind = "paving"
+size = 2.0
+wide = 2.7
+
+[node name="DrownedRoad6" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.30902, 0, -0.95106, 0, 1, 0, 0.95106, 0, -0.30902, 13, 0, 35)
+script = ExtResource("vael")
+kind = "paving"
+size = 2.0
+wide = 2.7
+
+[node name="DrownedRoad7" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.39073, 0, -0.9205, 0, 1, 0, 0.9205, 0, -0.39073, 15, 0, 38)
+script = ExtResource("vael")
+kind = "paving"
+size = 2.0
+wide = 2.7
+
+[node name="DrownedRoad8" type="Node3D" parent="Dressing"]
+transform = Transform3D(-0.20791, 0, -0.97815, 0, 1, 0, 0.97815, 0, -0.20791, 16, 0, 41)
+script = ExtResource("vael")
+kind = "paving"
+size = 2.0
+wide = 2.7
+
+[node name="BrokenSeaWall" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.46947, 0, -0.88295, 0, 1, 0, 0.88295, 0, 0.46947, -70, 0, 21)
+script = ExtResource("vael")
+kind = "drystone"
+size = 5.0
+
+[node name="BrokenSeaWall2" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.91355, 0, 0.40674, 0, 1, 0, -0.40674, 0, 0.91355, 65, 0, 56)
+script = ExtResource("vael")
+kind = "drystone"
+size = 5.0
+
+[node name="BrokenSeaWall3" type="Node3D" parent="Dressing"]
+transform = Transform3D(0.76604, 0, -0.64279, 0, 1, 0, 0.64279, 0, 0.76604, -15, 0, 59)
+script = ExtResource("vael")
+kind = "drystone"
+size = 5.0
 
 [node name="Chimney" type="Node3D" parent="Dressing"]
 transform = Transform3D(0.99863, 0, 0.05234, 0, 1, 0, -0.05234, 0, 0.99863, -76.6963, 5, -36.14131)
@@ -2887,66 +3267,6 @@ size = 12.0
 wide = 1.0
 on_ground = false
 
-[node name="SeaTrail" type="Node3D" parent="Dressing"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -55, 0, 0)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 7.0
-
-[node name="SeaTrail2" type="Node3D" parent="Dressing"]
-transform = Transform3D(0.17365, 0, -0.98481, 0, 1, 0, 0.98481, 0, 0.17365, -30, 0, -1)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 6.0
-
-[node name="SeaTrail3" type="Node3D" parent="Dressing"]
-transform = Transform3D(-0.17365, 0, -0.98481, 0, 1, 0, 0.98481, 0, -0.17365, 30, 0, 0)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 6.0
-
-[node name="SeaTrail4" type="Node3D" parent="Dressing"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 55, 0, -1)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 7.0
-
-[node name="SeaTrail5" type="Node3D" parent="Dressing"]
-transform = Transform3D(-0.08716, 0, -0.99619, 0, 1, 0, 0.99619, 0, -0.08716, -12, 0, -2)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 9.0
-
-[node name="SeaTrail6" type="Node3D" parent="Dressing"]
-transform = Transform3D(0.08716, 0, -0.99619, 0, 1, 0, 0.99619, 0, 0.08716, 12, 0, -1)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 9.0
-
-[node name="SeaTrail7" type="Node3D" parent="Dressing"]
-transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 0, 0, -24)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 8.0
-
-[node name="SeaTrail8" type="Node3D" parent="Dressing"]
-transform = Transform3D(-0.0349, 0, -0.99939, 0, 1, 0, 0.99939, 0, -0.0349, -60, 0, -24)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 7.0
-
-[node name="SeaTrail9" type="Node3D" parent="Dressing"]
-transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, 2, 0, -46)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 6.0
-
-[node name="SeaTrail10" type="Node3D" parent="Dressing"]
-transform = Transform3D(0.98481, 0, -0.17365, 0, 1, 0, 0.17365, 0, 0.98481, -52, 0, -52)
-script = ExtResource("vael")
-kind = "sea_trail"
-size = 8.0
-
 [node name="Tree6" type="Node3D" parent="Dressing"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 5, -42)
 script = ExtResource("tree")
@@ -3120,4 +3440,10 @@ text = "Drowned Bell"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 60)
 script = ExtResource("spot")
 kind = "place"
-text = "The Flats"
+text = "Tide Zone"
+
+[node name="Place11" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 5, -91)
+script = ExtResource("spot")
+kind = "place"
+text = "Valley Road"

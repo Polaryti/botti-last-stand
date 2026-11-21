@@ -654,7 +654,9 @@ func _beyond_weapons() -> void:
 	codex.add_child(codex._list)
 	codex._classes()
 	var codex_tags := codex._list.find_children("WeaponTags", "HFlowContainer", true, false)
-	check(codex_tags.size() == ClassDefs.ALL.size(), "every class in the Codex has weapon tags")
+	var listed := ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id))
+	check(codex_tags.size() == listed.size(), "every enabled class in the Codex has weapon tags")
+	check(not codex._list.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == "Harpooner"), "the disabled Harpooner is absent from the Codex")
 	codex._list.queue_free()
 	codex._list = VBoxContainer.new()
 	codex.add_child(codex._list)
@@ -1666,6 +1668,21 @@ func _requests_1116() -> void:
 		q.collision_mask = Terrain.BARRIER
 		q.transform = Transform3D(Basis(), Vector3(spot.x, bw.ground_at(Vector3(spot.x, 0, spot.y)) + 1.0, spot.y))
 		check(bw.get_world_3d().direct_space_state.intersect_shape(q, 4).is_empty() and bw.terrain.is_walkable(spot.x, spot.y), "no unseen wall in the dry hollow at %s" % spot)
+	# Both flyers leave their spawn when there is no player in their sight.
+	for kind: String in ["eagle", "mist_eagle"]:
+		var launch := bw.fort.heart_at + Vector3(0, 8, -55)
+		if not bw.spawn_zombie(kind, launch):
+			check(false, "%s spawns outside Mist Bastion" % kind)
+			continue
+		var bird: Zombie = bw.zombies.back()
+		bird._sees = false
+		bird._clear = false
+		var before := Vector2(bird.position.x - bw.fort.heart_at.x, bird.position.z - bw.fort.heart_at.z).length()
+		for i in 120:
+			bird._fly(pl, Vector3.ZERO, before, 1.0 / 60.0)
+		var after := Vector2(bird.position.x - bw.fort.heart_at.x, bird.position.z - bw.fort.heart_at.z).length()
+		check(before - after > 8.0, "%s approaches Mist Bastion while it has no target in sight" % kind)
+		bird.release()
 	# Freezing a Child of the Woods turns all of it to ice, its leaves and bark too; thawed, all comes back.
 	var at := bw.fort.heart_at + Vector3(0, 0, 8)
 	bw.spawn_zombie("child_of_woods", at)
@@ -1741,7 +1758,7 @@ func _port_vael() -> void:
 	# Everywhere a place is listed, Port Vael is.
 	check(Game.MAPS.has("vael") and "vael" in Game.VERSUS_MAPS and "vael" in Board.MAPS, "Port Vael can be chosen for the night and for versus, and has its boards")
 	check(Places.ORDER.has("vael") and Places.ALL["vael"]["tips"].size() == 3 and str(Places.ALL["vael"]["lore"]).length() > 80, "it has its page, its lore and its tips")
-	check(WorldAtlas.SPOTS.has("vael") and WorldAtlas.LINKS.any(func(l: Array) -> bool: return l[1] == "vael"), "it is on the world atlas, through a portal")
+	check(WorldAtlas.SPOTS.has("vael") and WorldAtlas.LINKS.has(["mesenlla", "vael", false]), "the atlas road from Mesenlla leads to Port Vael")
 	check(PlaceVista.LOOKS.has("vael") and Icons.exists("map_vael"), "its loading view and its icon")
 	check(Sfx.MUSIC_SETS.has("vael") and (Sfx.MUSIC_SETS["vael"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
 	check(Director.DAWN_SOUNDS.get("vael", "") == "dawn_vael" and Sfx.NAMES.has("dawn_vael"), "and its own sound at dawn")
@@ -1771,6 +1788,14 @@ func _port_vael() -> void:
 	you.set_physics_process(false)
 	check(vael.map_id == "vael" and vael.tide != null, "Port Vael loads, with its tide")
 	var t := vael.terrain
+	await get_tree().physics_frame
+	var lighthouse_hit := vael.get_world_3d().direct_space_state.intersect_ray(
+		PhysicsRayQueryParameters3D.create(Vector3(84, 2.7, 63), Vector3(84, 2.7, 70), 1))
+	check(not lighthouse_hit.is_empty() and (lighthouse_hit["position"] as Vector3).z < 67.0, "the lighthouse plinth stops characters on approach")
+	var road_end := Vector3(14, 0, -89)
+	var road_route := vael.grid.route(Vector3(0, 0, -53), road_end)
+	check(road_route.size() > 1 and Vector2(road_route[-1].x - road_end.x, road_route[-1].z - road_end.z).length() < 2.5, "the market is linked to Valley Road")
+	check(t.height(40, -18) > 2.4 and t.height(40, -22) > 3.7, "the town terraces grade up from the Quay without a moat")
 	check(absf(t.height(0, -5) - 2.2) < 0.15 and t.height(0, -55) > 4.5, "the quay and the town above it")
 	check(t.height(0, 40) < MistTide.HIGH_Y - 0.3 and t.height(0, 40) > MistTide.LOW_Y + 0.2, "the flats between low and high water")
 	check(t.deep_water(0, 104) and not t.is_walkable(0, 104) and t.is_walkable(0, 40), "the open sea beyond them is no place to walk")
@@ -2483,6 +2508,21 @@ func _vael_weapons() -> void:
 		for i in 40:
 			await get_tree().process_frame
 		check(far_one.position.distance_to(f.global_position) < Flare.REVEAL_RADIUS and far_one.revealed_left > 0.0, "and showing what stands in its light")
+		f.queue_free()
+	# Test a direct body hit separately from the ballistic shot that checks burning and reveal.
+	var lodged_shot := w.spawn_player_arrow(p, near.centre() + Vector3.BACK, Vector3.FORWARD * 24.0, 0.0, 12.0, 0.0, 1.0)
+	lodged_shot._hit_zombie(near, near.centre())
+	var lodged := w.get_children().back() as Flare
+	check(lodged != null and lodged._target == near, "a direct flare hit lodges in the enemy")
+	if lodged:
+		var hit_at := lodged.global_position
+		near.position.x += 1.0
+		lodged._process(0.01)
+		check(is_equal_approx(lodged.global_position.x, hit_at.x + 1.0), "a lodged flare follows its living target")
+		near.take_damage(10000.0, Vector3.ZERO, 0.0, near.centre())
+		lodged._process(0.01)
+		check(lodged._target == null and absf(lodged.global_position.y - w.ground_at(lodged.global_position)) < 0.15, "a lodged flare drops to the ground when its target dies")
+		lodged.queue_free()
 	for zz: Zombie in [near, side, far_one]: zz.release()
 	p.own_ammo["flare_pistol"] = 1
 	p._cooldown = 0.0

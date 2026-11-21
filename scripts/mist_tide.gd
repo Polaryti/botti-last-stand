@@ -264,7 +264,8 @@ func _build_water() -> void:
 	_water.extra_cull_margin = 4.0
 	_water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_mat = ShaderMaterial.new()
-	_mat.shader = load("res://assets/shaders/tide_sea.gdshader")
+	_mat.shader = preload("res://assets/shaders/tide_sea.gdshader")
+	_mat.set_shader_parameter("coastal", 1.0 if world.map_id == "vael" else 0.0)
 	_mat.set_shader_parameter("level", level)
 	_water.material_override = _mat
 	add_child(_water)

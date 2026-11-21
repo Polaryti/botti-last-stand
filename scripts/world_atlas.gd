@@ -3,16 +3,16 @@ extends Control
 ## The known world, drawn as a map to choose where to play: the Village in its lowland by the river,
 ## the road to the Fort, the Fort's portal to the Mists, the portal from the heart of the Mists to Mist
 ## Bastion on its peak in the twilight lands beyond, the road down from the Bastion to the Valleys
-## of Mesenlla, and the portal from the heart of the Mists to Port Vael on its grey coast.
+## of Mesenlla, and the road from the Valleys of Mesenlla down to the coast of Port Vael.
 ## Each place is a medal you can tap. Places that cannot be played in the mode being chosen for are
 ## drawn dimmed and cannot be picked.
 
 signal picked(id: String)
 
 ## Where each place lies on the atlas, as a share of its width and height.
-const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.85, 0.78), "bastion": Vector2(0.8, 0.36), "vael": Vector2(0.2, 0.24), "lantern_road": Vector2(0.08, 0.08)}
+const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.85, 0.78), "bastion": Vector2(0.8, 0.36), "vael": Vector2(0.66, 0.81), "lantern_road": Vector2(0.51, 0.76)}
 ## Roads walk; portals open. Each link is [from, to, through a portal].
-const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mists", "vael", true], ["vael", "lantern_road", false]]
+const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mesenlla", "vael", false], ["vael", "lantern_road", false]]
 const MEDAL := 92.0
 
 var allowed: Array = []
@@ -139,18 +139,17 @@ func _lowland(w: float, h: float) -> void:
 		draw_rect(Rect2(Vector2(w * (0.12 + 0.025 * i), h * (0.6 + 0.02 * (i % 2))), Vector2(8, 7)), Color(0.85, 0.72, 0.45, 0.5))
 
 
-## The coast of Vael, to the north-west: a grey-green sea with its waves moving, a curve of shore, and a
-## lighthouse on its breakwater, dark.
+## The grey-green coast below the Valleys, with a lighthouse on the breakwater.
 func _coast(w: float, h: float) -> void:
-	var sea := PackedVector2Array([Vector2(0, 0), Vector2(w * 0.4, 0)])
-	for i in 9:
+	var sea := PackedVector2Array([Vector2(w * 0.46, h), Vector2(w, h)])
+	for i in 8:
 		var f := i / 8.0
-		sea.append(Vector2(lerpf(w * 0.4, 0.0, f), lerpf(0.0, h * 0.44, f) + sin(f * 7.0) * h * 0.02))
+		sea.append(Vector2(lerpf(w, w * 0.46, f), lerpf(h * 0.67, h, f) + sin(f * 7.0) * h * 0.02))
 	draw_colored_polygon(sea, Color(0.07, 0.16, 0.18))
 	for i in 7:
-		var y := h * (0.04 + i * 0.05)
-		var x0 := w * 0.02
-		var x1 := w * (0.34 - i * 0.04)
+		var y := h * (0.73 + i * 0.035)
+		var x0 := w * (0.95 - i * 0.062)
+		var x1 := w * 0.99
 		if x1 <= x0:
 			continue
 		var pts := PackedVector2Array()
@@ -159,7 +158,7 @@ func _coast(w: float, h: float) -> void:
 			pts.append(Vector2(lerpf(x0, x1, f), y + sin(f * 12.0 + _t * 1.2 + i) * 2.0))
 		draw_polyline(pts, Color(0.5, 0.84, 0.76, 0.18), 1.5, true)
 	# The lighthouse on its mole.
-	var at := Vector2(w * 0.28, h * 0.32)
+	var at := Vector2(w * 0.74, h * 0.91)
 	draw_line(at + Vector2(-w * 0.06, 0), at + Vector2(w * 0.02, 0), Color(0.42, 0.42, 0.4), 3.0)
 	draw_colored_polygon(PackedVector2Array([at + Vector2(-5, 0), at + Vector2(-3.5, -22), at + Vector2(3.5, -22), at + Vector2(5, 0)]), Color(0.78, 0.76, 0.7))
 	draw_rect(Rect2(at + Vector2(-4, -14), Vector2(8, 3)), Color(0.66, 0.2, 0.16))

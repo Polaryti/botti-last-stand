@@ -50,6 +50,9 @@ func _ready() -> void:
 	await shot("vael_lighthouse", ground(84, 40, 1.7), ground(84, 70, 12.0))
 	await shot("vael_mole", ground(-84, 12, 1.7), ground(-84, 70, 1.0))
 	await shot("vael_town", ground(0, -30, 1.7), ground(0, -60, 3.0))
+	await shot("vael_harbour_terraces", ground(10, -7.0, 3.2), ground(0, -25, 1.4))
+	await shot("vael_valley_road", ground(14, -87, 2.0), ground(10, -108, 3.4))
+	await shot("vael_aurora", ground(71, -19, 3.5), ground(43, 72, 30.0))
 	await shot("vael_square", ground(-8, -46, 1.7), ground(10, -56, 2.0))
 	await shot("vael_chapel", ground(-30, -60, 1.7), ground(-40, -76, 4.0))
 	await tide_at(MistTide.TURN + MistTide.RISE + 5.0) # high tide

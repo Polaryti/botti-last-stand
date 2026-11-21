@@ -232,7 +232,7 @@ func _as_client() -> void:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "harpooner": "harpooner", "tidecaller": "tidecaller", "ferryman": "ferryman"}.get(rules, "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "tidecaller": "tidecaller", "ferryman": "ferryman"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -1587,6 +1587,12 @@ func _cartographer() -> void:
 ## Two Harpooners: the other phone's Haul drags this phone's creature in, everyone sees the rope, and a
 ## Rigger's line stands on both phones and trips what crosses it here.
 func _harpooner() -> void:
+	var client := _other() if host else Net.my_id()
+	ok(Net.roster[client]["class"] == "infantry", "the disabled Harpooner cannot be picked even by a client that owns it")
+	# Exercise the dormant kit through the existing network tests without enabling it in the lobby.
+	Net.roster[client]["class"] = "harpooner"
+	if not host:
+		pl.setup_class("harpooner")
 	w.director.running = false
 	w.director.set_process(false)
 	if host:

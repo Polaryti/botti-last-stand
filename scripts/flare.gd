@@ -14,7 +14,16 @@ const COLOR := Color(1.0, 0.42, 0.22)
 var world: World
 var owner_player: Player
 var shows_only := false
+var _target: Zombie
+var _target_generation := -1
+var _offset := Vector3.ZERO
 var _left := TIME
+
+func attach_to(target: Zombie, at: Vector3) -> void:
+	_target = target
+	_target_generation = target.spawn_generation
+	_offset = at - target.global_position
+
 var _next_reveal := 0.0
 var _light: OmniLight3D
 var _flame: MeshInstance3D
@@ -149,6 +158,13 @@ func _burn_around() -> void:
 
 
 func _process(delta: float) -> void:
+	if _target_generation >= 0:
+		if is_instance_valid(_target) and _target.is_alive() and _target.spawn_generation == _target_generation:
+			global_position = _target.global_position + _offset
+		else:
+			global_position = world.floor_contact(global_position)
+			_target = null
+			_target_generation = -1
 	_left -= delta
 	var t := TIME - _left
 	var fade := clampf(_left / 1.2, 0.0, 1.0)
