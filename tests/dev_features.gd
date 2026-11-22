@@ -1934,7 +1934,7 @@ func _vael_pass(vael: World) -> void:
 	var a := Vector3(arch.x, face, -90)
 	var b := Vector3(arch.x, face, -95)
 	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, 1))
-	check(not hit.is_empty() and (hit["position"] as Vector3).z > -94.0, "the visible rockfall shuts the mountain gate with solid geometry")
+	check(not hit.is_empty() and (hit["position"] as Vector3).z > -91.8, "the outer boulders are solid at their visible front face")
 	check(not vael.vael_sites.accessible(Vector3(13, 0, -98.5)) and terrain.slope(13, -98.5) > Terrain.STEEP, "the slope behind the rockfall is too steep for paths")
 	check(terrain.coast_scenery_height(38, -119) > 42.0, "the Mesenlla skyline rises steeply beyond the playable coast")
 	var edge := float(terrain.half_extent)
@@ -1958,7 +1958,7 @@ func _vael_pass(vael: World) -> void:
 		if you.is_on_floor():
 			you.input_jump = true
 		await get_tree().physics_frame
-	check(you.global_position.z > -92.7, "a player running and jumping stops at the rockfall")
+	check(you.global_position.z > -92.0, "a player running and jumping stops at the rockfall")
 	you.set_physics_process(false)
 	you.input_move = Vector2.ZERO
 	you.input_jump = false

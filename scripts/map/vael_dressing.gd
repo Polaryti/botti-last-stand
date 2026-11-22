@@ -298,7 +298,8 @@ static func closed_pass(b: MapBuilder, span: float) -> void:
 		[Vector3(-0.48, 4.49, -0.9), Vector3(1.03, 1.26, 0.92), -0.42],
 	]:
 		var col := MesenllaBuilder.ROCK.lerp(MesenllaBuilder.ROCK_DARK, rng.randf_range(0.11, 0.72))
-		_fall_boulder(l, stone[0], stone[1], stone[2], col)
+		var hull := _fall_boulder(l, stone[0], stone[1], stone[2], col)
+		b.w.add_wedge(b.xf, hull)
 	for i in 13:
 		var x := rng.randf_range(-span * 0.65, span * 0.65)
 		var z := rng.randf_range(0.05, 2.4)
@@ -307,7 +308,7 @@ static func closed_pass(b: MapBuilder, span: float) -> void:
 		l.prism(base, base + Vector3(wide * 0.32, wide * 0.8, -wide * 0.3), wide, wide * 0.46, 5, MesenllaBuilder.ROCK_DARK.lightened(rng.randf_range(0.04, 0.21)))
 
 
-static func _fall_boulder(l: LowPoly, at: Vector3, size: Vector3, turn: float, col: Color) -> void:
+static func _fall_boulder(l: LowPoly, at: Vector3, size: Vector3, turn: float, col: Color) -> PackedVector3Array:
 	var rings: Array[PackedVector3Array] = []
 	for row in 3:
 		var points := PackedVector3Array()
@@ -320,13 +321,15 @@ static func _fall_boulder(l: LowPoly, at: Vector3, size: Vector3, turn: float, c
 					(lift + sin(a + turn) * 0.11) * size.y, sin(a) * radius * size.z)
 			points.append(at + v.rotated(Vector3.UP, turn))
 		rings.append(points)
+	var tip := at + Vector3.UP * size.y * 0.6
 	for side in 6:
 		var next := (side + 1) % 6
 		var shade := col.lightened(float(side % 3) * 0.055)
-		l._tri(rings[2][side], rings[2][next], at + Vector3.UP * size.y * 0.6, at, shade)
+		l._tri(rings[2][side], rings[2][next], tip, at, shade)
 		for row in 2:
 			l._tri(rings[row][side], rings[row + 1][side], rings[row + 1][next], at, shade)
 			l._tri(rings[row][side], rings[row + 1][next], rings[row][next], at, shade)
+	return rings[0] + rings[1] + rings[2] + PackedVector3Array([tip])
 
 
 static func _arch_stone(l: LowPoly, ring: PackedVector3Array, depth: float, colour: Color) -> void:
