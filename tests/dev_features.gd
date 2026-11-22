@@ -1792,9 +1792,9 @@ func _port_vael() -> void:
 	var lighthouse_hit := vael.get_world_3d().direct_space_state.intersect_ray(
 		PhysicsRayQueryParameters3D.create(Vector3(84, 2.7, 63), Vector3(84, 2.7, 70), 1))
 	check(not lighthouse_hit.is_empty() and (lighthouse_hit["position"] as Vector3).z < 67.0, "the lighthouse plinth stops characters on approach")
-	var road_end := Vector3(-3, 0, -101)
+	var road_end := Vector3(13, 0, -84)
 	var road_route := vael.grid.route(Vector3(0, 0, -53), road_end)
-	check(road_route.size() > 1 and Vector2(road_route[-1].x - road_end.x, road_route[-1].z - road_end.z).length() < 2.5, "the market is linked to the upper switchback on Valley Road")
+	check(road_route.size() > 1 and Vector2(road_route[-1].x - road_end.x, road_route[-1].z - road_end.z).length() < 2.5, "the market is linked to the lower end of Valley Road")
 	await _vael_pass(vael)
 	check(t.height(40, -18) > 2.4 and t.height(40, -22) > 3.7, "the town terraces grade up from the Quay without a moat")
 	check(absf(t.height(0, -5) - 2.2) < 0.15 and t.height(0, -55) > 4.5, "the quay and the town above it")
@@ -1925,18 +1925,18 @@ func _port_vael() -> void:
 	await get_tree().process_frame
 
 
-## The climb towards Mesenlla, the border mesh and the shared obstacle traversal.
+## Valley Road's rockfall, the border mesh and the shared obstacle traversal.
 func _vael_pass(vael: World) -> void:
 	var terrain := vael.terrain
-	var arch := Vector3(7, 0, -93)
-	var up := Vector3(-6, 0, -4).normalized()
+	var arch := Vector3(10.5, 0, -92)
+	var face := vael.ground_at(arch) + 1.0
 	var space := vael.get_world_3d().direct_space_state
-	var a := arch - up * 2.0
-	var b := arch + up * 2.0
-	a.y = vael.ground_at(a) + 1.0
-	b.y = vael.ground_at(b) + 1.0
-	check(space.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.ENEMY_ONLY)).is_empty(), "Valley Road passes through the centre of the stone arch")
-	check(vael.vael_sites.accessible(Vector3(-3, 0, -101)) and terrain.height(-3, -101) > 12.0, "the playable road climbs through the gate into Mesenlla's foothills")
+	var a := Vector3(arch.x, face, -90)
+	var b := Vector3(arch.x, face, -95)
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, 1))
+	check(not hit.is_empty() and (hit["position"] as Vector3).z > -94.0, "the visible rockfall shuts the mountain gate with solid geometry")
+	check(not vael.vael_sites.accessible(Vector3(13, 0, -98.5)) and terrain.slope(13, -98.5) > Terrain.STEEP, "the slope behind the rockfall is too steep for paths")
+	check(terrain.coast_scenery_height(38, -119) > 42.0, "the Mesenlla skyline rises steeply beyond the playable coast")
 	var edge := float(terrain.half_extent)
 	var north: PackedVector3Array = terrain.skirt_mesh(0).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 	var seam_samples := 0
@@ -1948,6 +1948,21 @@ func _vael_pass(vael: World) -> void:
 	check(seam_samples >= terrain.vertices_per_side and seam_clear, "northern scenery meets the playable terrain at the exact seam")
 	var you := vael.player
 	var original := you.global_position
+	var facing := you.rotation
+	you.global_position = Vector3(arch.x, vael.ground_at(a) + 0.08, -89.6)
+	you.rotation.y = 0.0
+	you.velocity = Vector3.ZERO
+	you.input_move = Vector2(0, -1)
+	you.set_physics_process(true)
+	for i in 110:
+		if you.is_on_floor():
+			you.input_jump = true
+		await get_tree().physics_frame
+	check(you.global_position.z > -92.7, "a player running and jumping stops at the rockfall")
+	you.set_physics_process(false)
+	you.input_move = Vector2.ZERO
+	you.input_jump = false
+	you.velocity = Vector3.ZERO
 	# The low cargo on the quay is part of the map. The lane around the cargo stays open.
 	var floor_y := vael.ground_at(Vector3(5, 0, 3.7))
 	you.global_position = Vector3(5, floor_y, -2.5)
@@ -1970,7 +1985,6 @@ func _vael_pass(vael: World) -> void:
 		check(vaulted and sailor.global_position.z < 1.0, "a Drowned Sailor vaults the quay's cargo and lands across it")
 		sailor.release()
 	var old_auto_jump := Game.auto_jump
-	var facing := you.rotation
 	you.global_position = Vector3(5, floor_y + 0.10, 5.7)
 	you.rotation.y = 0.0
 	you.velocity = Vector3.ZERO
@@ -2033,7 +2047,6 @@ func _vael_districts(vael: World) -> void:
 			[Vector3(70, 0, 34), Vector3(84, 0, 34), "the East Mole landing"],
 			[Vector3(-51.5, 0, -6), Vector3(-39, 0, -12), "both Ropewalk doors"],
 			[Vector3(40, 0, -69), Vector3(40, 0, -82), "the Harbourmaster's House"],
-			[Vector3(9.5, 0, -90.5), Vector3(-3, 0, -101), "the Valley Road arch"],
 		]:
 		var at: Vector3 = trip[0]
 		at.y = vael.ground_at(at)

@@ -1136,6 +1136,11 @@ func _vael_look() -> void:
 	night_sky_shows = true
 	night_moon_colour = Color(0.8, 0.9, 1.0)
 	night_moon = 0.6
+	if map_id == "vael":
+		night_fog_colour = Color(0.19, 0.20, 0.28)
+		night_ambient = Color(0.47, 0.47, 0.61)
+		night_moon_colour = Color(0.91, 0.84, 1.0)
+		_sky_material.set_shader_parameter("highland_dusk", 0.92)
 	var atmosphere := MistAtmosphere.new()
 	atmosphere.name = "VaelAura"
 	atmosphere.world = self

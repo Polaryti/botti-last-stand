@@ -39,7 +39,7 @@ A new map beyond Port Vael, for Survive the Night alone or in Co-op. No clock: w
 ### The coast of Vael, dressed
 - **The Drowned climb out of the flats** by the stairs and slipways, at any tide, and no longer stick at the foot of the quay or the breakwaters. Two broad slipways now lead up from the flats either side of Harbour Street.
 - **The Lantern Barge keeps to its channel** of deep water the whole way to the Isle of Lamps.
-- **Port Vael** has a coastal aurora, sea mist blowing inland, and dark spires on the horizon. Valley Road climbs through the old stone arch into Mesenlla’s foothills. Fir and pine cover the surrounding ridges, and cairns mark the turns by a sheltered cart stop.
+- **Port Vael** has a coastal aurora, sea mist blowing inland, and dark spires on the horizon. At the end of Valley Road, a rockfall seals the old mountain gate. Look inland for Mesenlla’s steep fir-covered ridges, floating rock shelves and violet twilight. The aurora still shines out over the harbour.
 - Harbour braziers flicker in the sea wind. The Drowned can vault low cargo while pursuing you, and auto-jump helps you clear the same obstacles.
 - **The Quay and Market Square** are linked by graded terraces. The lighthouse now blocks passage through its base.
 - **The Tide Zone** has breaking foam as the water rises and falls. At low tide, follow the exposed stone track from the eastern slipway toward the Drowned Bell.

@@ -8,6 +8,14 @@ var _follow := 0.0
 var _wisps: CPUParticles3D
 var _motes: CPUParticles3D
 
+static func wisp_material(tint: Vector3, opacity: float) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/shaders/mist_wisp.gdshader")
+	material.set_shader_parameter("tint", tint)
+	material.set_shader_parameter("opacity", opacity)
+	return material
+
+
 func _ready() -> void:
 	_wisps = CPUParticles3D.new()
 	_wisps.name = "GroundWisps"
@@ -38,7 +46,8 @@ func _ready() -> void:
 		_wisps.initial_velocity_min = 0.85
 		_wisps.initial_velocity_max = 1.45
 		material.set_shader_parameter("tint", Vector3(0.54, 0.74, 0.77))
-		material.set_shader_parameter("opacity", 0.20)
+		material.set_shader_parameter("opacity", 0.23)
+		material.set_shader_parameter("highland_blend", 1.0)
 	elif place == Place.VAEL:
 		material.set_shader_parameter("tint", Vector3(0.48, 0.66, 0.64)) # sea-mist off the water
 		material.set_shader_parameter("opacity", 0.15)

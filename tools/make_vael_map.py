@@ -24,7 +24,7 @@ OUT = "maps/vael.tscn"
 SCRIPTS = [
     ("map_root", "root"), ("map_level", "level"), ("map_hill", "hill"), ("map_road", "road"),
     ("map_vael", "vael"), ("map_house", "house"), ("map_spot", "spot"), ("map_thing", "thing"),
-    ("map_prop", "prop"), ("map_tree", "tree"),
+    ("map_prop", "prop"), ("map_tree", "tree"), ("map_mesenlla", "mesenlla"),
 ]
 
 SLATE = "Color(0.26, 0.29, 0.33, 1)"
@@ -117,10 +117,12 @@ node("EastCliff", land, "hill", (109, 0, -28), height=10.0, radius=15.0)
 node("GullwatchTerrace", land, "level", (-91, 7.1, -57), size="Vector2(14, 15)", blend=4.0)
 node("PilgrimTerrace", land, "level", (77, 5.0, -82), size="Vector2(17, 14)", blend=3.0)
 node("SaltHouseGround", land, "level", (74, 2.2, -11), size="Vector2(19, 11)", blend=1.8)
-# The cut between these two spurs is the last turn of the mountain road into Vael.
-for x, z, height, radius in [(-28, -113, 18.0, 15.0), (31, -119, 22.0, 18.0),
-                            (-51, -129, 13.0, 20.0), (54, -134, 19.0, 22.0),
-                            (-16, -101, 5.5, 9.0), (18, -107, 6.8, 11.0)]:
+# The close rockfall breaks the last road down from two staggered rows of steep peaks.
+for x, z, height, radius in [(13, -108, 24.0, 8.0), (-24, -115, 30.0, 12.0),
+                            (38, -119, 47.0, 12.0), (-52, -128, 47.0, 15.0),
+                            (64, -135, 34.0, 13.0), (-15, -146, 61.0, 13.0),
+                            (21, -158, 55.0, 17.0), (-75, -151, 31.0, 16.0),
+                            (88, -145, 32.0, 17.0)]:
     node("MountainSpur", land, "hill", (x, 0, z), height=height, radius=radius)
 
 # --- Roads ---------------------------------------------------------------------------------------
@@ -128,17 +130,8 @@ roads = group("Roads")
 road("HarbourStreet", roads, [(0, 2.2, -10), (0, 3.4, -18), (0, 5.0, -27), (0, 5.0, -44)], 5.0, cut=True)
 road("QuayStreet", roads, [(-80, 2.2, -4), (80, 2.2, -4)], 6.0)
 road("MarketRow", roads, [(-86, 5.0, -52), (86, 5.0, -52)], 5.0)
-valley_road = [(8, 5.0, -54), (7, 5.0, -68), (12, 5.0, -78), (13, 5.15, -86),
-               (10, 6.6, -91), (4, 8.9, -95), (-2, 11.7, -100), (-6, 14.6, -108),
-               (2, 18.4, -120), (15, 21.8, -134)]
-road("ValleyRoad", roads, valley_road, 6.0, cut=True, blend=3.6)
-# The arch opening runs along the road, and its foot is sampled from the road itself.
-gate_downhill, gate_uphill = valley_road[4:6]
-# Widen the cut only at the gate, leaving both stone feet on a proper shoulder.
-road("GateShoulders", roads, [gate_downhill, gate_uphill], 8.6, cut=True, draw=False, blend=3.1)
-gate_x = (gate_downhill[0] + gate_uphill[0]) * 0.5
-gate_z = (gate_downhill[2] + gate_uphill[2]) * 0.5
-gate_yaw = math.degrees(math.atan2(gate_downhill[0] - gate_uphill[0], gate_downhill[2] - gate_uphill[2]))
+# Valley Road ends at the back lanes. North of this bend there is no road cut or paving.
+road("ValleyRoad", roads, [(8, 5.0, -54), (7, 5.0, -68), (12, 5.0, -78), (13, 5.0, -84)], 5.0)
 road("ChapelLane", roads, [(-40, 5.0, -52), (-40, 5.0, -84)], 4.0)
 road("HillLane", roads, [(40, 5.0, -52), (40, 5.0, -86)], 4.0)
 road("WestSteps", roads, [(-62, 2.2, -12), (-62, 3.6, -19), (-62, 5.0, -27)], 4.6, cut=True, blend=2.0)
@@ -147,7 +140,7 @@ road("EastSteps", roads, [(62, 2.2, -12), (62, 3.6, -19), (62, 5.0, -27)], 4.6, 
 road("WestCliffPath", roads, [(-70, 2.2, -3), (-85, 2.5, -7), (-91, 4.2, -21),
                             (-89, 5.4, -39), (-89, 7.1, -53), (-85, 6.0, -70),
                             (-73, 5.2, -87), (-68, 5.0, -91), (-40, 5.0, -91)], 4.8, cut=True, blend=3.0)
-road("NorthLane", roads, [(-40, 5.0, -91), (-24, 5.0, -89), (-14, 5.0, -89), (0, 5.0, -86), (12.4, 5.35, -87)], 4.2, cut=True)
+road("NorthLane", roads, [(-40, 5.0, -91), (-24, 5.0, -89), (-14, 5.0, -89), (0, 5.0, -86), (13, 5.0, -84)], 4.2, cut=True)
 road("EastHeadlandPath", roads, [(79, 2.2, -3), (88, 2.35, -9), (91, 3.5, -21), (90, 4.6, -36),
                                 (88, 5.0, -51), (89, 5.0, -67), (85, 5.0, -78),
                                 (77, 5.0, -81), (66, 5.0, -76), (49, 5.0, -71)], 4.8, cut=True, blend=3.0)
@@ -309,16 +302,22 @@ for x, z in [(-95, -54), (-92, -59), (71, -81), (81, -79), (-94, -41), (-93, -66
 for x, z, size in [(-96, -31, 1.45), (-97, -49, 2.1), (-95, -77, 1.4), (-57, -95, 1.35),
                    (95, -54, 1.9), (96, -38, 1.3), (96, 4, 1.7), (65, -94, 1.6), (94, 28, 1.75), (-96, 32, 1.4)]:
     node("StormBoulder", nature, "prop", (x, 0, z), kind="rock", grow=size)
-# Old retaining walls follow the outside of the turns, clear of both traffic and gardens.
-for x, z, yaw, length in [(17.6, -89, 82, 5.0), (5.7, -88.9, 137, 4.7)]:
-    node("RoadWall", nature, "vael", (x, 0, z, yaw), kind="drystone", size=length)
-node("OldValleyGate", nature, "vael", (gate_x, 0, gate_z, gate_yaw), kind="arch", size=8.4)
-for x, z, grow in [(-12.3, -98, 1.8), (-9, -101, 2.4), (13.7, -97.5, 1.7), (18, -95, 1.45)]:
-    node("PassOutcrop", nature, "prop", (x, 0, z), kind="rock", grow=grow, lift=-0.35)
-for x, z, size in [(-11, -96, 2.2), (-6.8, -92.4, 2.1), (11, -97, 2.7), (20, -96, 2.4)]:
+# The gate sits squarely across its old alignment, backed by the escarpment.
+node("OldValleyGate", nature, "vael", (10.5, 0, -92), kind="closed_pass", size=7.2)
+for x, z, grow in [(4.1, -93.3, 1.65), (18.7, -93.0, 1.45), (3.7, -90.5, 0.85), (21, -90.3, 0.95)]:
+    node("PassOutcrop", nature, "prop", (x, 0, z), kind="rock", grow=grow, lift=-0.25)
+for x, z, size in [(4.5, -91.6, 1.6), (20, -91.2, 1.7), (0, -92.6, 1.8)]:
     node("PassGrass", nature, "vael", (x, 0, z), kind="salt_grass", size=size)
-for x, z in [(8, -76), (-0.8, -94.6), (18.5, -90), (-96, -54), (-84, -55), (-91, -34), (87, -49), (85, -73)]:
+for x, z in [(8, -76), (16.8, -83.5), (-96, -54), (-84, -55), (-91, -34), (87, -49), (85, -73)]:
     node("RoadLamp", nature, "vael", (x, 0, z), kind="lamp_post")
+node("PassCairn", nature, "vael", (4, 0, -87.9, 31), kind="pass_cairn", size=1.1)
+node("PassCairn", nature, "vael", (21.4, 0, -87.6, -22), kind="pass_cairn", size=1.4)
+# The same torn-out mountain shelves seen in Mesenlla, distant silhouettes above the ridge.
+for x, y, z, width in [(-43, 81, -151, 15.0), (19, 87, -155, 20.0), (56, 70, -144, 10.0)]:
+    node("HighlandShelf", nature, "mesenlla", (x, y, z), kind="distant_island", size=width, on_ground=False)
+for x, y, z, width in [(-31, 21, -108, 26.0), (8, 19, -108, 21.0), (28, 25, -117, 34.0),
+                        (-4, 34, -136, 29.0)]:
+    node("RidgeMist", nature, "vael", (x, y, z), kind="ridge_mist", size=width, on_ground=False)
 
 # Gullwatch was the fleet's signal post. Pilgrims' Garden kept a sheltered stop on the coast road.
 landmarks = group("Districts")
@@ -336,7 +335,7 @@ node("ValleyStones", landmarks, "vael", (-15, 0, -94.5), kind="drystone", size=6
 node("ValleyBench", landmarks, "vael", (-18, 0, -92.4), kind="bench")
 node("Cairn", landmarks, "vael", (5.8, 0, -99.0, 40), kind="pass_cairn", size=1.75)
 node("Cairn", landmarks, "vael", (17.1, 0, -92.2, -30), kind="pass_cairn", size=1.2)
-node("PassCart", landmarks, "thing", (-9.2, 0, -93.1, 14), kind="cart")
+node("PassCart", landmarks, "thing", (-9.2, 0, -91.1, 14), kind="cart")
 node("CartCargo", landmarks, "prop", (-8.6, 0, -89.9, 20), kind="sack")
 node("CartCargo", landmarks, "prop", (-11.8, 0, -90.8, -28), kind="lumber_small")
 # Open supply racks mark rare finds. The pickups have dedicated clear cells in front of the racks.
@@ -350,7 +349,7 @@ entries = group("EnemyApproaches")
 for x, z in [
     (-73, 17), (-64, 31), (-55, 46), (-27, 31), (-16, 21), (3, 44), (7, 69),
     (24, 34), (44, 28), (57, 59), (69, 38), (72, 16), (-39, 74), (33, 74),
-    (-86, -10), (-87, -29), (-84, -58), (-79, -78), (-50, -90), (-32, -88), (-6, -87), (8.6, -92),
+    (-86, -10), (-87, -29), (-84, -58), (-79, -78), (-50, -90), (-32, -88), (-6, -87), (19, -81.5),
     (30, -87), (63, -89), (82, -79), (87, -65), (88, -47), (84, -27), (82, -9),
     (-75, -43), (-39, -46), (-29, -58), (16, -57), (38, -47), (71, -49),
 ]:
@@ -475,7 +474,7 @@ for (x, y, z) in [(-70, 5.0, -44), (70, 5.0, -44), (-60, 2.2, -2), (60, 2.2, -2)
 places = group("Places")
 for (x, y, z, text) in [(0, 5.0, -52, "Market Square"), (-40, 5.0, -76, "Chapel"), (40, 5.0, -76, "Harbourmaster's House"),
                         (0, 2.2, -4, "The Quay"), (-84, 2.0, 40, "West Mole"), (84, 2.0, 46, "East Mole"), (84, 2.0, 70, "Lighthouse"),
-                        (-22, 0, 46, "Wreck of the Grey Heron"), (8, 0, 30, "Drowned Bell"), (0, 0, 60, "Tide Zone"), (7, 7.8, -93, "Valley Road"),
+                        (-22, 0, 46, "Wreck of the Grey Heron"), (8, 0, 30, "Drowned Bell"), (0, 0, 60, "Tide Zone"), (13, 5, -83, "Valley Road"),
                         (-76, 2.2, -8, "Boatwright's Yard"), (54, 2.2, -7, "Fishmarket"), (74, 2.2, -21, "Salt House"),
                         (-93, 7.1, -56, "Gullwatch"), (76, 5.0, -87, "Pilgrims' Garden")]:
     spot(places, "place", (x, y, z), text=text)
@@ -489,7 +488,7 @@ def write():
     for c in curves:
         out.append(c)
         out.append("")
-    out.append('[node name="PortVael" type="Node3D"]\nscript = ExtResource("root")\nplay_half = 105.0\nland_half = 110\nforest_wall = true\ngrass = 0.6\nroughness = 3.0\ncalm_radius = 60.0\nlook = "vael"')
+    out.append('[node name="PortVael" type="Node3D"]\nscript = ExtResource("root")\nplay_half = 100.0\nland_half = 110\nforest_wall = true\ngrass = 0.6\nroughness = 3.0\ncalm_radius = 60.0\nlook = "vael"')
     out.append("")
     for n in nodes:
         out.append(n)

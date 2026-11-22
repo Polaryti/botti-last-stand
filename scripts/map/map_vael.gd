@@ -15,7 +15,7 @@ const FLATS_TOP := 0.55 # the flats' height at the foot of the harbour wall
 const FLATS_LOW := -0.85 # and where they meet the open sea
 const MOLE_RUN := 11.0
 
-@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage", "sea", "road_lantern", "waystation", "slipway", "spire", "statue", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "brazier", "shrine", "banner", "bunting", "cargo", "fish_rack", "ghost_lights", "drystone", "garden", "lantern_string", "laundry", "bench", "chimney", "sea_trail", "porch_lamp", "ship_frame", "fishing_cutter", "rope_bench", "sail_bench", "fish_bench", "supply_rack", "signal_beacon", "salt_grass", "pass_cairn") var kind := "wreck":
+@export_enum("coast", "paving", "quay_wall", "mole", "lighthouse", "wreck", "boat", "upturned_boat", "crane", "net_rack", "pots", "lamp_post", "pilings", "bell_tower", "sunk_anchor", "sea_rocks", "buoy", "sea_stairs", "salvage", "sea", "road_lantern", "waystation", "slipway", "spire", "statue", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "brazier", "shrine", "banner", "bunting", "cargo", "fish_rack", "ghost_lights", "drystone", "garden", "lantern_string", "laundry", "bench", "chimney", "sea_trail", "porch_lamp", "ship_frame", "fishing_cutter", "rope_bench", "sail_bench", "fish_bench", "supply_rack", "signal_beacon", "salt_grass", "pass_cairn", "closed_pass", "ridge_mist") var kind := "wreck":
 	set(v):
 		kind = v
 		refresh()
@@ -103,6 +103,8 @@ func build(b: MapBuilder) -> void:
 		"signal_beacon": VaelDressing.signal_beacon(b, size)
 		"salt_grass": VaelDressing.salt_grass(b, size)
 		"pass_cairn": VaelDressing.pass_cairn(b, size)
+		"closed_pass": VaelDressing.closed_pass(b, size)
+		"ridge_mist": VaelDressing.ridge_mist(b, size)
 		"salvage":
 			if not b.is_preview:
 				b.w.salvage_spots.append(Transform3D(b.xf.basis, b.xf.origin))
@@ -159,4 +161,4 @@ func shapes_land() -> bool:
 
 
 func follows_land() -> bool:
-	return kind in ["wreck", "pilings", "sea_rocks", "quay_wall", "mole", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "ghost_lights"]
+	return kind in ["wreck", "pilings", "sea_rocks", "quay_wall", "mole", "fallen_statue", "statue_head", "arch", "broken_arch", "whale_bones", "mast", "kelp_bed", "tide_pool", "ghost_lights", "closed_pass"]

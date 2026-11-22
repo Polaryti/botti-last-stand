@@ -221,6 +221,7 @@ func ground() -> void:
 		# cobble-dust on the streets.
 		mat.set_shader_parameter("tint", Vector3(1.12, 0.86, 0.7))
 		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
+		mat.set_shader_parameter("highland", 1.0 if look == "vael" else 0.0)
 	_ground_material = mat
 	var j := 0
 	while j < terrain.vertices_per_side - 1:
@@ -1718,7 +1719,7 @@ func _tall_wall(h: float) -> void:
 
 
 ## Stagger the firs over the slopes and onto the background rather than lining up against a flat
-## boundary. Open water and the uphill route stay visible.
+## boundary. Leave the open water and the high rock faces bare.
 func _coastal_forest(h: float) -> void:
 	var step: float = [8.1, 6.6, 5.8][quality]
 	var depth: int = [4, 5, 6][quality]
@@ -1732,7 +1733,13 @@ func _coastal_forest(h: float) -> void:
 				var y := terrain.coast_scenery_height(p.x, p.y)
 				if y < MistTide.HIGH_Y + 0.75 or terrain.near_cut_road(p, 2.25):
 					continue
-				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(p.x, y - 0.12, p.y)))
+				var alpine := p.y < -94.0 and y > 8.0
+				if alpine:
+					var across := terrain.coast_scenery_height(p.x + 1.0, p.y) - terrain.coast_scenery_height(p.x - 1.0, p.y)
+					var rise := terrain.coast_scenery_height(p.x, p.y + 1.0) - terrain.coast_scenery_height(p.x, p.y - 1.0)
+					if y > 41.0 + 4.0 * sin(p.x * 0.075) or Vector2(across, rise).length_squared() > 5.5:
+						continue
+				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(p.x, y - (0.46 if alpine else 0.15), p.y)))
 				var kind := "proc:tall_pine" if rng.randf() < 0.55 else "proc:giant_fir"
 				tree(kind, rng.randf_range(7.6, 11.0), rng.randf_range(0.92, 1.24), false)
 			run += step

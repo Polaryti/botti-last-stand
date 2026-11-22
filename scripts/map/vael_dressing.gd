@@ -243,6 +243,121 @@ static func arch(b: MapBuilder, span: float, broken: bool) -> void:
 			l.box(key + Vector3((k - 1) * 0.24, -0.32, 0.04), Vector3(0.22, 0.08, 0.06), BRONZE, Vector3(0, 0, 25))
 
 
+## An old masonry gateway at the foot of the highlands. The rockfall fills the opening.
+static func closed_pass(b: MapBuilder, span: float) -> void:
+	var l := b.cell()
+	var rng := b.seeded()
+	var radius := span * 0.5 - 0.65
+	var spring := 3.1
+	var deep := 0.88
+	for side: float in [-1.0, 1.0]:
+		var x := (radius + 0.27) * side
+		var foot := minf(_local_ground(b, x, deep), _local_ground(b, x, -deep)) - 0.42
+		l.box(Vector3(x, foot + 0.4, 0), Vector3(1.82, 0.8, 2.35), MesenllaBuilder.ROCK_DARK)
+		var course := (spring - foot - 0.73) / 5.0
+		for i in 5:
+			var width := 1.52 if i < 2 else 1.32
+			var y := foot + 0.73 + course * (i + 0.5)
+			var col := STONE.lerp(MesenllaBuilder.ROCK, rng.randf_range(0.34, 0.8))
+			l.box(Vector3(x, y, 0), Vector3(width, course - 0.025, 1.78), col)
+		l.box(Vector3(x, spring - 0.13, 0), Vector3(1.54, 0.23, 1.94), STONE_DARK)
+		b.solid(Vector3(x, (foot + spring) * 0.5, 0), Vector3(1.42, spring - foot, 1.78))
+	# Each arch stone is a wedge with a shared radius, so the crown stays joined at the spring line.
+	for i in 13:
+		var first := PI * (i + 0.022) / 13.0
+		var last := PI * (i + 0.978) / 13.0
+		var crown := i == 6
+		var outer := radius + (0.88 if crown else 0.68)
+		var inner_edge := radius - (0.11 if crown else 0.0)
+		var ring := PackedVector3Array([
+			Vector3(cos(first) * inner_edge, spring + sin(first) * inner_edge, 0),
+			Vector3(cos(last) * inner_edge, spring + sin(last) * inner_edge, 0),
+			Vector3(cos(last) * outer, spring + sin(last) * outer, 0),
+			Vector3(cos(first) * outer, spring + sin(first) * outer, 0),
+		])
+		var col := STONE.lightened(0.11) if crown else STONE.lerp(MesenllaBuilder.ROCK_DARK, rng.randf_range(0.16, 0.5))
+		_arch_stone(l, ring, deep + (0.19 if crown else 0.0), col)
+		if i in [1, 2, 3, 8, 10, 11]:
+			var a := (first + last) * 0.5
+			var stain := Vector3(cos(a) * (radius + 0.44), spring + sin(a) * (radius + 0.44), deep + 0.012)
+			var moss := KELP.lerp(MesenllaBuilder.MEADOW_DARK, rng.randf_range(0.2, 0.6))
+			l.leaf(stain + Vector3(-0.18, -0.04, 0), stain + Vector3(0.17, -0.07, 0), stain + Vector3(0.03, 0.13, 0), moss)
+	# The dark core connects the pile to the hillside. In front, large slabs have fallen across
+	# one another at different angles, with a fan of smaller debris on the town side.
+	var fall := Vector3(0, 2.2, -1.55)
+	_fall_boulder(l, Vector3(0, 2.45, -3.0), Vector3(radius + 0.75, 5.5, 1.52), 0.0, MesenllaBuilder.ROCK_UNDER)
+	b.solid(fall, Vector3(span - 0.58, 5.4, 1.5))
+	for stone: Array in [
+		[Vector3(-2.02, 0.6, -0.06), Vector3(1.48, 1.32, 1.02), -0.6],
+		[Vector3(0.15, 0.68, 0.13), Vector3(1.68, 1.35, 1.1), 0.56],
+		[Vector3(2.36, 0.74, -0.23), Vector3(1.44, 1.54, 0.75), -0.36],
+		[Vector3(-1.45, 2.06, -0.35), Vector3(1.52, 1.47, 0.98), 1.16],
+		[Vector3(0.96, 2.02, -0.2), Vector3(1.60, 1.39, 0.91), -0.78],
+		[Vector3(0.14, 3.63, -0.56), Vector3(1.64, 1.58, 1.08), 0.94],
+		[Vector3(1.76, 3.28, -0.73), Vector3(1.26, 1.08, 0.82), 0.32],
+		[Vector3(-0.48, 4.49, -0.9), Vector3(1.03, 1.26, 0.92), -0.42],
+	]:
+		var col := MesenllaBuilder.ROCK.lerp(MesenllaBuilder.ROCK_DARK, rng.randf_range(0.11, 0.72))
+		_fall_boulder(l, stone[0], stone[1], stone[2], col)
+	for i in 13:
+		var x := rng.randf_range(-span * 0.65, span * 0.65)
+		var z := rng.randf_range(0.05, 2.4)
+		var base := Vector3(x, _local_ground(b, x, z) - 0.1, z)
+		var wide := rng.randf_range(0.27, 0.72)
+		l.prism(base, base + Vector3(wide * 0.32, wide * 0.8, -wide * 0.3), wide, wide * 0.46, 5, MesenllaBuilder.ROCK_DARK.lightened(rng.randf_range(0.04, 0.21)))
+
+
+static func _fall_boulder(l: LowPoly, at: Vector3, size: Vector3, turn: float, col: Color) -> void:
+	var rings: Array[PackedVector3Array] = []
+	for row in 3:
+		var points := PackedVector3Array()
+		var lift: float = [-0.55, 0.07, 0.54][row]
+		var radius: float = [0.73, 1.0, 0.58][row]
+		for side in 6:
+			var a := TAU * float(side) / 6.0
+			var irregular := 1.0 + cos(float(side) * 2.8 + turn) * 0.14
+			var v := Vector3((cos(a) * radius * irregular + lift * 0.45) * size.x,
+					(lift + sin(a + turn) * 0.11) * size.y, sin(a) * radius * size.z)
+			points.append(at + v.rotated(Vector3.UP, turn))
+		rings.append(points)
+	for side in 6:
+		var next := (side + 1) % 6
+		var shade := col.lightened(float(side % 3) * 0.055)
+		l._tri(rings[2][side], rings[2][next], at + Vector3.UP * size.y * 0.6, at, shade)
+		for row in 2:
+			l._tri(rings[row][side], rings[row + 1][side], rings[row + 1][next], at, shade)
+			l._tri(rings[row][side], rings[row + 1][next], rings[row][next], at, shade)
+
+
+static func _arch_stone(l: LowPoly, ring: PackedVector3Array, depth: float, colour: Color) -> void:
+	var front := Vector3.BACK * depth
+	var centre := (ring[0] + ring[1] + ring[2] + ring[3]) * 0.25
+	for side: Vector3 in [front, -front]:
+		l._tri(ring[0] + side, ring[1] + side, ring[2] + side, centre, colour)
+		l._tri(ring[0] + side, ring[2] + side, ring[3] + side, centre, colour)
+	for i in 4:
+		var a := ring[i]
+		var z := ring[(i + 1) % 4]
+		l._tri(a - front, a + front, z + front, centre, colour.darkened(0.12))
+		l._tri(a - front, z + front, z - front, centre, colour.darkened(0.12))
+
+
+## Broad drifts moving through the ravines, beyond the player-following sea mist.
+static func ridge_mist(b: MapBuilder, width: float) -> void:
+	if b.is_preview:
+		return
+	var drift := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(width, width * 0.19)
+	quad.material = MistAtmosphere.wisp_material(Vector3(0.57, 0.35, 0.65), 0.37)
+	drift.mesh = quad
+	drift.position = b.xf.origin
+	drift.extra_cull_margin = width * 0.5
+	drift.visibility_range_end = 180.0
+	drift.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	b.w.add_child(drift)
+
+
 ## The bones of a great whale, washed up long ago: a spine of vertebrae along Z, a curve of ribs either
 ## side rising out of the sand like a hull's frames, and the long skull at the front.
 static func whale_bones(b: MapBuilder, length: float) -> void:
