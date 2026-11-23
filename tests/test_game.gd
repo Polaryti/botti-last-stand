@@ -2684,6 +2684,11 @@ func test_version_10() -> void:
 	ok(moved >= 2, "bots go looking for a fight (%d)" % moved)
 	var victim: BotPlayer = bots[0]
 	var lives: int = Net.lives_of(victim.peer)
+	# This checks death/lives/score, with active combat defences explicitly cleared.
+	victim.pawn.guard_left = 0.0
+	victim.pawn.mods["dodge"] = 0.0
+	victim.pawn._riposte_cd = 999.0
+	victim.pawn.stone_ward = false
 	Net.hit_player(victim.peer, 99999.0, pl.global_position)
 	await seconds(0.3)
 	ok(victim.down and victim.body.dead, "a bot can be defeated")

@@ -221,6 +221,8 @@ func _keep(z: Zombie, to: Vector3, dist: float, band: Vector2, delta: float, tar
 		want = -1.0
 	elif dist > band.y:
 		want = 1.0
+	# Cover must not make a ranged creature idle forever inside its preferred distance band.
+	if not _clear(z, target) and dist > 2.4: want = 1.0
 	var dir := to.normalized() * want if dist > 0.1 else Vector3.ZERO
 	dir.y = 0.0
 	var speed := z._speed * (0.5 if z._slow > 0.0 else 1.0) * (z.world.tide.quickens(z) if z.world.tide else 1.0)
