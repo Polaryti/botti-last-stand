@@ -1698,7 +1698,8 @@ func _harpooner() -> void:
 
 
 ## Two Tidecallers: the other phone's wave rolls on this phone too and strikes this phone's creature;
-## its Deep Song rings round it here; and as a Fogbinder its fog blinds this phone's creature.
+## its Tide Shell shows round its body here; its Stormspear strikes this phone's creature and its
+## lightning shows; and the sea serpent it calls up rises here too.
 func _tidecaller() -> void:
 	w.director.running = false
 	w.director.set_process(false)
@@ -1739,36 +1740,49 @@ func _tidecaller() -> void:
 		ok(z != null and z.hp < 2000.0, "the other phone's wave struck this phone's creature (%.0f)" % (2000.0 - z.hp if z else 0.0))
 	await sync(623)
 	if not host:
-		pl.grant_all_points()
-		for step in 4:
-			pl.choose_ability(step, 1 if step == 3 else 0)
-		pl.mana = pl.max_mana()
-		TidecallerKit.deep_song(pl)
+		TidecallerKit.raise_shell(pl)
 	await wait(0.6)
-	ok(w.get_children().any(func(n: Node) -> bool: return n is DeepSong and (n as DeepSong).owner_peer == (Net.my_id() if not host else _other())), "the Deepsinger's song rings round them on this phone")
 	await sync(624)
-	if not host:
-		for n: Node in w.get_children():
-			if n is DeepSong:
-				n.queue_free()
-	await wait(0.4)
+	if host:
+		var a := Net.avatar(_other())
+		ok(a != null and a.get_children().any(func(n: Node) -> bool: return n is TideShell), "the other phone's Tide Shell shows round its body here")
 	await sync(625)
-	if host:
-		var z: Zombie = w.zombie_by_id(mine)
-		told.rpc(var_to_str(z.position))
-	await wait(0.5)
-	await sync(626)
 	if not host:
-		var at: Vector3 = str_to_var(_told)
-		w.fog_bank(pl.net_id(), at, TidecallerKit.FOG_RADIUS, TidecallerKit.FOG_BLIND, 0)
-		Net.fog_bank(pl.net_id(), at, TidecallerKit.FOG_RADIUS, TidecallerKit.FOG_BLIND, 0)
-	await wait(0.8)
+		pl.shell_left = 0.01 # it runs out, and bursts
+	await wait(0.6)
+	await sync(626)
+	if host:
+		var a := Net.avatar(_other())
+		ok(a != null and not a.get_children().any(func(n: Node) -> bool: return n is TideShell and not (n as TideShell).gone()), "and goes when it bursts")
 	await sync(627)
-	ok(w.get_children().any(func(n: Node) -> bool: return n is FogBank), "the fog bank stands on this phone")
+	var before := 0.0
+	if host:
+		before = w.zombie_by_id(mine).hp
+		told.rpc(var_to_str(before))
+	await wait(0.4)
+	await sync(628)
+	var arcs := false
+	if not host:
+		pl.mana = pl.max_mana()
+		TidecallerKit.stormspear(pl)
+	for i in 20:
+		arcs = arcs or w.get_children().any(func(n: Node) -> bool: return n is StormArc)
+		await wait(0.03)
+	ok(arcs, "the Stormspear's lightning shows on this phone")
+	await wait(0.4)
+	await sync(629)
 	if host:
 		var z: Zombie = w.zombie_by_id(mine)
-		ok(z != null and z.blind_left > 0.0 and z._slow > 0.0, "the other phone's fog blinded and slowed this phone's creature")
-	await sync(628)
+		ok(z != null and z.hp < before, "the other phone's Stormspear struck this phone's creature (%.0f)" % (before - z.hp if z else 0.0))
+	await sync(630)
+	if not host:
+		TidecallerKit.call_of_the_deep(pl)
+		ok(TidecallerKit.serpent_of(pl) != null, "a sea serpent rises beside this phone's Deepcaller")
+	await wait(0.8)
+	await sync(631)
+	if host:
+		ok(w.allies.any(func(a: Ally) -> bool: return a.kind == "sea_serpent" and a.remote_owner == _other()), "and rises on this phone too")
+	await sync(632)
 
 
 ## Two Ferrymen: the other phone's skiff glides here too and strikes this phone's creature; a

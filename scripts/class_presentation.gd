@@ -56,7 +56,7 @@ const COPY := {
 	],
 	"tidecaller": [
 		"The sea comes when it is called.",
-		"Spend tide on waves that throw them back, and specialize in breakers, the drowned's song or binding fog."
+		"Draw tide with every Trident thrust and spend it on the sea, and specialize in a shell of seawater, the storm or a serpent from the deep."
 	],
 	"ferryman": [
 		"Every soul pays for its passage.",

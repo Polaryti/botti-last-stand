@@ -288,6 +288,22 @@ func set_fallen(on: bool) -> void:
 ## Straight there, without gliding across the map on the way.
 ## A Psychopomp's souls, circling this avatar as they circle the player on their own phone.
 var _soul_ring: SoulRing
+## Someone's Tide Shell, as their phone says it is.
+var _tide_shell: TideShell
+func set_tide_shell(up: bool) -> void:
+	if up and (_tide_shell == null or not is_instance_valid(_tide_shell)):
+		_tide_shell = TideShell.new(false)
+		add_child(_tide_shell)
+	if _tide_shell and is_instance_valid(_tide_shell):
+		_tide_shell.set_fill(1.0 if up else 0.0)
+
+
+func _drop_tide_shell() -> void:
+	if _tide_shell and is_instance_valid(_tide_shell) and _tide_shell.gone():
+		_tide_shell.queue_free()
+		_tide_shell = null
+
+
 func set_souls(n: int) -> void:
 	if _soul_ring == null:
 		if n <= 0:
@@ -400,6 +416,10 @@ func show_statuses(bits: int) -> void:
 
 func _process(delta: float) -> void:
 	bar_time = maxf(0.0, bar_time - delta)
+	if _tide_shell:
+		if dead:
+			_tide_shell.set_fill(0.0)
+		_drop_tide_shell()
 	if _flash > 0.0:
 		_flash -= delta
 		if _flash <= 0.0:

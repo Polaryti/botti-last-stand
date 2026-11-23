@@ -38,7 +38,7 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	# Last Light: the Leviathan of the Mists, a waystation's brazier, the lighthouse lit again
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
 	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
-	"call_tide", "tsunami", "deep_song", "bind_fog",
+	"call_tide", "tide_shell", "shell_burst", "stormspear", "chain_lightning", "maelstrom", "serpent_rise", "serpent_bite", "shell_hit",
 	"crossing", "toll_bell", "obol", "souls_go",
 	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
 	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop",

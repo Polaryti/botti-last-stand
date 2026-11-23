@@ -14,5 +14,5 @@
   "plague_doctor": ["apothecary", "pestilence", "rat_king"],
   "ranger": ["sharpshooter", "trapper", "beastmaster"],
   "revenant": ["leaper", "rift", "summoner"],
-  "tidecaller": ["wavebreaker", "deepsinger", "fogbinder"]
+  "tidecaller": ["tidewarden", "stormcaller", "deepcaller"]
 }

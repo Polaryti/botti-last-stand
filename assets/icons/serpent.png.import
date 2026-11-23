@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://kdb23tnn6kr3"
-path="res://.godot/imported/spec_wavebreaker.png-c8985ab4db3a03e5838bc6697279c0f4.ctex"
+uid="uid://b6crrv5s0x0bp"
+path="res://.godot/imported/serpent.png-d17fd83fde1325ae8c4c353471b59d9b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/spec_wavebreaker.png"
-dest_files=["res://.godot/imported/spec_wavebreaker.png-c8985ab4db3a03e5838bc6697279c0f4.ctex"]
+source_file="res://assets/icons/serpent.png"
+dest_files=["res://.godot/imported/serpent.png-d17fd83fde1325ae8c4c353471b59d9b.ctex"]
 
 [params]
 

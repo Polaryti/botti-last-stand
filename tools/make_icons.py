@@ -770,7 +770,26 @@ def trident():
 def crest_tidecaller():
     # A sea-green round shield with a wave curling over it and three tines rising from the crest.
     return (circ(("#36c6b8", "#0d4a46"), 50, 52, 44, 4) + at(50, 44, 0.62, trident_upright()) + at(50, 70, 0.6, wave()))
-for g in (song, trident):
+def shell():
+    # Tide Shell: a dome of seawater over the ground, a curl of light running round it and drops
+    # flying off its top.
+    return (path(("#a8f4ea", "#1f7f78"), "M10 86 C10 44 28 18 50 18 C72 18 90 44 90 86Z", 3.6)
+        + path(("#e6fffb", "#5fd8cc"), "M22 74 C24 50 36 34 52 30 C40 40 34 56 34 76Z", 0)
+        + curve("#ffffff", 3.4, "M24 62 C40 48 62 46 78 58", ink=False)
+        + line("#4ac0b2", 5, (4, 88), (96, 88))
+        + circ(("#e6fffb", "#5fd8cc"), 30, 12, 4.4, 1.6) + circ(("#e6fffb", "#5fd8cc"), 70, 10, 3.6, 1.6) + circ(("#e6fffb", "#5fd8cc"), 50, 6, 3, 1.4))
+def serpent():
+    # A sea serpent's neck rearing out of a swirl of water: green scale, a finned crest that glows,
+    # jaws open, a pale eye.
+    scale_ = ("#3aa890", "#0e3a36"); fin_ = ("#8ff5d8", "#1c8f7a")
+    return (path(scale_, "M30 92 C26 70 30 50 44 38 C52 30 54 22 52 14 L74 10 C86 12 92 22 88 32 L70 38 C60 44 52 58 50 72 C49 82 50 88 52 92Z")
+        + path(("#d4ead0", "#6a8a66"), "M38 90 C36 74 40 58 50 48 L54 52 C48 62 46 76 46 90Z", 1.6)
+        + path(fin_, "M46 40 L36 30 L48 34 L44 22 L54 28 L54 16 L60 24Z", 1.6)
+        + path(("#2a0a10", "#0a0204"), "M70 38 L92 44 L86 32Z", 1.6)
+        + ell(("#f0ffe0", "#8ff5d8"), 70, 22, 4, 2.4, -20, 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M6 90 C18 82 30 94 46 88 C62 82 76 94 94 86 L94 98 L6 98Z")
+        + curve("#dcfdf8", 3, "M14 86 C24 80 34 88 42 84", ink=False))
+for g in (song, trident, shell, serpent):
     PLAIN.append(g)
 CRESTS.append(crest_tidecaller)
 
@@ -866,9 +885,9 @@ SPECS = {
     "tollkeeper": ("ferryman", lambda: at(40, 56, 0.6, coin()) + at(64, 40, 0.5, coin()) + at(60, 70, 0.4, coin())),
     "boatman": ("ferryman", lambda: at(50, 54, 0.9, skiff())),
     "psychopomp": ("ferryman", lambda: at(50, 52, 0.66, soul()) + at(24, 30, 0.3, soul()) + at(78, 32, 0.3, soul())),
-    "wavebreaker": ("tidecaller", lambda: at(50, 56, 0.86, wave()) + "".join(circ(("#ffffff", "#9ad8e8"), x, y, r, 1.4) for x, y, r in ((70, 24, 5), (82, 34, 3.5), (60, 16, 3)))),
-    "deepsinger": ("tidecaller", lambda: at(50, 54, 0.86, song())),
-    "fogbinder": ("tidecaller", lambda: at(50, 50, 0.8, mist()) + at(50, 52, 0.42, chain())),
+    "tidewarden": ("tidecaller", lambda: at(50, 54, 0.86, shell()) + at(50, 52, 0.5, trident_upright())),
+    "stormcaller": ("tidecaller", lambda: at(46, 54, 0.8, trident()) + at(72, 30, 0.42, bolt()) + at(26, 30, 0.26, bolt())),
+    "deepcaller": ("tidecaller", lambda: at(50, 52, 0.9, serpent())),
     "reaver": ("harpooner", lambda: at(46, 54, 0.66, turn(-20, cutlass())) + at(74, 30, 0.34, drop()) + at(26, 30, 0.22, drop())),
     "rigger": ("harpooner", lambda: line("#e8d6a8", 5, (14, 70), (86, 38)) + rect(WOOD, 10, 62, 8, 30, 2) + rect(WOOD, 82, 30, 8, 30, 2) + at(50, 70, 0.4, rope())),
     "leviathan_hunter": ("harpooner", lambda: at(42, 60, 0.7, leviathan_head()) + at(60, 42, 0.72, turn(-10, harpoon()))),

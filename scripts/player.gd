@@ -122,7 +122,7 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0,
 	"haul_range": 0.0, "haul_cd": 1.0, "haul_stun": 0.0, "path_cd": 1.0, "blood_time": 0.0, "line_time": 0.0, "lines": 0.0, "line_reach": 0.0,
 	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0,
-	"wave_damage": 0.0, "wave_range": 0.0, "song_reach": 0.0, "song_time": 0.0, "song_heal": 0.0, "fog_radius": 0.0, "fog_time": 0.0, "fog_reach": 0.0,
+	"trident_reach": 0.0, "trident_hits": 0.0, "trident_tide": 0.0, "shell_hp": 0.0, "spear_range": 0.0, "chains": 0.0, "serpent_time": 0.0,
 	"cross_reach": 0.0, "ferry_cast_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
@@ -610,6 +610,10 @@ func readiness() -> Array[Dictionary]:
 		for e: Dictionary in _triggers.get(event, []):
 			if e.has("nth") and kind == WeaponDefs.Kind.MELEE:
 				every.call("nth_" + str(e.get("from", event)), {"name": e.get("from_name", ""), "icon": e.get("from_icon", "star+up")}, "fire", int(e["nth"]), int(e["count"]) % int(e["nth"]))
+	if wid == "trident" and has_flag("skewer"):
+		every.call("skewer", _ability_look("skewer"), "fire", TidecallerKit.SKEWER_EVERY, trident_thrusts % TidecallerKit.SKEWER_EVERY)
+	if spec_id == "stormcaller" and has_flag("maelstrom"):
+		every.call("maelstrom", _ability_look("maelstrom"), "art", TidecallerKit.MAELSTROM_EVERY, spears_thrown % TidecallerKit.MAELSTROM_EVERY)
 	if spec_id == "pyromaniac" and has_item("great_keg"):
 		every.call("great_keg", _item_look("great_keg", UiTheme.EMBER), "art", PathUpgrades.GREAT_KEG_EVERY, bombs_thrown % PathUpgrades.GREAT_KEG_EVERY)
 	if spec_id == "blade_dancer" and has_item("encore"):
@@ -632,6 +636,10 @@ func readiness() -> Array[Dictionary]:
 		armed.call("next_blow", look, "fire", true)
 	if has_flag("assassin") and kind == WeaponDefs.Kind.MELEE and world:
 		armed.call("assassin", _ability_look("death_dark"), "fire", _unaware_in_reach(float(d.get("range", 2.0)) + 0.5))
+	if has_flag("unbroken_sea"):
+		armed.call("unbroken_sea", _ability_look("unbroken_sea"), "", unbroken_cd <= 0.0)
+	if shell_left > 0.0:
+		armed.call("tide_shell", {"name": "Tide Shell: %d" % int(ceilf(shell_hp)), "icon": "shell", "color": TidecallerKit.TIDE}, "", false, true)
 	if has_flag("perfect_riposte"):
 		armed.call("riposte", _ability_look("perfect_riposte"), "", _riposte_cd <= 0.0)
 	if has_power("stone_sprite"):
@@ -1144,6 +1152,9 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if attacker and m("thorns") > 0.0:
 		attacker.take_damage(m("thorns"), attacker.position - global_position, 1.0, attacker.centre())
 	dmg = PathUpgrades.soul_link(self, dmg)
+	dmg = TidecallerKit.on_hurt(self, dmg, attacker)
+	if dmg <= 0.0:
+		return
 	if ward_hp > 0.0:
 		var stopped := minf(ward_hp, dmg)
 		ward_hp -= stopped
@@ -1163,7 +1174,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	damaged.emit(dmg, hit_by)
 	var push := global_position - from
 	push.y = 0
-	if push.length_squared() > 0.001:
+	if push.length_squared() > 0.001 and not TidecallerKit.steady(self):
 		# A bridge has no sides, and a good blow can put you over the edge.
 		var on_bridge := world.terrain.has_islands() and world.terrain.on_deck(global_position.x, global_position.z)
 		var thrown: bool = on_bridge or (attacker != null and attacker.def.get("shoves", false))
@@ -1202,7 +1213,7 @@ func ignite(seconds: float) -> void:
 ## A creature's sting or blow that stuns: for just as long as it says (not shortened, as another
 ## player's stun is), unless you are already stunned or just shook one off.
 func stun_by_creature(seconds: float) -> void:
-	if dead or guard_left > 0.0 or frozen_left > 0.0 or _status_immune > 0.0:
+	if dead or guard_left > 0.0 or frozen_left > 0.0 or _status_immune > 0.0 or TidecallerKit.steady(self):
 		return
 	frozen_left = seconds
 	is_iced = false
@@ -1227,7 +1238,7 @@ func drown(amount: float) -> void:
 
 ## Caught in a Press Gang's net: you can fight and turn, but not move, for as long as it says.
 func root_by_creature(seconds: float) -> void:
-	if dead or guard_left > 0.0:
+	if dead or guard_left > 0.0 or TidecallerKit.steady(self):
 		return
 	rooted_left = maxf(rooted_left, seconds)
 	say("Caught in a net!")
@@ -1247,7 +1258,7 @@ var _drag_to := Vector3.INF
 var _drag_stop := 2.0
 var _drag_left := 0.0
 func drag_to(at: Vector3, stop: float) -> void:
-	if dead or guard_left > 0.0 or is_riding():
+	if dead or guard_left > 0.0 or is_riding() or TidecallerKit.steady(self):
 		return
 	_drag_to = at
 	_drag_stop = stop
@@ -1272,7 +1283,21 @@ func haul_self_to(at: Vector3, stop: float) -> void:
 ## marked (Flensing), each until when it counts. And whether the haul ends in a Grapple Slam.
 var hauled := {}
 var hunted := {}
-var waves_called := 0 # a Wavebreaker's waves, for Tsunami's every third
+# The Tidecaller (TidecallerKit): the Trident's thrusts for Skewer, a Tidewarden's Tide Shell and
+# Unbroken Sea, a Stormcaller's spears for Maelstrom and its Squall Step, and what the Trident last struck.
+var trident_thrusts := 0
+var trident_frame := -1
+var skewering := false
+var trident_prey: Zombie
+var shell_hp := 0.0
+var shell_max := 0.0
+var shell_left := 0.0
+var unbroken_cd := 0.0
+var spears_thrown := 0
+var _squall_t := -1.0
+var _squall_from := Vector3.ZERO
+var _squall_to := Vector3.ZERO
+var _tide_shell: TideShell
 # The Ferryman (FerrymanKit): the Crossing under way, a Tollkeeper's obols and debtors, a Psychopomp's
 # souls, and the timers of the Last Ferry and the Gate of the Dead.
 var obols := 0
@@ -1312,6 +1337,31 @@ func _tick_cross(delta: float) -> void:
 		_was_on_floor = true
 		_land_dip = 0.6
 		FerrymanKit.on_cross_end(self, _cross_from, _cross_to)
+
+
+## A Stormcaller's Squall Step: thrown back on the wind as the spear leaves the hand.
+const SQUALL_TIME := 0.22
+func squall_step(offset: Vector3) -> void:
+	var dir := Vector3(offset.x, 0, offset.z)
+	if dir.length() < 0.1:
+		return
+	_squall_from = global_position
+	_squall_to = leap_landing(global_position, dir.normalized(), dir.length())
+	_squall_t = 0.0
+
+
+func _tick_squall(delta: float) -> void:
+	_squall_t += delta / SQUALL_TIME
+	var f := minf(_squall_t, 1.0)
+	var at := _squall_from.lerp(_squall_to, 1.0 - pow(1.0 - f, 2.0))
+	at.y = world.ground_at(at) + sin(f * PI) * 0.35
+	global_position = at
+	velocity = Vector3.ZERO
+	if _squall_t >= 1.0:
+		_squall_t = -1.0
+		global_position = _squall_to + Vector3.UP * 0.04
+		_was_on_floor = true
+		_land_dip = 0.4
 
 
 func is_crossing() -> bool:
@@ -1421,7 +1471,7 @@ func apply_status(kind: int, seconds: float) -> void:
 				say("Revealed!")
 			invis_lockout = maxf(invis_lockout, seconds)
 		Net.Status.BLIND:
-			# Bound in a rival Fogbinder's fog: the edges of sight close in, as in a Nightfall.
+			# Blinded (Net.Status.BLIND): the edges of sight close in, as in a Nightfall.
 			night_blind_left = maxf(night_blind_left, secs)
 			say("Lost in the fog!")
 
@@ -1966,8 +2016,6 @@ func _on_kill(z: Zombie) -> void:
 		BanditKit.plunder(self, z.position, z.tolled())
 	if class_id == "harpooner":
 		HarpoonerKit.on_kill(self, z)
-	if class_id == "tidecaller":
-		TidecallerKit.on_kill(self)
 	if class_id == "ferryman":
 		FerrymanKit.on_kill(self, z)
 	fire("kill", {"z": z})
@@ -3165,6 +3213,7 @@ func _tick_mist(delta: float) -> void:
 	mirror_hall_left = maxf(0.0, mirror_hall_left - delta)
 	PathUpgrades.tick(self, delta)
 	CrownUpgrades.tick(self, delta)
+	TidecallerKit.tick(self, delta)
 	if _cast_kind == "":
 		return
 	if _cast_kind == "sharpshooter":
@@ -3851,6 +3900,9 @@ func _physics_step(delta: float) -> void:
 	if _cross_t >= 0.0:
 		_tick_cross(delta)
 		return
+	if _squall_t >= 0.0:
+		_tick_squall(delta)
+		return
 	if _leap_t >= 0.0:
 		_tick_leap(delta)
 		return
@@ -4371,9 +4423,9 @@ func melee_stats(d: Dictionary) -> Dictionary:
 		mult *= 1.5
 	return {
 		"damage": WeaponDefs.DAMAGE * mult * float(d.get("power", 1.0)),
-		"range": float(d["range"]) + m("melee_reach"),
+		"range": float(d["range"]) + m("melee_reach") + (m("trident_reach") if d.has("tide") else 0.0),
 		"cone": float(d["cone"]) + m("melee_cone"),
-		"hits": int(d["max_hits"]) + int(m("melee_hits")),
+		"hits": int(d["max_hits"]) + int(m("melee_hits")) + (int(m("trident_hits")) if d.has("tide") else 0),
 		"knock": float(d["knock"]) * m("knock"),
 	}
 

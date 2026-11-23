@@ -2,13 +2,10 @@ class_name TideWave
 extends Node3D
 ## A Tidecaller's wave: a crest of seawater that rolls out over the ground from where it was called,
 ## in a straight line, and breaks at the end of its run. Every phone shows it. What it strikes is
-## worked out on the Tidecaller's own phone (or the host, for a bot), so each blow is counted once;
-## each phone looks after its own people, whom Salt Spray heals as the wave passes.
+## worked out on the Tidecaller's own phone (or the host, for a bot), so each blow is counted once.
 
 const SPEED := 14.0
 const BAND := 1.4 # how deep the crest is: what stands within this behind its front is struck
-## The tree's switches, sent as bits.
-const FLAGS := ["riptide", "breakers", "spray", "drowning", "tsunami"]
 
 var world: World
 var owner_peer := 0
@@ -17,7 +14,6 @@ var dir := Vector3.FORWARD
 var width := 3.0
 var reach := 14.0
 var damage := 0.0
-var bits := 0
 var _run := 0.0
 var _struck := {}
 var _crest: MeshInstance3D
@@ -26,7 +22,7 @@ static var _crest_mesh: Mesh
 static var _water: StandardMaterial3D
 
 
-func _init(owner_world: World, peer: int, start: Vector3, toward: Vector3, wide: float, length: float, power: float, flags: int) -> void:
+func _init(owner_world: World, peer: int, start: Vector3, toward: Vector3, wide: float, length: float, power: float) -> void:
 	world = owner_world
 	owner_peer = peer
 	from = start
@@ -34,12 +30,7 @@ func _init(owner_world: World, peer: int, start: Vector3, toward: Vector3, wide:
 	width = wide
 	reach = length
 	damage = power
-	bits = flags & ((1 << FLAGS.size()) - 1)
 	name = "TideWave%d" % peer
-
-
-func has(flag: String) -> bool:
-	return bits & (1 << FLAGS.find(flag)) != 0
 
 
 func _ready() -> void:
@@ -75,7 +66,7 @@ func _place() -> void:
 	var at := front()
 	at.y = world.ground_at(at)
 	var grow := clampf(_run / 2.0, 0.35, 1.0) * (1.0 - _fading)
-	var tall := (1.6 if has("tsunami") else 1.0) * grow
+	var tall := grow
 	_crest.global_transform = Transform3D(Basis.looking_at(dir, Vector3.UP).scaled(Vector3(width, tall, 1.0 + 0.4 * grow)), at)
 
 
@@ -97,18 +88,8 @@ func _physics_process(delta: float) -> void:
 		world.fx_mist(at + flank + Vector3.UP * 0.5, width * 0.27)
 		world.fx_mist(at - flank + Vector3.UP * 0.5, width * 0.27)
 	_place()
-	if has("spray"):
-		for p: Player in world.local_players():
-			if not p.dead and _in_band(p.global_position) and not _struck.has(p.get_instance_id()) and _friend(p):
-				_struck[p.get_instance_id()] = true
-				p.mended_by_friend(TidecallerKit.SPRAY_HEAL, owner_peer)
 	if owner_is_here():
 		_strike()
-
-
-func _friend(p: Player) -> bool:
-	var peer := p.net_id()
-	return peer == owner_peer or not Net.active() or not Net.bots_foes(owner_peer, peer)
 
 
 ## Inside the crest as it passes: within half the wave's width of its line, and just behind its front.
@@ -129,15 +110,8 @@ func _strike() -> void:
 		if not z.is_alive() or _struck.has(z.get_instance_id()) or not _in_band(z.position, z.body_radius()):
 			continue
 		_struck[z.get_instance_id()] = true
-		var push := -dir if has("riptide") else dir
-		world.damage_zombie(z, by.modify_damage(z, damage), push, 0.0 if has("riptide") else TidecallerKit.WAVE_KNOCK, z.centre(), false)
+		world.damage_zombie(z, by.modify_damage(z, damage), dir, TidecallerKit.WAVE_KNOCK, z.centre(), false)
 		z.slow(TidecallerKit.WAVE_SLOW)
-		if has("riptide"):
-			z.pull_to(by.global_position + dir * 1.5)
-		if has("breakers"):
-			z.stun(TidecallerKit.BREAKERS_STUN)
-		if has("drowning"):
-			z.add_dot(TidecallerKit.DROWNING.x, TidecallerKit.DROWNING.y)
 		world.fx_water(z.centre(), 0.8, Color(0.72, 0.9, 0.92))
 	for r: Target in world.rivals_near(mid, width * 0.5 + BAND + 2.0):
 		if _struck.has(r.get_instance_id()) or not _in_band(r.global_position, 0.4):
@@ -145,8 +119,6 @@ func _strike() -> void:
 		_struck[r.get_instance_id()] = true
 		world.hit_rival(r, damage, from)
 		world.status_rival(r, Net.Status.SLOW, TidecallerKit.WAVE_SLOW)
-		if has("breakers"):
-			world.status_rival(r, Net.Status.STUN, TidecallerKit.BREAKERS_STUN)
 	world.end_act(was)
 
 

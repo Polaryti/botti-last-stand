@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://mpnhabl6ayrv"
-path="res://.godot/imported/spec_deepsinger.png-3d76d6cc39bdd048de3fda1a7244d186.ctex"
+uid="uid://hfahxp3l6qok"
+path="res://.godot/imported/shell.png-ae934017e6810db05dc09509fb67938a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/spec_deepsinger.png"
-dest_files=["res://.godot/imported/spec_deepsinger.png-3d76d6cc39bdd048de3fda1a7244d186.ctex"]
+source_file="res://assets/icons/shell.png"
+dest_files=["res://.godot/imported/shell.png-ae934017e6810db05dc09509fb67938a.ctex"]
 
 [params]
 

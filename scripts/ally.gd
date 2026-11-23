@@ -9,9 +9,9 @@ extends Target
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
 const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0,
-	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0, "lodge_hunter": 90.0}
+	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0, "lodge_hunter": 90.0, "sea_serpent": TidecallerKit.SERPENT_HP}
 const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger",
-	"mist_infantry", "mist_ranger", "mist_heavy", "lodge_hunter"] # new kinds go at the end: their index travels between phones
+	"mist_infantry", "mist_ranger", "mist_heavy", "lodge_hunter", "sea_serpent"] # new kinds go at the end: their index travels between phones
 ## Mist Bastion's garrison: who they are, what they hit for (a weapon blow is 1) and how far from
 ## their post they will go after an enemy.
 ## The Lodge hunters of the Trappers' Guild (TrappersGuild) keep watch the same way, bow in hand.
@@ -28,9 +28,9 @@ const GARRISON_ABREAST := 1.7 # between soldiers side by side
 const GARRISON_RANGER_ROOM := 6.0 # how far from its place a Mist Ranger backs away from what comes at it
 const HEAVY_GUARD := 0.3 # the Mist Heavy's tower shield takes this much off every blow
 const RANGER_SHOT := 0.585 # of a weapon blow, every 1.1 seconds
-const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
-const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
-const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}
+const BEASTS := ["wolf", "raven", "snake", "fox", "rat", "sea_serpent"]
+const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4, "sea_serpent": TidecallerKit.SERPENT_BITE}
+const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5, "sea_serpent": 6.4}
 const RAVEN_HEIGHT := 2.1
 const SNAKE_POISON := 0.35
 const FOX_FOOD := 0.07 # a bite that turns something up, and of those, how many are food
@@ -107,6 +107,8 @@ var _head: Node3D
 var _tail: Node3D
 var _idle_time := 0.0
 var _raven: BirdRig
+var _serpent: SeaSerpentBody
+var grown := 1.0 # a Deepcaller's serpent with Leviathan's Child is bigger
 var _was_striking := false
 var _last_yaw := 0.0
 
@@ -160,6 +162,10 @@ func activate(seconds: float) -> void:
 	net_biting = false
 	_was_striking = false
 	if _snake: _snake.reset_pose()
+	if _serpent:
+		_serpent.rise()
+		grown = 1.0
+		_visual.scale = Vector3.ONE
 	life = seconds
 	remote_owner = 0
 	master = null
@@ -215,6 +221,7 @@ func _build_beast(root: Node3D) -> void:
 	_legs.assign(made["legs"])
 	_snake = made.get("snake")
 	_raven = made.get("raven")
+	_serpent = made.get("serpent")
 
 
 static func _part(root: Node3D, mesh: Mesh, at: Vector3) -> MeshInstance3D:
@@ -230,6 +237,10 @@ static func build_beast_model(beast: String, root: Node3D) -> Dictionary:
 	match beast:
 		"raven": return _raven_model(root)
 		"snake": return _snake_model(root)
+		"sea_serpent":
+			var body := SeaSerpentBody.new()
+			root.add_child(body)
+			return {"head": body, "tail": body, "legs": [] as Array[Node3D], "serpent": body}
 	return _four_legs_model(beast, root)
 
 
@@ -339,6 +350,50 @@ func _tick_body(delta: float) -> void:
 		PathUpgrades.body_strikes(self, me)
 
 
+# --- A Deepcaller's sea serpent (TidecallerKit) ---------------------------------------------------
+
+## Pack Hunter: what the Deepcaller's Trident struck last, if it is still there and near.
+func _serpent_prey(seen: Zombie) -> Zombie:
+	var me := _master()
+	if me and me.has_flag("pack_hunter") and me.trident_prey and is_instance_valid(me.trident_prey) and me.trident_prey.is_alive() \
+			and me.trident_prey.position.distance_to(position) <= 16.0:
+		return me.trident_prey
+	return seen
+
+
+func _serpent_bite(z: Zombie, bite: float, me: Player) -> float:
+	if me == null:
+		return bite
+	if me.has_flag("pack_hunter") and z == me.trident_prey:
+		bite *= 1.0 + TidecallerKit.PACK_HUNTER
+	if me.has_flag("venom_of_the_deep"):
+		z.add_dot(TidecallerKit.VENOM.x, TidecallerKit.VENOM.y)
+	if me.has_flag("coil"):
+		z.root(TidecallerKit.COIL_HOLD, true)
+	return bite
+
+
+## Leviathan's Child: it lashes what the Trident just struck.
+func lash(z: Zombie, amount: float) -> void:
+	if dead or not z.is_alive():
+		return
+	var to := z.position - position
+	rotation.y = atan2(to.x, to.z)
+	_attack_left = 0.35
+	var me := _master()
+	var was := world.begin_act(me)
+	z.take_damage(amount, to, 1.5, z.centre())
+	world.end_act(was)
+	if not z.is_alive() and me:
+		me.on_ally_kill()
+
+
+## Called up again while it is still here: it dives and rises anew.
+func rise_again() -> void:
+	if _serpent:
+		_serpent.rise()
+
+
 func strike_anim() -> void:
 	_strike_left = 0.5
 	_current = ""
@@ -356,9 +411,13 @@ func _die() -> void:
 		me.mist_burst_at(position + Vector3.UP, 0.4)
 	if kind == "revenant" and me and not _faded:
 		PathUpgrades.soul_returns(me)
+	if kind == "sea_serpent" and me and not _faded:
+		TidecallerKit.serpent_fell(me)
+	if _serpent:
+		_serpent.sink()
 	dead = true
 	collision_layer = 0
-	_dying = 1.2 if _anim else 0.3
+	_dying = 1.2 if _anim else 1.0 if _serpent else 0.3
 	_current = ""
 	_play("Death_A", 1.3)
 	if me:
@@ -421,6 +480,8 @@ func _tick_own(delta: float) -> void:
 		_think = 0.25
 		_foe = world.nearest_zombie(global_position + Vector3.UP, 16.0, true)
 		_rival = world.nearest_rival(global_position + Vector3.UP, 16.0)
+		if kind == "sea_serpent":
+			_foe = _serpent_prey(_foe)
 		if kind == "decoy" or kind == "body":
 			_foe = null
 			_rival = null
@@ -463,7 +524,7 @@ func _tick_own(delta: float) -> void:
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
 			world.hit_rival(_rival, WeaponDefs.DAMAGE * dmg_mult * 0.7, position)
-			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
+			world.sfx_at("serpent_bite" if kind == "sea_serpent" else "wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -6.0 if kind == "sea_serpent" else -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
 	elif _foe and _foe.is_alive():
@@ -476,7 +537,10 @@ func _tick_own(delta: float) -> void:
 			_attack_left = 0.5 if _anim else 0.25
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
-			_foe.take_damage(WeaponDefs.DAMAGE * dmg_mult * float(BEAST_BITE.get(kind, 0.7 if kind == "revenant" else 0.8 if kind == "skeleton" else 1.0)), to, 2.0, _foe.centre())
+			var bite := WeaponDefs.DAMAGE * dmg_mult * float(BEAST_BITE.get(kind, 0.7 if kind == "revenant" else 0.8 if kind == "skeleton" else 1.0))
+			if kind == "sea_serpent":
+				bite = _serpent_bite(_foe, bite, player)
+			_foe.take_damage(bite, to, 2.0, _foe.centre())
 			if _foe.is_alive() and kind == "artificer":
 				_foe.ignite(ZombieDefs.BURN_SECONDS)
 			if not _foe.is_alive() and player:
@@ -493,7 +557,9 @@ func _tick_own(delta: float) -> void:
 					Game.note_poison(40.0)
 			if kind == "fox":
 				_forage()
-			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
+			if kind == "sea_serpent":
+				world.fx_water(_foe.centre(), 0.7)
+			world.sfx_at("serpent_bite" if kind == "sea_serpent" else "wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -6.0 if kind == "sea_serpent" else -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
 	elif player:
@@ -781,6 +847,11 @@ func _move_wolf(delta: float, moving: bool) -> void:
 	if _snake:
 		_snake.moving = moving
 		_snake.biting = _attack_left > 0.0
+		return
+	if _serpent:
+		_serpent.moving = moving
+		_serpent.biting = _attack_left > 0.0 or net_biting
+		_visual.scale = _visual.scale.lerp(Vector3.ONE * grown, minf(1.0, delta * 3.0))
 		return
 	if _legs.is_empty():
 		return

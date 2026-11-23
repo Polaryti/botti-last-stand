@@ -2,6 +2,14 @@
 
 ## Development — Beyond the Mists
 
+### The Tidecaller, reworked
+
+- **The Trident at the heart of it:** health is now 110 (was 95), and the Trident hits harder and draws 6 tide a blow (was 5). The core of the tree is the Trident: Long Haft (reach and one more in the line), Skewer (every third thrust strikes twice as hard, holds and draws tide) and Brine.
+- **Tidewarden** (front line): Tide Shell soaks up harm, refills with every Trident blow and bursts outward. Up to Unbroken Sea: once a minute, a fatal blow passes through water.
+- **Stormcaller** (ranged burst): Trident blows soak enemies; Stormspear's lightning leaps between the soaked. Squall Step carries you back; Maelstrom leaves a storm cell over the fight.
+- **Deepcaller** (summoner): Call of the Deep raises a sea serpent that fights beside you and that enemies turn on. Up to Leviathan's Child: it grows and lashes whatever your Trident strikes.
+- Wavebreaker, Deepsinger and Fogbinder are gone, and with them the Fogbinder's fog and its broken ground. New effects, sounds and icons for every path.
+
 ### Coastal combat and salvage repairs
 
 - Chest weapons now drop beside the chest for a deliberate pickup. The equipped weapon stays with you. Sea chests have hollow interiors and a single hinged lid.

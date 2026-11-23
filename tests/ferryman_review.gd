@@ -37,7 +37,7 @@ func clear() -> void:
 	for z: Zombie in w.zombies.duplicate(): z.release()
 	for l: RigLine in w.rig_lines.duplicate(): w.remove_rig_line(l)
 	for n: Node in w.get_children():
-		if n is DeepSong or n is FogBank or n is TideWave or n is BlackWater or n is FerrySkiff or n is SoulBolt:
+		if n is TideWave or n is StormArc or n is Maelstrom or n is BlackWater or n is FerrySkiff or n is SoulBolt:
 			n.queue_free()
 	await get_tree().process_frame
 

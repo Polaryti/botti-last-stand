@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1ssvud7ps6y5"
-path="res://.godot/imported/spec_fogbinder.png-7e00b9efab9dabaf84c12a1851a4aaa8.ctex"
+uid="uid://b7ywd3vm1lu60"
+path="res://.godot/imported/spec_deepcaller.png-499e935b91dd71559a4c914bfff592b4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/spec_fogbinder.png"
-dest_files=["res://.godot/imported/spec_fogbinder.png-7e00b9efab9dabaf84c12a1851a4aaa8.ctex"]
+source_file="res://assets/icons/spec_deepcaller.png"
+dest_files=["res://.godot/imported/spec_deepcaller.png-499e935b91dd71559a4c914bfff592b4.ctex"]
 
 [params]
 

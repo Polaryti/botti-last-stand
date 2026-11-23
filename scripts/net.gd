@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 67
+const PROTOCOL := 68
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -64,7 +64,7 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	# Last Light
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
 	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
-	"call_tide", "tsunami", "deep_song", "bind_fog",
+	"call_tide", "tide_shell", "shell_burst", "stormspear", "chain_lightning", "maelstrom", "serpent_rise", "serpent_bite", "shell_hit",
 	"crossing", "toll_bell", "obol", "souls_go",
 	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
 	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop",
@@ -1457,7 +1457,7 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.PIN: z.root(a, true)
 		Zombie.Effect.REVEAL: z.reveal(a)
 		Zombie.Effect.HAUL: z.haul_to(Vector3(a, 0.0, b))
-		Zombie.Effect.DRIFT: z.drift_to(Vector3(a, 0.0, b), TidecallerKit.SONG_PULL)
+		Zombie.Effect.DRIFT: z.drift_to(Vector3(a, 0.0, b), CrownUpgrades.HORIZON_PULL) # only Event Horizon draws them now
 		Zombie.Effect.BLIND: z.blind_for(clampf(a, 0.0, 20.0))
 
 
@@ -1786,40 +1786,109 @@ func _from_tidecaller(owner_peer: int) -> bool:
 	return (sender == owner_peer or (sender == 1 and is_bot(owner_peer))) and world != null and is_instance_valid(world)
 
 
-## A Tidecaller's wave, so every phone sees it roll (and mends its own people with Salt Spray).
-func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, bits: int) -> void:
-	_tide_wave.rpc(owner_peer, from, dir, width, length, bits)
+## A Tidecaller's wave, so every phone sees it roll.
+func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float) -> void:
+	_tide_wave.rpc(owner_peer, from, dir, width, length)
 
 
 @rpc("any_peer", "reliable", "call_remote")
-func _tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, bits: int) -> void:
+func _tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float) -> void:
 	if not _from_tidecaller(owner_peer) or not is_finite(from.x) or not is_finite(dir.x):
 		return
-	world.tide_wave(owner_peer, from, dir, clampf(width, 1.0, 12.0), clampf(length, 1.0, 30.0), 0.0, bits)
+	world.tide_wave(owner_peer, from, dir, clampf(width, 1.0, 12.0), clampf(length, 1.0, 30.0), 0.0)
 
 
-## A Deepsinger's song, round the singer on every phone.
-func deep_song(owner_peer: int, reach: float, seconds: float, heal: float, bits: int) -> void:
-	_deep_song.rpc(owner_peer, reach, seconds, heal, bits)
+## A Tide Shell raised round someone (a Tidewarden, or a friend it lent one to), or given way. Every
+## other phone shows the bubble on their body, and the burst where it broke.
+func tide_shell(owner_peer: int, up: bool, at := Vector3.INF, reach := 0.0) -> void:
+	_tide_shell.rpc(owner_peer, up, at, reach)
 
 
 @rpc("any_peer", "reliable", "call_remote")
-func _deep_song(owner_peer: int, reach: float, seconds: float, heal: float, bits: int) -> void:
-	if not _from_tidecaller(owner_peer):
+func _tide_shell(owner_peer: int, up: bool, at: Vector3, reach: float) -> void:
+	if not _from_owner(owner_peer):
 		return
-	world.deep_song(owner_peer, clampf(reach, 1.0, 20.0), clampf(seconds, 0.5, 15.0), clampf(heal, 0.0, 12.0), bits)
+	var a := avatar(owner_peer)
+	if a:
+		a.set_tide_shell(up)
+		if up:
+			world.sfx_here("tide_shell", a.global_position, -4.0)
+	if not up and is_finite(at.x) and reach > 0.0:
+		world.tide_burst(at, clampf(reach, 1.0, 8.0))
 
 
-## A Fogbinder's fog bank, on every phone.
-func fog_bank(owner_peer: int, at: Vector3, radius: float, blind: float, bits: int) -> void:
-	_fog_bank.rpc(owner_peer, at, radius, blind, bits)
+## A Tidewarden's Tidal Ward on a friend: a shell of their own.
+func shell_peer(peer: int, amount: float, seconds: float) -> void:
+	if is_bot(peer):
+		if is_host():
+			_lend_shell(local_player(peer), amount, seconds)
+		else:
+			_bot_shell.rpc_id(1, peer, amount, seconds)
+		return
+	if peer == my_id():
+		_lend_shell(world.player, amount, seconds)
+		return
+	_shell.rpc_id(peer, amount, seconds)
+
+
+@rpc("any_peer", "reliable")
+func _bot_shell(peer: int, amount: float, seconds: float) -> void:
+	shell_peer(peer, clampf(amount, 0.0, 200.0), clampf(seconds, 0.0, 20.0))
+
+
+@rpc("any_peer", "reliable")
+func _shell(amount: float, seconds: float) -> void:
+	if world and is_instance_valid(world):
+		_lend_shell(world.player, clampf(amount, 0.0, 200.0), clampf(seconds, 0.0, 20.0))
+
+
+func _lend_shell(p: Player, amount: float, seconds: float) -> void:
+	if p and not p.dead:
+		TidecallerKit.lend_shell(p, amount, seconds)
+
+
+## A Stormcaller's spear and the leaps of its lightning, on every phone.
+func storm_arcs(owner_peer: int, points: PackedVector3Array) -> void:
+	_storm_arcs.rpc(owner_peer, points)
 
 
 @rpc("any_peer", "reliable", "call_remote")
-func _fog_bank(owner_peer: int, at: Vector3, radius: float, blind: float, bits: int) -> void:
+func _storm_arcs(owner_peer: int, points: PackedVector3Array) -> void:
+	if not _from_tidecaller(owner_peer) or points.size() < 2 or points.size() > 12:
+		return
+	for at: Vector3 in points:
+		if not is_finite(at.x) or not is_finite(at.y) or not is_finite(at.z):
+			return
+	world.storm_arcs(points)
+	world.sfx_here("stormspear", points[0], -4.0)
+	if points.size() > 2:
+		world.sfx_here("chain_lightning", points[points.size() - 1], -5.0)
+
+
+## A Stormcaller's Maelstrom, a storm over the fight on every phone (its bolts are struck by the caster's).
+func maelstrom(owner_peer: int, at: Vector3) -> void:
+	_maelstrom.rpc(owner_peer, at)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _maelstrom(owner_peer: int, at: Vector3) -> void:
 	if not _from_tidecaller(owner_peer) or not is_finite(at.x):
 		return
-	world.fog_bank(owner_peer, at, clampf(radius, 1.0, 12.0), clampf(blind, 0.5, 12.0), bits)
+	world.maelstrom(owner_peer, at)
+
+
+## A bolt from someone's Maelstrom, so every phone sees where it fell.
+func maelstrom_bolt(owner_peer: int, at: Vector3) -> void:
+	_maelstrom_bolt.rpc(owner_peer, at)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _maelstrom_bolt(owner_peer: int, at: Vector3) -> void:
+	if not _from_tidecaller(owner_peer) or not is_finite(at.x):
+		return
+	for n: Node in world.get_children():
+		if n is Maelstrom and (n as Maelstrom).owner_peer == owner_peer:
+			(n as Maelstrom).show_bolt(at)
 
 
 ## A Cartographer's beacon, so every phone has the same markers and lines.

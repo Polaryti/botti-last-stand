@@ -853,38 +853,97 @@ def call_tide():
     return reverb(draw + roll + hiss + thud(m, 0.3, 0.6, 60), 1.0, 0.3)
 
 
-def tsunami():
-    """A Tsunami: the same call, but the whole sea stands up and comes down like a cliff falling."""
-    m = n(2.6)
+def tide_shell():
+    """Tide Shell: water drawn up round you in a rush, closing over with a glassy ring."""
+    m = n(1.3)
     tt = t_(m)
-    swell = band(noise(m), 60, 1200) * np.clip(tt / 0.8, 0, 1) ** 1.5 * np.exp(-np.clip(tt - 1.0, 0, 9) * 1.6)
-    crash = band(noise(m), 150, 5000) * at(env(n(1.6), 0.01, 2.2), 0.9, 2.6) * 0.9
-    return reverb(swell + crash + thud(m, 0.9, 1.4, 42), 2.0, 0.4)
+    rush = sweep_filter(noise(m), 300, 2600, 0.5) * np.clip(tt / 0.35, 0, 1) * np.exp(-np.clip(tt - 0.35, 0, 9) * 3.5) * 0.7
+    ring = at(glass(880, 1.0) * env(n(1.0), 0.005, 4.5), 0.3, 1.3) * 0.22
+    return reverb(rush + ring + bubbles(m, 24, 400, 1400, 0.04) * 0.4, 1.2, 0.35)
 
 
-def deep_song():
-    """Deep Song: a wordless chord of low voices under the water, swelling and slowly beating."""
+def shell_hit():
+    """A blow on the Tide Shell: a heavy slap into water and a short, hollow wobble."""
+    m = n(0.45)
+    tt = t_(m)
+    slap = band(noise(m), 250, 2200) * env(m, 0.002, 14) * 0.8
+    wob = np.sin(2 * np.pi * curve(m, (0, 260), (1, 190)).cumsum() / SR) * env(m, 0.005, 9) * (1 + 0.4 * np.sin(2 * np.pi * 18 * tt)) * 0.25
+    return slap + wob
+
+
+def shell_burst():
+    """The shell breaking outward: a burst of spray, a deep boom of water, the patter coming down."""
+    m = n(1.6)
+    tt = t_(m)
+    burst = band(noise(m), 200, 5000) * env(m, 0.003, 5) * 0.9
+    patter = band(noise(m), 1500, 6000) * np.clip((tt - 0.2) / 0.2, 0, 1) * np.exp(-np.clip(tt - 0.4, 0, 9) * 2.5) * 0.25
+    patter *= (rng.random(m) < 0.02) * 3 + 0.2
+    return reverb(burst + patter + thud(m, 0.0, 0.6, 55) * 0.9, 1.4, 0.35)
+
+
+def crackle(m, density=0.004, lo=2500, hi=9000):
+    """Electric crackle: sparse sharp clicks through hissing noise."""
+    clicks = (rng.random(m) < density) * rng.uniform(-1, 1, m)
+    return band(clicks * 3 + noise(m) * 0.15, lo, hi)
+
+
+def stormspear():
+    """Stormspear: a charge building on the tines, then the spear of lightning loosed with a crack."""
+    m = n(1.4)
+    tt = t_(m)
+    charge = np.sin(2 * np.pi * curve(m, (0, 220), (0.25, 900), (1, 900)).cumsum() / SR) * np.clip(tt / 0.25, 0, 1) * np.clip((0.3 - tt) / 0.05, 0, 1) * 0.15
+    crack = crackle(m, 0.02) * at(env(n(0.5), 0.001, 7), 0.25, 1.4) * 0.9
+    zip_ = sweep_filter(noise(m), 4000, 900, 0.3) * at(env(n(0.35), 0.002, 8), 0.25, 1.4) * 0.5
+    roll = lowp(noise(m), 220) * at(env(n(1.1), 0.05, 3), 0.3, 1.4) * 1.4
+    return reverb(charge + crack + zip_ + roll, 1.6, 0.35)
+
+
+def chain_lightning():
+    """Lightning leaping from one to the next: quick snapping cracks, each a little further off."""
+    m = n(1.0)
+    x = np.zeros(m)
+    for i in range(4):
+        c = crackle(n(0.18), 0.05) * env(n(0.18), 0.001, 10) * (0.9 - i * 0.15)
+        s = n(0.06 + i * 0.07)
+        x[s:s + len(c)] += c
+    return reverb(x + lowp(noise(m), 300) * env(m, 0.05, 5) * 0.6, 1.2, 0.3)
+
+
+def maelstrom():
+    """Maelstrom: the sky closing in, wind starting to wheel, rain hissing down, thunder far above."""
     m = n(3.0)
     tt = t_(m)
-    v = np.zeros(m)
-    for f, w in ((110, 1.0), (165, 0.7), (220, 0.5), (277, 0.35)):
-        vib = 1 + 0.006 * np.sin(2 * np.pi * 4.6 * tt + f)
-        v += (np.sin(2 * np.pi * f * tt * vib) + 0.3 * np.sin(4 * np.pi * f * tt * vib)) * w
-    v *= np.sin(np.pi * np.clip(tt / 3.0, 0, 1)) ** 0.8 * 0.18
-    return reverb(lowp(v, 1800) + bubbles(m, 30, 160, 520, 0.05) * 0.3, 2.2, 0.5)
+    wind = sweep_filter(noise(m), 250, 900, 2.0) * (0.5 + 0.5 * np.sin(2 * np.pi * 0.7 * tt)) * np.clip(tt / 0.8, 0, 1) * np.clip((3.0 - tt) / 0.8, 0, 1) * 0.5
+    rain = band(noise(m), 2500, 8000) * np.clip((tt - 0.4) / 0.6, 0, 1) * np.clip((3.0 - tt) / 0.6, 0, 1) * 0.25
+    thunder = lowp(noise(m), 180) * at(env(n(2.0), 0.15, 1.8), 0.6, 3.0) * 1.6
+    return reverb(wind + rain + thunder, 2.4, 0.4)
 
 
-def bind_fog():
-    """Bind the Fog: a cold breath, and fog rolling in thick with a low moan inside it."""
-    m = n(1.8)
+def serpent_rise():
+    """Call of the Deep: the ground going to water under you, a long hiss, and something huge coming up."""
+    m = n(2.0)
     tt = t_(m)
-    breath = band(noise(m), 400, 2600) * np.sin(np.pi * np.clip(tt / 1.8, 0, 1)) ** 1.2 * 0.6
-    moan = np.sin(2 * np.pi * curve(m, (0, 140), (1, 110)).cumsum() / SR) * np.sin(np.pi * np.clip(tt / 1.8, 0, 1)) * 0.12
-    return reverb(breath + moan, 1.8, 0.5)
+    churn = band(noise(m), 150, 1600) * np.clip(tt / 0.5, 0, 1) * np.exp(-np.clip(tt - 0.9, 0, 9) * 2.2) * 0.7
+    surge = sweep_filter(noise(m), 200, 2400, 0.7) * at(env(n(1.0), 0.05, 4), 0.55, 2.0) * 0.8
+    hiss = band(noise(m), 3000, 8000) * at(env(n(0.9), 0.1, 4), 1.0, 2.0) * (1 + 0.6 * np.sin(2 * np.pi * 26 * tt)) * 0.3
+    groan = np.sin(2 * np.pi * curve(m, (0, 70), (0.6, 95), (1, 60)).cumsum() / SR) * np.sin(np.pi * np.clip(tt / 2.0, 0, 1)) * 0.25
+    return reverb(churn + surge + hiss + lowp(groan, 600) + bubbles(m, 30, 200, 800, 0.06) * 0.4, 1.8, 0.4)
+
+
+def serpent_bite():
+    """The serpent striking: a hiss, a whip of a long neck, and jaws slamming shut."""
+    m = n(0.6)
+    tt = t_(m)
+    hiss = band(noise(m), 3500, 9000) * np.clip((0.2 - tt) / 0.2, 0, 1) * 0.3
+    whip = sweep_filter(noise(m), 500, 2500, 0.2) * at(env(n(0.25), 0.01, 6), 0.12, 0.6) * 0.6
+    snap = band(noise(m), 600, 3000) * at(env(n(0.12), 0.001, 25), 0.3, 0.6) * 1.0
+    return hiss + whip + snap + thud(m, 0.3, 0.2, 90) * 0.5
 
 
 SOUNDS.update({
-    "call_tide": (call_tide, 0.8), "tsunami": (tsunami, 0.9), "deep_song": (deep_song, 0.7), "bind_fog": (bind_fog, 0.7),
+    "call_tide": (call_tide, 0.8), "tide_shell": (tide_shell, 0.7), "shell_hit": (shell_hit, 0.6), "shell_burst": (shell_burst, 0.85),
+    "stormspear": (stormspear, 0.8), "chain_lightning": (chain_lightning, 0.75), "maelstrom": (maelstrom, 0.75),
+    "serpent_rise": (serpent_rise, 0.8), "serpent_bite": (serpent_bite, 0.7),
 })
 
 

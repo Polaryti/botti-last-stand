@@ -1,7 +1,8 @@
 extends Node
 ## The Tidecaller as players will see it: dressed and holding its Trident from the front and behind, the
-## tide bar on the HUD, Call the Tide rolling into a crowd, a Wavebreaker's Tsunami, a Deepsinger's
-## Deep Song drawing enemies in, and a Fogbinder's fog bound round them.
+## tide bar on the HUD, Call the Tide rolling into a crowd, a Tidewarden in its Tide Shell and the shell
+## bursting, a Stormcaller's Stormspear leaping between soaked enemies and its Maelstrom, and a
+## Deepcaller's sea serpent rising, swaying and biting.
 ##     godot --path . res://tests/tidecaller_review.tscn -- OUT
 var out := ""
 var w: World
@@ -37,8 +38,10 @@ func clear() -> void:
 	for z: Zombie in w.zombies.duplicate(): z.release()
 	for l: RigLine in w.rig_lines.duplicate(): w.remove_rig_line(l)
 	for n: Node in w.get_children():
-		if n is DeepSong or n is FogBank or n is TideWave:
+		if n is TideWave or n is StormArc or n is Maelstrom:
 			n.queue_free()
+	for a: Ally in w.allies.duplicate():
+		w.remove_ally(a)
 	await get_tree().process_frame
 
 
@@ -122,35 +125,70 @@ func _ready() -> void:
 	TidecallerKit.call_the_tide(p)
 	await shot("tidecaller_wave", here + Vector3(6, 2.6, -2), here + Vector3(0, 0.6, -6), 0.32)
 	await shot("tidecaller_wave_struck", here + Vector3(6, 2.6, -2), here + Vector3(0, 0.6, -9), 0.35)
-	# A Wavebreaker's Tsunami.
+	# A Tidewarden in its Tide Shell, seen by another player, and the shell bursting.
 	await clear()
 	tidecaller(0, true, here)
-	p.waves_called = TidecallerKit.TSUNAMI_EVERY - 1
-	for i in 5:
-		foe(ground(-3 + i * 1.5, 10))
-	TidecallerKit.call_the_tide(p)
-	await shot("tidecaller_tsunami", here + Vector3(9, 3.5, 1), here + Vector3(0, 0.8, -7), 0.4)
-	# A Deepsinger's song, drawing them in.
+	var warden := Avatar.new(w, 950, {"name": "", "class": "tidecaller", "team": 0})
+	w.add_child(warden)
+	warden.apply_pose(here, PI, 0.0, Vector3.ZERO, 1.0, 0, 0, "trident", 1.0)
+	warden.teleport(here)
+	warden.set_tide_shell(true)
+	for i in 4:
+		var a := TAU * i / 4.0 + 0.4
+		foe(here + Vector3(cos(a) * 2.6, 0, sin(a) * 2.6))
+	await shot("tidecaller_shell", here + Vector3(2.6, 1.9, 3.4), here + Vector3(0, 1.0, 0), 0.8)
+	await shot("tidecaller_shell_close", here + Vector3(1.2, 1.5, 2.0), here + Vector3(0, 1.1, 0), 0.2)
+	TidecallerKit.raise_shell(p)
+	p.global_position = here
+	TidecallerKit.burst(p)
+	warden.set_tide_shell(false)
+	await shot("tidecaller_shell_burst", here + Vector3(4.5, 3.2, 5.0), here + Vector3(0, 0.6, 0), 0.12)
+	warden.queue_free()
+	# A Stormcaller's Stormspear, leaping from soaked enemy to soaked enemy.
 	await clear()
 	tidecaller(1, true, here)
-	for i in 5:
-		var a := TAU * i / 5.0
-		foe(here + Vector3(cos(a) * 7.0, 0, sin(a) * 7.0))
-	TidecallerKit.deep_song(p)
-	var singer := Avatar.new(w, 950, {"name": "", "class": "tidecaller", "team": 0})
-	w.add_child(singer)
-	singer.apply_pose(here, PI, 0.0, Vector3.ZERO, 1.0, 0, 0, "trident", 1.0)
-	singer.teleport(here)
-	await shot("tidecaller_song", here + Vector3(0, 9, 11), here, 1.1)
-	singer.queue_free()
-	# A Fogbinder's fog, bound round a knot of them.
+	var line: Array[Zombie] = [foe(ground(0, 11)), foe(ground(2.2, 8)), foe(ground(-1.6, 6)), foe(ground(1.5, 4)), foe(ground(-2.5, 3))]
+	for z: Zombie in line.slice(1):
+		z.soak(TidecallerKit.SOAK_TIME)
+	var caster := Avatar.new(w, 951, {"name": "", "class": "tidecaller", "team": 0})
+	w.add_child(caster)
+	caster.apply_pose(here, PI, 0.0, Vector3.ZERO, 1.0, 0, 0, "trident", 1.0)
+	caster.teleport(here)
+	await shot("tidecaller_soaked", here + Vector3(5.5, 2.4, -4.0), here + Vector3(0, 1.0, -9), 0.5)
+	p.spears_thrown = 0
+	TidecallerKit.stormspear(p)
+	await shot("tidecaller_stormspear", here + Vector3(7, 3.4, -3), here + Vector3(0, 1.0, -8), 0.2)
+	caster.queue_free()
+	# Its Maelstrom over a crowd.
+	await clear()
+	tidecaller(1, true, here)
+	var eye := ground(0, 10)
+	for i in 6:
+		var a := TAU * i / 6.0
+		foe(eye + Vector3(cos(a) * 3.5, 0, sin(a) * 3.5))
+	w.maelstrom(p.net_id(), eye)
+	await shot("tidecaller_maelstrom", here + Vector3(9, 4.5, 6), eye + Vector3(0, 2.5, 0), 1.6)
+	# A Deepcaller's sea serpent rising beside it, then going for a crowd.
 	await clear()
 	tidecaller(2, true, here)
-	var at := TidecallerKit.fog_point(p)
-	for i in 4:
-		foe(at + Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5)))
-	TidecallerKit.bind_the_fog(p)
-	await shot("tidecaller_fog", here + Vector3(7, 4, 2), at, 0.6)
+	var deep := Avatar.new(w, 952, {"name": "", "class": "tidecaller", "team": 0})
+	w.add_child(deep)
+	deep.apply_pose(here, PI, 0.0, Vector3.ZERO, 1.0, 0, 0, "trident", 1.0)
+	deep.teleport(here)
+	TidecallerKit.call_of_the_deep(p)
+	var serpent := TidecallerKit.serpent_of(p)
+	serpent.set_physics_process(false)
+	serpent.global_position = here + Vector3(1.6, 0, -2.2)
+	serpent.global_position.y = w.ground_at(serpent.global_position)
+	serpent.rotation.y = PI
+	await shot("tidecaller_serpent_rising", here + Vector3(3.5, 1.6, 3.5), serpent.global_position + Vector3(0, 1.4, 0), 0.3)
+	await shot("tidecaller_serpent", here + Vector3(4.2, 2.2, 3.2), serpent.global_position + Vector3(0, 1.6, 0), 1.0)
+	await shot("tidecaller_serpent_close", serpent.global_position + Vector3(2.4, 2.4, -2.6), serpent.global_position + Vector3(0, 2.0, 0), 0.4)
+	serpent.set_physics_process(true)
+	for i in 3:
+		foe(serpent.global_position + Vector3(-1.0 + i, 0, -2.0))
+	await shot("tidecaller_serpent_bite", serpent.global_position + Vector3(4.5, 2.4, 1.0), serpent.global_position + Vector3(0, 1.2, -1.2), 0.62)
+	deep.queue_free()
 	await clear()
 	hud.queue_free()
 	await preload("res://tests/scene_cleanup.gd").finish(w)

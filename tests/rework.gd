@@ -1526,7 +1526,7 @@ func _crown_upgrades() -> void:
 func _trappers_guild() -> void:
 	var d: Dictionary = ShopDefs.ITEMS[TrappersGuild.ID]
 	check(d["section"] == "maps" and d["map"] == "mesenlla" and (d["levels"] as Array).size() == ShopDefs.MAP_LEVELS and Icons.exists(str(d["icon"])) and UpgradeShowcase.shows(TrappersGuild.ID), "the Trappers' Guild is a Map Upgrade of the Valleys, with four levels, its icon and its scene")
-	check(Ally.KINDS.back() == "lodge_hunter" and Ally.GARRISON.has("lodge_hunter"), "the Lodge hunter is a new kind at the end of the list, and keeps watch like the garrison")
+	check(Ally.KINDS.find("lodge_hunter") == Ally.KINDS.find("mist_heavy") + 1 and Ally.GARRISON.has("lodge_hunter"), "the Lodge hunter is a new kind after the Mist Bastion's garrison, and keeps watch like it")
 	for sound: String in ["snare_snap", "trapper_horn", "cache_drop"]:
 		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound, heard on every phone" % sound)
 	var tscn := FileAccess.get_file_as_string("res://maps/mesenlla.tscn")
@@ -1988,10 +1988,10 @@ func _tidecaller() -> void:
 	check(d["weapon"] == "trident" and d.get("mana", false) and d.get("earned", "") == "lighthouses" and not ClassDefs.for_sale().has("tidecaller"), "the Tidecaller starts with its Trident, spends tide, and is earned on the Lantern Road")
 	check(WeaponDefs.ALL["trident"].get("only", "") == "tidecaller" and WeaponDefs.mesh("trident") != null, "the Trident is the Tidecaller's alone")
 	var specs: Array = AbilityData.tree("tidecaller")["specs"].map(func(x: Dictionary) -> String: return x["id"])
-	check(specs == ["wavebreaker", "deepsinger", "fogbinder"], "Wavebreaker, Deepsinger and Fogbinder")
-	for id: String in ["crest_tidecaller", "spec_wavebreaker", "spec_deepsinger", "spec_fogbinder", "song", "trident", "wave", "mist", "feather"]:
+	check(specs == ["tidewarden", "stormcaller", "deepcaller"], "Tidewarden, Stormcaller and Deepcaller")
+	for id: String in ["crest_tidecaller", "spec_tidewarden", "spec_stormcaller", "spec_deepcaller", "shell", "serpent", "trident", "wave", "bolt", "storm", "rain"]:
 		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
-	for sound: String in ["call_tide", "tsunami", "deep_song", "bind_fog", "wave_crash"]:
+	for sound: String in ["call_tide", "tide_shell", "shell_hit", "shell_burst", "stormspear", "chain_lightning", "maelstrom", "serpent_rise", "serpent_bite"]:
 		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
 	check(ClassGear._pieces("tidecaller").has("chest:glow") and Avatar.MODELS.has("tidecaller") and ClassPresentation.COPY.has("tidecaller"), "dressed, seen by others, and described")
 	# Earned by the third Last Light won.
@@ -2043,63 +2043,137 @@ func _tidecaller() -> void:
 	check(is_equal_approx(aside.hp, a0), "but not what stands off to the side")
 	hit.release()
 	aside.release()
-	# Wavebreaker: wider and harder; Riptide drags back; every third a Tsunami.
+	# The core of the tree is the Trident: Long Haft, Skewer, Brine.
+	pawn("tidecaller", 0)
+	await frames(3)
+	_face_ahead()
+	var trident: Dictionary = WeaponDefs.ALL["trident"]
+	var reach: Dictionary = p.melee_stats(trident)
+	check(p.has_flag("skewer") and p.has_flag("brine") and is_equal_approx(float(reach["range"]), float(trident["range"]) + TidecallerKit.LONG_HAFT_REACH)
+		and int(reach["hits"]) == int(trident["max_hits"]) + TidecallerKit.LONG_HAFT_HITS, "Long Haft: the Trident reaches %d m further and strikes %d more" % [int(TidecallerKit.LONG_HAFT_REACH), TidecallerKit.LONG_HAFT_HITS])
+	var pricked := foe("normal", 3.0)
+	var scales: Array[float] = []
+	for i in TidecallerKit.SKEWER_EVERY:
+		scales.append(TidecallerKit.trident_scale(p, pricked))
+		p.mana = 0.0
+		p.on_melee_connect(pricked, trident)
+		await w.get_tree().physics_frame
+	check(is_equal_approx(scales[0], 1.0) and is_equal_approx(scales[TidecallerKit.SKEWER_EVERY - 1], TidecallerKit.SKEWER_MULT * (1.0 + TidecallerKit.BRINE_HARD)),
+		"Skewer: every third thrust strikes twice as hard (and Brine on what the first two slowed): %s" % str(scales))
+	check(pricked.root_left > 0.0 and absf(p.mana - TidecallerKit.TRIDENT_TIDE - TidecallerKit.SKEWER_TIDE) < 0.5, "and holds what it strikes, drawing %d more tide (held %.1f s, %.0f tide)" % [int(TidecallerKit.SKEWER_TIDE), pricked.root_left, p.mana])
+	check(pricked._slow > 0.0, "Brine: Trident blows slow what they strike")
+	pricked.release()
+	# Tidewarden: Tide Shell takes the blows, Trident blows fill it, it bursts; Unbroken Sea.
 	pawn("tidecaller", 0, true)
 	await frames(3)
 	_face_ahead()
-	check(p.art_def()["name"] == "Breaking Wave" and p.has_flag("riptide") and p.has_flag("tsunami"), "a Wavebreaker's tree: Breaking Wave, Riptide, Tsunami")
-	var widths: Array[float] = []
-	for i in 3:
-		TidecallerKit.call_the_tide(p)
-		var waves := w.get_children().filter(func(n: Node) -> bool: return n is TideWave)
-		widths.append((waves.back() as TideWave).width)
-	check(is_equal_approx(widths[0], TidecallerKit.WAVE_WIDTH + TidecallerKit.BREAK_WIDE) and is_equal_approx(widths[2], widths[0] * 2.0), "Breaking Wave is %d m wider, and every third is a Tsunami twice as wide" % int(TidecallerKit.BREAK_WIDE))
-	await frames(40)
-	var dragged := foe("normal", 10.0)
-	TidecallerKit.call_the_tide(p)
-	await frames(60)
-	check(dragged.position.distance_to(p.global_position) < 6.0, "Riptide drags what the wave strikes back toward the Wavebreaker (%.1f m)" % dragged.position.distance_to(p.global_position))
-	dragged.release()
-	# Deepsinger: Deep Song draws them in and mends friends; Lullaby and Requiem when it ends.
+	check(p.art_def()["name"] == "Tide Shell" and p.m("shell_hp") > 0.0 and p.has_flag("steady_footing") and p.has_flag("breakwater") and p.has_flag("unbroken_sea"), "a Tidewarden's tree: Tide Shell, up to Unbroken Sea")
+	var biter := foe("normal", 1.5)
+	var near := foe("normal", 2.5, 1.0)
+	TidecallerKit.raise_shell(p)
+	var full := TidecallerKit.SHELL_BASE + TidecallerKit.SHELL_SHARE * p.max_hp() + TidecallerKit.SHELL_THICK
+	check(is_equal_approx(p.shell_hp, full) and p.shell_left > 0.0, "the shell holds %d (Thick Shell included)" % int(full))
+	await frames(2)
+	check(p.get_children().any(func(n: Node) -> bool: return n is TideShell), "and shows round the Tidewarden")
+	var hp0 := p.hp
+	p.hurt(30.0, biter.position, biter)
+	check(is_equal_approx(p.hp, hp0) and is_equal_approx(p.shell_hp, full - 30.0), "a blow is taken by the shell, not by you")
+	p.on_melee_connect(biter, trident)
+	check(is_equal_approx(p.shell_hp, full - 30.0 + TidecallerKit.SHELL_REFILL), "a Trident blow fills it by %d" % int(TidecallerKit.SHELL_REFILL))
+	p.stun_by_creature(2.0)
+	p.root_by_creature(2.0)
+	check(p.frozen_left <= 0.0 and p.rooted_left <= 0.0, "Steady Footing: while it holds, nothing stuns or holds you")
+	var n0 := near.hp
+	p.hurt(full + 50.0, biter.position, biter)
+	check(p.shell_left <= 0.0 and near.hp < n0 and near._stun > 0.0, "a blow too heavy breaks it: it bursts, striking and (Breakwater) stunning what stands round (%.0f)" % (n0 - near.hp))
+	check(p.hp < hp0, "and the rest of the blow gets through")
+	p.hp = 10.0
+	p.hurt(500.0, biter.position, biter)
+	check(not p.dead and p.guard_left > 0.0 and p.shell_left > 0.0 and p.hp > 10.0, "Unbroken Sea: a fatal blow passes through water, and the shell rises again")
+	p.hp = 5.0
+	p.guard_left = 0.0
+	p.shell_left = 0.0
+	p.shell_hp = 0.0
+	p.hurt(500.0, biter.position, biter)
+	check(p.dead or p.hp <= 0.0, "but only once a minute")
+	biter.release()
+	near.release()
+	# Stormcaller: Trident blows soak; Stormspear leaps between the soaked; Squall Step; Maelstrom.
 	pawn("tidecaller", 1, true)
 	await frames(3)
 	_face_ahead()
-	check(p.art_def()["name"] == "Deep Song" and p.has_flag("requiem"), "a Deepsinger sings Deep Song, up to Requiem of the Deep")
-	var lured := foe("normal", 8.0)
-	lured.stun(30.0) # it would walk in anyway: stood still, only the song moves it
-	var lured_was := lured.position.distance_to(p.global_position)
-	var l0 := lured.hp
-	p.hp = 40.0
-	TidecallerKit.deep_song(p)
-	await frames(30)
-	check(lured.position.distance_to(p.global_position) < lured_was - 0.5 and lured._slow > 0.0, "the song draws an enemy in and slows it (%.1f m, was %.1f)" % [lured.position.distance_to(p.global_position), lured_was])
-	check(p.hp > 40.0, "and mends the singer")
-	lured._stun = 0.0
-	var song: DeepSong = w.get_children().filter(func(n: Node) -> bool: return n is DeepSong).front()
-	song.left = 0.01
-	await frames(4)
-	check(lured.hp < l0 - TidecallerKit.REQUIEM * 0.5 and lured._stun > 0.0, "when it ends: Lullaby puts it to sleep and Requiem strikes it (%.0f)" % (l0 - lured.hp))
-	lured.release()
-	# Fogbinder: Bind the Fog blinds and slows; Mistbound Sea stays and binds what walks in.
+	check(p.art_def()["name"] == "Stormspear" and p.has_flag("charged_tines") and p.m("chains") > 0.0 and p.has_flag("squall_step") and p.has_flag("maelstrom"), "a Stormcaller's tree: Stormspear, up to Maelstrom")
+	var first := foe("normal", 9.0)
+	var wet: Array[Zombie] = [foe("normal", 12.0, 2.0), foe("normal", 15.0, -1.0), foe("normal", 17.5, 2.5)]
+	var dry := foe("normal", 11.0, -4.0)
+	for z: Zombie in wet:
+		p.on_melee_connect(z, trident)
+	check(wet.all(func(z: Zombie) -> bool: return z.soaked_left > 0.0) and dry.soaked_left <= 0.0, "Trident blows soak what they strike")
+	# Both in the same thrust: what tells them apart is the soaking (and Brine, since the soaked one was struck).
+	var ratio := TidecallerKit.trident_scale(p, wet[0]) / TidecallerKit.trident_scale(p, dry)
+	check(is_equal_approx(ratio, (1.0 + TidecallerKit.CHARGED_TINES) * (1.0 + TidecallerKit.BRINE_HARD)), "Charged Tines: soaked enemies take Trident blows %d%% harder (x%.2f)" % [int(TidecallerKit.CHARGED_TINES * 100.0), ratio])
+	var was_at := p.global_position
+	var hps := wet.map(func(z: Zombie) -> float: return z.hp)
+	var f0 := first.hp
+	var d0 := dry.hp
+	TidecallerKit.stormspear(p)
+	check(first.hp < f0 - TidecallerKit.SPEAR_DAMAGE * 0.5, "Stormspear strikes the first enemy in its way (%.0f)" % (f0 - first.hp))
+	var leapt := 0
+	for i in wet.size():
+		if wet[i].hp < float(hps[i]):
+			leapt += 1
+	check(leapt == wet.size() and wet.all(func(z: Zombie) -> bool: return z.soaked_left <= 0.0 and z._stun > 0.0), "its lightning leaps from soaked enemy to soaked enemy, jolting each (%d of %d)" % [leapt, wet.size()])
+	check(is_equal_approx(dry.hp, d0), "but not to one that is dry")
+	check(w.get_children().any(func(n: Node) -> bool: return n is StormArc), "and every leap shows")
+	await frames(20)
+	check(Vector2(p.global_position.x - was_at.x, p.global_position.z - was_at.z).length() > TidecallerKit.SQUALL_STEP * 0.5, "Squall Step carries the Stormcaller back on the wind (%.1f m)" % Vector2(p.global_position.x - was_at.x, p.global_position.z - was_at.z).length())
+	for z: Zombie in wet + [first, dry]:
+		z.release()
+	for i in TidecallerKit.MAELSTROM_EVERY - 1:
+		TidecallerKit.stormspear(p)
+	check(w.get_children().any(func(n: Node) -> bool: return n is Maelstrom), "every third Stormspear leaves a Maelstrom")
+	var under := foe("normal", 0.0)
+	var storm: Maelstrom = w.get_children().filter(func(n: Node) -> bool: return n is Maelstrom).back()
+	under.position = storm.global_position + Vector3(1.0, 0, 0)
+	var u0 := under.hp
+	for i in 90:
+		if under.hp < u0:
+			break
+		await frames(1)
+	check(under.hp < u0 and under.soaked_left > 0.0, "its bolts fall on what is under it, and soak it")
+	under.release()
+	# Deepcaller: Call of the Deep raises a serpent that draws enemies and bites; Bond of Salt; Shed Skin.
 	pawn("tidecaller", 2, true)
 	await frames(3)
 	_face_ahead()
-	check(p.art_def()["name"] == "Bind the Fog" and p.has_flag("fog_field") and p.has_flag("fog_root"), "a Fogbinder binds the fog, up to Mistbound Sea")
-	var spot := TidecallerKit.fog_point(p)
-	check(Vector2(spot.x - p.global_position.x, spot.z - p.global_position.z).length() > 2.0, "the fog lands ahead of it")
-	var lost := foe("normal", 0.0)
-	lost.position = spot + Vector3(1.0, 0, 0)
-	TidecallerKit.bind_the_fog(p)
-	await frames(3)
-	check(lost.blind_left > 0.0 and lost._slow > 0.0 and lost.root_left > 0.0, "what is in the fog is blinded, slowed, and with Fog Chains held")
-	var late := foe("normal", 0.0)
-	late.position = spot + Vector3(-1.0, 0, 0)
-	await frames(20)
-	check(late.blind_left > 0.0, "Mistbound Sea: the fog stays and binds what walks into it")
-	lost.release()
-	late.release()
+	check(p.art_def()["name"] == "Call of the Deep" and p.has_flag("thick_scales") and p.has_flag("pack_hunter") and p.has_flag("coil") and p.m("art_cost") < 1.0 and p.has_flag("leviathans_child"), "a Deepcaller's tree: Call of the Deep, up to Leviathan's Child")
+	var prey := foe("normal", 6.0)
+	TidecallerKit.call_of_the_deep(p)
+	var serpent := TidecallerKit.serpent_of(p)
+	check(serpent != null and serpent.kind == "sea_serpent" and is_equal_approx(serpent.hp, TidecallerKit.SERPENT_HP * (1.0 + TidecallerKit.THICK_SCALES + TidecallerKit.CHILD_HP)), "a sea serpent rises, with Thick Scales and Leviathan's Child health")
+	check(serpent != null and is_equal_approx(serpent.grown, TidecallerKit.CHILD_SIZE), "grown by Leviathan's Child")
+	check(w.nearest_target(prey.position) == serpent or prey.position.distance_to(serpent.global_position) < prey.position.distance_to(p.global_position) + 4.0, "and draws the enemies near it")
+	var p0 := prey.hp
+	p.on_melee_connect(prey, trident)
+	check(prey.hp < p0 and p.trident_prey == prey, "Leviathan's Child: it lashes what the Trident strikes (%.0f)" % (p0 - prey.hp))
+	var bitten := prey.hp
+	for i in 120:
+		if prey.hp < bitten:
+			break
+		await frames(1)
+	check(prey.hp < bitten and prey.root_left > 0.0, "it goes for the Trident's prey and bites it, Coil holding it (%.0f)" % (bitten - prey.hp))
+	TidecallerKit.call_of_the_deep(p)
+	check(TidecallerKit.serpent_of(p) == serpent and w.allies.filter(func(a: Ally) -> bool: return a.kind == "sea_serpent" and not a.dead).size() == 1, "called again, the same serpent rises anew: never two")
+	prey.release()
+	serpent.hurt(9999.0, serpent.global_position)
+	check(serpent.dead, "it can be struck down")
+	for i in 400:
+		if not w.allies.has(serpent):
+			break
+		await frames(1)
+	check(TidecallerKit.serpent_of(p) == null and not w.allies.has(serpent), "and sinks back into the deep")
 	for n: Node in w.get_children():
-		if n is FogBank or n is DeepSong or n is TideWave:
+		if n is TideWave or n is StormArc or n is Maelstrom:
 			n.queue_free()
 
 

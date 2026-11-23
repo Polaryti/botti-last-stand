@@ -1711,7 +1711,10 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 			# A Boarding Hook pulls what it catches towards you: about drags metres, if it can be dragged.
 			push = Vector3(origin.x - centre.x, 0, origin.z - centre.z).normalized()
 			knock = float(d["drags"]) * 8.0 * z._scale if z.draggable() else 0.0
-		damage_zombie(z, attacker.modify_damage(z, float(stats["damage"])), push, knock, centre, false)
+		var blow := attacker.modify_damage(z, float(stats["damage"]))
+		if d.has("tide") and attacker.class_id == "tidecaller":
+			blow *= TidecallerKit.trident_scale(attacker, z) # the Trident's own tree: Skewer, Brine, Charged Tines
+		damage_zombie(z, blow, push, knock, centre, false)
 		last_melee.append(z)
 		attacker.on_melee_connect(z, d)
 		hits += 1
@@ -1880,34 +1883,44 @@ func great_harpoon_mesh() -> Mesh:
 	return _great_harpoon
 
 
-## A Tidecaller's wave, a Deepsinger's song, a Fogbinder's fog: each phone has its own copy, and the
-## caster's phone (or the host, for a bot) does the sums.
-func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, damage: float, bits: int) -> TideWave:
-	var wave := TideWave.new(self, owner_peer, from, dir, width, length, damage, bits)
+## A Tidecaller's wave, a Stormcaller's lightning and Maelstrom, a Tidewarden's burst: each phone has
+## its own copy, and the caster's phone (or the host, for a bot) does the sums.
+func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, damage: float) -> TideWave:
+	var wave := TideWave.new(self, owner_peer, from, dir, width, length, damage)
 	add_child(wave)
 	return wave
 
 
-func deep_song(owner_peer: int, reach: float, seconds: float, heal: float, bits: int) -> DeepSong:
-	for n: Node in get_children():
-		if n is DeepSong and (n as DeepSong).owner_peer == owner_peer:
-			n.queue_free() # a new song takes over from the last
-	var song := DeepSong.new(self, owner_peer, reach, seconds, heal, bits)
-	add_child(song)
-	return song
+## The Stormspear's flight and every leap of its lightning, through these points in turn.
+func storm_arcs(points: PackedVector3Array) -> void:
+	if points.size() < 2:
+		return
+	var arcs := StormArc.new(points)
+	add_child(arcs)
+
+
+func maelstrom(owner_peer: int, at: Vector3) -> Maelstrom:
+	var cell := Maelstrom.new(self, owner_peer, at)
+	add_child(cell)
+	return cell
+
+
+## A Tide Shell gives way: a ring of seawater thrown out over the ground.
+func tide_burst(at: Vector3, reach: float) -> void:
+	var ground := Vector3(at.x, ground_at(at), at.z)
+	fx_ring(ground, reach, Color(0.55, 0.95, 0.95))
+	fx_ring(ground, reach * 0.6, Color(0.8, 1.0, 0.98))
+	fx_mist(ground + Vector3.UP * 0.5, reach * 0.22)
+	for i in 10:
+		var a := TAU * i / 10.0
+		fx_gore(ground + Vector3(cos(a) * reach * 0.7, 0.5, sin(a) * reach * 0.7), Color(0.82, 0.98, 1.0))
+	sfx_here("shell_burst", ground, -1.0)
 
 
 func black_water(owner_peer: int, from: Vector3, to: Vector3, seconds: float) -> BlackWater:
 	var wake := BlackWater.new(self, owner_peer, from, to, seconds)
 	add_child(wake)
 	return wake
-
-
-func fog_bank(owner_peer: int, at: Vector3, radius: float, blind: float, bits: int) -> FogBank:
-	at.y = ground_at(at)
-	var bank := FogBank.new(self, owner_peer, at, radius, blind, bits)
-	add_child(bank)
-	return bank
 
 
 ## A Rigger's lines on this phone, everyone's.
@@ -4103,6 +4116,12 @@ static func _make_bolt() -> ArrayMesh:
 	mat.disable_fog = true
 	m.surface_set_material(0, mat)
 	return m
+
+
+## A sound only this phone hears: for what every phone makes its own copy of anyway.
+func sfx_here(sound: String, at: Vector3, volume := 0.0) -> void:
+	if player:
+		Sfx.play_at(sound, at, _player_camera_position(), volume)
 
 
 func sfx_at(sound: String, at: Vector3, volume := 0.0) -> void:

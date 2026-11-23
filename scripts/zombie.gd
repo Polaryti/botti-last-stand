@@ -58,6 +58,10 @@ var _pull_at := Vector3.ZERO
 var _pull_left := 0.0
 var weapon_id := ""
 var blind_left := 0.0 # inside an enemy Nightfall: sees only BLIND_SIGHT metres
+var soaked_left := 0.0 # soaked by a Stormcaller's Trident, on that Stormcaller's phone (TidecallerKit)
+var _drips: CPUParticles3D
+var _puddle: MeshInstance3D
+static var _puddle_mesh: Mesh
 var burn_time := 0.0
 var xp_value := 10
 var reveal_left := 0.0
@@ -1707,6 +1711,10 @@ func _tick_carried(delta: float) -> void:
 func release() -> void:
 	if not active:
 		return
+	soaked_left = 0.0
+	if _drips:
+		_drips.emitting = false
+		_puddle.visible = false
 	_set_enabled(false)
 	world.recycle_zombie(self)
 	if Net.is_host():
@@ -1714,6 +1722,60 @@ func release() -> void:
 
 
 # --- On a joined phone -------------------------------------------------------
+
+## Soaked by a Stormcaller's Trident: seawater runs off it, and its Stormspear's lightning leaps to it.
+func soak(seconds: float) -> void:
+	if not is_alive():
+		return
+	soaked_left = maxf(soaked_left, seconds)
+	if _drips == null:
+		_drips = CPUParticles3D.new()
+		_drips.amount = 22
+		_drips.lifetime = 0.6
+		_drips.local_coords = false
+		_drips.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		_drips.emission_box_extents = Vector3(body_radius() * 0.8, HEIGHT * _scale * 0.35, body_radius() * 0.8)
+		_drips.direction = Vector3.DOWN
+		_drips.spread = 12.0
+		_drips.gravity = Vector3(0, -9.0, 0)
+		_drips.initial_velocity_min = 0.4
+		_drips.initial_velocity_max = 1.2
+		_drips.scale_amount_min = 0.6
+		_drips.scale_amount_max = 1.0
+		var drop := SphereMesh.new()
+		drop.radius = 0.045
+		drop.height = 0.13
+		drop.radial_segments = 4
+		drop.rings = 2
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(0.6, 0.92, 1.0)
+		drop.material = m
+		_drips.mesh = drop
+		_drips.position = Vector3.UP * HEIGHT * _scale * 0.55
+		_drips.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_drips)
+		# The seawater running off it pools round its feet, glinting.
+		if _puddle_mesh == null:
+			var ring := TorusMesh.new()
+			ring.inner_radius = 0.7
+			ring.outer_radius = 1.0
+			ring.rings = 18
+			ring.ring_segments = 4
+			var glint := StandardMaterial3D.new()
+			glint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			glint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			glint.albedo_color = Color(0.5, 0.85, 1.0, 0.45)
+			ring.material = glint
+			_puddle_mesh = ring
+		_puddle = MeshInstance3D.new()
+		_puddle.mesh = _puddle_mesh
+		_puddle.position.y = 0.06
+		_puddle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_puddle)
+	_drips.emitting = true
+	_puddle.visible = true
+
 
 ## True while this flyer is about to come down on someone.
 func is_warning() -> bool:
@@ -1837,7 +1899,7 @@ func pull_to(at: Vector3) -> void:
 	_pull_left = 0.7
 
 
-## Drawn by a Deepsinger's song: carried slowly toward a point for a moment, while it still walks and
+## Drawn by an Adept's Event Horizon: carried slowly toward a point for a moment, while it still walks and
 ## fights as it would (unlike a pull, which takes it off its feet).
 func drift_to(at: Vector3, speed: float) -> void:
 	if not is_alive() or not draggable():
@@ -1852,7 +1914,7 @@ var _drift := Vector3.ZERO
 var _drift_left := 0.0
 
 
-## Bound in a Fogbinder's fog: it sees only a few metres for a while (on every phone, by way of the host).
+## Blinded: it sees only a few metres for a while (on every phone, by way of the host).
 func blind_for(seconds: float) -> void:
 	if control_immune(): return
 	if not is_alive():
@@ -3171,6 +3233,12 @@ func _tick_flash(delta: float) -> void:
 func _process(delta: float) -> void:
 	_anim_accum += delta
 	_frame += 1
+	if soaked_left > 0.0:
+		soaked_left -= delta
+		if _drips:
+			_drips.emitting = soaked_left > 0.0 and is_alive()
+			_puddle.visible = _drips.emitting
+			_puddle.scale = Vector3.ONE * body_radius() * (1.6 + 0.12 * sin(_anim_accum * 5.0))
 	if _court_light:
 		# The Keeper's lamp swells as he lifts it, and blazes as it is held up (here and on every phone).
 		var lifting := _current_anim == "Raise" and is_alive()

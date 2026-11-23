@@ -708,17 +708,24 @@ func _harpooner_skills(p: Player, has_target: bool, dist: float) -> void:
 			p.use_art()
 
 
-## A Tidecaller bot: a wave at what it fights when it is a few steps off, the song when it is crowded
-## or friends are hurt, the fog when enemies close in.
+## A Tidecaller bot: a wave at what it fights when it is a few steps off; a Tidewarden raises its
+## shell when the fight comes to it; a Stormcaller throws its spear at what it fights, sooner when
+## the enemies near it are soaked; a Deepcaller calls its serpent when there is none and enemies close in.
 func _tidecaller_skills(p: Player, has_target: bool, dist: float) -> void:
 	if p._cast_kind != "" or p.art_cd_left > 0.0 or p.mana < p.art_cost():
 		return
 	match p.spec_id:
-		"deepsinger":
-			if _enemies_within(TidecallerKit.SONG_REACH) >= 3 or (p.hp < p.max_hp() * 0.5 and _enemies_within(6.0) > 0):
+		"tidewarden":
+			if p.shell_left <= 0.0 and (_enemies_within(4.0) >= 2 or (p.hp < p.max_hp() * 0.6 and _enemies_within(6.0) > 0)):
 				p.use_art()
-		"fogbinder":
-			if has_target and dist < TidecallerKit.FOG_AHEAD and _enemies_within(TidecallerKit.FOG_AHEAD) >= 2:
+		"stormcaller":
+			if has_target and dist < TidecallerKit.SPEAR_RANGE + p.m("spear_range") - 1.0:
+				var soaked := world.zombies_near(p.global_position, 12.0, 12).filter(func(z: Zombie) -> bool: return z.soaked_left > 0.0).size()
+				if soaked >= 2 or dist > 5.0 or p.hp < p.max_hp() * 0.5:
+					_face(_target_point(), false)
+					p.use_art()
+		"deepcaller":
+			if TidecallerKit.serpent_of(p) == null and _enemies_within(TidecallerKit.SERPENT_TAUNT + 4.0) > 0:
 				_face(_target_point(), false)
 				p.use_art()
 		_:
