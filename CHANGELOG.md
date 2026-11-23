@@ -9,6 +9,7 @@
 - **Its arts:** an arm rears over each of you and whips down on your ring. It sweeps away anyone who comes close, hooks whoever stands furthest off and spits blinding ink. At each third of its health it turns the harbour into a whirlpool and raises the drowned. In its last third its arms come down three at a time and waves roll out from it.
 - **Fixed:** the Kraken and its arms can now be struck with any weapon. A blade now reaches tall bodies anywhere up their height.
 - New entrance bells, roar, rise, ink and whirlpool sounds, a Codex entry and an icon. Its hoard washes up where it sinks.
+- **Coastal flyers move like themselves:** Wreck Gulls flap in bursts and glide, bank into turns and tumble when shot down. Storm Rays row with a wave along each fin and cup them to charge. The Bell Wraith's bell swings with its drift and tolls.
 
 ### The Tidecaller, reworked
 
