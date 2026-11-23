@@ -2077,6 +2077,7 @@ func _vael() -> void:
 	if not host:
 		pl.powers.erase(PowerDefs.CROWN)
 	await sync(440)
+	await _vael_sky_net(base)
 
 
 ## Last Light on two phones: the same barge in the same place, a waystation where each phone chooses
@@ -2420,3 +2421,49 @@ func _spectate_client() -> void:
 	await wait(0.5)
 	ok(m.world != null and m.world.mode == Game.Mode.MENU, "and it is back at the menu")
 	finish()
+
+
+## Coastal flyers: real host release, replicated articulated pose, warning and local damage.
+func _vael_sky_net(base: Vector3) -> void:
+	for i in VaelSkyMind.KINDS.size():
+		var id: String = VaelSkyMind.KINDS[i]
+		var style: int = [MistSeal.Style.SALT, MistSeal.Style.BRINE_BOLT, MistSeal.Style.KNELL][i]
+		pl.position = Vector3(base.x + (-2.0 if host else 2.0), w.ground_at(base) + 0.05, base.z)
+		pl.hp = pl.max_hp()
+		pl.guard_left = 0
+		pl._status_immune = 0
+		pl.frozen_left = 0
+		if host:
+			for z: Zombie in w.zombies.duplicate(): z.release()
+		await wait(0.4)
+		await sync(450 + i * 10)
+		if host:
+			w.spawn_zombie(id, _avatar().position + Vector3(0, 0, -10))
+			var z: Zombie = w.zombies.back()
+			z.set_physics_process(false)
+			z._sees = true
+			z.mesenlla_mind.cooldown = 0
+			z.mesenlla_mind.tick(z, _avatar(), Vector3.ZERO, 10, 0)
+		await wait(0.4)
+		await sync(451 + i * 10)
+		var mobs := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == id and z.is_alive())
+		ok(mobs.size() == 1 and mobs[0].flies and mobs[0].is_warning() and mobs[0]._current_anim == "m_cast", id + " flies and telegraphs on both phones")
+		ok(w.mist_seals.is_empty(), id + " has no impact before release")
+		await sync(454 + i * 10)
+		if host:
+			var z: Zombie = mobs[0]
+			var mind := z.mesenlla_mind as VaelSkyMind
+			mind.aim = _avatar().global_position
+			if id == "bell_wraith": mind.aim += Vector3.RIGHT * 2.7
+			mind._release(z)
+			mind.phase = "recover"
+			mind._show(z, "m_throw")
+		await wait(0.18)
+		await sync(452 + i * 10)
+		ok(w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == style), id + " impact warning arrives on both phones")
+		var before := pl.hp
+		await wait(1.5)
+		await sync(453 + i * 10)
+		if not host:
+			ok(pl.hp < before, id + " hurts the remote player's locally owned body")
+		ok(w.mist_seals.is_empty(), id + " impact cleans up on both phones")

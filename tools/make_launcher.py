@@ -395,7 +395,7 @@ THEMES = {
     "sunken_crown": {"backdrop": crown_backdrop, "crowned": True, "title": "The Sunken Crown", "title_ink": (150, 240, 205),
         "metal": {"dark": (0.07, 0.15, 0.15), "warm": (0.20, 0.58, 0.48), "hot": (0.62, 1.0, 0.84), "rim": (0.74, 0.96, 0.88)}},
 }
-EDITION = "sunken_crown"
+EDITION = "beyond_the_mists"
 
 DEV_BAND = (242, 168, 58)    # amber: the Dev build's band
 DEV_INK = (30, 18, 10)

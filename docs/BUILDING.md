@@ -186,7 +186,8 @@ Everything generated is made by the scripts in `tools/`. They need Python 3 with
 | `tools/make_music.py` | All the music: the Village's three stems (`night`, `hunted`, `dawn`), those of the Mists, the Fort, the Valleys of Mesenlla and Mist Bastion (`mists_*`, `fort_*`, `mesenlla_*`, `bastion_*`) and the title-screen theme (`menu_mesenlla`). The score is written in this file, and it plays it with the VSCO 2 Community Edition samples. They are 3 GB and not kept here, so clone https://github.com/sgossner/VSCO-2-CE and pass its folder: `python3 tools/make_music.py path/to/VSCO-2-CE [stem ...]`. A sparse checkout of `Strings Brass Woodwinds Percussion` is enough |
 | `tools/make_icons.py` | Every icon |
 | `tools/make_ui.py` | Discs, slider knob, menu shade, the Botti Doubloon and the wordmark |
-| `tools/make_launcher.py` | Launcher icon and splash |
+| `tools/make_launcher.py` | Launcher icon and splash (defaults to Beyond the Mists) |
+| `tools/make_vael_sky_audio.py` | Deterministic Wreck Gull, Storm Ray and Bell Wraith voices and impact sounds |
 | `tools/make_assets.py` | The ground texture |
 | `tools/slim_characters.mjs` | Strips the KayKit characters down and joins them into one mesh per material |
 

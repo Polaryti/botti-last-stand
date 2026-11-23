@@ -1919,6 +1919,8 @@ func _port_vael() -> void:
 	d._tick_vael()
 	var jellies := vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "lantern_jelly")
 	check(jellies.size() == Director.JELLIES_AT_ONCE and jellies.all(func(z: Zombie) -> bool: return vael.tide.flooded(z.position)), "the high tide brings Lantern Jellies in over the water")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	await _vael_sky(vael)
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode
@@ -2090,7 +2092,7 @@ func _drowned_court() -> void:
 	check(["harbourmaster", "lighthouse_keeper", "kraken_arm"].all(func(id: String) -> bool: return ZombieDefs.ALL[id].get("miniboss", false)) and ZombieDefs.ALL["hollow_sovereign"].get("vael_boss", false), "three of the court are minibosses, and the Hollow Sovereign the boss")
 	check(Director.BOSS_CARDS.has("hollow_sovereign") and Sfx.NAMES.has("boss_bells_sovereign") and ResourceLoader.exists("res://assets/sounds/boss_bells_sovereign.ogg"), "he enters with his own card and bells")
 	check(Net.ANIMS.size() <= 64 and ["m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"].all(func(a: String) -> bool: return Net.ANIMS.has(a)), "every phone is sent what they are doing (%d states)" % Net.ANIMS.size())
-	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.LOOKS.size() == 14, "the new rings come after the old on the wire")
+	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.LOOKS.size() == 17, "the new rings come after the old on the wire")
 	var space := SubViewport.new()
 	space.own_world_3d = true
 	add_child(space)
@@ -2712,3 +2714,87 @@ func _vael_weapons() -> void:
 	p.setup_class("infantry")
 	p.slots = ["sword", null]
 	p._equip()
+
+
+## Coastal flyers exercise real wind-ups, dodges, interruption, damage and pool reuse.
+func _vael_sky(vael: World) -> void:
+	for seal: MistSeal in vael.mist_seals.duplicate(): seal.queue_free()
+	await frames(1)
+	var you := vael.player
+	var saved := you.position
+	var at := Vector3(0, vael.ground_at(Vector3(0, 0, 40)), 40)
+	you.position = at
+	you.guard_left = 0.0
+	for id: String in VaelSkyMind.KINDS:
+		check(ZombieDefs.roams(id, 600, "vael") and not ZombieDefs.roams(id, 600, "lantern_road") and not ZombieDefs.roams(id, 600, "village"), id + " stays in Port Vael")
+		check(not ZombieDefs.roams(id, 10, "vael") and Icons.exists(id) and CodexPanel.enemy_group(id) == 5, id + " has a timed arrival, icon and Codex entry")
+		for suffix: String in ["call", "release", "hurt", "death"]:
+			check(Sfx.NAMES.has(id + "_" + suffix) and Net.SOUNDS.has(id + "_" + suffix), id + " has its own " + suffix)
+		check(vael.spawn_zombie(id, at + Vector3(0, 0, -10)), id + " spawns from its pool")
+		var z: Zombie = vael.zombies.back()
+		z.set_physics_process(false)
+		z._sees = true
+		var mind := z.mesenlla_mind as VaelSkyMind
+		check(z.flies and mind != null and z.position.y > vael.ground_at(z.position) + 2, id + " flies with its own mind")
+		mind.cooldown = 0
+		mind.tick(z, you, Vector3.ZERO, 10, 0)
+		check(mind.phase == "tell" and z.is_warning() and vael.mist_seals.is_empty(), id + " warns before releasing damage")
+		z._animate_custom(0.1, 1)
+		# Stun before release prevents any attack.
+		z.stun(0.6)
+		check(mind.phase == "" and not z.is_warning() and vael.mist_seals.is_empty(), id + " stun interrupts wind-up")
+		z._stun = 0
+		z._sees = true
+		mind.cooldown = 0
+		mind.tick(z, you, Vector3.ZERO, 10, 0)
+		mind.tick(z, you, Vector3.ZERO, 10, float(VaelSkyMind.TELLS[id]) + 0.01)
+		check(mind.phase == "recover" and not z.is_warning() and not vael.mist_seals.is_empty(), id + " releases and enters recovery")
+		var shots := vael.mist_seals.duplicate()
+		check(shots.size() == (3 if id == "storm_ray" else 1), id + " has the right attack pattern")
+		var seal: MistSeal = shots[0]
+		seal.set_physics_process(false)
+		var hit_at := seal.position + (Vector3.RIGHT * 2.7 if id == "bell_wraith" else Vector3.ZERO)
+		you.position = hit_at + Vector3.RIGHT * 10
+		you.hp = you.max_hp()
+		var hp_before := you.hp
+		seal.strike()
+		check(you.hp == hp_before, id + " can be dodged")
+		you.position = seal.position if id == "bell_wraith" else hit_at
+		if id == "bell_wraith":
+			seal.strike()
+			check(you.hp == hp_before and not seal.contains(you.position), "the knell has a safe centre")
+		you.position = hit_at
+		you._status_immune = 0
+		you.frozen_left = 0
+		you.guard_left = 0
+		seal.strike()
+		check(you.hp < hp_before, id + " hurts inside the marked area")
+		for s: MistSeal in shots: s.queue_free()
+		await frames(1)
+		# Joined phones display the same pose and tell from snapshot state.
+		z.puppet = true
+		z.net_apply(z.position, 0, 64, 1.0, "m_cast", 1.0)
+		z._animate_custom(0.1, 1)
+		check(z.is_warning() and z._current_anim == "m_cast", id + " receives its ranged pose on a joined phone")
+		z.puppet = false
+		# Low recovery reaches a hittable height; steering stays in the playable bounds.
+		you.position = at
+		mind.phase = "recover"
+		mind.left = VaelSkyMind.RECOVERY
+		for i in 108: mind.tick(z, you, Vector3.ZERO, 10, 1.0 / 60)
+		check(z.position.y < at.y + 2.5 and absf(z.position.x) < vael.half_size, id + " recovers low inside map bounds")
+		z.release()
+		check(vael.spawn_zombie(id, at + Vector3(0, 0, -10)), id + " reuses its pooled body")
+		z = vael.zombies.back()
+		check(z._current_anim == "" and not z.is_warning() and (z.mesenlla_mind as VaelSkyMind).phase == "", id + " clears its attack when reused")
+		z.set_physics_process(false)
+		z._die()
+		z._physics_process(0.1)
+		z.release()
+	check(MistSeal.Style.SALT == 14 and MistSeal.Style.KNELL == 16 and Net.ANIMS.size() <= 64, "coastal impacts append wire styles and reuse animation slots")
+	# With all three ranged slots occupied, the director keeps spawning ground enemies.
+	for id: String in VaelSkyMind.KINDS: vael.spawn_zombie(id, at + Vector3(0, 0, -15))
+	vael.director.elapsed = 600
+	for i in 50: check(vael.director._pick_roamer() not in VaelSkyMind.KINDS, "the ranged population is capped at three")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.position = saved

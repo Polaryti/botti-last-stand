@@ -12,10 +12,13 @@ const LIMIT := 16
 const STING_STUN := 0.8 # how long a Lantern Jelly's sting stuns you (ZombieDefs "sting_stun")
 ## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
 const PORTAL_SHARE := 1.5
-enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN }
+enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL }
 const FROST_FREEZE := 0.6
 const FROST_SLOW := 2.0
 const LOOKS := {
+	Style.SALT: [Color(0.4, 0.85, 0.75), Color(0.9, 1, 0.86)],
+	Style.BRINE_BOLT: [Color(0.35, 0.7, 1), Color(0.85, 0.95, 1)],
+	Style.KNELL: [Color(0.95, 0.72, 0.25), Color(0.4, 1, 0.78)],
 	Style.MIST: [Color(0.2, 0.8, 1.0), Color(0.85, 0.4, 1.0)],
 	Style.QUAKE: [Color(0.95, 0.86, 0.32), Color(1.0, 0.6, 0.12)],
 	Style.STORM: [Color(0.75, 0.85, 1.0), Color(1.0, 1.0, 0.75)],
@@ -34,12 +37,12 @@ const LOOKS := {
 ## What each sounds like as its circle appears, and as it closes.
 const WARN_SOUNDS := {Style.MIST: "mist_warning", Style.QUAKE: "quake_warning", Style.STORM: "storm_call", Style.FIRE: "fire_warning",
 	Style.BOULDER: "boulder_throw", Style.FROST: "frost_warning", Style.STING: "jelly_hum", Style.NET: "", Style.WAVE: "wave_rise",
-	Style.HOOK: "", Style.LAMP: "", Style.SLAM: "", Style.FLASH: "lamp_flare", Style.CROWN: "crown_toll"}
+	Style.HOOK: "", Style.LAMP: "", Style.SLAM: "", Style.FLASH: "lamp_flare", Style.CROWN: "crown_toll", Style.SALT: "", Style.BRINE_BOLT: "", Style.KNELL: ""}
 const STRIKE_SOUNDS := {Style.MIST: "mist_burst", Style.QUAKE: "earth_slam", Style.STORM: "thunder", Style.FIRE: "fire_breath",
 	Style.BOULDER: "boulder_impact", Style.FROST: "frost_burst", Style.STING: "jelly_sting", Style.NET: "net_land", Style.WAVE: "wave_crash",
-	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall"}
+	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall", Style.SALT: "salt_splash", Style.BRINE_BOLT: "brine_crack", Style.KNELL: "knell_strike"}
 ## Thrown things (a net, a hook, a lamp) leave the thrower's hand for the last part of the tell.
-const THROWN := [Style.NET, Style.HOOK, Style.LAMP]
+const THROWN := [Style.NET, Style.HOOK, Style.LAMP, Style.SALT]
 const THROW_FLIGHT := 0.55
 ## What each of the drowned court's circles does to you (VaelMind has the numbers).
 const NET_HOLD := VaelMind.NET_HOLD
@@ -181,6 +184,11 @@ static func thrown_mesh(kind: int) -> Mesh:
 		return _thrown_meshes[kind]
 	var l := LowPoly.new()
 	match kind:
+		Style.SALT:
+			l.prism(Vector3(0, -0.17, 0), Vector3(0, 0.18, 0), 0.16, 0.12, 7, Color(0.65, 0.95, 0.8))
+			for i in 5:
+				var a := TAU * i / 5.0
+				l.prism(Vector3(cos(a) * 0.12, 0, sin(a) * 0.12), Vector3(cos(a) * 0.3, 0.1, sin(a) * 0.3), 0.06, 0.0, 4, Color(0.9, 1, 0.88))
 		Style.NET:
 			# A net spread as it falls: a ring of cork floats and lead weights, the mesh between them.
 			var rope := Color(0.62, 0.52, 0.36)
@@ -254,8 +262,19 @@ func _physics_process(delta: float) -> void:
 func strike() -> void:
 	var col: Color = LOOKS[style][1]
 	world.show_ring(position, radius, col)
-	world.fx_blast(position + Vector3.UP * 0.5, radius, Color(col, 0.65))
+	if style != Style.KNELL:
+		world.fx_blast(position + Vector3.UP * 0.5, radius, Color(col, 0.65))
 	match style:
+		Style.SALT:
+			world.fx_water(position, radius * 0.8, Color(0.65, 0.95, 0.8))
+			if _boulder: _boulder.visible = false
+		Style.BRINE_BOLT:
+			var caster := world.zombie_by_id(source_id)
+			world.fx_spark(caster.centre() if caster and caster.active else position + Vector3.UP * 6, position + Vector3.UP * 0.2)
+			world.fx_water(position, radius * 0.6, Color(0.5, 0.8, 1))
+		Style.KNELL:
+			world.show_ring(position + Vector3.UP * 0.4, inner, Color(0.4, 1, 0.78))
+			world.fx_mist(position + Vector3.UP, radius * 0.25)
 		Style.MIST:
 			world.fx_mist(position + Vector3.UP, radius * 0.5)
 		Style.STORM:
@@ -305,6 +324,9 @@ func strike() -> void:
 		if target is Player:
 			var p := target as Player
 			match style:
+				Style.SALT: p.slow_by_creature(1.5)
+				Style.BRINE_BOLT: p.stun_by_creature(0.35)
+				Style.KNELL: p.slow_by_creature(2.0)
 				Style.NET: p.root_by_creature(NET_HOLD)
 				Style.WAVE:
 					var away := Vector3(p.global_position.x - position.x, 0, p.global_position.z - position.z)

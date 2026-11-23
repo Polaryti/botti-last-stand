@@ -189,7 +189,7 @@ func show_menu(rebuild := false) -> void:
 	mark.custom_minimum_size = Vector2(590, 80)
 	mark.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	top.add_child(mark)
-	var update_title := _label("The Sunken Crown", UiTheme.FS_LEAD, UiTheme.TIDE.lightened(0.15))
+	var update_title := _label("Beyond the Mists", UiTheme.FS_LEAD, UiTheme.TWILIGHT.lightened(0.15))
 	update_title.name = "UpdateTitle"
 	update_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(update_title)

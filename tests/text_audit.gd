@@ -338,7 +338,7 @@ func run() -> Array[String]:
 	# Port Vael's foes and the Sunken Crown: what the Codex says of them is what they do.
 	for zid: String in ZombieDefs.ALL:
 		if SpawnRules.is_vael(ZombieDefs.ALL[zid]):
-			_audit("enemy:" + zid, str(ZombieDefs.ALL[zid]["desc"]), [ZombieDefs.ALL[zid]])
+			_audit("enemy:" + zid, str(ZombieDefs.ALL[zid]["desc"]), [ZombieDefs.ALL[zid], [VaelSkyMind.REACH, VaelSkyMind.RECOVERY, 1.5, 2.0]] if zid in VaelSkyMind.KINDS else [ZombieDefs.ALL[zid]])
 	_audit("power:sunken_crown", str(PowerDefs.ALL[PowerDefs.CROWN]["desc"]), [PowerDefs.CROWN_DAMAGE])
 	for bid: String in Boons.ALL:
 		_audit("boon:" + bid, str(Boons.ALL[bid]["desc"]), [Boons.ALL[bid].get("add", {})])

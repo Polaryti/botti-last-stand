@@ -437,6 +437,11 @@ func minute() -> int:
 
 func _pick_roamer() -> String:
 	var kind := ZombieDefs.pick_roamer(elapsed, world.spawn_map())
+	# Coastal flyers share three ranged slots, leaving room for the drowned on phones.
+	if kind in VaelSkyMind.KINDS:
+		var flyers := 0
+		for id: String in VaelSkyMind.KINDS: flyers += world.count_type(id)
+		if flyers >= 3: return "drowned_sailor"
 	# Leave two pooled bodies available for the Regent's second phase.
 	return "rift_stalker" if kind == "lantern_wisp" and world.count_type(kind) >= 3 else kind
 

@@ -9,7 +9,7 @@ extends RefCounted
 
 ## Also the creatures of Port Vael (VaelModels.KINDS), built and moved through here on the same rigs.
 const KINDS := ["bear", "mist_bear", "eagle", "mist_eagle", "shapeshifter", "earth_elemental", "mist_elemental",
-	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan"]
+	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan", "wreck_gull", "storm_ray", "bell_wraith"]
 const FLYERS := ["eagle", "mist_eagle", "wyvern", "war_wyvern"]
 const BOSS_NAMES := {"great_revenant_elemental": "GREAT REVENANT ELEMENTAL", "war_wyvern": "WAR WYVERN"}
 
@@ -668,6 +668,8 @@ static func steed_gait(root: Node3D, gait: float) -> void:
 
 ## Returns the model. Named nodes and meta are what animate() moves.
 static func build(id: String) -> Node3D:
+	if id in VaelSkyModels.KINDS:
+		return VaelSkyModels.build(id)
 	var root := Node3D.new()
 	match id:
 		"bear":
@@ -798,6 +800,9 @@ static func _label(root: Node3D, high: float) -> void:
 
 ## Called every frame with the creature's state (Zombie._current_anim) and how fast it moves.
 static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> void:
+	if z.model_id in VaelSkyModels.KINDS:
+		VaelSkyModels.animate(z, root, delta, moving)
+		return
 	var t := z.world.now + float(z.net_id) * 0.37
 	var state := z._current_anim
 	# How long it has been in this state, for moves that play out over time (a maul, a slash).
@@ -1485,6 +1490,9 @@ static func begin_death(z: Zombie, root: Node3D) -> void:
 
 ## Each frame of a death, k seconds after it began.
 static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> void:
+	if z.model_id in VaelSkyModels.KINDS:
+		VaelSkyModels.fall(root, k, delta)
+		return
 	var side := float(root.get_meta("side", 1.0))
 	var total := death_time(z.model_id)
 	# The last moments: the body sinks into the ground and is gone.

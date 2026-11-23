@@ -1,6 +1,16 @@
 # Changelog
 
-## Development — The Sunken Crown
+## Development — Beyond the Mists
+
+### Above Port Vael
+
+- **Wreck Gulls** circle the wrecks and spit salt. Their throats swell before the throw; step out of the splash to avoid its slow.
+- **Storm Rays** glide over the harbour on broad, rippling fins. Their spines charge before three lightning strikes cross a marked line. Dodge sideways.
+- **Bell Wraiths** carry cracked ship's bells on ragged sails. Their distant knell strikes a ring: its centre is safe. Interrupt the clattering bell with a stun before it releases.
+- Each has its own articulated model, flight and attack animations, impact effects, voice, hurt and death sounds, and Codex entry. All three drop low after firing. Roofs break their aim; at most three coastal flyers hunt at once.
+- Restored the **Beyond the Mists** launcher icon, adaptive and Dev icons, boot splash and edition title. The Port Vael menu tour and music remain.
+
+### The Sunken Crown
 
 ### Port Vael, a new map
 Follow the road down from the Valleys of Mesenlla to the drowned harbour of Vael. Available in Survive the Night, Co-op, All vs All and Teams.
