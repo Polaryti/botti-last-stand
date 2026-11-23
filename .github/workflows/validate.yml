@@ -48,6 +48,8 @@ jobs:
           - suite: render
             mode: coop
           - suite: network
+            mode: vael
+          - suite: network
             mode: coop
           - suite: network
             mode: ffa

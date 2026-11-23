@@ -3427,7 +3427,7 @@ func test_flow() -> void:
 	add_child(m)
 	await frames(3)
 	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.map_id == "vael", "the title screen shows Port Vael")
-	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "The Sunken Crown", "main title names the production update")
+	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "Beyond the Mists", "main title names the restored Beyond the Mists edition")
 	ok(m.world.player == null and m.world.zombies.is_empty() and not m.world.director.running, "the title backdrop has no active match")
 	await m.start_game(Game.Mode.SANDBOX)
 	await seconds(3.0)
