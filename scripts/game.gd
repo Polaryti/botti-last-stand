@@ -402,7 +402,7 @@ const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 
 ## Port Vael: the drowned and what the Mist Tide brings in, and the drowned court: two gangs of the
 ## Press Gang and one more at the Harbourmaster's bell; a Kraken's four arms; and one of each of the rest.
 const VAEL_POOLS := {"drowned": 18, "barnacle_brute": 3, "brine_hound": 6, "lantern_jelly": 6, "angler": 3,
-	"wreck_gull": 3, "storm_ray": 2, "bell_wraith": 2, "siren": 2, "press_gang": 9, "tide_witch": 2, "harbourmaster": 1, "lighthouse_keeper": 1, "kraken_arm": 4, "hollow_sovereign": 1, "leviathan": 1}
+	"wreck_gull": 3, "storm_ray": 2, "bell_wraith": 2, "siren": 2, "press_gang": 9, "tide_witch": 2, "harbourmaster": 1, "lighthouse_keeper": 1, "kraken_arm": 4, "hollow_sovereign": 1, "leviathan": 1, "kraken": 1}
 
 
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
@@ -422,6 +422,7 @@ func zombie_pool_plan() -> Dictionary:
 			road.erase(flyer)
 		road.erase("hollow_sovereign")
 		road.erase("kraken_arm")
+		road.erase("kraken")
 		road["drowned"] = 22
 		road["leviathan"] = 1
 		return road

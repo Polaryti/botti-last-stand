@@ -9,7 +9,7 @@ extends RefCounted
 
 ## Also the creatures of Port Vael (VaelModels.KINDS), built and moved through here on the same rigs.
 const KINDS := ["bear", "mist_bear", "eagle", "mist_eagle", "shapeshifter", "earth_elemental", "mist_elemental",
-	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan", "wreck_gull", "storm_ray", "bell_wraith"]
+	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan", "wreck_gull", "storm_ray", "bell_wraith", "kraken"]
 const FLYERS := ["eagle", "mist_eagle", "wyvern", "war_wyvern"]
 const BOSS_NAMES := {"great_revenant_elemental": "GREAT REVENANT ELEMENTAL", "war_wyvern": "WAR WYVERN"}
 
@@ -778,7 +778,9 @@ static func build(id: String) -> Node3D:
 		"siren":
 			VaelModels.siren_parts(root)
 		"kraken_arm":
-			VaelModels.kraken_parts(root)
+			KrakenModels.arm_parts(root)
+		"kraken":
+			KrakenModels.kraken_parts(root)
 		"leviathan":
 			VaelModels.leviathan_parts(root)
 	return root
@@ -872,7 +874,9 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 		"siren":
 			VaelModels.animate_siren(z, root, delta, speed, state, t, float(root.get_meta("act_t", 0.0)))
 		"kraken_arm":
-			VaelModels.animate_kraken(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
+			KrakenModels.animate_arm(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
+		"kraken":
+			KrakenModels.animate_kraken(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
 		"leviathan":
 			VaelModels.animate_leviathan(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
 	if z.model_id == "war_wyvern":
@@ -1456,6 +1460,8 @@ static func death_time(id: String) -> float:
 			return 2.8
 		"leviathan":
 			return 4.2
+		"kraken":
+			return 5.0
 	return 2.6
 
 
@@ -1527,7 +1533,9 @@ static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> vo
 			VaelModels.fall_siren(root, k, side)
 			root.position.y = -sink * 0.8
 		"kraken_arm":
-			VaelModels.fall_kraken(root, k, side)
+			KrakenModels.fall_arm(root, k, side)
+		"kraken":
+			KrakenModels.fall_kraken(root, k, side)
 		"leviathan":
 			VaelModels.fall_leviathan(root, k, side)
 		"shapeshifter":

@@ -20,7 +20,7 @@ extends MesenllaMind
 ## body's own animations (BodyAnim), which other phones are sent like any other; the Siren and the
 ## Kraken's Arm are built of parts (VaelModels) and show theirs as Zombie._current_anim states.
 
-const KINDS := ["siren", "press_gang", "tide_witch", "harbourmaster", "lighthouse_keeper", "kraken_arm", "hollow_sovereign", "leviathan"]
+const KINDS := ["siren", "press_gang", "tide_witch", "harbourmaster", "lighthouse_keeper", "kraken_arm", "hollow_sovereign", "leviathan", "kraken"]
 
 # The Siren
 const SONG_EVERY := 9.0
@@ -111,6 +111,37 @@ const DOUSE_EVERY := 22.0
 const DIVE_EVERY := 28.0
 const DIVE_RAISES := 3
 
+# The Kraken of Vael: the end of it all
+const KRAKEN_RISE := 3.2 # seconds out of the sea
+const KRAKEN_ROAR := 2.0
+const KRAKEN_BODY := 3.4 # metres from its middle to the edge of its mantle (KrakenModels.BODY_SCALE)
+const KRAKEN_PHASES := [0.66, 0.33] # of its health: it roars and raises the drowned at each
+const KRAKEN_SLAM_EVERY := [4.2, 3.6, 3.0]
+const KRAKEN_SLAMS := [1, 2, 3] # arms that come down at once, in each third of its health
+const KRAKEN_SLAM_TELL := 1.4
+const KRAKEN_SLAM_RADIUS := 2.8
+const KRAKEN_SLAM_POWER := 1.3
+const KRAKEN_SLAM_REACH := 17.0 # as far as its arms come down
+const KRAKEN_SWEEP_EVERY := 9.0
+const KRAKEN_SWEEP_REACH := 7.5
+const KRAKEN_SWEEP_TELL := 1.5
+const KRAKEN_GRASP_EVERY := 14.0
+const KRAKEN_GRASP_REACH := 26.0
+const KRAKEN_GRASP_RADIUS := 2.2
+const KRAKEN_GRASP_TELL := 1.2
+const KRAKEN_INK_EVERY := 12.0
+const KRAKEN_INK_RADIUS := 3.6
+const KRAKEN_INK_TELL := 1.1
+const KRAKEN_INK_BLIND := 3.5
+const KRAKEN_INK_SLOW := 2.0
+const KRAKEN_PULL := 1.6 # metres a second toward it, in its whirlpool
+const KRAKEN_PULL_TIME := 6.0
+const KRAKEN_PULL_REACH := 24.0
+const KRAKEN_BROOD := 4 # Drowned Sailors it raises at each third
+const KRAKEN_WRATH_EVERY := 11.0
+const KRAKEN_WRATH_WAVES := 4
+const KRAKEN_HOARD := 6 # potions and food that wash up where it sank
+
 var _song_from := 0.0
 var _dives := 0
 var _cooldown_d := DIVE_EVERY
@@ -143,6 +174,7 @@ func tick(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> 
 		"kraken_arm": return _arm(z, target, dist, delta)
 		"hollow_sovereign": return _sovereign(z, target, dist, delta)
 		"leviathan": return _leviathan(z, target, delta)
+		"kraken": return _kraken(z, target, delta)
 	return false
 
 
@@ -154,6 +186,20 @@ func after(z: Zombie) -> void:
 
 
 func on_death(z: Zombie) -> void:
+	if kind == "kraken":
+		# It sinks; the harbour lets go of the tide; what it hoarded under the sea washes up.
+		var w := z.world
+		if w.tide:
+			w.tide.surge(0.0)
+		w.fx_water(z.position + Vector3.UP, 6.0, Color(0.72, 0.9, 0.92), true)
+		for i in KRAKEN_HOARD:
+			var a := TAU * i / KRAKEN_HOARD + z.rotation.y
+			var at := _ground(z, z.position + Vector3(sin(a), 0, cos(a)) * (KRAKEN_BODY + 1.5))
+			if i % 2 == 0:
+				w.spawn_pickup_at(at, Pickup.Kind.POWER, PowerDefs.pick_potion(w.spawn_map()))
+			else:
+				w.spawn_pickup_at(at, Pickup.Kind.FOOD, PowerDefs.pick_weighted(PowerDefs.FOODS))
+		return
 	if kind == "hollow_sovereign":
 		# The Sunken Crown rolls from his empty hood, for whoever dares to wear it.
 		z.world.spawn_pickup_at(z.position + Vector3(0, 0, 1.2), Pickup.Kind.POWER, "sunken_crown")
@@ -175,6 +221,18 @@ func interrupt(z: Zombie) -> void:
 
 
 func start(z: Zombie) -> void:
+	if kind == "kraken":
+		# The harbour heaves and it comes up out of it, the water pouring off its crown.
+		phase = "rise"
+		left = KRAKEN_RISE
+		cooldown = 2.0
+		cooldown_b = 7.0
+		_cooldown_c = 5.0
+		_cooldown_d = 5.0
+		_cooldown_e = 9.0
+		_show(z, "m_rise")
+		z.world.sfx_at("kraken_emerge", z.position, 6.0)
+		return
 	if kind == "kraken_arm" or kind == "leviathan":
 		# Up out of the water.
 		phase = "rise"
@@ -690,3 +748,156 @@ func _leviathan(z: Zombie, target: Target, delta: float) -> bool:
 		MistSeal.cast(z, _lead(z, target, BITE_TELL_L * 0.4), BITE_RADIUS_L, BITE_TELL_L, z._damage * BITE_POWER_L, 0.0, MistSeal.Style.SLAM)
 		z.world.sfx_at("leviathan_roar", z.position, 0.0)
 	return true
+
+
+# --- The Kraken of Vael --------------------------------------------------------------------------
+
+## Rooted in the harbour, the last of Vael. Eight arms each strike where it means them to: an arm rears
+## over the water above each ring and whips down on it. Whoever comes close is thrown back by its
+## sweep; from the start it hooks whoever stands furthest off and drags them in. Each third of its
+## health it roars, holds the tide in, draws everyone near toward it in a whirlpool and raises the
+## drowned round it; below two thirds it spits ink that blinds; in its last third its arms come down
+## three at a time and the sea rolls out from it in waves.
+func _kraken(z: Zombie, target: Target, delta: float) -> bool:
+	z.velocity = Vector3.ZERO
+	_cooldown_d -= delta
+	_cooldown_e -= delta
+	var dist := Vector2(target.global_position.x - z.position.x, target.global_position.z - z.position.z).length()
+	match phase:
+		"rise":
+			left -= delta
+			if left <= 0.0:
+				phase = "roar"
+				left = KRAKEN_ROAR
+				_show(z, "m_roar")
+				z.world.sfx_at("kraken_roar", z.position, 6.0)
+			return true
+		"roar", "slam", "sweep", "ink", "grasp", "wrath":
+			left -= delta
+			_face(z, target.global_position, delta, 0.8)
+			if left <= 0.0:
+				phase = ""
+				_show(z, "")
+			return true
+		"pull":
+			left -= delta
+			if left <= 0.0:
+				phase = ""
+				_show(z, "")
+			return true
+	var stage := kraken_stage(z)
+	if stage > _decreed:
+		# A third of it gone: it roars, the tide stands in, the sea turns round it, the drowned rise.
+		_decreed = stage
+		phase = "pull"
+		left = KRAKEN_PULL_TIME
+		_show(z, "m_pull")
+		z.world.sfx_at("kraken_roar", z.position, 6.0)
+		z.world.sfx_at("kraken_whirlpool", z.position, 4.0)
+		z.world.director.show_banner("The Kraken drags the sea round itself!" if stage == 1 else "The Kraken rages: the whole harbour churns!", 3.5)
+		for i in KRAKEN_BROOD:
+			var a := TAU * i / float(KRAKEN_BROOD) + z.rotation.y + 0.4
+			var at := _ground(z, z.position + Vector3(cos(a), 0, sin(a)) * 9.0)
+			if z.world.terrain.is_walkable(at.x, at.z) and z.world.spawn_zombie("drowned_sailor", at):
+				z.world.fx_water(at, 1.4, Color(0.72, 0.9, 0.92), true)
+		return true
+	_face(z, target.global_position, delta, 0.6)
+	if not z._sees:
+		return true
+	var near := _players_within(z, KRAKEN_SWEEP_REACH)
+	if _cooldown_d <= 0.0 and near > 0:
+		# Too close: every arm sweeps round low and throws you back into the sea.
+		_cooldown_d = KRAKEN_SWEEP_EVERY
+		phase = "sweep"
+		left = KRAKEN_SWEEP_TELL + 0.6
+		_show(z, "m_sweep", true)
+		MistSeal.cast(z, _ground(z, z.position), KRAKEN_SWEEP_REACH, KRAKEN_SWEEP_TELL, z._damage, KRAKEN_BODY, MistSeal.Style.WAVE)
+		z.world.sfx_at("kraken_roar", z.position, 0.0)
+		return true
+	if stage >= 2 and _cooldown_c <= 0.0:
+		# The sea rolls out from it in waves, a line toward each of you.
+		_cooldown_c = KRAKEN_WRATH_EVERY
+		phase = "wrath"
+		left = 1.2
+		_show(z, "m_roar", true)
+		for t: Target in z.world.players:
+			if t.dead or t.is_unseen() or t.global_position.distance_to(z.position) > KRAKEN_GRASP_REACH:
+				continue
+			var along := (t.global_position - z.position) * Vector3(1, 0, 1)
+			along = along.normalized() if along.length() > 0.1 else Vector3.FORWARD
+			for i in KRAKEN_WRATH_WAVES:
+				var spot := z.position + along * (KRAKEN_BODY + 2.5 + i * WAVE_RADIUS * 1.7)
+				MistSeal.cast(z, _ground(z, spot), WAVE_RADIUS, WAVE_TELL + i * WAVE_STEP, z._damage, 0.0, MistSeal.Style.WAVE)
+		z.world.sfx_at("wave_rise", z.position, 4.0)
+		return true
+	if _cooldown_e <= 0.0:
+		var far := _furthest(z, target)
+		var gap := far.global_position.distance_to(z.position)
+		if gap > KRAKEN_SWEEP_REACH + 2.0 and gap < KRAKEN_GRASP_REACH:
+			# An arm reaches out flat for whoever stands furthest off, and drags them in.
+			_cooldown_e = KRAKEN_GRASP_EVERY
+			phase = "grasp"
+			left = KRAKEN_GRASP_TELL + 0.4
+			_show(z, "m_grab", true)
+			MistSeal.cast(z, _lead(z, far, KRAKEN_GRASP_TELL * 0.3), KRAKEN_GRASP_RADIUS, KRAKEN_GRASP_TELL, z._damage * 0.6, 0.0, MistSeal.Style.HOOK)
+			z.world.sfx_at("kraken_rise", z.position, 2.0)
+			return true
+	if stage >= 1 and cooldown_b <= 0.0 and dist < KRAKEN_GRASP_REACH:
+		# A cloud of ink, spat over whoever it hunts.
+		cooldown_b = KRAKEN_INK_EVERY
+		phase = "ink"
+		left = KRAKEN_INK_TELL + 0.3
+		_show(z, "m_ink", true)
+		MistSeal.cast(z, _lead(z, target, KRAKEN_INK_TELL * 0.4), KRAKEN_INK_RADIUS, KRAKEN_INK_TELL, z._damage * 0.4, 0.0, MistSeal.Style.INK)
+		z.world.sfx_at("kraken_ink", z.position, 2.0)
+		return true
+	if cooldown <= 0.0 and dist < KRAKEN_SLAM_REACH:
+		# Its arms rear up over each of you, and come down.
+		cooldown = float(KRAKEN_SLAM_EVERY[stage])
+		phase = "slam"
+		left = KRAKEN_SLAM_TELL + 0.5
+		_show(z, "m_slam", true)
+		var hunted: Array[Target] = [target]
+		for t: Target in z.world.players:
+			if t != target and not t.dead and not t.is_unseen() and t.global_position.distance_to(z.position) < KRAKEN_SLAM_REACH:
+				hunted.append(t)
+		for i in int(KRAKEN_SLAMS[stage]):
+			var who: Target = hunted[i % hunted.size()]
+			var spot := _lead(z, who, KRAKEN_SLAM_TELL * 0.4)
+			if i >= hunted.size():
+				# More arms than people: the next lands just ahead of where they are going.
+				var aside := Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * KRAKEN_SLAM_RADIUS * 1.6
+				spot = _ground(z, spot + aside)
+			MistSeal.cast(z, spot, KRAKEN_SLAM_RADIUS, KRAKEN_SLAM_TELL + i * 0.25, z._damage * KRAKEN_SLAM_POWER, 0.0, MistSeal.Style.SLAM)
+		z.world.sfx_at("kraken_rise", z.position, 0.0)
+		return true
+	return true
+
+
+## 0 above two thirds of its health, 1 to one third, 2 below.
+static func kraken_stage(z: Zombie) -> int:
+	var f := z.hp / maxf(z.max_hp, 1.0)
+	return 2 if f <= float(KRAKEN_PHASES[1]) else 1 if f <= float(KRAKEN_PHASES[0]) else 0
+
+
+func _players_within(z: Zombie, reach: float) -> int:
+	var n := 0
+	for t: Target in z.world.players:
+		if not t.dead and Vector2(t.global_position.x - z.position.x, t.global_position.z - z.position.z).length() < reach + 0.5:
+			n += 1
+	return n
+
+
+## The whirlpool round the Kraken, on every phone for its own players: while it turns (its state
+## "m_pull", which every phone is sent), each of them within reach is drawn toward it. Run by World
+## every frame, with the Sirens' songs.
+static func whirl(w: World) -> void:
+	for z: Zombie in w.zombies:
+		if z.type_id != "kraken" or not z.is_alive() or z._current_anim != "m_pull":
+			continue
+		for p: Player in w.local_players():
+			if p.dead:
+				continue
+			var d := Vector2(p.global_position.x - z.position.x, p.global_position.z - z.position.z).length()
+			if d < KRAKEN_PULL_REACH and d > KRAKEN_BODY + 1.5:
+				p.lure(z.position, KRAKEN_PULL, "The whirlpool drags you in...")

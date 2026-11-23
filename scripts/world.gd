@@ -1297,6 +1297,7 @@ func take_path_budget() -> bool:
 func _process(delta: float) -> void:
 	_tick_fx(delta)
 	VaelMind.sing(self) # any Siren singing draws this phone's players in (at Port Vael, or in the Sandbox)
+	VaelMind.whirl(self) # and so does the Kraken's whirlpool
 	for s: Dictionary in _spinners:
 		(s["node"] as Node3D).rotate_object_local(s["axis"], float(s["speed"]) * delta)
 	_tick_fires(delta)
@@ -1698,7 +1699,8 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 		var dist := flat.length()
 		# What counts is the edge of the body, not its middle.
 		var body := z.body_radius()
-		if dist > range_m + body or absf(to.y) > 3.0:
+		# A tall body (the Leviathan, the Kraken) can be struck anywhere up its height.
+		if dist > range_m + body or absf(to.y) > maxf(3.0, z.height * 0.55):
 			continue
 		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos(minf(half_cone + atan2(body, dist), PI)):
 			continue

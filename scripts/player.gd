@@ -1419,11 +1419,11 @@ func hauled_by_rival(at: Vector3) -> void:
 var _lure_at := Vector3.INF
 var _lure_speed := 0.0
 var _lure_left := 0.0
-func lure(at: Vector3, speed: float) -> void:
+func lure(at: Vector3, speed: float, why := "The song draws you in...") -> void:
 	if dead or guard_left > 0.0:
 		return
 	if _lure_left <= 0.0:
-		say("The song draws you in...")
+		say(why)
 	_lure_at = at
 	_lure_speed = speed
 	_lure_left = 0.15

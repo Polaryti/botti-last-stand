@@ -697,6 +697,23 @@ def kraken_arm():
         + "".join(circ(SUCK, x, y, r, 1.4) for x, y, r in ((50, 86, 4), (49, 74, 3.8), (50, 62, 3.5), (54, 50, 3.2), (60, 40, 2.8), (68, 34, 2.4)))
         + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z")
         + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
+def kraken():
+    # The Kraken of Vael: its mantle reared out of the sea, the broken gold towers of drowned Vael grown
+    # into its head with their windows lit, two great gold eyes barred with black, and arms curling up
+    # out of the waves either side.
+    arm_l = path(KRAK, "M2 94 C-2 70 6 46 20 40 C30 36 34 46 28 52 C24 56 18 52 20 46 C12 54 10 74 14 94Z")
+    arm_r = path(KRAK, "M98 94 C102 70 94 46 80 40 C70 36 66 46 72 52 C76 56 82 52 80 46 C88 54 90 74 86 94Z")
+    crown = "".join(poly(("#f0d27a", "#7a5a18"), (x - 5, 40), (x - 1, 40 - h), (x + 1, 40 - h), (x + 5, 40))
+                    + rect(("#bfffe8", "#3ae0b0"), x - 1.6, 36 - h * 0.45, 3.2, 4, 0.5, 0) for x, h in ((32, 12), (41, 20), (50, 28), (59, 20), (68, 12)))
+    return (arm_l + arm_r
+        + path(KRAK, "M18 96 C14 72 20 48 34 40 C44 34 56 34 66 40 C80 48 86 72 82 96Z")
+        + crown + rect(("#f0d27a", "#7a5a18"), 26, 38, 48, 6, 2, 1.6)
+        + "".join(circ(SUCK, x, y, r, 1.2) for x, y, r in ((30, 84, 3), (70, 84, 3), (26, 72, 2.4), (74, 72, 2.4), (8, 62, 2.2), (92, 62, 2.2)))
+        + ell(("#ffe07a", "#c87a10"), 36, 60, 8.5, 7.5, 0, 1.6) + ell(("#ffe07a", "#c87a10"), 64, 60, 8.5, 7.5, 0, 1.6)
+        + rect("#14060a", 28.5, 58.6, 15, 2.8, 1, 0) + rect("#14060a", 56.5, 58.6, 15, 2.8, 1, 0)
+        + path(("#2a1418", "#0a0204"), "M44 74 L56 74 L50 84Z", 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M2 88 C18 80 30 92 46 86 C62 80 76 92 98 84 L98 98 L2 98Z")
+        + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
 def hollow_sovereign():
     # The Hollow Sovereign: a deep royal hood with nothing inside it but two points of gold light.
     return (path(ROYAL, "M10 96 C8 56 22 18 50 16 C78 18 92 56 90 96Z")
@@ -711,7 +728,7 @@ def sunken_crown():
         + "".join(circ(("#fbf6ec", "#a09888"), x, y, 4.2, 1.6) for x, y in ((12, 32), (36, 20), (64, 20), (88, 32)))
         + ell(("#7ff0b0", "#1a8a50"), 50, 66, 6, 7, 0, 2)
         + path(("#f08a78", "#8a2a20"), "M80 74 L86 52 L88 62 L94 50 L90 70Z", 1.6) + _barnacles([(22, 80), (30, 82)], 3))
-for g in (siren, press_gang, tide_witch, harbourmaster, lighthouse_keeper, kraken_arm, hollow_sovereign, sunken_crown):
+for g in (siren, press_gang, tide_witch, harbourmaster, lighthouse_keeper, kraken_arm, kraken, hollow_sovereign, sunken_crown):
     PLAIN.append(g)
 
 # The Harpooner (stage 5)

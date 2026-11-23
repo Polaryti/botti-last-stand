@@ -602,6 +602,58 @@ def kraken_death():
     return reverb(lowp(v, 1500) + water(m, 200, 2500, 60) * env(m, 0.4, 1.0) * 0.6 + thud(m, 0.4, 1.0, 50), 1.8, 0.35)
 
 
+def kraken_emerge():
+    """The whole Kraken rising: the harbour heaving up, a roar of water pouring off something vast,
+    stones grinding on the sea floor, and under it all a groan so low it is felt more than heard."""
+    m = n(4.5)
+    t = t_(m)
+    heave = lowp(noise(m), 160) * np.clip(t / 1.5, 0, 1) * np.exp(-np.clip(t - 3.0, 0, 9) * 1.5) * 2.2
+    pour = water(m, 200, 4000, 160) * np.clip((t - 1.0) / 0.8, 0, 1) * np.exp(-np.clip(t - 3.2, 0, 9) * 1.8) * 0.9
+    grind = band(noise(m), 300, 900) * (0.5 + 0.5 * np.sin(2 * np.pi * 7 * t)) * np.sin(np.pi * np.clip(t / 3.0, 0, 1)) * 0.25
+    groan = throat(m, curve(m, (0, 32), (0.5, 40), (1, 28)), ((140, 0.4, 1.0), (330, 0.3, 0.5)), breath=0.4, rough=1.2, sub=1.0) * np.sin(np.pi * np.clip(t / 4.5, 0, 1)) * 0.8
+    return reverb(heave + pour + grind + groan, 2.6, 0.45)
+
+
+def kraken_roar():
+    """The Kraken's roar: a bellow from a throat the size of a ship's hold, wet and rattling, with the
+    sea hissing off it."""
+    m = n(3.0)
+    t = t_(m)
+    v = throat(m, curve(m, (0, 55), (0.2, 75), (0.7, 62), (1, 40)), ((160, 0.5, 1.0), (390, 0.4, 0.6), (900, 0.25, 0.3)), breath=0.5, rough=1.6, sub=1.0)
+    v *= np.clip(t / 0.25, 0, 1) * np.exp(-np.clip(t - 1.6, 0, 9) * 2.0)
+    rattle = band(noise(m), 200, 1200) * (0.5 + 0.5 * np.sign(np.sin(2 * np.pi * 22 * t))) * np.clip(t / 0.3, 0, 1) * np.exp(-np.clip(t - 1.4, 0, 9) * 2.5) * 0.35
+    hiss = band(noise(m), 3000, 8000) * np.clip((t - 0.2) / 0.3, 0, 1) * np.exp(-np.clip(t - 1.2, 0, 9) * 2) * 0.2
+    return reverb(lowp(v, 2400) + rattle + hiss, 2.8, 0.45)
+
+
+def kraken_ink():
+    """Ink spat out of it: a deep gulping heave, a thick wet burst, and a dark rain pattering down."""
+    m = n(1.6)
+    t = t_(m)
+    gulp = np.sin(2 * np.pi * curve(m, (0, 90), (0.3, 60), (1, 50)).cumsum() / SR) * np.clip((0.35 - t) / 0.35, 0, 1) * 0.5
+    burst = band(noise(m), 150, 1800) * at(env(n(0.6), 0.01, 4), 0.3, 1.6) * 1.0
+    patter = band(noise(m), 800, 3500) * np.clip((t - 0.5) / 0.2, 0, 1) * np.exp(-np.clip(t - 0.7, 0, 9) * 2) * ((rng.random(m) < 0.03) * 2.5 + 0.15) * 0.5
+    return reverb(gulp + burst + patter + bubbles(m, 20, 120, 420, 0.08) * 0.4, 1.4, 0.35)
+
+
+def kraken_whirlpool():
+    """The sea turning round it: a vast rushing circle of water, rising and falling as it wheels."""
+    m = n(5.0)
+    t = t_(m)
+    swirl = sweep_filter(noise(m), 200, 700, 1.5) * (0.6 + 0.4 * np.sin(2 * np.pi * 0.45 * t)) * np.clip(t / 0.8, 0, 1) * np.clip((5.0 - t) / 1.0, 0, 1) * 0.9
+    roar = lowp(noise(m), 140) * np.clip(t / 1.0, 0, 1) * np.clip((5.0 - t) / 1.0, 0, 1) * 1.5
+    return reverb(swirl + roar + water(m, 400, 3000, 80) * 0.35, 2.4, 0.4)
+
+
+def kraken_end():
+    """The Kraken falling: one long sinking bellow, the sea pouring in over it, and then quiet water."""
+    m = n(5.5)
+    t = t_(m)
+    v = throat(m, curve(m, (0, 70), (0.6, 40), (1, 22)), ((160, 0.4, 1.0), (380, 0.3, 0.5)), breath=0.5, rough=1.0, sub=1.0) * env(m, 0.05, 1.4)
+    pour = water(m, 200, 3500, 140) * np.clip((t - 1.0) / 1.0, 0, 1) * np.exp(-np.clip(t - 3.0, 0, 9) * 1.2) * 0.9
+    return reverb(lowp(v, 1600) + pour + thud(m, 1.5, 1.6, 40), 3.0, 0.45)
+
+
 def wave_rise():
     """A wave being called up: water gathering and rising."""
     m = n(1.0)
@@ -944,6 +996,8 @@ SOUNDS.update({
     "call_tide": (call_tide, 0.8), "tide_shell": (tide_shell, 0.7), "shell_hit": (shell_hit, 0.6), "shell_burst": (shell_burst, 0.85),
     "stormspear": (stormspear, 0.8), "chain_lightning": (chain_lightning, 0.75), "maelstrom": (maelstrom, 0.75),
     "serpent_rise": (serpent_rise, 0.8), "serpent_bite": (serpent_bite, 0.7),
+    "kraken_emerge": (kraken_emerge, 0.95), "kraken_roar": (kraken_roar, 0.95), "kraken_ink": (kraken_ink, 0.8),
+    "kraken_whirlpool": (kraken_whirlpool, 0.8), "kraken_end": (kraken_end, 0.95),
 })
 
 

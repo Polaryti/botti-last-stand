@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 68
+const PROTOCOL := 69
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -60,6 +60,7 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"siren_song", "siren_shriek", "siren_hum", "siren_death", "press_shout", "net_throw", "net_land", "witch_call", "witch_death",
 	"chain_rattle", "hook_throw", "harbour_bell", "harbour_growl", "lamp_throw", "lamp_smash", "lamp_flare", "lamp_blaze", "keeper_laugh", "keeper_hurt",
 	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
+	"kraken_emerge", "kraken_roar", "kraken_ink", "kraken_whirlpool", "kraken_end", "boss_bells_kraken",
 	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign",
 	# Last Light
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
@@ -78,7 +79,9 @@ const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_
 	"Ride", "RideCharge", "RideThrust", "RideBrandish",
 	# Port Vael: a Lantern Jelly's sting, a Siren's song, a Kraken's Arm rising and sinking; and the drowned
 	# court's throws and calls (BodyAnim). Never more than 63 of these: the top bits carry poison and bleeding.
-	"m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"]
+	"m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise",
+	# The Kraken: its sweep, its ink, its hook, its roar and its whirlpool (KrakenModels).
+	"m_sweep", "m_ink", "m_grab", "m_roar", "m_pull"]
 
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL

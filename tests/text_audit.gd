@@ -263,6 +263,7 @@ static func facts() -> Dictionary:
 		# Port Vael's foes (their special moves are VaelMind's), and the clock times they come at,
 		# read as minutes and seconds ("around 3:00").
 		"enemy:siren": [VaelMind.SONG_REACH, VaelMind.SONG_PULL],
+		"enemy:kraken": [VaelMind.KRAKEN_SWEEP_REACH, VaelMind.KRAKEN_INK_BLIND, VaelMind.KRAKEN_PULL_REACH, VaelMind.KRAKEN_PULL_TIME, VaelMind.KRAKEN_BROOD],
 		"enemy:press_gang": [VaelMind.NET_HOLD],
 		"enemy:tide_witch": [float(VaelMind.WAVES), VaelMind.WAVE_SLOW, float(VaelMind.RAISE_COUNT)],
 		"enemy:harbourmaster": _clock(Director.HARBOURMASTER_AT),

@@ -59,6 +59,13 @@ const KEEPER_AT := 360.0
 const QUAY_STAIRS := [Vector3(-30, 0, 10), Vector3(30, 0, 10)] # the foot of each, on the flats
 const KEEPER_FROM := Vector3(84, 2.0, 62) # on the East Mole, under the lighthouse
 const SOVEREIGN_FROM := Vector3(0, 0, 44) # the middle of the flats
+# The end of it all: once the Hollow Sovereign and the Leviathan have both fallen, the harbour goes
+# still, and after a little while the Kraken rises in front of the quay, under the Tide King's gaze.
+# Dawn will not come until it sinks.
+const KRAKEN := "kraken"
+const KRAKEN_AFTER := 14.0 # seconds of stillness before it rises
+const KRAKEN_FROM := Vector3(0, 0, 24)
+const KRAKEN_HOLDS_TIDE := 900.0 # it holds the tide in while it lives
 const CROWN_AT := 120.0 # All vs All: when the Sunken Crown washes up at the Drowned Bell
 const CROWN_SPOT := Vector3(8, 0, 34)
 const VAEL_BOSS := "hollow_sovereign"
@@ -100,6 +107,9 @@ var _cache_look := 0.0
 var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
 var _coastal_leviathan := false
+var _kraken_at := -1.0
+var _kraken_risen := false
+var _kraken_fallen := false
 var _mist_boss_defeated := false
 var _next_wyvern := FIRST_WYVERN
 var _next_siren := 150.0
@@ -177,6 +187,7 @@ const BOSS_CARDS := {
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
 	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "the drowned harbour belongs to the deep", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
 	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
+	KRAKEN: {"name": "The Kraken", "line": "the last of Vael rises from the deep", "color": Color(0.45, 1.0, 0.8), "glow": Color(0.32, 0.06, 0.2), "bells": "boss_bells_kraken", "strikes": [0.0, 0.32, 1.2, 1.86, 2.3, 3.3]},
 }
 const BOSS_CARD_TIME := 7.0 # long enough to read what it says
 var boss_card := "" # the boss whose card shows, while boss_card_time lasts
@@ -368,7 +379,7 @@ func _process(delta: float) -> void:
 		_far_timer = 4.0
 		if world.fort == null:
 			_clear_far_zombies()
-	var dawned := world.last_light.lit if world.last_light else elapsed >= match_length() and not Net.fog_rules() and (not requires_regent() or (_mist_boss_defeated and (world.map_id != "vael" or (_coastal_leviathan and world.count_type("leviathan") == 0))))
+	var dawned := world.last_light.lit if world.last_light else elapsed >= match_length() and not Net.fog_rules() and (not requires_regent() or (_mist_boss_defeated and (world.map_id != "vael" or _kraken_fallen)))
 	if dawned:
 		_won = true
 		_sound("rooster", 0.0)
@@ -502,7 +513,10 @@ func _raise_sovereign() -> void:
 ## A boss has fallen: the Veil Regent, the Great Revenant Elemental, the War Wyvern or the Hollow
 ## Sovereign. Dawn can come now.
 func boss_fallen(_z: Zombie) -> void:
-	if _z.type_id != "leviathan":
+	if _z.type_id == KRAKEN:
+		_kraken_fallen = true
+		show_banner("The Kraken sinks. The deep is still, and Vael is free.", 6.0)
+	elif _z.type_id != "leviathan":
 		_mist_boss_defeated = true
 
 
@@ -556,6 +570,34 @@ func _tick_vael() -> void:
 		if at != Vector3.INF and world.spawn_zombie("leviathan", at):
 			_coastal_leviathan = true
 			show_banner("The Leviathan rises from the drowned harbour", 5.0)
+	_tick_kraken()
+
+
+## The end of Port Vael's night: the Kraken, once both its royals have fallen.
+func _tick_kraken() -> void:
+	if world.map_id != "vael" or Net.fog_rules() or _follows_host or _kraken_risen:
+		return
+	if _kraken_at < 0.0:
+		if _mist_boss_defeated and _coastal_leviathan and world.count_type("leviathan") == 0:
+			_kraken_at = elapsed + KRAKEN_AFTER
+			show_banner("The harbour goes still. Something vast is moving under it...", 5.0)
+			_sound("kraken_whirlpool", 2.0)
+		return
+	if elapsed >= _kraken_at:
+		_raise_kraken()
+
+
+func _raise_kraken() -> void:
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(KRAKEN_FROM)))
+	spot.y = world.ground_at(spot)
+	if not world.spawn_zombie(KRAKEN, spot):
+		_kraken_at = elapsed + 2.0 # nowhere to rise just now: a moment later
+		return
+	_kraken_risen = true
+	if world.tide:
+		world.tide.surge(KRAKEN_HOLDS_TIDE)
+	world.fx_water(spot + Vector3.UP, 8.0, Color(0.72, 0.9, 0.92), true)
+	world.fx_ring(spot, 14.0, Color(0.55, 0.95, 0.9))
 
 
 

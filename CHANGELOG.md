@@ -2,6 +2,14 @@
 
 ## Development — Beyond the Mists
 
+### The Kraken, the end of Port Vael
+
+- **The final boss of the coast:** once the Hollow Sovereign and the Leviathan have both fallen, the harbour goes still and the Kraken rises in front of the quay. It holds the tide in, and dawn waits until it sinks.
+- **One creature:** a great mantle crowned with the drowned towers of Vael, two gold eyes, a beak, and eight arms. They are the same arms that rise from the flats in the middle of the night.
+- **Its arts:** an arm rears over each of you and whips down on your ring. It sweeps away anyone who comes close, hooks whoever stands furthest off and spits blinding ink. At each third of its health it turns the harbour into a whirlpool and raises the drowned. In its last third its arms come down three at a time and waves roll out from it.
+- **Fixed:** the Kraken and its arms can now be struck with any weapon. A blade now reaches tall bodies anywhere up their height.
+- New entrance bells, roar, rise, ink and whirlpool sounds, a Codex entry and an icon. Its hoard washes up where it sinks.
+
 ### The Tidecaller, reworked
 
 - **The Trident at the heart of it:** health is now 110 (was 95), and the Trident hits harder and draws 6 tide a blow (was 5). The core of the tree is the Trident: Long Haft (reach and one more in the line), Skewer (every third thrust strikes twice as hard, holds and draws tide) and Brine.

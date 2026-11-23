@@ -12,7 +12,7 @@ extends RefCounted
 ## The Drowned Sailors and the Barnacle Brutes are the drowned themselves, on the game's own bodies,
 ## dressed by sailor_gear() and brute_gear().
 
-const KINDS := ["brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan"]
+const KINDS := ["brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan", "kraken"] # the Kraken and its arms are drawn by KrakenModels
 
 const SKIN := Color(0.17, 0.27, 0.31)
 const SKIN_DARK := Color(0.09, 0.15, 0.19)
@@ -613,17 +613,11 @@ const ERMINE := Color(0.78, 0.78, 0.72)
 const PALE := Color(0.62, 0.72, 0.7) # a Siren's skin
 const SCALES := Color(0.22, 0.42, 0.46)
 const SCALES_DARK := Color(0.12, 0.25, 0.3)
-const KRAKEN := Color(0.42, 0.16, 0.24)
-const KRAKEN_DARK := Color(0.24, 0.08, 0.14)
-const SUCKER := Color(0.86, 0.66, 0.62)
 const SONG_GLOW := Color(0.62, 1.0, 0.9)
 const HOLLOW_GLOW := Color(1.0, 0.82, 0.4)
 
 const SIREN_TAIL := 5
 const SIREN_TAIL_LEN := 0.42
-const ARM_SEGMENTS := 20
-const ARM_SEGMENT := 0.33 # metres each: an arm stands 6.6 m tall
-const ARM_BURIED := -6.8 # where it waits, under the sea, before it rises
 
 
 ## The Sunken Crown: a band of sea-dulled gold with points of two heights, each tipped with a pearl,
@@ -1220,118 +1214,6 @@ static func fall_siren(root: Node3D, k: float, side: float) -> void:
 		at.rotation.y = side * sin(clampf(k / 0.9, 0.0, 1.0) * PI) * 0.35 * (1.0 - over * 0.5)
 		if i < SIREN_TAIL - 1:
 			at = at.get_node("Tail%d" % (i + 1)) as Node3D
-
-
-# --- Kraken's Arm ----------------------------------------------------------------------------
-
-## One great arm of the kraken, standing out of the sea: twelve joints, thick and dark red-purple at its
-## root and tapering to a curling tip, pale underneath with rows of suckers along its inner side (the
-## side toward you). Where it comes out of the water, a ring of churned foam. Nodes: Arm (lifted out
-## of the sea as it rises) > Seg0 > Seg1 > ... > Seg11; Foam.
-static func kraken_parts(root: Node3D) -> void:
-	var foam_mesh := _mesh("kraken_foam", func(l: LowPoly) -> void:
-		for i in 16:
-			var a := TAU * i / 16.0
-			var b := TAU * (i + 1) / 16.0
-			l.prism(Vector3(cos(a), 0, sin(a)) * 1.35, Vector3(cos(b), 0, sin(b)) * 1.35, 0.18, 0.18, 4, Color(0.86, 0.94, 0.92))
-			l.prism(Vector3(cos(a), 0, sin(a)) * 1.8, Vector3(cos(a + 0.2), 0, sin(a + 0.2)) * 2.1, 0.12, 0.0, 3, Color(0.78, 0.88, 0.86)))
-	var foam := MesenllaModels._part(root, foam_mesh, Vector3(0, 0.05, 0), "Foam")
-	foam.material_override = MesenllaModels.ghost_material()
-	var arm := MesenllaModels._pivot(root, Vector3.ZERO, "Arm")
-	var at := arm
-	var where := Vector3(0, -0.3, 0)
-	for i in ARM_SEGMENTS:
-		var seg := MesenllaModels._pivot(at, where, "Seg%d" % i)
-		var r0 := lerpf(0.82, 0.06, pow(float(i) / ARM_SEGMENTS, 0.72))
-		var r1 := lerpf(0.82, 0.06, pow(float(i + 1) / ARM_SEGMENTS, 0.72))
-		MesenllaModels._part(seg, _mesh("kraken_seg%d" % i, func(l: LowPoly) -> void:
-			l.prism(Vector3.ZERO, Vector3(0, ARM_SEGMENT, 0), r0, r1, 9, KRAKEN if i % 2 == 0 else KRAKEN.darkened(0.06))
-			# The pale underside, and its suckers, toward +Z.
-			l.prism(Vector3(0, 0, r0 * 0.45), Vector3(0, ARM_SEGMENT, r1 * 0.45), r0 * 0.62, r1 * 0.62, 7, SUCKER.darkened(0.15))
-			for s in 2:
-				var y := ARM_SEGMENT * (0.25 + s * 0.5)
-				var r := lerpf(r0, r1, 0.25 + s * 0.5)
-				for x: float in [-0.35, 0.35]:
-					var p := Vector3(x * r, y, r * 0.98)
-					l.prism(p, p + Vector3(0, 0, r * 0.14), r * 0.2, r * 0.17, 7, SUCKER)
-					l.prism(p + Vector3(0, 0, r * 0.13), p + Vector3(0, 0, r * 0.15), r * 0.1, r * 0.1, 6, KRAKEN_DARK)
-			# Raised dorsal ridges, scarred hide and a translucent cutting fin along the tip.
-			l.prism(Vector3(0,0,-r0), Vector3(0,ARM_SEGMENT,-r1),r0*0.1,r1*0.08,5,KRAKEN_DARK)
-			if i > 13:
-				l.leaf(Vector3(0,0,-r0),Vector3(0,ARM_SEGMENT*0.45,-r0*2.5),Vector3(0,ARM_SEGMENT,-r1),CORAL.darkened(0.2))
-			for scar in 2:
-				l.prism(Vector3(r0*0.8,ARM_SEGMENT*(0.2+scar*0.4),-r0*0.4),Vector3(r0*0.6,ARM_SEGMENT*(0.4+scar*0.4),-r0*0.7),0.014,0.006,3,SUCKER.darkened(0.35))
-			# Darker blotches on its back.
-			if i % 3 == 1:
-				l.box(Vector3(r0 * 0.3, ARM_SEGMENT * 0.5, -r0 * 0.85), Vector3(r0 * 0.6, ARM_SEGMENT * 0.4, 0.04), KRAKEN_DARK)
-			if i < 3:
-				var rng := RandomNumberGenerator.new()
-				rng.seed = 2461 + i
-				barnacles(l, Vector3(-r0 * 0.7, ARM_SEGMENT * 0.5, -r0 * 0.6), Vector3(-1, 0, -0.8), 4, 0.06, rng)))
-		at = seg
-		where = Vector3(0, ARM_SEGMENT, 0)
-	arm.position.y = ARM_BURIED
-
-
-## Each frame: rising out of the sea or sinking back into it, swaying and curling where it stands;
-## rearing back high before a slam (the tell) and whipping down to the ground in front of it; sweeping
-## round low across the water close by.
-static func animate_kraken(z: Zombie, root: Node3D, delta: float, state: String, t: float, act: float) -> void:
-	var arm := root.get_node("Arm") as Node3D
-	var foam := root.get_node("Foam") as Node3D
-	foam.rotation.y = t * 0.6
-	foam.scale = Vector3.ONE * (1.0 + sin(t * 2.3) * 0.06)
-	var k := minf(1.0, delta * 9.0)
-	var up := 1.0
-	match state:
-		"m_rise": up = smoothstep(0.0, VaelMind.RISE_TIME, act)
-		"m_sink": up = 1.0 - smoothstep(0.0, VaelMind.SINK_TIME, act)
-	arm.position.y = lerpf(ARM_BURIED, -0.3, up)
-	var at := arm.get_node("Seg0") as Node3D
-	for i in ARM_SEGMENTS:
-		var f := float(i) / ARM_SEGMENTS
-		# Standing: a slow wave runs up it and the tip curls over toward you.
-		var want_x := sin(t * 1.5 - i * 0.36) * (0.025 + f * 0.035) + f * f * 0.17
-		var want_z := sin(t * 1.1 - i * 0.28) * (0.02 + f * 0.04)
-		match state:
-			"m_slam":
-				if z.is_warning():
-					# Reared back and up, coiled to strike.
-					var coil := clampf(act / maxf(VaelMind.KRAKEN_TELL - 0.25, 0.1), 0.0, 1.0)
-					want_x = lerpf(want_x, -0.22 + f * 0.35 if i > 2 else -0.1, coil)
-					want_z = sin(t * 7.0 - i) * 0.03 * coil
-				else:
-					# Down it comes, flat along the ground in front.
-					var whip := clampf(act / 0.18, 0.0, 1.0)
-					want_x = lerpf(-0.2, (0.21 if i < 6 else 0.015) - (0.0 if f < 0.8 else 0.08), whip)
-					want_z = 0.0
-					k = minf(1.0, delta * 26.0)
-			"m_swipe":
-				var sweep := clampf(act / 0.45, 0.0, 1.0)
-				want_x = 0.16 if i < 6 else 0.06
-				want_z = (0.22 if i < 5 else 0.05) * lerpf(-1.0, 1.0, sweep)
-				k = minf(1.0, delta * 18.0)
-			"m_rise", "m_sink":
-				want_x = sin(t * 4.0 - i * 0.6) * 0.15
-		at.rotation.x = lerpf(at.rotation.x, want_x, k)
-		at.rotation.z = lerpf(at.rotation.z, want_z, k)
-		if i < ARM_SEGMENTS - 1:
-			at = at.get_node("Seg%d" % (i + 1)) as Node3D
-
-
-## Dying: it shudders, goes limp, and falls over sideways into the water, then sinks.
-static func fall_kraken(root: Node3D, k: float, side: float) -> void:
-	var arm := root.get_node("Arm") as Node3D
-	var limp := smoothstep(0.15, 1.2, k)
-	arm.rotation.z = side * 1.35 * limp
-	arm.position.y = -0.3 - smoothstep(1.4, 2.6, k) * 3.5
-	var at := arm.get_node("Seg0") as Node3D
-	for i in ARM_SEGMENTS:
-		at.rotation.x = sin(k * 30.0 - i) * 0.08 * (1.0 - limp) + 0.04 * limp
-		at.rotation.z = side * 0.06 * limp
-		if i < ARM_SEGMENTS - 1:
-			at = at.get_node("Seg%d" % (i + 1)) as Node3D
-	(root.get_node("Foam") as Node3D).scale = Vector3.ONE * (1.0 + k * 0.4)
 
 
 # --- The Leviathan of the Mists ----------------------------------------------------------------

@@ -34,6 +34,7 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"siren_song", "siren_hum", "siren_shriek", "siren_death", "press_shout", "net_throw", "net_land", "witch_call", "witch_death",
 	"chain_rattle", "hook_throw", "harbour_bell", "harbour_growl", "lamp_throw", "lamp_smash", "lamp_flare", "lamp_blaze", "keeper_laugh", "keeper_hurt",
 	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
+	"kraken_emerge", "kraken_roar", "kraken_ink", "kraken_whirlpool", "kraken_end", "boss_bells_kraken",
 	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign",
 	# Last Light: the Leviathan of the Mists, a waystation's brazier, the lighthouse lit again
 	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",

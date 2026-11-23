@@ -12,7 +12,10 @@ Regent: slow down through D minor to a low D struck twice over the gong, the Mis
 boss_bells_sovereign.ogg (the Hollow Sovereign: Port Vael's G minor, falling slowly from D5 to a low G
 struck twice, as heavy and as slow as the tide; the gong under it like a wave breaking), and
 boss_bells_leviathan.ogg (the Leviathan of the Mists: the Lantern Road's D minor, a low D struck three
-times like the barge's hull knocking, then D5 and A4 crying out over two gongs).
+times like the barge's hull knocking, then D5 and A4 crying out over two gongs), and
+boss_bells_kraken.ogg (the Kraken, the last of Vael: every bell of Port Vael's G minor at once, struck
+down from G5 to a low G in fours like a great heart under the harbour, three gongs under them and
+the bell tree run down the whole way after).
     ONLY=sovereign python3 tools/make_boss_bells.py /path/to/VSCO-2-CE     (just that one)"""
 import glob, os, sys
 import numpy as np
@@ -111,11 +114,25 @@ def leviathan():
     return mix(6.4, parts)
 
 
+def kraken():
+    # The Kraken, the end of it all: a low G knocked twice like a heartbeat under the harbour floor,
+    # then G5 D5 B-flat 4 G4 struck down fast, the low G and lower D under the loudest gong, the heart
+    # once more, and the bell tree run all the way down.
+    toll = [(0.0, "G3", 0.75), (0.32, "G3", 0.6), (1.2, "G5", 0.8), (1.42, "D5", 0.84), (1.64, "A#4", 0.88), (1.86, "G4", 0.92),
+        (2.3, "G3", 1.0), (2.3, "D4", 0.7), (3.3, "G3", 0.75), (3.62, "G3", 0.6)]
+    parts = [(at, tube(note, 5.0), gain) for at, note, gain in toll]
+    parts.append((0.0, one("Percussion/gongHit_mf.wav"), 0.3))
+    parts.append((1.2, one("Percussion/gongHit_mf.wav"), 0.32))
+    parts.append((2.3, one("Percussion/gongHit_f.wav"), 0.52))
+    parts.append((2.35, one("Percussion/BellTree_Stroke4_*.wav"), 0.32))
+    return mix(7.4, parts)
+
+
 if __name__ == "__main__":
     if not SAMPLES or not glob.glob(os.path.join(SAMPLES, "Percussion/TB_hit_*.wav")):
         raise SystemExit("Give the VSCO-2 CE folder (the soundtrack's samples) as the first argument.")
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
-    for name, make in (("revenant", revenant), ("wyvern", wyvern), ("regent", regent), ("sovereign", sovereign), ("leviathan", leviathan)):
+    for name, make in (("revenant", revenant), ("wyvern", wyvern), ("regent", regent), ("sovereign", sovereign), ("leviathan", leviathan), ("kraken", kraken)):
         if not only or name in only:
             write("assets/sounds/boss_bells_%s.ogg" % name, make(), 0.8, q=4)
     print("boss bells done")

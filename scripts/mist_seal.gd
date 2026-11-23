@@ -12,7 +12,7 @@ const LIMIT := 16
 const STING_STUN := 0.8 # how long a Lantern Jelly's sting stuns you (ZombieDefs "sting_stun")
 ## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
 const PORTAL_SHARE := 1.5
-enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL }
+enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL, INK } # new ones go at the end
 const FROST_FREEZE := 0.6
 const FROST_SLOW := 2.0
 const LOOKS := {
@@ -33,16 +33,17 @@ const LOOKS := {
 	Style.SLAM: [Color(0.5, 0.85, 0.75), Color(0.85, 0.4, 0.55)],
 	Style.FLASH: [Color(1.0, 0.95, 0.7), Color(1.0, 1.0, 0.92)],
 	Style.CROWN: [Color(0.95, 0.78, 0.3), Color(0.45, 1.0, 0.82)],
+	Style.INK: [Color(0.42, 0.16, 0.5), Color(0.12, 0.04, 0.16)],
 }
 ## What each sounds like as its circle appears, and as it closes.
 const WARN_SOUNDS := {Style.MIST: "mist_warning", Style.QUAKE: "quake_warning", Style.STORM: "storm_call", Style.FIRE: "fire_warning",
 	Style.BOULDER: "boulder_throw", Style.FROST: "frost_warning", Style.STING: "jelly_hum", Style.NET: "", Style.WAVE: "wave_rise",
-	Style.HOOK: "", Style.LAMP: "", Style.SLAM: "", Style.FLASH: "lamp_flare", Style.CROWN: "crown_toll", Style.SALT: "", Style.BRINE_BOLT: "", Style.KNELL: ""}
+	Style.HOOK: "", Style.LAMP: "", Style.SLAM: "", Style.FLASH: "lamp_flare", Style.CROWN: "crown_toll", Style.SALT: "", Style.BRINE_BOLT: "", Style.KNELL: "", Style.INK: ""}
 const STRIKE_SOUNDS := {Style.MIST: "mist_burst", Style.QUAKE: "earth_slam", Style.STORM: "thunder", Style.FIRE: "fire_breath",
 	Style.BOULDER: "boulder_impact", Style.FROST: "frost_burst", Style.STING: "jelly_sting", Style.NET: "net_land", Style.WAVE: "wave_crash",
-	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall", Style.SALT: "salt_splash", Style.BRINE_BOLT: "brine_crack", Style.KNELL: "knell_strike"}
+	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall", Style.SALT: "salt_splash", Style.BRINE_BOLT: "brine_crack", Style.KNELL: "knell_strike", Style.INK: "kraken_ink"}
 ## Thrown things (a net, a hook, a lamp) leave the thrower's hand for the last part of the tell.
-const THROWN := [Style.NET, Style.HOOK, Style.LAMP, Style.SALT]
+const THROWN := [Style.NET, Style.HOOK, Style.LAMP, Style.SALT, Style.INK]
 const THROW_FLIGHT := 0.55
 ## What each of the drowned court's circles does to you (VaelMind has the numbers).
 const NET_HOLD := VaelMind.NET_HOLD
@@ -54,6 +55,8 @@ const LAMP_BURN := VaelMind.LAMP_BURN
 const SLAM_STUN := VaelMind.KRAKEN_STUN
 const FLASH_STUN := VaelMind.FLASH_STUN
 const JUDGEMENT_STUN := VaelMind.JUDGEMENT_STUN
+const INK_BLIND := VaelMind.KRAKEN_INK_BLIND
+const INK_SLOW := VaelMind.KRAKEN_INK_SLOW
 var style := 0
 var _boulder: MeshInstance3D
 var _chain: MeshInstance3D
@@ -184,6 +187,14 @@ static func thrown_mesh(kind: int) -> Mesh:
 		return _thrown_meshes[kind]
 	var l := LowPoly.new()
 	match kind:
+		Style.INK:
+			# A gout of ink, ragged at the edges, trailing a tail.
+			var ink := Color(0.08, 0.03, 0.1)
+			l.prism(Vector3(0, -0.3, 0), Vector3(0, 0.3, 0), 0.38, 0.3, 7, ink)
+			for i in 6:
+				var a := TAU * i / 6.0
+				l.prism(Vector3(cos(a) * 0.25, 0, sin(a) * 0.25), Vector3(cos(a) * 0.55, 0.12, sin(a) * 0.55), 0.14, 0.0, 4, ink.lightened(0.08))
+			l.prism(Vector3(0, 0.25, 0), Vector3(0, 0.9, -0.2), 0.18, 0.0, 5, ink)
 		Style.SALT:
 			l.prism(Vector3(0, -0.17, 0), Vector3(0, 0.18, 0), 0.16, 0.12, 7, Color(0.65, 0.95, 0.8))
 			for i in 5:
@@ -304,6 +315,12 @@ func strike() -> void:
 		Style.CROWN:
 			world.fx_water(position, radius * 0.6, Color(0.95, 0.82, 0.4))
 			world.flash_bolt(position)
+		Style.INK:
+			world.fx_gore(position + Vector3.UP * 0.6, Color(0.1, 0.03, 0.12))
+			world.fx_gore(position + Vector3(radius * 0.4, 0.4, 0), Color(0.16, 0.05, 0.18))
+			world.fx_gore(position + Vector3(-radius * 0.4, 0.4, 0), Color(0.16, 0.05, 0.18))
+			if _boulder:
+				_boulder.visible = false
 	var strike_sound: String = STRIKE_SOUNDS.get(style, "")
 	if world.player and strike_sound != "":
 		Sfx.play_at(strike_sound, position, world.player.global_position, 0.0)
@@ -343,6 +360,11 @@ func strike() -> void:
 					p.stun_by_creature(SLAM_STUN)
 					p.velocity += Vector3(p.global_position.x - position.x, 0, p.global_position.z - position.z).normalized() * 6.0 + Vector3.UP * 4.0
 				Style.CROWN: p.stun_by_creature(JUDGEMENT_STUN)
+				Style.INK:
+					# Ink in your eyes: the dark closes in round the edges for a while, and you stumble.
+					p.night_blind_left = maxf(p.night_blind_left, INK_BLIND)
+					p.slow_by_creature(INK_SLOW)
+					p.say("Ink in your eyes!")
 				Style.MIST: p.apply_status(Net.Status.SLOW, 2.0)
 				Style.QUAKE, Style.BOULDER:
 					p.apply_status(Net.Status.STUN, 0.8)

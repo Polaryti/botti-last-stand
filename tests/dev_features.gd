@@ -1922,6 +1922,7 @@ func _port_vael() -> void:
 	for z: Zombie in vael.zombies.duplicate(): z.release()
 	await _vael_sky(vael)
 	await _coastal_repairs(vael)
+	await _kraken_finale(vael)
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode
@@ -2093,7 +2094,7 @@ func _drowned_court() -> void:
 	check(["harbourmaster", "lighthouse_keeper", "kraken_arm"].all(func(id: String) -> bool: return ZombieDefs.ALL[id].get("miniboss", false)) and ZombieDefs.ALL["hollow_sovereign"].get("vael_boss", false), "three of the court are minibosses, and the Hollow Sovereign the boss")
 	check(Director.BOSS_CARDS.has("hollow_sovereign") and Sfx.NAMES.has("boss_bells_sovereign") and ResourceLoader.exists("res://assets/sounds/boss_bells_sovereign.ogg"), "he enters with his own card and bells")
 	check(Net.ANIMS.size() <= 64 and ["m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"].all(func(a: String) -> bool: return Net.ANIMS.has(a)), "every phone is sent what they are doing (%d states)" % Net.ANIMS.size())
-	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.LOOKS.size() == 17, "the new rings come after the old on the wire")
+	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.Style.INK == 17 and MistSeal.LOOKS.size() == 18, "the new rings come after the old on the wire")
 	var space := SubViewport.new()
 	space.own_world_3d = true
 	add_child(space)
@@ -2808,6 +2809,126 @@ func _vael_sky(vael: World) -> void:
 	you.position = saved
 
 
+## The Kraken, the end of Port Vael's night: it rises only once the Hollow Sovereign and the Leviathan
+## have both fallen, holds the tide in, can be struck by blade, arrow and Trident, uses each of its
+## arts in its own third of its health, and dawn waits for it.
+func _kraken_finale(coast: World) -> void:
+	var d := coast.director
+	var you := coast.player
+	var saved := you.position
+	for z: Zombie in coast.zombies.duplicate(): z.release()
+	var def: Dictionary = ZombieDefs.ALL[Director.KRAKEN]
+	check(def.get("vael_boss", false) and def.get("rooted", false) and VaelMind.handles(Director.KRAKEN) and Icons.exists("kraken") and Director.BOSS_CARDS.has(Director.KRAKEN)
+		and Game.zombie_pool_plan().has(Director.KRAKEN) and str(def.get("lore", "")).length() > 80, "the Kraken is the coast's last boss, with its card, its icon and its lore")
+	for sound: String in ["kraken_emerge", "kraken_roar", "kraken_ink", "kraken_whirlpool", "kraken_end", "boss_bells_kraken"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# It waits for both royals.
+	d._kraken_at = -1.0
+	d._kraken_risen = false
+	d._kraken_fallen = false
+	d._mist_boss_defeated = false
+	d._coastal_leviathan = true
+	d.elapsed = 800.0
+	d._tick_kraken()
+	check(d._kraken_at < 0.0 and coast.count_type(Director.KRAKEN) == 0, "not while the Hollow Sovereign stands")
+	d._mist_boss_defeated = true
+	coast.spawn_zombie("leviathan", coast.vael_sites.enemy_site(15.0, 190.0, VaelSites.Shore.WATERLINE))
+	d._tick_kraken()
+	check(d._kraken_at < 0.0, "nor while the Leviathan does")
+	for z: Zombie in coast.zombies.duplicate(): z.release()
+	d._tick_kraken()
+	check(d._kraken_at >= d.elapsed + Director.KRAKEN_AFTER - 0.01 and coast.count_type(Director.KRAKEN) == 0, "once both have fallen, the harbour goes still for %d s" % int(Director.KRAKEN_AFTER))
+	d.elapsed = d._kraken_at + 0.1
+	d._tick_kraken()
+	check(coast.count_type(Director.KRAKEN) == 1 and d._kraken_risen and coast.tide.surging(), "then the Kraken rises, and holds the tide in")
+	var beast: Zombie = coast.zombies.filter(func(z: Zombie) -> bool: return z.type_id == Director.KRAKEN).front()
+	check(Vector2(beast.position.x - Director.KRAKEN_FROM.x, beast.position.z - Director.KRAKEN_FROM.z).length() < 4.0, "in front of the quay")
+	check(beast._visual.find_children("Arm*", "Node3D", true, false).filter(func(n: Node) -> bool: return n.name.begins_with("Arm") and n.name.length() == 4).size() == KrakenModels.ARMS
+		and beast._visual.get_node_or_null("Body/Crown") != null and beast._visual.get_node_or_null("Body/Eyes") != null, "eight arms, its crown of drowned towers, its eyes")
+	# It can be struck: by a blade from the water's edge, by an arrow, by the Trident.
+	beast.set_physics_process(false)
+	var mind := beast.mesenlla_mind as VaelMind
+	mind.phase = ""
+	beast.hp = beast.max_hp
+	var edge := beast.position + Vector3(0, 0, -(VaelMind.KRAKEN_BODY + 2.0))
+	you.position = Vector3(edge.x, coast.ground_at(edge), edge.z)
+	you.look_at(Vector3(beast.position.x, you.position.y, beast.position.z), Vector3.UP)
+	you.yaw = you.rotation.y
+	var h0 := beast.hp
+	you.pitch = 0.0
+	you.camera.rotation = Vector3.ZERO
+	var sword: Dictionary = WeaponDefs.ALL["sword"]
+	var hit := coast.melee_hit(you, sword, you.melee_stats(sword))
+	check(hit > 0 and beast.hp < h0, "a blade from the water's edge reaches it (%.0f)" % (h0 - beast.hp))
+	await get_tree().physics_frame # the physics world catches up with where everything stands
+	var space := coast.get_world_3d().direct_space_state
+	var ray := PhysicsRayQueryParameters3D.create(you.eye_position(), beast.centre(), Zombie.LAYER)
+	var found := space.intersect_ray(ray)
+	check(not found.is_empty() and found["collider"] == beast, "an arrow or a bolt finds its body (layer %d, %s)" % [beast.collision_layer, str(found.get("collider", null))])
+	# Its arts, each in its own third.
+	check(VaelMind.kraken_stage(beast) == 0, "whole, it is in its first third")
+	beast.hp = beast.max_hp * 0.6
+	check(VaelMind.kraken_stage(beast) == 1, "below two thirds, its second")
+	beast.hp = beast.max_hp * 0.3
+	check(VaelMind.kraken_stage(beast) == 2, "below one third, its last")
+	beast.hp = beast.max_hp
+	you.position = Vector3(edge.x, coast.ground_at(edge), edge.z) + Vector3(0, 0, -8)
+	you.guard_left = 0.0
+	mind._decreed = 0
+	mind.cooldown = 0.0
+	mind._cooldown_d = 99.0
+	mind._cooldown_e = 99.0
+	mind.cooldown_b = 99.0
+	mind._cooldown_c = 99.0
+	beast._sees = true
+	var seals_before := coast.mist_seals.size()
+	mind._kraken(beast, you, 0.016)
+	check(mind.phase == "slam" and beast.is_warning() and coast.mist_seals.size() > seals_before, "its arms rear over you and a ring shows where they will come down (%s, %d)" % [mind.phase, coast.mist_seals.size() - seals_before])
+	await get_tree().physics_frame
+	for s: MistSeal in coast.mist_seals.duplicate(): s.queue_free()
+	mind.phase = ""
+	beast.hp = beast.max_hp * 0.6
+	mind._kraken(beast, you, 0.016)
+	check(mind.phase == "pull" and beast._current_anim == "m_pull" and coast.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "drowned_sailor").size() > 0, "at two thirds it roars, turns the sea round itself and raises the drowned")
+	var was := you.position
+	you.global_position = beast.position + Vector3(0, 0, -(VaelMind.KRAKEN_BODY + 8.0))
+	you.global_position.y = coast.ground_at(you.global_position)
+	VaelMind.whirl(coast)
+	check(you.is_lured(), "its whirlpool draws you toward it")
+	you.position = was
+	mind.phase = ""
+	mind.cooldown_b = 0.0
+	mind.cooldown = 99.0
+	mind._kraken(beast, you, 0.016)
+	check(mind.phase == "ink" and coast.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.INK), "in its second third it spits ink (%s, %d rings)" % [mind.phase, coast.mist_seals.size()])
+	if not coast.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.INK):
+		return
+	var ink: MistSeal = coast.mist_seals.filter(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.INK).front()
+	you.global_position = ink.global_position
+	ink.elapsed = ink.warning
+	ink.strike()
+	check(you.night_blind_left > 0.0, "ink in your eyes: the dark closes in")
+	for s: MistSeal in coast.mist_seals.duplicate(): s.queue_free()
+	for z: Zombie in coast.zombies.duplicate():
+		if z != beast: z.release()
+	# Its fall: dawn can come, the tide is let go, and its hoard washes up.
+	var loot := coast.pickups.size()
+	beast.set_physics_process(true)
+	beast.take_damage(99999.0, Vector3.BACK, 0.0, beast.centre())
+	await get_tree().physics_frame
+	check(d._kraken_fallen and not coast.tide.surging() and coast.pickups.size() >= loot + VaelMind.KRAKEN_HOARD, "its fall: dawn can come, the tide goes free, and its hoard washes up")
+	for i in 400:
+		if coast.count_type(Director.KRAKEN) == 0:
+			break
+		await get_tree().physics_frame
+	for z: Zombie in coast.zombies.duplicate(): z.release()
+	for p: Pickup in coast.pickups.duplicate(): coast.remove_pickup(p)
+	d._kraken_fallen = false
+	d._kraken_risen = false
+	d._kraken_at = -1.0
+	you.position = saved
+
+
 func _coastal_campaign() -> void:
 	check(not Game.MAPS.has("lantern_road") and not Places.ORDER.has("lantern_road"), "Lantern Road is retired from selection and atlas")
 	var saved := Game.night_map
@@ -2816,14 +2937,14 @@ func _coastal_campaign() -> void:
 	Game.night_map = "vael"
 	check(Game.zombie_pool_plan().has("leviathan"), "the coast reserves the former road boss")
 	check(ZombieDefs.ALL["barnacle_brute"]["hp"] == 290.0 and ZombieDefs.ALL["harbourmaster"]["hp"] == 700.0, "coastal heavies have lower health")
-	check(VaelVault.RISE >= 1.8 and VaelModels.ARM_SEGMENTS >= 20, "stone-wall vault and continuous tentacle joints")
+	check(VaelVault.RISE >= 1.8 and KrakenModels.SEGMENTS >= 20, "stone-wall vault and continuous tentacle joints")
 	Game.night_map = saved
 
 
 func _coastal_repairs(coast: World) -> void:
 	var you := coast.player
 	var at := Vector3(0,coast.ground_at(Vector3(0,0,40)),40)
-	for id: String in ["harbourmaster","hollow_sovereign","kraken_arm","leviathan"]:
+	for id: String in ["harbourmaster","hollow_sovereign","kraken_arm","leviathan","kraken"]:
 		check(coast.spawn_zombie(id,at), id+" immunity fixture spawns")
 		var boss: Zombie = coast.zombies.back()
 		boss.set_physics_process(false)
