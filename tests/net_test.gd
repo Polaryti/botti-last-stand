@@ -419,11 +419,32 @@ func _with_bots() -> void:
 		ok(Net._avatars.has(b) and w.players.has(Net._avatars[b]), "with bodies on this phone")
 	var bot_id: int = ids[0]
 	var body: Avatar = Net._avatars[bot_id]
+	if host:
+		# Verify replicated locomotion with a walking goal, independent of a randomly
+		# selected ranged class legitimately stopping to shoot during this window.
+		var bot: BotPlayer = Net.bot_players()[0]
+		var spot := Vector3(0,w.ground_at(Vector3(0,0,36))+0.05,36)
+		bot.pawn.position = spot
+		bot.body.teleport(spot)
+		bot._target = null
+		bot._think = 10.0
+		bot._has_goal = true
+		bot._goal = spot+Vector3.RIGHT*8
+		bot._errand = "explore"
+		bot._away = false
+		bot._clear_way = true
+		bot._path = PackedVector3Array()
+		bot._raining = -1.0
+	await wait(0.5)
 	await sync(50)
 	var was := body.global_position
 	await wait(4.0)
 	await sync(51)
-	ok(body.global_position.distance_to(was) > 1.0 or rules == "bots", "the bots move on this phone")
+	ok(body.global_position.distance_to(was) > 1.0, "the walking bot moves on this phone")
+	if host:
+		var bot: BotPlayer = Net.bot_players()[0]
+		bot._think = 0.0
+		bot._has_goal = false
 	# A blow from the phone that does not run the bot. In co-op a friend's blow does nothing to it,
 	# so there the night's own damage is sent instead, the way a zombie's would be.
 	if not host:
