@@ -54,7 +54,7 @@ func _ready() -> void:
 	print("REWORK tidecaller")
 	await _tidecaller()
 	print("REWORK ferryman")
-	await _ferryman()
+	check(ClassDefs.disabled("ferryman") and not ClassDefs.available().has("ferryman"), "Ferryman is disabled and absent from playable classes")
 	print("REWORK walls")
 	await _walls_protect()
 	print("REWORK statuses")

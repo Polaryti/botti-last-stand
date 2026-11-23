@@ -1075,6 +1075,10 @@ func reveal(seconds: float) -> void:
 
 
 ## Small enough for a Boarding Hook to drag: not a boss, nor anything much bigger than a person.
+func control_immune() -> bool:
+	return is_boss() or is_miniboss()
+
+
 func draggable() -> bool:
 	return not is_boss() and not def.get("miniboss", false) and _scale < 1.5 and not flies and carrier == null
 
@@ -1220,12 +1224,12 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		hp = maxf(hp, 1.0)
 	bar_time = 2.5
 	_flash_on()
-	if flies and (_dive > 0.0 or _windup > 0.0):
+	if not control_immune() and flies and (_dive > 0.0 or _windup > 0.0):
 		# A blow knocks it out of its dive, and it hangs there for a moment.
 		_dive = 0.0
 		_windup = 0.0
 		_recover = maxf(_recover, 0.8)
-	if not def.get("rooted", false): # (a Kraken's Arm stands in the sea floor)
+	if not control_immune() and not def.get("rooted", false): # (a Kraken's Arm stands in the sea floor)
 		_knock += Vector3(from_dir.x, 0, from_dir.z).normalized() * knock / _scale
 	world.fx_gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
 	if Net.is_host():
@@ -1238,7 +1242,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		return
 	_check_dismount()
 	world.sfx_at(_hurt_sound(), position, -8.0)
-	if type_id != "beast":
+	if type_id != "beast" and not control_immune():
 		_hurt_stun = 0.1
 	var p := world.nearest_player(position)
 	if p:
@@ -1349,6 +1353,7 @@ func _show_awake() -> void:
 ## Caught off guard: whatever blow it was winding up comes to nothing, and it cannot start another for
 ## a moment. It still moves and sees. (A Thief appearing in front of it with a blade, for one.)
 func flinch(seconds: float) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1362,6 +1367,7 @@ func flinch(seconds: float) -> void:
 
 
 func stun(seconds: float) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1388,6 +1394,7 @@ func stun(seconds: float) -> void:
 
 ## Mist Burst: frozen solid, and a hit does not thaw it.
 func freeze(seconds: float) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1405,6 +1412,7 @@ func _show_frozen(seconds: float) -> void:
 
 
 func slow(seconds: float) -> void:
+	if control_immune(): return
 	if puppet:
 		Net.effect_zombie(self, Effect.SLOW, seconds)
 		return
@@ -1478,6 +1486,7 @@ func _die() -> void:
 
 
 func blind(seconds: float) -> void:
+	if control_immune(): return
 	blind_left = maxf(blind_left, seconds)
 
 
@@ -1487,6 +1496,7 @@ func blind(seconds: float) -> void:
 ## On a phone that is not the host this one is only a copy, so the host is told to do it for real:
 ## the host drops the weapon and tells every phone the creature is unarmed.
 func disarm(drop := true) -> String:
+	if control_immune(): return ""
 	if weapon_id == "" or not WeaponDefs.lies_around(weapon_id):
 		return ""
 	var held := weapon_id
@@ -1552,6 +1562,7 @@ func _show_death() -> void:
 ## Caught by an Antler Charm's vines (PowerDefs.ANTLER_ROOT), or pinned by a harpoon (pinned: no
 ## wait between one and the next).
 func root(seconds: float, pinned := false) -> void:
+	if control_immune(): return
 	if not is_alive() or flies or carrier:
 		return
 	if puppet:
@@ -1793,6 +1804,7 @@ func _puppet_tick(delta: float) -> void:
 # --- Senses ------------------------------------------------------------------
 
 func forget() -> void:
+	if control_immune(): return
 	if type_id == "beast" or not is_alive():
 		return
 	if puppet:
@@ -1806,6 +1818,7 @@ func forget() -> void:
 
 ## A Guardian's challenge: everything comes for them, even what had lost interest.
 func taunted_by(at: Vector3) -> void:
+	if control_immune(): return
 	if puppet:
 		Net.effect_zombie(self, Effect.TAUNT, at.x, at.z)
 	elif not dormant:
@@ -1814,6 +1827,7 @@ func taunted_by(at: Vector3) -> void:
 
 ## Dragged to a point, as if on a rope.
 func pull_to(at: Vector3) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1840,6 +1854,7 @@ var _drift_left := 0.0
 
 ## Bound in a Fogbinder's fog: it sees only a few metres for a while (on every phone, by way of the host).
 func blind_for(seconds: float) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:

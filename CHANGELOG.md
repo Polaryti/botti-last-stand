@@ -2,6 +2,14 @@
 
 ## Development — Beyond the Mists
 
+### Coastal combat and salvage repairs
+
+- Chest weapons now drop beside the chest for a deliberate pickup. The equipped weapon stays with you. Sea chests have hollow interiors and a single hinged lid.
+- Bosses and minibosses are immune to crowd control and forced movement; damage still applies.
+- Ferryman is disabled and hidden, including on phones that previously unlocked it.
+- Kraken arms now visibly connect to a central mantle with a matching hitbox. Kraken arm health falls to 230 and Leviathan health to 2300; coastal entrance text replaces the obsolete island message.
+- Creature brains now choose poses while one animation update advances each rig per physics frame, fixing doubled animation playback. Coastal attacks have stronger anticipation, strike and recovery poses.
+
 ### The drowned harbour, extended
 
 - Port Vael now lasts fifteen minutes. The Leviathan joins its coastal encounters at 11:30; dawn requires both it and the Hollow Sovereign to fall.

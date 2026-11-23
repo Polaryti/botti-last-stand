@@ -334,7 +334,7 @@ func _tick_salvage(e: float) -> void:
 		var can_open := salvage_open(c)
 		(c["glow"] as Node3D).visible = can_open
 		var lid := c["lid"] as Node3D
-		lid.rotation.x = move_toward(lid.rotation.x, 0.0 if int(c["taken"]) != n else -1.7, get_process_delta_time() * 3.0)
+		lid.rotation.x = move_toward(lid.rotation.x, 0.0 if int(c["taken"]) != n else -1.7, maxf(get_physics_process_delta_time(), 1.0/60.0) * 3.0)
 		if can_open and p and not p.dead and p.global_position.distance_to(c["at"]) < SALVAGE_REACH:
 			_open(c, p, n)
 
@@ -351,8 +351,8 @@ func _open(c: Dictionary, p: Player, n: int) -> void:
 	var usable := SALVAGE_WEAPONS.filter(func(w: String) -> bool: return p.can_use(w))
 	if roll < 0.5 and not usable.is_empty():
 		var weapon: String = usable.pick_random()
-		p.give_weapon(weapon)
-		got += " and a %s" % WeaponDefs.ALL[weapon]["name"]
+		world.drop_weapon(c["at"] + Vector3(1.8, 0.15, 0), weapon)
+		got += "; a %s lies beside the chest" % WeaponDefs.ALL[weapon]["name"]
 	elif roll < 0.75:
 		p.heal(35.0)
 		got += " and ship's biscuit"
@@ -372,9 +372,13 @@ static func _build_chest_meshes() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 2391
 	var l := LowPoly.new()
-	l.box(Vector3(0, 0.3, 0), Vector3(1.2, 0.6, 0.8), wood)
+	l.box(Vector3(0, 0.06, 0), Vector3(1.2, 0.12, 0.8), wood.darkened(0.45))
+	for side: float in [-1,1]:
+		l.box(Vector3(side*0.55,0.33,0),Vector3(0.1,0.54,0.8),wood)
+		l.box(Vector3(0,0.33,side*0.35),Vector3(1.0,0.54,0.1),wood)
 	for x: float in [-0.45, 0.0, 0.45]:
-		l.box(Vector3(x, 0.3, 0), Vector3(0.08, 0.62, 0.84), iron)
+		for side: float in [-1,1]:
+			l.box(Vector3(x,0.3,side*0.405),Vector3(0.08,0.62,0.03),iron)
 	l.box(Vector3(0, 0.42, 0.41), Vector3(0.16, 0.2, 0.04), Color(0.7, 0.55, 0.25))
 	VaelModels.barnacles(l, Vector3(0.45, 0.15, 0.4), Vector3(0.4, 0, 1), 5, 0.035, rng)
 	VaelModels.barnacles(l, Vector3(-0.55, 0.2, -0.2), Vector3(-1, 0.2, 0), 4, 0.03, rng)

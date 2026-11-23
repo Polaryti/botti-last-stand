@@ -1921,6 +1921,7 @@ func _port_vael() -> void:
 	check(jellies.size() == Director.JELLIES_AT_ONCE and jellies.all(func(z: Zombie) -> bool: return vael.tide.flooded(z.position)), "the high tide brings Lantern Jellies in over the water")
 	for z: Zombie in vael.zombies.duplicate(): z.release()
 	await _vael_sky(vael)
+	await _coastal_repairs(vael)
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode
@@ -2595,7 +2596,7 @@ func _vael_weapons() -> void:
 	big.def = big.def.duplicate()
 	big.def["mesenlla_boss"] = true # the village keeps no boss bodies: this one stands in for one
 	p._do_melee_hit()
-	check(not big.draggable() and big._knock.length() < 0.01 and big._stun > 0.0, "a boss is too big to drag, only staggered")
+	check(not big.draggable() and big._knock.length() < 0.01 and big._stun == 0.0, "bosses resist the hook without stagger")
 	big.release()
 	# Whaler's Harpoon: pins what it strikes, lies where it lands, comes back when you walk over it.
 	p.slots = ["harpoon", "sword"]
@@ -2817,3 +2818,57 @@ func _coastal_campaign() -> void:
 	check(ZombieDefs.ALL["barnacle_brute"]["hp"] == 290.0 and ZombieDefs.ALL["harbourmaster"]["hp"] == 700.0, "coastal heavies have lower health")
 	check(VaelVault.RISE >= 1.8 and VaelModels.ARM_SEGMENTS >= 20, "stone-wall vault and continuous tentacle joints")
 	Game.night_map = saved
+
+
+func _coastal_repairs(coast: World) -> void:
+	var you := coast.player
+	var at := Vector3(0,coast.ground_at(Vector3(0,0,40)),40)
+	for id: String in ["harbourmaster","hollow_sovereign","kraken_arm","leviathan"]:
+		check(coast.spawn_zombie(id,at), id+" immunity fixture spawns")
+		var boss: Zombie = coast.zombies.back()
+		boss.set_physics_process(false)
+		var from := boss.position
+		boss.stun(5)
+		boss.freeze(5)
+		boss.slow(5)
+		boss.root(5,true)
+		boss.pull_to(from+Vector3.RIGHT*10)
+		boss.haul_to(from+Vector3.RIGHT*10)
+		boss.drift_to(from+Vector3.RIGHT*10,10)
+		boss.blind_for(5)
+		boss.flinch(5)
+		var hp_before := boss.hp
+		boss.take_damage(1,Vector3.RIGHT,100,boss.centre())
+		check(boss._stun == 0 and boss._frozen == 0 and boss._slow == 0 and boss.root_left == 0 and boss._pull_left == 0 and boss._drift_left == 0 and boss._knock.is_zero_approx(), id+" cannot be controlled or displaced")
+		check(boss.hp < hp_before, id+" still takes damage")
+		boss.release()
+	for id: String in ["angler", "siren", "kraken_arm"]:
+		coast.spawn_zombie(id,at)
+		var actor: Zombie = coast.zombies.back()
+		actor.set_physics_process(false)
+		actor._current_anim = "m_bite" if id == "angler" else "m_song" if id == "siren" else "m_slam"
+		actor.mesenlla_warning = true
+		actor._animate_custom(0.01,0)
+		actor._animate_custom(0.8,0)
+		actor.mesenlla_warning = false
+		actor._animate_custom(1.0/60,0)
+		check(float(actor._visual.get_meta("act_t",9)) < 0.02,id+" restarts its strike timer after the tell")
+		actor.release()
+	var chest: Dictionary = coast.tide.salvage()[0]
+	var saved_mode := Game.mode
+	var taken: int = chest["taken"]
+	var slots := you.slots.duplicate()
+	var seen := false
+	Game.mode = Game.Mode.SANDBOX
+	for i in 20:
+		var before := coast.pickups.size()
+		seed(7080+i)
+		coast.tide._open(chest,you,0)
+		if coast.pickups.size() > before:
+			seen = true
+			break
+	check(seen and you.slots == slots,"salvage weapon appears on the ground without replacing any carried weapon")
+	check(not coast.tide.salvage_open(chest),"opened chest cannot be reopened in the same ebb")
+	chest["taken"] = taken
+	Game.mode = saved_mode
+	check(ClassDefs.disabled("ferryman") and not ClassDefs.available().has("ferryman"),"Ferryman stays out of selection even when owned")

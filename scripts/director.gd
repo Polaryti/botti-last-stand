@@ -175,7 +175,7 @@ const BOSS_CARDS := {
 	"veil_regent": {"name": "Veil Regent", "line": "wakes on its throne in the Mists", "color": Color(0.78, 0.62, 1.0), "glow": Color(0.36, 0.16, 0.62), "bells": "boss_bells_regent", "strikes": [0.0, 0.7, 1.4, 2.2, 2.6]},
 	MESENLLA_BOSS: {"name": "Great Revenant Elemental", "line": "rises at the Ring of Stones", "color": Color(0.45, 0.95, 0.88), "glow": Color(0.15, 0.55, 0.62), "bells": "boss_bells_revenant", "strikes": [0.0, 0.55, 1.1, 1.75]},
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
-	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "rises at the Isle of Lamps", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
+	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "the drowned harbour belongs to the deep", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
 	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
 }
 const BOSS_CARD_TIME := 7.0 # long enough to read what it says
@@ -591,7 +591,7 @@ func _tick_court() -> void:
 	if not _court_came.has("kraken_arm") and elapsed >= KRAKEN_AT and world.tide and world.tide.high() and world.tide.level > MistTide.HIGH_Y - 0.3:
 		_court_came["kraken_arm"] = true
 		if world.raise_kraken() > 0:
-			show_banner("The Kraken's arms rise out of the flats!", 4.0)
+			show_banner("The Kraken wakes. Its arms close around the harbour.", 4.0)
 	if not _court_came.has("lighthouse_keeper") and elapsed >= KEEPER_AT:
 		if _summon("lighthouse_keeper", KEEPER_FROM, "keeper_laugh"):
 			show_banner("The Mad Lighthouse Keeper comes down the East Mole: \u201c%s\u201d" % ZombieDefs.ALL["lighthouse_keeper"]["first_words"], 4.5)

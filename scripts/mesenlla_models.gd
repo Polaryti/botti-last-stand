@@ -806,7 +806,8 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 	var t := z.world.now + float(z.net_id) * 0.37
 	var state := z._current_anim
 	# How long it has been in this state, for moves that play out over time (a maul, a slash).
-	if state != str(root.get_meta("act_state", "")):
+	if state != str(root.get_meta("act_state", "")) or z.is_warning() != bool(root.get_meta("act_warning", false)):
+		root.set_meta("act_warning", z.is_warning())
 		root.set_meta("from_state", root.get_meta("act_state", ""))
 		root.set_meta("act_state", state)
 		root.set_meta("act_t", 0.0)
@@ -1159,7 +1160,7 @@ static func _animate_wolf(z: Zombie, holder: Node3D, delta: float, speed: float,
 	var gallop := speed > 0.6
 	# Low, driving shoulders and a delayed finned-tail counterbalance for the harbour hound.
 	if z.model_id == "brine_hound": now *= 0.88
-	var phase := _advance_phase(holder, delta, lerpf(1.0, 2.1, speed) if speed > 0.02 else 0.0)
+	var phase := _advance_phase(holder, delta, lerpf(1.2, 3.6 if z.model_id == "brine_hound" else 2.4, speed) if speed > 0.02 else 0.0)
 	var pose := {"head": 0.05 + sin(now * 0.8) * 0.05, "look": sin(now * 0.5) * 0.3 * (1.0 - speed), "tail_up": 0.15, "wag": sin(now * 6.0) * 0.25}
 	var legs := {}
 	for leg_name: String in ["LegFL", "LegFR", "LegBL", "LegBR"]:

@@ -324,6 +324,7 @@ func note_game_finished() -> void:
 
 
 func _earn(id: String) -> void:
+	if ClassDefs.disabled(id): return
 	unlocked[id] = true
 	fresh_unlocks.append(id)
 	save_settings()

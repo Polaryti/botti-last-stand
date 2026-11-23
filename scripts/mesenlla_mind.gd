@@ -288,7 +288,6 @@ func _shapeshifter(z: Zombie, target: Target, to: Vector3, dist: float, delta: f
 			z.move_and_slide()
 			z.position.y = z.world.ground_at(z.position)
 			z.rotation.y = lerp_angle(z.rotation.y, atan2(away.x, away.z), minf(1.0, delta * 6.0))
-			z._animate_custom(delta, z.velocity.length())
 			if left <= 0.0:
 				# It got away: the mist mends it whole, and it comes back to fight.
 				z.hp = z.max_hp
@@ -352,7 +351,6 @@ func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 					Net.blast_fx(z.centre(), HOWL_REACH, Color(0.45, 0.95, 0.92, 0.35))
 				phase = ""
 				_show(z, "m_wolf")
-			z._animate_custom(delta, 0.0)
 			return true
 		"crouch":
 			left -= delta
@@ -366,7 +364,6 @@ func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				left = LUNGE_TIME
 				struck = false
 				_show(z, "m_lunge")
-			z._animate_custom(delta, 0.0)
 			return true
 		"leap":
 			left -= delta
@@ -383,7 +380,6 @@ func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				phase = ""
 				_show(z, "m_wolf")
 				z.velocity = Vector3.ZERO
-			z._animate_custom(delta, LUNGE_SPEED)
 			return true
 	return false
 
@@ -435,7 +431,6 @@ func _owl(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				_show(z, "m_owl", true)
 				z.world.sfx_at("owl_screech", z.position, 2.0)
 	z.position.y = maxf(z.position.y, ground + 0.3)
-	z._animate_custom(delta, speed)
 	return true
 
 
@@ -464,7 +459,6 @@ func _boar(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			left = minf(1.6, (dist + 4.0) / (z._speed * GORE_SPEED))
 			struck = false
 			_show(z, "m_charge")
-		z._animate_custom(delta, 0.0)
 		return true
 	if phase == "charge":
 		left -= delta
@@ -487,7 +481,6 @@ func _boar(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			phase = ""
 			_show(z, "m_boar")
 			z.velocity = Vector3.ZERO
-		z._animate_custom(delta, z.velocity.length())
 		return true
 	return false
 
@@ -618,7 +611,6 @@ func _storm(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 	z.move_and_slide()
 	z.position.y = z.world.ground_at(z.position)
 	_face(z, target.global_position, delta, 6.0)
-	z._animate_custom(delta, z.velocity.length())
 	return true
 
 
@@ -674,7 +666,6 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			# A line of fire that ends on the portal, coming from where the wyvern came.
 			for i in 4:
 				MistSeal.cast(z, _ground(z, fort.heart_at - along * (3 - i) * BREATH_RADIUS * 1.6), BREATH_RADIUS * 1.15, BREATH_TELL + i * 0.15, z._damage, 0.0, style)
-		z._animate_custom(delta, 1.0)
 		return true
 	if phase == "" and cooldown <= 0.0 and z._sees and dist < 28.0 and z._dive <= 0.0 and z._windup <= 0.0:
 		_at_portal = false
@@ -703,7 +694,6 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		if left <= 0.0:
 			phase = ""
 			_show(z, "")
-		z._animate_custom(delta, 1.0)
 		return true
 	return false
 
@@ -782,7 +772,6 @@ func _jelly(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				phase = "sting"
 				left = 0.45
 				_show(z, "m_sting")
-			z._animate_custom(delta, 0.0)
 			return true
 		"sting":
 			left -= delta
@@ -790,7 +779,6 @@ func _jelly(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			if left <= 0.0:
 				phase = ""
 				_show(z, "")
-			z._animate_custom(delta, 0.0)
 			return true
 	return false
 
@@ -819,13 +807,11 @@ func _angler(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				var ahead := Vector3(sin(z.rotation.y), 0, cos(z.rotation.y))
 				if flat.length() < BITE_REACH + 0.3 and (flat.length() < 0.6 or flat.normalized().dot(ahead) > 0.4) and absf(target.global_position.y - z.position.y) < 2.0:
 					target.hurt(z._damage * BITE_POWER, z.position, z)
-			z._animate_custom(delta, 0.0)
 			return true
 		"bite":
 			left -= delta
 			if left <= 0.0:
 				phase = ""
 				_show(z, "")
-			z._animate_custom(delta, 0.0)
 			return true
 	return false

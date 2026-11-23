@@ -489,7 +489,7 @@ static func animate_angler(z: Zombie, root: Node3D, delta: float, speed: float, 
 	leg_r.rotation.x = -sin(gait) * 0.7 * speed
 	var jaw_want := 0.08 + sin(t * 1.3) * 0.05
 	var head_want := 0.0
-	var arms_want := -sin(gait) * 0.5 * speed
+	var arms_want := -sin(gait - 0.6) * 0.65 * speed
 	match state:
 		"m_bite":
 			if z.is_warning():
@@ -502,12 +502,13 @@ static func animate_angler(z: Zombie, root: Node3D, delta: float, speed: float, 
 				var snap := smoothstep(0.03, 0.21, act)
 				jaw_want = 0.9 * (1.0 - snap)
 				head_want = 0.3 * sin(snap * PI)
-				body.rotation.x = lerpf(body.rotation.x, 0.35 * sin(snap * PI), minf(1.0, delta * 20.0))
+				body.rotation.x = lerpf(body.rotation.x, 0.5 * sin(snap * PI), minf(1.0, delta * 20.0))
 				arms_want = -0.6
 				k = minf(1.0, delta * 20.0)
 		"m_swipe":
 			arms_want = -1.4 + clampf(act / 0.3, 0.0, 1.0) * 1.8
 	jaw.rotation.x = lerpf(jaw.rotation.x, jaw_want, k)
+	body.position.z = lerpf(body.position.z, sin(clampf(act / 0.45,0,1)*PI)*0.4 if state == "m_bite" and not z.is_warning() else 0.0,k)
 	head.rotation.x = lerpf(head.rotation.x, head_want, k)
 	arm_l.rotation.x = lerpf(arm_l.rotation.x, arms_want, k)
 	arm_r.rotation.x = lerpf(arm_r.rotation.x, -arms_want if state == "" else arms_want, k)
@@ -1141,7 +1142,7 @@ static func animate_siren(z: Zombie, root: Node3D, delta: float, speed: float, s
 			at = at.get_node("Tail%d" % (i + 1)) as Node3D
 	(at.get_node("Fan") as Node3D).rotation.y = sin(wave - SIREN_TAIL * 0.9) * 0.4
 	body.rotation.z = lerpf(body.rotation.z, sin(wave - 0.8) * 0.06 * (0.3 + speed), k)
-	body.position.y = 0.62 + sin(t * 1.4) * 0.025
+	body.position.y = 0.62 + sin(t * 1.4) * 0.05 + (0.12 * sin(minf(act * 5,PI)) if state == "m_swipe" else 0.0)
 	hair.rotation.x = lerpf(hair.rotation.x, 0.15 + speed * 0.35 + sin(t * 1.1) * 0.06, k)
 	hair.rotation.z = sin(t * 0.8) * 0.08
 	var torso_x := 0.08 * speed

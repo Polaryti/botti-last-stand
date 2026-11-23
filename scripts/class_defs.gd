@@ -35,7 +35,7 @@ const ALL := {
 		"desc": "Hunts what climbs out of the sea. Starts with a Whaler's Harpoon, which comes back to hand by itself after 4 s, and a Boarding Hook. Haul drags an enemy to you, or you to anything too big to move. Uses melee and ranged weapons."},
 	"tidecaller": {"name": "Tidecaller", "weapon": "trident", "arrows": 0, "hp": 95.0, "speed": 1.0, "ranged": true, "mana": true, "mana_regen": 0.5, "hidden": true, "earned": "lighthouses",
 		"desc": "Speaks for the sea. Starts with a Trident: every blow it lands draws 5 tide, and the tide also rises slowly by itself. Call the Tide spends it on a wave that throws enemies back and slows them. Uses melee and ranged weapons."},
-	"ferryman": {"two_handed": true, "name": "Ferryman", "weapon": "oar", "arrows": 0, "hp": 120.0, "speed": 0.95, "ranged": false, "hidden": true, "earned": "vael_nights",
+	"ferryman": {"disabled": true, "two_handed": true, "name": "Ferryman", "weapon": "oar", "arrows": 0, "hp": 120.0, "speed": 0.95, "ranged": false, "hidden": true, "earned": "vael_nights",
 		"desc": "Rows the dead across the Sound. Starts with a Ferryman's Oar. Crossing glides you 9 m ahead in a ghostly skiff, through enemies: they are shoved aside, struck and slowed, and friends it passes are healed 15. Uses melee and two-handed weapons."},
 	"commander": {"two_handed": true, "name": "Commander", "weapon": "sword", "arrows": 0, "hp": 110.0, "speed": 1.05, "ranged": true, "hidden": true, "unavailable": true, "unique": true, "no_bots": true,
 		"desc": "First prize in VRAIN tournaments. Only one Commander per match; never a bot. Command rallies allies, then becomes Last Command at level 10."},

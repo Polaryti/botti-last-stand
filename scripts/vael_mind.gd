@@ -254,7 +254,6 @@ func _siren(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 				left = SONG_TIME
 				_song_from = z.hp
 				_show(z, "m_song")
-			z._animate_custom(delta, 0.0)
 			return true
 		"song":
 			left -= delta
@@ -267,7 +266,6 @@ func _siren(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 			elif left <= 0.0:
 				phase = ""
 				_show(z, "")
-			z._animate_custom(delta, 0.0)
 			return true
 	if cooldown <= 0.0 and z._sees and dist < SONG_REACH and dist > SONG_CLOSE + 1.0 and _clear(z, target):
 		phase = "draw"
@@ -275,12 +273,10 @@ func _siren(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 		cooldown = SONG_EVERY
 		_show(z, "m_song", true)
 		z.world.sfx_at("siren_song", z.position, 2.0)
-		z._animate_custom(delta, 0.0)
 		return true
 	if dist < 2.4:
 		return false # close enough to claw: the ordinary walk and strike
 	_keep(z, to, dist, SIREN_RANGE, delta, target)
-	z._animate_custom(delta, z.velocity.length())
 	return true
 
 
@@ -486,14 +482,11 @@ func _arm(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			if left <= 0.0:
 				phase = ""
 				_show(z, "")
-			z._animate_custom(delta, 0.0)
 			return true
 		"sink":
 			left -= delta
 			if left <= 0.0:
 				z.release() # back under the sea: it is gone, and nobody killed it
-			else:
-				z._animate_custom(delta, 0.0)
 			return true
 		"rear":
 			left -= delta
@@ -503,14 +496,12 @@ func _arm(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				left = 0.5
 				_show(z, "m_slam")
 				z.world.sfx_at("kraken_slam", z.position, 2.0)
-			z._animate_custom(delta, 0.0)
 			return true
 		"slam", "sweep":
 			left -= delta
 			if left <= 0.0:
 				phase = ""
 				_show(z, "")
-			z._animate_custom(delta, 0.0)
 			return true
 	# The tide has gone out: back under the sea.
 	if z.world.tide and not z.world.tide.high() and not z.world.tide.always_high:
@@ -518,7 +509,6 @@ func _arm(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		left = SINK_TIME
 		_show(z, "m_sink")
 		z.world.sfx_at("kraken_rise", z.position, -2.0)
-		z._animate_custom(delta, 0.0)
 		return true
 	_face(z, target.global_position, delta, 1.5)
 	if cooldown_b <= 0.0 and z._sees and dist < SWEEP_REACH and absf(target.global_position.y - z.position.y) < 3.0:
@@ -535,7 +525,6 @@ func _arm(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		cooldown = KRAKEN_EVERY
 		_show(z, "m_slam", true)
 		MistSeal.cast(z, _lead(z, target, KRAKEN_TELL * 0.4), KRAKEN_RADIUS, KRAKEN_TELL, z._damage * KRAKEN_POWER, 0.0, MistSeal.Style.SLAM)
-	z._animate_custom(delta, 0.0)
 	return true
 
 
@@ -635,7 +624,6 @@ func _leviathan(z: Zombie, target: Target, delta: float) -> bool:
 			if left <= 0.0:
 				phase = ""
 				_show(z, "")
-			z._animate_custom(delta, 0.0)
 			return true
 		"sink":
 			left -= delta
@@ -654,7 +642,6 @@ func _leviathan(z: Zombie, target: Target, delta: float) -> bool:
 				left = RISE_TIME
 				_show(z, "m_rise")
 				z.world.sfx_at("leviathan_rise", z.position, 2.0)
-			z._animate_custom(delta, 0.0)
 			return true
 		"rear":
 			left -= delta
@@ -664,14 +651,12 @@ func _leviathan(z: Zombie, target: Target, delta: float) -> bool:
 				left = 0.7
 				_show(z, "m_bite")
 				z.world.sfx_at("leviathan_bite", z.position, 3.0)
-			z._animate_custom(delta, 0.0)
 			return true
 		"strike", "spit", "call":
 			left -= delta
 			if left <= 0.0:
 				phase = ""
 				_show(z, "")
-			z._animate_custom(delta, 0.0)
 			return true
 	_face(z, target.global_position, delta, 1.2)
 	if _cooldown_d <= 0.0:
@@ -704,5 +689,4 @@ func _leviathan(z: Zombie, target: Target, delta: float) -> bool:
 		_show(z, "m_slam", true)
 		MistSeal.cast(z, _lead(z, target, BITE_TELL_L * 0.4), BITE_RADIUS_L, BITE_TELL_L, z._damage * BITE_POWER_L, 0.0, MistSeal.Style.SLAM)
 		z.world.sfx_at("leviathan_roar", z.position, 0.0)
-	z._animate_custom(delta, 0.0)
 	return true
