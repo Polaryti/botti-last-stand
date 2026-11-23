@@ -77,6 +77,11 @@ func _process(delta: float) -> void:
 	if leader >= 0: mob.world.set_meta("kraken_head",leader)
 	leader = int(mob.world.get_meta("kraken_head",leader))
 	visible = leader == mob.net_id
+	var phase_time := float(mob._visual.get_meta("act_t",0.0))
+	if mob._current_anim == "m_rise":
+		centre.y -= 3.5 * (1.0 - smoothstep(0.0,VaelMind.RISE_TIME,phase_time))
+	elif mob._current_anim == "m_sink":
+		centre.y -= 3.5 * smoothstep(0.0,VaelMind.SINK_TIME,phase_time)
 	head_hit.disabled = not visible or not mob.is_alive()
 	if visible:
 		global_position = centre
