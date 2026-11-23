@@ -353,6 +353,7 @@ func _build_visual() -> void:
 			(mi as MeshInstance3D).set_meta("own_material", (mi as MeshInstance3D).material_override)
 		if deep:
 			MesenllaModels.remember_pose(_visual)
+		if model_id == "kraken_arm": KrakenMantle.install(self, _visual)
 		_fit[model_id] = 1.0
 		if model_id == "mimic":
 			_build_lure()
@@ -433,9 +434,10 @@ func _build_visual() -> void:
 			var gear := VaelModels.gear_for(model_id)
 			var worn: Array[MeshInstance3D] = []
 			for key: String in gear:
+				if model_id == "hollow_sovereign" and key.begins_with("handslot"): continue
 				var piece := _attach(key.get_slice(":", 0), gear[key], Vector3.ZERO)
 				if key.begins_with("handslot"):
-					piece.rotation = VaelModels.HELD_TURN
+					piece.rotation = Vector3(0, 0, -1.5) if model_id == "hollow_sovereign" else VaelModels.HELD_TURN
 				if key.ends_with(":glow"):
 					piece.material_override = MesenllaModels.glow_material()
 				worn.append(piece)
@@ -458,6 +460,7 @@ func _build_visual() -> void:
 			for piece in worn:
 				piece.set_meta("own_material", piece.material_override)
 				_parts.append(piece)
+	if model_id == "hollow_sovereign": SovereignRegalia.install(self)
 	_shadow = World.make_blob_shadow(1.0)
 	add_child(_shadow)
 
@@ -2411,7 +2414,7 @@ func _physics_process(delta: float) -> void:
 			_think_hop(target, dist)
 			if _airborne:
 				return
-	elif world.vael_sites and state == State.CHASE and dist < 7.5:
+	elif world.vael_sites and state == State.CHASE and dist < 18.0:
 		_hop_cd -= delta
 		if _hop_cd <= 0.0:
 			_hop_cd = 0.55
@@ -2524,7 +2527,7 @@ func _tick_leap(target: Target, delta: float) -> void:
 ## Drowned walkers vault low obstacles in pursuit. A blocked arc leaves their route alone so they
 ## can take a nearby door or the path around a wall.
 func _try_vael_vault(to: Vector3, dist: float) -> bool:
-	if phases or is_boss() or dormant or _hold or _attack_left > 0.0 or root_left > 0.0 or dist < 2.35:
+	if phases or is_boss() or dormant or _hold or _attack_left > 0.0 or root_left > 0.0 or dist < 1.6:
 		return false
 	# Once out of sight, follow the known target position rather than reacting through buildings.
 	var heading := to if _sees else _last_seen - position

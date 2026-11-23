@@ -2,9 +2,9 @@ class_name VaelVault
 extends RefCounted
 ## A short jump over an obstacle in Port Vael, with room for the whole body throughout.
 
-const TIME := 0.61
-const RISE := 1.12
-const REACH := 1.35
+const TIME := 0.72
+const RISE := 1.85
+const REACH := 1.8
 const SWEEPS := 8
 
 
@@ -30,14 +30,14 @@ static func landing(body: CharacterBody3D, world: World, heading: Vector3) -> Ve
 	if not space.intersect_ray(PhysicsRayQueryParameters3D.create(high, high + dir * REACH, mask)).is_empty():
 		return Vector3.INF
 	var min_run := low.distance_to(face["position"]) + 0.83
-	for reach: float in [1.85, 2.25, 2.7, 3.1]:
+	for reach: float in [2.0, 2.5, 3.0, 3.6, 4.2]:
 		if reach < min_run:
 			continue
 		var to := from + dir * reach
 		if not world.vael_sites.accessible(to):
 			continue
 		to.y = world.ground_at(to) + 0.055
-		if absf(to.y - from.y) > 0.55:
+		if absf(to.y - from.y) > 0.85:
 			continue
 		if _clear_arc(body, world, from, to):
 			return to

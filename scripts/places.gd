@@ -3,7 +3,7 @@ class_name Places
 ## screen and the world atlas. Each has a name, an icon, a colour, its lore, what is played there and
 ## a few hints about it for the loading screen.
 
-const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael", "lantern_road"]
+const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael"]
 
 const ALL := {
 	"village": {"name": "The Village", "icon": "map_village", "color": Color("efe8d8"), "plays": "Survive the Night, Co-op, All vs All and Teams",

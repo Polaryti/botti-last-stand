@@ -55,7 +55,7 @@ const RAISE_EVERY := 18.0
 const RAISE_COUNT := 2
 const RAISE_MAX := 4 # of her raised sailors standing at once
 # The Harbourmaster
-const HOOK_EVERY := 7.0
+const HOOK_EVERY := 8.0
 const HOOK_TELL := 1.0
 const HOOK_RADIUS := 1.6
 const HOOK_RANGE := Vector2(6.0, 22.0)
@@ -227,6 +227,8 @@ func _keep(z: Zombie, to: Vector3, dist: float, band: Vector2, delta: float, tar
 	if want < 0.0:
 		speed *= 0.8 # backing away
 	z.velocity = dir * speed
+	if want > 0 and z.world.vael_sites and not z.world.grid.line_is_open(z.position, z.position + dir * 2.0) and z._try_vael_vault(to, dist):
+		return
 	z.move_and_slide()
 	z.position.y = z.world.ground_at(z.position)
 	_face(z, target.global_position, delta, 6.0)

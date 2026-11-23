@@ -99,6 +99,7 @@ var _cache_due := {} # cache spot index -> when it may be filled again
 var _cache_look := 0.0
 var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
+var _coastal_leviathan := false
 var _mist_boss_defeated := false
 var _next_wyvern := FIRST_WYVERN
 var _next_siren := 150.0
@@ -258,7 +259,7 @@ func local_banner(text: String, seconds: float) -> void:
 
 ## How long this match runs. In All vs All the clock counts down to the fog closing, not to dawn.
 func match_length() -> float:
-	return ClosingFog.TOTAL if Net.fog_rules() else Game.NIGHT_LENGTH
+	return ClosingFog.TOTAL if Net.fog_rules() else Game.night_length()
 
 
 func night_left() -> float:
@@ -287,9 +288,9 @@ func target_population() -> int:
 		cap = int(round(cap * BASTION_CROWD))
 	var start := mini(12 if mists or bastion else 6, cap)
 	# A slow start while the player finds a weapon, then the crowd builds.
-	var t := pow(clampf(elapsed / (Game.NIGHT_LENGTH * 0.75), 0.0, 1.0), 1.3)
+	var t := pow(clampf(elapsed / (match_length() * 0.75), 0.0, 1.0), 1.3)
 	var crowd := lerpf(start, cap, t) * (1.0 + 0.35 * (world.players.size() - 1))
-	if elapsed >= LAST_STAND:
+	if elapsed >= match_length() - 120.0:
 		crowd *= 1.3
 	if Net.fog_rules():
 		crowd *= 0.6 # enough to keep you busy, but the others are the danger here
@@ -367,7 +368,7 @@ func _process(delta: float) -> void:
 		_far_timer = 4.0
 		if world.fort == null:
 			_clear_far_zombies()
-	var dawned := world.last_light.lit if world.last_light else elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules() and (not requires_regent() or _mist_boss_defeated)
+	var dawned := world.last_light.lit if world.last_light else elapsed >= match_length() and not Net.fog_rules() and (not requires_regent() or (_mist_boss_defeated and (world.map_id != "vael" or (_coastal_leviathan and world.count_type("leviathan") == 0))))
 	if dawned:
 		_won = true
 		_sound("rooster", 0.0)
@@ -419,7 +420,7 @@ func _tick_last_stand(delta: float) -> void:
 	if Net.fog_rules() or world.last_light:
 		return # (no dawn to sense on the Lantern Road, only the lighthouse)
 	if not _last_stand:
-		if elapsed >= LAST_STAND:
+		if elapsed >= match_length() - 120.0:
 			_last_stand = true
 			_call_timer = 2.0
 			show_banner("They sense the dawn...", 4.0)
@@ -501,7 +502,8 @@ func _raise_sovereign() -> void:
 ## A boss has fallen: the Veil Regent, the Great Revenant Elemental, the War Wyvern or the Hollow
 ## Sovereign. Dawn can come now.
 func boss_fallen(_z: Zombie) -> void:
-	_mist_boss_defeated = true
+	if _z.type_id != "leviathan":
+		_mist_boss_defeated = true
 
 
 ## What only happens beyond the Mists.
@@ -548,6 +550,13 @@ func _tick_vael() -> void:
 		if world.count_type("angler") < MAX_ANGLERS:
 			world.spawn_angler()
 	_tick_court()
+	if world.map_id == "vael" and not Net.fog_rules() and elapsed >= 690.0 and not _coastal_leviathan:
+		var at := world.vael_sites.enemy_site(20.0, 65.0, VaelSites.Shore.WATERLINE)
+		if at == Vector3.INF: at = world.vael_sites.enemy_site(15.0, 190.0, VaelSites.Shore.WATERLINE)
+		if at != Vector3.INF and world.spawn_zombie("leviathan", at):
+			_coastal_leviathan = true
+			show_banner("The Leviathan rises from the drowned harbour", 5.0)
+
 
 
 ## The drowned court of Port Vael (see SIREN_EVERY and what follows it).

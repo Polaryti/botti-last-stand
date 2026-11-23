@@ -42,7 +42,7 @@ func _ready() -> void:
 	await _vael_weapons()
 	await _port_vael()
 	await _drowned_court()
-	await _last_light()
+	await _coastal_campaign()
 	await _feedback_and_numbers()
 	await _wilds_of_mesenlla()
 	_text_audit()
@@ -2020,7 +2020,7 @@ func _vael_districts(vael: World) -> void:
 		you.global_position = at
 		for i in 8:
 			var found := sites.enemy_site()
-			if found == Vector3.INF or not sites.accessible(found) or found.distance_to(you.global_position) < 25.0:
+			if found == Vector3.INF or not sites.accessible(found) or found.distance_to(you.global_position) < 16.0:
 				spawn_failures += 1
 	check(spawn_failures == 0, "enemy spawns find connected, unoccupied approaches from the coast, market and back lanes")
 	check(vael.vael_approaches.size() >= 30 and vael.vael_approaches.all(sites.accessible), "all marked enemy approaches are walkable and connected")
@@ -2198,7 +2198,7 @@ func _drowned_court() -> void:
 	# The Harbourmaster's hook drags you to him; at half health his bell brings a Press Gang.
 	check(vael.spawn_zombie("harbourmaster", ground.call(0.0, 12.0)), "the Harbourmaster")
 	var harbour: Zombie = vael.zombies.back()
-	check(harbour.named_bar() and harbour.is_miniboss() and not harbour.draggable() and is_equal_approx(harbour.max_hp, 900.0 * Game.enemy_health()), "a named foe, too big to drag, %d health" % int(harbour.max_hp))
+	check(harbour.named_bar() and harbour.is_miniboss() and not harbour.draggable() and is_equal_approx(harbour.max_hp, 700.0 * Game.enemy_health()), "a named foe, too big to drag, %d health" % int(harbour.max_hp))
 	ready_you.call()
 	you.global_position = ground.call(0.0, 26.0)
 	strike.call(you.global_position, VaelMind.HOOK_RADIUS, MistSeal.Style.HOOK, harbour)
@@ -2797,4 +2797,23 @@ func _vael_sky(vael: World) -> void:
 	vael.director.elapsed = 600
 	for i in 50: check(vael.director._pick_roamer() not in VaelSkyMind.KINDS, "the ranged population is capped at three")
 	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.position = at
+	vael.director.elapsed = 690.0
+	vael.director._tick_vael()
+	check(vael.count_type("leviathan") == 1, "the former road boss rises in the harbour at 11:30")
+	vael.director._tick_vael()
+	check(vael.count_type("leviathan") == 1, "the coastal Leviathan is summoned once")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
 	you.position = saved
+
+
+func _coastal_campaign() -> void:
+	check(not Game.MAPS.has("lantern_road") and not Places.ORDER.has("lantern_road"), "Lantern Road is retired from selection and atlas")
+	var saved := Game.night_map
+	Game.night_map = "lantern_road"
+	check(Game.current_map() == "vael" and Game.night_length() == 900.0, "retired map migrates to the fifteen-minute coast")
+	Game.night_map = "vael"
+	check(Game.zombie_pool_plan().has("leviathan"), "the coast reserves the former road boss")
+	check(ZombieDefs.ALL["barnacle_brute"]["hp"] == 290.0 and ZombieDefs.ALL["harbourmaster"]["hp"] == 700.0, "coastal heavies have lower health")
+	check(VaelVault.RISE >= 1.8 and VaelModels.ARM_SEGMENTS >= 20, "stone-wall vault and continuous tentacle joints")
+	Game.night_map = saved

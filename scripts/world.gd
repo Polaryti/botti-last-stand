@@ -2514,6 +2514,8 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	zombies.append(z)
 	var minute := director.minute() if director else 0
 	z.spawn(id, at, minute)
+	if vael_sites and not _warming and not Net.is_client() and not players.is_empty() and not z.dormant and not z.def.get("rooted", false):
+		z._start_chase(random_player_position())
 	if z.is_boss() and director and not _warming and not Net.is_client():
 		director.boss_entrance(id) # every boss enters with its card (Director.BOSS_CARDS)
 	z.fort_gate = gate

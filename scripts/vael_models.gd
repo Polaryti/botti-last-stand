@@ -479,8 +479,9 @@ static func animate_angler(z: Zombie, root: Node3D, delta: float, speed: float, 
 			root.set_meta("risen", 0.0)
 		lure_idle(root, t)
 		return
-	var gait := t * (5.0 + speed * 4.0)
+	var gait := t * (4.0 + speed * 3.0)
 	var waddle := sin(gait) * speed
+	head.rotation.y = lerpf(head.rotation.y, sin(gait * 0.5) * speed * 0.09, k)
 	body.position.y = lerpf(body.position.y, 0.5 + absf(sin(gait)) * 0.06 * speed, k)
 	body.rotation.z = lerpf(body.rotation.z, waddle * 0.16, k)
 	body.rotation.x = lerpf(body.rotation.x, 0.1 * speed, k)
@@ -493,12 +494,12 @@ static func animate_angler(z: Zombie, root: Node3D, delta: float, speed: float, 
 		"m_bite":
 			if z.is_warning():
 				# Gaping wide, rearing back, arms spread.
-				jaw_want = 0.95
-				head_want = -0.35
+				jaw_want = lerpf(0.15, 0.95, smoothstep(0.0, 0.45, act))
+				head_want = -0.35 * smoothstep(0.0, 0.4, act)
 				body.rotation.x = lerpf(body.rotation.x, -0.25, k)
 				arms_want = -1.2
 			else:
-				var snap := clampf(act / 0.25, 0.0, 1.0)
+				var snap := smoothstep(0.03, 0.21, act)
 				jaw_want = 0.9 * (1.0 - snap)
 				head_want = 0.3 * sin(snap * PI)
 				body.rotation.x = lerpf(body.rotation.x, 0.35 * sin(snap * PI), minf(1.0, delta * 20.0))
@@ -619,8 +620,8 @@ const HOLLOW_GLOW := Color(1.0, 0.82, 0.4)
 
 const SIREN_TAIL := 5
 const SIREN_TAIL_LEN := 0.42
-const ARM_SEGMENTS := 12
-const ARM_SEGMENT := 0.55 # metres each: an arm stands 6.6 m tall
+const ARM_SEGMENTS := 20
+const ARM_SEGMENT := 0.33 # metres each: an arm stands 6.6 m tall
 const ARM_BURIED := -6.8 # where it waits, under the sea, before it rises
 
 
@@ -1134,12 +1135,12 @@ static func animate_siren(z: Zombie, root: Node3D, delta: float, speed: float, s
 	# The tail's wave, stronger when she moves.
 	var at := root.get_node("Tail0") as Node3D
 	for i in SIREN_TAIL:
-		at.rotation.y = lerpf(at.rotation.y, sin(wave - i * 0.9) * (0.12 + speed * 0.32) * (0.5 + i * 0.25), k)
+		at.rotation.y = lerpf(at.rotation.y, sin(wave - i * 0.72) * (0.08 + speed * 0.18) * (0.65 + i * 0.13), k)
 		at.rotation.x = lerpf(at.rotation.x, 0.05 if i == 0 else 0.0, k)
 		if i < SIREN_TAIL - 1:
 			at = at.get_node("Tail%d" % (i + 1)) as Node3D
 	(at.get_node("Fan") as Node3D).rotation.y = sin(wave - SIREN_TAIL * 0.9) * 0.4
-	body.rotation.z = lerpf(body.rotation.z, sin(wave) * 0.08 * (0.3 + speed), k)
+	body.rotation.z = lerpf(body.rotation.z, sin(wave - 0.8) * 0.06 * (0.3 + speed), k)
 	body.position.y = 0.62 + sin(t * 1.4) * 0.025
 	hair.rotation.x = lerpf(hair.rotation.x, 0.15 + speed * 0.35 + sin(t * 1.1) * 0.06, k)
 	hair.rotation.z = sin(t * 0.8) * 0.08
@@ -1171,7 +1172,7 @@ static func animate_siren(z: Zombie, root: Node3D, delta: float, speed: float, s
 				singing = 1.0
 		"m_swipe":
 			var swipes := int(root.get_meta("swipes", 0))
-			var rake := clampf(act / 0.35, 0.0, 1.0)
+			var rake := smoothstep(0.09, 0.34, act)
 			var arm := Vector3(lerpf(-2.4, 0.4, rake), 0, 0.0)
 			if swipes % 2 == 0:
 				ar = arm + Vector3(0, 0, lerpf(0.6, -0.5, rake))
@@ -1240,8 +1241,8 @@ static func kraken_parts(root: Node3D) -> void:
 	var where := Vector3(0, -0.3, 0)
 	for i in ARM_SEGMENTS:
 		var seg := MesenllaModels._pivot(at, where, "Seg%d" % i)
-		var r0 := lerpf(0.82, 0.06, pow(float(i) / ARM_SEGMENTS, 0.85))
-		var r1 := lerpf(0.82, 0.06, pow(float(i + 1) / ARM_SEGMENTS, 0.85))
+		var r0 := lerpf(0.82, 0.06, pow(float(i) / ARM_SEGMENTS, 0.72))
+		var r1 := lerpf(0.82, 0.06, pow(float(i + 1) / ARM_SEGMENTS, 0.72))
 		MesenllaModels._part(seg, _mesh("kraken_seg%d" % i, func(l: LowPoly) -> void:
 			l.prism(Vector3.ZERO, Vector3(0, ARM_SEGMENT, 0), r0, r1, 9, KRAKEN if i % 2 == 0 else KRAKEN.darkened(0.06))
 			# The pale underside, and its suckers, toward +Z.
@@ -1253,6 +1254,12 @@ static func kraken_parts(root: Node3D) -> void:
 					var p := Vector3(x * r, y, r * 0.98)
 					l.prism(p, p + Vector3(0, 0, r * 0.14), r * 0.2, r * 0.17, 7, SUCKER)
 					l.prism(p + Vector3(0, 0, r * 0.13), p + Vector3(0, 0, r * 0.15), r * 0.1, r * 0.1, 6, KRAKEN_DARK)
+			# Raised dorsal ridges, scarred hide and a translucent cutting fin along the tip.
+			l.prism(Vector3(0,0,-r0), Vector3(0,ARM_SEGMENT,-r1),r0*0.1,r1*0.08,5,KRAKEN_DARK)
+			if i > 13:
+				l.leaf(Vector3(0,0,-r0),Vector3(0,ARM_SEGMENT*0.45,-r0*2.5),Vector3(0,ARM_SEGMENT,-r1),CORAL.darkened(0.2))
+			for scar in 2:
+				l.prism(Vector3(r0*0.8,ARM_SEGMENT*(0.2+scar*0.4),-r0*0.4),Vector3(r0*0.6,ARM_SEGMENT*(0.4+scar*0.4),-r0*0.7),0.014,0.006,3,SUCKER.darkened(0.35))
 			# Darker blotches on its back.
 			if i % 3 == 1:
 				l.box(Vector3(r0 * 0.3, ARM_SEGMENT * 0.5, -r0 * 0.85), Vector3(r0 * 0.6, ARM_SEGMENT * 0.4, 0.04), KRAKEN_DARK)
@@ -1283,8 +1290,8 @@ static func animate_kraken(z: Zombie, root: Node3D, delta: float, state: String,
 	for i in ARM_SEGMENTS:
 		var f := float(i) / ARM_SEGMENTS
 		# Standing: a slow wave runs up it and the tip curls over toward you.
-		var want_x := sin(t * 1.3 - i * 0.45) * 0.07 + f * f * 0.5
-		var want_z := sin(t * 0.9 - i * 0.35) * 0.06
+		var want_x := sin(t * 1.5 - i * 0.36) * (0.025 + f * 0.035) + f * f * 0.17
+		var want_z := sin(t * 1.1 - i * 0.28) * (0.02 + f * 0.04)
 		match state:
 			"m_slam":
 				if z.is_warning():
@@ -1295,7 +1302,7 @@ static func animate_kraken(z: Zombie, root: Node3D, delta: float, state: String,
 				else:
 					# Down it comes, flat along the ground in front.
 					var whip := clampf(act / 0.18, 0.0, 1.0)
-					want_x = lerpf(-0.2, (0.33 if i < 4 else 0.04) - (0.0 if i < 10 else 0.25), whip)
+					want_x = lerpf(-0.2, (0.21 if i < 6 else 0.015) - (0.0 if f < 0.8 else 0.08), whip)
 					want_z = 0.0
 					k = minf(1.0, delta * 26.0)
 			"m_swipe":
@@ -1368,6 +1375,17 @@ static func leviathan_parts(root: Node3D) -> void:
 				if k > 0 and k < 7:
 					var top := c + Vector3(cos((a0 + a1) * 0.5) * (r + thick * 0.9), sin((a0 + a1) * 0.5) * (r + thick * 0.9) - 0.6, 0)
 					l.leaf(top, top + Vector3(cos((a0 + a1) * 0.5), sin((a0 + a1) * 0.5), 0) * 0.8, top + Vector3(0, 0, 0.5), LEVI_FIN)))
+	# A continuous articulated tail replaces the disconnected rear silhouette.
+	var tail_parent := coils
+	for i in 16:
+		var tail := MesenllaModels._pivot(tail_parent, Vector3(0, 0, -0.85) if i > 0 else Vector3(0, 0.1, -3.5), "SeaTail%d" % i)
+		var r := lerpf(0.85, 0.035, float(i)/16)
+		MesenllaModels._part(tail, _mesh("sea_tail%d" % i, func(l: LowPoly) -> void:
+			l.prism(Vector3.ZERO, Vector3(0,0,-0.9),r,r*0.85,10,LEVI_SCALES)
+			l.leaf(Vector3(0,r,0),Vector3(0,r+0.55,-0.45),Vector3(0,r*0.8,-0.9),LEVI_FIN)
+			if i == 15:
+				for side: float in [-1,1]: l.leaf(Vector3.ZERO,Vector3(side*1.3,0.3,-1.2),Vector3(side*0.3,0,-0.6),LEVI_FIN)))
+		tail_parent = tail
 	var body := MesenllaModels._pivot(root, Vector3(0, LEVI_BURIED, 0), "Body")
 	var at := body
 	var where := Vector3(0, -0.6, 0)
@@ -1446,6 +1464,11 @@ static func animate_leviathan(z: Zombie, root: Node3D, delta: float, state: Stri
 		"m_sink": up = 1.0 - smoothstep(0.0, VaelMind.SINK_TIME, act)
 	body.position.y = lerpf(LEVI_BURIED, 0.0, up)
 	(root.get_node("Coils") as Node3D).position.y = lerpf(-4.0, 0.0, up)
+	var tail := root.get_node("Coils/SeaTail0") as Node3D
+	for i in 16:
+		tail.rotation.y = sin(t*1.7-i*0.4)*(0.08+float(i)*0.007)
+		tail.rotation.x = sin(t*1.2-i*0.35)*0.045
+		if i < 15: tail = tail.get_node("SeaTail%d" % (i+1)) as Node3D
 	var k := minf(1.0, delta * 6.0)
 	var head_x := 0.25
 	var jaw_x := 0.1 + sin(t * 1.3) * 0.05

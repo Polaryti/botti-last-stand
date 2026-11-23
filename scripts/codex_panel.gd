@@ -122,7 +122,9 @@ func _enemies() -> void:
 			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
 		var locations := PackedStringArray()
-		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "vael": "Port Vael", "lantern_road": "The Lantern Road", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
+		for map_id: String in d.get("maps", []):
+			if map_id == "lantern_road": continue
+			locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "vael": "Port Vael", "lantern_road": "The Lantern Road", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
 		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
 		if d.get("mist_boss", false) or d.get("mesenlla_boss", false):

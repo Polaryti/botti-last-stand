@@ -140,15 +140,19 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 	var rig := root.get_node("Rig") as Node3D
 	var pitch := -0.18 if tell else (0.3 * exp(-age * 4.0) if cast else sin(t * 2.0) * 0.04)
 	rig.rotation.x = lerpf(rig.rotation.x, pitch, minf(1, delta * 9))
-	rig.rotation.z = lerpf(rig.rotation.z, sin(t * 1.3) * minf(moving * 0.025, 0.14), minf(1, delta * 6))
+	rig.rotation.z = lerpf(rig.rotation.z, clampf(z.velocity.dot(z.global_basis.x) * -0.045, -0.22, 0.22), minf(1, delta * 6))
 	rig.position.y = 0.55 + sin(t * 2.2) * 0.07
 	for side: float in [-1, 1]:
 		var wing := rig.get_node("WingL" if side < 0 else "WingR") as Node3D
-		var beat := sin(t * (5.5 if z.model_id == "wreck_gull" else 2.8))
-		var fold := 0.6 if tell else (0.85 * exp(-age * 5) if cast else beat * 0.32)
+		var frequency := 5.5 if z.model_id == "wreck_gull" else 2.1 if z.model_id == "storm_ray" else 1.3
+		var beat := sin(t * frequency)
+		# A quick powered downstroke followed by a slower folded recovery.
+		if z.model_id == "wreck_gull": beat = signf(beat) * pow(absf(beat), 0.65)
+		var charge := smoothstep(0.0, float(VaelSkyMind.TELLS[z.model_id]), age)
+		var fold := lerpf(beat * 0.15, 0.6, charge) if tell else (0.85 * exp(-age * 5) if cast else beat * 0.32)
 		wing.rotation.z = lerpf(wing.rotation.z, side * fold, minf(1, delta * 10))
 		var tip := wing.get_node_or_null("Tip") as Node3D
-		if tip: tip.rotation.z = side * sin(t * 4 - 0.7) * (0.12 if tell else 0.3)
+		if tip: tip.rotation.z = side * sin(t * frequency - 0.9) * (0.08 if tell else 0.22)
 	match z.model_id:
 		"wreck_gull":
 			(rig.get_node("Head") as Node3D).rotation.x = -0.5 if tell else (0.7 * exp(-age * 6) if cast else sin(t * 2) * 0.05)
@@ -162,7 +166,7 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 			charge.rotation.y = t * 5
 		"bell_wraith":
 			var bell := rig.get_node("Bell") as Node3D
-			bell.rotation.x = sin(t * (12 if tell else 2)) * (0.32 if tell else 0.07)
+			bell.rotation.x = sin(t * (12 if tell else 2)) * (0.32 if tell else 0.07) + (sin(age * 12) * exp(-age * 3) * 0.5 if cast else 0.0)
 			(bell.get_node("Clapper") as Node3D).rotation.x = sin(t * (12 if tell else 2) - 0.9) * (0.65 if tell else 0.16)
 			for i in 6:
 				(rig.get_node("Strip%d" % i) as Node3D).rotation.x = sin(t * 2.5 - i * 0.7) * 0.18

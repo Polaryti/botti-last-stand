@@ -1157,7 +1157,9 @@ static func _animate_wolf(z: Zombie, holder: Node3D, delta: float, speed: float,
 	var parts := _four(holder)
 	var now := z.world.now + float(z.net_id) * 0.37
 	var gallop := speed > 0.6
-	var phase := _advance_phase(holder, delta, lerpf(1.2, 2.4, speed) if speed > 0.02 else 0.0)
+	# Low, driving shoulders and a delayed finned-tail counterbalance for the harbour hound.
+	if z.model_id == "brine_hound": now *= 0.88
+	var phase := _advance_phase(holder, delta, lerpf(1.0, 2.1, speed) if speed > 0.02 else 0.0)
 	var pose := {"head": 0.05 + sin(now * 0.8) * 0.05, "look": sin(now * 0.5) * 0.3 * (1.0 - speed), "tail_up": 0.15, "wag": sin(now * 6.0) * 0.25}
 	var legs := {}
 	for leg_name: String in ["LegFL", "LegFR", "LegBL", "LegBR"]:
@@ -1193,6 +1195,17 @@ static func _animate_wolf(z: Zombie, holder: Node3D, delta: float, speed: float,
 				pose["wag"] = sin(TAU * phase) * 0.15
 				pose["pitch"] = sin(TAU * phase) * 0.06 * float(gallop)
 				k = minf(1.0, delta * 16.0)
+	if z.model_id == "brine_hound":
+		pose["wag"] = sin(TAU * phase - 0.8) * (0.08 + speed * 0.18)
+		if state == "m_bite":
+			var gather := smoothstep(0.0, 0.09, act)
+			var release := 1.0 - smoothstep(0.16, 0.4, act)
+			pose["jaw"] = 0.7 * gather * release
+			pose["lunge"] = 0.32 * gather * release
+			pose["head"] = -0.12 + 0.45 * gather * release
+		elif state == "":
+			pose["pitch"] = sin(TAU * phase - 0.5) * 0.09 * speed
+			pose["head"] = 0.08 + speed * 0.12
 	_ease_four(parts, pose, legs, k)
 
 

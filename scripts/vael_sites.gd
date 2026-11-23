@@ -38,14 +38,14 @@ func _live_players() -> Array[Target]:
 
 ## Each candidate is checked against every living player. A separated group can get enemies on both
 ## sides of the map, while a doorway occupied by a teammate cannot become a spawn point.
-func enemy_site(lo := 25.0, hi := 66.0, shore := Shore.ANY) -> Vector3:
+func enemy_site(lo := 16.0, hi := 38.0, shore := Shore.ANY) -> Vector3:
 	var live := _live_players()
 	if live.is_empty():
 		return Vector3.INF
 	var focus: Target = live.pick_random()
 	var pool := world.vael_approaches.duplicate()
 	# A player off the marked routes still gets pressure, including in the back streets.
-	for i in 12:
+	for i in 64:
 		var angle := randf() * TAU
 		pool.append(focus.global_position + Vector3(cos(angle), 0, sin(angle)) * randf_range(lo, hi))
 	var best := Vector3.INF
@@ -68,6 +68,9 @@ func enemy_site(lo := 25.0, hi := 66.0, shore := Shore.ANY) -> Vector3:
 		if not _shore_allows(candidate, shore) or not _room_for_enemy(candidate):
 			continue
 		if world.fog and not world.fog.contains(candidate, -4.0):
+			continue
+		var route := world.grid.route(candidate, focus.global_position)
+		if route.size() < 2:
 			continue
 		var behind := from_focus.normalized().dot(focus.look_direction()) < 0.25
 		var value := randf_range(0.0, 13.0) - sqrt(dist_sq) * 0.23 + (8.0 if behind else 0.0)

@@ -55,8 +55,7 @@ var fort_map := "fort"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
 	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."},
-	"vael": {"name": "Port Vael", "desc": "A drowned harbour. The Mist Tide comes in and goes out."},
-	"lantern_road": {"name": "The Lantern Road", "desc": "Last Light: walk with the Lantern Barge to the Isle of Lamps."}}
+	"vael": {"name": "Port Vael", "desc": "A fifteen-minute siege of a drowned harbour. The Mist Tide brings the court and the Leviathan."}}
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
 const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
 	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
@@ -149,16 +148,20 @@ func owns_class(id: String) -> bool:
 
 
 ## Which map a night is played on: the host decides in a game together.
+func night_length() -> float:
+	return 900.0 if current_map() == "vael" else NIGHT_LENGTH
+
+
 func current_map() -> String:
 	if Net.active():
 		if Net.rules == Net.Rules.FORT:
 			return Net.fort_map if FORT_MAPS.has(Net.fort_map) else "fort"
 		if Net.pvp():
 			return Net.night_map if Net.night_map in VERSUS_MAPS else "village"
-		return Net.night_map
+		return "vael" if Net.night_map == "lantern_road" else Net.night_map
 	if mode == Mode.FORT:
 		return fort_map
-	return night_map
+	return "vael" if night_map == "lantern_road" else night_map
 
 
 func owns_item(id: String) -> bool:
@@ -216,7 +219,7 @@ func earn_text(id: String) -> String:
 		"vael_nights":
 			return "Survive %d nights in Port Vael (reach the dawn there, alone or with friends) to unlock this class. So far: %d." % [VAEL_NIGHTS_FOR_FERRYMAN, mini(vael_nights, VAEL_NIGHTS_FOR_FERRYMAN)]
 		"lighthouses":
-			return "Win Last Light %d times (bring the Lantern Barge to the Isle of Lamps and light the lighthouse) to unlock this class. So far: %d." % [LIGHTHOUSES_FOR_TIDECALLER, mini(lighthouses_lit, LIGHTHOUSES_FOR_TIDECALLER)]
+			return "Survive Port Vael %d times to unlock this class. So far: %d." % [LIGHTHOUSES_FOR_TIDECALLER, mini(lighthouses_lit, LIGHTHOUSES_FOR_TIDECALLER)]
 		"harbourmaster":
 			return "Defeat the Harbourmaster of Port Vael to unlock this class: be in the match when he falls."
 		"beyond":
@@ -260,6 +263,7 @@ func note_vael_night() -> void:
 	if mode == Mode.SANDBOX:
 		return
 	vael_nights += 1
+	note_last_light()
 	if vael_nights >= VAEL_NIGHTS_FOR_FERRYMAN and not unlocked.has("ferryman"):
 		_earn("ferryman")
 	save_settings()
@@ -397,7 +401,7 @@ const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 
 ## Port Vael: the drowned and what the Mist Tide brings in, and the drowned court: two gangs of the
 ## Press Gang and one more at the Harbourmaster's bell; a Kraken's four arms; and one of each of the rest.
 const VAEL_POOLS := {"drowned": 18, "barnacle_brute": 3, "brine_hound": 6, "lantern_jelly": 6, "angler": 3,
-	"wreck_gull": 3, "storm_ray": 2, "bell_wraith": 2, "siren": 2, "press_gang": 9, "tide_witch": 2, "harbourmaster": 1, "lighthouse_keeper": 1, "kraken_arm": 4, "hollow_sovereign": 1}
+	"wreck_gull": 3, "storm_ray": 2, "bell_wraith": 2, "siren": 2, "press_gang": 9, "tide_witch": 2, "harbourmaster": 1, "lighthouse_keeper": 1, "kraken_arm": 4, "hollow_sovereign": 1, "leviathan": 1}
 
 
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
@@ -507,6 +511,7 @@ func load_settings() -> void:
 	migrate_items(switched_off)
 	pet = _saved(c, "progress", "pet", "wolf")
 	night_map = _saved(c, "progress", "night_map", "village")
+	if night_map == "lantern_road": night_map = "vael"
 	if not MAPS.has(night_map):
 		night_map = "village"
 	fort_map = _saved(c, "progress", "fort_map", "fort")

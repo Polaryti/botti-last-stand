@@ -2,6 +2,14 @@
 
 ## Development — Beyond the Mists
 
+### The drowned harbour, extended
+
+- Port Vael now lasts fifteen minutes. The Leviathan joins its coastal encounters at 11:30; dawn requires both it and the Hollow Sovereign to fall.
+- The Lantern Road has been retired from selection and the atlas. Old selections move to Port Vael. Tidecaller progress now comes from surviving Port Vael.
+- Closer, route-checked coastal spawns and higher, longer obstacle vaults keep the drowned pursuing through the village.
+- Barnacle Brutes have 290 health, reduced damage and speed. The Harbourmaster has 700 health, reduced damage and speed.
+- Revised coastal movement and attack timing, finer Kraken articulation and an articulated sea-serpent tail. The Sovereign carries an upright, independently animated trident under a broken spectral halo, with luminous ribs and streaming funeral robes.
+
 ### Above Port Vael
 
 - **Wreck Gulls** circle the wrecks and spit salt. Their throats swell before the throw; step out of the splash to avoid its slow.

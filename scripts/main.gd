@@ -2120,14 +2120,14 @@ func _on_dawn() -> void:
 		hud.release_all()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	var kills := world.player.kills
-	Game.record_run(Game.NIGHT_LENGTH, kills, true)
-	var earned := Game.award_doubloons(Game.NIGHT_LENGTH, kills, true, false)
+	Game.record_run(Game.night_length(), kills, true)
+	var earned := Game.award_doubloons(Game.night_length(), kills, true, false)
 	var current := world
 	var line := "%s survived the night: %d kills, level %d.%s" % [_character_name(world.player), kills, world.player.level, _earned_line(earned)]
 	if world.last_light:
 		line = "%s brought the Lantern Barge to the Isle of Lamps: %d kills, level %d.%s" % [_character_name(world.player), kills, world.player.level, _earned_line(earned)]
 	# The Mists can run past ten minutes, until the Regent falls.
-	line += _board_line(maxf(Game.NIGHT_LENGTH, world.director.elapsed), kills, true)
+	line += _board_line(maxf(Game.night_length(), world.director.elapsed), kills, true)
 	# Let the sunrise and the burning zombies play first.
 	await get_tree().create_timer(3.5).timeout
 	if world != current or not is_inside_tree():
@@ -3171,7 +3171,7 @@ func _note_pending(mine: Label) -> void:
 
 
 static func _map_word(map: String) -> String:
-	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael", "lantern_road": "Lantern Road"}.get(map, map.capitalize())
+	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael", "lantern_road": "Port Vael"}.get(map, map.capitalize())
 
 
 ## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort",
