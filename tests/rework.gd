@@ -1985,7 +1985,7 @@ func _harpooner() -> void:
 
 func _tidecaller() -> void:
 	var d: Dictionary = ClassDefs.ALL["tidecaller"]
-	check(d["weapon"] == "trident" and d.get("mana", false) and d.get("earned", "") == "lighthouses" and not ClassDefs.for_sale().has("tidecaller"), "the Tidecaller starts with its Trident, spends tide, and is earned on the Lantern Road")
+	check(d["weapon"] == "trident" and d.get("mana", false) and d.get("earned", "") == "vael_win" and not ClassDefs.for_sale().has("tidecaller"), "the Tidecaller starts with its Trident, spends tide, and is earned in Port Vael")
 	check(WeaponDefs.ALL["trident"].get("only", "") == "tidecaller" and WeaponDefs.mesh("trident") != null, "the Trident is the Tidecaller's alone")
 	var specs: Array = AbilityData.tree("tidecaller")["specs"].map(func(x: Dictionary) -> String: return x["id"])
 	check(specs == ["tidewarden", "stormcaller", "deepcaller"], "Tidewarden, Stormcaller and Deepcaller")
@@ -1994,20 +1994,31 @@ func _tidecaller() -> void:
 	for sound: String in ["call_tide", "tide_shell", "shell_hit", "shell_burst", "stormspear", "chain_lightning", "maelstrom", "serpent_rise", "serpent_bite"]:
 		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
 	check(ClassGear._pieces("tidecaller").has("chest:glow") and Avatar.MODELS.has("tidecaller") and ClassPresentation.COPY.has("tidecaller"), "dressed, seen by others, and described")
-	# Earned by the third Last Light won.
+	# Earned by winning one match in Port Vael (dawn there, or a versus match won there).
 	var had: Dictionary = Game.unlocked.duplicate()
-	var lit := Game.lighthouses_lit
 	var was_mode := Game.mode
+	var was_map := Game.night_map
 	Game.unlocked.erase("tidecaller")
 	Game.mode = Game.Mode.NIGHT
-	Game.lighthouses_lit = Game.LIGHTHOUSES_FOR_TIDECALLER - 2
+	Game.night_map = "mesenlla"
+	var wins := Game.mesenlla_wins
+	Game.note_beyond_win()
+	Game.mesenlla_wins = wins
+	check(not Game.owns_class("tidecaller") and Game.earn_text("tidecaller").contains("Port Vael"), "a win elsewhere does not earn it, and it says to win in Port Vael")
+	Game.night_map = "lantern_road"
 	Game.note_last_light()
-	check(not Game.owns_class("tidecaller") and Game.earn_text("tidecaller").contains("So far: %d" % (Game.LIGHTHOUSES_FOR_TIDECALLER - 1)), "two lighthouses lit are not enough, and it says how many so far")
-	Game.note_last_light()
-	check(Game.owns_class("tidecaller"), "the third earns the Tidecaller")
+	Game.lighthouses_lit -= 1
+	check(not Game.owns_class("tidecaller"), "nor does a lighthouse lit")
+	Game.night_map = "vael"
+	Game.note_beyond_win()
+	check(Game.owns_class("tidecaller") and Game.fresh_unlocks.has("tidecaller"), "one win in Port Vael earns the Tidecaller")
+	Game.unlocked.erase("tidecaller")
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_beyond_win()
+	check(not Game.owns_class("tidecaller"), "but not in the Sandbox")
 	Game.unlocked = had
-	Game.lighthouses_lit = lit
 	Game.mode = was_mode
+	Game.night_map = was_map
 	Game.fresh_unlocks.erase("tidecaller")
 	# The class: tide from the Trident, and Call the Tide.
 	pawn("tidecaller")

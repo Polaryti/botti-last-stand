@@ -351,6 +351,8 @@ func _build_visual() -> void:
 		# A creature of Mesenlla is built of parts on pivots: all of them flash when struck.
 		var deep := model_id in MesenllaModels.KINDS or model_id == "crow" # (a Carrion Crow is a posed bird)
 		for mi in _visual.find_children("*", "MeshInstance3D", deep, false):
+			if mi.has_meta("no_flash"):
+				continue # the water and foam round it keep their own look when it is struck
 			_parts.append(mi as MeshInstance3D)
 			(mi as MeshInstance3D).set_meta("mist_rest", (mi as MeshInstance3D).transform)
 			# Its own look (glowing eyes, mist, a walking shader) comes back after a flash.

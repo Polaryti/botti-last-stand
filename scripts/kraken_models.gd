@@ -111,6 +111,7 @@ static func _foam(parent: Node3D, size: float, label: String, swirl_under := tru
 	ring.material_override = _foam_mat
 	ring.scale = Vector3(1.0, 0.18, 1.0)
 	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.set_meta("no_flash", true) # the sea round it is not struck
 	foam.add_child(ring)
 	foam.scale = Vector3(size, 1.0, size)
 	return foam
@@ -128,6 +129,7 @@ static func _swirl_disc(foam: Node3D) -> void:
 	water.shader = SeaSerpentBody._water_shader()
 	swirl.material_override = water
 	swirl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	swirl.set_meta("no_flash", true)
 	foam.add_child(swirl)
 
 
@@ -320,6 +322,8 @@ static func kraken_parts(root: Node3D) -> void:
 	var turning := ShaderMaterial.new()
 	turning.shader = _whirl_shader()
 	whirl.material_override = turning
+	whirl.set_meta("no_flash", true) # a blow to the Kraken must not turn its whirlpool white
+	whirl.set_meta("shader", turning)
 	whirl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	whirl.scale = Vector3(VaelMind.KRAKEN_PULL_REACH, 1.0, VaelMind.KRAKEN_PULL_REACH)
 	whirl.visible = false
@@ -383,7 +387,7 @@ static func animate_kraken(z: Zombie, root: Node3D, delta: float, state: String,
 	w_strength = move_toward(w_strength, 1.0 if turning else 0.0, delta * (1.5 if turning else 0.8))
 	whirl.set_meta("strength", w_strength)
 	whirl.visible = w_strength > 0.01
-	(whirl.material_override as ShaderMaterial).set_shader_parameter("strength", w_strength)
+	(whirl.get_meta("shader") as ShaderMaterial).set_shader_parameter("strength", w_strength)
 	_float(z, whirl)
 	whirl.global_position.y += 0.03
 	var k := minf(1.0, delta * 6.0)

@@ -37,8 +37,7 @@ var doubloons := 0
 var board_prizes := {} # week -> doubloons, for leaderboard prizes already paid
 var finished_games := 0
 var mists_wins := 0
-var lighthouses_lit := 0 # Last Light won: the Isle of Lamps' lighthouse burning again
-const LIGHTHOUSES_FOR_TIDECALLER := 3
+var lighthouses_lit := 0 # Last Light won: the Isle of Lamps' lighthouse burning again (counted only)
 const VAEL_NIGHTS_FOR_FERRYMAN := 3
 var vael_nights := 0 # nights survived to the dawn in Port Vael: three earn the Ferryman
 var harbourmasters_beaten := 0 # Harbourmasters defeated in matches you played
@@ -218,8 +217,8 @@ func earn_text(id: String) -> String:
 			return "Deal %d poison damage to unlock this class. So far: %d." % [POISON_FOR_PLAGUE, mini(int(poison_dealt), POISON_FOR_PLAGUE)]
 		"vael_nights":
 			return "Survive %d nights in Port Vael (reach the dawn there, alone or with friends) to unlock this class. So far: %d." % [VAEL_NIGHTS_FOR_FERRYMAN, mini(vael_nights, VAEL_NIGHTS_FOR_FERRYMAN)]
-		"lighthouses":
-			return "Survive Port Vael %d times to unlock this class. So far: %d." % [LIGHTHOUSES_FOR_TIDECALLER, mini(lighthouses_lit, LIGHTHOUSES_FOR_TIDECALLER)]
+		"vael_win":
+			return "Win a match in Port Vael to unlock this class: reach the dawn there, alone or with friends, or win a versus match there."
 		"harbourmaster":
 			return "Defeat the Harbourmaster of Port Vael to unlock this class: be in the match when he falls."
 		"beyond":
@@ -263,28 +262,30 @@ func note_vael_night() -> void:
 	if mode == Mode.SANDBOX:
 		return
 	vael_nights += 1
-	note_last_light()
 	if vael_nights >= VAEL_NIGHTS_FOR_FERRYMAN and not unlocked.has("ferryman"):
 		_earn("ferryman")
 	save_settings()
 
 
-## Last Light won. Three wins earn the Tidecaller.
+## Last Light won (the Lantern Road is retired; the count is kept).
 func note_last_light() -> void:
 	if mode == Mode.SANDBOX:
 		return
 	lighthouses_lit += 1
-	if lighthouses_lit >= LIGHTHOUSES_FOR_TIDECALLER and not unlocked.has("tidecaller"):
-		_earn("tidecaller")
 	save_settings()
 
 
-## A match won beyond the Mists: dawn reached in the Valleys of Mesenlla or at Mist Bastion, or a
-## versus match won in the Valleys. Three wins in each earn the Cartographer.
+## A match won beyond the Mists: dawn reached in the Valleys of Mesenlla, at Mist Bastion or in Port
+## Vael, or a versus match won there. Three wins in each of the first two earn the Cartographer; the
+## first win in Port Vael earns the Tidecaller.
 func note_beyond_win() -> void:
 	if mode == Mode.SANDBOX:
 		return
 	match current_map():
+		"vael":
+			if not unlocked.has("tidecaller"):
+				_earn("tidecaller")
+			return
 		"mesenlla":
 			mesenlla_wins += 1
 		"bastion":
@@ -502,6 +503,10 @@ func load_settings() -> void:
 	lighthouses_lit = maxi(0, _saved(c, "progress", "lighthouses_lit", 0))
 	harbourmasters_beaten = maxi(0, _saved(c, "progress", "harbourmasters_beaten", 0))
 	vael_nights = maxi(0, _saved(c, "progress", "vael_nights", 0))
+	if vael_nights > 0 and not unlocked.has("tidecaller") and not ClassDefs.disabled("tidecaller"):
+		# Already won in Port Vael before one win was enough: the Tidecaller is theirs.
+		unlocked["tidecaller"] = true
+		fresh_unlocks.append("tidecaller")
 	mesenlla_wins = maxi(0, _saved(c, "progress", "mesenlla_wins", 0))
 	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
 	changelog_seen = str(_saved(c, "progress", "changelog_seen", ""))

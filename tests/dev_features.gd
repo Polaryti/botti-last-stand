@@ -2860,6 +2860,14 @@ func _kraken_finale(coast: World) -> void:
 	var sword: Dictionary = WeaponDefs.ALL["sword"]
 	var hit := coast.melee_hit(you, sword, you.melee_stats(sword))
 	check(hit > 0 and beast.hp < h0, "a blade from the water's edge reaches it (%.0f)" % (h0 - beast.hp))
+	# Struck, it flashes, but its whirlpool keeps its own shader: animating it must still find it.
+	var whirl := beast._visual.get_node("Whirl") as MeshInstance3D
+	check(beast._flash > 0.0 and whirl.material_override is ShaderMaterial and not beast._parts.has(whirl), "a blow flashes the Kraken but not its whirlpool")
+	var foams := beast._visual.find_children("*", "MeshInstance3D", true, false).filter(func(m: Node) -> bool: return m.has_meta("no_flash"))
+	check(foams.size() >= 2 and foams.all(func(m: Node) -> bool: return not beast._parts.has(m)), "nor the foam and water round it (%d)" % foams.size())
+	beast._current_anim = "m_pull"
+	MesenllaModels.animate(beast, beast._visual, 0.05, 0.0)
+	check((whirl.material_override as ShaderMaterial).get_shader_parameter("strength") > 0.0, "the whirlpool still turns while it flashes")
 	await get_tree().physics_frame # the physics world catches up with where everything stands
 	var space := coast.get_world_3d().direct_space_state
 	var ray := PhysicsRayQueryParameters3D.create(you.eye_position(), beast.centre(), Zombie.LAYER)

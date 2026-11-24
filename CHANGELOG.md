@@ -8,6 +8,7 @@
 - **One creature:** a great mantle crowned with the drowned towers of Vael, two gold eyes, a beak, and eight arms. They are the same arms that rise from the flats in the middle of the night.
 - **Its arts:** an arm rears over each of you and whips down on your ring. It sweeps away anyone who comes close, hooks whoever stands furthest off and spits blinding ink. At each third of its health it turns the harbour into a whirlpool and raises the drowned. In its last third its arms come down three at a time and waves roll out from it.
 - **Fixed:** the Kraken and its arms can now be struck with any weapon. A blade now reaches tall bodies anywhere up their height.
+- **Fixed:** striking the Kraken no longer breaks the game. Its whirlpool and the foam round it no longer flash when it is hit.
 - New entrance bells, roar, rise, ink and whirlpool sounds, a Codex entry and an icon. Its hoard washes up where it sinks.
 - **Coastal flyers move like themselves:** Wreck Gulls flap in bursts and glide, bank into turns and tumble when shot down. Storm Rays row with a wave along each fin and cup them to charge. The Bell Wraith's bell swings with its drift and tolls.
 
@@ -18,6 +19,7 @@
 - **Stormcaller** (ranged burst): Trident blows soak enemies; Stormspear's lightning leaps between the soaked. Squall Step carries you back; Maelstrom leaves a storm cell over the fight.
 - **Deepcaller** (summoner): Call of the Deep raises a sea serpent that fights beside you and that enemies turn on. Up to Leviathan's Child: it grows and lashes whatever your Trident strikes.
 - Wavebreaker, Deepsinger and Fogbinder are gone, and with them the Fogbinder's fog and its broken ground. New effects, sounds and icons for every path.
+- **Earned in Port Vael:** win one match there to unlock the Tidecaller, by reaching the dawn or winning a versus match. Anyone who has already reached the dawn there has it.
 
 ### Coastal combat and salvage repairs
 
