@@ -4243,3 +4243,81 @@ kind = "rival"
 transform = Transform3D(1.00000, 0, -0.00000, 0, 1, 0, 0.00000, 0, 1.00000, 76, 0, 4)
 script = ExtResource("8_s")
 kind = "rival"
+
+[node name="Guild" type="Node3D" parent="."]
+
+[node name="GuildSnareNW" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 6, -53.5)
+script = ExtResource("8_s")
+kind = "snare"
+gate = 3
+
+[node name="GuildSnareNE" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 6, -53.5)
+script = ExtResource("8_s")
+kind = "snare"
+gate = 2
+
+[node name="GuildSnareW" type="Node3D" parent="Guild"]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -27.5, 6, -31)
+script = ExtResource("8_s")
+kind = "snare"
+gate = 5
+
+[node name="GuildSnareE" type="Node3D" parent="Guild"]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 27.5, 6, -31)
+script = ExtResource("8_s")
+kind = "snare"
+gate = 4
+
+[node name="GuildSnareS" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 6, -9.5)
+script = ExtResource("8_s")
+kind = "snare"
+gate = 7
+
+[node name="GuildSnareRoad" type="Node3D" parent="Guild"]
+transform = Transform3D(0.6293204, 0, 0.777146, 0, 1, 0, -0.777146, 0, 0.6293204, -44, 11, -44)
+script = ExtResource("8_s")
+kind = "snare"
+gate = 3
+
+[node name="GuildFallback1" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 14, -57)
+script = ExtResource("8_s")
+kind = "hunter"
+gate = 2
+
+[node name="GuildFallback2" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 14, -55)
+script = ExtResource("8_s")
+kind = "hunter"
+gate = 2
+
+[node name="GuildCampHunter1" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42, 13, -60)
+script = ExtResource("8_s")
+kind = "hunter"
+gate = 4
+
+[node name="GuildCampHunter2" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 14, -50)
+script = ExtResource("8_s")
+kind = "hunter"
+gate = 4
+
+[node name="GuildCache" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 6, -21.5)
+script = ExtResource("8_s")
+kind = "trap_cache"
+
+[node name="GuildCacheStones" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47, 14, -61)
+script = ExtResource("8_s")
+kind = "trap_cache"
+gate = 1
+
+[node name="GuildCamp" type="Node3D" parent="Guild"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 13, -56)
+script = ExtResource("8_s")
+kind = "guild_camp"

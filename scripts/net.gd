@@ -22,13 +22,13 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 55
+const PROTOCOL := 69
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
-enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH }
-enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT }
+enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH, FLARE, HARPOON_LIE, HARPOON_GONE, QUAKE }
+enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT, REVEAL, BLIND } # new ones go at the end: the number travels
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
 const SNAPSHOT_EVERY := 0.08
@@ -52,12 +52,36 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"fire_breath", "wyvern_roar", "boulder_throw", "boulder_impact", "revenant_roar", "stone_grind", "woods_chatter", "mist_muster", "portal_wound",
 	"bear_hurt", "bear_death", "claw_swipe", "eagle_hurt", "eagle_death", "wing_flap", "wyvern_hurt", "wyvern_death", "stag_call", "stag_hurt", "beast_growl", "shapeshifter_death", "stone_hit", "stone_crumble", "revenant_death", "mist_hurt", "mist_dissipate", "storm_hurt", "storm_burst", "woods_hurt", "woods_death", "dawn_mists", "dawn_valleys", "dawn_bastion",
 	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent",
-	"frost_warning", "frost_burst", "owl_screech", "boar_snort"]
+	"frost_warning", "frost_burst", "owl_screech", "boar_snort",
+	"hook_catch", "harpoon_hit", "flare_burst", "anchor_slam",
+	"dawn_vael", "drowned_moan", "drowned_hurt", "drowned_death", "brute_hurt", "brute_death", "hound_snarl", "hound_bite", "hound_death",
+	"jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death",
+	# The drowned court (Stage 3 of The Sunken Crown).
+	"siren_song", "siren_shriek", "siren_hum", "siren_death", "press_shout", "net_throw", "net_land", "witch_call", "witch_death",
+	"chain_rattle", "hook_throw", "harbour_bell", "harbour_growl", "lamp_throw", "lamp_smash", "lamp_flare", "lamp_blaze", "keeper_laugh", "keeper_hurt",
+	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
+	"kraken_emerge", "kraken_roar", "kraken_ink", "kraken_whirlpool", "kraken_end", "boss_bells_kraken",
+	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign",
+	# Last Light
+	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
+	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
+	"call_tide", "tide_shell", "shell_burst", "stormspear", "chain_lightning", "maelstrom", "serpent_rise", "serpent_bite", "shell_hit",
+	"crossing", "toll_bell", "obol", "souls_go",
+	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
+	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop",
+	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
 	"m_swipe", "m_rear", "m_charge", "m_slam", "m_cast", "m_breath", "m_throw", "m_blink", "m_stag", "m_beast", "m_shift",
-	"m_paw", "m_wolf", "m_bite", "m_lunge", "m_howl", "m_owl", "m_dive", "m_boar", "m_gore"]
+	"m_paw", "m_wolf", "m_bite", "m_lunge", "m_howl", "m_owl", "m_dive", "m_boar", "m_gore",
+	# A Woodland Cavalry rider astride its bear.
+	"Ride", "RideCharge", "RideThrust", "RideBrandish",
+	# Port Vael: a Lantern Jelly's sting, a Siren's song, a Kraken's Arm rising and sinking; and the drowned
+	# court's throws and calls (BodyAnim). Never more than 63 of these: the top bits carry poison and bleeding.
+	"m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise",
+	# The Kraken: its sweep, its ink, its hook, its roar and its whirlpool (KrakenModels).
+	"m_sweep", "m_ink", "m_grab", "m_roar", "m_pull"]
 
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
@@ -645,6 +669,8 @@ func _spectator_loaded() -> void:
 	if world.portals:
 		_portals.rpc_id(id, world.portals.state_bits())
 	_spectate_now.rpc_id(id, world.director.elapsed, world.director._mist_boss_spawned, world.director._mist_boss_defeated)
+	if world.tide and world.tide.surge_from >= 0.0:
+		_tide_surge.rpc_id(id, world.tide.surge_from, world.tide.surge_until)
 	_go.rpc_id(id)
 
 
@@ -1111,6 +1137,12 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 		Fx.SPARK: world.fx_spark(a, b)
 		Fx.SENTRY: world.place_sentry(null, a, b.x)
 		Fx.MIST_PATCH: world.drop_mist_patch(a, b.x, true)
+		Fx.FLARE:
+			var attached := world.zombie_by_id(int(b.x) - 1) if b.x > 0.0 and is_finite(b.x) else null
+			world.flare(a, null, true, attached)
+		Fx.HARPOON_LIE: world.lay_harpoon(by, a, b, true)
+		Fx.HARPOON_GONE: world.take_harpoon(by)
+		Fx.QUAKE: world.anchor_quake_fx(a, b.x)
 
 
 func set_night_map(id: String) -> void:
@@ -1290,6 +1322,7 @@ func _z_died(net_id: int, killer: int) -> void:
 	if z == null or not z.active:
 		return
 	if z.is_boss(): world.director._mist_boss_defeated = true
+	world.note_defeated(z)
 	z.net_die()
 	_credit(z, killer)
 
@@ -1424,6 +1457,11 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.DISARM: z.disarm(a > 0.5)
 		Zombie.Effect.FLINCH: z.flinch(a)
 		Zombie.Effect.ROOT: z.root(a)
+		Zombie.Effect.PIN: z.root(a, true)
+		Zombie.Effect.REVEAL: z.reveal(a)
+		Zombie.Effect.HAUL: z.haul_to(Vector3(a, 0.0, b))
+		Zombie.Effect.DRIFT: z.drift_to(Vector3(a, 0.0, b), CrownUpgrades.HORIZON_PULL) # only Event Horizon draws them now
+		Zombie.Effect.BLIND: z.blind_for(clampf(a, 0.0, 20.0))
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -1595,6 +1633,267 @@ func _disarm(peer: int, by: int, stun: bool) -> void:
 		BanditKit.be_robbed((_bots[peer] as BotPlayer).pawn, stun)
 
 
+# --- The Harpooner -------------------------------------------------------------------------------
+
+## Someone or something seen in a game together: a creature by its number, or a player by theirs.
+func _body_of(kind: int, id: int) -> Node3D:
+	if world == null or not is_instance_valid(world):
+		return null
+	if kind == 0:
+		return world.zombie_by_id(id)
+	var body: Node3D = avatar(id)
+	return body if body else local_player(id)
+
+
+## A Harpooner's Haul: every other phone sees the rope fly from their hand to what it caught.
+func haul_rope(owner_peer: int, target: Node3D) -> void:
+	if target is Zombie:
+		_haul_rope.rpc(owner_peer, 0, (target as Zombie).net_id)
+	elif target is Target and world:
+		_haul_rope.rpc(owner_peer, 1, world.peer_of(target as Target))
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _haul_rope(owner_peer: int, kind: int, id: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != owner_peer and not (sender == 1 and is_bot(owner_peer)):
+		return
+	var from := _body_of(1, owner_peer)
+	var to := _body_of(kind, id)
+	if from and to:
+		HarpoonerKit.show_rope(world, from, to)
+
+
+## A rival Harpooner's Haul caught a player: their own phone (or the host, for a bot) hauls them in.
+func hauled(peer: int, at: Vector3, by: int) -> void:
+	if peer == my_id() or (is_host() and is_bot(peer)):
+		_hauled(peer, at, by)
+	else:
+		_hauled.rpc(peer, at, by)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _hauled(peer: int, at: Vector3, by: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != by and not (sender == 1 and is_bot(by)):
+		return
+	if not is_finite(at.x) or not is_finite(at.z) or not bots_foes(by, peer):
+		return
+	var p := local_player(peer)
+	if p and (peer == my_id() or (is_host() and is_bot(peer))):
+		p.hauled_by_rival(at)
+
+
+## A Rigger's line, so every phone has the same rope across the ground.
+func rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits: int, keep: int, cradle: bool) -> void:
+	_rig_line.rpc(owner_peer, from, to, seconds, bits, keep, cradle)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits: int, keep: int, cradle: bool) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != owner_peer and not (sender == 1 and is_bot(owner_peer)):
+		return
+	if world == null or not is_instance_valid(world) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > HarpoonerKit.RIG_REACH + 12.0:
+		return
+	world.rig_line(owner_peer, from, to, clampf(seconds, 1.0, 30.0), bits, clampi(keep, 1, HarpoonerKit.RIG_LINES + 1), cradle)
+
+
+# --- The Ferryman --------------------------------------------------------------------------------
+
+func _from_owner(owner_peer: int) -> bool:
+	var sender := multiplayer.get_remote_sender_id()
+	return (sender == owner_peer or (sender == 1 and is_bot(owner_peer))) and world != null and is_instance_valid(world)
+
+
+## A Ferryman's Crossing: every other phone sees the skiff glide.
+func crossing(owner_peer: int, from: Vector3, to: Vector3) -> void:
+	_crossing.rpc(owner_peer, from, to)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _crossing(owner_peer: int, from: Vector3, to: Vector3) -> void:
+	if not _from_owner(owner_peer) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > 30.0:
+		return
+	FerrySkiff.create(world, avatar(owner_peer), from, to, FerrymanKit.CROSS_TIME)
+
+
+## A Boatman's skiff carries a friend: their own phone (or the host, for a bot) moves them with it.
+func carried(peer: int, at: Vector3, by: int) -> void:
+	if peer == my_id() or (is_host() and is_bot(peer)):
+		_carried(peer, at, by)
+	else:
+		_carried.rpc(peer, at, by)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _carried(peer: int, at: Vector3, by: int) -> void:
+	var sender := multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != by and not (sender == 1 and is_bot(by)):
+		return
+	if not is_finite(at.x) or not is_finite(at.z) or bots_foes(by, peer):
+		return
+	var p := local_player(peer)
+	if p and (peer == my_id() or (is_host() and is_bot(peer))):
+		p.carried_to(at)
+
+
+## A Boatman's wake of black water, on every phone.
+func black_water(owner_peer: int, from: Vector3, to: Vector3, seconds: float) -> void:
+	_black_water.rpc(owner_peer, from, to, seconds)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _black_water(owner_peer: int, from: Vector3, to: Vector3, seconds: float) -> void:
+	if not _from_owner(owner_peer) or not is_finite(from.x) or not is_finite(to.x) or from.distance_to(to) > 30.0:
+		return
+	world.black_water(owner_peer, from, to, clampf(seconds, 0.5, 10.0))
+
+
+## A Psychopomp's soul flying out: every other phone sees it go.
+func soul_bolt(owner_peer: int, target: Node3D, index: int) -> void:
+	if target is Zombie:
+		_soul_bolt.rpc(owner_peer, 0, (target as Zombie).net_id, index)
+	elif target is Target and world:
+		_soul_bolt.rpc(owner_peer, 1, world.peer_of(target as Target), index)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _soul_bolt(owner_peer: int, kind: int, id: int, index: int) -> void:
+	if not _from_owner(owner_peer):
+		return
+	var from := _body_of(1, owner_peer)
+	var to := _body_of(kind, id)
+	if from and to:
+		SoulBolt.create(world, from, to, clampi(index, 0, 12), false)
+
+
+## How many souls circle a Psychopomp, so their avatar shows them.
+func souls(owner_peer: int, count: int) -> void:
+	_souls.rpc(owner_peer, count)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _souls(owner_peer: int, count: int) -> void:
+	if not _from_owner(owner_peer):
+		return
+	var a := avatar(owner_peer)
+	if a:
+		a.set_souls(clampi(count, 0, 12))
+
+
+# --- The Tidecaller --------------------------------------------------------------------------------
+
+func _from_tidecaller(owner_peer: int) -> bool:
+	var sender := multiplayer.get_remote_sender_id()
+	return (sender == owner_peer or (sender == 1 and is_bot(owner_peer))) and world != null and is_instance_valid(world)
+
+
+## A Tidecaller's wave, so every phone sees it roll.
+func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float) -> void:
+	_tide_wave.rpc(owner_peer, from, dir, width, length)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float) -> void:
+	if not _from_tidecaller(owner_peer) or not is_finite(from.x) or not is_finite(dir.x):
+		return
+	world.tide_wave(owner_peer, from, dir, clampf(width, 1.0, 12.0), clampf(length, 1.0, 30.0), 0.0)
+
+
+## A Tide Shell raised round someone (a Tidewarden, or a friend it lent one to), or given way. Every
+## other phone shows the bubble on their body, and the burst where it broke.
+func tide_shell(owner_peer: int, up: bool, at := Vector3.INF, reach := 0.0) -> void:
+	_tide_shell.rpc(owner_peer, up, at, reach)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _tide_shell(owner_peer: int, up: bool, at: Vector3, reach: float) -> void:
+	if not _from_owner(owner_peer):
+		return
+	var a := avatar(owner_peer)
+	if a:
+		a.set_tide_shell(up)
+		if up:
+			world.sfx_here("tide_shell", a.global_position, -4.0)
+	if not up and is_finite(at.x) and reach > 0.0:
+		world.tide_burst(at, clampf(reach, 1.0, 8.0))
+
+
+## A Tidewarden's Tidal Ward on a friend: a shell of their own.
+func shell_peer(peer: int, amount: float, seconds: float) -> void:
+	if is_bot(peer):
+		if is_host():
+			_lend_shell(local_player(peer), amount, seconds)
+		else:
+			_bot_shell.rpc_id(1, peer, amount, seconds)
+		return
+	if peer == my_id():
+		_lend_shell(world.player, amount, seconds)
+		return
+	_shell.rpc_id(peer, amount, seconds)
+
+
+@rpc("any_peer", "reliable")
+func _bot_shell(peer: int, amount: float, seconds: float) -> void:
+	shell_peer(peer, clampf(amount, 0.0, 200.0), clampf(seconds, 0.0, 20.0))
+
+
+@rpc("any_peer", "reliable")
+func _shell(amount: float, seconds: float) -> void:
+	if world and is_instance_valid(world):
+		_lend_shell(world.player, clampf(amount, 0.0, 200.0), clampf(seconds, 0.0, 20.0))
+
+
+func _lend_shell(p: Player, amount: float, seconds: float) -> void:
+	if p and not p.dead:
+		TidecallerKit.lend_shell(p, amount, seconds)
+
+
+## A Stormcaller's spear and the leaps of its lightning, on every phone.
+func storm_arcs(owner_peer: int, points: PackedVector3Array) -> void:
+	_storm_arcs.rpc(owner_peer, points)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _storm_arcs(owner_peer: int, points: PackedVector3Array) -> void:
+	if not _from_tidecaller(owner_peer) or points.size() < 2 or points.size() > 12:
+		return
+	for at: Vector3 in points:
+		if not is_finite(at.x) or not is_finite(at.y) or not is_finite(at.z):
+			return
+	world.storm_arcs(points)
+	world.sfx_here("stormspear", points[0], -4.0)
+	if points.size() > 2:
+		world.sfx_here("chain_lightning", points[points.size() - 1], -5.0)
+
+
+## A Stormcaller's Maelstrom, a storm over the fight on every phone (its bolts are struck by the caster's).
+func maelstrom(owner_peer: int, at: Vector3) -> void:
+	_maelstrom.rpc(owner_peer, at)
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _maelstrom(owner_peer: int, at: Vector3) -> void:
+	if not _from_tidecaller(owner_peer) or not is_finite(at.x):
+		return
+	world.maelstrom(owner_peer, at)
+
+
+## A bolt from someone's Maelstrom, so every phone sees where it fell.
+func maelstrom_bolt(owner_peer: int, at: Vector3) -> void:
+	_maelstrom_bolt.rpc(owner_peer, at)
+
+
+@rpc("any_peer", "unreliable", "call_remote")
+func _maelstrom_bolt(owner_peer: int, at: Vector3) -> void:
+	if not _from_tidecaller(owner_peer) or not is_finite(at.x):
+		return
+	for n: Node in world.get_children():
+		if n is Maelstrom and (n as Maelstrom).owner_peer == owner_peer:
+			(n as Maelstrom).show_bolt(at)
+
+
 ## A Cartographer's beacon, so every phone has the same markers and lines.
 func beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> void:
 	_survey_beacon.rpc(owner_peer, at, cfg, yaw)
@@ -1657,6 +1956,32 @@ func path_field(owner_peer: int, kind: String, at: Vector3) -> void:
 func _path_field(owner_peer: int, kind: String, at: Vector3) -> void:
 	if world and is_instance_valid(world) and PathField.KINDS.has(kind):
 		world.spawn_path_field(owner_peer, kind, at)
+
+
+## A snare of the Trappers' Guild sprung, told by the host to the other phones.
+func snare(i: int) -> void:
+	if is_host():
+		_snare.rpc(i)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _snare(i: int) -> void:
+	if world and is_instance_valid(world) and world.guild:
+		world.guild.spring_snare(i)
+
+
+## A Mercenary's Contract, shown over its creature on every phone.
+func contract(z: Zombie, secs: float) -> void:
+	if z.net_id >= 0:
+		_contract.rpc(z.net_id, clampf(secs, 0.0, 30.0))
+
+
+@rpc("any_peer", "reliable", "call_remote")
+func _contract(net_id: int, secs: float) -> void:
+	if world and is_instance_valid(world):
+		var z: Zombie = world.zombie_by_id(net_id)
+		if z:
+			world.show_contract(z, clampf(secs, 0.0, 30.0))
 
 
 func rat_tide(from: Vector3, dir: Vector3) -> void:
@@ -1916,6 +2241,40 @@ func _healed_by_you(healed: int, amount: float) -> void:
 
 
 ## A boss of Beyond the Mists enters: every phone shows its card and rings its bells.
+## Last Light: where the Lantern Barge is on its course, and how it stands (LastLight.state_bits),
+## sent by the host every LastLight.SEND_EVERY.
+func last_light(progress: float, bits: int, dim: float) -> void:
+	_last_light.rpc(progress, bits, dim)
+
+
+@rpc("authority", "unreliable_ordered")
+func _last_light(progress: float, bits: int, dim: float) -> void:
+	if world and is_instance_valid(world) and world.last_light and is_finite(progress) and is_finite(dim):
+		world.last_light.follow(progress, bits, clampf(dim, 0.0, 60.0))
+
+
+## Last Light: this phone's player has chosen a boon at the waystation the barge waits at.
+func boon_chosen() -> void:
+	_boon_chosen.rpc_id(1)
+
+
+@rpc("any_peer", "reliable")
+func _boon_chosen() -> void:
+	if is_host() and world and is_instance_valid(world) and world.last_light:
+		world.last_light.peer_chose(multiplayer.get_remote_sender_id())
+
+
+## The Hollow Sovereign has called the tide in: from `from` until `until` on the night's clock.
+func tide_surge(from: float, until: float) -> void:
+	_tide_surge.rpc(from, until)
+
+
+@rpc("authority", "reliable")
+func _tide_surge(from: float, until: float) -> void:
+	if world and is_instance_valid(world) and world.tide and is_finite(from) and is_finite(until) and until > from and until - from < 600.0:
+		world.tide.set_surge(from, until)
+
+
 func boss_entrance(kind: String) -> void:
 	_boss_entrance.rpc(kind)
 
@@ -2386,7 +2745,10 @@ func on_dawn_reached() -> void:
 	_dawn_ending = true
 	match rules:
 		Rules.COOP, Rules.FORT:
-			finish("Dawn!", "You survived the night together.\n" + score_lines())
+			if world and world.last_light:
+				finish("The lighthouse burns!", "You brought the Lantern Barge to the Isle of Lamps together.\n" + score_lines())
+			else:
+				finish("Dawn!", "You survived the night together.\n" + score_lines())
 		Rules.TEAMS:
 			var totals := [0, 0]
 			for p: int in roster:

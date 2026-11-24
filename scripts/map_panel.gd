@@ -67,6 +67,9 @@ static func _bake(w: World) -> ImageTexture:
 				col = pal["void"]
 			elif h < Terrain.WATER_Y and _by_river(t, wx, wz):
 				col = pal["water"]
+			elif not t.coast.is_empty() and h < MistTide.HIGH_Y:
+				# The coast: the open sea, and the flats the Mist Tide covers and uncovers, in sand.
+				col = pal["water"] if t.open_sea(wx, wz) else Color(0.42, 0.4, 0.33).lerp(Color(0.26, 0.31, 0.3), clampf((MistTide.HIGH_Y - h) / 2.0, 0.0, 1.0))
 			elif t.slope(wx, wz) > Terrain.STEEP or not t.is_walkable(wx, wz):
 				col = col.darkened(0.3)
 			img.set_pixel(x, y, col)
@@ -108,12 +111,7 @@ static func _bake(w: World) -> ImageTexture:
 
 ## Water is only drawn where the river's water lies: low ground elsewhere is just a hollow.
 static func _by_river(t: Terrain, x: float, z: float) -> bool:
-	var at := Vector2(x, z)
-	var reach := t.river_width + Terrain.BANK * 0.5
-	for i in t.river.size() - 1:
-		if at.distance_to(Geometry2D.get_closest_point_to_segment(at, t.river[i], t.river[i + 1])) <= reach:
-			return true
-	return false
+	return t.by_river(x, z)
 
 
 ## A line of square dots on the baked map, thick pixels to each side.
@@ -248,6 +246,23 @@ func _draw_features() -> void:
 				for i in 8:
 					var a := TAU * i / 8.0
 					draw_circle(p + Vector2(cos(a), sin(a)) * maxf(s, 4.0), 1.8, Color(0.75, 0.72, 0.66))
+			"lighthouse":
+				# A white tower with a ring round it: lit, a beam turning.
+				draw_circle(p, 4.5, Color(0.86, 0.84, 0.78))
+				draw_arc(p, 6.5, 0.0, TAU, 20, Color(0.66, 0.2, 0.16), 2.0, true)
+			"wreck":
+				# A hull lying on the sand.
+				var along: Vector2 = f["dir"] * s * 0.5
+				draw_line(p - along, p + along, Color(0.36, 0.25, 0.17), 5.0, true)
+				draw_line(p - along * 0.9, p + along * 0.9, Color(0.55, 0.2, 0.15), 1.5, true)
+			"bell_tower":
+				draw_rect(Rect2(p - Vector2(3, 3), Vector2(6, 6)), Color(0.6, 0.6, 0.58))
+				draw_circle(p, 1.6, Color(0.32, 0.5, 0.42))
+			"quay", "mole":
+				var stretch: Vector2 = f["dir"] * s * 0.5
+				if f["kind"] == "mole":
+					stretch = Vector2(-stretch.y, stretch.x) # a mole runs out to sea, across its piece's X
+				draw_line(p - stretch, p + stretch, Color(0.52, 0.52, 0.5), 4.0 if f["kind"] == "mole" else 2.5, true)
 			"mine":
 				# A dark mouth in a timber frame.
 				var across: Vector2 = f["dir"] * maxf(s, 4.0) * 0.6

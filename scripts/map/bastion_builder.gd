@@ -17,6 +17,7 @@ const SPINE_DARK := Color(0.19, 0.18, 0.23)
 const GATES := ["west", "middle", "east"]
 const POSTERN_W := 1.9
 const POSTERN_H := 2.5
+const MERLON_GUARD := 1.6 # metres of unseen wall over each merlon
 const SINK := 1.5 # walls go this far into the ground, so slopes never show a gap under them
 
 
@@ -113,6 +114,9 @@ static func _wall(b: MapBuilder, l: LowPoly, runes: LowPoly, a: Vector2, c: Vect
 		var size := _sized(along_x, 1.1, 0.84, 0.4)
 		l.box(at, size, SLATE_DARK.lightened(0.08))
 		b.w.add_collider(b.xf * at, size)
+		# Unseen above each merlon, as tall as someone: walking up to one is walking up to a wall, not
+		# to a step to jump onto, so auto-jump leaves it alone (and nobody stands on top of one).
+		b.w.add_barrier(b.xf * (at + Vector3.UP * (0.42 + MERLON_GUARD * 0.5)), _sized(along_x, 1.1, MERLON_GUARD, 0.4), false)
 		b.w.fort.merlons.append(b.xf * _on(along_x, m, line, top))
 		m += 2.3
 

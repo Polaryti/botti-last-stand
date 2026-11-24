@@ -111,8 +111,9 @@ static func _mist(b: MapBuilder, local: Vector3, extents: Vector3, col: Color, a
 
 ## A lump of the mountains torn loose and hanging in the twilight: meadow on top with a few pines,
 ## raw rock beneath narrowing to a point, mist crystals glinting under it and mist falling from its edge.
-static func floating_island(b: MapBuilder, width: float) -> void:
-	_feature(b, "island", width)
+static func floating_island(b: MapBuilder, width: float, distant := false) -> void:
+	if not distant:
+		_feature(b, "island", width)
 	var r := b.seeded()
 	var l := b.mesh()
 	var w := width * 0.5
@@ -162,6 +163,9 @@ static func floating_island(b: MapBuilder, width: float) -> void:
 		var end := bend + Vector3(r.randf_range(-0.4, 0.4), -r.randf_range(0.8, 2.4), r.randf_range(-0.4, 0.4))
 		l.prism(rim, bend, 0.09, 0.07, 4, BARK.darkened(0.25))
 		l.prism(bend, end, 0.07, 0.02, 4, BARK.darkened(0.35))
+	if distant:
+		b.add(l).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		return
 	b.add(l)
 	# Loose rocks drifting slowly around it, each with a seam of mist-glass.
 	var debris := LowPoly.new()

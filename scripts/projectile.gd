@@ -30,11 +30,37 @@ var poison_trail := false
 var spins := false # a thrown ring turns flat as it flies
 var spin_axis := Vector3.UP # ...and a thrown knife tumbles end over end
 var hit_sound := ""
+var is_flare := false
 var bleed := Vector2.ZERO # damage per second and seconds of bleeding, for a Highwayman's knives
 var slow_secs := 0.0
 var close_from := Vector3.INF # Point Blank: half as strong again within 6 m of here
 var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
+var pins := 0.0 # a Whaler's Harpoon: seconds it holds what it strikes to the spot
+var tether := false # ...and where it ends up, it lies until its owner takes it back
+var harpoon_mark := false # a Harpooner's harpoon: what it strikes is marked and torn (HarpoonerKit)
+## A Highwayman's Toll knife (CrownUpgrades): it gleams gold, and what it pins pays when it dies.
+var toll := false:
+	set(on):
+		toll = on
+		material_override = _toll_glow() if on else null
+static var _toll_mat: StandardMaterial3D
+var glow := Color.TRANSPARENT: # a Flare: burns bright as it flies, its light on what it passes
+	set(c):
+		glow = c
+		if c.a > 0.0 and _glow_light == null:
+			_glow_light = OmniLight3D.new()
+			_glow_light.omni_range = 5.0
+			_glow_light.shadow_enabled = false
+			add_child(_glow_light)
+		if _glow_light:
+			_glow_light.visible = c.a > 0.0
+			_glow_light.light_color = c
+			_glow_light.light_energy = 2.4
+		if c.a > 0.0:
+			_flame.visible = true
+			_flame.modulate = c.lightened(0.2)
+var _glow_light: OmniLight3D
 var owner_player: Player # who shot it: this phone's player, or one of the host's bots
 var garrison := false
 var _through_wall := false # a returning axe that has passed through a wall # shot by a Mist Soldier: nobody's, and nobody is credited with what it kills
@@ -90,6 +116,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	spins = false
 	spin_axis = Vector3.UP
 	hit_sound = ""
+	is_flare = false
 	bleed = Vector2.ZERO
 	slow_secs = 0.0
 	close_from = Vector3.INF
@@ -97,6 +124,11 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	poison = Vector2.ZERO
 	poison_trail = false
 	stagger = 0.0
+	pins = 0.0
+	harpoon_mark = false
+	tether = false
+	toll = false
+	glow = Color.TRANSPARENT
 	mesh = m
 	position = pos
 	_vel = vel
@@ -197,6 +229,9 @@ func _fly(delta: float) -> void:
 	var step := _vel * delta
 	_left -= step.length()
 	if _left <= 0.0:
+		if tether and not visual:
+			_lay_tether(Vector3(position.x, world.ground_at(position), position.z))
+			return
 		if kind == Kind.AXE and not _returning:
 			_turn_back()
 		elif kind == Kind.BOLT and blast_radius > 0.0:
@@ -289,9 +324,12 @@ func _fly(delta: float) -> void:
 		stop()
 		return
 	world.fx_impact(at)
-	world.sfx_at("thunk", at, -6.0)
+	world.sfx_at(hit_sound if tether else "thunk", at, -6.0)
 	if _is_friendly() and not visual:
 		world.make_noise(at, 8.0)
+	if tether and not visual:
+		_lay_tether(at)
+		return
 	if kind == Kind.AXE:
 		_turn_back()
 	elif blast_radius > 0.0:
@@ -335,6 +373,14 @@ func _grazed_body(from: Vector3, step: Vector3, ray_hit: Dictionary) -> Dictiona
 func _walled(a: Vector3, b: Vector3) -> bool:
 	var q := PhysicsRayQueryParameters3D.create(a, b, 1 | Terrain.LAYER)
 	return not get_world_3d().direct_space_state.intersect_ray(q).is_empty()
+
+
+## A thrown harpoon comes to rest here, and lies until its owner walks over it.
+func _lay_tether(at: Vector3) -> void:
+	var shooter := _owner()
+	if shooter:
+		world.lay_harpoon(shooter.net_id(), at, _vel)
+	stop()
 
 
 func _turn_back() -> void:
@@ -390,6 +436,8 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		shooter.spark_from(z, sparks, amount)
 	if from_player and shooter:
 		shooter.on_shot_connect(z)
+		if harpoon_mark:
+			HarpoonerKit.on_harpoon_hit(shooter, z)
 	if fire:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if frost:
@@ -404,7 +452,19 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		z.add_dot(bleed.x, bleed.y, true)
 	if slow_secs > 0.0:
 		z.slow(slow_secs)
+	if pins > 0.0:
+		z.root(pins, true)
+		if toll:
+			z.toll_until = world.now + pins + 0.25
+	if is_flare:
+		stop()
+		world.flare(at, shooter, false, z if z.is_alive() else null)
+		return
 	world.sfx_at(hit_sound if hit_sound != "" else "thunk", at, -3.0)
+	if tether:
+		# The harpoon stays in it, then drops at its feet when it pulls free.
+		_lay_tether(Vector3(z.position.x, world.ground_at(z.position), z.position.z) + _vel.normalized() * 0.3)
+		return
 	_exclude.append(z.get_rid())
 	if blast_radius > 0.0:
 		_explode(at)
@@ -427,3 +487,16 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 			_orient()
 			return
 	stop()
+
+
+static func _toll_glow() -> StandardMaterial3D:
+	if _toll_mat == null:
+		# Gilded steel that catches the light, and gleams a little of itself in the dark.
+		_toll_mat = StandardMaterial3D.new()
+		_toll_mat.albedo_color = CrownUpgrades.COIN
+		_toll_mat.metallic = 0.8
+		_toll_mat.roughness = 0.25
+		_toll_mat.emission_enabled = true
+		_toll_mat.emission = CrownUpgrades.COIN
+		_toll_mat.emission_energy_multiplier = 0.6
+	return _toll_mat

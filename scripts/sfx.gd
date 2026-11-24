@@ -22,7 +22,28 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	# The Commander's battle cry
 	"command",
 	# The bosses of Beyond the Mists enter to the soundtrack's bells (tools/make_boss_bells.py)
-	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent"]
+	"boss_bells_revenant", "boss_bells_wyvern", "boss_bells_regent",
+	# The Sunken Crown (tools/make_sunken_audio.py): the weapons of Vael
+	"cutlass_swing", "hook_swing", "hook_catch", "harpoon_throw", "harpoon_hit", "harpoon_reel", "flare_shot", "flare_burst",
+	"anchor_heave", "anchor_slam", "oar_sweep",
+	# Port Vael: the Mist Tide and the drowned
+	"tide_bell", "tide_in", "tide_out", "salvage", "dawn_vael", "drowned_moan", "drowned_hurt", "drowned_death", "brute_hurt", "brute_death",
+	"hound_snarl", "hound_bite", "hound_death", "jelly_sting", "jelly_hum", "jelly_burst", "angler_rise", "angler_bite", "angler_death",
+	# The drowned court: Sirens, the Press Gang, Tide Witches, the Harbourmaster, the Lighthouse Keeper, the
+	# Kraken's arms, the Hollow Sovereign and his crown
+	"siren_song", "siren_hum", "siren_shriek", "siren_death", "press_shout", "net_throw", "net_land", "witch_call", "witch_death",
+	"chain_rattle", "hook_throw", "harbour_bell", "harbour_growl", "lamp_throw", "lamp_smash", "lamp_flare", "lamp_blaze", "keeper_laugh", "keeper_hurt",
+	"kraken_rise", "kraken_slam", "kraken_hurt", "kraken_death", "wave_rise", "wave_crash", "crown_toll", "crown_fall", "crown_take",
+	"kraken_emerge", "kraken_roar", "kraken_ink", "kraken_whirlpool", "kraken_end", "boss_bells_kraken",
+	"sovereign_decree", "sovereign_voice", "sovereign_hurt", "sovereign_death", "boss_bells_sovereign",
+	# Last Light: the Leviathan of the Mists, a waystation's brazier, the lighthouse lit again
+	"leviathan_rise", "leviathan_roar", "leviathan_bite", "leviathan_hurt", "leviathan_death", "waystation", "lighthouse_lit", "boss_bells_leviathan",
+	"haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon",
+	"call_tide", "tide_shell", "shell_burst", "stormspear", "chain_lightning", "maelstrom", "serpent_rise", "serpent_bite", "shell_hit",
+	"crossing", "toll_bell", "obol", "souls_go",
+	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
+	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop",
+	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],
@@ -36,7 +57,9 @@ const MUSIC_SETS := {
 	"fort": ["fort_night", "fort_hunted", "fort_dawn"],
 	"mesenlla": ["mesenlla_night", "mesenlla_hunted", "mesenlla_dawn"],
 	"bastion": ["bastion_night", "bastion_hunted", "bastion_dawn"],
-	"menu": ["menu_mesenlla", "", ""],
+	"vael": ["vael_night", "vael_hunted", "vael_dawn"],
+	"lantern": ["lantern_night", "lantern_hunted", "lantern_dawn"],
+	"menu": ["menu_vael", "", ""],
 }
 const MUSIC_BUS := "Music"
 const SOUND_BUS := "Sounds"

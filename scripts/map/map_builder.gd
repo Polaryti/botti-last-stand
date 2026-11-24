@@ -6,6 +6,7 @@ extends RefCounted
 ## The same code draws the preview in the Godot editor, so what you see there is what you get.
 
 const THATCH := Color(0.52, 0.42, 0.22)
+const SHORE_Y := 1.0 # on a coast, ground lower than this is beach and seabed
 const SHINGLE := Color(0.27, 0.2, 0.2)
 const PLASTER := Color(0.68, 0.62, 0.5)
 const PLASTER_B := Color(0.6, 0.55, 0.47)
@@ -116,6 +117,13 @@ func collider(at: Vector3, size: Vector3) -> void:
 	w.add_collider_xf(xf.translated_local(at), size)
 
 
+## Ground nothing should plan to walk over, though nothing solid stands on it: the foot of a sea wall,
+## where the climb is too high (PathGrid only, no collision).
+func no_walk(at: Vector3, size: Vector3) -> void:
+	if w.grid:
+		w.grid.block_turned(xf.translated_local(at), size)
+
+
 ## A window's opening: stops bodies and blades, not sight or shots.
 func window_gap(at: Vector3, size: Vector3) -> void:
 	w.add_window_xf(xf.translated_local(at), size)
@@ -178,7 +186,9 @@ func flush() -> void:
 	_trees.clear()
 	for key: Vector2i in _cells:
 		(_cells[key] as LowPoly).base = Transform3D.IDENTITY
-		add(_cells[key])
+		var mi := add(_cells[key])
+		if mi.mesh.get_surface_count() == 0: # a square asked for but left empty
+			mi.queue_free()
 	_cells.clear()
 
 
@@ -200,11 +210,18 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA else 0.0)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" else 0.0)
+	mat.set_shader_parameter("shore", SHORE_Y if not terrain.coast.is_empty() or not terrain.sea.is_empty() else -1000.0)
 	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
 		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
 		mat.set_shader_parameter("dirt", Vector3(0.24, 0.19, 0.17))
+	elif look in SpawnRules.VAEL:
+		# Salt grass by the sea, burnt dun and grey-green by the wind and spray, and grey-brown
+		# cobble-dust on the streets.
+		mat.set_shader_parameter("tint", Vector3(1.12, 0.86, 0.7))
+		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
+		mat.set_shader_parameter("highland", 1.0 if look == "vael" else 0.0)
 	_ground_material = mat
 	var j := 0
 	while j < terrain.vertices_per_side - 1:
@@ -242,7 +259,7 @@ func boundary(h: float) -> void:
 			# You can walk off the edge. Mobs know better.
 			w.add_enemy_block(Vector3(c.x, 0.0, c.y), Vector3(r.size.x, 120.0, r.size.y))
 		else:
-			if terrain.height(c.x, c.y) < Terrain.WATER_Y - Terrain.WADE:
+			if terrain.deep_water(c.x, c.y):
 				w.add_barrier(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
 			else:
 				w.add_enemy_block(Vector3(c.x, y, c.y), Vector3(r.size.x, 60.0, r.size.y))
@@ -1009,7 +1026,7 @@ func bonfire() -> void:
 	# where nothing could reach them.
 	w.add_barrier(at + Vector3.UP * 3.0, Vector3(1.9, 4.0, 1.9))
 	w.add_glow(at + Vector3.UP * 1.0, Color(1.0, 0.6, 0.22), 4.5, 95.0)
-	_flame(at + Vector3.UP * 0.1, 1.0)
+	flame(at + Vector3.UP * 0.1, 1.0)
 	var light: OmniLight3D = null
 	if quality > 0:
 		light = OmniLight3D.new()
@@ -1031,7 +1048,7 @@ func torch() -> void:
 	var at := xf.origin
 	w.add_solid(at + Vector3.UP, Vector3(0.22, 2.0, 0.22))
 	w.add_glow(at + Vector3.UP * 2.6, Color(1.0, 0.64, 0.26), 2.0, 85.0)
-	_flame(at + Vector3.UP * 2.38, 0.38)
+	flame(at + Vector3.UP * 2.38, 0.38)
 	var light: OmniLight3D = null
 	if quality == 2:
 		light = OmniLight3D.new()
@@ -1045,9 +1062,10 @@ func torch() -> void:
 	w.add_fire(at, WorldLight.TORCH_REACH, light)
 
 
-func _flame(at: Vector3, size: float) -> void:
+func flame(at: Vector3, size: float, geometry: Mesh = null) -> void:
 	var mi := MeshInstance3D.new()
-	mi.mesh = WorldLight.flame_mesh()
+	mi.name = "AnimatedFlame"
+	mi.mesh = geometry if geometry else WorldLight.flame_mesh()
 	mi.position = at
 	mi.scale = Vector3.ONE * size
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1645,6 +1663,9 @@ func fort_keep() -> void:
 
 ## A forest wall outside the playable edge. It needs no collision, so it may depend on quality.
 func forest_wall(h: float) -> void:
+	if look == "vael":
+		_coastal_forest(h)
+		return
 	var apron := LowPoly.new()
 	for side in 4:
 		var outward := Vector3(sin(side * PI * 0.5), 0, cos(side * PI * 0.5))
@@ -1669,6 +1690,8 @@ func forest_wall(h: float) -> void:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1))
 				p.y = terrain.height(p.x, p.z)
+				if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4:
+					continue # no trees in the sea: the coast's edge is open water
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 				var file := "res://assets/nature/tree_single_A.gltf" if rng.randf() < 0.72 else "res://assets/nature/tree_single_B.gltf"
 				tree(file, rng.randf_range(5.5, 8.5), rng.randf_range(0.9, 1.15), false)
@@ -1695,8 +1718,37 @@ func _tall_wall(h: float) -> void:
 			t += step + (row % 2) * 0.5
 
 
+## Stagger the firs over the slopes and onto the background rather than lining up against a flat
+## boundary. Leave the open water and the high rock faces bare.
+func _coastal_forest(h: float) -> void:
+	var step: float = [8.1, 6.6, 5.8][quality]
+	var depth: int = [4, 5, 6][quality]
+	var rows := [-2.0, 4.0, 11.0, 20.0, 31.0, 44.0]
+	for row in depth:
+		var edge := h + float(rows[row])
+		var run := -edge + step * (0.5 if row % 2 == 1 else 0.15)
+		while run < edge:
+			for at: Vector2 in [Vector2(run, -edge), Vector2(-edge, run), Vector2(edge, run)]:
+				var p := at + Vector2(rng.randf_range(-1.45, 1.45), rng.randf_range(-1.45, 1.45))
+				var y := terrain.coast_scenery_height(p.x, p.y)
+				if y < MistTide.HIGH_Y + 0.75 or terrain.near_cut_road(p, 2.25):
+					continue
+				var alpine := p.y < -94.0 and y > 8.0
+				if alpine:
+					var across := terrain.coast_scenery_height(p.x + 1.0, p.y) - terrain.coast_scenery_height(p.x - 1.0, p.y)
+					var rise := terrain.coast_scenery_height(p.x, p.y + 1.0) - terrain.coast_scenery_height(p.x, p.y - 1.0)
+					if y > 41.0 + 4.0 * sin(p.x * 0.075) or Vector2(across, rise).length_squared() > 5.5:
+						continue
+				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), Vector3(p.x, y - (0.46 if alpine else 0.15), p.y)))
+				var kind := "proc:tall_pine" if rng.randf() < 0.55 else "proc:giant_fir"
+				tree(kind, rng.randf_range(7.6, 11.0), rng.randf_range(0.92, 1.24), false)
+			run += step
+
+
 ## Grass tufts, in patches so the camera can skip those it cannot see.
 func grass(h: float) -> void:
+	# By the sea the tufts are salt-burnt like the ground under them.
+	var tuft_tint := Color(1.0, 0.8, 0.64) if look in SpawnRules.VAEL else Color.WHITE
 	var patches := {}
 	var tuft := _grass_tuft()
 	# The same thickness of grass on any size of map.
@@ -1711,12 +1763,13 @@ func grass(h: float) -> void:
 			if MapIslands.on_masonry(Vector2(p.x, p.z)): continue
 			if not is_preview and MapIslands._near_gate(w, p, 4.0): continue
 		p.y = terrain.height(p.x, p.z)
+		if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.z / 24.0)))
 		if not patches.has(key):
 			patches[key] = [[], PackedColorArray()]
 		var s := rng.randf_range(1.0, 1.9)
 		(patches[key][0] as Array).append(Transform3D(Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s, s)), p))
-		patches[key][1] = (patches[key][1] as PackedColorArray) + PackedColorArray([Color.WHITE.darkened(rng.randf() * 0.2)])
+		patches[key][1] = (patches[key][1] as PackedColorArray) + PackedColorArray([tuft_tint.darkened(rng.randf() * 0.2)])
 	for key: Vector2i in patches:
 		var list: Array[Transform3D] = []
 		list.assign(patches[key][0])

@@ -18,8 +18,8 @@ const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
 const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
-	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0),
-	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6)}
+	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64), "tidecaller": Vector3(0.24, 0.8, 0.74), "ferryman": Vector3(0.86, 0.84, 0.76),
+	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6), "lodge_hunter": Vector3(0.36, 0.48, 0.22)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5), "mist_heavy": Vector3(0.66, 0.92, 0.98)}
 ## Mist-glass on the Mist Soldiers, which glows in the dark. Pieces named "bone:glow" are made of it.
@@ -103,9 +103,13 @@ static func _pieces(id: String) -> Dictionary:
 			"artificer": built = _artificer()
 			"bandit": built = _bandit()
 			"cartographer": built = _cartographer()
+			"harpooner": built = _harpooner()
+			"tidecaller": built = _tidecaller()
+			"ferryman": built = _ferryman()
 			"mist_infantry": built = _mist_infantry()
 			"mist_ranger": built = _mist_ranger()
 			"mist_heavy": built = _mist_heavy()
+			"lodge_hunter": built = _lodge_hunter()
 		_made[id] = built
 	return _made[id]
 
@@ -351,6 +355,162 @@ static func _cartographer() -> Dictionary:
 	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
 
 
+## A loop of rope: `rings` turns of it round `centre`, across the plane of `u` and `v` (their lengths are
+## the loop's two half-widths), each turn a little further along `step`.
+static func _coil(l: LowPoly, centre: Vector3, u: Vector3, v: Vector3, rings: int, step: Vector3, thick: float, col: Color, sides := 14) -> void:
+	for r in rings:
+		var c := centre + step * r
+		for i in sides:
+			var a0 := TAU * i / sides
+			var a1 := TAU * (i + 1) / sides
+			l.prism(c + u * cos(a0) + v * sin(a0), c + u * cos(a1) + v * sin(a1), thick, thick, 5, col.darkened(0.06 * ((r + i) % 2)))
+
+
+## Harpooner: a whaler's knitted watch cap with a turned-up brim and a gold ring in one ear, a coil of
+## line worn across the chest like a bandolier, a bigger coil on the back, and at the hips a cork float
+## and a flensing knife in its sheath.
+static func _harpooner() -> Dictionary:
+	const WOOL := Color(0.6, 0.2, 0.15)
+	const LINE := Color(0.66, 0.54, 0.34)
+	const CORK := Color(0.72, 0.56, 0.36)
+	var head := LowPoly.new()
+	# The crown of the cap, rounded over the head and a little slouched to the back.
+	var rings := [[0.64, 0.64, 0.0], [0.86, 0.6, -0.02], [1.0, 0.54, -0.05], [1.08, 0.36, -0.08], [1.11, 0.0, -0.1]]
+	for i in rings.size() - 1:
+		head.prism(Vector3(0, rings[i][0], rings[i][2]), Vector3(0, rings[i + 1][0], rings[i + 1][2]), rings[i][1], rings[i + 1][1], 12, WOOL.darkened(0.04 * i))
+	# The turned-up brim, and the ribs of the knit round it.
+	head.prism(Vector3(0, 0.6, 0.0), Vector3(0, 0.75, 0.0), 0.67, 0.66, 12, WOOL.darkened(0.2))
+	for i in 7:
+		var a := -1.2 + i * 0.4
+		head.box(Vector3(sin(a) * 0.67, 0.675, cos(a) * 0.67), Vector3(0.025, 0.14, 0.02), WOOL.darkened(0.32), Vector3(0, rad_to_deg(a), 0))
+	_disc(head, Vector3(0.62, 0.36, 0.06), Vector3.RIGHT, 0.07, 0.025, GOLD, 8)
+	var chest := LowPoly.new()
+	# The bandolier coil: two turns of line from the right shoulder down across the chest to the left hip.
+	var across := Vector3(0.56, 0.83, 0.0)
+	_coil(chest, Vector3(0, 0.04, -0.02), across * 0.62, Vector3(0, 0, 0.44), 2, Vector3(0.03, -0.02, 0), 0.045, LINE)
+	# The big coil on the back, flat against it, and a lashing round it.
+	_coil(chest, Vector3(0.06, -0.08, -0.5), Vector3(0.22, 0, 0), Vector3(0, 0.22, 0), 3, Vector3(0, 0, -0.035), 0.04, LINE.darkened(0.06))
+	chest.box(Vector3(0.06, -0.08, -0.55), Vector3(0.05, 0.5, 0.13), DARK_LEATHER)
+	var hips := LowPoly.new()
+	hips.prism(Vector3(0, 0.08, 0), Vector3(0, 0.2, 0), 0.6, 0.6, 12, DARK_LEATHER)
+	hips.box(Vector3(0, 0.14, 0.58), Vector3(0.16, 0.14, 0.04), BRASS)
+	# The cork float, hanging by a short line.
+	hips.prism(Vector3(0.5, 0.1, 0.1), Vector3(0.52, -0.08, 0.12), 0.012, 0.012, 4, LINE)
+	hips.prism(Vector3(0.52, -0.08, 0.12), Vector3(0.52, -0.3, 0.12), 0.1, 0.1, 8, CORK)
+	hips.prism(Vector3(0.52, -0.17, 0.12), Vector3(0.52, -0.21, 0.12), 0.105, 0.105, 8, RED)
+	# The flensing knife: a broad curved blade in a leather sheath, its handle up.
+	hips.box(Vector3(-0.5, -0.06, 0.16), Vector3(0.07, 0.36, 0.14), LEATHER, Vector3(0, 0, -10))
+	hips.prism(Vector3(-0.47, 0.12, 0.16), Vector3(-0.45, 0.3, 0.16), 0.035, 0.035, 6, WOOD)
+	hips.prism(Vector3(-0.45, 0.3, 0.16), Vector3(-0.45, 0.33, 0.16), 0.045, 0.045, 6, BRASS)
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
+
+
+## Tidecaller: a circlet of shells and branching coral with a pearl at the brow, a mantle of kelp over
+## the shoulders hanging in ragged strips, and at the hips a sash of fishing net with a conch horn.
+static func _tidecaller() -> Dictionary:
+	const CORAL := Color(0.94, 0.48, 0.42)
+	const SHELL := Color(0.95, 0.9, 0.8)
+	const KELP := Color(0.24, 0.42, 0.22)
+	const PEARL := Color(0.9, 0.96, 1.0)
+	var head := LowPoly.new()
+	# The circlet: a band of twisted cord round the brow of the hood, low over the forehead.
+	head.prism(Vector3(0, 0.6, 0.0), Vector3(0, 0.65, 0.0), 0.575, 0.57, 16, Color(0.44, 0.36, 0.26))
+	for i in 7:
+		var a := -1.5 + i * 0.5
+		var at := Vector3(sin(a) * 0.58, 0.62, cos(a) * 0.58)
+		var turned := Vector3(0, rad_to_deg(a), 0)
+		if i % 2 == 1:
+			# A scallop shell standing on the band, ribs fanning up from its hinge.
+			for k in 3:
+				head.box(at + Vector3(0, 0.05 + k * 0.025, 0), Vector3(0.11 - k * 0.025, 0.03, 0.025), SHELL.darkened(0.06 * k), turned)
+		else:
+			# A little branch of coral, forking.
+			var up := at + Vector3(0, 0.14, 0)
+			head.prism(at, up, 0.02, 0.012, 4, CORAL)
+			head.prism(at + Vector3(0, 0.07, 0), at + Vector3(cos(a) * 0.05, 0.13, -sin(a) * 0.05), 0.013, 0.008, 4, CORAL.lightened(0.12))
+	# A pearl at the brow, in a little bronze setting.
+	head.prism(Vector3(0, 0.625, 0.57), Vector3(0, 0.625, 0.6), 0.05, 0.05, 8, Color(0.62, 0.5, 0.26))
+	head.prism(Vector3(0, 0.625, 0.59), Vector3(0, 0.625, 0.63), 0.035, 0.015, 8, PEARL)
+	var chest := LowPoly.new()
+	# The kelp mantle: a collar round the shoulders, ragged strips hanging from it, longer at the back.
+	chest.prism(Vector3(0, 0.1, -0.02), Vector3(0, 0.2, -0.02), 0.62, 0.56, 12, KELP)
+	for i in 14:
+		var a := TAU * i / 14.0
+		var front := cos(a) > 0.3
+		var length := (0.14 if front else 0.3) + 0.08 * ((i * 7) % 3)
+		var top := Vector3(sin(a) * 0.6, 0.12, cos(a) * 0.54 - 0.02)
+		chest.box(top + Vector3(0, -length * 0.5, 0), Vector3(0.1, length, 0.025), KELP.lightened(0.06 * (i % 3)), Vector3(0, rad_to_deg(a), 0))
+	# A pair of ribbed scallop pauldrons and a sea-glass clasp.
+	for side: float in [-1.0, 1.0]:
+		var hinge := Vector3(side * 0.48, 0.17, 0.15)
+		for i in 5:
+			var rim := Vector3(side * (0.60 + i * 0.055), 0.30 - i * 0.045, 0.19 - i * 0.034)
+			chest.prism(hinge, rim, 0.043, 0.073, 5, SHELL.darkened(i * 0.035))
+		chest.prism(hinge, Vector3(side * 0.68, 0.21, 0.2), 0.055, 0.035, 6, CORAL)
+	var glass := LowPoly.new()
+	_disc(chest, Vector3(0, 0.13, 0.54), Vector3.BACK, 0.12, 0.04, BRASS, 8)
+	glass.prism(Vector3(0, 0.034, 0.58), Vector3(0, 0.22, 0.58), 0.025, 0.065, 5, MIST_GLASS)
+	var hips := LowPoly.new()
+	# A sash of netting, knotted at the side.
+	hips.prism(Vector3(0, 0.06, 0), Vector3(0, 0.18, 0), 0.6, 0.6, 12, Color(0.62, 0.56, 0.42))
+	for i in 6:
+		var a := -1.2 + i * 0.48
+		hips.box(Vector3(sin(a) * 0.61, 0.12, cos(a) * 0.61), Vector3(0.02, 0.13, 0.02), Color(0.4, 0.34, 0.24), Vector3(0, rad_to_deg(a), 0))
+	# The conch horn, hanging by a cord.
+	hips.prism(Vector3(-0.52, 0.1, 0.18), Vector3(-0.56, -0.06, 0.2), 0.012, 0.012, 4, Color(0.4, 0.34, 0.24))
+	hips.prism(Vector3(-0.62, -0.08, 0.2), Vector3(-0.48, -0.16, 0.2), 0.04, 0.1, 7, SHELL)
+	hips.prism(Vector3(-0.48, -0.16, 0.2), Vector3(-0.42, -0.24, 0.2), 0.1, 0.0, 7, CORAL.lightened(0.3))
+	return {"head": head.commit(), "chest": chest.commit(), "chest:glow": glass.commit(), "hips": hips.commit()}
+
+
+## Ferryman: a broad, flat-brimmed boatman's hat of grey felt over the hood, a ragged black mantle over
+## the shoulders with a string of obols across the chest, a lantern hung from a hook on the back, and a
+## rope belt with a coin purse.
+static func _ferryman() -> Dictionary:
+	const FELT := Color(0.32, 0.31, 0.3)
+	const CLOTH := Color(0.1, 0.1, 0.12)
+	const COIN := Color(0.82, 0.84, 0.88)
+	const ROPE := Color(0.56, 0.48, 0.34)
+	var head := LowPoly.new()
+	# The hat: a wide brim, tipped a little forward, and a low round crown with a band.
+	head.prism(Vector3(0, 0.84, 0.04), Vector3(0, 0.88, 0.04), 0.94, 0.92, 16, FELT)
+	head.prism(Vector3(0, 0.88, 0.0), Vector3(0, 1.12, -0.02), 0.62, 0.5, 12, FELT.lightened(0.06))
+	head.prism(Vector3(0, 0.88, 0.0), Vector3(0, 0.95, 0.0), 0.63, 0.63, 12, CLOTH)
+	head.prism(Vector3(0, 0.836, 0.04), Vector3(0, 0.851, 0.04), 0.95, 0.94, 16, ROPE)
+	_disc(head, Vector3(0.22, 0.92, 0.58), Vector3.BACK, 0.084, 0.035, COIN, 8)
+	for side: float in [-1.0, 1.0]:
+		head.box(Vector3(side * 0.43, 0.53, 0.32), Vector3(0.12, 0.55, 0.24), CLOTH, Vector3(0, side * 16.0, side * 12.0))
+	var chest := LowPoly.new()
+	# The mantle: a short cape over the shoulders, its hem cut ragged.
+	chest.prism(Vector3(0, 0.3, -0.02), Vector3(0, 0.12, -0.04), 0.58, 0.66, 12, CLOTH)
+	for i in 12:
+		var a := TAU * i / 12.0
+		var length := 0.16 + 0.1 * ((i * 5) % 3)
+		chest.box(Vector3(sin(a) * 0.64, 0.12 - length * 0.5, cos(a) * 0.6 - 0.04), Vector3(0.18, length, 0.02), CLOTH.lightened(0.04 * (i % 2)), Vector3(0, rad_to_deg(a), 0))
+	# The string of obols across the chest.
+	for k in 7:
+		var x := -0.3 + k * 0.1
+		var y := 0.06 - (0.3 * 0.3 - x * x) * 0.6
+		_disc(chest, Vector3(x, y, 0.5), Vector3.BACK, 0.05, 0.015, COIN.darkened(0.08 * (k % 2)), 8)
+	# The lantern on the back, hanging from an iron hook.
+	chest.prism(Vector3(0.18, 0.28, -0.52), Vector3(0.18, 0.1, -0.6), 0.015, 0.015, 4, Color(0.2, 0.2, 0.22))
+	var iron := Color(0.19, 0.20, 0.22)
+	chest.box(Vector3(0.18, -0.23, -0.66), Vector3(0.27, 0.055, 0.26), iron)
+	chest.prism(Vector3(0.18, 0.07, -0.66), Vector3(0.18, 0.14, -0.66), 0.18, 0.025, 4, iron)
+	for dx: float in [-0.105, 0.105]:
+		for dz: float in [-0.105, 0.105]:
+			chest.box(Vector3(0.18 + dx, -0.08, -0.66 + dz), Vector3(0.025, 0.32, 0.025), iron)
+	var light := LowPoly.new()
+	light.prism(Vector3(0.18, -0.21, -0.66), Vector3(0.18, 0.07, -0.66), 0.12, 0.095, 6, Color(1.0, 0.78, 0.38))
+	var hips := LowPoly.new()
+	hips.prism(Vector3(0, 0.08, 0), Vector3(0, 0.16, 0), 0.6, 0.6, 12, ROPE)
+	hips.prism(Vector3(0.18, 0.12, 0.58), Vector3(0.22, -0.16, 0.6), 0.025, 0.02, 4, ROPE)
+	# The coin purse.
+	hips.prism(Vector3(-0.48, 0.08, 0.26), Vector3(-0.5, -0.16, 0.28), 0.1, 0.13, 7, LEATHER)
+	hips.prism(Vector3(-0.48, 0.08, 0.26), Vector3(-0.48, 0.13, 0.26), 0.06, 0.08, 7, LEATHER.darkened(0.2))
+	return {"head": head.commit(), "chest": chest.commit(), "chest:glow": light.commit(), "hips": hips.commit()}
+
+
 ## Mist Infantry: a rounded sallet with a crest of three mist-glass fins and a glowing eye-slit, a kite
 ## shield on the back with the Great Portal's ring on it, and a pauldron on the shield arm.
 static func _mist_infantry() -> Dictionary:
@@ -398,6 +558,36 @@ static func _mist_ranger() -> Dictionary:
 		chest.prism(Vector3(0.28, 0.5, -0.5) + off, top, 0.018, 0.018, 4, Color(0.8, 0.8, 0.82))
 		glints.box(top + Vector3(0, 0.05, 0), Vector3(0.1, 0.18, 0.02), MIST_GLASS)
 	return {"head": head.commit(), "head:glow": glass.commit(), "chest": chest.commit(), "chest:glow": glints.commit()}
+
+
+## A Lodge hunter of the Valleys (the Trappers' Guild): a moss-green hood with a ruff of pale fur round
+## its edge, a fur mantle over the shoulders, a quiver of grey-fletched arrows, a hunting horn slung on a
+## strap across the chest, and a coil of snare-cord at the belt.
+static func _lodge_hunter() -> Dictionary:
+	const HOOD := Color(0.24, 0.32, 0.15)
+	const FUR := Color(0.78, 0.7, 0.55)
+	var head := LowPoly.new()
+	head.prism(Vector3(0, 0.6, -0.08), Vector3(0, 1.12, -0.12), 0.74, 0.3, 8, HOOD)
+	head.prism(Vector3(0, 1.1, -0.14), Vector3(0, 1.3, -0.4), 0.3, 0.0, 6, HOOD.darkened(0.15))
+	head.prism(Vector3(0, 0.6, 0.02), Vector3(0, 0.72, 0.02), 0.8, 0.76, 10, FUR)
+	var chest := LowPoly.new()
+	# The fur mantle, and the quiver on the back with its arrows.
+	chest.prism(Vector3(0, 0.38, -0.02), Vector3(0, 0.0, -0.1), 0.4, 0.7, 9, FUR.darkened(0.25))
+	chest.prism(Vector3(0.24, -0.42, -0.42), Vector3(0.3, 0.56, -0.5), 0.15, 0.18, 8, DARK_LEATHER)
+	for i in 4:
+		var off := Vector3(0.05 * i, 0.0, 0.03 * (i % 2))
+		var top := Vector3(0.34, 1.02, -0.52) + off
+		chest.prism(Vector3(0.28, 0.5, -0.5) + off, top, 0.018, 0.018, 4, Color(0.8, 0.68, 0.45))
+		chest.box(top + Vector3(0, 0.05, 0), Vector3(0.1, 0.18, 0.02), Color(0.55, 0.55, 0.58))
+	# The horn: a curved cone of pale horn with brass bands, on a strap across the chest.
+	chest.box(Vector3(0, -0.02, 0.36), Vector3(0.1, 0.9, 0.04), LEATHER, Vector3(0, 0, -32))
+	chest.prism(Vector3(-0.3, -0.34, 0.42), Vector3(-0.04, -0.2, 0.46), 0.03, 0.07, 6, Color(0.92, 0.86, 0.7))
+	chest.prism(Vector3(-0.04, -0.2, 0.46), Vector3(0.14, -0.04, 0.44), 0.07, 0.13, 6, Color(0.95, 0.9, 0.76))
+	chest.prism(Vector3(-0.16, -0.28, 0.44), Vector3(-0.13, -0.26, 0.44), 0.06, 0.06, 6, BRASS)
+	var hips := LowPoly.new()
+	hips.prism(Vector3(-0.42, 0.1, 0.0), Vector3(-0.42, 0.26, 0.0), 0.16, 0.16, 8, Color(0.66, 0.56, 0.38))
+	hips.prism(Vector3(-0.42, 0.14, 0.0), Vector3(-0.42, 0.22, 0.0), 0.1, 0.1, 8, Color(0.5, 0.4, 0.26))
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit()}
 
 
 ## Mist Heavy: a closed great helm crowned by two curved mist-glass horns, round pauldrons rimmed with

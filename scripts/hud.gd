@@ -134,6 +134,11 @@ func _input(event: InputEvent) -> void:
 		return
 	if player == null or get_tree().paused or menu_open or not visible:
 		return
+	if event is InputEventKey and (event as InputEventKey).pressed and player.world.last_light and not player.world.last_light.offer.is_empty():
+		var k := (event as InputEventKey).keycode - KEY_1
+		if k >= 0 and k < player.world.last_light.offer.size():
+			player.world.last_light.choose(player.world.last_light.offer[k])
+			return
 	if player.dead:
 		if event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed:
 			var at: Vector2 = (event as InputEventScreenTouch).position
@@ -152,6 +157,10 @@ func _input(event: InputEvent) -> void:
 
 
 func _touch_down(index: int, at: Vector2) -> void:
+	for i in _boon_cards.size():
+		if _boon_cards[i].has_point(at) and player.world.last_light and i < player.world.last_light.offer.size():
+			player.world.last_light.choose(player.world.last_light.offer[i])
+			return
 	var best := ""
 	var best_d := INF
 	for id: String in _buttons:
@@ -372,6 +381,7 @@ func _draw() -> void:
 		for i in 6:
 			var band := r + i * minf(s.x, s.y) * 0.08
 			draw_arc(centre, band + 60.0, 0.0, TAU, 64, Color(dark, 0.16 + i * 0.06), 120.0)
+	_draw_boons(s)
 	var cross := 40.0
 	draw_texture_rect(_crosshair, Rect2(centre - Vector2.ONE * cross * 0.5, Vector2.ONE * cross), false, Color(1, 1, 1, 0.85))
 	if player.hit_marker > 0.0:
@@ -394,6 +404,7 @@ func _draw() -> void:
 	if player.class_id == "adept":
 		_draw_stance(s)
 	_draw_fog(s, centre)
+	_draw_tide_mist(s, centre)
 	if player.frozen_left > 0.0:
 		if player.is_iced:
 			draw_rect(Rect2(Vector2.ZERO, s), Color(0.6, 0.85, 1.0, 0.24))
@@ -484,6 +495,22 @@ func _draw_fog(s: Vector2, centre: Vector2) -> void:
 	_sensor_arrow(centre, (Vector3(fog.centre.x, 0.0, fog.centre.y) - player.global_position).normalized() * 5.0, UiTheme.MOSS)
 
 
+## Wading in the Mist Tide at high water: sea-mist closes in from the edges of sight, half the view at
+## its deepest (MistTide.blind_for).
+func _draw_tide_mist(s: Vector2, centre: Vector2) -> void:
+	var tide := player.world.tide
+	if tide == null or player.dead:
+		return
+	var blind := tide.blind_for(player.global_position)
+	if blind <= 0.0:
+		return
+	var mist := Color(0.42, 0.6, 0.58)
+	draw_rect(Rect2(Vector2.ZERO, s), Color(mist, blind * 0.45))
+	var r := minf(s.x, s.y) * lerpf(0.6, 0.28, blind * 2.0)
+	for i in 6:
+		draw_arc(centre, r + i * minf(s.x, s.y) * 0.09 + 60.0, 0.0, TAU, 64, Color(mist, (0.12 + i * 0.08) * blind * 2.0), 120.0)
+
+
 ## Who else is out there, in a panel under your own: each player's name and level, their health and,
 ## when they are down, how long until they are back. In a fight, the score. If you are down, your own
 ## countdown in the middle.
@@ -572,11 +599,15 @@ func _draw_status(s: Vector2) -> void:
 		xp_f = float(player.xp) / float(player.xp_needed())
 	_bar(Rect2(x, 43, BAR_W, 7), xp_f, UiTheme.EMBER)
 	if has_mana:
-		_bar(Rect2(x, 56, BAR_W, 16), player.mana / maxf(player.max_mana(), 1.0), KI_COLOUR if player.class_def().get("ki", false) else UiTheme.MIST)
+		_bar(Rect2(x, 56, BAR_W, 16), player.mana / maxf(player.max_mana(), 1.0), KI_COLOUR if player.class_def().get("ki", false) else TidecallerKit.TIDE if player.class_id == "tidecaller" else UiTheme.MIST)
 		_text("%d" % int(player.mana), Vector2(x + 9, 70), HUD_SMALL - 2, Color.WHITE)
 	var y := card.end.y + 6.0
 	var cx := _pad - 10.0
-	if Game.is_night() and director:
+	if Game.is_night() and director and player.world.last_light:
+		var ll := player.world.last_light
+		_clock(s, "The lighthouse burns" if ll.lit else "The Isle of Lamps" if ll.arrived else "Isle of Lamps: %d m" % ceili(ll.left()))
+		cx += _chip("%d kills" % player.kills, "skull", UiTheme.BONE, Vector2(cx, y)) + 6.0
+	elif Game.is_night() and director:
 		_clock(s, Game.clock(director.night_left()))
 		cx += _chip("%d kills" % player.kills, "skull", UiTheme.BONE, Vector2(cx, y)) + 6.0
 	elif Game.mode == Game.Mode.SANDBOX:
@@ -586,6 +617,49 @@ func _draw_status(s: Vector2) -> void:
 	elif player.has_mount():
 		_chip("%s %d/%d" % [player.mount_name(), player.horse_progress, player.horses_needed()], player.mount_kind(), UiTheme.EMBER if player.horse_ready() else UiTheme.BONE, Vector2(cx, y))
 	_status_bottom = y + CHIP_H
+
+
+## Last Light: the three boons offered at a waystation, as cards across the middle of the screen,
+## each its icon, name and what it does. A tap on one (or 1, 2, 3) chooses it.
+var _boon_cards: Array[Rect2] = []
+func _draw_boons(s: Vector2) -> void:
+	_boon_cards.clear()
+	var ll := player.world.last_light
+	if ll == null or ll.offer.is_empty():
+		return
+	var w := minf(260.0, (s.x - 80.0) / 3.0)
+	var h := 128.0
+	var gap := 16.0
+	var x0 := s.x * 0.5 - (w * 3.0 + gap * 2.0) * 0.5
+	var y := s.y * 0.5 + 48.0 # below the middle and the crosshair, under the waystation's banner
+	_text("Choose a boon", Vector2(s.x * 0.5 - font.get_string_size("Choose a boon", HORIZONTAL_ALIGNMENT_LEFT, -1, HUD_TOAST).x * 0.5, y - 14.0), HUD_TOAST, UiTheme.EMBER)
+	for i in ll.offer.size():
+		var d: Dictionary = Boons.ALL[ll.offer[i]]
+		var r := Rect2(x0 + i * (w + gap), y, w, h)
+		_boon_cards.append(r)
+		draw_rect(r, Color(0.04, 0.05, 0.08, 0.86))
+		draw_rect(r, Color(UiTheme.EMBER, 0.75), false, 2.0)
+		Icons.draw(self, Rect2(r.position.x + 12, r.position.y + 12, 46, 46), str(d["icon"]), UiTheme.EMBER)
+		_text("%d  %s" % [i + 1, d["name"]], Vector2(r.position.x + 66, r.position.y + 40), HUD_TEXT, UiTheme.BONE)
+		var lines := _wrap(str(d["desc"]), w - 24.0, HUD_SMALL)
+		for k in lines.size():
+			_text(lines[k], Vector2(r.position.x + 12, r.position.y + 80 + k * 20.0), HUD_SMALL, Color(UiTheme.BONE, 0.9))
+
+
+## Words broken into lines no wider than `width`.
+func _wrap(t: String, width: float, fs: int) -> Array[String]:
+	var out: Array[String] = []
+	var line := ""
+	for word in t.split(" "):
+		var next := word if line == "" else line + " " + word
+		if font.get_string_size(next, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > width and line != "":
+			out.append(line)
+			line = word
+		else:
+			line = next
+	if line != "":
+		out.append(line)
+	return out
 
 
 ## A small rounded label sitting on the world: an icon and a few words. Drawn from its left edge (or
@@ -611,7 +685,7 @@ func _draw_chips(s: Vector2) -> void:
 	if Game.is_night() and director:
 		var hunting := player.world.count_hunting()
 		if player.invis_left > 0.0:
-			chips.append(["Invisible", "eye_closed", UiTheme.MIST])
+			chips.append(["Invisible", "invisible", UiTheme.MIST])
 		elif hunting > 0:
 			chips.append(["Hunted", "eye", UiTheme.BLOOD.lightened(0.3)])
 		else:
@@ -631,6 +705,31 @@ func _draw_chips(s: Vector2) -> void:
 	for storm: MistStorm in player.world.mist_storms:
 		if is_instance_valid(storm) and storm.hud_line != "":
 			chips.append([storm.hud_line, "storm", Color(0.85, 0.7, 1.0)])
+	var tide := player.world.tide
+	var ll := player.world.last_light
+	if ll and not ll.lit:
+		# Last Light: the barge's light, and whether the barge is going on.
+		var out := ll.out_for(player)
+		if out > Boons.grace(player):
+			chips.append(["Outside the light: the tide is drowning you!", "tide", UiTheme.BLOOD.lightened(0.3)])
+			draw_rect(Rect2(Vector2.ZERO, s), Color(0.05, 0.25, 0.3, 0.22))
+		elif out > 0.0:
+			chips.append(["Outside the light! Back to the barge", "lantern", UiTheme.BLOOD.lightened(0.45)])
+		else:
+			chips.append(["In the barge's light", "lantern", UiTheme.EMBER])
+		if ll.docked >= 0:
+			chips.append(["The barge waits at the waystation", "anchor", UiTheme.BONE])
+		elif ll.held:
+			chips.append(["Something clings to the barge!", "anchor", UiTheme.BLOOD.lightened(0.3)])
+		elif not ll.moving and not ll.arrived:
+			chips.append(["Walk with the barge to move it", "anchor", UiTheme.BONE])
+	elif tide:
+		var state := tide.status()
+		var when := float(state["turns_in"])
+		var words: String = state["text"]
+		if when >= 0.0:
+			words += ", turns in %d:%02d" % [int(when) / 60, int(when) % 60]
+		chips.append([words, "tide", Color(0.55, 1.0, 0.82) if state["high"] else UiTheme.BONE])
 	_centre_y = 64.0
 	if chips.is_empty():
 		return
@@ -662,7 +761,7 @@ func _draw_powers(top: float) -> void:
 		var left: float = player.powers[id]
 		Icons.draw(self, Rect2(x, y, 46, 46), Icons.power(id), d["color"])
 		var fs := HUD_SMALL
-		var t := "%d" % ceil(left)
+		var t := "%d" % ceil(left) if left < 900.0 else "" # a relic is worn until you fall
 		var w := font.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		_text(t, Vector2(x + 23 - w * 0.5, y + 60), fs, UiTheme.BONE)
 		x += 52.0
@@ -871,7 +970,7 @@ func _draw_readiness(centre: Vector2) -> void:
 	var y := 34.0
 	var rows := 0
 	for r: Dictionary in _readiness():
-		if r["button"] == "art" or rows >= READY_ROWS:
+		if r["button"] in ["art", "path_art"] or rows >= READY_ROWS:
 			continue
 		var col: Color = r["color"]
 		var lit: bool = r["primed"] or r["active"]
@@ -900,7 +999,7 @@ func _draw_readiness(centre: Vector2) -> void:
 		draw_arc(centre, 24.0, 0.0, TAU, 40, Color(primed["color"], pulse * 0.6), 2.5, true)
 
 
-## The first thing primed on a button ("fire" or "art"), or {}.
+## The first thing primed on a button ("fire", "art" or "path_art"), or {}.
 func _primed_on(button: String) -> Dictionary:
 	for r: Dictionary in _readiness():
 		if r["button"] == button and r["primed"]:
@@ -912,8 +1011,8 @@ func _primed_on(button: String) -> Dictionary:
 ## on a badge at the corner. A counter on the art button counts its uses above it.
 func _draw_button_readiness(id: String, pos: Vector2, r: float) -> void:
 	var pulse := 0.6 + sin(Time.get_ticks_msec() * 0.01) * 0.4
-	if id == "art":
-		var counted: Array = _readiness().filter(func(e: Dictionary) -> bool: return e["button"] == "art" and int(e["need"]) > 0)
+	if id == "art" or id == "path_art":
+		var counted: Array = _readiness().filter(func(e: Dictionary) -> bool: return e["button"] == id and int(e["need"]) > 0)
 		if not counted.is_empty():
 			var e: Dictionary = counted[0]
 			var need: int = e["need"]
@@ -953,6 +1052,9 @@ func _draw_weapon(s: Vector2) -> void:
 	elif player.class_def().get("ki", false):
 		extra = "%d Ki" % int(player.mana)
 		extra_col = KI_COLOUR
+	elif player.class_id == "tidecaller":
+		extra = "%d tide" % int(player.mana)
+		extra_col = TidecallerKit.TIDE
 	elif WeaponDefs.own_ammo(player.weapon_id()) > 0:
 		var throws := player.ammo_of(player.weapon_id())
 		extra = "%d throws" % throws
@@ -976,6 +1078,8 @@ func _draw_weapon(s: Vector2) -> void:
 
 
 var _path_art_useful := true
+var _haul_ready := true # a Harpooner has something in reach to Haul (looked at a few times a second)
+var _haul_looked := 0.0
 
 
 func _draw_controls() -> void:
@@ -990,6 +1094,9 @@ func _draw_controls() -> void:
 		draw_arc(hint, JOY_R, 0.0, TAU, 40, Color(1, 1, 1, 0.2), 3.0)
 		draw_circle(hint, 36.0, Color(1, 1, 1, 0.12))
 	_path_art_useful = player.has_path_art() and player.path_art_has_use()
+	if player.class_id == "harpooner" and Time.get_ticks_msec() * 0.001 - _haul_looked > 0.15:
+		_haul_looked = Time.get_ticks_msec() * 0.001
+		_haul_ready = HarpoonerKit.haul_target(player) != null
 	for id: String in _buttons:
 		if not _button_visible(id) or (player.dead and id != "pause" and id != "tree"):
 			continue
@@ -1010,6 +1117,10 @@ func _draw_controls() -> void:
 				tint = UiTheme.MIST if player.path_art_cd_left <= 0.0 and _path_art_useful else Color(0.6, 0.6, 0.6)
 			"art":
 				tint = UiTheme.MIST if player.art_cd_left <= 0.0 and player.mana >= player.art_cost() else Color(0.6, 0.6, 0.6)
+				if player.class_id == "harpooner" and not _haul_ready:
+					tint = Color(0.6, 0.6, 0.6)
+				if player.class_id == "ferryman" and not FerrymanKit.has_use(player):
+					tint = Color(0.6, 0.6, 0.6)
 				if player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
 					# Planted here, the beacon would link to none of the others.
 					tint = UNLINKED if player.art_cd_left <= 0.0 else UNLINKED.darkened(0.35)
@@ -1029,7 +1140,7 @@ func _draw_controls() -> void:
 		var inset := r * 0.42
 		draw_texture_rect(Icons.glyph(glyph), rect.grow(-inset), false, Color.WHITE)
 		draw_texture_rect(_ring, rect, false, Color(1, 1, 1, 0.6) if not held else UiTheme.EMBER)
-		if id == "fire" or id == "art":
+		if id == "fire" or id == "art" or id == "path_art":
 			_draw_button_readiness(id, pos, r)
 		if id == "drop" and held and _drop_held >= 0.0:
 			draw_arc(pos, r - 4.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(_drop_held / DROP_HOLD, 0.0, 1.0), 32, UiTheme.EMBER, 7.0)
@@ -1039,6 +1150,18 @@ func _draw_controls() -> void:
 			_chip(player.nearby_weapon.display_name(), "grab", UiTheme.BONE, pos + Vector2(0, -r - 18 - CHIP_H), true)
 		if id == "art" and player.class_id == "cartographer" and CartographerKit.would_stand_alone(player):
 			_centered("Too far to link", pos + Vector2(0, -r - 14), HUD_SMALL, UNLINKED.lightened(0.3))
+		elif id == "art" and player.class_id == "ferryman" and player.spec_id in ["tollkeeper", "psychopomp"]:
+			# What the Tollkeeper holds and what the Psychopomp has gathered, over the button.
+			var gathered := player.obols if player.spec_id == "tollkeeper" else player.souls
+			var most := FerrymanKit.obols_max(player) if player.spec_id == "tollkeeper" else FerrymanKit.souls_max(player)
+			var word := "obol" if player.spec_id == "tollkeeper" else "soul"
+			_centered("%d/%d %ss" % [gathered, most, word], pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE if gathered > 0 else UiTheme.ASH)
+		elif id == "art" and player.class_id == "harpooner":
+			# Haul: a ring of the class's colour when something is in reach, and when not, says so.
+			if _haul_ready and player.art_cd_left <= 0.0:
+				var pulse := 0.55 + sin(Time.get_ticks_msec() * 0.009) * 0.35
+				draw_arc(pos, r + 5.0, 0.0, TAU, 40, Color(UiTheme.EMBER, pulse), 4.0)
+			_centered("Haul" if _haul_ready or player.art_cd_left > 0.0 else "Nothing in reach", pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE if _haul_ready or player.art_cd_left > 0.0 else UiTheme.ASH)
 		elif id == "art" and player.art_label() != "":
 			_centered(player.art_label(), pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE)
 		if id == "path_art":
@@ -1052,14 +1175,14 @@ func _draw_controls() -> void:
 				word = "No one in reach"
 			_centered(word, pos + Vector2(0, -r - 14), HUD_SMALL, UiTheme.BONE if _path_art_useful or not ready else UiTheme.ASH)
 			if not ready:
-				var total := maxf(float(player.path_art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
+				var total := maxf(float(player.path_art_def().get("cd", 1.0)) * player.path_cd_scale(), 0.1)
 				draw_arc(pos, r - 5.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(player.path_art_cd_left / total, 0.0, 1.0), 28, Color(0, 0, 0, 0.7), 9.0)
 				_centered("%d" % ceili(player.path_art_cd_left), pos, HUD_TOAST - 2, Color.WHITE)
 		if id == "burst" or id == "art":
 			var left: float = player.burst_cd_left if id == "burst" else player.art_cd_left
 			if id == "art" and player.spirit_left > 0.0:
 				left = 0.0
-			var total: float = player.m("burst_cd") if id == "burst" else maxf(float(player.art_def().get("cd", 1.0)) * player.m("art_cd"), 0.1)
+			var total: float = player.m("burst_cd") if id == "burst" else maxf(float(player.art_def().get("cd", 1.0)) * player.art_cd_scale(), 0.1)
 			if left > 0.0:
 				draw_arc(pos, r - 5.0, -PI * 0.5, -PI * 0.5 + TAU * clampf(left / total, 0.0, 1.0), 28, Color(0, 0, 0, 0.7), 9.0)
 				_centered("%d" % ceili(left), pos, HUD_TOAST - 2, Color.WHITE)

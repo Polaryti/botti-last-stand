@@ -9,6 +9,12 @@ var astar := AStarGrid2D.new()
 var crops: PackedByteArray
 var _far := AStarGrid2D.new() # 4 m cells, for planning long journeys cheaply
 
+## Plan every way in full on the fine grid. On the coastal maps a sea wall or a breakwater is a line
+## one cell thick between two levels, which the coarse grid cannot see: it would send walkers straight
+## at the wall and never round by the stairs.
+var fine_only := false
+var closed_steep := 0 # cells block_steep shut
+
 const FAR_CELL := 4
 const LONG_TRIP := 44.0
 const LEG := 32.0
@@ -54,6 +60,35 @@ func block_turned(t: Transform3D, box: Vector3) -> void:
 			var local := inv * (to_world(Vector2i(x, y)) - Vector3(t.origin.x, 0.0, t.origin.z))
 			if absf(local.x) < half_x and absf(local.z) < half_z:
 				astar.set_point_solid(Vector2i(x, y), true)
+
+
+## Ground too steep to walk up (rising more than `rise` metres a metre between neighbouring points of
+## the land): closed, so nothing plans a way up a sea wall's slope or a breakwater's tumbled side it
+## could never climb, and goes round by the stairs instead. On the coastal maps (Port Vael, the
+## Lantern Road), where the sea meets stone.
+func block_steep(t: Terrain, rise: float) -> int:
+	var n := t.vertices_per_side
+	var limit := rise * Terrain.CELL
+	var closed := 0
+	for j in n - 1:
+		for i in n - 1:
+			var a := t.walk[j * n + i]
+			var b := t.walk[j * n + i + 1]
+			var c := t.walk[(j + 1) * n + i]
+			var d := t.walk[(j + 1) * n + i + 1]
+			if maxf(maxf(absf(a - b), absf(c - d)), maxf(absf(a - c), absf(b - d))) <= limit:
+				continue
+			var x0 := i * Terrain.CELL - t.half_extent
+			var z0 := j * Terrain.CELL - t.half_extent
+			var lo := to_cell(Vector3(x0 + 0.05, 0, z0 + 0.05))
+			var hi := to_cell(Vector3(x0 + Terrain.CELL - 0.05, 0, z0 + Terrain.CELL - 0.05))
+			for y in range(lo.y, hi.y + 1):
+				for x in range(lo.x, hi.x + 1):
+					if not astar.is_point_solid(Vector2i(x, y)):
+						astar.set_point_solid(Vector2i(x, y), true)
+						closed += 1
+	closed_steep += closed
+	return closed
 
 
 ## A gate opening or closing.
@@ -143,7 +178,7 @@ func build_far_grid() -> void:
 ## The way to somewhere. Far away, this only plans the next stretch: the walker asks again when it
 ## gets there. A full path across this map costs as much as the rest of the frame put together.
 func route(from: Vector3, to: Vector3) -> PackedVector3Array:
-	if Vector2(from.x - to.x, from.z - to.z).length() <= LONG_TRIP:
+	if fine_only or Vector2(from.x - to.x, from.z - to.z).length() <= LONG_TRIP:
 		return path(from, to)
 	var a := _far_nearest(from)
 	var b := _far_nearest(to)

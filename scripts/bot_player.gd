@@ -679,6 +679,81 @@ func _bandit_skills(p: Player, has_target: bool, dist: float) -> void:
 		p.use_art()
 
 
+## A Harpooner bot: Haul what it is fighting when it is out of reach (or itself to something big), and
+## its path's ability on the second button.
+func _harpooner_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "":
+		return
+	var low := p.hp < p.max_hp() * 0.4
+	var near := _enemies_within(4.5)
+	if p.has_path_art() and p.path_art_cd_left <= 0.0:
+		match p.spec_id:
+			"reaver":
+				if near >= 2 or (low and near > 0) or (has_target and dist < 3.0):
+					p.use_path_art()
+					return
+			"rigger":
+				if has_target and dist > 5.0 and dist < HarpoonerKit.RIG_REACH:
+					_face(_target_point(), false)
+					p.use_path_art()
+					return
+			"leviathan_hunter":
+				if has_target and dist < HarpoonerKit.GREAT_RANGE * 0.7:
+					_face(_target_point(), false)
+					p.use_path_art()
+					return
+	if p.art_cd_left <= 0.0 and has_target and dist > 4.0 and dist < HarpoonerKit.HAUL_RANGE + p.m("haul_range") - 1.0:
+		_face(_target_point(), false)
+		if HarpoonerKit.haul_target(p) != null:
+			p.use_art()
+
+
+## A Tidecaller bot: a wave at what it fights when it is a few steps off; a Tidewarden raises its
+## shell when the fight comes to it; a Stormcaller throws its spear at what it fights, sooner when
+## the enemies near it are soaked; a Deepcaller calls its serpent when there is none and enemies close in.
+func _tidecaller_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "" or p.art_cd_left > 0.0 or p.mana < p.art_cost():
+		return
+	match p.spec_id:
+		"tidewarden":
+			if p.shell_left <= 0.0 and (_enemies_within(4.0) >= 2 or (p.hp < p.max_hp() * 0.6 and _enemies_within(6.0) > 0)):
+				p.use_art()
+		"stormcaller":
+			if has_target and dist < TidecallerKit.SPEAR_RANGE + p.m("spear_range") - 1.0:
+				var soaked := world.zombies_near(p.global_position, 12.0, 12).filter(func(z: Zombie) -> bool: return z.soaked_left > 0.0).size()
+				if soaked >= 2 or dist > 5.0 or p.hp < p.max_hp() * 0.5:
+					_face(_target_point(), false)
+					p.use_art()
+		"deepcaller":
+			if TidecallerKit.serpent_of(p) == null and _enemies_within(TidecallerKit.SERPENT_TAUNT + 4.0) > 0:
+				_face(_target_point(), false)
+				p.use_art()
+		_:
+			if has_target and dist > 2.5 and dist < TidecallerKit.WAVE_RANGE * 0.8:
+				_face(_target_point(), false)
+				p.use_art()
+
+
+## A Ferryman bot: crosses to close on what it fights (or away when hurt), demands the toll of a
+## crowd in front, and sends its souls once it has gathered a few.
+func _ferryman_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "" or p.art_cd_left > 0.0 or p.is_crossing():
+		return
+	match p.spec_id:
+		"tollkeeper":
+			if _enemies_within(FerrymanKit.TOLL_REACH) >= 2:
+				if has_target:
+					_face(_target_point(), false)
+				p.use_art()
+		"psychopomp":
+			if p.souls >= 3 and has_target and dist < 14.0:
+				p.use_art()
+		_:
+			if has_target and dist > 4.0 and dist < FerrymanKit.cross_reach(p) + 2.0:
+				_face(_target_point(), false)
+				p.use_art()
+
+
 ## The same buttons a person has, pressed when they would help.
 func _use_skills() -> void:
 	var p := pawn
@@ -694,6 +769,15 @@ func _use_skills() -> void:
 		return
 	if p.class_id == "bandit":
 		_bandit_skills(p, has_target, dist)
+		return
+	if p.class_id == "harpooner":
+		_harpooner_skills(p, has_target, dist)
+		return
+	if p.class_id == "tidecaller":
+		_tidecaller_skills(p, has_target, dist)
+		return
+	if p.class_id == "ferryman":
+		_ferryman_skills(p, has_target, dist)
 		return
 	if not p.has_art() or p.art_cd_left > 0.0 or p._cast_kind != "" or p.aiming_art:
 		return

@@ -23,7 +23,7 @@ const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
 ## What each land sounds like when the dead sense the dawn. The Village and the Fort keep the wolf.
-const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion"}
+const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael"}
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0
@@ -36,6 +36,39 @@ const MAX_RIDERS := 2
 const FIRST_WYVERN := 300.0
 const WYVERN_EVERY := 95.0
 const MAX_WYVERNS := 1
+# Port Vael (_tick_vael)
+const HOUND_PACK_EVERY := 80.0
+const MAX_HOUNDS := 6
+const JELLIES_EVERY := 30.0 # while the tide is high
+const JELLIES_AT_ONCE := 2
+const MAX_JELLIES := 6
+const MAX_ANGLERS := 3
+# Port Vael, the drowned court (_tick_court): Sirens at the water's edge and Press Gangs through the
+# night, and three who come once each, at their hour: the Harbourmaster up the quay stairs, the
+# Kraken's four arms out of the flooded flats at the high tide after it, the Lighthouse Keeper down the
+# East Mole. The Hollow Sovereign rises from the flats around 8:30 (_tick_mist_boss), and the night
+# ends only when he falls (in Teams too, where his crown is a prize for either side). In All vs All
+# there is no court: the Sunken Crown washes up at the Drowned Bell instead.
+const SIREN_EVERY := 60.0
+const MAX_SIRENS := 2
+const PRESS_EVERY := 95.0
+const MAX_PRESS := 6
+const HARBOURMASTER_AT := 180.0
+const KRAKEN_AT := 280.0 # the high tide after 4:30
+const KEEPER_AT := 360.0
+const QUAY_STAIRS := [Vector3(-30, 0, 10), Vector3(30, 0, 10)] # the foot of each, on the flats
+const KEEPER_FROM := Vector3(84, 2.0, 62) # on the East Mole, under the lighthouse
+const SOVEREIGN_FROM := Vector3(0, 0, 44) # the middle of the flats
+# The end of it all: once the Hollow Sovereign and the Leviathan have both fallen, the harbour goes
+# still, and after a little while the Kraken rises in front of the quay, under the Tide King's gaze.
+# Dawn will not come until it sinks.
+const KRAKEN := "kraken"
+const KRAKEN_AFTER := 14.0 # seconds of stillness before it rises
+const KRAKEN_FROM := Vector3(0, 0, 24)
+const KRAKEN_HOLDS_TIDE := 900.0 # it holds the tide in while it lives
+const CROWN_AT := 120.0 # All vs All: when the Sunken Crown washes up at the Drowned Bell
+const CROWN_SPOT := Vector3(8, 0, 34)
+const VAEL_BOSS := "hollow_sovereign"
 const MESENLLA_BOSS := "great_revenant_elemental"
 const BASTION_BOSS := "war_wyvern"
 
@@ -73,8 +106,16 @@ var _cache_due := {} # cache spot index -> when it may be filled again
 var _cache_look := 0.0
 var _mist_boss_at := 510.0
 var _mist_boss_spawned := false
+var _coastal_leviathan := false
+var _kraken_at := -1.0
+var _kraken_risen := false
+var _kraken_fallen := false
 var _mist_boss_defeated := false
 var _next_wyvern := FIRST_WYVERN
+var _next_siren := 150.0
+var _next_press := 200.0
+var _court_came := {} # which of the court has come tonight
+var _crown_washed := false
 
 
 func _init(owner_world: World) -> void:
@@ -125,7 +166,9 @@ func begin(with_zombies: bool) -> void:
 ## until then. Whatever else the night holds (a boss, a barrage) is not given away here.
 func opening_line() -> String:
 	var opening := "Survive until the dawn"
-	if world.map_id == "bastion":
+	if world.last_light:
+		opening = "Walk with the Lantern Barge to the Isle of Lamps"
+	elif world.map_id == "bastion":
 		opening = "Defend the Great Portal until the dawn"
 	elif world.fort:
 		opening = "Defend the fort until the dawn"
@@ -142,6 +185,9 @@ const BOSS_CARDS := {
 	"veil_regent": {"name": "Veil Regent", "line": "wakes on its throne in the Mists", "color": Color(0.78, 0.62, 1.0), "glow": Color(0.36, 0.16, 0.62), "bells": "boss_bells_regent", "strikes": [0.0, 0.7, 1.4, 2.2, 2.6]},
 	MESENLLA_BOSS: {"name": "Great Revenant Elemental", "line": "rises at the Ring of Stones", "color": Color(0.45, 0.95, 0.88), "glow": Color(0.15, 0.55, 0.62), "bells": "boss_bells_revenant", "strikes": [0.0, 0.55, 1.1, 1.75]},
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
+	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "the drowned harbour belongs to the deep", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
+	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
+	KRAKEN: {"name": "The Kraken", "line": "the last of Vael rises from the deep", "color": Color(0.45, 1.0, 0.8), "glow": Color(0.32, 0.06, 0.2), "bells": "boss_bells_kraken", "strikes": [0.0, 0.32, 1.2, 1.86, 2.3, 3.3]},
 }
 const BOSS_CARD_TIME := 7.0 # long enough to read what it says
 var boss_card := "" # the boss whose card shows, while boss_card_time lasts
@@ -206,6 +252,8 @@ func _tick_caches() -> void:
 			continue
 		if elapsed < float(_cache_due.get(i, 0.0)) or world.storm_at(at) != null:
 			continue
+		if world.vael_sites and not world.vael_sites.can_stock(at, false, VaelSites.CACHE_CLEARANCE, true):
+			continue
 		_cache_due[i] = elapsed + CACHE_REFILL
 		if randf() < 0.65:
 			var id := WeaponDefs.pick_rare(world.spawn_map())
@@ -222,7 +270,7 @@ func local_banner(text: String, seconds: float) -> void:
 
 ## How long this match runs. In All vs All the clock counts down to the fog closing, not to dawn.
 func match_length() -> float:
-	return ClosingFog.TOTAL if Net.fog_rules() else Game.NIGHT_LENGTH
+	return ClosingFog.TOTAL if Net.fog_rules() else Game.night_length()
 
 
 func night_left() -> float:
@@ -233,6 +281,9 @@ func night_left() -> float:
 func dawn_amount() -> float:
 	if not running or Net.fog_rules():
 		return 0.0
+	if world.last_light:
+		# No clock on the Lantern Road: the sky pales a little as the Isle of Lamps comes near.
+		return 1.0 if world.last_light.lit else clampf(world.last_light.progress / world.last_light.length, 0.0, 1.0) * 0.3
 	var dawn := clampf(1.0 - night_left() / DAWN_GLOW, 0.0, 1.0)
 	return minf(dawn, 0.45) if requires_regent() and not _mist_boss_defeated else dawn
 
@@ -248,9 +299,9 @@ func target_population() -> int:
 		cap = int(round(cap * BASTION_CROWD))
 	var start := mini(12 if mists or bastion else 6, cap)
 	# A slow start while the player finds a weapon, then the crowd builds.
-	var t := pow(clampf(elapsed / (Game.NIGHT_LENGTH * 0.75), 0.0, 1.0), 1.3)
+	var t := pow(clampf(elapsed / (match_length() * 0.75), 0.0, 1.0), 1.3)
 	var crowd := lerpf(start, cap, t) * (1.0 + 0.35 * (world.players.size() - 1))
-	if elapsed >= LAST_STAND:
+	if elapsed >= match_length() - 120.0:
 		crowd *= 1.3
 	if Net.fog_rules():
 		crowd *= 0.6 # enough to keep you busy, but the others are the danger here
@@ -328,7 +379,8 @@ func _process(delta: float) -> void:
 		_far_timer = 4.0
 		if world.fort == null:
 			_clear_far_zombies()
-	if elapsed >= Game.NIGHT_LENGTH and not Net.fog_rules() and (not requires_regent() or _mist_boss_defeated):
+	var dawned := world.last_light.lit if world.last_light else elapsed >= match_length() and not Net.fog_rules() and (not requires_regent() or (_mist_boss_defeated and (world.map_id != "vael" or _kraken_fallen)))
+	if dawned:
 		_won = true
 		_sound("rooster", 0.0)
 		if Net.is_host():
@@ -376,10 +428,10 @@ func _spawn_familiar() -> void:
 
 ## The last two minutes: the sky starts to change, and everything still standing wants you dead.
 func _tick_last_stand(delta: float) -> void:
-	if Net.fog_rules():
-		return
+	if Net.fog_rules() or world.last_light:
+		return # (no dawn to sense on the Lantern Road, only the lighthouse)
 	if not _last_stand:
-		if elapsed >= LAST_STAND:
+		if elapsed >= match_length() - 120.0:
 			_last_stand = true
 			_call_timer = 2.0
 			show_banner("They sense the dawn...", 4.0)
@@ -397,6 +449,11 @@ func minute() -> int:
 
 func _pick_roamer() -> String:
 	var kind := ZombieDefs.pick_roamer(elapsed, world.spawn_map())
+	# Coastal flyers share three ranged slots, leaving room for the drowned on phones.
+	if kind in VaelSkyMind.KINDS:
+		var flyers := 0
+		for id: String in VaelSkyMind.KINDS: flyers += world.count_type(id)
+		if flyers >= 3: return "drowned_sailor"
 	# Leave two pooled bodies available for the Regent's second phase.
 	return "rift_stalker" if kind == "lantern_wisp" and world.count_type(kind) >= 3 else kind
 
@@ -404,6 +461,9 @@ func _pick_roamer() -> String:
 func _tick_mist_boss() -> void:
 	if not _follows_host and not sandbox and world.map_id in SpawnRules.MESENLLA and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		_raise_mesenlla_boss()
+		return
+	if not _follows_host and not sandbox and world.map_id == "vael" and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
+		_raise_sovereign()
 		return
 	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		var throne := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3.ZERO)))
@@ -438,9 +498,26 @@ func _raise_mesenlla_boss() -> void:
 		_sound("revenant_roar", 2.0)
 
 
-## A boss has fallen: the Veil Regent, the Great Revenant Elemental or the War Wyvern. Dawn can come now.
+## The Hollow Sovereign rises out of the middle of the flats, the tide pouring off him.
+func _raise_sovereign() -> void:
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(SOVEREIGN_FROM)))
+	spot.y = world.ground_at(spot)
+	if world.spawn_zombie(VAEL_BOSS, spot):
+		_mist_boss_spawned = true
+		world.fx_water(spot, 3.0, Color(0.72, 0.9, 0.92), true)
+		CommandField.visual_impact(world, spot, 10.0, true)
+		if Net.is_host(): Net.command_impact_visual(spot, 10.0, true)
+		_sound("sovereign_voice", 4.0)
+
+
+## A boss has fallen: the Veil Regent, the Great Revenant Elemental, the War Wyvern or the Hollow
+## Sovereign. Dawn can come now.
 func boss_fallen(_z: Zombie) -> void:
-	_mist_boss_defeated = true
+	if _z.type_id == KRAKEN:
+		_kraken_fallen = true
+		show_banner("The Kraken sinks. The deep is still, and Vael is free.", 6.0)
+	elif _z.type_id != "leviathan":
+		_mist_boss_defeated = true
 
 
 ## What only happens beyond the Mists.
@@ -465,12 +542,136 @@ func _tick_mesenlla() -> void:
 			show_banner("A wyvern over the valley!", 3.0)
 
 
+## Port Vael: Brine Hounds come up out of the sea in packs; the high tide carries Lantern Jellies in
+## over the flats; and Anglers lie buried on the shore with their lures showing.
+func _tick_vael() -> void:
+	if elapsed >= _next_rider and elapsed >= ZombieDefs.ALL["brine_hound"]["from"]:
+		_next_rider = elapsed + HOUND_PACK_EVERY
+		if world.count_type("brine_hound") <= MAX_HOUNDS - int(ZombieDefs.ALL["brine_hound"]["pack"]):
+			var pack := int(ZombieDefs.ALL["brine_hound"]["pack"])
+			var came := world.vael_sites.spawn_pack("brine_hound", pack, VaelSites.Shore.WATERLINE) if world.vael_sites else _lantern_pack("brine_hound", pack, 26.0, 40.0)
+			if came > 0:
+				_sound("hound_snarl", 0.0)
+				show_banner("Hounds out of the sea...", 3.0)
+	if elapsed >= _next_wyvern and world.tide and world.tide.high() and elapsed >= ZombieDefs.ALL["lantern_jelly"]["from"]:
+		_next_wyvern = elapsed + JELLIES_EVERY
+		for i in JELLIES_AT_ONCE:
+			if world.count_type("lantern_jelly") >= MAX_JELLIES:
+				break
+			world.spawn_on_tide("lantern_jelly")
+	if elapsed >= _next_ambush and elapsed >= ZombieDefs.ALL["angler"]["from"]:
+		_next_ambush = elapsed + AMBUSH_EVERY
+		if world.count_type("angler") < MAX_ANGLERS:
+			world.spawn_angler()
+	_tick_court()
+	if world.map_id == "vael" and not Net.fog_rules() and elapsed >= 690.0 and not _coastal_leviathan:
+		var at := world.vael_sites.enemy_site(20.0, 65.0, VaelSites.Shore.WATERLINE)
+		if at == Vector3.INF: at = world.vael_sites.enemy_site(15.0, 190.0, VaelSites.Shore.WATERLINE)
+		if at != Vector3.INF and world.spawn_zombie("leviathan", at):
+			_coastal_leviathan = true
+			show_banner("The Leviathan rises from the drowned harbour", 5.0)
+	_tick_kraken()
+
+
+## The end of Port Vael's night: the Kraken, once both its royals have fallen.
+func _tick_kraken() -> void:
+	if world.map_id != "vael" or Net.fog_rules() or _follows_host or _kraken_risen:
+		return
+	if _kraken_at < 0.0:
+		if _mist_boss_defeated and _coastal_leviathan and world.count_type("leviathan") == 0:
+			_kraken_at = elapsed + KRAKEN_AFTER
+			show_banner("The harbour goes still. Something vast is moving under it...", 5.0)
+			_sound("kraken_whirlpool", 2.0)
+		return
+	if elapsed >= _kraken_at:
+		_raise_kraken()
+
+
+func _raise_kraken() -> void:
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(KRAKEN_FROM)))
+	spot.y = world.ground_at(spot)
+	if not world.spawn_zombie(KRAKEN, spot):
+		_kraken_at = elapsed + 2.0 # nowhere to rise just now: a moment later
+		return
+	_kraken_risen = true
+	if world.tide:
+		world.tide.surge(KRAKEN_HOLDS_TIDE)
+	world.fx_water(spot + Vector3.UP, 8.0, Color(0.72, 0.9, 0.92), true)
+	world.fx_ring(spot, 14.0, Color(0.55, 0.95, 0.9))
+
+
+
+## The drowned court of Port Vael (see SIREN_EVERY and what follows it).
+func _tick_court() -> void:
+	if elapsed >= _next_siren and elapsed >= ZombieDefs.ALL["siren"]["from"]:
+		_next_siren = elapsed + SIREN_EVERY
+		if world.count_type("siren") < MAX_SIRENS and world.spawn_siren():
+			_sound("siren_hum", 0.0)
+	if elapsed >= _next_press and elapsed >= ZombieDefs.ALL["press_gang"]["from"]:
+		_next_press = elapsed + PRESS_EVERY
+		var gang := int(ZombieDefs.ALL["press_gang"]["pack"])
+		if world.count_type("press_gang") <= MAX_PRESS - gang:
+			var came := world.vael_sites.spawn_pack("press_gang", gang, VaelSites.Shore.DRY) if world.vael_sites else _lantern_pack("press_gang", gang, 24.0, 38.0)
+			if came > 0:
+				_sound("press_shout", 2.0)
+				show_banner("A Press Gang is looking for hands...", 3.0)
+	if world.map_id != "vael":
+		return # on the Lantern Road the court waits at the waystations instead (LastLight)
+	if Net.fog_rules():
+		# All vs All: no court, but the Sunken Crown washes up for whoever can take it and keep it.
+		if not _crown_washed and elapsed >= CROWN_AT and world.map_id == "vael":
+			_crown_washed = true
+			world.spawn_pickup_at(CROWN_SPOT, Pickup.Kind.POWER, PowerDefs.CROWN)
+			world.fx_water(CROWN_SPOT, 2.0, Color(0.95, 0.82, 0.4), true)
+			show_banner("The Sunken Crown has washed up at the Drowned Bell", 4.0)
+			_sound("crown_toll", 4.0)
+		return
+	if not _court_came.has("harbourmaster") and elapsed >= HARBOURMASTER_AT:
+		var stairs: Vector3 = QUAY_STAIRS[0] if world.random_player_position().x < 0.0 else QUAY_STAIRS[1]
+		if _summon("harbourmaster", stairs, "harbour_bell"):
+			show_banner("The Harbourmaster climbs the quay stairs: \u201c%s\u201d" % ZombieDefs.ALL["harbourmaster"]["first_words"], 4.5)
+	if not _court_came.has("kraken_arm") and elapsed >= KRAKEN_AT and world.tide and world.tide.high() and world.tide.level > MistTide.HIGH_Y - 0.3:
+		_court_came["kraken_arm"] = true
+		if world.raise_kraken() > 0:
+			show_banner("The Kraken wakes. Its arms close around the harbour.", 4.0)
+	if not _court_came.has("lighthouse_keeper") and elapsed >= KEEPER_AT:
+		if _summon("lighthouse_keeper", KEEPER_FROM, "keeper_laugh"):
+			show_banner("The Mad Lighthouse Keeper comes down the East Mole: \u201c%s\u201d" % ZombieDefs.ALL["lighthouse_keeper"]["first_words"], 4.5)
+
+
+## The Lantern Road shares these encounters. Check each pack member in its own cell there as well.
+func _lantern_pack(id: String, count: int, near: float, far: float) -> int:
+	var at := world.spawn_point_near(world.random_player_position(), near, far)
+	if at == Vector3.INF:
+		return 0
+	var came := 1 if world.spawn_zombie(id, at) else 0
+	for i in count - 1:
+		var next := world.spawn_point_near(at, 1.6, 3.0)
+		if next != Vector3.INF and world.spawn_zombie(id, next):
+			came += 1
+	return came
+
+
+## One of the court, come at its hour where it comes from; once, whether or not it could.
+func _summon(id: String, near: Vector3, sound: String) -> bool:
+	_court_came[id] = true
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(near)))
+	spot.y = world.ground_at(spot)
+	if not world.spawn_zombie(id, spot):
+		return false
+	_sound(sound, 4.0)
+	return true
+
+
 func _tick_specials() -> void:
 	_tick_mist_boss()
 	if world.garrison:
 		world.garrison.tick(elapsed)
 	if world.map_id in SpawnRules.MESENLLA:
 		_tick_mesenlla()
+		return
+	if world.map_id in SpawnRules.VAEL:
+		_tick_vael()
 		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
 		_next_rider = elapsed + RIDER_EVERY
@@ -553,4 +754,4 @@ func _spawn_roamer() -> void:
 
 ## The Mists end only when the Veil Regent falls, and Mesenlla only when the Great Revenant Elemental does.
 func requires_regent() -> bool:
-	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA) and not sandbox and not Net.fog_rules()
+	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA or world.map_id == "vael") and not sandbox and not Net.fog_rules()

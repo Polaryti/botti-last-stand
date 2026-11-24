@@ -2,6 +2,7 @@
 class_name MapSpot
 extends MapPiece
 ## A place on the map that nobody sees in the game, but that the game uses.
+## vael_spawn: a harbour approach where Port Vael may raise enemies.
 ## loot: where items can appear. cache: where ruins keep one of the rarer finds, filled again a while
 ## after it is taken. poi: where zombies wander to. crop: where a Scarecrow can rise, in a field.
 ## wood and yard_wood: where wood appears in the fort. start: where players begin, in order.
@@ -12,8 +13,15 @@ extends MapPiece
 ## lane is where the enemies sent against that gate come up from, lane_way a point of the road they
 ## keep to on the way up (as many as the road has bends, in any order), muster where its Mist Soldiers
 ## step out of the mist, and post where they wait before the gate.
+## barge: a point of the Lantern Barge's course on the Lantern Road (Last Light), numbered in order by
+## gate.
+## The Trappers' Guild of the Valleys (TrappersGuild): snare, the middle of a line of snares running
+## along the spot's X, with gate snares in it; hunter, where a Lodge hunter stands guard (gate 2: where
+## the towers' hunters fall back to when the camp is lost; gate 4: the fallback camp's own); trap_cache,
+## where the hunters leave a cache (gate 0 by the camp's fire, gate 1 once the camp is lost);
+## guild_camp, the fallback camp's fire.
 
-@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way") var kind := "loot":
+@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way", "barge", "snare", "hunter", "trap_cache", "guild_camp", "vael_spawn") var kind := "loot":
 	set(v):
 		kind = v
 		refresh()
@@ -33,6 +41,9 @@ func build(b: MapBuilder) -> void:
 	var at := b.xf.origin
 	match kind:
 		"loot": b.w.loot_spots.append(at)
+		"vael_spawn":
+			if not b.is_preview:
+				b.w.vael_approaches.append(at)
 		"cache": b.w.cache_spots.append(at)
 		"poi": b.w.pois.append(at)
 		"crop": b.w.crop_spots.append(at)
@@ -42,7 +53,8 @@ func build(b: MapBuilder) -> void:
 		"rival": b.w.rival_spots.append(at)
 		"dummy": b.w.dummy_spots.append(at)
 		"place": b.w.map_marks.append({"name": text, "at": Vector2(at.x, at.z)})
-		"lane", "lane_way", "muster", "post": b.w.lane_marks.append({"kind": kind, "gate": gate, "at": at})
+		"lane", "lane_way", "muster", "post", "barge": b.w.lane_marks.append({"kind": kind, "gate": gate, "at": at})
+		"snare", "hunter", "trap_cache", "guild_camp": b.w.guild_marks.append({"kind": kind, "gate": gate, "at": at, "yaw": b.xf.basis.get_euler().y})
 		"weapon", "item", "familiar": b.w.stands.append({"kind": kind, "at": at, "yaw": b.xf.basis.get_euler().y})
 	if b.is_preview:
 		b.w.show_spot(kind, text, at)

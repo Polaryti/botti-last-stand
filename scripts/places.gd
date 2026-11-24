@@ -1,9 +1,9 @@
 class_name Places
-## The five places of the world, said the same way everywhere they are shown: the Codex, the loading
+## The six places of the world, said the same way everywhere they are shown: the Codex, the loading
 ## screen and the world atlas. Each has a name, an icon, a colour, its lore, what is played there and
 ## a few hints about it for the loading screen.
 
-const ORDER := ["village", "fort", "mists", "mesenlla", "bastion"]
+const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael"]
 
 const ALL := {
 	"village": {"name": "The Village", "icon": "map_village", "color": Color("efe8d8"), "plays": "Survive the Night, Co-op, All vs All and Teams",
@@ -31,6 +31,16 @@ const ALL := {
 		"tips": ["Mist Soldiers step out of each lane's waystone to hold it. Fight beside them.",
 			"The War Wyvern makes burning passes at the Great Portal. Bring it down before the portal falls.",
 			"Each gate has a small door beside it that only you fit through."]},
+	"vael": {"name": "Port Vael", "icon": "map_vael", "color": Color("7fd6c2"), "plays": "Survive the Night, Co-op, All vs All and Teams",
+		"lore": "The old road descends from the Valleys of Mesenlla to a grey coast. Here the kingdom of Vael kept its harbour, until the night its crown went into the sea and the sea came after it. Every night since, the Mist Tide rolls in over the flats, and the drowned walk in with it.",
+		"tips": ["Low tide bares the seabed. Open the sea chests on the wrecks before the water comes back.",
+			"At high tide the flats flood: wading slows you and the sea-mist half blinds you. Keep to the quay and the moles.",
+			"Explore the headland paths and Harbourmaster's House for supplies. The bells warn when the tide is about to turn."]},
+	"lantern_road": {"name": "The Lantern Road", "icon": "map_lantern_road", "color": Color("ffd36e"), "plays": "Last Light, alone or in Co-op",
+		"lore": "Beyond Port Vael an old causeway runs out across the drowned Sound to the Isle of Lamps, where the ferrymen once rowed the dead. Its lanterns went out when the Mists rose. Only the Lantern Barge still carries a light along it, and the Mist Tide never goes out.",
+		"tips": ["Keep inside the barge's light. Outside it, the tide starts to drown you after a few seconds.",
+			"The barge only moves while one of you walks beside it, and stops while anything clings to it.",
+			"At each waystation, choose a boon. They last until you reach the lighthouse."]},
 }
 
 

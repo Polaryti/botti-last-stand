@@ -12,6 +12,8 @@ uniform float map_half = 110.0;
 uniform float mask_reach = 3.0;
 uniform vec3 tint = vec3(1.0); // the grass of other lands
 uniform float cliffs = 0.0; // on the islands, the steep faces are banded rock
+uniform float highland = 0.0;
+uniform float shore = -1000.0; // below this height the land is the seabed: sand, then wet sand, mud and weed
 
 varying vec2 at;
 varying vec3 world_at;
@@ -45,7 +47,21 @@ void fragment() {
 		float side_grain = texture(tile, vec2(at.x + at.y, world_at.y) * 0.09).g;
 		float band = 0.5 + 0.5 * sin(world_at.y * 0.9 + sin((at.x + at.y) * 0.05) * 3.0 + side_grain * 2.0);
 		vec3 rock = mix(vec3(0.27, 0.3, 0.35), vec3(0.47, 0.49, 0.52), band * 0.8 + side_grain * 0.2);
+		float inland = highland * smoothstep(68.0, 106.0, -world_at.z);
+		rock = mix(rock, rock * vec3(1.15, 0.90, 1.05), inland);
 		ground = mix(rock, ground, smoothstep(0.35, 0.75, flat_ground));
+	}
+	if (world_at.y < shore + 0.6) {
+		// Broad, soft variation only (the tile's fine pattern repeats too plainly on open sand).
+		float lump = texture(tile, at * 0.031).g;
+		float drift = texture(tile, at * 0.011 + 0.37).g;
+		float y = world_at.y + (lump - 0.5) * 0.5;
+		float shade = 0.82 + drift * 0.3;
+		vec3 bed = mix(vec3(0.5, 0.46, 0.37), vec3(0.31, 0.3, 0.26), 1.0 - smoothstep(shore - 0.7, shore - 0.2, y));
+		bed = mix(bed, vec3(0.2, 0.2, 0.18), 1.0 - smoothstep(shore - 1.6, shore - 0.9, y));
+		float weed = smoothstep(0.58, 0.72, texture(tile, at * 0.017 + 7.0).g) * (1.0 - smoothstep(shore - 1.2, shore - 0.6, y));
+		bed = mix(bed * shade, vec3(0.11, 0.17, 0.1) * shade, weed * 0.8);
+		ground = mix(bed, ground, smoothstep(shore - 0.1, shore + 0.5, y));
 	}
 	ALBEDO = ground;
 	float warmth = 0.0;

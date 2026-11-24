@@ -37,6 +37,13 @@ const QUAKE_RADIUS := 6.5
 const QUAKE_TELL := 1.3
 const BOULDER_RADIUS := 3.2
 const BOULDER_TELL := 1.4
+# Port Vael
+const STING_TELL := 0.7 # a Lantern Jelly's threads flare this long before it stings
+const STING_EVERY := 3.2
+const BITE_REACH := 2.6 # an Angler's lunge
+const BITE_TELL := 0.45
+const BITE_POWER := 1.0
+const BITE_EVERY := 2.4
 
 var kind := ""
 var cooldown := 2.0
@@ -57,7 +64,7 @@ var _trail := 0.0
 
 static func wants(id: String) -> bool:
 	return id in ["bear", "mist_bear", "mist_eagle", "shapeshifter", "earth_elemental", "mist_elemental", "storm_elemental",
-		"wyvern", "great_revenant_elemental", "war_wyvern"]
+		"wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler"]
 
 
 func _init(id: String) -> void:
@@ -96,6 +103,9 @@ func tick(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> 
 		"storm_elemental": return _storm(z, target, to, dist, delta)
 		"wyvern", "war_wyvern": return _wyvern(z, target, dist, delta)
 		"great_revenant_elemental": return _revenant(z, target, dist, delta)
+		"brine_hound": return _wolf(z, target, dist, delta)
+		"lantern_jelly": return _jelly(z, target, dist, delta)
+		"angler": return _angler(z, target, dist, delta)
 	return false
 
 
@@ -124,6 +134,9 @@ func on_dive(z: Zombie) -> void:
 func on_death(z: Zombie) -> void:
 	if kind == "mist_elemental":
 		MistSeal.cast(z, _ground(z, z.position), 3.5, 0.6, z._damage * 0.5, 0.0, MistSeal.Style.MIST)
+	elif kind == "lantern_jelly":
+		# Its last sting, as it bursts.
+		MistSeal.cast(z, _ground(z, z.position), float(z.def["sting_reach"]), STING_TELL * 0.5, z._damage * 0.6, 0.0, MistSeal.Style.STING)
 
 
 # --- Bears -------------------------------------------------------------------------
@@ -275,7 +288,6 @@ func _shapeshifter(z: Zombie, target: Target, to: Vector3, dist: float, delta: f
 			z.move_and_slide()
 			z.position.y = z.world.ground_at(z.position)
 			z.rotation.y = lerp_angle(z.rotation.y, atan2(away.x, away.z), minf(1.0, delta * 6.0))
-			z._animate_custom(delta, z.velocity.length())
 			if left <= 0.0:
 				# It got away: the mist mends it whole, and it comes back to fight.
 				z.hp = z.max_hp
@@ -311,7 +323,7 @@ func _next_form() -> String:
 ## that hastens every creature near it.
 func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 	if phase == "":
-		if cooldown_b <= 0.0 and z._sees and dist < HOWL_REACH:
+		if kind != "brine_hound" and cooldown_b <= 0.0 and z._sees and dist < HOWL_REACH:
 			phase = "howl"
 			left = HOWL_TIME
 			cooldown_b = HOWL_EVERY
@@ -322,7 +334,7 @@ func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			left = LUNGE_TELL
 			cooldown = LUNGE_EVERY
 			_show(z, "m_lunge", true)
-			z.world.sfx_at("beast_growl", z.position, -2.0)
+			z.world.sfx_at("hound_snarl" if kind == "brine_hound" else "beast_growl", z.position, -2.0)
 	match phase:
 		"howl":
 			left -= delta
@@ -339,7 +351,6 @@ func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 					Net.blast_fx(z.centre(), HOWL_REACH, Color(0.45, 0.95, 0.92, 0.35))
 				phase = ""
 				_show(z, "m_wolf")
-			z._animate_custom(delta, 0.0)
 			return true
 		"crouch":
 			left -= delta
@@ -353,7 +364,6 @@ func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				left = LUNGE_TIME
 				struck = false
 				_show(z, "m_lunge")
-			z._animate_custom(delta, 0.0)
 			return true
 		"leap":
 			left -= delta
@@ -365,12 +375,11 @@ func _wolf(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			if not struck and flat.length() < 1.7 and absf(target.global_position.y - z.position.y) < 2.0:
 				struck = true
 				target.hurt(z._damage * LUNGE_POWER, z.position, z)
-				z.world.sfx_at("wolf", z.position, 0.0)
+				z.world.sfx_at("hound_bite" if kind == "brine_hound" else "wolf", z.position, 0.0)
 			if left <= 0.0 or _hit_wall(z):
 				phase = ""
 				_show(z, "m_wolf")
 				z.velocity = Vector3.ZERO
-			z._animate_custom(delta, LUNGE_SPEED)
 			return true
 	return false
 
@@ -422,7 +431,6 @@ func _owl(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 				_show(z, "m_owl", true)
 				z.world.sfx_at("owl_screech", z.position, 2.0)
 	z.position.y = maxf(z.position.y, ground + 0.3)
-	z._animate_custom(delta, speed)
 	return true
 
 
@@ -451,7 +459,6 @@ func _boar(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			left = minf(1.6, (dist + 4.0) / (z._speed * GORE_SPEED))
 			struck = false
 			_show(z, "m_charge")
-		z._animate_custom(delta, 0.0)
 		return true
 	if phase == "charge":
 		left -= delta
@@ -474,7 +481,6 @@ func _boar(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			phase = ""
 			_show(z, "m_boar")
 			z.velocity = Vector3.ZERO
-		z._animate_custom(delta, z.velocity.length())
 		return true
 	return false
 
@@ -605,7 +611,6 @@ func _storm(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 	z.move_and_slide()
 	z.position.y = z.world.ground_at(z.position)
 	_face(z, target.global_position, delta, 6.0)
-	z._animate_custom(delta, z.velocity.length())
 	return true
 
 
@@ -661,7 +666,6 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 			# A line of fire that ends on the portal, coming from where the wyvern came.
 			for i in 4:
 				MistSeal.cast(z, _ground(z, fort.heart_at - along * (3 - i) * BREATH_RADIUS * 1.6), BREATH_RADIUS * 1.15, BREATH_TELL + i * 0.15, z._damage, 0.0, style)
-		z._animate_custom(delta, 1.0)
 		return true
 	if phase == "" and cooldown <= 0.0 and z._sees and dist < 28.0 and z._dive <= 0.0 and z._windup <= 0.0:
 		_at_portal = false
@@ -690,7 +694,6 @@ func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		if left <= 0.0:
 			phase = ""
 			_show(z, "")
-		z._animate_custom(delta, 1.0)
 		return true
 	return false
 
@@ -747,3 +750,68 @@ func _second_target(z: Zombie, first: Target) -> Target:
 		if best == null or t.global_position.distance_to(z.position) < best.global_position.distance_to(z.position):
 			best = t
 	return best
+
+
+# --- Port Vael ---------------------------------------------------------------------------------
+
+## A Lantern Jelly drifts at you; close enough, its threads flare (a ring on the ground beneath it shows
+## the sting's reach), then everything in the ring is stung and stunned (MistSeal.Style.STING).
+func _jelly(z: Zombie, target: Target, dist: float, delta: float) -> bool:
+	var reach := float(z.def["sting_reach"])
+	if phase == "" and cooldown <= 0.0 and dist < reach - 0.3 and absf(target.global_position.y - z.position.y) < 3.0:
+		phase = "flare"
+		left = STING_TELL
+		cooldown = STING_EVERY
+		_show(z, "m_sting", true)
+		MistSeal.cast(z, _ground(z, z.position), reach, STING_TELL, z._damage, 0.0, MistSeal.Style.STING)
+	match phase:
+		"flare":
+			left -= delta
+			z.velocity = Vector3.ZERO
+			if left <= 0.0:
+				phase = "sting"
+				left = 0.45
+				_show(z, "m_sting")
+			return true
+		"sting":
+			left -= delta
+			z.velocity = Vector3.ZERO
+			if left <= 0.0:
+				phase = ""
+				_show(z, "")
+			return true
+	return false
+
+
+## An Angler, once it is out of the sand: it waddles at you, and close by it rears back with its jaws
+## wide (the tell) and then lunges and bites whatever is in front of it.
+func _angler(z: Zombie, target: Target, dist: float, delta: float) -> bool:
+	if phase == "" and cooldown <= 0.0 and z._sees and dist < BITE_REACH and z._stun <= 0.0:
+		phase = "gape"
+		left = BITE_TELL
+		cooldown = BITE_EVERY
+		_show(z, "m_bite", true)
+		z.world.sfx_at("angler_rise", z.position, -6.0)
+	match phase:
+		"gape":
+			left -= delta
+			z.velocity = Vector3.ZERO
+			_face(z, target.global_position, delta, 6.0)
+			if left <= 0.0:
+				phase = "bite"
+				left = 0.35
+				_show(z, "m_bite")
+				z.world.sfx_at("angler_bite", z.position, 0.0)
+				var flat := target.global_position - z.position
+				flat.y = 0.0
+				var ahead := Vector3(sin(z.rotation.y), 0, cos(z.rotation.y))
+				if flat.length() < BITE_REACH + 0.3 and (flat.length() < 0.6 or flat.normalized().dot(ahead) > 0.4) and absf(target.global_position.y - z.position.y) < 2.0:
+					target.hurt(z._damage * BITE_POWER, z.position, z)
+			return true
+		"bite":
+			left -= delta
+			if left <= 0.0:
+				phase = ""
+				_show(z, "")
+			return true
+	return false

@@ -20,7 +20,7 @@ const FAN_RANGE := 22.0
 const PLUNDER_ARROWS := 6
 
 const ARTS := {
-	"": {"name": "Into the Shadows", "cost": 0.0, "cast": 0.1, "cd": 12.0, "icon": "eye_closed", "anim": "Stance"},
+	"": {"name": "Into the Shadows", "cost": 0.0, "cast": 0.1, "cd": 12.0, "icon": "invisible", "anim": "Stance"},
 	"thief": {"name": "Steal", "cost": 0.0, "cast": 0.08, "cd": 10.0, "icon": "hand"},
 	"mercenary": {"name": "Nightfall", "cost": 0.0, "cast": 0.3, "cd": 22.0, "icon": "moon", "anim": "Stance"},
 	"highwayman": {"name": "Dagger Fan", "cost": 0.0, "cast": 0.15, "cd": 8.0, "icon": "dagger"},
@@ -50,7 +50,7 @@ static func cast_path(p: Player) -> void:
 			if p.has_flag("fan_twice"):
 				p.get_tree().create_timer(0.35).timeout.connect(func() -> void:
 					if is_instance_valid(p) and not p.dead:
-						dagger_fan(p))
+						dagger_fan(p, true))
 
 
 # --- Into the Shadows ----------------------------------------------------------
@@ -131,6 +131,7 @@ static func steal(p: Player) -> void:
 	var dmg := STEAL_DAMAGE * p.m("steal_damage") * p.m("melee_damage") * p.damage_multiplier()
 	for victim in targets:
 		_rob(p, victim, dmg, victim == t)
+	CrownUpgrades.lucky_fingers(p, spot + (there - spot) * 0.4)
 	if p.has_flag("steal_dash"):
 		p._act({"do": "buff", "key": "steal_dash", "stat": "speed", "val": AbilityNumbers.SLIP_AWAY, "secs": AbilityNumbers.SLIP_AWAY_TIME}, {})
 	p._noise(3.0)
@@ -186,11 +187,15 @@ static func nightfall(p: Player) -> void:
 	p.world.spawn_nightfall(p.net_id(), p.global_position, radius, secs, linger, bits)
 	if Net.active():
 		Net.nightfall(p.net_id(), p.global_position, radius, secs, linger, bits)
+	CrownUpgrades.contract(p, p.global_position, radius, secs)
 
 
 # --- Dagger Fan and Plunder -------------------------------------------------------
 
-static func dagger_fan(p: Player) -> void:
+static func dagger_fan(p: Player, second := false) -> void:
+	# The Toll is counted on the throw, not on Dead or Alive's second fan, which follows it in kind.
+	var toll := p.toll_fan if second else CrownUpgrades.next_is_toll(p)
+	p.toll_fan = toll
 	var knives := FAN_KNIVES + int(p.m("fan_knives"))
 	var dir := -p.camera.global_basis.z
 	var from := p.camera.global_position + dir * 0.5 + Vector3.DOWN * 0.1
@@ -199,8 +204,10 @@ static func dagger_fan(p: Player) -> void:
 		var t := 0.5 if knives == 1 else float(i) / float(knives - 1)
 		var angle := deg_to_rad(lerpf(-FAN_SPREAD * 0.5, FAN_SPREAD * 0.5, t))
 		var d := dir.rotated(Vector3.UP, angle)
-		p.world.spawn_knife(p, from, d * FAN_SPEED, FAN_RANGE, dmg, int(p.m("fan_bounces")), p.has_flag("fan_bleed"), p.has_flag("fan_slow"), p.has_flag("fan_close"))
+		p.world.spawn_knife(p, from, d * FAN_SPEED, FAN_RANGE, dmg, int(p.m("fan_bounces")), p.has_flag("fan_bleed"), p.has_flag("fan_slow"), p.has_flag("fan_close"), toll)
 	p.world.sfx_at("dagger_fan", from, -3.0)
+	if toll:
+		p.world.sfx_at("chain_rattle", from, -6.0)
 	# Long Shadows: the Highwayman slips out of sight behind the knives.
 	if p.m("shadow_time") > 0.0 and p.can_vanish():
 		p.invis_left = maxf(p.invis_left, p.m("shadow_time"))
@@ -211,9 +218,10 @@ static func dagger_fan(p: Player) -> void:
 	p._noise(3.0)
 
 
-## A Highwayman's kill sometimes leaves something worth taking.
-static func plunder(p: Player, at: Vector3) -> void:
-	if randf() >= p.m("plunder"):
+## A Highwayman's kill sometimes leaves something worth taking (always, when `sure`: a creature
+## killed while the Toll pinned it, or a pocket Lucky Fingers picked).
+static func plunder(p: Player, at: Vector3, sure := false) -> void:
+	if not sure and randf() >= p.m("plunder"):
 		return
 	var roll := randf()
 	if roll < 0.45:

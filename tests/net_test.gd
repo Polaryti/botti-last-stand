@@ -90,8 +90,12 @@ func _ready() -> void:
 	Game.difficulty = 1
 	Game.player_class = "infantry"
 	# Lobby tests exercise these classes; a fresh isolated save has not earned them yet.
-	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer"]:
+	for id: String in ["magician", "chivalry", "artificer", "commander", "bandit", "cartographer", "harpooner", "tidecaller", "ferryman"]:
 		Game.unlocked[id] = true
+	if rules == "mesenlla":
+		# Both phones bring the Trappers' Guild into the Valleys: Level 2.
+		Game.owned_items[TrappersGuild.ID] = true
+		Game.switched_off.erase(TrappersGuild.ID)
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await wait(0.3)
@@ -129,7 +133,13 @@ func _as_host() -> void:
 	if rules == "bastion":
 		Net.set_fort_map("bastion")
 		ok(Net.fort_map == "bastion", "the host picks Mist Bastion")
-	Net.set_rules({"bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	if rules == "vael":
+		Net.set_night_map("vael")
+		ok(Net.night_map == "vael", "the host picks Port Vael")
+	if rules == "lantern":
+		Net.set_night_map("lantern_road")
+		ok(Net.night_map == "lantern_road", "the host picks the Lantern Road")
+	Net.set_rules({"ferryman": Net.Rules.COOP, "tidecaller": Net.Rules.COOP, "harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -211,12 +221,18 @@ func _as_client() -> void:
 		Net.set_my_class("bandit")
 	if rules == "cartographer":
 		Net.set_my_class("cartographer")
+	if rules == "harpooner":
+		Net.set_my_class("harpooner")
+	if rules == "tidecaller":
+		Net.set_my_class("tidecaller")
+	if rules == "ferryman":
+		Net.set_my_class("ferryman")
 	t = 0.0
 	while not Net.in_game and t < 60.0:
 		await wait(0.1)
 		t += 0.1
 	ok(Net.in_game, "the host's start reaches this phone")
-	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer"}.get(rules, "infantry"), "with the class I picked")
+	ok(Game.player_class == {"commander": "commander", "bandit": "bandit", "cartographer": "cartographer", "tidecaller": "tidecaller", "ferryman": "ferryman"}.get(rules, "infantry"), "with the class I picked")
 	await _play()
 
 
@@ -277,10 +293,20 @@ func _play() -> void:
 		await _bandit()
 	elif rules == "cartographer":
 		await _cartographer()
+	elif rules == "harpooner":
+		await _harpooner()
+	elif rules == "tidecaller":
+		await _tidecaller()
+	elif rules == "ferryman":
+		await _ferryman()
 	elif rules == "mesenlla":
 		await _mesenlla()
 	elif rules == "bastion":
 		await _bastion()
+	elif rules == "vael":
+		await _vael()
+	elif rules == "lantern":
+		await _lantern()
 	elif rules == "coop":
 		await _coop()
 	elif rules == "bots" or rules == "botsffa":
@@ -393,11 +419,32 @@ func _with_bots() -> void:
 		ok(Net._avatars.has(b) and w.players.has(Net._avatars[b]), "with bodies on this phone")
 	var bot_id: int = ids[0]
 	var body: Avatar = Net._avatars[bot_id]
+	if host:
+		# Verify replicated locomotion with a walking goal, independent of a randomly
+		# selected ranged class legitimately stopping to shoot during this window.
+		var bot: BotPlayer = Net.bot_players()[0]
+		var spot := Vector3(0,w.ground_at(Vector3(0,0,36))+0.05,36)
+		bot.pawn.position = spot
+		bot.body.teleport(spot)
+		bot._target = null
+		bot._think = 10.0
+		bot._has_goal = true
+		bot._goal = spot+Vector3.RIGHT*8
+		bot._errand = "explore"
+		bot._away = false
+		bot._clear_way = true
+		bot._path = PackedVector3Array()
+		bot._raining = -1.0
+	await wait(0.5)
 	await sync(50)
 	var was := body.global_position
 	await wait(4.0)
 	await sync(51)
-	ok(body.global_position.distance_to(was) > 1.0 or rules == "bots", "the bots move on this phone")
+	ok(body.global_position.distance_to(was) > 1.0, "the walking bot moves on this phone")
+	if host:
+		var bot: BotPlayer = Net.bot_players()[0]
+		bot._think = 0.0
+		bot._has_goal = false
 	# A blow from the phone that does not run the bot. In co-op a friend's blow does nothing to it,
 	# so there the night's own damage is sent instead, the way a zombie's would be.
 	if not host:
@@ -1389,6 +1436,43 @@ func _bandit() -> void:
 	else:
 		ok(pl.invis_left > 0.0 and pl.night_blind_left <= 0.0, "the Mercenary is hidden, not darkened")
 	await sync(205)
+	# Contract: the Mercenary's next Nightfall names a creature of the host's; its seal shows on both
+	# phones, and the host's creature takes the extra damage.
+	for n: Node in w.get_children():
+		if n is NightfallDome:
+			n.queue_free()
+	if host:
+		var merc := _avatar().global_position
+		w.spawn_zombie("normal", merc + Vector3(2, 0, 0))
+		var named: Zombie = w.zombies.back()
+		named.position = merc + Vector3(2, 0, 0)
+		named.set_physics_process(false)
+		named.max_hp = 900.0
+		named.hp = 900.0
+	await wait(1.0)
+	await sync(710)
+	if not host:
+		Game.owned_items["contract"] = true
+		pl.path_art_cd_left = 0.0
+		pl.invis_lockout = 0.0
+		pl.use_path_art()
+	await wait(1.2)
+	await sync(711)
+	var sealed := w.zombies.filter(func(z: Zombie) -> bool: return z.get_node_or_null("ContractSeal") != null)
+	ok(sealed.size() == 1, "the Contract's seal hangs over the creature on this phone")
+	if host:
+		ok(sealed.size() == 1 and sealed[0]._mark_time > 0.0 and is_equal_approx(sealed[0]._mark_mult, CrownUpgrades.CONTRACT_MARK), "and the host's creature is marked to take 50% more")
+	# Both phones have looked before the host clears up: the host can pass a step the moment it
+	# reaches it, and its next message would otherwise reach the other phone before that phone looks.
+	await sync(712)
+	for z: Zombie in w.zombies.duplicate():
+		if host:
+			z.release()
+	for n: Node in w.get_children():
+		if n is NightfallDome:
+			n.queue_free()
+	await wait(0.5)
+	await sync(713)
 	# A Highwayman's Dagger Fan, from 6 m away.
 	if host:
 		pl.guard_left = 0.0
@@ -1521,6 +1605,248 @@ func _cartographer() -> void:
 
 
 
+## Two Harpooners: the other phone's Haul drags this phone's creature in, everyone sees the rope, and a
+## Rigger's line stands on both phones and trips what crosses it here.
+func _harpooner() -> void:
+	var client := _other() if host else Net.my_id()
+	ok(Net.roster[client]["class"] == "infantry", "the disabled Harpooner cannot be picked even by a client that owns it")
+	# Exercise the dormant kit through the existing network tests without enabling it in the lobby.
+	Net.roster[client]["class"] = "harpooner"
+	if not host:
+		pl.setup_class("harpooner")
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	var spot := Vector3(base.x + (-6.0 if host else 0.0), 0, base.z + 6.0)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	pl.yaw = 0.0
+	pl.rotation.y = 0.0
+	pl.pitch = 0.0
+	pl.camera.rotation = Vector3.ZERO
+	var mine := -1 # the host's creature at each step
+	await wait(0.6)
+	await sync(600)
+	if not host:
+		ok(pl.class_id == "harpooner" and pl.art_def()["name"] == "Haul", "this phone plays a Harpooner, with Haul")
+	# The host's creature, in front of the other phone's Harpooner.
+	if host:
+		var there := Vector3(base.x, 0, base.z + 6.0 - 13.0)
+		w.spawn_zombie("normal", Vector3(there.x, w.ground_at(there), there.z))
+		var z: Zombie = w.zombies.back()
+		z.hp = 2000.0
+		z.max_hp = 2000.0
+		z.set_physics_process(true)
+		z.stun(3.0)
+		mine = z.net_id
+		told.rpc(str(z.net_id))
+	await wait(0.8)
+	await sync(601)
+	if not host:
+		pl.yaw = 0.0
+		pl.rotation.y = 0.0
+		pl.camera.rotation = Vector3.ZERO
+		var t := HarpoonerKit.haul_target(pl)
+		ok(t != null and t is Zombie and str((t as Zombie).net_id) == _told, "the host's creature is the one in reach of this phone's Haul")
+		HarpoonerKit.haul(pl)
+		ok(w.get_children().any(func(n: Node) -> bool: return n is HaulRope), "the rope flies here")
+	await wait(0.25)
+	if host:
+		ok(w.get_children().any(func(n: Node) -> bool: return n is HaulRope), "and on the other phone, from the Harpooner's hand")
+	await wait(1.6)
+	await sync(602)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		var them := _avatar().global_position
+		var gap := Vector2(z.position.x - them.x, z.position.z - them.z).length()
+		ok(z.hp < 2000.0 and gap < 3.5, "the other phone's Haul dragged this phone's creature to the Harpooner and struck it (%.1f m from them)" % gap)
+		z.release()
+	await sync(603)
+	# A Rigger's line, on both phones.
+	if not host:
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 1 if step == 3 else 0)
+		ok(pl.spec_id == "rigger" and pl.path_art_def()["name"] == "Rig a Line", "the other phone's Harpooner becomes a Rigger")
+		pl.yaw = 0.0
+		pl.rotation.y = 0.0
+		HarpoonerKit.rig_a_line(pl)
+	await wait(0.8)
+	await sync(604)
+	var rigger := Net.my_id() if not host else _other()
+	var lines := w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and l.owner_peer == rigger)
+	ok(lines.size() == 1 and (lines[0] as RigLine).length() > 8.0, "the line stands on this phone too")
+	if host and not lines.is_empty():
+		var line: RigLine = lines[0]
+		var on := (line.a + line.b) * 0.5
+		w.spawn_zombie("normal", Vector3(on.x, w.ground_at(on), on.z))
+		var crosser: Zombie = w.zombies.back()
+		crosser.set_physics_process(false)
+		crosser.hp = 2000.0
+		crosser.max_hp = 2000.0
+		mine = crosser.net_id
+	await wait(1.2)
+	await sync(605)
+	if host:
+		var crosser: Zombie = w.zombie_by_id(mine)
+		ok(crosser != null and crosser._stun > 0.0 and crosser._slow > 0.0, "this phone's creature trips on the other phone's line: stunned and slowed")
+	await sync(606)
+
+
+## Two Tidecallers: the other phone's wave rolls on this phone too and strikes this phone's creature;
+## its Tide Shell shows round its body here; its Stormspear strikes this phone's creature and its
+## lightning shows; and the sea serpent it calls up rises here too.
+func _tidecaller() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	var spot := Vector3(base.x + (-6.0 if host else 0.0), 0, base.z + 6.0)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	pl.yaw = 0.0
+	pl.rotation.y = 0.0
+	pl.pitch = 0.0
+	pl.camera.rotation = Vector3.ZERO
+	var mine := -1
+	await wait(0.6)
+	await sync(620)
+	if host:
+		var there := Vector3(base.x, 0, base.z + 6.0 - 7.0)
+		w.spawn_zombie("normal", Vector3(there.x, w.ground_at(there), there.z))
+		var z: Zombie = w.zombies.back()
+		z.hp = 2000.0
+		z.max_hp = 2000.0
+		z.stun(20.0)
+		mine = z.net_id
+	await wait(0.8)
+	await sync(621)
+	if not host:
+		ok(pl.class_id == "tidecaller" and pl.art_def()["name"] == "Call the Tide", "this phone plays a Tidecaller")
+		TidecallerKit.call_the_tide(pl)
+	await wait(0.15)
+	ok(w.get_children().any(func(n: Node) -> bool: return n is TideWave), "the wave rolls on this phone")
+	await wait(1.4)
+	await sync(622)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		ok(z != null and z.hp < 2000.0, "the other phone's wave struck this phone's creature (%.0f)" % (2000.0 - z.hp if z else 0.0))
+	await sync(623)
+	if not host:
+		TidecallerKit.raise_shell(pl)
+	await wait(0.6)
+	await sync(624)
+	if host:
+		var a := Net.avatar(_other())
+		ok(a != null and a.get_children().any(func(n: Node) -> bool: return n is TideShell), "the other phone's Tide Shell shows round its body here")
+	await sync(625)
+	if not host:
+		pl.shell_left = 0.01 # it runs out, and bursts
+	await wait(0.6)
+	await sync(626)
+	if host:
+		var a := Net.avatar(_other())
+		ok(a != null and not a.get_children().any(func(n: Node) -> bool: return n is TideShell and not (n as TideShell).gone()), "and goes when it bursts")
+	await sync(627)
+	var before := 0.0
+	if host:
+		before = w.zombie_by_id(mine).hp
+		told.rpc(var_to_str(before))
+	await wait(0.4)
+	await sync(628)
+	var arcs := false
+	if not host:
+		pl.mana = pl.max_mana()
+		TidecallerKit.stormspear(pl)
+	for i in 20:
+		arcs = arcs or w.get_children().any(func(n: Node) -> bool: return n is StormArc)
+		await wait(0.03)
+	ok(arcs, "the Stormspear's lightning shows on this phone")
+	await wait(0.4)
+	await sync(629)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		ok(z != null and z.hp < before, "the other phone's Stormspear struck this phone's creature (%.0f)" % (before - z.hp if z else 0.0))
+	await sync(630)
+	if not host:
+		TidecallerKit.call_of_the_deep(pl)
+		ok(TidecallerKit.serpent_of(pl) != null, "a sea serpent rises beside this phone's Deepcaller")
+	await wait(0.8)
+	await sync(631)
+	if host:
+		ok(w.allies.any(func(a: Ally) -> bool: return a.kind == "sea_serpent" and a.remote_owner == _other()), "and rises on this phone too")
+	await sync(632)
+
+
+## Two Ferrymen: the other phone's skiff glides here too and strikes this phone's creature; a
+## Psychopomp's souls circle its avatar here; and a Boatman's skiff carries this phone's player along.
+func _ferryman() -> void:
+	w.director.running = false
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := Vector3(0, 0, 40)
+	var spot := Vector3(base.x + (-6.0 if host else 0.0), 0, base.z + 6.0)
+	pl.global_position = Vector3(spot.x, w.ground_at(spot) + 0.05, spot.z)
+	pl.input_move = Vector2.ZERO
+	pl.guard_left = 0.0
+	pl.yaw = 0.0
+	pl.rotation.y = 0.0
+	var mine := -1
+	await wait(0.6)
+	await sync(640)
+	if host:
+		var there := Vector3(base.x, 0, base.z + 6.0 - 4.5)
+		w.spawn_zombie("normal", Vector3(there.x, w.ground_at(there), there.z))
+		var z: Zombie = w.zombies.back()
+		z.hp = 2000.0
+		z.max_hp = 2000.0
+		z.stun(20.0)
+		mine = z.net_id
+	await wait(0.8)
+	await sync(641)
+	if not host:
+		ok(pl.class_id == "ferryman" and pl.art_def()["name"] == "Crossing", "this phone plays a Ferryman")
+		FerrymanKit.cross(pl)
+	await wait(0.2)
+	ok(w.get_children().any(func(n: Node) -> bool: return n is FerrySkiff), "the skiff glides on this phone")
+	await wait(1.0)
+	await sync(642)
+	if host:
+		var z: Zombie = w.zombie_by_id(mine)
+		ok(z != null and z.hp < 2000.0, "the other phone's skiff struck this phone's creature on its way (%.0f)" % (2000.0 - z.hp if z else 0.0))
+		z.release()
+	await sync(643)
+	if not host:
+		pl.grant_all_points()
+		for step in 4:
+			pl.choose_ability(step, 2 if step == 3 else 0)
+		pl.set_souls(4)
+	await wait(0.6)
+	await sync(644)
+	if host:
+		var a := _avatar() as Avatar
+		ok(a != null and a._soul_ring != null and a._soul_ring.count == 4, "the Psychopomp's 4 souls circle its avatar on this phone")
+	await sync(645)
+	# A Boatman's skiff carries this phone's player across with it.
+	var before := pl.global_position
+	if host:
+		Net.carried(_other(), _avatar().global_position + Vector3(0, 0, -6), Net.my_id())
+	await wait(1.0)
+	await sync(646)
+	if not host:
+		ok(pl.global_position.distance_to(before) > 4.0, "a friend's skiff carried this phone's player across (%.1f m)" % pl.global_position.distance_to(before))
+	await sync(647)
+
+
 ## Two phones in the Valleys of Mesenlla: the creatures look and act the same on both, a tell's circle
 ## reaches the other phone and hurts there, and the boss rises on both.
 func _mesenlla() -> void:
@@ -1601,6 +1927,282 @@ func _mesenlla() -> void:
 	ok(bosses.size() == 1 and (bosses[0]._visual.get_node("BossHealth") as Label3D).text.begins_with("GREAT REVENANT ELEMENTAL"), "the Great Revenant Elemental stands on both phones, its name over it")
 	ok(w.director.boss_card == "great_revenant_elemental" and w.director.boss_card_time > 0.0, "and both see its entrance card")
 	await sync(409)
+	# The Trappers' Guild, brought by both: Level 2 on both phones, the same snares, the host's hunters
+	# on the camp's towers, and a snare the host springs shown sprung on the other phone too.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	await wait(0.5)
+	await sync(700)
+	ok(w.guild != null and w.guild.level == 2, "the Trappers' Guild is at Level 2 on this phone (%s)" % str(w.guild.level if w.guild else -1))
+	if host:
+		told.rpc(str(w.guild.snares.size()))
+	await wait(0.4)
+	await sync(701)
+	if not host:
+		ok(str(w.guild.snares.size()) == _told and w.guild.snares.size() > 10, "the same %s snares lie here" % _told)
+	await until(func() -> bool: return w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead).size() >= 2, 4.0)
+	var hunters := w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead)
+	if host:
+		ok(hunters.size() == 2 and hunters.all(func(a: Ally) -> bool: return a.remote_owner == 0 and a.perch != Vector3.INF), "the host sends two hunters up the camp's towers")
+	else:
+		ok(hunters.size() == 2 and hunters.all(func(a: Ally) -> bool: return a.remote_owner == 1), "and they keep watch on this phone too, as the host's")
+		ok(hunters.all(func(a: Ally) -> bool: return a.global_position.y > w.ground_at(a.global_position) + 3.0), "up on the towers here as well")
+	await sync(702)
+	if host:
+		var snare: Vector3 = w.guild.snares[0]["at"]
+		w.spawn_zombie("child_of_woods", snare)
+		var caught: Zombie = w.zombies.back()
+		caught.position = snare
+		caught.set_physics_process(false)
+	await until(func() -> bool: return float(w.guild.snares[0]["armed_at"]) > w.now, 4.0)
+	ok(float(w.guild.snares[0]["armed_at"]) > w.now and (w.guild.snares[0]["node"] as MeshInstance3D).mesh == TrappersGuild.snare_mesh(true), "the first snare is sprung on this phone")
+	await sync(703)
+
+
+## Two phones in Port Vael: the Mist Tide stands the same on both, a Drowned Sailor carries the same
+## weapon on both, and a Lantern Jelly's sting reaches the other phone and stuns its player there.
+func _vael() -> void:
+	ok(w.map_id == "vael" and w.tide != null and Game.zombie_pool_plan().has("drowned"), "both phones are in Port Vael, with its tide")
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	var base := w.start_spots[0] if not w.start_spots.is_empty() else Vector3.ZERO
+	pl.global_position = Vector3(base.x + (-2.0 if host else 2.0), w.ground_at(base) + 0.05, base.z)
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	await wait(0.6)
+	await sync(420)
+	ok(not w.tide.high(), "the night begins at low tide")
+	if host:
+		w.director.elapsed = MistTide.TURN + MistTide.RISE + 3.0
+	await wait(1.8)
+	await sync(421)
+	await wait(0.3)
+	ok(w.tide.high() and absf(w.tide.level - MistTide.HIGH_Y) < 0.05, "the tide comes in on both phones, to the same height")
+	await sync(422)
+	if host:
+		w.spawn_zombie("drowned_sailor", base + Vector3(0, 0, -6))
+		var sailor: Zombie = w.zombies.back()
+		sailor.set_physics_process(false)
+		told.rpc(sailor.weapon_id)
+	await wait(0.8)
+	await sync(423)
+	if not host:
+		var sailors := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "drowned_sailor")
+		ok(sailors.size() == 1 and sailors[0].weapon_id == _told and _told != "", "the Drowned Sailor holds the same %s here" % _told)
+	await sync(424)
+	var hp_before := pl.hp
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("lantern_jelly", them + Vector3(0, 0, -1.5))
+		var jelly: Zombie = w.zombies.back()
+		jelly.set_physics_process(false)
+		jelly.mesenlla_mind.cooldown = 0.0
+		jelly.mesenlla_mind.tick(jelly, _avatar(), them - jelly.position, jelly.position.distance_to(them), 0.0)
+	await wait(0.4)
+	await sync(425)
+	ok(w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.STING), "the sting's circle shows on this phone")
+	var stunned := 0.0
+	var until := Time.get_ticks_msec() + int((MesenllaMind.STING_TELL + 0.8) * 1000.0)
+	while Time.get_ticks_msec() < until:
+		stunned = maxf(stunned, pl.frozen_left)
+		await get_tree().process_frame
+	await sync(426)
+	if not host:
+		ok(pl.hp < hp_before and stunned > MistSeal.STING_STUN * 0.8, "staying inside hurts and stuns the player on this phone (%.0f, %.2f s)" % [hp_before - pl.hp, stunned])
+	await sync(427)
+	# The drowned court. A Siren sings on the host, and draws the other phone's player in.
+	pl.frozen_left = 0.0
+	pl._status_immune = 0.0
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("siren", them + Vector3(0, 0, -9))
+		var siren: Zombie = w.zombies.back()
+		siren.set_physics_process(false)
+		siren.mesenlla_mind.phase = "song"
+		siren.mesenlla_mind.left = 99.0
+		siren._current_anim = "m_song"
+		siren.mesenlla_warning = false
+	await wait(0.5)
+	await sync(428)
+	var start := pl.global_position
+	var lured := false
+	var sirens: Array = []
+	if not host:
+		until = Time.get_ticks_msec() + 1500
+		while Time.get_ticks_msec() < until:
+			lured = lured or pl.is_lured()
+			await get_tree().process_frame
+		sirens = w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "siren")
+		ok(sirens.size() == 1 and sirens[0]._current_anim == "m_song", "the Siren sings on this phone too")
+		ok(lured and pl.global_position.distance_to(sirens[0].position) < start.distance_to(sirens[0].position) - 0.5, "and her song draws this phone's player toward her (%.1f m)" % (start.distance_to(sirens[0].position) - pl.global_position.distance_to(sirens[0].position)))
+	await sync(429)
+	# A Press Gang's net holds the other phone's player where they stand.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		w.spawn_zombie("press_gang", them + Vector3(6, 0, 0))
+		var press: Zombie = w.zombies.back()
+		press.set_physics_process(false)
+		MistSeal.cast(press, them, VaelMind.NET_RADIUS, 0.6, 1.0, 0.0, MistSeal.Style.NET)
+	await wait(0.3)
+	await sync(430)
+	var held := 0.0
+	until = Time.get_ticks_msec() + 1400
+	while Time.get_ticks_msec() < until:
+		held = maxf(held, pl.rooted_left)
+		await get_tree().process_frame
+	await sync(431)
+	if not host:
+		ok(held > VaelMind.NET_HOLD * 0.8, "caught in the net on this phone (%.2f s)" % held)
+	await sync(432)
+	# The Harbourmaster's hook hauls the other phone's player across to him.
+	pl.frozen_left = 0.0
+	pl.rooted_left = 0.0
+	pl._status_immune = 0.0
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		var them := _avatar().global_position
+		var spot := w.spawn_point_near(them, 11.0, 14.0)
+		w.spawn_zombie("harbourmaster", spot if spot != Vector3.INF else them + Vector3(12, 0, 0))
+		var harbour: Zombie = w.zombies.back()
+		harbour.set_physics_process(false)
+		MistSeal.cast(harbour, them, VaelMind.HOOK_RADIUS, 0.6, 1.0, 0.0, MistSeal.Style.HOOK)
+	await wait(0.3)
+	await sync(433)
+	var hooked := false
+	var hm: Array = w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "harbourmaster")
+	var far := pl.global_position.distance_to(hm[0].position) if not hm.is_empty() else 0.0
+	until = Time.get_ticks_msec() + 2200
+	while Time.get_ticks_msec() < until:
+		hooked = hooked or pl.is_dragged()
+		await get_tree().process_frame
+	await sync(434)
+	if not host:
+		var near := pl.global_position.distance_to(hm[0].position) if not hm.is_empty() else 99.0
+		ok(hooked and near < far - 4.0, "hooked on this phone, and hauled from %.0f m to %.1f m" % [far, near])
+	await sync(435)
+	# The Hollow Sovereign calls the tide in, out of its turn, on both phones.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		w.director.elapsed = MistTide.TURN * 2.0 + MistTide.RISE + 3.0 # low tide
+		await wait(0.2)
+		w.tide.surge(VaelMind.SURGE)
+	await wait(1.2)
+	await sync(436)
+	ok(w.tide.surging() and w.tide.high() and is_equal_approx(w.tide.surge_until - w.tide.surge_from, VaelMind.SURGE), "the Sovereign's decree calls the tide in on this phone")
+	await sync(437)
+	# The Sunken Crown: whoever wears it is seen wearing it on the other phone.
+	if not host:
+		pl.activate_power(PowerDefs.CROWN)
+	await wait(0.8)
+	await sync(438)
+	if host:
+		ok(_avatar().wears_crown(), "the other phone's player wears the Sunken Crown here")
+	await sync(439)
+	if not host:
+		pl.powers.erase(PowerDefs.CROWN)
+	await sync(440)
+	await _vael_sky_net(base)
+
+
+## Last Light on two phones: the same barge in the same place, a waystation where each phone chooses
+## its own boon and the host waits for both, the Leviathan rising on both, and the lighthouse lit.
+func _lantern() -> void:
+	var ll := w.last_light
+	ok(w.map_id == "lantern_road" and ll != null and w.tide.high(), "both phones are on the Lantern Road, with its barge, and the tide in")
+	if ll == null:
+		return
+	w.director.set_process(false)
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	pl.guard_left = 0.0
+	pl.hp = pl.max_hp()
+	var beside := func() -> void:
+		var b := ll.barge_at()
+		var at := Vector3(b.x - 5.0, 0, b.z + (-1.5 if host else 1.5))
+		pl.global_position = Vector3(at.x, w.ground_at(at) + 0.05, at.z)
+	beside.call()
+	await wait(2.5)
+	await sync(450)
+	beside.call()
+	await wait(0.5)
+	await sync(451)
+	told.rpc(str(snappedf(ll.progress, 0.01)))
+	await wait(0.4)
+	await sync(452)
+	ok(ll.progress > 2.0 and absf(ll.progress - float(_told)) < 3.0, "the barge goes on, and is in the same place on both phones (%.1f m, %s m)" % [ll.progress, _told])
+	await sync(453)
+	# A waystation: each phone is offered its own boons; the host waits for both to choose.
+	if host:
+		ll.progress = ll.way_at[0] - 0.3
+		ll._place(0.0)
+	await wait(0.6)
+	beside.call()
+	await wait(0.8)
+	await sync(454)
+	ok(ll.docked == 0 and ll.offer.size() == Boons.OFFERED, "both phones stop at the first waystation, and this one is offered %d boons" % ll.offer.size())
+	await sync(455)
+	if not host:
+		ll.choose(ll.offer[0])
+	await wait(0.6)
+	await sync(456)
+	if host:
+		ok(ll.chosen.size() == 1 and ll.docked == 0, "the host knows the other phone has chosen, and waits for its own player")
+		ll.choose(ll.offer[0])
+	await wait(0.8)
+	await sync(457)
+	ok(pl.boons.size() == 1 and ll.docked == -1, "both have chosen (%s here), and the barge leaves on both phones" % ",".join(pl.boons))
+	await sync(458)
+	# The Leviathan douses the barge's light, on both phones.
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		ll.douse()
+	await wait(0.6)
+	await sync(459)
+	ok(ll.dim_left > 0.0 and is_equal_approx(ll.light_radius(), LastLight.DIM_RADIUS), "its light shrinks on this phone too")
+	await sync(460)
+	# Out of the light on the other phone, the tide drowns its own player.
+	if not host:
+		var b := ll.barge_at()
+		var far := Vector3(b.x - 25.0, 0, b.z)
+		pl.global_position = Vector3(far.x, w.ground_at(far) + 0.05, far.z)
+		pl.hp = pl.max_hp()
+	await wait(Boons.grace(pl) + 1.5)
+	await sync(461)
+	if not host:
+		ok(pl.hp < pl.max_hp() and pl.hp > 0.0, "out of the light, the tide drowns this phone's player (%.0f lost)" % (pl.max_hp() - pl.hp))
+		pl.hp = pl.max_hp()
+	beside.call()
+	await sync(462)
+	# The Isle of Lamps: the Leviathan rises on both phones; when it falls, the lighthouse burns.
+	if host:
+		ll.progress = ll.length - 0.3
+		ll.ways_done = ll.way_at.size()
+		ll._place(0.0)
+	await wait(0.4)
+	beside.call()
+	await wait(1.2)
+	await sync(463)
+	ok(ll.arrived and w.zombies.any(func(z: Zombie) -> bool: return z.type_id == "leviathan"), "at the Isle of Lamps the Leviathan rises on this phone")
+	await sync(464)
+	if host:
+		w.director._mist_boss_defeated = true
+	await wait(0.8)
+	await sync(465)
+	ok(ll.lit, "and when it falls, the lighthouse burns on this phone")
+	await sync(466)
 
 
 ## Wait for the behavior being checked, with a strict wall-clock bound and no guessed delay.
@@ -1854,3 +2456,49 @@ func _spectate_client() -> void:
 	await wait(0.5)
 	ok(m.world != null and m.world.mode == Game.Mode.MENU, "and it is back at the menu")
 	finish()
+
+
+## Coastal flyers: real host release, replicated articulated pose, warning and local damage.
+func _vael_sky_net(base: Vector3) -> void:
+	for i in VaelSkyMind.KINDS.size():
+		var id: String = VaelSkyMind.KINDS[i]
+		var style: int = [MistSeal.Style.SALT, MistSeal.Style.BRINE_BOLT, MistSeal.Style.KNELL][i]
+		pl.position = Vector3(base.x + (-2.0 if host else 2.0), w.ground_at(base) + 0.05, base.z)
+		pl.hp = pl.max_hp()
+		pl.guard_left = 0
+		pl._status_immune = 0
+		pl.frozen_left = 0
+		if host:
+			for z: Zombie in w.zombies.duplicate(): z.release()
+		await wait(0.4)
+		await sync(450 + i * 10)
+		if host:
+			w.spawn_zombie(id, _avatar().position + Vector3(0, 0, -10))
+			var z: Zombie = w.zombies.back()
+			z.set_physics_process(false)
+			z._sees = true
+			z.mesenlla_mind.cooldown = 0
+			z.mesenlla_mind.tick(z, _avatar(), Vector3.ZERO, 10, 0)
+		await wait(0.4)
+		await sync(451 + i * 10)
+		var mobs := w.zombies.filter(func(z: Zombie) -> bool: return z.type_id == id and z.is_alive())
+		ok(mobs.size() == 1 and mobs[0].flies and mobs[0].is_warning() and mobs[0]._current_anim == "m_cast", id + " flies and telegraphs on both phones")
+		ok(w.mist_seals.is_empty(), id + " has no impact before release")
+		await sync(454 + i * 10)
+		if host:
+			var z: Zombie = mobs[0]
+			var mind := z.mesenlla_mind as VaelSkyMind
+			mind.aim = _avatar().global_position
+			if id == "bell_wraith": mind.aim += Vector3.RIGHT * 2.7
+			mind._release(z)
+			mind.phase = "recover"
+			mind._show(z, "m_throw")
+		await wait(0.18)
+		await sync(452 + i * 10)
+		ok(w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == style), id + " impact warning arrives on both phones")
+		var before := pl.hp
+		await wait(1.5)
+		await sync(453 + i * 10)
+		if not host:
+			ok(pl.hp < before, id + " hurts the remote player's locally owned body")
+		ok(w.mist_seals.is_empty(), id + " impact cleans up on both phones")

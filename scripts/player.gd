@@ -119,7 +119,11 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"shadow_time": 0.0, "steal_range": 0.0, "steal_damage": 1.0, "steal_hide": 0.0, "night_radius": 0.0, "night_time": 0.0, "night_linger": 0.0,
 	"fan_knives": 0.0, "fan_damage": 1.0, "fan_bounces": 0.0, "plunder": 0.0,
 	"beacons": 0.0, "link_range": 0.0, "beacon_radius": 0.0, "line_heal": 0.0, "mark_range": 0.0, "star_bonus": 0.0, "star_power": 0.0,
-	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0}
+	"gate_speed": 0.0, "gate_rest": 0.0, "gate_heal": 0.0, "find_rest": 0.0, "find_gap": 0.0, "find_damage": 0.0, "lantern_time": 0.0,
+	"haul_range": 0.0, "haul_cd": 1.0, "haul_stun": 0.0, "path_cd": 1.0, "blood_time": 0.0, "line_time": 0.0, "lines": 0.0, "line_reach": 0.0,
+	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0,
+	"trident_reach": 0.0, "trident_hits": 0.0, "trident_tide": 0.0, "shell_hp": 0.0, "spear_range": 0.0, "chains": 0.0, "serpent_time": 0.0,
+	"cross_reach": 0.0, "ferry_cast_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
@@ -187,6 +191,17 @@ var ward_hp := 0.0 # Shield Wall: harm still to be stopped
 var ward_left := 0.0
 var bombs_thrown := 0 # for the Great Keg
 var musket_shots := 0 # for Grapeshot
+# The Class Upgrades of the Adept, the Cartographer and the Bandit (CrownUpgrades)
+var encore_count := 0 # stance changes, for the Encore
+var open_door_cd := 0.0
+var blaze_from := Vector3.INF # where the last Trailblazer mark was left
+var lucky_steals := 0
+var contract_on: Variant = null # the Zombie a Mercenary's Contract is on
+var contract_until := 0.0
+var contract_at := Vector3.ZERO
+var contract_radius := 0.0
+var fans_thrown := 0 # for the Toll
+var toll_fan := false # the fan just thrown was the Toll
 var _mended_by := {} # friend's net id -> healing their fields gave since the last report
 var _mended_wait := 0.0
 var grapeshot_flash := 0.0 # 1 when Grapeshot has just gone off, fading: the HUD's burst round the crosshair
@@ -215,6 +230,10 @@ var _flail_idle := 0.0
 var _cleave_count := 0 # Battleaxe blows in a row
 var _cleave_idle := 0.0
 var _axe_out := false
+var harpoon_out := false # your Whaler's Harpoon lies somewhere: walk over it to take it back
+var _harpoon_back := 0.0 # seconds until it comes back to your hand by itself
+var _fervour := 0 # Cutlass kills in a row
+var _fervour_left := 0.0
 var _trampled := {}
 
 var input_move := Vector2.ZERO
@@ -347,7 +366,7 @@ func _init(owner_world: World, as_bot := 0) -> void:
 	camera.fov = BASE_FOV
 	camera.near = 0.06
 	# The Mists and Mesenlla have islands far off in the sky; elsewhere the fog ends the view.
-	camera.far = 460.0 if owner_world.terrain.has_islands() else 240.0 if owner_world.map_id in SpawnRules.MESENLLA else 100.0
+	camera.far = 460.0 if owner_world.terrain.has_islands() else 240.0 if owner_world.map_id in SpawnRules.MESENLLA else 300.0 if owner_world.map_id in SpawnRules.VAEL else 100.0
 	head.add_child(camera)
 	_vm_root = Node3D.new()
 	camera.add_child(_vm_root)
@@ -529,11 +548,11 @@ func status_effects() -> Array[Dictionary]:
 			out.append({"icon": icon, "color": UiTheme.BLOOD if entry["field"] in ["burn_time", "poison_left", "bleed_left", "frozen_left", "slowed_left", "night_blind_left"] else ClassDefs.color(class_id), "left": remaining, "stacks": 1})
 	for key: String in _buffs:
 		# Last Command raises melee, ranged and spell damage together: one icon says it.
-		if key in ["command_ranged", "command_spell", "shrine_bear_ranged_damage", "shrine_bear_spell_damage"]:
+		if key in ["command_ranged", "command_spell", "shrine_bear_ranged_damage", "shrine_bear_spell_damage", "blood_guard"]:
 			continue
 		var b: Dictionary = _buffs[key]
 		var from_command := key.begins_with("command_")
-		var buff_icon: String = _BUFF_ICONS.get(b["stat"], "star+up")
+		var buff_icon: String = {"blood_water": "drop+up", "lifeline": "boot+rope"}.get(key, _BUFF_ICONS.get(b["stat"], "star+up"))
 		if b["stat"] == "horse_speed":
 			buff_icon = mount_kind() + "+up"
 		out.append({"icon": buff_icon, "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
@@ -591,9 +610,23 @@ func readiness() -> Array[Dictionary]:
 		for e: Dictionary in _triggers.get(event, []):
 			if e.has("nth") and kind == WeaponDefs.Kind.MELEE:
 				every.call("nth_" + str(e.get("from", event)), {"name": e.get("from_name", ""), "icon": e.get("from_icon", "star+up")}, "fire", int(e["nth"]), int(e["count"]) % int(e["nth"]))
+	if wid == "trident" and has_flag("skewer"):
+		every.call("skewer", _ability_look("skewer"), "fire", TidecallerKit.SKEWER_EVERY, trident_thrusts % TidecallerKit.SKEWER_EVERY)
+	if spec_id == "stormcaller" and has_flag("maelstrom"):
+		every.call("maelstrom", _ability_look("maelstrom"), "art", TidecallerKit.MAELSTROM_EVERY, spears_thrown % TidecallerKit.MAELSTROM_EVERY)
 	if spec_id == "pyromaniac" and has_item("great_keg"):
 		every.call("great_keg", _item_look("great_keg", UiTheme.EMBER), "art", PathUpgrades.GREAT_KEG_EVERY, bombs_thrown % PathUpgrades.GREAT_KEG_EVERY)
+	if spec_id == "blade_dancer" and has_item("encore"):
+		every.call("encore", _item_look("encore", col), "art", CrownUpgrades.ENCORE_EVERY, CrownUpgrades.encore_have(self))
+	if spec_id == "thief" and has_item("lucky_fingers"):
+		every.call("lucky_fingers", _item_look("lucky_fingers", CrownUpgrades.COIN), "path_art", CrownUpgrades.LUCKY_ONE_IN, CrownUpgrades.lucky_have(self))
+	if spec_id == "highwayman" and has_item("toll_road"):
+		every.call("toll_road", _item_look("toll_road", col), "path_art", CrownUpgrades.TOLL_EVERY, CrownUpgrades.toll_have(self))
 	# Armed and waiting for the next one.
+	if spec_id == "worlds_traveler" and has_item("open_door"):
+		armed.call("open_door", _item_look("open_door", col), "", CrownUpgrades.door_ready(self))
+	if contract_on != null and is_instance_valid(contract_on):
+		armed.call("contract", _item_look("contract", CrownUpgrades.COIN), "", false, true)
 	if kind == WeaponDefs.Kind.RANGED and has_flag("killing_shot"):
 		armed.call("killing_shot", _ability_look("killing_shot"), "fire", _kill_shot_cd <= 0.0)
 	if _next_hit_mult > 1.0 and kind == WeaponDefs.Kind.MELEE:
@@ -603,6 +636,10 @@ func readiness() -> Array[Dictionary]:
 		armed.call("next_blow", look, "fire", true)
 	if has_flag("assassin") and kind == WeaponDefs.Kind.MELEE and world:
 		armed.call("assassin", _ability_look("death_dark"), "fire", _unaware_in_reach(float(d.get("range", 2.0)) + 0.5))
+	if has_flag("unbroken_sea"):
+		armed.call("unbroken_sea", _ability_look("unbroken_sea"), "", unbroken_cd <= 0.0)
+	if shell_left > 0.0:
+		armed.call("tide_shell", {"name": "Tide Shell: %d" % int(ceilf(shell_hp)), "icon": "shell", "color": TidecallerKit.TIDE}, "", false, true)
 	if has_flag("perfect_riposte"):
 		armed.call("riposte", _ability_look("perfect_riposte"), "", _riposte_cd <= 0.0)
 	if has_power("stone_sprite"):
@@ -615,6 +652,11 @@ func readiness() -> Array[Dictionary]:
 	if class_id == "adept" and STANCES.has(stance):
 		out.append({"key": "stance_mastery", "name": "Stance Mastery", "icon": "lotus+up", "color": col, "button": "",
 			"need": 3, "have": stance_hits, "primed": false, "active": _stance_mastered})
+	if d.has("fervour") and _fervour > 0:
+		out.append({"key": "fervour", "name": "Fervour", "icon": "cutlass+up", "color": Color(0.95, 0.75, 0.5), "button": "",
+			"need": int(d["fervour"]), "have": _fervour, "primed": false, "active": true})
+	if d.has("tethered") and harpoon_out:
+		armed.call("harpoon", {"name": "Harpoon thrown: walk over it", "icon": "harpoon", "color": Color(0.85, 0.72, 0.45)}, "fire", false, true)
 	if d.get("momentum", false) and _flail_stacks > 0:
 		out.append({"key": "momentum", "name": "Momentum", "icon": "flail+up", "color": Color(0.95, 0.75, 0.5), "button": "",
 			"need": 3, "have": _flail_stacks, "primed": false, "active": true})
@@ -1009,7 +1051,7 @@ func _equip() -> void:
 		return
 	_vm_mesh.equip(weapon_id(), true)
 	_vm_mesh.rotation.y = float(d.get("mesh_yaw", 0.0))
-	_vm_mesh.visible = not (d.get("returning", false) and _axe_out)
+	_vm_mesh.visible = not (d.get("returning", false) and _axe_out) and not (d.has("tethered") and harpoon_out)
 	_vm_root.scale = Vector3.ONE * float(d["scale"])
 	_vm_left.visible = WeaponAnim.both_hands(d)
 	if _vm_left.visible:
@@ -1073,7 +1115,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if stone_ward:
 		_ward_breaks(attacker)
 		return
-	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0)
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0) * FerrymanKit.ward(self)
 	if Net.active():
 		# A Guardian nearby takes part of it.
 		var cover: Target = world.best_cover(global_position)
@@ -1094,6 +1136,8 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 		fire("block", {"attacker": attacker})
 	if UpgradeKit.mirror_dodges(self, dmg):
 		return
+	if CrownUpgrades.open_door(self, dmg):
+		return
 	if has_flag("mana_shield") and mana > 0.0:
 		var drained := minf(mana, dmg * 0.5)
 		mana -= drained
@@ -1108,6 +1152,9 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if attacker and m("thorns") > 0.0:
 		attacker.take_damage(m("thorns"), attacker.position - global_position, 1.0, attacker.centre())
 	dmg = PathUpgrades.soul_link(self, dmg)
+	dmg = TidecallerKit.on_hurt(self, dmg, attacker)
+	if dmg <= 0.0:
+		return
 	if ward_hp > 0.0:
 		var stopped := minf(ward_hp, dmg)
 		ward_hp -= stopped
@@ -1127,7 +1174,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	damaged.emit(dmg, hit_by)
 	var push := global_position - from
 	push.y = 0
-	if push.length_squared() > 0.001:
+	if push.length_squared() > 0.001 and not TidecallerKit.steady(self):
 		# A bridge has no sides, and a good blow can put you over the edge.
 		var on_bridge := world.terrain.has_islands() and world.terrain.on_deck(global_position.x, global_position.z)
 		var thrown: bool = on_bridge or (attacker != null and attacker.def.get("shoves", false))
@@ -1163,6 +1210,229 @@ func ignite(seconds: float) -> void:
 	burn_time = maxf(burn_time, seconds)
 
 
+## A creature's sting or blow that stuns: for just as long as it says (not shortened, as another
+## player's stun is), unless you are already stunned or just shook one off.
+func stun_by_creature(seconds: float) -> void:
+	if dead or guard_left > 0.0 or frozen_left > 0.0 or _status_immune > 0.0 or TidecallerKit.steady(self):
+		return
+	frozen_left = seconds
+	is_iced = false
+	say("Stunned!")
+
+
+## Last Light: the boons this player has chosen at the Lantern Road's waystations (Boons).
+var boons: Array[String] = []
+
+
+## Last Light: the Mist Tide drowning you, outside the Lantern Barge's light.
+func drown(amount: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	hp -= amount
+	damaged.emit(amount, "the tide")
+	hurt_flash = maxf(hurt_flash, 0.25)
+	if hp <= 0.0:
+		hit_by = "the Mist Tide"
+		_on_fatal()
+
+
+## Caught in a Press Gang's net: you can fight and turn, but not move, for as long as it says.
+func root_by_creature(seconds: float) -> void:
+	if dead or guard_left > 0.0 or TidecallerKit.steady(self):
+		return
+	rooted_left = maxf(rooted_left, seconds)
+	say("Caught in a net!")
+
+
+## Slowed by a creature (a wave knocking you off your feet): for just as long as it says.
+func slow_by_creature(seconds: float) -> void:
+	if dead or guard_left > 0.0:
+		return
+	slowed_left = maxf(slowed_left, seconds)
+
+
+## Hooked by the Harbourmaster's chain: hauled across the ground to `at`, stopping `stop` metres short.
+const DRAG_SPEED := 20.0
+const DRAG_MAX := 1.4 # however far it is, the haul ends after this long
+var _drag_to := Vector3.INF
+var _drag_stop := 2.0
+var _drag_left := 0.0
+func drag_to(at: Vector3, stop: float) -> void:
+	if dead or guard_left > 0.0 or is_riding() or TidecallerKit.steady(self):
+		return
+	_drag_to = at
+	_drag_stop = stop
+	_drag_left = DRAG_MAX
+	say("Hooked!")
+
+
+func is_dragged() -> bool:
+	return _drag_left > 0.0
+
+
+## A Harpooner's Haul on something too big to move: the rope hauls the Harpooner to it instead.
+func haul_self_to(at: Vector3, stop: float) -> void:
+	if dead or is_riding():
+		return
+	_drag_to = at
+	_drag_stop = stop
+	_drag_left = DRAG_MAX
+
+
+## Haul's rope, a Harpooner's own business: what it caught (No Quarter) and what its harpoons
+## marked (Flensing), each until when it counts. And whether the haul ends in a Grapple Slam.
+var hauled := {}
+var hunted := {}
+# The Tidecaller (TidecallerKit): the Trident's thrusts for Skewer, a Tidewarden's Tide Shell and
+# Unbroken Sea, a Stormcaller's spears for Maelstrom and its Squall Step, and what the Trident last struck.
+var trident_thrusts := 0
+var trident_frame := -1
+var skewering := false
+var trident_prey: Zombie
+var shell_hp := 0.0
+var shell_max := 0.0
+var shell_left := 0.0
+var unbroken_cd := 0.0
+var spears_thrown := 0
+var _squall_t := -1.0
+var _squall_from := Vector3.ZERO
+var _squall_to := Vector3.ZERO
+var _tide_shell: TideShell
+# The Ferryman (FerrymanKit): the Crossing under way, a Tollkeeper's obols and debtors, a Psychopomp's
+# souls, and the timers of the Last Ferry and the Gate of the Dead.
+var obols := 0
+var debtors := {}
+var souls := 0
+var oarlock := false
+var second_trip_left := 0.0
+var death_gate_left := 0.0
+var _cross_t := -1.0
+var _cross_from := Vector3.ZERO
+var _cross_to := Vector3.ZERO
+var _cross_struck := {}
+var _soul_ring: SoulRing
+var _aura_tick := 0.0
+
+
+func start_cross(from: Vector3, to: Vector3) -> void:
+	_cross_from = from
+	_cross_to = to
+	_cross_t = 0.0
+	_cross_struck.clear()
+	guard_left = maxf(guard_left, FerrymanKit.CROSS_TIME)
+
+
+## The skiff glides over the ground, the Ferryman in it; whatever it passes is shoved aside.
+func _tick_cross(delta: float) -> void:
+	_cross_t += delta / FerrymanKit.CROSS_TIME
+	var f := minf(_cross_t, 1.0)
+	var at := _cross_from.lerp(_cross_to, f)
+	at.y = world.ground_at(at) + 0.3 + sin(f * PI) * 0.15
+	global_position = at
+	velocity = Vector3.ZERO
+	FerrymanKit.on_cross_step(self, _cross_from, at, _cross_struck)
+	if _cross_t >= 1.0:
+		_cross_t = -1.0
+		global_position = _cross_to + Vector3.UP * 0.04
+		_was_on_floor = true
+		_land_dip = 0.6
+		FerrymanKit.on_cross_end(self, _cross_from, _cross_to)
+
+
+## A Stormcaller's Squall Step: thrown back on the wind as the spear leaves the hand.
+const SQUALL_TIME := 0.22
+func squall_step(offset: Vector3) -> void:
+	var dir := Vector3(offset.x, 0, offset.z)
+	if dir.length() < 0.1:
+		return
+	_squall_from = global_position
+	_squall_to = leap_landing(global_position, dir.normalized(), dir.length())
+	_squall_t = 0.0
+
+
+func _tick_squall(delta: float) -> void:
+	_squall_t += delta / SQUALL_TIME
+	var f := minf(_squall_t, 1.0)
+	var at := _squall_from.lerp(_squall_to, 1.0 - pow(1.0 - f, 2.0))
+	at.y = world.ground_at(at) + sin(f * PI) * 0.35
+	global_position = at
+	velocity = Vector3.ZERO
+	if _squall_t >= 1.0:
+		_squall_t = -1.0
+		global_position = _squall_to + Vector3.UP * 0.04
+		_was_on_floor = true
+		_land_dip = 0.4
+
+
+func is_crossing() -> bool:
+	return _cross_t >= 0.0
+
+
+func set_souls(n: int) -> void:
+	if n == souls and (_soul_ring == null or _soul_ring.count == n):
+		return
+	souls = n
+	if _soul_ring == null and n > 0:
+		_soul_ring = SoulRing.new()
+		add_child(_soul_ring)
+	if _soul_ring:
+		_soul_ring.set_count(n)
+	if Net.active():
+		Net.souls(net_id(), n)
+
+
+func _tick_ferryman(delta: float) -> void:
+	second_trip_left = maxf(0.0, second_trip_left - delta)
+	death_gate_left = maxf(0.0, death_gate_left - delta)
+	if has_flag("obol_speed") and obols > 0:
+		_buffs["obol_speed"] = {"stat": "speed", "val": FerrymanKit.OBOL_SPEED * obols, "left": 0.3, "stacks": 1}
+	_aura_tick -= delta
+	if _aura_tick <= 0.0:
+		_aura_tick = 1.0
+		FerrymanKit.soul_aura(self)
+var slam_on_arrival := false
+
+
+## Carried by a friend's skiff, a Boatman's: moved with it to where it grounds.
+func carried_to(at: Vector3) -> void:
+	if dead or is_riding():
+		return
+	_drag_to = at
+	_drag_stop = 0.3
+	_drag_left = DRAG_MAX
+	guard_left = maxf(guard_left, FerrymanKit.CROSS_TIME)
+	say("Ferried!")
+
+
+## Hauled in by a rival Harpooner's rope (from their phone).
+func hauled_by_rival(at: Vector3) -> void:
+	if dead or guard_left > 0.0 or is_riding():
+		return
+	_drag_to = at
+	_drag_stop = 0.6
+	_drag_left = DRAG_MAX
+	say("Hauled in!")
+
+
+## A Siren's song: drawn toward `at` at `speed` metres a second, on top of your own walking, for as long
+## as it is sung (VaelMind.sing says so again every frame).
+var _lure_at := Vector3.INF
+var _lure_speed := 0.0
+var _lure_left := 0.0
+func lure(at: Vector3, speed: float, why := "The song draws you in...") -> void:
+	if dead or guard_left > 0.0:
+		return
+	if _lure_left <= 0.0:
+		say(why)
+	_lure_at = at
+	_lure_speed = speed
+	_lure_left = 0.15
+
+
+func is_lured() -> bool:
+	return _lure_left > 0.0
+
+
 ## Another player's ability. It does not last as long on a person as on the undead.
 func apply_status(kind: int, seconds: float) -> void:
 	if dead or guard_left > 0.0:
@@ -1194,6 +1464,16 @@ func apply_status(kind: int, seconds: float) -> void:
 		Net.Status.ROOT:
 			rooted_left = maxf(rooted_left, secs)
 			say("Rooted!")
+		Net.Status.REVEAL:
+			# A flare's light: no hiding in it.
+			if invis_left > 0.0:
+				invis_left = 0.0
+				say("Revealed!")
+			invis_lockout = maxf(invis_lockout, seconds)
+		Net.Status.BLIND:
+			# Blinded (Net.Status.BLIND): the edges of sight close in, as in a Nightfall.
+			night_blind_left = maxf(night_blind_left, secs)
+			say("Lost in the fog!")
 
 
 ## The deadly fog: no armour or dodge helps against it, though a moment of invincibility does.
@@ -1210,6 +1490,8 @@ func fog_hurt(amount: float) -> void:
 
 
 func _on_fatal() -> void:
+	if class_id == "ferryman" and FerrymanKit.gate_of_the_dead(self):
+		return
 	_kill()
 
 
@@ -1262,6 +1544,9 @@ func respawn(at: Vector3) -> void:
 	frozen_left = 0.0
 	slowed_left = 0.0
 	rooted_left = 0.0
+	_drag_left = 0.0
+	slam_on_arrival = false
+	_lure_left = 0.0
 	_status_immune = 0.0
 	guard_left = 2.5
 	last_foe = 0
@@ -1312,9 +1597,22 @@ func _kill() -> void:
 		return
 	hp = 0.0
 	dead = true
+	obols = 0
+	set_souls(0)
+	debtors.clear()
+	oarlock = false
 	input_fire = false
 	if is_riding():
 		dismount()
+	_drag_left = 0.0
+	slam_on_arrival = false
+	_lure_left = 0.0
+	if has_power(PowerDefs.CROWN):
+		# The crown falls where you do, for someone else to take.
+		powers.erase(PowerDefs.CROWN)
+		world.spawn_pickup_at(global_position, Pickup.Kind.POWER, PowerDefs.CROWN)
+		if bot_peer == 0 and world.director:
+			world.director.local_banner("The Sunken Crown falls from your head", 3.0)
 	world.on_player_died(self)
 
 
@@ -1682,6 +1980,10 @@ func on_kill(z: Zombie) -> void:
 
 
 func _on_kill(z: Zombie) -> void:
+	var held := weapon_def()
+	if held.has("fervour"):
+		_fervour = mini(int(held["fervour"]), _fervour + 1)
+		_fervour_left = float(held["fervour_time"])
 	kills += 1
 	if z.poison_left > 0.0 and has_flag("plague_burst"):
 		world.drop_poison(z.position)
@@ -1692,6 +1994,8 @@ func _on_kill(z: Zombie) -> void:
 			_note_poison(70.0)
 	if has_item("shadow_shroud"):
 		shadow_kills = mini(SHROUD_KILLS, shadow_kills + 1)
+	if bot_peer == 0:
+		Game.note_killed(z.type_id)
 	if bot_peer == 0 and z.type_id == "rider" and not Game.unlocked.has("chivalry"):
 		Game.note_rider_killed()
 		if Game.unlocked.has("chivalry"):
@@ -1708,8 +2012,12 @@ func _on_kill(z: Zombie) -> void:
 			void_left += AbilityNumbers.WALKER_BETWEEN
 			invis_left = maxf(invis_left, void_left)
 	add_arrows(int(class_def().get("kill_arrows", 0)))
-	if m("plunder") > 0.0:
-		BanditKit.plunder(self, z.position)
+	if m("plunder") > 0.0 or z.tolled():
+		BanditKit.plunder(self, z.position, z.tolled())
+	if class_id == "harpooner":
+		HarpoonerKit.on_kill(self, z)
+	if class_id == "ferryman":
+		FerrymanKit.on_kill(self, z)
 	fire("kill", {"z": z})
 	if _assassin_kill:
 		_assassin_kill = false
@@ -1748,6 +2056,10 @@ func modify_damage(z: Zombie, base: float) -> float:
 		say("✦ Backstab")
 	if has_flag("pack_tactics") and world.ally_near(z.position, AbilityNumbers.PACK_REACH):
 		dmg *= AbilityNumbers.PACK_TACTICS
+	if class_id == "harpooner":
+		dmg *= HarpoonerKit.damage_scale(self, z)
+	if class_id == "ferryman":
+		dmg *= FerrymanKit.blow_scale(self)
 	return dmg
 
 
@@ -1799,8 +2111,9 @@ func dismount() -> void:
 
 
 ## What a rider's look adds to its pose: bit 0, the White Stag in place of the horse.
+## What others see of you beyond your class: the White Stag (1), and the Sunken Crown on your head (2).
 func skin_bits() -> int:
-	return 1 if bot_peer == 0 and ShopDefs.skin_on("stag_steed") else 0
+	return (1 if bot_peer == 0 and ShopDefs.skin_on("stag_steed") else 0) | (2 if has_power(PowerDefs.CROWN) else 0)
 
 
 func _build_horse() -> void:
@@ -1943,6 +2256,11 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 	var d: Dictionary = PowerDefs.ALL[id]
 	var time: float = d["time"]
 	time *= m("familiar_time") if d["familiar"] else m("potion_time")
+	if d.get("relic", false):
+		time = d["time"] # worn until you fall
+		if bot_peer == 0 and world.director:
+			world.director.local_banner("You wear the Sunken Crown. Everyone can see where you are", 3.5)
+		sfx("crown_take", 0.0)
 	if id == "lantern":
 		time += m("lantern_time")
 	if forced_time > 0.0:
@@ -1971,7 +2289,7 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 				shown = Node3D.new()
 				var bird := BirdRig.new("crow")
 				bird.rotation.y = PI * 0.8
-				bird.scale = Vector3.ONE * 0.32
+				bird.scale = Vector3.ONE * RAVEN_FAMILIAR_SCALE
 				shown.add_child(bird)
 				bird.set_layers(2)
 			else:
@@ -1992,6 +2310,10 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 	say(str(d["name"]) + "!")
 
 
+## The Raven familiar's size in view: its wings spread about 14 cm, like the other familiars beside it.
+const RAVEN_FAMILIAR_SCALE := 0.15
+
+
 func _arrange_familiars() -> void:
 	var i := 0
 	for id: String in _familiars:
@@ -2000,6 +2322,8 @@ func _arrange_familiars() -> void:
 
 
 func _tick_powers(delta: float) -> void:
+	if has_power(PowerDefs.CROWN) and not dead:
+		hp = minf(max_hp(), hp + PowerDefs.CROWN_REGEN * delta)
 	for id: String in powers.keys():
 		powers[id] = float(powers[id]) - delta
 		if float(powers[id]) <= 0.0:
@@ -2202,6 +2526,8 @@ func _familiar_mark(reach: float, need_sight: bool) -> Node3D:
 
 
 func _tick_ability_timers(delta: float) -> void:
+	if class_id == "ferryman":
+		_tick_ferryman(delta)
 	if _banner != null:
 		_banner.rotation.z = sin(world.now * (12.0 if _cast_kind == "command" else 2.0)) * (0.18 if _cast_kind == "command" else 0.025)
 	for key: String in _buffs.keys():
@@ -2214,6 +2540,7 @@ func _tick_ability_timers(delta: float) -> void:
 	friend_heal_left = maxf(0.0, friend_heal_left - delta)
 	night_blind_left = maxf(0.0, night_blind_left - delta)
 	gate_rest_left = maxf(0.0, gate_rest_left - delta)
+	open_door_cd = maxf(0.0, open_door_cd - delta)
 	find_rest_left = maxf(0.0, find_rest_left - delta)
 	guard_left = maxf(0.0, guard_left - delta)
 	dome_left = maxf(0.0, dome_left - delta)
@@ -2258,7 +2585,24 @@ func has_path_art() -> bool:
 func path_art_def() -> Dictionary:
 	if class_id == "bandit":
 		return BanditKit.path_art(self)
+	if class_id == "harpooner":
+		return HarpoonerKit.path_art(self)
 	return {}
+
+
+## How much the tree shortens the ability button's wait. The Bandit's tree sharpens its path's
+## ability instead, and the Harpooner's has its own for Haul.
+func art_cd_scale() -> float:
+	if class_id == "bandit":
+		return 1.0
+	if class_id == "harpooner":
+		return m("haul_cd")
+	return m("art_cd")
+
+
+## ...and the second button's.
+func path_cd_scale() -> float:
+	return m("path_cd") if class_id == "harpooner" else m("art_cd")
 
 
 ## Whether the path's ability would do anything if used now (Steal needs someone in reach).
@@ -2272,8 +2616,8 @@ func use_path_art() -> void:
 	var d := path_art_def()
 	if d.is_empty() or _cast_kind != "" or _is_moved_by_mist() or path_art_cd_left > 0.0 or frozen_left > 0.0 or spirit_left > 0.0:
 		return
-	path_art_cd_left = maxf(0.5, float(d["cd"]) * m("art_cd"))
-	_cast_kind = "bandit_path"
+	path_art_cd_left = maxf(0.5, float(d["cd"]) * path_cd_scale())
+	_cast_kind = class_id + "_path"
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -2291,6 +2635,12 @@ func art_def() -> Dictionary:
 		return BanditKit.art(self)
 	if class_id == "cartographer":
 		return CartographerKit.art(self)
+	if class_id == "harpooner":
+		return HarpoonerKit.art(self)
+	if class_id == "tidecaller":
+		return TidecallerKit.art(self)
+	if class_id == "ferryman":
+		return FerrymanKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -2423,7 +2773,7 @@ func art_cost() -> float:
 
 ## What the bar is full of, for "Not enough...".
 func _art_fuel() -> String:
-	return "Ki" if class_def().get("ki", false) else "mist"
+	return "Ki" if class_def().get("ki", false) else "tide" if class_id == "tidecaller" else "mist"
 
 
 ## Mist Burst: gather the mist for a moment, then let it go.
@@ -2474,8 +2824,8 @@ func use_art() -> void:
 		return
 	mana -= art_cost()
 	# The Bandit's paths sharpen their own ability (on the second button), not Into the Shadows.
-	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * (1.0 if class_id == "bandit" else m("art_cd")))
-	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * art_cd_scale())
+	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "tidecaller" if class_id == "tidecaller" else "ferryman" if class_id == "ferryman" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -2731,13 +3081,22 @@ func _change_stance() -> void:
 		_next_hit_mult = maxf(_next_hit_mult, AbilityNumbers.MIRROR_NEXT_BLOW)
 		_undo_hit()
 	if has_flag("blade_dancer"):
-		_dance_sweep()
+		var encore := CrownUpgrades.next_is_encore(self)
+		_dance_sweep(CrownUpgrades.ENCORE_POWER if encore else 1.0)
+		if encore:
+			CrownUpgrades.encore(self, STANCE_COLOURS[stance])
 		if has_flag("storm_of_steel"):
 			_second_sweep = 0.25
 
 
-func _dance_sweep() -> void:
-	var hits := _sweep(SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0), (AbilityNumbers.WHIRL if has_flag("whirl") else 1.0) * _transition_power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
+## How far a Blade Dancer's sweep reaches.
+func sweep_reach() -> float:
+	return SWEEP_REACH + (AbilityNumbers.WIDE_SWEEP if has_flag("wide_sweep") else 0.0)
+
+
+func _dance_sweep(power := 1.0) -> void:
+	var reach := sweep_reach() + (CrownUpgrades.ENCORE_REACH if power > 1.0 else 0.0)
+	var hits := _sweep(reach, (AbilityNumbers.WHIRL if has_flag("whirl") else 1.0) * _transition_power * power, 1.0 if has_flag("stance_echo") and stance == "stone" else 0.0, STANCE_COLOURS[stance])
 	if hits <= 0:
 		return
 	if hp < max_hp():
@@ -2771,6 +3130,7 @@ func _undo_hit() -> void:
 		world.stun_around(global_position, AbilityNumbers.BLINDING_STEP_REACH, AbilityNumbers.BLINDING_STEP_STUN)
 	if has_flag("patient_blade"):
 		_act({"do": "buff", "key": "patient_blade", "stat": "melee_damage", "val": AbilityNumbers.PATIENT_BLADE, "secs": AbilityNumbers.PATIENT_BLADE_TIME}, {})
+	CrownUpgrades.shatter(self)
 	if has_flag("perfect_reflection"):
 		const REACH := AbilityNumbers.PERFECT_REFLECTION_REACH
 		world.fx_ring(global_position, REACH, Color(0.7, 0.85, 1.0))
@@ -2784,6 +3144,7 @@ func _undo_hit() -> void:
 func _left_void() -> void:
 	if has_flag("aftermath"):
 		world.stun_around(global_position, AbilityNumbers.AFTERMATH_REACH, AbilityNumbers.AFTERMATH_STUN)
+	CrownUpgrades.event_horizon(self)
 	invis_left = 0.0
 
 
@@ -2851,6 +3212,8 @@ func _tick_mist(delta: float) -> void:
 	path_art_cd_left = maxf(0.0, path_art_cd_left - delta)
 	mirror_hall_left = maxf(0.0, mirror_hall_left - delta)
 	PathUpgrades.tick(self, delta)
+	CrownUpgrades.tick(self, delta)
+	TidecallerKit.tick(self, delta)
 	if _cast_kind == "":
 		return
 	if _cast_kind == "sharpshooter":
@@ -2882,6 +3245,10 @@ func _tick_mist(delta: float) -> void:
 		"bandit": BanditKit.cast(self)
 		"bandit_path": BanditKit.cast_path(self)
 		"cartographer": CartographerKit.cast(self)
+		"harpooner": HarpoonerKit.cast(self)
+		"harpooner_path": HarpoonerKit.cast_path(self)
+		"tidecaller": TidecallerKit.cast(self)
+		"ferryman": FerrymanKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -3282,7 +3649,7 @@ func decoy_burst(at: Vector3) -> void:
 func take_shared(amount: float) -> void:
 	if dead or guard_left > 0.0:
 		return
-	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (1.0 - minf(0.6, m("shield")))
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (1.0 - minf(0.6, m("shield"))) * FerrymanKit.ward(self)
 	hp -= dmg
 	hurt_flash = maxf(hurt_flash, 0.4)
 	sfx("block", -8.0, 1.0, 0.15)
@@ -3475,6 +3842,8 @@ func _summon_revenants() -> void:
 
 func damage_multiplier() -> float:
 	var mult := PowerDefs.DAEMON_MULTIPLIER if has_power("daemon") else 1.0
+	if has_power(PowerDefs.CROWN):
+		mult *= PowerDefs.CROWN_DAMAGE
 	if void_left > 0.0:
 		mult *= 2.0
 	if has_flag("rage"):
@@ -3497,6 +3866,22 @@ func _physics_step(delta: float) -> void:
 	slowed_left = maxf(0.0, slowed_left - delta)
 	rooted_left = maxf(0.0, rooted_left - delta)
 	_status_immune = maxf(0.0, _status_immune - delta)
+	if _drag_left > 0.0:
+		# Hauled in on the chain, whatever else is happening; a stun waits until it is over.
+		_drag_left -= delta
+		var haul := Vector3(_drag_to.x - global_position.x, 0, _drag_to.z - global_position.z)
+		if haul.length() <= _drag_stop or _drag_left <= 0.0:
+			_drag_left = 0.0
+			velocity = Vector3(0, minf(velocity.y, 0.0), 0)
+			if slam_on_arrival:
+				slam_on_arrival = false
+				HarpoonerKit.land_slam(self)
+		else:
+			velocity.x = haul.normalized().x * DRAG_SPEED
+			velocity.z = haul.normalized().z * DRAG_SPEED
+			velocity.y = velocity.y - GRAVITY * delta if not is_on_floor() else 0.0
+			move_and_slide()
+			return
 	if frozen_left > 0.0:
 		frozen_left -= delta
 		if frozen_left <= 0.0:
@@ -3512,6 +3897,12 @@ func _physics_step(delta: float) -> void:
 	if ride_behind != 0:
 		_tick_seat(delta)
 		return
+	if _cross_t >= 0.0:
+		_tick_cross(delta)
+		return
+	if _squall_t >= 0.0:
+		_tick_squall(delta)
+		return
 	if _leap_t >= 0.0:
 		_tick_leap(delta)
 		return
@@ -3525,7 +3916,7 @@ func _physics_step(delta: float) -> void:
 	var dir := global_basis * Vector3(input_move.x, 0, input_move.y)
 	if _cast_kind == "sharpshooter":
 		dir = Vector3.ZERO
-	var speed := WALK_SPEED * m("speed") * (1.4 if has_power("speed") else 1.0) * (CartographerKit.LANTERN_SPEED if has_power("lantern") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
+	var speed := WALK_SPEED * m("speed") * float(weapon_def().get("burden", 1.0)) * (1.4 if has_power("speed") else 1.0) * (CartographerKit.LANTERN_SPEED if has_power("lantern") else 1.0) * (0.5 if zoomed else 1.0) * (RAGE_SPEED if rage_left > 0.0 else 1.0)
 	if is_riding():
 		speed = WALK_SPEED * (CHARIOT_SPEED if mount_kind() == "chariot" else HORSE_SPEED) * m("horse_speed")
 	elif input_move.y > 0.0:
@@ -3540,8 +3931,10 @@ func _physics_step(delta: float) -> void:
 	if bleed_left > 0.0:
 		speed *= BLEED_SPEED
 	var wading := world.terrain.in_water(global_position.x, global_position.z)
-	if wading:
+	if wading and not has_flag("sea_legs"):
 		speed *= WADE_SPEED
+	if world.tide and not has_flag("sea_legs"):
+		speed *= world.tide.slow_at(global_position) # wading in the Mist Tide, on foot or mounted
 	var accel := 14.0 if is_on_floor() else 5.0
 	velocity.x = move_toward(velocity.x, dir.x * speed, accel * speed * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, accel * speed * delta)
@@ -3563,6 +3956,12 @@ func _physics_step(delta: float) -> void:
 	if wading and global_position.y < Terrain.WATER_Y + 0.6:
 		var flow := world.terrain.river_flow(global_position.x, global_position.z)
 		move_and_collide(Vector3(flow.x, 0, flow.y) * Terrain.CURRENT * delta)
+	if _lure_left > 0.0:
+		# A Siren's song, drawing you in over the ground whatever way you walk.
+		_lure_left -= delta
+		var pull := Vector3(_lure_at.x - global_position.x, 0, _lure_at.z - global_position.z)
+		if pull.length() > VaelMind.SONG_CLOSE:
+			move_and_collide(pull.normalized() * _lure_speed * delta)
 	# However it happened, nobody stays under the ground.
 	var floor_y := world.terrain.ground_height(global_position.x, global_position.z) if world.terrain.has_islands() else world.terrain.height(global_position.x, global_position.z)
 	if global_position.y < floor_y - 1.0:
@@ -3665,6 +4064,8 @@ func _noise(radius: float) -> void:
 
 ## Something low ahead with free space above it, like a fence or a crate.
 func _should_auto_jump(dir: Vector3) -> bool:
+	if world.vael_sites and not is_riding():
+		return rooted_left <= 0.0 and VaelVault.landing(self, world, dir) != Vector3.INF
 	var flat := Vector3(dir.x, 0, dir.z)
 	if flat.length_squared() < 0.01:
 		return false
@@ -3774,6 +4175,12 @@ func _process_step(delta: float) -> void:
 			_do_melee_hit()
 	_flail_idle += delta
 	_cleave_idle += delta
+	if _fervour > 0:
+		_fervour_left -= delta
+		if _fervour_left <= 0.0:
+			_fervour = 0
+	if harpoon_out:
+		_tick_harpoon(delta)
 	if _flail_idle > 1.4:
 		_flail_stacks = 0
 	_handle_fire()
@@ -3795,6 +4202,8 @@ func attack_interval(d: Dictionary) -> float:
 		rate /= m("melee_rate")
 		if d.get("momentum", false):
 			rate /= 1.0 + _flail_stacks * 0.35
+		if d.has("fervour") and _fervour > 0:
+			rate /= 1.0 + _fervour * float(d["fervour_rate"])
 		if has_flag("blood_frenzy") and hp < max_hp() * AbilityNumbers.FRENZY_BELOW:
 			rate /= AbilityNumbers.FRENZY_RATE
 	elif d["kind"] == WeaponDefs.Kind.SPELL:
@@ -3824,6 +4233,8 @@ func _handle_fire() -> void:
 		mana -= float(d["cost"])
 	if d.get("returning", false) and _axe_out:
 		return
+	if d.has("tethered") and harpoon_out:
+		return
 	invis_left = 0.0
 	_cooldown = attack_interval(d)
 	attack_count += 1
@@ -3839,7 +4250,9 @@ func _handle_fire() -> void:
 			_flail_idle = 0.0
 			if d.get("momentum", false):
 				_flail_stacks = mini(3, _flail_stacks + 1)
-			if WeaponDefs.is_two_handed(weapon_id()):
+			if d.has("swing_sound"):
+				sfx(str(d["swing_sound"]), -3.0, randf_range(0.94, 1.06))
+			elif WeaponDefs.is_two_handed(weapon_id()):
 				sfx("heavy_swing", -3.0, randf_range(0.92, 1.05))
 			else:
 				sfx("swing", -3.0, 1.15 if weapon_id() == "dagger" else 1.0)
@@ -3852,6 +4265,10 @@ func _handle_fire() -> void:
 				elif WeaponDefs.own_ammo(weapon_id()) > 0:
 					own_ammo[weapon_id()] = ammo_of(weapon_id()) - 1
 				_fire_arrow(d)
+				if d.has("tethered"):
+					harpoon_out = true
+					_harpoon_back = HarpoonerKit.harpoon_return(self, float(d["tethered"]))
+					_vm_mesh.visible = false
 				_spent_weapon()
 		WeaponDefs.Kind.SPELL:
 			mana -= float(d["cost"]) * m("spell_cost")
@@ -3888,6 +4305,8 @@ func _start_swing(d: Dictionary) -> void:
 
 func _ranged_mult() -> float:
 	var mult := m("ranged_damage") * damage_multiplier()
+	if class_id == "harpooner" and HarpoonerKit.by_own_line(self):
+		mult *= 1.0 + HarpoonerKit.CROWS_NEST
 	if weapon_def().get("spec", "") == "pathfinder":
 		mult *= 1.0 + m("find_damage")
 	if is_riding():
@@ -3934,11 +4353,17 @@ func _fire_arrow(d: Dictionary) -> void:
 	if d.get("silent", false):
 		sfx("bow", -16.0, 1.6)
 		return
+	if d.get("gun", false):
+		sfx("flare_shot", -2.0, randf_range(0.96, 1.04))
+		_noise(10.0)
+		return
 	if d.has("shot"):
 		_swing_time = 0.3
 		_swing = 0.0
 		_swing_keys = "throw"
-		if d["shot"] == "chakram":
+		if d["shot"] == "harpoon":
+			sfx("harpoon_throw", -2.0, randf_range(0.95, 1.05))
+		elif d["shot"] == "chakram":
 			sfx("chakram_throw", -3.0, randf_range(0.95, 1.05))
 		elif d["shot"] == "bolas":
 			sfx("bolas_throw", -3.0, randf_range(0.95, 1.05))
@@ -3998,9 +4423,9 @@ func melee_stats(d: Dictionary) -> Dictionary:
 		mult *= 1.5
 	return {
 		"damage": WeaponDefs.DAMAGE * mult * float(d.get("power", 1.0)),
-		"range": float(d["range"]) + m("melee_reach"),
+		"range": float(d["range"]) + m("melee_reach") + (m("trident_reach") if d.has("tide") else 0.0),
 		"cone": float(d["cone"]) + m("melee_cone"),
-		"hits": int(d["max_hits"]) + int(m("melee_hits")),
+		"hits": int(d["max_hits"]) + int(m("melee_hits")) + (int(m("trident_hits")) if d.has("tide") else 0),
 		"knock": float(d["knock"]) * m("knock"),
 	}
 
@@ -4026,6 +4451,8 @@ func _do_melee_hit() -> void:
 			world.fx_blast(global_position + Vector3.UP * 0.3 - global_basis.z * 1.6, 1.4, Color(0.95, 0.75, 0.5, 0.45))
 			sfx("cleave", -1.0, randf_range(0.95, 1.05))
 	var hits := world.melee_hit(self, d, stats)
+	if d.has("quake") and d != BASH:
+		hits += _anchor_quake(d, stats)
 	if hits > 0 and d != BASH:
 		fire("melee_swing", {})
 	_next_hit_mult = 1.0
@@ -4048,9 +4475,84 @@ func _do_melee_hit() -> void:
 		_noise(float(d.get("loud", 9.0)))
 
 
+## A Ship's Anchor meeting the ground: everything within its reach that the blow itself missed takes
+## a share of it and staggers. Returns how many it caught.
+func _anchor_quake(d: Dictionary, stats: Dictionary) -> int:
+	# Project the anchor's crown at the authored contact frame onto the actual floor.
+	var strike := WeaponAnim.sample(WeaponAnim.keys_for("slam", true), SWING_HIT, float(d.get("arc", 1.0)))
+	var crown: Vector3 = d["pos"] + strike[0] + (strike[1] as Quaternion) * Vector3(0, 0.9 * float(d["scale"]), 0)
+	var eye := eye_position()
+	var view := camera.global_basis if camera else global_basis
+	var tip := view * crown
+	var at := eye + Vector3(tip.x, 0.0, tip.z)
+	var wall := get_world_3d().direct_space_state.intersect_ray(
+		PhysicsRayQueryParameters3D.create(eye, at, 1 | Terrain.LAYER))
+	if not wall.is_empty():
+		at = Vector3(wall["position"]) + Vector3(wall["normal"]) * 0.06
+	at = world.floor_contact(at)
+	var reach := float(d["quake"])
+	var caught := 0
+	var was := world.begin_act(self)
+	for z: Zombie in world.zombies_near(at, reach, 24):
+		if not z.is_alive() or z.flies or world.last_melee.has(z):
+			continue
+		var flat := Vector3(z.position.x - at.x, 0, z.position.z - at.z)
+		if flat.length() > reach + z.body_radius():
+			continue
+		world.damage_zombie(z, modify_damage(z, float(stats["damage"]) * float(d["quake_share"])), flat.normalized(), 1.5, z.centre(), false)
+		z.stun(float(d["quake_stagger"]))
+		caught += 1
+	if Net.pvp():
+		for t: Target in world.rivals_near(at, reach):
+			if t.global_position.distance_to(at) <= reach:
+				world.hit_rival(t, float(stats["damage"]) * float(d["quake_share"]), at)
+				status_on(world.peer_of(t), Net.Status.STUN, float(d["quake_stagger"]))
+				caught += 1
+	world.end_act(was)
+	world.anchor_quake_fx(at, reach)
+	if Net.active():
+		Net.world_fx(Net.Fx.QUAKE, at, Vector3(reach, 0, 0))
+	shake(0.55)
+	_noise(18.0)
+	return caught
+
+
+## Your Whaler's Harpoon, out in the world: taken back when you walk over it, or back in your hand
+## by itself once its time is up. If you no longer carry the harpoon, it is simply gone.
+func _tick_harpoon(delta: float) -> void:
+	var lying: Node3D = world.harpoons.get(net_id(), null)
+	if not slots.has("harpoon"):
+		_harpoon_home(false)
+		return
+	_harpoon_back -= delta
+	if lying and is_instance_valid(lying) and lying.global_position.distance_to(global_position) < HARPOON_REACH:
+		_harpoon_home(true)
+	elif _harpoon_back <= 0.0:
+		_harpoon_home(true)
+
+
+const HARPOON_REACH := 1.8 # metres from your thrown harpoon at which you take it back
+
+
+func _harpoon_home(in_hand: bool) -> void:
+	harpoon_out = false
+	world.take_harpoon(net_id())
+	if Net.active():
+		Net.world_fx(Net.Fx.HARPOON_GONE, Vector3.ZERO, Vector3.ZERO, net_id())
+	if in_hand:
+		sfx("harpoon_reel", -4.0)
+		if weapon_id() == "harpoon":
+			_vm_mesh.visible = true
+			_switch_anim = 0.18
+
+
 ## Rules applied to every zombie a melee swing connects with.
 func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 	_ki_from_blow()
+	if d.has("tide") and class_id == "tidecaller":
+		TidecallerKit.on_trident_hit(self, z)
+	if class_id == "ferryman":
+		FerrymanKit.on_blow(self, z)
 	if stance == "flame":
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if has_flag("void_walker") and STANCES.has(stance):
@@ -4068,6 +4570,12 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		z.stun(float(d["stun"]))
 	if d.get("bleed", false):
 		z.add_dot(8.0, 3.0, true)
+	if d.has("drags"):
+		# Caught on the hook: dragged in (world.melee_hit pulls it), or, too big for that, only staggered.
+		z.stun(float(d["drag_stagger"]))
+		world.sfx_at("hook_catch", z.centre(), -3.0)
+	if d.has("slows"):
+		z.slow(float(d["slows"]))
 	if rage_left > 0.0:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if d.get("backstab", false) and z.is_alive():
@@ -4076,6 +4584,8 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 			z.take_damage(melee_stats(d)["damage"], Vector3.ZERO, 0.0, z.centre())
 			say("Backstab!")
 	_antler_root(z)
+	if class_id == "harpooner":
+		HarpoonerKit.on_blow(self)
 	fire("hit", {"z": z})
 
 
@@ -4092,8 +4602,14 @@ func on_melee_rival(peer: int, d: Dictionary) -> void:
 		status_on(peer, Net.Status.STUN, float(d["stun"]))
 	if d.get("bleed", false):
 		status_on(peer, Net.Status.BLEED, 3.0)
+	if d.has("drags"):
+		status_on(peer, Net.Status.STUN, float(d["drag_stagger"]))
+	if d.has("slows"):
+		status_on(peer, Net.Status.SLOW, float(d["slows"]))
 	if has_power("antler_charm"):
 		status_on(peer, Net.Status.ROOT, PowerDefs.ANTLER_ROOT)
+	if class_id == "harpooner":
+		HarpoonerKit.on_blow(self)
 	fire("hit", {"rival": peer})
 
 
@@ -4112,6 +4628,8 @@ func on_shot_rival(peer: int, fire_shot: bool, frost_shot: bool) -> void:
 ## Rules for arrows and bolts that reach a zombie.
 func on_shot_connect(z: Zombie) -> void:
 	gain_ki(KI_PER_SHOT)
+	if class_id == "harpooner":
+		HarpoonerKit.on_blow(self)
 	_antler_root(z)
 	fire("shot", {"z": z})
 
@@ -4219,7 +4737,11 @@ func _pose_shot(d: Dictionary, pos: Vector3, q: Quaternion) -> void:
 	var loosed := 1.0 - smoothstep(0.0, 0.32, r)
 	var drawing := smoothstep(0.3, 0.72, r) * (1.0 - smoothstep(0.8, 1.0, r))
 	var aim := Quaternion.IDENTITY
-	if weapon_id() in ["crossbow", "musket"]:
+	if d.get("gun", false):
+		# A pistol bucks up when it fires, then dips as the next cartridge goes in.
+		pos += Vector3(0, loosed * 0.03 - drawing * 0.08, loosed * 0.025)
+		aim = Quaternion(Vector3(0, 1, 0), -0.22) * Quaternion(Vector3(1, 0, 0), loosed * 0.45 - drawing * 0.4 - 0.04)
+	elif weapon_id() in ["crossbow", "musket"]:
 		pos += Vector3(0, loosed * 0.03 - drawing * 0.14, loosed * 0.09 + drawing * 0.06)
 		aim = Quaternion(Vector3(1, 0, 0), loosed * 0.32 - drawing * 0.55)
 	else:

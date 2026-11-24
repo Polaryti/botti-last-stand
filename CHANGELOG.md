@@ -1,5 +1,103 @@
 # Changelog
 
+## 0.22.1 — The Sunken Crown (24 November 2026)
+
+*Down the road from the Valleys lies Vael, a harbour kingdom drowned when the Mists rose like a sea. Its Hollow Sovereign still holds court.* A new map with its own tide, creatures, court and bosses, a new class, coast weapons, nine Class Upgrades and the Trappers' Guild.
+
+### Port Vael, a new map
+- **The drowned harbour of Vael**, for Survive the Night, Co-op, All vs All and Teams. The night here lasts 15 minutes.
+- The upper town and Market Square, the Harbourmaster's house, the chapel, the quay with cranes and warehouses, two breakwaters, a lighthouse, three wrecks and a drowned bell tower.
+- The Boatwright's Yard, Ropewalk, Fishmarket and Salt House; coast paths under the firs to Gullwatch and Pilgrims' Garden.
+- Marked racks at Gullwatch, Valley Road, Pilgrims' Garden and the Harbourmaster's House hold weapons and potions.
+- Stairs, slipways and breakwater landings link the flats to the town. The Drowned climb out by them at any tide.
+- A coastal aurora, sea mist, drowned spires on the horizon, and its own music and sounds.
+
+### The Mist Tide
+- **The tide turns every 90 s**, taking 12 s to come in or go out. The harbour bells ring 10 s before each turn.
+- **Low tide:** each wreck and the drowned bell tower keeps a sea chest you can open once every low tide.
+- **High tide:** the flats flood. Wading slows you, down to 60% chest-deep, the sea-mist half blinds you in the water, and the Drowned are a quarter quicker.
+
+### The drowned of Vael
+- **Drowned Sailor:** a cutlass, a boarding hook or a knife; sometimes leaves it when it falls.
+- **Barnacle Brute:** its crust takes half of every blow from in front. Get round it.
+- **Brine Hound:** hunts in packs of three, and lunges.
+- **Lantern Jelly:** drifts in on the high tide and stings everything within 2.4 m, stunning for 0.8 s.
+- **Angler:** lies buried with only its lure showing, and bursts out to bite.
+- **Siren:** while she sings, everyone within 16 m is drawn toward her. A stun, or a fifth of her health lost, breaks the song.
+- **Press Gang:** comes in threes and throws nets. Caught, you can't move for 1.6 s.
+- **Tide Witch:** sends 3 waves at you in a line. At high tide she raises 2 Drowned Sailors.
+
+### Above Port Vael
+- **Wreck Gulls** spit salt. Their throats swell before the throw; step out of the splash.
+- **Storm Rays** cup their fins and charge, then three lightning strikes cross a marked line. Dodge sideways.
+- **Bell Wraiths** toll a knell that strikes a ring; its centre is safe. A stun stops the bell.
+- At most three hunt at once, and roofs break their aim.
+
+### The drowned court
+- **Harbourmaster** (around 3:00): his hook drags you to him. Below half health his bell calls a Press Gang.
+- **Kraken's Arms** (the high tide after 4:30): four arms rise from the flooded flats and slam down, sinking when the tide goes out.
+- **Mad Lighthouse Keeper** (around 6:00): throws burning lamps. When he lifts his great lamp, turn your back or be dazzled for 1.5 s.
+
+### Bosses
+- **Hollow Sovereign** (around 8:30): waves in a line, the tide called in with his court rising round him, and below half health the crown's judgement.
+- **Leviathan of the Mists** (around 11:30): its head strikes down, tidal waves roll out, and it dives, rising again with Drowned Sailors.
+- **The Kraken**, the end of it all: once both have fallen, the harbour goes still and the Kraken rises in front of the quay. Dawn waits until it sinks.
+- Its arms rear over each of you and whip down. It sweeps away anyone close, hooks whoever stands furthest off and spits blinding ink. At each third of its health it turns the harbour into a whirlpool.
+
+### The Sunken Crown
+- It falls with the Hollow Sovereign. Wear it to hit 25% harder and heal 2 health a second, but everyone can see you, and it falls when you do.
+- In All vs All it washes up at the Drowned Bell at 2:00.
+
+### A new class: the Tidecaller
+- **Earned by winning a match in Port Vael**: reach the dawn there, or win a versus match there.
+- 110 health. Spends tide, which its Trident draws, 6 with every blow that lands. Call the Tide rolls a wave 14 m ahead.
+- **The Trident at the core of the tree:** Long Haft (reach, and one more in the line), Skewer (every third thrust strikes twice as hard) and Brine.
+- **Tidewarden:** Tide Shell soaks up harm, refills with every Trident blow and bursts outward. Up to Unbroken Sea.
+- **Stormcaller:** Trident blows soak enemies; Stormspear's lightning leaps between the soaked. Up to Maelstrom.
+- **Deepcaller:** Call of the Deep raises a sea serpent that fights beside you and that enemies turn on. Up to Leviathan's Child.
+
+### Weapons of the coast
+- **Cutlass:** each kill quickens your swings by 15%, up to three times.
+- **Boarding Hook:** drags what it catches 1.6 m towards you and staggers it.
+- **Whaler's Harpoon:** pins for 2 s. Walk over it to take it back, or it returns after 15 s.
+- **Flare Pistol:** sets alight everything within 3 m and shows every enemy within 7 m for 8 s, hidden ones too.
+- **Ship's Anchor:** a slow two-handed slam; everything within 4.5 m takes half the blow and staggers.
+- **Ferryman's Oar:** a wide two-handed sweep through up to eight, shoving them back.
+
+### Class Upgrades for the Adept, the Cartographer and the Bandit
+- **Encore** (Blade Dancer): every third stance change, a sweep that reaches further, hits 50% harder and knocks down.
+- **Shattered Mirror** (Mirror Step): an undone hit sends 6 shards at the nearest enemies.
+- **Event Horizon** (Void Walker): leaving Void opens a rift that draws enemies in, then falls in for 60.
+- **Star Shower** (Star Reader): closing a constellation brings 5 stars down across it.
+- **Open Door** (Worlds Traveler): a hit that would leave you under 30% is never taken; you step out of your farthest Waygate. Once a minute.
+- **Trailblazer** (Pathfinder): friends on your trail move 20% faster; enemies on it are slowed.
+- **Lucky Fingers** (Thief), **Contract** (Mercenary) and **Toll Road** (Highwayman) for the Bandit.
+
+### The Trappers' Guild, for the Valleys
+- A Map Upgrade for the Valleys of Mesenlla, up to Level 4: snare lines, Lodge hunters on the camp's towers, a hunters' cache every 60 s, and a fallback camp at the Ring of Stones.
+
+### Screens
+- **Armory:** a class you don't own shows how to unlock it, with a button to the Store where it is sold.
+- **Store:** buying no longer sends the list back to the top. **Settings:** changing difficulty or Graphics keeps your place.
+- **Codex:** an enemy's description stays hidden until your first kill. Sandbox kills don't count.
+- New icons for the Bear, Mist Bear, Mist Eagle, Mist and Storm Elementals, Woodland Cavalry and the Daemon familiar.
+
+### Creatures
+- **Woodland Cavalry** ride a full harnessed bear that walks and gallops. Brought down, it rolls over and its rider fights on.
+- Children of the Woods carry spears, bows and crossbows about 1 in 4 times (was 1 in 2).
+- Bosses and minibosses shrug off crowd control and forced movement; damage still applies.
+
+### Mist Bastion
+- Gate archers hold the Long Bow or the Crossbow, at their proper size.
+- Mist Soldiers outside a fallen gate always make it back to the portal.
+- The invisible walls in the dry hollows are gone, and the battlements no longer set off auto-jump.
+
+### Fixes
+- Animations no longer play twice as fast on some creatures.
+- Chest weapons drop beside the chest instead of swapping your own.
+- Freezing a Child of the Woods turns all of it to ice.
+- Online matches need everyone on 0.22.1.
+
 ## 0.22.0 — Beyond the Mists (16 November 2026)
 
 *Having conquered the heart of the Mists, new paths open through its portals to distant lands.* Two new places, the creatures that live there, two new classes, 21 new Class Upgrades, Map Upgrades, Spectator Mode and a new look for every screen.

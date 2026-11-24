@@ -45,6 +45,16 @@ func _ready() -> void:
 	await _path_upgrades()
 	print("REWORK cartographer")
 	await _cartographer()
+	print("REWORK crown upgrades")
+	await _crown_upgrades()
+	await _trappers_guild()
+	_class_codes()
+	print("REWORK harpooner")
+	await _harpooner()
+	print("REWORK tidecaller")
+	await _tidecaller()
+	print("REWORK ferryman")
+	check(ClassDefs.disabled("ferryman") and not ClassDefs.available().has("ferryman"), "Ferryman is disabled and absent from playable classes")
 	print("REWORK walls")
 	await _walls_protect()
 	print("REWORK statuses")
@@ -1325,6 +1335,289 @@ func _clear_fields() -> void:
 
 
 ## Beacons straight in front of the Cartographer, at the given offsets, each faced north.
+## The Class Upgrades of the Adept, the Cartographer and the Bandit (CrownUpgrades).
+func _crown_upgrades() -> void:
+	var owned_before: Dictionary = Game.owned_items.duplicate()
+	var ids := ["encore", "shattered_mirror", "event_horizon", "star_shower", "open_door", "trailblazer", "lucky_fingers", "contract", "toll_road"]
+	for id: String in ids:
+		Game.owned_items[id] = true
+		var d: Dictionary = ShopDefs.ITEMS[id]
+		check(d["section"] == "upgrades" and int(d["price"]) >= 260 and int(d["price"]) <= 320, "%s is a Class Upgrade at the usual price (%d)" % [id, int(d["price"])])
+		check(Icons.exists(str(d["icon"]).split("+")[0]) and Icons.exists(str(d["icon"]).split("+")[1]), "%s has its icons" % id)
+		check(UpgradeShowcase.shows(id), "%s has a scene of its own in the Store" % id)
+	for cls: String in ["adept", "cartographer", "bandit"]:
+		for spec: Dictionary in AbilityData.tree(cls)["specs"]:
+			check(ShopDefs.ITEMS.values().filter(func(i: Dictionary) -> bool: return i.get("spec", "") == spec["id"]).size() == 1, "%s's %s path has one Class Upgrade" % [cls, spec["id"]])
+	var names: Array = ids.map(func(id: String) -> String: return ShopDefs.ITEMS[id]["name"])
+	var clashes: Array[String] = []
+	for cls: String in ClassDefs.ALL:
+		for spec: Dictionary in AbilityData.tree(cls).get("specs", []):
+			for row: Array in spec["path"]:
+				for ab: Dictionary in row:
+					if names.has(ab["name"]):
+						clashes.append("%s (%s)" % [ab["name"], cls])
+			if names.has(spec["final"]["name"]):
+				clashes.append("%s (%s)" % [spec["final"]["name"], cls])
+	check(clashes.is_empty(), "no upgrade shares its name with a talent: %s" % ", ".join(clashes))
+	for sound: String in ["mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal"]:
+		check(Sfx.NAMES.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# Encore: every third change of stance, a wider, harder sweep that knocks everything down.
+	pawn("adept", 0)
+	var out_of_reach := target(p.global_position + Vector3(p.sweep_reach() + 1.2, 0, 0))
+	var have: Array[int] = []
+	for k in 3:
+		have.append(CrownUpgrades.encore_have(p))
+		var before := out_of_reach.hp
+		p._change_stance()
+		if k < 2:
+			check(is_equal_approx(out_of_reach.hp, before), "change %d: the sweep does not reach %.1f m" % [k + 1, p.sweep_reach() + 1.2])
+	check(have == Array([0, 1, 2], TYPE_INT, "", null) and p.readiness().any(func(e: Dictionary) -> bool: return e["key"] == "encore" and e["button"] == "art"), "the marks over the ability button count to it: %s" % str(have))
+	check(out_of_reach.hp < out_of_reach.max_hp and out_of_reach._stun >= CrownUpgrades.ENCORE_DOWN - 0.05, "the third is the Encore: it reaches 2 m further and knocks down (%.0f, %.1f s)" % [out_of_reach.max_hp - out_of_reach.hp, out_of_reach._stun])
+	out_of_reach.release()
+	# Shattered Mirror: an undone hit sends shards at the nearest, and they bleed.
+	pawn("adept", 1)
+	var near_a := target(p.global_position + Vector3(3, 0, -2))
+	var near_b := target(p.global_position + Vector3(-4, 0, -4))
+	var too_far := target(p.global_position + Vector3(0, 0, CrownUpgrades.SHARD_REACH + 4.0))
+	p._last_hit = 10.0
+	p._last_hit_left = 1.0
+	p._undo_hit()
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.mesh == w._shot_mesh("shard")).size() == CrownUpgrades.SHARDS, "the mirror breaks into 6 shards")
+	await frames(40)
+	var cut := (near_a.max_hp - near_a.hp) + (near_b.max_hp - near_b.hp)
+	check(cut >= CrownUpgrades.SHARD_DAMAGE * CrownUpgrades.SHARDS * 0.9 and near_a.bleed_left > 0.0 and near_b.bleed_left > 0.0, "they strike the two nearest, 25 each, and leave them bleeding (%.0f)" % cut)
+	check(is_equal_approx(too_far.hp, too_far.max_hp), "and nothing beyond 10 m")
+	for z: Zombie in [near_a, near_b, too_far]:
+		z.release()
+	# Event Horizon: leaving Void stance opens a rift that pulls, bites and then collapses.
+	pawn("adept", 2)
+	var drawn := foe("normal", 5.0)
+	drawn.stun(30.0)
+	var start_gap := Vector2(drawn.position.x - p.global_position.x, drawn.position.z - p.global_position.z).length()
+	var hp0 := drawn.hp
+	p._left_void()
+	var rift: PathField = w.get_children().filter(func(n: Node) -> bool: return n is PathField and n.kind == "horizon").back()
+	check(rift != null, "leaving Void stance tears a rift open where the Adept stood")
+	await frames(90)
+	var gap := Vector2(drawn.position.x - rift.position.x, drawn.position.z - rift.position.z).length()
+	check(gap < start_gap - 1.0 and drawn.hp < hp0, "it draws in what is within 7 m and hurts it (%.1f m from %.1f, %.0f)" % [gap, start_gap, hp0 - drawn.hp])
+	var mid := drawn.hp
+	await until_gone(PathField)
+	check(mid - drawn.hp >= CrownUpgrades.HORIZON_COLLAPSE * 0.9, "and falls in on itself for 60 (%.0f)" % (mid - drawn.hp))
+	drawn.release()
+	# Star Shower: a stone that closes a constellation brings five stars down across it.
+	pawn("cartographer", 0)
+	var under := target(p.global_position + Vector3(0, 0, CartographerKit.PLANT_AHEAD - 6.0))
+	var survey := plant_at([Vector3(-8, 0, 0), Vector3(8, 0, 0)])
+	await frames(30)
+	check(is_equal_approx(under.hp, under.max_hp), "two stones bring nothing down")
+	plant_at([Vector3(0, 0, -14)])
+	check(survey.triangles().size() == 1 and survey.in_constellation(under.position), "the third closes the constellation over it")
+	await frames(150)
+	check(under.max_hp - under.hp >= CrownUpgrades.SHOWER_DAMAGE, "the first star falls on it, the toughest inside (%.0f)" % (under.max_hp - under.hp))
+	check(survey._shower_n == -1, "and all five have fallen")
+	under.release()
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	await frames(1)
+	# Open Door: a hit that would leave you low is never taken; you are at the farthest gate instead.
+	pawn("cartographer", 1)
+	survey = plant_at([Vector3(0, 0, 0), Vector3(24, 0, 0)])
+	var home := p.global_position
+	check(CrownUpgrades.door_ready(p) and p.readiness().any(func(e: Dictionary) -> bool: return e["key"] == "open_door" and e["primed"]), "with a gate far off, the door is ready, and the HUD says so")
+	var full := p.hp
+	p.hurt(p.max_hp() * 0.85 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	var far_gate: Vector3 = survey.beacons[1]["at"]
+	check(is_equal_approx(p.hp, minf(p.max_hp(), full + CrownUpgrades.DOOR_HEAL)) and Vector2(p.global_position.x - far_gate.x, p.global_position.z - far_gate.z).length() < 2.5, "the hit is never taken: the Traveler steps out of the far gate (%.1f m from it, %.0f health)" % [Vector2(p.global_position.x - far_gate.x, p.global_position.z - far_gate.z).length(), p.hp])
+	check(p.guard_left > 0.0 and is_equal_approx(p.open_door_cd, CrownUpgrades.DOOR_REST), "untouchable for a moment, and not again for 60 s")
+	p.guard_left = 0.0
+	full = p.hp
+	p.hurt(p.max_hp() * 0.85 / p.m("damage_taken"), p.global_position + Vector3(0, 0, -1))
+	check(p.hp < full, "the next one lands")
+	p.hp = p.max_hp()
+	p.global_position = home
+	survey.queue_free()
+	w.surveys.erase(p.net_id())
+	await frames(1)
+	# Trailblazer: marks every 3 m while on the move, that speed friends and slow enemies.
+	pawn("cartographer", 2)
+	await frames(3)
+	var from := p.global_position
+	for k in 14:
+		p.global_position = from + Vector3(0, 0, -0.8 * k)
+		p.global_position.y = w.ground_at(p.global_position) + 0.02
+		await frames(3)
+	var marks := w.get_children().filter(func(n: Node) -> bool: return n is PathField and n.kind == "blaze")
+	check(marks.size() >= 3, "a mark every 3 m along the way (%d over 10 m)" % marks.size())
+	var first_mark: PathField = marks[0]
+	var slowed := target(first_mark.position)
+	p.global_position = first_mark.position + Vector3.UP * 0.05
+	await frames(20)
+	check(p._buffs.has("trailblazer") and slowed._slow > 0.0, "on the trail a friend runs faster, and an enemy is slowed")
+	slowed.release()
+	_clear_fields()
+	# Lucky Fingers: every Steal picks a pocket, and every fourth is ready again at once.
+	pawn("bandit", 0)
+	w.spawn_zombie("clever", p.global_position + Vector3(0, 0, -8))
+	var mark: Zombie = w.zombies.back()
+	mark.set_physics_process(false)
+	mark.hp = 5000.0
+	mark.max_hp = 5000.0
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	var ready_after: Array[bool] = []
+	for k in 4:
+		p.path_art_cd_left = 5.0
+		mark.weapon_id = ""
+		BanditKit.cast_path(p)
+		ready_after.append(p.path_art_cd_left <= 0.0)
+	check(w.pickups.size() >= 4, "each Steal leaves food, arrows or a potion (%d)" % w.pickups.size())
+	check(ready_after == Array([false, false, false, true], TYPE_BOOL, "", null), "and the fourth is lucky: ready again at once %s" % str(ready_after))
+	mark.release()
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	# Contract: Nightfall names the toughest inside, it takes more, and its death pays.
+	pawn("bandit", 1)
+	var tough := target(p.global_position + Vector3(2, 0, -2))
+	tough.max_hp = 600.0
+	tough.hp = 600.0
+	var small := target(p.global_position + Vector3(-2, 0, -1))
+	small.max_hp = 75.0
+	small.hp = 75.0
+	BanditKit.nightfall(p)
+	check(p.contract_on == tough and tough.get_node_or_null("ContractSeal") != null and small.get_node_or_null("ContractSeal") == null, "the Contract goes on the toughest, and its seal shows over it")
+	var was_hp := tough.hp
+	tough.take_damage(20.0, Vector3.ZERO, 0.0, tough.centre())
+	check(is_equal_approx(was_hp - tough.hp, 20.0 * CrownUpgrades.CONTRACT_MARK), "it takes 50%% more (%.0f of 20)" % (was_hp - tough.hp))
+	p.hp = 40.0
+	p.path_art_cd_left = 20.0
+	tough.next_hitter = -1
+	tough.take_damage(10000.0, Vector3.ZERO, 0.0, tough.centre())
+	await frames(2)
+	check(is_equal_approx(p.hp, 40.0 + CrownUpgrades.CONTRACT_HEAL) and p.path_art_cd_left <= 20.0 - CrownUpgrades.CONTRACT_REFUND + 0.1, "its death heals 25 and brings Nightfall 8 s sooner (%.0f, %.1f s)" % [p.hp, p.path_art_cd_left])
+	small.release()
+	_clear_fields()
+	for n: Node in w.get_children():
+		if n is NightfallDome:
+			n.queue_free()
+	# Toll Road: every third fan pins, and what dies pinned always pays.
+	pawn("bandit", 2)
+	_face_ahead()
+	var tolled := target(p.global_position + Vector3(0, 0, -6))
+	var counted: Array[int] = []
+	for k in 3:
+		counted.append(CrownUpgrades.toll_have(p))
+		BanditKit.dagger_fan(p)
+	check(counted == Array([0, 1, 2], TYPE_INT, "", null) and p.readiness().any(func(e: Dictionary) -> bool: return e["key"] == "toll_road" and e["button"] == "path_art"), "marks over the second button count the fans: %s" % str(counted))
+	var gold := w._projectiles.filter(func(q: Projectile) -> bool: return q.active and q.toll)
+	check(gold.size() == BanditKit.FAN_KNIVES + int(p.m("fan_knives")) and p.toll_fan, "the third fan is the Toll: its knives gleam gold (%d)" % gold.size())
+	await frames(30)
+	check(tolled.root_left > 0.0 and tolled.tolled(), "and pin what they strike")
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	p.mods["plunder"] = 0.0
+	tolled.next_hitter = -1
+	p.on_kill(tolled)
+	check(w.pickups.size() == 1, "a creature killed while pinned always leaves plunder")
+	tolled.release()
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	Game.owned_items = owned_before
+
+
+## The Trappers' Guild, with the Valleys' marks laid out on the test ground: its snares, its hunters,
+## its caches and its fallback camp, by level.
+func _trappers_guild() -> void:
+	var d: Dictionary = ShopDefs.ITEMS[TrappersGuild.ID]
+	check(d["section"] == "maps" and d["map"] == "mesenlla" and (d["levels"] as Array).size() == ShopDefs.MAP_LEVELS and Icons.exists(str(d["icon"])) and UpgradeShowcase.shows(TrappersGuild.ID), "the Trappers' Guild is a Map Upgrade of the Valleys, with four levels, its icon and its scene")
+	check(Ally.KINDS.find("lodge_hunter") == Ally.KINDS.find("mist_heavy") + 1 and Ally.GARRISON.has("lodge_hunter"), "the Lodge hunter is a new kind after the Mist Bastion's garrison, and keeps watch like it")
+	for sound: String in ["snare_snap", "trapper_horn", "cache_drop"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound, heard on every phone" % sound)
+	var tscn := FileAccess.get_file_as_string("res://maps/mesenlla.tscn")
+	for kind: String in ["snare", "hunter", "trap_cache", "guild_camp"]:
+		check(tscn.contains('kind = "%s"' % kind), "the Valleys mark where the Guild's %s goes" % kind)
+	pawn("ranger")
+	await frames(3)
+	var home := p.global_position
+	var marks_before := w.guild_marks.duplicate()
+	w.guild_marks.assign([
+		{"kind": "snare", "gate": 3, "at": home + Vector3(0, 0, -10), "yaw": 0.0},
+		{"kind": "hunter", "gate": 2, "at": home + Vector3(-6, 0, 4), "yaw": 0.0},
+		{"kind": "hunter", "gate": 4, "at": home + Vector3(8, 0, 4), "yaw": 0.0},
+		{"kind": "hunter", "gate": 4, "at": home + Vector3(10, 0, 6), "yaw": 0.0},
+		{"kind": "trap_cache", "gate": 0, "at": home + Vector3(3, 0, 3), "yaw": 0.0},
+		{"kind": "trap_cache", "gate": 1, "at": home + Vector3(-3, 0, 3), "yaw": 0.0},
+		{"kind": "guild_camp", "gate": 0, "at": home + Vector3(12, 0, 0), "yaw": 0.0}])
+	# Level 1: snares only.
+	var guild := TrappersGuild.new(w, 1)
+	w.add_child(guild)
+	w.guild = guild
+	check(guild.snares.size() == 3 and guild.camp_at == Vector3.INF, "Level 1 lays its line of 3 snares, and no camp")
+	var line_gap: float = (guild.snares[0]["at"] as Vector3).distance_to(guild.snares[1]["at"])
+	check(absf(line_gap - TrappersGuild.SNARE_GAP * 1.0) < 0.3, "2 m apart along the line (%.1f)" % line_gap)
+	var walker := foe("normal", 10.0, 0.0, 200.0)
+	walker.position = guild.snares[1]["at"]
+	await frames(4)
+	check(walker.root_left > 0.0 and is_equal_approx(walker.hp, 200.0 - TrappersGuild.SNARE_DAMAGE), "a creature that steps in a snare is held and cut for 15 (%.0f)" % walker.hp)
+	check(float(guild.snares[1]["armed_at"]) > w.now + TrappersGuild.SNARE_REARM - 0.5 and (guild.snares[1]["node"] as MeshInstance3D).mesh == TrappersGuild.snare_mesh(true), "the snare shows sprung, and is set again in 12 s")
+	walker.root_left = 0.0
+	walker.position = guild.snares[1]["at"] + Vector3(0.1, 0, 0)
+	var held_hp := walker.hp
+	await frames(4)
+	check(is_equal_approx(walker.hp, held_hp), "a sprung snare catches nothing until it is set again")
+	walker.release()
+	check(w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead).is_empty(), "no hunters at Level 1")
+	guild.queue_free()
+	await frames(1)
+	# Level 4: hunters at their posts (no towers on this ground), caches, and the camp's fire and snares.
+	w.prepare_allies("lodge_hunter", 4)
+	guild = TrappersGuild.new(w, 4)
+	w.add_child(guild)
+	w.guild = guild
+	await frames(3)
+	check(guild.camp_at != Vector3.INF and guild.snares.size() == 3 + TrappersGuild.CAMP_SNARES, "Level 4 makes the fallback camp, ringed with 6 snares")
+	var hunters := w.allies.filter(func(a: Ally) -> bool: return a.kind == "lodge_hunter" and not a.dead)
+	check(hunters.size() == 2 and hunters.all(func(a: Ally) -> bool: return a.is_garrison() and a.perch == Vector3.INF), "its two hunters stand guard by the camp (%d)" % hunters.size())
+	var prey := foe("normal", 0.0, 0.0, 5000.0)
+	prey.position = home + Vector3(4, 0, 1)
+	prey.position.y = w.ground_at(prey.position)
+	prey.stun(30.0)
+	await frames(200)
+	check(prey.hp < 5000.0, "the hunters shoot what comes near (%.0f)" % (5000.0 - prey.hp))
+	prey.release()
+	p.global_position = guild.camp_at + Vector3(1.5, 0.05, 0)
+	p.hp = p.max_hp() * 0.5
+	var low := p.hp
+	await frames(60)
+	check(p.hp > low + TrappersGuild.FIRE_HEAL * 0.6, "a friend by the camp fire mends 3 a second (%.1f)" % (p.hp - low))
+	p.global_position = home
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	w.director.elapsed = TrappersGuild.CACHE_EVERY + 0.5
+	await frames(2)
+	var first_cache := w.pickups.filter(func(i: Pickup) -> bool: return i.global_position.distance_to(guild.cache_spot()) < 1.0)
+	check(first_cache.size() == 1 and (first_cache[0] as Pickup).kind == Pickup.Kind.FOOD, "after 60 s a cache by the fire: food first")
+	w.director.elapsed = TrappersGuild.CACHE_EVERY * 2.0 + 1.0
+	await frames(2)
+	check(w.pickups.size() == 1, "and none on top of it while it is still lying there")
+	w.remove_pickup(first_cache[0])
+	w.director.elapsed = TrappersGuild.CACHE_EVERY * 3.0 + 1.5
+	await frames(2)
+	check(w.pickups.size() == 1 and w.pickups[0].kind == Pickup.Kind.ARROWS, "once taken, the next: arrows")
+	# A hunter struck down is replaced from the Lodge after a while.
+	var fallen: Ally = hunters[0]
+	fallen.hurt(10000.0, fallen.global_position)
+	await frames(2)
+	var spot: Dictionary = guild.hunters.filter(func(h: Dictionary) -> bool: return h["ally"] == fallen)[0]
+	check(float(spot["back_at"]) > w.now, "a hunter struck down is missed")
+	spot["back_at"] = w.now - 0.1
+	await frames(2)
+	check(spot["ally"] != fallen and (spot["ally"] as Ally).kind == "lodge_hunter" and not (spot["ally"] as Ally).dead, "and another comes from the Lodge in its place")
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	w.director.elapsed = 0.0
+	guild.queue_free()
+	w.guild = null
+	for ally: Ally in w.allies.duplicate():
+		w.remove_ally(ally)
+	w.guild_marks.assign(marks_before)
+	await frames(1)
+
+
 func plant_at(spots: Array) -> SurveyNet:
 	var start := p.global_position
 	for spot: Vector3 in spots:
@@ -1453,6 +1746,554 @@ func _cartographer() -> void:
 		if is_instance_valid(left):
 			left.queue_free()
 	w.surveys.clear()
+
+## A creature of the kind asked for, `ahead` metres in front of the player, standing still.
+func foe(kind: String, ahead: float, side := 0.0, hp := 10000.0) -> Zombie:
+	var at := p.global_position + Vector3(side, 0, -ahead)
+	at.y = w.ground_at(at)
+	w.spawn_zombie(kind, at)
+	var z: Zombie = w.zombies.back()
+	z.position = at
+	z.hp = hp
+	z.max_hp = hp
+	return z
+
+
+## Frames go by until nothing of this kind is left in the world (a wave rolled out, a soul landed):
+## frames come faster or slower with the machine, the game's own clock does not.
+func until_gone(kind: Variant) -> void:
+	for i in 600:
+		if not w.get_children().any(func(n: Node) -> bool: return is_instance_of(n, kind)):
+			break
+		await frames(1)
+	await frames(2)
+
+
+func _face_ahead() -> void:
+	p.yaw = 0.0
+	p.rotation.y = 0.0
+	p.pitch = 0.0
+	if p.camera:
+		p.camera.rotation = Vector3.ZERO
+
+
+func _class_codes() -> void:
+	# Every class that is not free from the start can be opened with a code (the codes themselves are
+	# kept out of the repository: only their hashes are in the game).
+	var coded := Game.CODES.values()
+	for id: String in ClassDefs.ALL:
+		var d: Dictionary = ClassDefs.ALL[id]
+		if d.get("hidden", false) and not ClassDefs.disabled(id):
+			check(coded.has(id), "%s can be opened with a code" % d["name"])
+
+
+func _harpooner() -> void:
+	var d: Dictionary = ClassDefs.ALL["harpooner"]
+	check(d["weapon"] == "harpoon" and d["second"] == "boarding_hook" and ClassDefs.price("harpooner") == 0 and not ClassDefs.for_sale().has("harpooner") and d.get("earned", "") == "harbourmaster", "the Harpooner starts with a Whaler's Harpoon and a Boarding Hook, and is earned against the Harbourmaster")
+	check(ClassDefs.weapon_categories("harpooner") == Array(["melee", "two_handed", "ranged"], TYPE_STRING, "", null), "Harpooner wields Melee, Two-Handed and Ranged weapons")
+	var specs: Array = AbilityData.tree("harpooner")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["reaver", "rigger", "leviathan_hunter"], "Reaver, Rigger and Leviathan Hunter")
+	for id: String in ["crest_harpooner", "spec_reaver", "spec_rigger", "spec_leviathan_hunter", "rope", "chain", "drop", "harpoon"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["haul_throw", "blood_water", "rig_line", "line_trip", "great_harpoon", "hook_catch"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	check(ClassGear._pieces("harpooner").size() == 3 and Avatar.MODELS.has("harpooner") and ClassPresentation.COPY.has("harpooner"), "dressed, seen by others, and described")
+	# The kit remains covered while the class is disabled in the player roster.
+	var had: Dictionary = Game.unlocked.duplicate()
+	var beaten := Game.harbourmasters_beaten
+	Game.unlocked.erase("harpooner")
+	check(d.get("disabled", false) and not Game.owns_class("harpooner"), "the Harpooner is disabled")
+	# (This map has no Harbourmaster of its own: a stand-in falls as one, the way every phone hears of it.)
+	var hm := target(p.global_position + Vector3(0, 0, -20))
+	hm.type_id = "harbourmaster"
+	w.note_defeated(hm)
+	hm.type_id = "normal"
+	hm.release()
+	check(not Game.owns_class("harpooner") and Game.harbourmasters_beaten == beaten + 1, "the Harbourmaster kill is counted without unlocking the Harpooner")
+	Game.unlocked = had
+	Game.harbourmasters_beaten = beaten
+	Game.fresh_unlocks.erase("harpooner")
+	# The class: Haul on the button, and its harpoon comes back by itself quickly.
+	pawn("harpooner")
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.weapon_id() == "harpoon" and p.slots.has("boarding_hook"), "it holds its Harpoon, the Hook at its side")
+	check(p.art_def()["name"] == "Haul" and not p.has_path_art(), "its ability is Haul, and no second button yet")
+	check(is_equal_approx(HarpoonerKit.harpoon_return(p, 15.0), HarpoonerKit.RETURN), "a Harpooner's harpoon comes back by itself after %d s" % int(HarpoonerKit.RETURN))
+	HarpoonerKit.haul(p)
+	check(p.art_cd_left <= 0.5, "with nothing in reach, Haul does nothing and comes straight back")
+	var caught := foe("normal", 12.0)
+	var hp0 := caught.hp
+	check(HarpoonerKit.haul_target(p) == caught, "something in front, in reach: Haul finds it")
+	var behind := foe("normal", -6.0)
+	check(HarpoonerKit.haul_target(p) == caught, "and not what is behind")
+	behind.release()
+	HarpoonerKit.haul(p)
+	check(w.get_children().any(func(n: Node) -> bool: return n is HaulRope), "the rope flies from the Harpooner's hand")
+	await frames(60)
+	var gap := Vector2(caught.position.x - p.global_position.x, caught.position.z - p.global_position.z).length()
+	check(gap < 3.2 and caught.hp < hp0 and caught._stun > 0.0, "Haul drags it in on the rope, strikes and stuns it (%.1f m away now)" % gap)
+	caught.release()
+	# Too big to move: the rope hauls the Harpooner to it.
+	_face_ahead()
+	var big := foe("normal", 14.0)
+	big._scale = 1.6 # too big to drag, like a Brute or anything a boss
+	big.set_physics_process(false)
+	var from := p.global_position
+	HarpoonerKit.haul(p)
+	await frames(90)
+	var to_big := Vector2(big.position.x - p.global_position.x, big.position.z - p.global_position.z).length()
+	check(p.global_position.distance_to(from) > 8.0 and to_big < HarpoonerKit.HAUL_STOP + big.body_radius() + 1.0, "something too big to move pulls the Harpooner to it instead (%.1f m from it)" % to_big)
+	big._scale = 1.0
+	big.release()
+	# Reaver: Blood in the Water.
+	pawn("harpooner", 0)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.path_art_def()["name"] == "Blood in the Water", "a Reaver keeps Haul and gets Blood in the Water on a second button")
+	HarpoonerKit.cast_path(p)
+	check(HarpoonerKit.in_blood(p) and is_equal_approx(p.m("speed"), 1.0 + HarpoonerKit.BLOOD_SPEED), "in Blood in the Water the Reaver moves 15% faster")
+	p.hp = 50.0
+	HarpoonerKit.on_blow(p)
+	check(is_equal_approx(p.hp, 50.0 + HarpoonerKit.BLOOD_HEAL), "and every blow that lands heals 3")
+	var mark := foe("normal", 10.0)
+	HarpoonerKit.haul(p)
+	check(is_equal_approx(mark._mark_mult, HarpoonerKit.HAUL_MARK), "what a Reaver hauls takes 30% more damage")
+	mark.release()
+	# Red Tide, No Quarter: with the whole tree, a kill in Blood in the Water hauls the next one in.
+	pawn("harpooner", 0, true)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.has_flag("red_tide") and p.has_flag("haul_refund"), "a Reaver's tree reaches Red Tide")
+	HarpoonerKit.cast_path(p)
+	var victim := foe("normal", 2.0, 0.0, 30.0)
+	var next := foe("normal", 10.0, 3.0)
+	var next_was := next.position.distance_to(p.global_position)
+	p.hauled[victim.get_instance_id()] = w.now + 4.0
+	p.art_cd_left = 6.0
+	victim.next_hitter = -1 # nobody is credited: the kill is handed to the player below
+	victim.take_damage(500.0, Vector3.ZERO, 0.0, victim.centre())
+	p.on_kill(victim)
+	await frames(60)
+	check(next.position.distance_to(p.global_position) < next_was - 4.0, "Red Tide: the kill hauls the nearest enemy in (%.1f m, was %.1f)" % [next.position.distance_to(p.global_position), next_was])
+	check(p.art_cd_left <= 2.0 + 0.01, "No Quarter: killing what it hauled takes 4 s off Haul (%.1f)" % p.art_cd_left)
+	next.release()
+	# Grapple Slam: hauled to something big, the Harpooner lands in a slam.
+	p.flags["haul_slam"] = true
+	_face_ahead()
+	var anchor := foe("normal", 13.0)
+	anchor._scale = 1.6
+	anchor.set_physics_process(false)
+	var bystander := foe("normal", 12.0, 1.5)
+	bystander.set_physics_process(false)
+	var by0 := bystander.hp
+	HarpoonerKit.haul(p)
+	await frames(100)
+	check(bystander.hp < by0 - 1.0, "Grapple Slam strikes what stands round where it lands (%.0f)" % (by0 - bystander.hp))
+	anchor._scale = 1.0
+	anchor.release()
+	bystander.release()
+	# Rigger: Rig a Line.
+	pawn("harpooner", 1)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.path_art_def()["name"] == "Rig a Line", "a Rigger gets Rig a Line")
+	HarpoonerKit.cast_path(p)
+	var mine := w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and l.owner_peer == p.net_id())
+	check(mine.size() == 1 and (mine[0] as RigLine).length() > 10.0, "a line staked from the Rigger's feet ahead (%.1f m)" % ((mine[0] as RigLine).length() if not mine.is_empty() else 0.0))
+	if mine.is_empty():
+		return
+	var line: RigLine = mine[0]
+	var mid := (line.a + line.b) * 0.5
+	var tripper := foe("normal", 0.0)
+	tripper.position = Vector3(mid.x, w.ground_at(mid), mid.z)
+	tripper.set_physics_process(false)
+	await frames(20)
+	check(tripper._stun > 0.0 and tripper._slow > 0.0, "an enemy on the line trips: stunned and slowed")
+	tripper.release()
+	p.path_art_cd_left = 0.0
+	p.global_position += Vector3(4, 0, 0)
+	HarpoonerKit.cast_path(p)
+	p.global_position += Vector3(4, 0, 0)
+	HarpoonerKit.cast_path(p)
+	mine = w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and not l.is_queued_for_deletion() and l.owner_peer == p.net_id())
+	check(mine.size() == HarpoonerKit.RIG_LINES, "only %d lines at a time: the oldest comes up" % HarpoonerKit.RIG_LINES)
+	for l: RigLine in w.rig_lines.duplicate(): w.remove_rig_line(l)
+	pawn("harpooner", 1, true)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.has_flag("cats_cradle") and p.has_flag("line_barbs") and int(p.m("line_time")) == 6, "a Rigger's tree: Tarred Rope, Barbed Line and Cat's Cradle")
+	HarpoonerKit.cast_path(p)
+	p.global_position += Vector3(6, 0, 0)
+	HarpoonerKit.cast_path(p)
+	var ties := w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and l.cradle)
+	check(ties.size() == 1, "Cat's Cradle ties the new line to the far end of the other")
+	var cut := foe("normal", 0.0)
+	var own: RigLine = w.rig_lines.filter(func(l: RigLine) -> bool: return is_instance_valid(l) and not l.cradle).front()
+	var on := (own.a + own.b) * 0.5
+	cut.position = Vector3(on.x, w.ground_at(on), on.z)
+	cut.set_physics_process(false)
+	var cut0 := cut.hp
+	await frames(20)
+	check(cut.hp <= cut0 - HarpoonerKit.BARB_DAMAGE + 0.01 and cut.bleed_left > 0.0, "Barbed Line: what trips is cut and bleeds (%.0f)" % (cut0 - cut.hp))
+	check(own.left > HarpoonerKit.RIG_TIME, "Tarred Rope: lines stand longer")
+	cut.release()
+	for l: RigLine in w.rig_lines.duplicate(): w.remove_rig_line(l)
+	await frames(2)
+	# Leviathan Hunter: Great Harpoon through a line of them, pinned and marked.
+	pawn("harpooner", 2)
+	_face_ahead()
+	await frames(3)
+	_face_ahead()
+	check(p.path_art_def()["name"] == "Great Harpoon", "a Leviathan Hunter gets Great Harpoon")
+	var first := foe("normal", 8.0)
+	var second := foe("normal", 14.0)
+	first.set_physics_process(false)
+	second.set_physics_process(false)
+	var f0 := first.hp
+	var s0 := second.hp
+	HarpoonerKit.cast_path(p)
+	await frames(80)
+	check(first.hp < f0 and second.hp < s0, "the Great Harpoon flies through both (%.0f, %.0f)" % [f0 - first.hp, s0 - second.hp])
+	check(is_equal_approx(first._mark_mult, HarpoonerKit.MARK) and first._mark_time > 0.0 and first.root_left > 0.0, "and pins and marks what it strikes: 20% more damage from everyone")
+	first.release()
+	second.release()
+	p.flags["big_game"] = true
+	p.flags["bane"] = true
+	var boss := foe("normal", 10.0)
+	boss.def = boss.def.duplicate()
+	boss.def["miniboss"] = true # as the Harbourmaster or the Lighthouse Keeper are
+	boss.set_physics_process(false)
+	HarpoonerKit.mark(p, boss)
+	check(is_equal_approx(boss._mark_mult, HarpoonerKit.BANE), "Leviathan's Bane: a marked miniboss takes 40% more")
+	check(is_equal_approx(p.modify_damage(boss, 100.0), 100.0 * (1.0 + HarpoonerKit.BIG_GAME)), "Whale Oil: the Hunter strikes bosses and minibosses 30% harder")
+	boss.release()
+	p.flags["flensing"] = true
+	var prey := foe("normal", 6.0, 0.0, 20.0)
+	HarpoonerKit.mark(p, prey)
+	p.hp = 40.0
+	prey.next_hitter = -1 # nobody is credited: the kill is handed to the player below
+	prey.take_damage(500.0, Vector3.ZERO, 0.0, prey.centre())
+	p.on_kill(prey)
+	check(is_equal_approx(p.hp, 40.0 + HarpoonerKit.FLENSE_HEAL), "Flensing: killing what you marked heals 10")
+
+
+func _tidecaller() -> void:
+	var d: Dictionary = ClassDefs.ALL["tidecaller"]
+	check(d["weapon"] == "trident" and d.get("mana", false) and d.get("earned", "") == "vael_win" and not ClassDefs.for_sale().has("tidecaller"), "the Tidecaller starts with its Trident, spends tide, and is earned in Port Vael")
+	check(WeaponDefs.ALL["trident"].get("only", "") == "tidecaller" and WeaponDefs.mesh("trident") != null, "the Trident is the Tidecaller's alone")
+	var specs: Array = AbilityData.tree("tidecaller")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["tidewarden", "stormcaller", "deepcaller"], "Tidewarden, Stormcaller and Deepcaller")
+	for id: String in ["crest_tidecaller", "spec_tidewarden", "spec_stormcaller", "spec_deepcaller", "shell", "serpent", "trident", "wave", "bolt", "storm", "rain"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["call_tide", "tide_shell", "shell_hit", "shell_burst", "stormspear", "chain_lightning", "maelstrom", "serpent_rise", "serpent_bite"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	check(ClassGear._pieces("tidecaller").has("chest:glow") and Avatar.MODELS.has("tidecaller") and ClassPresentation.COPY.has("tidecaller"), "dressed, seen by others, and described")
+	# Earned by winning one match in Port Vael (dawn there, or a versus match won there).
+	var had: Dictionary = Game.unlocked.duplicate()
+	var was_mode := Game.mode
+	var was_map := Game.night_map
+	Game.unlocked.erase("tidecaller")
+	Game.mode = Game.Mode.NIGHT
+	Game.night_map = "mesenlla"
+	var wins := Game.mesenlla_wins
+	Game.note_beyond_win()
+	Game.mesenlla_wins = wins
+	check(not Game.owns_class("tidecaller") and Game.earn_text("tidecaller").contains("Port Vael"), "a win elsewhere does not earn it, and it says to win in Port Vael")
+	Game.night_map = "lantern_road"
+	Game.note_last_light()
+	Game.lighthouses_lit -= 1
+	check(not Game.owns_class("tidecaller"), "nor does a lighthouse lit")
+	Game.night_map = "vael"
+	Game.note_beyond_win()
+	check(Game.owns_class("tidecaller") and Game.fresh_unlocks.has("tidecaller"), "one win in Port Vael earns the Tidecaller")
+	Game.unlocked.erase("tidecaller")
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_beyond_win()
+	check(not Game.owns_class("tidecaller"), "but not in the Sandbox")
+	Game.unlocked = had
+	Game.mode = was_mode
+	Game.night_map = was_map
+	Game.fresh_unlocks.erase("tidecaller")
+	# The class: tide from the Trident, and Call the Tide.
+	pawn("tidecaller")
+	await frames(3)
+	_face_ahead()
+	check(p.weapon_id() == "trident" and p.max_mana() > 0.0 and p.art_def()["name"] == "Call the Tide", "it holds its Trident, has tide, and Call the Tide")
+	p.mana = 0.0
+	var poked := foe("normal", 2.0)
+	p.on_melee_connect(poked, WeaponDefs.ALL["trident"])
+	check(is_equal_approx(p.mana, TidecallerKit.TRIDENT_TIDE), "a Trident blow that lands draws %d tide" % int(TidecallerKit.TRIDENT_TIDE))
+	poked.release()
+	var hit := foe("normal", 6.0)
+	var aside := foe("normal", 6.0, 6.0)
+	var h0 := hit.hp
+	var a0 := aside.hp
+	var hit_was := hit.position
+	hit.stun(30.0) # so only the wave moves it
+	TidecallerKit.call_the_tide(p)
+	# How far along the wave's way it was thrown, at the furthest: frames come at the machine's pace.
+	# The throw is the push the wave gives it (a rock behind it in the test world can stop it short),
+	# or the ground it covered, whichever shows more.
+	var thrown := 0.0
+	for i in 600:
+		thrown = maxf(thrown, maxf(hit_was.z - hit.position.z, -hit._knock.z))
+		if not w.get_children().any(func(n: Node) -> bool: return n is TideWave):
+			break
+		await frames(1)
+	for i in 10:
+		thrown = maxf(thrown, maxf(hit_was.z - hit.position.z, -hit._knock.z))
+		await frames(1)
+	check(hit.hp < h0 and hit._slow > 0.0, "the wave strikes what is in its way and slows it (%.0f)" % (h0 - hit.hp))
+	check(thrown > 0.5, "and throws it back along the wave's way (%.1f m)" % thrown)
+	check(is_equal_approx(aside.hp, a0), "but not what stands off to the side")
+	hit.release()
+	aside.release()
+	# The core of the tree is the Trident: Long Haft, Skewer, Brine.
+	pawn("tidecaller", 0)
+	await frames(3)
+	_face_ahead()
+	var trident: Dictionary = WeaponDefs.ALL["trident"]
+	var reach: Dictionary = p.melee_stats(trident)
+	check(p.has_flag("skewer") and p.has_flag("brine") and is_equal_approx(float(reach["range"]), float(trident["range"]) + TidecallerKit.LONG_HAFT_REACH)
+		and int(reach["hits"]) == int(trident["max_hits"]) + TidecallerKit.LONG_HAFT_HITS, "Long Haft: the Trident reaches %d m further and strikes %d more" % [int(TidecallerKit.LONG_HAFT_REACH), TidecallerKit.LONG_HAFT_HITS])
+	var pricked := foe("normal", 3.0)
+	var scales: Array[float] = []
+	for i in TidecallerKit.SKEWER_EVERY:
+		scales.append(TidecallerKit.trident_scale(p, pricked))
+		p.mana = 0.0
+		p.on_melee_connect(pricked, trident)
+		await w.get_tree().physics_frame
+	check(is_equal_approx(scales[0], 1.0) and is_equal_approx(scales[TidecallerKit.SKEWER_EVERY - 1], TidecallerKit.SKEWER_MULT * (1.0 + TidecallerKit.BRINE_HARD)),
+		"Skewer: every third thrust strikes twice as hard (and Brine on what the first two slowed): %s" % str(scales))
+	check(pricked.root_left > 0.0 and absf(p.mana - TidecallerKit.TRIDENT_TIDE - TidecallerKit.SKEWER_TIDE) < 0.5, "and holds what it strikes, drawing %d more tide (held %.1f s, %.0f tide)" % [int(TidecallerKit.SKEWER_TIDE), pricked.root_left, p.mana])
+	check(pricked._slow > 0.0, "Brine: Trident blows slow what they strike")
+	pricked.release()
+	# Tidewarden: Tide Shell takes the blows, Trident blows fill it, it bursts; Unbroken Sea.
+	pawn("tidecaller", 0, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Tide Shell" and p.m("shell_hp") > 0.0 and p.has_flag("steady_footing") and p.has_flag("breakwater") and p.has_flag("unbroken_sea"), "a Tidewarden's tree: Tide Shell, up to Unbroken Sea")
+	var biter := foe("normal", 1.5)
+	var near := foe("normal", 2.5, 1.0)
+	TidecallerKit.raise_shell(p)
+	var full := TidecallerKit.SHELL_BASE + TidecallerKit.SHELL_SHARE * p.max_hp() + TidecallerKit.SHELL_THICK
+	check(is_equal_approx(p.shell_hp, full) and p.shell_left > 0.0, "the shell holds %d (Thick Shell included)" % int(full))
+	await frames(2)
+	check(p.get_children().any(func(n: Node) -> bool: return n is TideShell), "and shows round the Tidewarden")
+	var hp0 := p.hp
+	p.hurt(30.0, biter.position, biter)
+	check(is_equal_approx(p.hp, hp0) and is_equal_approx(p.shell_hp, full - 30.0), "a blow is taken by the shell, not by you")
+	p.on_melee_connect(biter, trident)
+	check(is_equal_approx(p.shell_hp, full - 30.0 + TidecallerKit.SHELL_REFILL), "a Trident blow fills it by %d" % int(TidecallerKit.SHELL_REFILL))
+	p.stun_by_creature(2.0)
+	p.root_by_creature(2.0)
+	check(p.frozen_left <= 0.0 and p.rooted_left <= 0.0, "Steady Footing: while it holds, nothing stuns or holds you")
+	var n0 := near.hp
+	p.hurt(full + 50.0, biter.position, biter)
+	check(p.shell_left <= 0.0 and near.hp < n0 and near._stun > 0.0, "a blow too heavy breaks it: it bursts, striking and (Breakwater) stunning what stands round (%.0f)" % (n0 - near.hp))
+	check(p.hp < hp0, "and the rest of the blow gets through")
+	p.hp = 10.0
+	p.hurt(500.0, biter.position, biter)
+	check(not p.dead and p.guard_left > 0.0 and p.shell_left > 0.0 and p.hp > 10.0, "Unbroken Sea: a fatal blow passes through water, and the shell rises again")
+	p.hp = 5.0
+	p.guard_left = 0.0
+	p.shell_left = 0.0
+	p.shell_hp = 0.0
+	p.hurt(500.0, biter.position, biter)
+	check(p.dead or p.hp <= 0.0, "but only once a minute")
+	biter.release()
+	near.release()
+	# Stormcaller: Trident blows soak; Stormspear leaps between the soaked; Squall Step; Maelstrom.
+	pawn("tidecaller", 1, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Stormspear" and p.has_flag("charged_tines") and p.m("chains") > 0.0 and p.has_flag("squall_step") and p.has_flag("maelstrom"), "a Stormcaller's tree: Stormspear, up to Maelstrom")
+	var first := foe("normal", 9.0)
+	var wet: Array[Zombie] = [foe("normal", 12.0, 2.0), foe("normal", 15.0, -1.0), foe("normal", 17.5, 2.5)]
+	var dry := foe("normal", 11.0, -4.0)
+	for z: Zombie in wet:
+		p.on_melee_connect(z, trident)
+	check(wet.all(func(z: Zombie) -> bool: return z.soaked_left > 0.0) and dry.soaked_left <= 0.0, "Trident blows soak what they strike")
+	# Both in the same thrust: what tells them apart is the soaking (and Brine, since the soaked one was struck).
+	var ratio := TidecallerKit.trident_scale(p, wet[0]) / TidecallerKit.trident_scale(p, dry)
+	check(is_equal_approx(ratio, (1.0 + TidecallerKit.CHARGED_TINES) * (1.0 + TidecallerKit.BRINE_HARD)), "Charged Tines: soaked enemies take Trident blows %d%% harder (x%.2f)" % [int(TidecallerKit.CHARGED_TINES * 100.0), ratio])
+	var was_at := p.global_position
+	var hps := wet.map(func(z: Zombie) -> float: return z.hp)
+	var f0 := first.hp
+	var d0 := dry.hp
+	TidecallerKit.stormspear(p)
+	check(first.hp < f0 - TidecallerKit.SPEAR_DAMAGE * 0.5, "Stormspear strikes the first enemy in its way (%.0f)" % (f0 - first.hp))
+	var leapt := 0
+	for i in wet.size():
+		if wet[i].hp < float(hps[i]):
+			leapt += 1
+	check(leapt == wet.size() and wet.all(func(z: Zombie) -> bool: return z.soaked_left <= 0.0 and z._stun > 0.0), "its lightning leaps from soaked enemy to soaked enemy, jolting each (%d of %d)" % [leapt, wet.size()])
+	check(is_equal_approx(dry.hp, d0), "but not to one that is dry")
+	check(w.get_children().any(func(n: Node) -> bool: return n is StormArc), "and every leap shows")
+	await frames(20)
+	check(Vector2(p.global_position.x - was_at.x, p.global_position.z - was_at.z).length() > TidecallerKit.SQUALL_STEP * 0.5, "Squall Step carries the Stormcaller back on the wind (%.1f m)" % Vector2(p.global_position.x - was_at.x, p.global_position.z - was_at.z).length())
+	for z: Zombie in wet + [first, dry]:
+		z.release()
+	for i in TidecallerKit.MAELSTROM_EVERY - 1:
+		TidecallerKit.stormspear(p)
+	check(w.get_children().any(func(n: Node) -> bool: return n is Maelstrom), "every third Stormspear leaves a Maelstrom")
+	var under := foe("normal", 0.0)
+	var storm: Maelstrom = w.get_children().filter(func(n: Node) -> bool: return n is Maelstrom).back()
+	under.position = storm.global_position + Vector3(1.0, 0, 0)
+	var u0 := under.hp
+	for i in 90:
+		if under.hp < u0:
+			break
+		await frames(1)
+	check(under.hp < u0 and under.soaked_left > 0.0, "its bolts fall on what is under it, and soak it")
+	under.release()
+	# Deepcaller: Call of the Deep raises a serpent that draws enemies and bites; Bond of Salt; Shed Skin.
+	pawn("tidecaller", 2, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Call of the Deep" and p.has_flag("thick_scales") and p.has_flag("pack_hunter") and p.has_flag("coil") and p.m("art_cost") < 1.0 and p.has_flag("leviathans_child"), "a Deepcaller's tree: Call of the Deep, up to Leviathan's Child")
+	var prey := foe("normal", 6.0)
+	TidecallerKit.call_of_the_deep(p)
+	var serpent := TidecallerKit.serpent_of(p)
+	check(serpent != null and serpent.kind == "sea_serpent" and is_equal_approx(serpent.hp, TidecallerKit.SERPENT_HP * (1.0 + TidecallerKit.THICK_SCALES + TidecallerKit.CHILD_HP)), "a sea serpent rises, with Thick Scales and Leviathan's Child health")
+	check(serpent != null and is_equal_approx(serpent.grown, TidecallerKit.CHILD_SIZE), "grown by Leviathan's Child")
+	check(w.nearest_target(prey.position) == serpent or prey.position.distance_to(serpent.global_position) < prey.position.distance_to(p.global_position) + 4.0, "and draws the enemies near it")
+	var p0 := prey.hp
+	p.on_melee_connect(prey, trident)
+	check(prey.hp < p0 and p.trident_prey == prey, "Leviathan's Child: it lashes what the Trident strikes (%.0f)" % (p0 - prey.hp))
+	var bitten := prey.hp
+	for i in 120:
+		if prey.hp < bitten:
+			break
+		await frames(1)
+	check(prey.hp < bitten and prey.root_left > 0.0, "it goes for the Trident's prey and bites it, Coil holding it (%.0f)" % (bitten - prey.hp))
+	TidecallerKit.call_of_the_deep(p)
+	check(TidecallerKit.serpent_of(p) == serpent and w.allies.filter(func(a: Ally) -> bool: return a.kind == "sea_serpent" and not a.dead).size() == 1, "called again, the same serpent rises anew: never two")
+	prey.release()
+	serpent.hurt(9999.0, serpent.global_position)
+	check(serpent.dead, "it can be struck down")
+	for i in 400:
+		if not w.allies.has(serpent):
+			break
+		await frames(1)
+	check(TidecallerKit.serpent_of(p) == null and not w.allies.has(serpent), "and sinks back into the deep")
+	for n: Node in w.get_children():
+		if n is TideWave or n is StormArc or n is Maelstrom:
+			n.queue_free()
+
+
+func _ferryman() -> void:
+	var d: Dictionary = ClassDefs.ALL["ferryman"]
+	check(d["weapon"] == "oar" and d.get("earned", "") == "vael_nights" and not ClassDefs.for_sale().has("ferryman"), "the Ferryman starts with the Ferryman's Oar, and is earned in Port Vael")
+	var specs: Array = AbilityData.tree("ferryman")["specs"].map(func(x: Dictionary) -> String: return x["id"])
+	check(specs == ["tollkeeper", "boatman", "psychopomp"], "Tollkeeper, Boatman and Psychopomp")
+	for id: String in ["crest_ferryman", "spec_tollkeeper", "spec_boatman", "spec_psychopomp", "coin", "skiff", "soul", "oar", "bell", "lantern"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["crossing", "toll_bell", "obol", "souls_go"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	check(ClassGear._pieces("ferryman").has("chest:glow") and Avatar.MODELS.has("ferryman") and ClassPresentation.COPY.has("ferryman"), "dressed, seen by others, and described")
+	# Earned by the third night survived in Port Vael.
+	var had: Dictionary = Game.unlocked.duplicate()
+	var nights := Game.vael_nights
+	var was_mode := Game.mode
+	Game.unlocked.erase("ferryman")
+	Game.mode = Game.Mode.NIGHT
+	Game.vael_nights = Game.VAEL_NIGHTS_FOR_FERRYMAN - 2
+	Game.note_vael_night()
+	check(not Game.owns_class("ferryman") and Game.earn_text("ferryman").contains("So far: %d" % (Game.VAEL_NIGHTS_FOR_FERRYMAN - 1)), "two nights are not enough, and it says how many so far")
+	Game.note_vael_night()
+	check(Game.owns_class("ferryman"), "the third earns the Ferryman")
+	Game.unlocked = had
+	Game.vael_nights = nights
+	Game.mode = was_mode
+	Game.fresh_unlocks.erase("ferryman")
+	# Crossing: the skiff carries the Ferryman ahead, through what is in the way.
+	pawn("ferryman")
+	await frames(3)
+	_face_ahead()
+	check(p.weapon_id() == "oar" and p.art_def()["name"] == "Crossing", "it holds its Oar, and Crossing")
+	var in_way := foe("normal", 4.5)
+	in_way.stun(30.0)
+	var w0 := in_way.hp
+	var from := p.global_position
+	FerrymanKit.cross(p)
+	check(p.is_crossing() and w.get_children().any(func(n: Node) -> bool: return n is FerrySkiff), "the skiff sets off, and shows")
+	await frames(40)
+	var went := Vector2(p.global_position.x - from.x, p.global_position.z - from.z).length()
+	check(not p.is_crossing() and went > FerrymanKit.CROSS_REACH - 1.5, "it carries the Ferryman %.1f m ahead" % went)
+	check(in_way.hp < w0 and in_way._slow > 0.0, "what it passes is struck and slowed (%.0f)" % (w0 - in_way.hp))
+	in_way.release()
+	# Tollkeeper: debts, obols, Debt Collector.
+	pawn("ferryman", 0, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Demand the Toll" and p.has_flag("debt_collector"), "a Tollkeeper demands the toll, up to Debt Collector")
+	var debtor := foe("normal", 4.0, 0.0, 30.0)
+	var spared := foe("normal", -4.0, 0.0, 30.0)
+	FerrymanKit.demand_the_toll(p)
+	check(FerrymanKit.in_debt(p, debtor) and is_equal_approx(debtor._mark_mult, FerrymanKit.DEBT), "those in front fall in debt, taking 25% more damage")
+	check(FerrymanKit.in_debt(p, spared), "with All Must Pay, those behind too")
+	p.hp = 40.0
+	debtor.next_hitter = -1
+	debtor.take_damage(500.0, Vector3.ZERO, 0.0, debtor.centre())
+	p.on_kill(debtor)
+	check(p.obols == 1 and is_equal_approx(p.hp, 40.0 + FerrymanKit.OBOL_HEAL + p.m("obol_heal")), "a debtor's death pays an obol and heals")
+	check(is_equal_approx(FerrymanKit.blow_scale(p), 1.0 + FerrymanKit.OBOL_DAMAGE), "each obol makes the Tollkeeper's blows 5% harder")
+	spared.release()
+	var low := foe("normal", 3.0, 0.0, 100.0)
+	FerrymanKit.demand_the_toll(p)
+	low.hp = 15.0
+	p.on_melee_connect(low, WeaponDefs.ALL["oar"])
+	check(not low.is_alive(), "Debt Collector: a blow ends a debtor below 20% health")
+	p._kill()
+	check(p.obols == 0, "and the obols are lost when the Tollkeeper falls")
+	# Boatman: Black Water behind the skiff, and the Last Ferry.
+	pawn("ferryman", 1, true)
+	await frames(3)
+	_face_ahead()
+	check(p.has_flag("carry") and p.has_flag("wake") and p.has_flag("last_ferry"), "a Boatman's tree: carry, Black Water, The Last Ferry")
+	var knocked := foe("normal", 4.5)
+	FerrymanKit.cross(p)
+	await frames(40)
+	check(knocked._stun > 0.0, "the Boatman's skiff knocks down what it passes")
+	check(w.get_children().any(func(n: Node) -> bool: return n is BlackWater), "and leaves black water behind")
+	check(p.art_cd_left <= 0.0 and p.second_trip_left > 0.0, "The Last Ferry: a second trip, at once")
+	knocked.release()
+	# Psychopomp: souls of the dead near it; Guide the Souls; Gate of the Dead.
+	pawn("ferryman", 2, true)
+	await frames(3)
+	_face_ahead()
+	check(p.art_def()["name"] == "Guide the Souls" and not FerrymanKit.has_use(p), "a Psychopomp guides souls, and has none yet")
+	for i in 3:
+		var dead := foe("normal", 3.0, float(i), 10.0)
+		dead.take_damage(500.0, Vector3.ZERO, 0.0, dead.centre())
+	await frames(2)
+	check(p.souls >= 3 and p._soul_ring != null and p._soul_ring.count == p.souls, "the souls of the dead nearby circle it (%d)" % p.souls)
+	var target_foe := foe("normal", 6.0)
+	var t0 := target_foe.hp
+	FerrymanKit.guide_the_souls(p)
+	check(p.souls == 0, "Guide the Souls sends them all")
+	await until_gone(SoulBolt)
+	check(target_foe.hp < t0 - FerrymanKit.SOUL_DAMAGE, "they strike the enemy near (%.0f)" % (t0 - target_foe.hp))
+	target_foe.release()
+	p.set_souls(FerrymanKit.GATE_SOULS)
+	p.hp = 5.0
+	p._on_fatal()
+	check(not p.dead and p.hp >= p.max_hp() * 0.5 - 0.1 and p.souls == 0, "Gate of the Dead: falling with 6 souls, it comes back at half health")
+	p.hp = 5.0
+	p.set_souls(FerrymanKit.GATE_SOULS)
+	p._on_fatal()
+	check(p.dead, "but only once a minute")
+	for n: Node in w.get_children():
+		if n is BlackWater or n is FerrySkiff or n is SoulBolt:
+			n.queue_free()
+
 
 
 ## A wall between a shot and a body protects the body: an arrow flying along a wall does not graze a

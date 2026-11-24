@@ -2684,6 +2684,11 @@ func test_version_10() -> void:
 	ok(moved >= 2, "bots go looking for a fight (%d)" % moved)
 	var victim: BotPlayer = bots[0]
 	var lives: int = Net.lives_of(victim.peer)
+	# This checks death/lives/score, with active combat defences explicitly cleared.
+	victim.pawn.guard_left = 0.0
+	victim.pawn.mods["dodge"] = 0.0
+	victim.pawn._riposte_cd = 999.0
+	victim.pawn.stone_ward = false
 	Net.hit_player(victim.peer, 99999.0, pl.global_position)
 	await seconds(0.3)
 	ok(victim.down and victim.body.dead, "a bot can be defeated")
@@ -2960,7 +2965,7 @@ func test_version_8() -> void:
 	ok(not CodexPanel.TABS.has("Tips") and CodexPanel.TABS[0] == "Classes", "the Codex has classes and no tips")
 	m.show_codex()
 	await frames(2)
-	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.size(), "and shows every class, owned or not")
+	ok((m.panel as CodexPanel)._list.get_child_count() == ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id)).size(), "and shows every enabled class, owned or not")
 	m.show_store("artificer")
 	await frames(2)
 	var unowned := ClassDefs.for_sale().filter(func(c: String) -> bool: return not Game.owns_class(c)).size()
@@ -3117,8 +3122,9 @@ func test_version_8() -> void:
 	ok(w.count_pickups(Pickup.Kind.WEAPON) == weapon_count, "every weapon is on show (%d)" % w.count_pickups(Pickup.Kind.WEAPON))
 	var missing := 0
 	for id: String in PowerDefs.ALL:
-		# Pathfinder finds are unearthed by its beacons, never set out on a stand.
-		if not items.has(id) and not PowerDefs.ALL[id].has("spec"):
+		# Pathfinder finds are unearthed by its beacons, and a relic (the Sunken Crown) is won from its
+		# keeper: neither is set out on a stand.
+		if not items.has(id) and not PowerDefs.ALL[id].has("spec") and not PowerDefs.ALL[id].get("relic", false):
 			missing += 1
 	for id: String in PowerDefs.FOODS:
 		if not items.has(id):
@@ -3425,8 +3431,8 @@ func test_flow() -> void:
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await frames(3)
-	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.map_id == "mesenlla", "the title screen shows the Valleys of Mesenlla")
-	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "Beyond the Mists", "main title names the production update")
+	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.map_id == "vael", "the title screen shows Port Vael")
+	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "Beyond the Mists", "main title names the restored Beyond the Mists edition")
 	ok(m.world.player == null and m.world.zombies.is_empty() and not m.world.director.running, "the title backdrop has no active match")
 	await m.start_game(Game.Mode.SANDBOX)
 	await seconds(3.0)
@@ -3485,8 +3491,9 @@ func test_beyond_review() -> void:
 	ok(absf(back / maxf(ahead, 0.01) - Player.BACK_SPEED) < 0.03, "walking backwards goes at %d%% of walking on (%.2f against %.2f m/s)" % [int(Player.BACK_SPEED * 100.0), back, ahead])
 	# The Scarecrow belongs to the Village.
 	ok(ZombieDefs.ALL["scarecrow"]["maps"] == ["village"] and SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "village") and not SpawnRules.allows(ZombieDefs.ALL["scarecrow"], "mesenlla"), "the Scarecrow is the Village's alone")
-	# The world atlas: the Mists lead only to Mist Bastion, and the Valleys lie below it.
-	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion"], "on the atlas the Mists connect to the Fort and Mist Bastion only")
+	# The coast lies downhill from the Valleys along the same road.
+	ok(WorldAtlas.LINKS.filter(func(l: Array) -> bool: return "mists" in [l[0], l[1]]).map(func(l: Array) -> String: return l[1] if l[0] == "mists" else l[0]) == ["fort", "bastion"], "the Mists connect to the Fort and Mist Bastion")
+	ok(WorldAtlas.LINKS.has(["mesenlla", "vael", false]), "Port Vael is reached by land from the Valleys")
 	ok((WorldAtlas.SPOTS["mesenlla"] as Vector2).y > (WorldAtlas.SPOTS["bastion"] as Vector2).y, "and the Valleys of Mesenlla lie below Mist Bastion")
 	m.show_map_picker()
 	await frames(2)
@@ -3523,7 +3530,11 @@ func test_beyond_review() -> void:
 	ok(Game.changelog_seen == ChangelogPanel.signature(), "opening the Changelog reads them")
 	await frames(30)
 	var all_lines: int = m.panel.find_children("*", "RichTextLabel", true, false).size()
-	ok(lines < all_lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, all_lines])
+	var newest := ChangelogPanel.count(ChangelogPanel.versions(ChangelogPanel.notes())[0])
+	if newest > ChangelogPanel.FIRST_BUILT:
+		ok(lines < all_lines, "the rest of the newest version's changes follow over the next moments, so it opens at once (%d, then %d)" % [lines, all_lines])
+	else:
+		ok(lines == all_lines and all_lines >= newest, "the newest version's %d changes are all there at once (%d)" % [newest, all_lines])
 	m.show_menu()
 	await frames(2)
 	notes = m.ui_layer.find_child("ChangelogButton", true, false) as Button
@@ -4108,7 +4119,7 @@ func test_powers() -> void:
 			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
 			await seconds(0.25)
 		ok(pl.has_power(id), "%s activates" % id)
-		var want := 20.0
+		var want := PowerDefs.CROWN_TIME if PowerDefs.ALL[id].get("relic", false) else 20.0 # a relic is worn until you fall
 		ok(absf(float(pl.powers[id]) - want) < 1.0, "%s lasts %d s" % [id, want])
 		pl.powers.erase(id)
 		if pl._familiars.has(id):
@@ -5773,7 +5784,7 @@ func test_review() -> void:
 	m.show_class_picker(Game.Mode.NIGHT)
 	await frames(2)
 	var rows: Node = m.panel.get_meta("list")
-	ok(rows.get_child_count() == ClassDefs.ALL.size(), "every class is listed, the Adept too")
+	ok(rows.get_child_count() == ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id)).size(), "every enabled class is listed, the Adept too")
 	(rows.get_child(2) as Button).pressed.emit()
 	await frames(1)
 	await _press("Play as Heavy Infantry")

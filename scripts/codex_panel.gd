@@ -79,6 +79,8 @@ func _row(icon: String, color: Color, title: String, text: String, note := "") -
 ## Every class, whether or not it is yours yet, with its paths.
 func _classes() -> void:
 	for id: String in ClassDefs.ALL:
+		if ClassDefs.disabled(id):
+			continue
 		var d: Dictionary = ClassDefs.ALL[id]
 		var paths := PackedStringArray()
 		for spec: Dictionary in AbilityData.tree(id)["specs"]:
@@ -93,15 +95,19 @@ func _classes() -> void:
 ## Families are kept together; alphabetical order is only used within a family.
 static func enemy_group(id: String) -> int:
 	var d: Dictionary = ZombieDefs.ALL[id]
-	if d.get("mist_boss", false) or d.get("mesenlla_boss", false): return 5
+	if d.get("mist_boss", false) or d.get("mesenlla_boss", false) or d.get("vael_boss", false): return 6
+	if SpawnRules.is_vael(d): return 5
 	if SpawnRules.is_mesenlla(d): return 4
+	if d.get("hero", false) or d.get("rider", false) or d.get("fallen", false): return 2
 	if d.get("maps", []).has("mists"): return 3
-	if d.get("hero", false) or d.get("rider", false): return 2
 	if id in ["normal", "clever", "magic", "beast", "leaper"]: return 0
 	return 1
 
+const HIDDEN_ENEMY := "Kill one to learn about it."
+
 func _enemies() -> void:
-	var order: Array = ZombieDefs.ALL.keys()
+	# A War Wyvern's rider is part of the War Wyvern's entry, not one of its own.
+	var order: Array = ZombieDefs.ALL.keys().filter(func(k: String) -> bool: return not ZombieDefs.ALL[k].get("carried", false))
 	order.sort_custom(func(a: String, b: String) -> bool:
 		var ga := enemy_group(a)
 		var gb := enemy_group(b)
@@ -112,11 +118,13 @@ func _enemies() -> void:
 	for id: String in order:
 		var group := enemy_group(id)
 		if group != previous:
-			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Creatures of Mesenlla", "Bosses"][group])
+			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Creatures of Mesenlla", "The drowned of Vael", "Bosses"][group])
 			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
 		var locations := PackedStringArray()
-		for map_id: String in d.get("maps", []): locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
+		for map_id: String in d.get("maps", []):
+			if map_id == "lantern_road": continue
+			locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "vael": "Port Vael", "lantern_road": "The Lantern Road", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
 		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 		var from: float = d.get("from", -1.0)
 		if d.get("mist_boss", false) or d.get("mesenlla_boss", false):
@@ -126,9 +134,14 @@ func _enemies() -> void:
 		elif from > 0.0:
 			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
 		var words: String = d["desc"]
+		if d.has("lore"):
+			words += "\n" + str(d["lore"])
 		if d.has("first_words"):
 			# A boss's words: as it comes, and as it falls.
 			words += "\nAs it comes: \u201c%s\u201d\nAs it falls: \u201c%s\u201d" % [d["first_words"], d.get("last_words", "")]
+		if not Game.has_killed(id):
+			# What it is, and what it does, are learned by killing one.
+			words = HIDDEN_ENEMY
 		_row(d["icon"], d.get("tint", Color(0.34, 0.34, 0.38)).darkened(0.1), d["name"], words, note)
 		_map_badge(d, d.get("maps", []).has("village"))
 
@@ -157,7 +170,7 @@ func _items() -> void:
 	for id: String in PowerDefs.ALL:
 		var d: Dictionary = PowerDefs.ALL[id]
 		if not d["familiar"]:
-			_row(Icons.power(id), Color(d["color"]).darkened(0.35), PowerDefs.title(id), d["desc"], "Base duration: %d seconds" % int(d["time"]))
+			_row(Icons.power(id), Color(d["color"]).darkened(0.35), PowerDefs.title(id), d["desc"], "Worn until you fall" if d.get("relic", false) else "Base duration: %d seconds" % int(d["time"]))
 			_map_badge(d)
 
 
@@ -174,7 +187,11 @@ func _weapons() -> void:
 				note = "Range %d m, %.1f shots a second" % [int(d["range"]), 1.0 / float(d["rate"])]
 			WeaponDefs.Kind.SPELL:
 				note = "Range %d m, %d mana a bolt" % [int(d["range"]), int(d["cost"])]
-		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], d["desc"], note)
+		# What it does, and, for the weapons of the lands beyond, where it comes from.
+		var words: String = d["desc"]
+		if d.has("lore"):
+			words += "\n" + str(d["lore"])
+		_row(Icons.weapon(id), Color(0.4, 0.34, 0.26), d["name"], words, note)
 		var tags := HFlowContainer.new()
 		tags.add_theme_constant_override("h_separation", 8)
 		var cat := WeaponDefs.category(id)

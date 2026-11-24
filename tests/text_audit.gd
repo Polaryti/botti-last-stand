@@ -139,6 +139,72 @@ static func facts() -> Dictionary:
 		"pathfinder_entry": [CartographerKit.FIND_GAP, CartographerKit.FIND_REST],
 		"keen_eye": [CartographerKit.FIND_REST - 8.0],
 		"wanderer": [CartographerKit.FIND_GAP - 7.0],
+		# Harpooner
+		"class:harpooner": [HarpoonerKit.RETURN],
+		"reaver_entry": [HarpoonerKit.BLOOD_TIME, HarpoonerKit.BLOOD_HEAL, pct(HarpoonerKit.BLOOD_SPEED), pct(HarpoonerKit.HAUL_MARK - 1.0), HarpoonerKit.HAUL_MARK_TIME],
+		"sea_dog": [pct(HarpoonerKit.BLOOD_GUARD)],
+		"grapple_slam": [HarpoonerKit.SLAM_DAMAGE, HarpoonerKit.SLAM_RADIUS],
+		"no_quarter": [HarpoonerKit.REFUND],
+		"red_tide": [HarpoonerKit.RED_TIDE_REACH],
+		"rigger_entry": [HarpoonerKit.RIG_REACH, HarpoonerKit.RIG_TIME, HarpoonerKit.TRIP_STUN, HarpoonerKit.TRIP_SLOW, float(HarpoonerKit.RIG_LINES)],
+		"barbed_line": [HarpoonerKit.BARB_DAMAGE],
+		"snare_knot": [HarpoonerKit.SNARE],
+		"lifeline": [pct(HarpoonerKit.LIFELINE_SPEED), HarpoonerKit.LIFELINE_TIME],
+		"crows_nest": [pct(HarpoonerKit.CROWS_NEST), HarpoonerKit.CROWS_REACH],
+		"leviathan_hunter_entry": [HarpoonerKit.GREAT_DAMAGE, HarpoonerKit.GREAT_PIN, HarpoonerKit.MARK_TIME, pct(HarpoonerKit.MARK - 1.0)],
+		"whale_oil": [pct(HarpoonerKit.BIG_GAME)],
+		"flensing": [HarpoonerKit.FLENSE_HEAL],
+		"leviathans_bane": [pct(HarpoonerKit.BANE - 1.0)],
+		# Tidecaller
+		"class:tidecaller": [TidecallerKit.TRIDENT_TIDE],
+		"long_haft": [TidecallerKit.LONG_HAFT_REACH, TidecallerKit.LONG_HAFT_HITS],
+		"skewer": [TidecallerKit.SKEWER_HOLD, TidecallerKit.SKEWER_TIDE],
+		"tide_deep_breath": [TidecallerKit.DEEP_BREATH_TIDE],
+		"brine": [TidecallerKit.BRINE_SLOW, pct(TidecallerKit.BRINE_HARD)],
+		"tidewarden_entry": [TidecallerKit.SHELL_TIME, TidecallerKit.SHELL_BASE, TidecallerKit.SHELL_REFILL, TidecallerKit.BURST_RADIUS, TidecallerKit.BURST_DAMAGE],
+		"thick_shell": [TidecallerKit.SHELL_THICK],
+		"coral_barbs": [TidecallerKit.CORAL_DAMAGE],
+		"salt_mend": [TidecallerKit.SALT_MEND],
+		"breakwater": [TidecallerKit.BREAKWATER_STUN],
+		"high_surge": [TidecallerKit.SURGE_REACH, pct(TidecallerKit.SURGE_HARD)],
+		"tidal_ward": [TidecallerKit.WARD_REACH],
+		"unbroken_sea": [TidecallerKit.UNBROKEN_TIME, pct(TidecallerKit.UNBROKEN_HEAL)],
+		"stormcaller_entry": [TidecallerKit.SOAK_TIME, TidecallerKit.SPEAR_RANGE, TidecallerKit.SPEAR_DAMAGE, TidecallerKit.CHAINS, TidecallerKit.CHAIN_REACH, TidecallerKit.CHAIN_DAMAGE, TidecallerKit.CHAIN_JOLT],
+		"charged_tines": [pct(TidecallerKit.CHARGED_TINES)],
+		"long_throw": [TidecallerKit.LONG_THROW],
+		"conductor": [TidecallerKit.CONDUCTOR],
+		"static_charge": [TidecallerKit.STATIC_SLOW],
+		"squall_step": [TidecallerKit.SQUALL_STEP],
+		"rain_cloak": [TidecallerKit.RAIN_COUNT, TidecallerKit.RAIN_REACH, pct(TidecallerKit.RAIN_CLOAK)],
+		"downpour": [TidecallerKit.DOWNPOUR],
+		"maelstrom": [TidecallerKit.MAELSTROM_TIME, TidecallerKit.MAELSTROM_GAP, TidecallerKit.MAELSTROM_REACH, TidecallerKit.MAELSTROM_DAMAGE],
+		"deepcaller_entry": [TidecallerKit.SERPENT_HP, TidecallerKit.SERPENT_TIME, TidecallerKit.SERPENT_TAUNT],
+		"thick_scales": [pct(TidecallerKit.THICK_SCALES)],
+		"long_tide": [TidecallerKit.LONG_TIDE],
+		"pack_hunter": [pct(TidecallerKit.PACK_HUNTER)],
+		"venom_of_the_deep": [TidecallerKit.VENOM.x, TidecallerKit.VENOM.y],
+		"coil": [TidecallerKit.COIL_HOLD],
+		"shed_skin": [TidecallerKit.SHED_HEAL, pct(TidecallerKit.SHED_REST)],
+		"leviathans_child": [pct(TidecallerKit.CHILD_HP), TidecallerKit.CHILD_REACH],
+		# Ferryman
+		"class:ferryman": [FerrymanKit.CROSS_REACH, FerrymanKit.CROSS_HEAL],
+		"toll_bell": [FerrymanKit.TOLL_BELL],
+		"ferrymans_due": [FerrymanKit.DUE_HEAL],
+		"tollkeeper_entry": [FerrymanKit.TOLL_REACH, FerrymanKit.DEBT_TIME + 1.0, pct(FerrymanKit.DEBT - 1.0), FerrymanKit.OBOL_HEAL, pct(FerrymanKit.OBOL_DAMAGE), float(FerrymanKit.OBOLS)],
+		"interest": [FerrymanKit.INTEREST],
+		"all_must_pay": [FerrymanKit.TOLL_WIDE],
+		"silver_tongue": [pct(FerrymanKit.OBOL_SPEED)],
+		"debt_collector": [pct(FerrymanKit.COLLECT_BELOW)],
+		"boatman_entry": [FerrymanKit.CARRY_REACH, FerrymanKit.BOAT_STUN],
+		"black_water": [FerrymanKit.WAKE_TIME],
+		"ferry_fare": [FerrymanKit.LEECH],
+		"safe_passage": [pct(FerrymanKit.SAFE_PASSAGE), FerrymanKit.SAFE_TIME],
+		"the_last_ferry": [FerrymanKit.SECOND_TRIP],
+		"psychopomp_entry": [FerrymanKit.SOUL_REACH, float(FerrymanKit.SOULS), FerrymanKit.SOUL_CAST_REACH + 2.0, FerrymanKit.SOUL_DAMAGE, FerrymanKit.SOUL_HEAL],
+		"soul_ward": [pct(FerrymanKit.SOUL_WARD)],
+		"restless_dead": [FerrymanKit.SOUL_AURA_REACH, FerrymanKit.SOUL_AURA],
+		"reaping": [2.0],
+		"gate_of_the_dead": [float(FerrymanKit.GATE_SOULS)],
 		# Commander
 		"composure": [pct(1.0 - CommanderKit.TRAINED_COMMAND_CD / CommanderKit.COMMAND_CD)],
 		"warlock": [WeaponDefs.DAMAGE * 1.8, 0.8, 16.0],
@@ -181,7 +247,40 @@ static func facts() -> Dictionary:
 		"item:tesla_coil": [float(PathUpgrades.TESLA_TARGETS), PathUpgrades.TESLA_REACH, PathUpgrades.TESLA_EVERY, PathUpgrades.TESLA_TIME, PathUpgrades.TESLA_DAMAGE],
 		"item:grapeshot": [float(PathUpgrades.GRAPESHOT_PELLETS), PathUpgrades.GRAPESHOT_DAMAGE],
 		"item:shield_wall": [PathUpgrades.SHIELD_WALL_RADIUS, PathUpgrades.SHIELD_WALL_AMOUNT, PathUpgrades.SHIELD_WALL_TIME],
+		"item:encore": [float(CrownUpgrades.ENCORE_EVERY), CrownUpgrades.ENCORE_REACH, pct(CrownUpgrades.ENCORE_POWER - 1.0), CrownUpgrades.ENCORE_DOWN],
+		"item:shattered_mirror": [float(CrownUpgrades.SHARDS), CrownUpgrades.SHARD_REACH, CrownUpgrades.SHARD_DAMAGE, CrownUpgrades.SHARD_BLEED.x, CrownUpgrades.SHARD_BLEED.y],
+		"item:event_horizon": [CrownUpgrades.HORIZON_TIME, CrownUpgrades.HORIZON_REACH, CrownUpgrades.HORIZON_DPS, CrownUpgrades.HORIZON_COLLAPSE, CrownUpgrades.HORIZON_COLLAPSE_REACH],
+		"item:star_shower": [float(CrownUpgrades.SHOWER_STARS), CrownUpgrades.SHOWER_DAMAGE, CrownUpgrades.SHOWER_RADIUS, CrownUpgrades.SHOWER_STUN],
+		"item:open_door": [pct(CrownUpgrades.DOOR_BELOW), CrownUpgrades.DOOR_HEAL, CrownUpgrades.DOOR_GUARD, CrownUpgrades.DOOR_REST, CrownUpgrades.DOOR_MIN],
+		"item:trailblazer": [CrownUpgrades.BLAZE_GAP, CrownUpgrades.BLAZE_TIME, pct(CrownUpgrades.BLAZE_SPEED)],
+		"item:lucky_fingers": [float(CrownUpgrades.LUCKY_ONE_IN)],
+		"item:contract": [pct(CrownUpgrades.CONTRACT_MARK - 1.0), CrownUpgrades.CONTRACT_HEAL, CrownUpgrades.CONTRACT_REFUND],
+		"item:toll_road": [float(CrownUpgrades.TOLL_EVERY), CrownUpgrades.TOLL_PIN],
+		"item:trappers_guild": [TrappersGuild.SNARE_HOLD, TrappersGuild.SNARE_DAMAGE, TrappersGuild.SNARE_REARM, TrappersGuild.CACHE_EVERY, TrappersGuild.FIRE_REACH, TrappersGuild.FIRE_HEAL] + range(1, ShopDefs.MAP_LEVELS + 1).map(func(n: int) -> float: return float(n)),
+		# Weapons whose rules are written in code
+		"weapon:flare_pistol": [Flare.BURN_RADIUS, Flare.TIME, Flare.REVEAL_RADIUS],
+		"weapon:blowgun": [pct(Player.POISON_HURT - 1.0)],
+		# Port Vael's foes (their special moves are VaelMind's), and the clock times they come at,
+		# read as minutes and seconds ("around 3:00").
+		"enemy:siren": [VaelMind.SONG_REACH, VaelMind.SONG_PULL],
+		"enemy:kraken": [VaelMind.KRAKEN_SWEEP_REACH, VaelMind.KRAKEN_INK_BLIND, VaelMind.KRAKEN_PULL_REACH, VaelMind.KRAKEN_PULL_TIME, VaelMind.KRAKEN_BROOD],
+		"enemy:press_gang": [VaelMind.NET_HOLD],
+		"enemy:tide_witch": [float(VaelMind.WAVES), VaelMind.WAVE_SLOW, float(VaelMind.RAISE_COUNT)],
+		"enemy:harbourmaster": _clock(Director.HARBOURMASTER_AT),
+		"enemy:lighthouse_keeper": [VaelMind.FLASH_REACH, VaelMind.FLASH_STUN, 2.0] + _clock(Director.KEEPER_AT),
+		"enemy:kraken_arm": _clock(MistTide.TURN * 3.0),
+		"enemy:hollow_sovereign": [float(VaelMind.UNDERTOW_WAVES), VaelMind.SURGE, float(VaelMind.COURT)] + _clock(510.0),
+		"power:sunken_crown": [PowerDefs.CROWN_REGEN] + _clock(Director.CROWN_AT),
+		# Last Light
+		"enemy:leviathan": [float(VaelMind.TIDAL_WAVES), LastLight.DIM_RADIUS, LastLight.DIM_TIME, float(VaelMind.DIVE_RAISES)],
+		"boon:deep_lungs": [Boons.DEEP_GRACE],
+		"boon:lantern_bearer": [Boons.BEARER_REACH],
 	}
+
+
+## A time on the night's clock, as the words write it ("4:30"): its minutes and its seconds.
+static func _clock(seconds: float) -> Array:
+	return [floorf(seconds / 60.0), fmod(seconds, 60.0)]
 
 
 ## Numbers found in data: as they are, and as the percentages they read as.
@@ -247,4 +346,15 @@ func run() -> Array[String]:
 		var item: Dictionary = ShopDefs.ITEMS[id]
 		# A Map Upgrade's levels, as the Armory lists them, are held to the same numbers.
 		_audit("item:" + id, str(item["desc"]) + " " + " ".join(PackedStringArray(item.get("levels", []))), [item.get("art", {}), item.get("effect", {})])
+	# Port Vael's foes and the Sunken Crown: what the Codex says of them is what they do.
+	for zid: String in ZombieDefs.ALL:
+		if SpawnRules.is_vael(ZombieDefs.ALL[zid]):
+			_audit("enemy:" + zid, str(ZombieDefs.ALL[zid]["desc"]), [ZombieDefs.ALL[zid], [VaelSkyMind.REACH, VaelSkyMind.RECOVERY, 1.5, 2.0]] if zid in VaelSkyMind.KINDS else [ZombieDefs.ALL[zid]])
+	_audit("power:sunken_crown", str(PowerDefs.ALL[PowerDefs.CROWN]["desc"]), [PowerDefs.CROWN_DAMAGE])
+	for bid: String in Boons.ALL:
+		_audit("boon:" + bid, str(Boons.ALL[bid]["desc"]), [Boons.ALL[bid].get("add", {})])
+	# Weapons: every number a weapon's words quote (Codex, Armory) is one of its own, or a fact.
+	for wid: String in WeaponDefs.ALL:
+		var wd: Dictionary = WeaponDefs.ALL[wid]
+		_audit("weapon:" + wid, str(wd.get("desc", "")), [wd])
 	return failures

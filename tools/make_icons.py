@@ -397,7 +397,41 @@ def lantern():
         + line("#8f5f1e", 3, (50, 28), (50, 74), ink=False) + rect(BRASS, 28, 74, 44, 10, 2) + circ(HOT, 50, 50, 8, 0))
 def compass():
     return circ(BRASS, 50, 50, 44) + circ("#f6efdc", 50, 50, 34, 2) + poly(RED, (50, 18), (58, 50), (42, 50)) + poly("#59627a", (50, 82), (58, 50), (42, 50)) + circ(BRASS, 50, 50, 5, 1.5)
+# The Sunken Crown: the weapons of Vael
+SEA_IRON = ("#b9c2c8", "#4a545c"); TARRED = ("#4a3c34", "#15110f"); SILVER = ("#ffffff", "#9aa3ae")
+def cutlass():
+    # A broad curved blade under a brass basket guard.
+    return (path(STEEL, "M40 64 C46 40 58 18 80 6 C76 26 66 48 52 70 Z") + curve("#7a859c", 2.4, "M46 60 C52 42 62 26 74 14", ink=False)
+        + path(BRASS, "M28 62 C34 52 56 56 60 68 C52 76 36 76 28 62 Z") + curve("#c9831c", 4, "M30 66 C26 76 30 90 40 92")
+        + line("#3a2c22", 9, (44, 70), (36, 88)) + "".join(line("#ffe68a", 2.2, (a, b), (a + 7, b + 3), ink=False) for a, b in ((37, 76), (35, 82))) + circ(BRASS, 34, 92, 5))
+def boarding_hook():
+    # A hooked iron head on a short haft, and a few links of chain at its foot.
+    return (line("#c08a52", 7, (34, 94), (52, 34)) + "".join(line("#2a2420", 8, a, b, ink=False) for a, b in (((36, 88), (38, 82)), ((40, 76), (42, 70))))
+        + curve("#b9c2c8", 8, "M52 36 C50 14 70 4 82 14 C90 22 86 36 76 38") + poly(SEA_IRON, (70, 34), (80, 44), (82, 32))
+        + circ("none", 30, 98, 4, 3) + circ("none", 24, 94, 4, 3))
+def harpoon():
+    # A whaling iron: a barbed head, a lashed shaft and a coil of rope at its tail.
+    return (line("#c08a52", 6, (20, 86), (70, 30)) + poly(STEEL, (70, 30), (94, 6), (76, 38)) + poly(DSTEEL, (74, 26), (68, 18), (80, 22))
+        + poly(DSTEEL, (78, 36), (86, 42), (82, 30)) + "".join(line("#2a2420", 6, a, b, ink=False) for a, b in (((62, 38), (66, 34)), ((58, 42), (62, 38))))
+        + circ(("#e8d6a8", "#9c7f4a"), 20, 86, 11) + circ("none", 20, 86, 6, 2.4))
+def flare_pistol():
+    # A brass signal pistol, its wide muzzle spitting a red flare.
+    return (rect(BRASS, 20, 34, 50, 18, 4) + path(BRASS, "M14 30 L22 30 L22 56 L14 56 Z") + path(("#a46a3a", "#4a2c16"), "M60 46 C66 60 72 74 70 88 L54 90 C54 74 52 62 48 50 Z")
+        + curve("#c9831c", 3.4, "M48 54 C44 64 52 70 58 64") + circ(("#ffffff", "#ff5a3a"), 10, 22, 10) + circ(("#ffe6a0", "#ff8a2a"), 10, 22, 5, 0)
+        + line("#ffb52e", 3, (4, 12), (0, 6), ink=False) + line("#ffb52e", 3, (20, 12), (24, 4), ink=False))
+def anchor():
+    # A ship's anchor: ring, stock, shank, and the crown with its two curved arms and flukes.
+    return (circ("none", 50, 12, 8, 6) + circ("none", 50, 12, 8, 3) + rect(("#c08a52", "#6f4522"), 26, 22, 48, 9, 2)
+        + line("#b9c2c8", 9, (50, 18), (50, 84)) + curve("#b9c2c8", 9, "M16 60 C18 82 34 90 50 88 C66 90 82 82 84 60")
+        + poly(SEA_IRON, (8, 66), (16, 50), (24, 66)) + poly(SEA_IRON, (76, 66), (84, 50), (92, 66)))
+def oar():
+    # A long black oar with a broad blade edged in silver and the lamp of Vael painted on it.
+    return (line("#3a302a", 7, (16, 94), (54, 46)) + rect(SILVER, 10, 88, 12, 10, 3)
+        + path(TARRED, "M54 46 C58 30 72 8 86 6 C96 10 94 28 82 42 C74 52 62 56 54 46 Z") + curve("#e8eef6", 3, "M58 44 C64 30 74 14 86 10", ink=False)
+        + path(("#fff2b0", "#e0a020"), "M72 30 C68 24 72 18 76 14 C78 20 80 26 76 30 Z", 1.6) + rect(("#e0b050", "#8f5f1e"), 68, 30, 12, 4, 1.4))
 for g in (beacon, link, waygate, machete, bolas, lantern, compass):
+    PLAIN.append(g)
+for g in (cutlass, boarding_hook, harpoon, flare_pistol, anchor, oar):
     PLAIN.append(g)
 
 def crest_cartographer():
@@ -445,7 +479,91 @@ def wyvern():
     return (path(("#6f5446", "#3a2a22"), wing) + f'<g transform="translate(100 0) scale(-1 1)">{path(("#6f5446", "#3a2a22"), wing)}</g>'
         + path(green, "M44 40 C44 26 56 26 56 40 L56 70 C56 76 44 76 44 70Z") + path(green, "M46 30 C46 18 54 18 54 30 L54 34 L46 34Z") + poly(green, (44, 14), (56, 14), (50, 4))
         + curve("#33482a", 5, "M50 74 C52 84 46 90 50 96", ink=False) + poly(BONE, (50, 98), (44, 90), (56, 90)) + circ("#ffb52e", 47, 12, 2, 0) + circ("#ffb52e", 53, 12, 2, 0))
-for g in (bear, eagle, antlers, sprout, boulder, storm, wyvern):
+def _ruff(cx, cy, rx, ry, spikes, deep, col):
+    # A shaggy outline: points alternating out and in around an ellipse.
+    pts = []
+    for i in range(spikes * 2):
+        a = math.pi * 2 * i / (spikes * 2) - math.pi / 2
+        k = 1.0 if i % 2 == 0 else deep
+        pts.append((round(cx + math.cos(a) * rx * k, 1), round(cy + math.sin(a) * ry * k, 1)))
+    return poly(col, *pts)
+def _bear_head(fur, ruff, muzzle, eyes, mouth="#5a1414", glow=None):
+    # A bear's head from the front, snarling: a shaggy ruff, small round ears, a heavy brow, an open
+    # mouth with fangs.
+    out = circ(fur, 22, 22, 11) + circ(fur, 78, 22, 11) + circ(ruff[1], 22, 22, 5, 0) + circ(ruff[1], 78, 22, 5, 0)
+    out += _ruff(50, 55, 44, 40, 13, 0.86, ruff)
+    out += path(fur, "M20 50 C20 24 80 24 80 50 C80 74 66 88 50 88 C34 88 20 74 20 50Z")
+    out += path(muzzle, "M34 66 C34 54 66 54 66 66 C66 80 58 88 50 88 C42 88 34 80 34 66Z")
+    out += path(mouth, "M38 72 C42 84 58 84 62 72 C56 76 44 76 38 72Z", 2.4)
+    out += poly("#fffbe8", (41, 73), (44, 81), (46.5, 74.5), w=1.6) + poly("#fffbe8", (53.5, 74.5), (56, 81), (59, 73), w=1.6)
+    out += ell(INK, 50, 62, 7, 5, 0, 0)
+    out += line(ruff[1], 3.2, (30, 40), (44, 46), ink=False) + line(ruff[1], 3.2, (70, 40), (56, 46), ink=False)
+    if glow:
+        out += circ(glow, 38, 49, 7, 0).replace("/>", ' opacity="0.45"/>') + circ(glow, 62, 49, 7, 0).replace("/>", ' opacity="0.45"/>')
+    out += ell(eyes, 38, 49, 4.2, 3.2, 12, 1.6) + ell(eyes, 62, 49, 4.2, 3.2, -12, 1.6)
+    return out
+def bear():
+    # A brown bear's head, snarling, in a shaggy ruff of fur.
+    return _bear_head(("#a5743f", "#4e3018"), ("#7a5028", "#3a2410"), ("#d8b88c", "#9a7248"), ("#ffcf5a", "#d98a14"))
+def mist_bear():
+    # The Mist Bear: the same snarl in pale spectral fur, eyes burning cyan, mist curling below it.
+    head = _bear_head(("#d4fbf6", "#4fa8a4"), ("#a8ece6", "#2c6e6c"), ("#f2fffd", "#9ed8d2"), ("#ffffff", "#5ff0ff"), "#1f4a50", "#9ff8ff")
+    wisps = curve("#e6fffc", 5, "M4 90 C20 80 32 96 48 90 C64 84 76 98 96 88", ink=False) + curve("#bff3ec", 3.5, "M10 98 C26 92 40 100 56 96", ink=False)
+    return head + wisps
+def mist_eagle():
+    # A Mist Eagle's head in profile: a hooked beak, a burning eye, its feathers trailing into mist.
+    ghost = ("#e8fffc", "#55b8b3")
+    return (path(ghost, "M30 30 C40 12 70 8 84 22 C94 32 96 50 88 60 C94 68 96 78 90 90 C80 84 72 82 62 86 C60 76 54 70 46 68 C36 66 30 58 30 48Z")
+        + curve("#9fdcd6", 3, "M58 30 C70 34 78 44 80 56", ink=False) + curve("#9fdcd6", 3, "M52 46 C62 50 70 60 72 72", ink=False)
+        + path(GOLD, "M32 32 C18 30 6 40 4 56 C10 50 16 48 22 50 C20 56 22 60 28 62 C30 52 34 46 40 44Z")
+        + path(("#fff2a8", "#e0b030"), "M30 32 C34 30 40 32 42 36 C38 36 34 36 30 36Z", 2)
+        + circ("#9ff8ff", 48, 38, 9, 0).replace("/>", ' opacity="0.45"/>') + circ(("#ffffff", "#5ff0ff"), 48, 38, 5.5, 2) + circ(INK, 49, 38, 2.2, 0)
+        + line("#2c6e6c", 3, (38, 30), (58, 32), ink=False)
+        + curve("#e6fffc", 5, "M62 92 C72 86 80 96 92 90", ink=False) + curve("#bff3ec", 3.5, "M70 99 C78 95 86 100 96 96", ink=False))
+def mist_elemental():
+    # A column of swirling mist round a glowing core, with two pale eyes in its hood.
+    body = path(("#d8fffb", "#3a9e9a"), "M50 6 C70 8 82 26 78 44 C90 54 88 72 74 80 C70 90 58 96 50 96 C42 96 30 90 26 80 C12 72 10 54 22 44 C18 26 30 8 50 6Z")
+    swirl = curve("#ffffff", 4, "M28 74 C20 56 40 42 56 50 C70 58 60 78 46 72", ink=False) + curve("#bff7f2", 3, "M70 30 C78 40 76 52 68 58", ink=False) + curve("#bff7f2", 3, "M24 34 C30 26 38 22 46 22", ink=False)
+    core = circ("#ffffff", 50, 62, 15, 0).replace("/>", ' opacity="0.35"/>') + circ(("#ffffff", "#5fe3da"), 50, 62, 9, 2.4)
+    eyes = (ell("#1f4a50", 40, 32, 7, 4.5, 14, 0) + ell("#1f4a50", 60, 32, 7, 4.5, -14, 0)
+        + ell(("#ffffff", "#9ff8ff"), 40.5, 32, 4, 2.2, 14, 0) + ell(("#ffffff", "#9ff8ff"), 59.5, 32, 4, 2.2, -14, 0))
+    return body + swirl + core + eyes
+def storm_elemental():
+    # A thunderhead with burning eyes, a body that is one bolt of lightning, and crackling arms.
+    cloud = path(("#8c95ac", "#353b50"), "M14 50 C2 48 4 28 18 28 C18 12 40 6 50 18 C60 6 82 12 82 28 C96 28 98 48 86 50 C80 56 20 56 14 50Z")
+    eyes = ell(("#ffffff", "#bfe0ff"), 38, 36, 6, 3, 12, 1.6) + ell(("#ffffff", "#bfe0ff"), 62, 36, 6, 3, -12, 1.6)
+    body = poly(("#ffffff", "#7fc0ff"), (42, 52), (60, 52), (52, 68), (64, 68), (38, 98), (46, 74), (34, 74))
+    arms = line("#cfe8ff", 3.2, (16, 52), (8, 64), (16, 66), (6, 82)) + line("#cfe8ff", 3.2, (84, 52), (92, 64), (84, 66), (94, 82))
+    return arms + cloud + body + eyes
+def woodland_cavalry():
+    # A Child of the Woods riding a bear into battle, its spear couched across the bear's head.
+    spear_shaft = line("#c08a52", 4, (8, 74), (84, 12))
+    tip = poly(STEEL, (84, 12), (97, 2), (90, 18), w=2.4)
+    rider = at(46, 24, 0.48, sprout())
+    beast = at(50, 64, 0.74, _bear_head(("#a5743f", "#4e3018"), ("#7a5028", "#3a2410"), ("#d8b88c", "#9a7248"), ("#ffcf5a", "#d98a14")))
+    return beast + rider + spear_shaft + tip
+def daemon():
+    # A horned daemon's head on bat wings, eyes burning and fangs bared.
+    wing = "M40 46 C28 30 12 26 2 32 C8 40 10 46 8 54 C16 52 22 56 24 62 C30 56 36 54 42 56Z"
+    red = ("#ff6a4a", "#8c1010")
+    return (path(("#5a1a1a", "#250808"), wing) + f'<g transform="translate(100 0) scale(-1 1)">{path(("#5a1a1a", "#250808"), wing)}</g>'
+        + path(BONE, "M30 32 C18 24 14 12 18 2 C24 12 32 16 40 22Z") + path(BONE, "M70 32 C82 24 86 12 82 2 C76 12 68 16 60 22Z")
+        + path(red, "M26 42 C26 18 74 18 74 42 L72 64 C68 82 58 92 50 92 C42 92 32 82 28 64Z")
+        + line("#4a0808", 3.4, (32, 42), (46, 48), ink=False) + line("#4a0808", 3.4, (68, 42), (54, 48), ink=False)
+        + circ("#ffe066", 39, 52, 7, 0).replace("/>", ' opacity="0.4"/>') + circ("#ffe066", 61, 52, 7, 0).replace("/>", ' opacity="0.4"/>')
+        + ell(("#fff6b0", "#ffb52e"), 39, 52, 5, 2.8, 15, 1.6) + ell(("#fff6b0", "#ffb52e"), 61, 52, 5, 2.8, -15, 1.6)
+        + path("#3a0606", "M34 70 C42 80 58 80 66 70 C58 74 42 74 34 70Z", 2.2)
+        + poly("#fffbe8", (38, 71), (41, 79), (43, 72.5), w=1.4) + poly("#fffbe8", (57, 72.5), (59, 79), (62, 71), w=1.4))
+def invisible():
+    # Someone who is there and isn't: a dashed outline of a figure, faintly filled, with glints of light.
+    dash = 'stroke-dasharray="7 5"'
+    fig = ('<g fill="#dcfdf8" fill-opacity="0.18">'
+        + f'<circle cx="50" cy="28" r="13" stroke="{INK}" stroke-width="8" {dash}/>'
+        + f'<path d="M24 94 C24 60 34 46 50 46 C66 46 76 60 76 94Z" stroke="{INK}" stroke-width="8" stroke-linejoin="round" {dash}/>'
+        + f'<circle cx="50" cy="28" r="13" stroke="#dcfdf8" stroke-width="4" {dash}/>'
+        + f'<path d="M24 94 C24 60 34 46 50 46 C66 46 76 60 76 94Z" stroke="#dcfdf8" stroke-width="4" stroke-linejoin="round" {dash}/></g>')
+    return fig + at(82, 18, 0.3, star()) + at(16, 54, 0.22, star()) + at(86, 70, 0.16, star())
+for g in (bear, mist_bear, eagle, mist_eagle, antlers, sprout, boulder, storm, wyvern, mist_elemental, storm_elemental, woodland_cavalry, daemon, invisible):
     PLAIN.append(g)
 
 # Beyond the Mists: Mist Bastion's garrison
@@ -469,13 +587,271 @@ def mist_heavy():
     return (path(GLASS, "M30 30 C20 22 16 10 22 2 C26 12 32 18 40 22Z") + path(GLASS, "M70 30 C80 22 84 10 78 2 C74 12 68 18 60 22Z")
         + path(MSTEEL, "M24 32 C24 16 76 16 76 32 L78 86 C70 94 30 94 22 86Z")
         + rect(INK, 26, 46, 48, 9, 2, 0) + rect(GLASS, 30, 48.5, 40, 4, 1, 0) + rect(MSTEEL, 46, 56, 8, 26, 1, 2))
+# The Sunken Crown: the drowned of Port Vael and what the tide brings
+SEA_SKIN = ("#5f8a90", "#1c3238"); KELP = ("#7aa84a", "#2a4a18"); BARN = ("#f2ead6", "#9c927c"); JELLY = ("#e6f6ff", "#7ab4d8")
+def _barnacles(pts, r=4):
+    return "".join(circ(BARN, x, y, r, 1.8) + circ("#5a554c", x, y, r * 0.4, 0) for x, y in pts)
+def drowned_sailor():
+    # A drowned sailor's head: a knitted cap gone green, weed hanging from it, sea-green eyes, a bubble rising.
+    return (path(SEA_SKIN, "M24 46 C24 24 76 24 76 46 L74 70 C70 86 60 94 50 94 C40 94 30 86 26 70Z")
+        + path(("#3a5a78", "#162a3c"), "M20 46 C18 22 32 8 50 8 C68 8 82 22 80 46 C70 40 30 40 20 46Z")
+        + rect(("#4a6a8a", "#1e3448"), 18, 40, 64, 9, 3) + circ(("#c8443a", "#6a1a14"), 50, 8, 6)
+        + curve("#5a8a3a", 4, "M24 48 C20 60 26 70 20 84", ink=False) + curve("#3e6a26", 3.5, "M78 48 C82 58 76 66 82 78", ink=False)
+        + ell("#0e2228", 39, 60, 7, 4.5, 8, 0) + ell("#0e2228", 61, 60, 7, 4.5, -8, 0)
+        + ell(("#e8fff6", "#5ff0c8"), 39, 60, 4, 2.4, 8, 0) + ell(("#e8fff6", "#5ff0c8"), 61, 60, 4, 2.4, -8, 0)
+        + path("#0e2228", "M40 78 C46 82 54 82 60 78 C56 84 44 84 40 78Z", 2) + _barnacles([(70, 74), (75, 66)], 3.5)
+        + circ("none", 88, 26, 5, 2.4) + circ("none", 92, 12, 3, 2))
+def barnacle_brute():
+    # A hulking shoulder and head crusted in barnacle shell, chain over it, eyes deep in the crust.
+    return (path(("#8c8679", "#3a3630"), "M6 92 C6 56 20 34 50 30 C80 34 94 56 94 92Z")
+        + path(SEA_SKIN, "M32 52 C32 30 68 30 68 52 L66 70 C62 82 38 82 34 70Z")
+        + path(("#b0a892", "#5a554c"), "M28 44 C28 18 72 18 72 44 C62 36 38 36 28 44Z")
+        + _barnacles([(18, 70), (28, 60), (14, 82), (82, 70), (74, 60), (86, 84), (40, 26), (54, 22), (64, 30)], 4.5)
+        + line("#c8cdd2", 5, (10, 58), (30, 76), (52, 86), (74, 84), (92, 70))
+        + ell(("#e8fff6", "#5ff0c8"), 42, 56, 4, 2.4, 10, 1.4) + ell(("#e8fff6", "#5ff0c8"), 58, 56, 4, 2.4, -10, 1.4)
+        + path(("#e08070", "#8a2a20"), "M58 18 L66 2 L70 20Z", 2) + path(("#e08070", "#8a2a20"), "M44 16 L40 4 L50 14Z", 2))
+def brine_hound():
+    # A finned, eel-skinned hound's head in profile: a wide mouth of needles, a glowing eye, gill slits.
+    return (path(SEA_SKIN, "M10 56 C12 36 34 26 56 28 C74 30 90 38 94 50 C88 54 80 54 72 56 C62 58 60 66 54 74 C44 80 26 80 16 72Z")
+        + path(("#4a8a88", "#1a3a3a"), "M30 30 L36 6 L46 28 L54 8 L62 28 L74 14 L76 32Z", 2.4)
+        + path("#3a0e10", "M94 50 C86 60 72 62 58 60 C70 66 84 66 92 58Z", 2) + "".join(poly(BONE, (x, 55), (x + 2.6, 62), (x + 5, 55), w=1.2) for x in (64, 70, 76, 82))
+        + "".join(poly(BONE, (x, 63), (x + 2.4, 57), (x + 4.8, 63), w=1.2) for x in (67, 73, 79))
+        + "".join(line("#0e2228", 2.6, (x, 48), (x - 4, 64), ink=False) for x in (30, 36, 42))
+        + circ("#5ff0c8", 66, 40, 8, 0).replace("/>", ' opacity="0.4"/>') + circ(("#e8fff6", "#5ff0c8"), 66, 40, 5, 1.6) + circ(INK, 67, 40, 2, 0)
+        + _barnacles([(22, 66), (28, 72)], 3.2))
+def lantern_jelly():
+    # A jelly's pale bell with a lantern burning inside it, and stinging threads trailing below.
+    threads = "".join(curve(c, 3, d, ink=False) for c, d in (("#bfe6ff", "M24 56 C20 70 30 80 24 96"), ("#e6c6f2", "M38 58 C36 72 44 82 40 98"),
+        ("#bfe6ff", "M62 58 C64 72 56 82 60 98"), ("#e6c6f2", "M76 56 C80 70 70 80 76 96"), ("#9ff8e0", "M50 60 C48 74 54 86 50 98")))
+    bell = path(JELLY, "M12 56 C10 26 30 8 50 8 C70 8 90 26 88 56 C80 52 74 60 66 56 C60 60 54 56 50 60 C46 56 40 60 34 56 C26 60 20 52 12 56Z")
+    lamp = (rect(("#5a4a3a", "#2a2018"), 40, 22, 20, 4, 1.4, 2) + rect(("#fff6b0", "#ffb52e"), 42, 26, 16, 18, 2, 2)
+        + line("#2a2018", 2, (50, 26), (50, 44), ink=False) + rect(("#5a4a3a", "#2a2018"), 40, 44, 20, 4, 1.4, 2))
+    glow = circ("#ffd070", 50, 35, 20, 0).replace("/>", ' opacity="0.35"/>')
+    return threads + bell + glow + lamp
+def angler():
+    # A great-jawed angler with a glowing lure on a stalk over its head.
+    return (curve("#2a3a40", 4, "M54 30 C56 14 70 6 82 10", ink=True)
+        + circ("#ffe08a", 84, 16, 12, 0).replace("/>", ' opacity="0.4"/>') + circ(("#fffbe0", "#ffc040"), 84, 16, 7, 2)
+        + path(SEA_SKIN, "M8 64 C8 40 26 26 52 28 C76 30 92 44 92 60 C80 62 60 64 40 62 C30 62 18 64 8 64Z")
+        + path(("#8a9a90", "#3a4a44"), "M6 64 C20 70 50 72 94 62 C92 80 76 94 50 94 C26 94 8 82 6 64Z")
+        + path("#3a0e10", "M14 64 C30 72 66 72 90 62 C82 68 60 76 40 74 C28 72 20 70 14 64Z", 2)
+        + "".join(poly(BONE, (x, 64), (x + 3, 76), (x + 6, 65), w=1.2) for x in (20, 32, 46, 60, 74))
+        + "".join(poly(BONE, (x, 72), (x + 3, 60), (x + 6, 71), w=1.2) for x in (26, 40, 54, 68))
+        + circ(("#e8fff6", "#5ff0c8"), 30, 42, 3.4, 1.4) + circ(("#e8fff6", "#5ff0c8"), 46, 38, 3.4, 1.4) + _barnacles([(66, 36), (74, 42)], 3.2))
+def tide():
+    # The Mist Tide: a rolling wave with mist over it.
+    return (path(("#7fd6c2", "#1e5a5a"), "M4 70 C14 40 40 30 58 40 C70 46 70 62 58 62 C50 62 50 52 56 50 C40 44 24 58 20 78 L4 78Z")
+        + path(("#4aa8a0", "#163c40"), "M4 78 C24 70 40 86 60 78 C76 72 86 80 96 76 L96 96 L4 96Z")
+        + curve("#dcfdf8", 4, "M22 22 C34 16 46 26 58 20 C68 15 78 22 90 18", ink=False) + curve("#bff3ec", 3, "M30 32 C40 28 52 34 64 30", ink=False))
+for g in (drowned_sailor, barnacle_brute, brine_hound, lantern_jelly, angler, tide):
+    PLAIN.append(g)
+
+# The drowned court (stage 3)
+PALE = ("#c8dcd8", "#5a7a78"); GOLDD = ("#e8c060", "#7a5418"); NAVY = ("#3a4c74", "#141c30"); OIL = ("#f2cc40", "#8a6410")
+ROYAL = ("#6a3a7a", "#2a1032"); KRAK = ("#9a3c54", "#3a1020"); SUCK = ("#f2c8bc", "#a07068")
+def _song(x, y):
+    return "".join(curve("#bff7ec", 3, f"M{x - r} {y - r * 0.6} C{x - r * 0.3} {y - r} {x + r * 0.3} {y - r} {x + r} {y - r * 0.6}", ink=False) for r in (10, 16))
+def siren():
+    # A Siren singing: a thin pale face thrown back, mouth open, hair of kelp, rings of song rising.
+    return (curve("#5a8a3a", 5, "M30 30 C18 50 26 70 16 94", ink=False) + curve("#3e6a26", 5, "M70 30 C82 50 74 70 84 94", ink=False)
+        + path(PALE, "M32 40 C32 18 68 18 68 40 L66 64 C62 80 56 88 50 88 C44 88 38 80 34 64Z")
+        + path(("#4a7a3a", "#1e3a14"), "M28 42 C26 16 40 8 50 8 C62 8 74 16 72 42 C64 30 36 30 28 42Z")
+        + ell("#0e2228", 41, 50, 6, 3.6, 8, 0) + ell("#0e2228", 59, 50, 6, 3.6, -8, 0)
+        + ell(("#e8fff6", "#5ff0c8"), 41, 50, 3.2, 2, 8, 0) + ell(("#e8fff6", "#5ff0c8"), 59, 50, 3.2, 2, -8, 0)
+        + ell("#2a0a10", 50, 72, 5, 7, 0, 2) + _song(50, 10))
+def press_gang():
+    # A press-gang man: a tarred round hat, a drowned face, and a weighted net slung over a shoulder.
+    return (path(("#a08458", "#4a3a20"), "M58 60 C80 56 94 70 92 92 L56 92Z") + "".join(circ(("#c49058", "#5a3a18"), x, y, 4, 1.6) for x, y in ((62, 64), (74, 62), (86, 70), (90, 84)))
+        + line("#6a5434", 1.6, (60, 66), (90, 90)) + line("#6a5434", 1.6, (72, 62), (70, 92)) + line("#6a5434", 1.6, (84, 66), (58, 88))
+        + path(SEA_SKIN, "M22 44 C22 24 62 24 62 44 L60 66 C56 80 50 86 42 86 C34 86 28 80 24 66Z")
+        + path(("#2a2622", "#0a0806"), "M8 40 L76 40 L74 46 L10 46Z", 2.4) + path(("#3a3430", "#100c0a"), "M20 40 C20 18 64 18 64 40Z")
+        + rect(("#8a2a20", "#3a0e08"), 20, 33, 44, 5, 1, 1.6)
+        + ell(("#e8fff6", "#5ff0c8"), 34, 56, 3.4, 2.2, 8, 1.2) + ell(("#e8fff6", "#5ff0c8"), 50, 56, 3.4, 2.2, -8, 1.2)
+        + path("#0e2228", "M34 72 C40 76 46 76 52 72", 2.6))
+def tide_witch():
+    # A Tide Witch: a crown of shells over kelp hair, a hooded drowned face, and her glowing float.
+    return (path(("#3a5a2a", "#162a10"), "M18 92 C14 50 24 20 46 18 C68 20 78 50 74 92Z")
+        + path(PALE, "M32 48 C32 32 60 32 60 48 L58 66 C54 78 38 78 34 66Z")
+        + "".join(poly(("#f2e6d4", "#8a7a64"), (x - 5, 22), (x, 6 + abs(x - 46) * 0.3), (x + 5, 22), w=1.6) for x in (30, 46, 62))
+        + ell(("#e8fff6", "#5ff0c8"), 40, 54, 3, 2, 0, 1.2) + ell(("#e8fff6", "#5ff0c8"), 52, 54, 3, 2, 0, 1.2)
+        + line("#a8987a", 5, (86, 94), (80, 34)) + circ("#5ff0c8", 80, 24, 14, 0).replace("/>", ' opacity="0.35"/>') + circ(("#d8fff4", "#3ac4a4"), 80, 24, 8, 2))
+def harbourmaster():
+    # The Harbourmaster: a peaked cap with an anchor badge over grey whiskers, a hook on a chain.
+    return (path(SEA_SKIN, "M26 46 C26 26 70 26 70 46 L68 68 C64 82 56 88 48 88 C40 88 32 82 28 68Z")
+        + path(NAVY, "M22 42 C20 18 76 18 74 42Z") + path(("#1a1a1a", "#000"), "M18 42 L78 42 L70 50 L26 50Z", 2)
+        + rect(GOLDD, 22, 36, 52, 5, 1, 1.4) + line("#e8c060", 3, (48, 22), (48, 34)) + line("#e8c060", 3, (43, 28), (53, 28))
+        + path(("#d8dcd8", "#6a6e6a"), "M26 58 C24 74 32 84 38 84 L36 66Z", 1.8) + path(("#d8dcd8", "#6a6e6a"), "M70 58 C72 74 64 84 58 84 L60 66Z", 1.8)
+        + ell(("#e8fff6", "#5ff0c8"), 40, 56, 3.4, 2.2, 8, 1.2) + ell(("#e8fff6", "#5ff0c8"), 56, 56, 3.4, 2.2, -8, 1.2)
+        + line("#8a8e94", 3, (86, 4), (86, 14), (84, 22), (86, 30), (86, 58))
+        + curve(("#c8ccd2"), 6, "M86 58 C86 78 70 80 68 66", ink=True) + poly(("#e8ecf0", "#6a6e74"), (66, 70), (68, 60), (72, 68), w=1.4))
+def lighthouse_keeper():
+    # The Mad Lighthouse Keeper: a yellow sou'wester, a wild white beard, lit spectacles, and his lamp held up.
+    return (circ("#ffe08a", 80, 20, 18, 0).replace("/>", ' opacity="0.35"/>') + rect(GOLDD, 72, 8, 16, 4, 1, 1.4) + rect(("#fff6c0", "#ffc040"), 73, 12, 14, 16, 2, 1.6) + rect(GOLDD, 72, 28, 16, 4, 1, 1.4)
+        + path(PALE, "M26 46 C26 28 66 28 66 46 L64 62 C60 72 32 72 28 62Z")
+        + path(OIL, "M10 48 C14 24 28 14 46 14 C64 14 76 26 80 46 C70 40 22 40 10 48Z")
+        + path(("#f4f4ee", "#9a9a94"), "M28 60 C26 84 38 96 46 96 C54 96 66 84 64 60 C58 68 34 68 28 60Z", 2)
+        + circ(("#fff6c0", "#ffc040"), 37, 52, 6, 2) + circ(("#fff6c0", "#ffc040"), 55, 52, 6, 2) + line("#7a5418", 2, (43, 52), (49, 52)))
+def kraken_arm():
+    # A kraken's arm curling up out of the waves, suckers along its inner side.
+    return (path(KRAK, "M30 96 C26 70 30 46 46 30 C58 18 76 16 84 26 C90 34 84 44 76 40 C70 36 74 30 68 30 C58 32 50 46 48 62 C46 76 50 88 54 96Z")
+        + "".join(circ(SUCK, x, y, r, 1.4) for x, y, r in ((50, 86, 4), (49, 74, 3.8), (50, 62, 3.5), (54, 50, 3.2), (60, 40, 2.8), (68, 34, 2.4)))
+        + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z")
+        + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
+def kraken():
+    # The Kraken of Vael: its mantle reared out of the sea, the broken gold towers of drowned Vael grown
+    # into its head with their windows lit, two great gold eyes barred with black, and arms curling up
+    # out of the waves either side.
+    arm_l = path(KRAK, "M2 94 C-2 70 6 46 20 40 C30 36 34 46 28 52 C24 56 18 52 20 46 C12 54 10 74 14 94Z")
+    arm_r = path(KRAK, "M98 94 C102 70 94 46 80 40 C70 36 66 46 72 52 C76 56 82 52 80 46 C88 54 90 74 86 94Z")
+    crown = "".join(poly(("#f0d27a", "#7a5a18"), (x - 5, 40), (x - 1, 40 - h), (x + 1, 40 - h), (x + 5, 40))
+                    + rect(("#bfffe8", "#3ae0b0"), x - 1.6, 36 - h * 0.45, 3.2, 4, 0.5, 0) for x, h in ((32, 12), (41, 20), (50, 28), (59, 20), (68, 12)))
+    return (arm_l + arm_r
+        + path(KRAK, "M18 96 C14 72 20 48 34 40 C44 34 56 34 66 40 C80 48 86 72 82 96Z")
+        + crown + rect(("#f0d27a", "#7a5a18"), 26, 38, 48, 6, 2, 1.6)
+        + "".join(circ(SUCK, x, y, r, 1.2) for x, y, r in ((30, 84, 3), (70, 84, 3), (26, 72, 2.4), (74, 72, 2.4), (8, 62, 2.2), (92, 62, 2.2)))
+        + ell(("#ffe07a", "#c87a10"), 36, 60, 8.5, 7.5, 0, 1.6) + ell(("#ffe07a", "#c87a10"), 64, 60, 8.5, 7.5, 0, 1.6)
+        + rect("#14060a", 28.5, 58.6, 15, 2.8, 1, 0) + rect("#14060a", 56.5, 58.6, 15, 2.8, 1, 0)
+        + path(("#2a1418", "#0a0204"), "M44 74 L56 74 L50 84Z", 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M2 88 C18 80 30 92 46 86 C62 80 76 92 98 84 L98 98 L2 98Z")
+        + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
+def hollow_sovereign():
+    # The Hollow Sovereign: a deep royal hood with nothing inside it but two points of gold light.
+    return (path(ROYAL, "M10 96 C8 56 22 18 50 16 C78 18 92 56 90 96Z")
+        + path(("#ece8dc", "#8a867a"), "M12 90 C26 82 74 82 88 90 L90 98 L10 98Z", 2) + "".join(rect("#1a1a1a", x, 90, 3, 4, 0.5, 0) for x in (22, 36, 50, 64, 78))
+        + path("#050508", "M30 74 C26 50 34 34 50 32 C66 34 74 50 70 74 C62 80 38 80 30 74Z", 2.4)
+        + circ("#ffd070", 42, 54, 7, 0).replace("/>", ' opacity="0.35"/>') + circ("#ffd070", 58, 54, 7, 0).replace("/>", ' opacity="0.35"/>')
+        + circ(("#fff6c0", "#ffc040"), 42, 54, 2.8, 0) + circ(("#fff6c0", "#ffc040"), 58, 54, 2.8, 0))
+def sunken_crown():
+    # The Sunken Crown: gold gone dull, pearl-tipped points, coral grown through it, a green stone.
+    return (path(GOLDD, "M14 78 L12 34 L28 54 L36 22 L50 50 L64 22 L72 54 L88 34 L86 78Z")
+        + rect(GOLDD, 12, 72, 76, 14, 2, 3) + rect(("#7ac8a8", "#2a5a48"), 14, 76, 72, 5, 1, 0)
+        + "".join(circ(("#fbf6ec", "#a09888"), x, y, 4.2, 1.6) for x, y in ((12, 32), (36, 20), (64, 20), (88, 32)))
+        + ell(("#7ff0b0", "#1a8a50"), 50, 66, 6, 7, 0, 2)
+        + path(("#f08a78", "#8a2a20"), "M80 74 L86 52 L88 62 L94 50 L90 70Z", 1.6) + _barnacles([(22, 80), (30, 82)], 3))
+for g in (siren, press_gang, tide_witch, harbourmaster, lighthouse_keeper, kraken_arm, kraken, hollow_sovereign, sunken_crown):
+    PLAIN.append(g)
+
+# The Harpooner (stage 5)
+HEMP = ("#e8d6a8", "#9c7f4a")
+def rope():
+    # A coil of hemp line, three turns flat on the ground, its end trailing off to the side.
+    return (ell(HEMP, 46, 58, 40, 30) + ell("none", 46, 58, 30, 22, 0, 3) + ell("none", 46, 58, 19, 13, 0, 3) + ell(("#4a3a20", "#2a2010"), 46, 58, 10, 6, 0, 2)
+        + curve("#e8d6a8", 9, "M82 50 C92 40 92 22 78 16 C66 10 58 18 62 26") + curve("#9c7f4a", 3, "M84 46 C90 38 88 24 78 20", ink=False))
+def crest_harpooner():
+    # A navy shield shaped like a whale's tail fluke, a harpoon crossing it and a coil of line below.
+    return (path(("#3f74a8", "#102640"), "M50 98 C46 82 44 70 40 62 C26 58 8 50 3 24 C18 28 32 22 42 8 C46 22 48 30 50 36 C52 30 54 22 58 8 C68 22 82 28 97 24 C92 50 74 58 60 62 C56 70 54 82 50 98Z", 4)
+        + at(50, 50, 0.84, turn(-4, harpoon())))
+for g in (rope,):
+    PLAIN.append(g)
+CRESTS.append(crest_harpooner)
+
+# The Ferryman (stage 5)
+def coin():
+    # An obol: a worn silver coin stamped with the lamp of Vael.
+    return (circ(("#e8eef6", "#7a8494"), 50, 50, 40, 4) + circ("none", 50, 50, 31, 3)
+        + path(("#fff2b0", "#c08a1e"), "M50 26 C42 38 42 48 50 54 C58 48 58 38 50 26Z", 2) + rect(("#e0b050", "#8f5f1e"), 38, 56, 24, 8, 2)
+        + "".join(circ(("#c8d0dc", "#7a8494"), 50 + 35 * c, 50 + 35 * s, 2.4, 0) for c, s in ((1, 0), (-1, 0), (0, 1), (0, -1))))
+def skiff():
+    # A pale ghostly skiff with a lantern on a pole at its stern, mist curling under it.
+    return (path(("#d6f2ea", "#5a8a84"), "M2 40 C14 52 30 58 50 58 C70 58 86 52 98 40 C92 64 74 76 50 76 C26 76 8 64 2 40Z", 3) + curve("#5a8a84", 3, "M8 48 C26 58 74 58 92 48", ink=False)
+        + line("#4a6a66", 4, (78, 54), (78, 14)) + line("#4a6a66", 3, (78, 16), (66, 16)) + rect(("#fff8c0", "#d0a030"), 60, 18, 12, 14, 3)
+        + curve("#e8f6f4", 5, "M8 88 C22 80 34 94 50 86 C64 80 78 94 92 86", ink=False))
+def soul():
+    # A wisp: a pale flame-shaped soul with a trailing tail and two dark eyes.
+    return (path(("#e8fff8", "#5ac8b0"), "M50 8 C66 26 78 44 72 62 C68 78 56 86 46 84 C30 82 22 66 30 50 C34 40 24 34 20 26 C34 30 42 22 50 8Z", 3)
+        + ell(("#1a3a36", "#1a3a36"), 44, 58, 4, 6, 0, 1) + ell(("#1a3a36", "#1a3a36"), 58, 58, 4, 6, 0, 1))
+def crest_ferryman():
+    # A bone-white lozenge with the ferry's lantern over a coin and the oars crossed behind.
+    return (path(("#e6dfc6", "#5a5240"), "M50 4 L94 50 L50 96 L6 50Z", 4) + at(50, 50, 0.62, turn(45, oar())) + at(50, 50, 0.62, turn(-45, oar()))
+        + at(50, 40, 0.42, lantern()) + at(50, 70, 0.3, coin()))
+for g in (coin, skiff, soul):
+    PLAIN.append(g)
+CRESTS.append(crest_ferryman)
+
+# The Tidecaller (stage 5)
+def song():
+    # Two notes of the drowned's song rising out of a curl of water.
+    return (path(ICE, "M6 86 C20 70 36 66 50 74 C62 80 76 80 94 68 L94 94 L6 94Z")
+        + circ(("#9ff5e2", "#2a8a7a"), 30, 58, 10) + rect(("#9ff5e2", "#2a8a7a"), 37, 18, 6, 42, 2)
+        + circ(("#9ff5e2", "#2a8a7a"), 66, 46, 10) + rect(("#9ff5e2", "#2a8a7a"), 73, 8, 6, 40, 2)
+        + path(("#9ff5e2", "#2a8a7a"), "M40 18 L79 8 L79 18 L40 28Z", 2))
+def trident_upright():
+    # Upright: a coral-crusted haft, a bronze collar, and three barbed tines, the middle one longer.
+    green = ("#8fe0c0", "#24584a")
+    return (line("#6a5640", 7, (50, 98), (50, 44)) + "".join(circ(("#f07a6a", "#8a3028"), 50 + dx, y, 3.6, 1.4) for dx, y in ((-3, 86), (3, 76), (-3, 66)))
+        + rect(("#d0aa52", "#6a4c1c"), 30, 38, 40, 9, 3)
+        + line(green[0], 6, (34, 40), (34, 14)) + line(green[0], 6, (66, 40), (66, 14)) + line(green[0], 6, (50, 40), (50, 8))
+        + poly(green, (28, 16), (34, 2), (40, 16)) + poly(green, (60, 16), (66, 2), (72, 16)) + poly(green, (44, 10), (50, -4), (56, 10)))
+def trident():
+    return at(50, 50, 0.92, turn(35, trident_upright()))
+def crest_tidecaller():
+    # A sea-green round shield with a wave curling over it and three tines rising from the crest.
+    return (circ(("#36c6b8", "#0d4a46"), 50, 52, 44, 4) + at(50, 44, 0.62, trident_upright()) + at(50, 70, 0.6, wave()))
+def shell():
+    # Tide Shell: a dome of seawater over the ground, a curl of light running round it and drops
+    # flying off its top.
+    return (path(("#a8f4ea", "#1f7f78"), "M10 86 C10 44 28 18 50 18 C72 18 90 44 90 86Z", 3.6)
+        + path(("#e6fffb", "#5fd8cc"), "M22 74 C24 50 36 34 52 30 C40 40 34 56 34 76Z", 0)
+        + curve("#ffffff", 3.4, "M24 62 C40 48 62 46 78 58", ink=False)
+        + line("#4ac0b2", 5, (4, 88), (96, 88))
+        + circ(("#e6fffb", "#5fd8cc"), 30, 12, 4.4, 1.6) + circ(("#e6fffb", "#5fd8cc"), 70, 10, 3.6, 1.6) + circ(("#e6fffb", "#5fd8cc"), 50, 6, 3, 1.4))
+def serpent():
+    # A sea serpent's neck rearing out of a swirl of water: green scale, a finned crest that glows,
+    # jaws open, a pale eye.
+    scale_ = ("#3aa890", "#0e3a36"); fin_ = ("#8ff5d8", "#1c8f7a")
+    return (path(scale_, "M30 92 C26 70 30 50 44 38 C52 30 54 22 52 14 L74 10 C86 12 92 22 88 32 L70 38 C60 44 52 58 50 72 C49 82 50 88 52 92Z")
+        + path(("#d4ead0", "#6a8a66"), "M38 90 C36 74 40 58 50 48 L54 52 C48 62 46 76 46 90Z", 1.6)
+        + path(fin_, "M46 40 L36 30 L48 34 L44 22 L54 28 L54 16 L60 24Z", 1.6)
+        + path(("#2a0a10", "#0a0204"), "M70 38 L92 44 L86 32Z", 1.6)
+        + ell(("#f0ffe0", "#8ff5d8"), 70, 22, 4, 2.4, -20, 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M6 90 C18 82 30 94 46 88 C62 82 76 94 94 86 L94 98 L6 98Z")
+        + curve("#dcfdf8", 3, "M14 86 C24 80 34 88 42 84", ink=False))
+for g in (song, trident, shell, serpent):
+    PLAIN.append(g)
+CRESTS.append(crest_tidecaller)
+
+# Last Light (stage 4)
+LEVI = ("#3a6a78", "#0e2630"); LEVI_BELLY = ("#b8d8c8", "#4a6a60")
+def leviathan():
+    # The Leviathan of the Mists: a great sea-serpent's neck rearing out of the waves, a finned crest,
+    # jaws open over rows of teeth, and two cold green eyes.
+    return (path(LEVI, "M20 96 C18 72 26 52 40 40 C48 32 52 24 50 16 L74 10 C86 14 92 24 88 34 L70 40 C58 46 50 58 46 72 C44 82 46 90 48 96Z")
+        + path(LEVI_BELLY, "M30 94 C30 74 36 58 46 48 L52 52 C44 62 40 76 40 94Z", 1.6)
+        + path(("#5aa0a8", "#163a44"), "M50 16 L44 4 L56 12 L58 2 L64 10 L70 0 L74 10Z", 1.6)
+        + path(("#2a0a10", "#0a0204"), "M70 40 L94 46 L88 34Z", 1.6)
+        + "".join(poly(("#f4f0e4", "#8a8474"), (x, 38 + (x - 70) * 0.25), (x + 2, 44 + (x - 70) * 0.25), (x + 4, 39 + (x - 70) * 0.25), w=1) for x in (72, 78, 84))
+        + ell(("#e8fff6", "#5ff0c8"), 70, 24, 4.4, 2.6, -20, 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z")
+        + curve("#dcfdf8", 3.4, "M8 84 C18 78 28 86 38 82", ink=False) + curve("#dcfdf8", 3.4, "M60 82 C70 78 80 86 92 80", ink=False))
+PLAIN.append(leviathan)
+def leviathan_head():
+    # Just the serpent's head and neck rising from a wave, for the Leviathan Hunter's emblem.
+    return (path(LEVI, "M24 96 C22 70 30 50 46 40 C54 34 58 26 56 18 L80 12 C92 16 96 28 90 38 L72 44 C62 50 54 62 50 76 C48 86 50 92 52 96Z")
+        + path(("#5aa0a8", "#163a44"), "M56 18 L50 6 L62 14 L66 4 L72 12Z", 1.6)
+        + ell(("#e8fff6", "#5ff0c8"), 76, 26, 4.4, 2.6, -20, 1.4)
+        + path(("#7fd6c2", "#1e5a5a"), "M4 88 C18 80 30 92 46 86 C62 80 76 92 96 84 L96 98 L4 98Z"))
+
 for g in (mist_infantry, mist_ranger, mist_heavy):
     PLAIN.append(g)
+
+def lodge_hunter():
+    # A hunter of the Lodge in the Valleys: a moss-green hood trimmed with fur, a hunting horn on a
+    # strap across the chest, and a bow drawn up behind.
+    return (curve("#c08a52", 5, "M86 8 C62 32 62 66 86 92", ink=False) + line("#e9eef5", 1.6, (86, 8), (86, 92), ink=False)
+        + path(("#5d7a3a", "#243a17"), "M50 6 C80 10 92 44 86 90 L14 90 C8 44 20 10 50 6Z")
+        + path(("#d8c4a0", "#7a6040"), "M18 40 C30 26 70 26 82 40 C76 36 70 38 64 34 C58 38 52 32 46 36 C40 32 34 38 28 34 C24 38 20 38 18 40Z", 1.6)
+        + ell(INK, 50, 60, 21, 23, 0, 0) + ell(("#fff1c8", "#d9a441"), 42, 58, 3.6, 2.6, 0, 0) + ell(("#fff1c8", "#d9a441"), 58, 58, 3.6, 2.6, 0, 0)
+        + curve("#6b4426", 4, "M16 76 C36 92 64 92 84 74", ink=False)
+        + path(("#f2e6c8", "#9a7a4a"), "M26 84 C40 84 54 78 62 66 L72 74 C62 88 44 92 26 88Z", 1.6)
+        + ell(("#fff4d8", "#b08850"), 67, 70, 6.5, 4, -50, 1.6) + ell(INK, 67, 70, 3.2, 1.8, -50, 0)
+        + line("#c9a24a", 2.6, (40, 82), (42, 89), ink=False) + line("#c9a24a", 2.6, (52, 77), (56, 84), ink=False))
+PLAIN.append(lodge_hunter)
 
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
-    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78")}
+    "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78"),
+    "harpooner": ("#3f74a8", "#102640"), "tidecaller": ("#36c6b8", "#0d4a46"), "ferryman": ("#c8bf9e", "#3a3428")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -523,6 +899,15 @@ SPECS = {
         + at(24, 68, 0.26, star()) + at(50, 28, 0.3, star()) + at(78, 60, 0.26, star())),
     "worlds_traveler": ("cartographer", lambda: at(50, 52, 0.78, waygate()) + at(76, 24, 0.24, star())),
     "pathfinder": ("cartographer", lambda: at(36, 58, 0.62, turn(-20, machete())) + at(68, 40, 0.5, compass())),
+    "tollkeeper": ("ferryman", lambda: at(40, 56, 0.6, coin()) + at(64, 40, 0.5, coin()) + at(60, 70, 0.4, coin())),
+    "boatman": ("ferryman", lambda: at(50, 54, 0.9, skiff())),
+    "psychopomp": ("ferryman", lambda: at(50, 52, 0.66, soul()) + at(24, 30, 0.3, soul()) + at(78, 32, 0.3, soul())),
+    "tidewarden": ("tidecaller", lambda: at(50, 54, 0.86, shell()) + at(50, 52, 0.5, trident_upright())),
+    "stormcaller": ("tidecaller", lambda: at(46, 54, 0.8, trident()) + at(72, 30, 0.42, bolt()) + at(26, 30, 0.26, bolt())),
+    "deepcaller": ("tidecaller", lambda: at(50, 52, 0.9, serpent())),
+    "reaver": ("harpooner", lambda: at(46, 54, 0.66, turn(-20, cutlass())) + at(74, 30, 0.34, drop()) + at(26, 30, 0.22, drop())),
+    "rigger": ("harpooner", lambda: line("#e8d6a8", 5, (14, 70), (86, 38)) + rect(WOOD, 10, 62, 8, 30, 2) + rect(WOOD, 82, 30, 8, 30, 2) + at(50, 70, 0.4, rope())),
+    "leviathan_hunter": ("harpooner", lambda: at(42, 60, 0.7, leviathan_head()) + at(60, 42, 0.72, turn(-10, harpoon()))),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),
 }
 

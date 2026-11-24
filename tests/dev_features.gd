@@ -38,6 +38,11 @@ func _ready() -> void:
 	await _beyond_weapons()
 	await _together_store_and_dawn()
 	await _maps_weather_and_balance()
+	await _requests_1116()
+	await _vael_weapons()
+	await _port_vael()
+	await _drowned_court()
+	await _coastal_campaign()
 	await _feedback_and_numbers()
 	await _wilds_of_mesenlla()
 	_text_audit()
@@ -629,6 +634,8 @@ func _beyond_weapons() -> void:
 	var m := Main.new()
 	add_child(m)
 	await frames(2)
+	var had_magician := Game.unlocked.has("magician")
+	Game.unlocked["magician"] = true # the Armory shows a class's details only once it is yours
 	for id: String in ["infantry", "magician"]:
 		var want := ClassDefs.weapon_categories(id).map(func(c: String) -> String: return WeaponDefs.CATEGORY_NAMES[c])
 		m.show_class_picker(Game.Mode.NIGHT)
@@ -639,13 +646,17 @@ func _beyond_weapons() -> void:
 		m._fill_armory(m.panel.get_meta("detail"), id)
 		check(_tag_texts(m.panel) == want, "Armory tags for %s" % id)
 		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text.begins_with(ClassPresentation.stats_line(id))), "Armory stat line for %s" % id)
+	if not had_magician:
+		Game.unlocked.erase("magician")
 	var codex := CodexPanel.new()
 	add_child(codex)
 	codex._list = VBoxContainer.new()
 	codex.add_child(codex._list)
 	codex._classes()
 	var codex_tags := codex._list.find_children("WeaponTags", "HFlowContainer", true, false)
-	check(codex_tags.size() == ClassDefs.ALL.size(), "every class in the Codex has weapon tags")
+	var listed := ClassDefs.ALL.keys().filter(func(id: String) -> bool: return not ClassDefs.disabled(id))
+	check(codex_tags.size() == listed.size(), "every enabled class in the Codex has weapon tags")
+	check(not codex._list.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == "Harpooner"), "the disabled Harpooner is absent from the Codex")
 	codex._list.queue_free()
 	codex._list = VBoxContainer.new()
 	codex.add_child(codex._list)
@@ -693,7 +704,8 @@ func _together_store_and_dawn() -> void:
 	check(not (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Buy"), "and offers no Buy button")
 	m.show_armory("chivalry")
 	await frames(2)
-	check((m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Class locked" and b.disabled), "the Armory, too, says the class comes first")
+	var armory_says := m.panel.find_child("UnlockRequirement", true, false) as Label
+	check(armory_says != null and armory_says.text == Game.earn_text("chivalry") and m.panel.find_child("ToStore", true, false) == null, "the Armory, too, shows the class locked, and how it is earned")
 	# A class that is bought: its locked Class Upgrades lead to it in the Store.
 	var bought_class := ""
 	for item: String in ShopDefs.ITEMS:
@@ -714,7 +726,26 @@ func _together_store_and_dawn() -> void:
 		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == ClassDefs.ALL[bought_class]["name"]), "which opens that class's page")
 	m.show_armory(bought_class)
 	await frames(2)
-	check((m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Unlock class" and not b.disabled), "and the Armory offers to unlock it")
+	var locked_page := m.panel.find_child("LockedClass", true, false)
+	var requirement := m.panel.find_child("UnlockRequirement", true, false) as Label
+	check(locked_page != null and requirement != null and requirement.text == m.armory_unlock_text(bought_class) and requirement.text.contains(str(ClassDefs.price(bought_class))), "in the Armory, a class you don't own is locked and says only how to unlock it: %s" % (requirement.text if requirement else "nothing"))
+	check(m.panel.find_children("*", "ModelView", true, false).is_empty() and m.panel.find_child("CosmeticsSection", true, false) == null and not (m.panel.find_children("*", "Label", true, false) as Array).any(func(l: Label) -> bool: return l.text == ClassPresentation.COPY[bought_class][0]), "with nothing else of it shown: no model, description, paths or tabs")
+	var to_store := m.panel.find_child("ToStore", true, false) as Button
+	check(to_store != null, "and, sold in the Store, a button straight to it there")
+	if to_store:
+		to_store.pressed.emit()
+		await frames(2)
+		check(m.panel.find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == ClassDefs.ALL[bought_class]["name"]) and (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "Buy" or b.text.begins_with("Need ")), "which opens the class in the Store, to buy")
+	var earned_class := ""
+	for c: String in ClassDefs.ALL:
+		if ClassDefs.ALL[c].has("earned") and not Game.owns_class(c):
+			earned_class = c
+			break
+	if earned_class != "":
+		m.show_armory(earned_class)
+		await frames(2)
+		var earned_req := m.panel.find_child("UnlockRequirement", true, false) as Label
+		check(earned_req != null and earned_req.text == Game.earn_text(earned_class) and m.panel.find_child("ToStore", true, false) == null, "a class earned in play shows how to earn it, with no Store button (%s)" % earned_class)
 	if had_bought_class:
 		Game.unlocked[bought_class] = true
 	Game.unlocked["chivalry"] = true
@@ -810,7 +841,7 @@ func _together_store_and_dawn() -> void:
 	var knob := m.panel.find_child("MapSwitch_mist_reinforcements", true, false) as Button
 	check(m.panel.find_child("MapUpgradesRow", true, false) != null and knob != null and (knob.find_child("Switch", true, false) as UiSwitch).on, "the Armory has a Map Upgrades section, with an On switch for Mist Reinforcements")
 	var level_lines: Array = m.panel.find_children("*", "Label", true, false).filter(func(l: Label) -> bool: return l.text.begins_with("Level "))
-	check(level_lines.size() == ShopDefs.MAP_LEVELS, "it lists all %d levels" % ShopDefs.MAP_LEVELS)
+	check(level_lines.size() == ShopDefs.MAP_LEVELS * ShopDefs.in_section("maps").size(), "it lists all %d levels of each Map Upgrade (%d lines)" % [ShopDefs.MAP_LEVELS, level_lines.size()])
 	knob.pressed.emit()
 	check(not Game.item_active("mist_reinforcements") and Game.owns_item("mist_reinforcements") and not (knob.find_child("Switch", true, false) as UiSwitch).on and Game.map_upgrades_on().is_empty(), "switched Off there, it stays owned but you do not bring it")
 	knob.pressed.emit()
@@ -819,15 +850,26 @@ func _together_store_and_dawn() -> void:
 	m.show_armory("maps")
 	await frames(2)
 	check(m.panel.find_child("MapSwitch_mist_reinforcements", true, false) == null and (m.panel.find_children("*", "Button", true, false) as Array).any(func(b: Button) -> bool: return b.text == "In the Store"), "not owned, it has no switch, only the way to the Store")
-	# After buying, the Store's list and page start again from the top.
+	# After buying, the Store's list stays where it was, on what came after the thing bought.
+	for c: String in ClassDefs.ALL:
+		Game.unlocked[c] = true
+	Game.doubloons = 100000
 	m.show_store("", -1, "upgrades")
 	await frames(2)
 	var store_list := (m.panel.get_meta("list") as Control).get_parent() as DragScroll
 	store_list.scroll_to(600.0)
-	check(store_list._pos > 0.0, "the Store's list scrolls (%.0f)" % store_list._pos)
-	m._store_to_top(m.panel)
-	await frames(2)
-	check(is_instance_valid(store_list) and store_list._pos == 0.0 and store_list.get_v_scroll_bar().value == 0.0, "and is back at the top after a purchase")
+	await frames(1)
+	var was_at := float(store_list.scroll_vertical)
+	check(was_at > 300.0, "the Store's list scrolls (%.0f)" % was_at)
+	var on_sale: Array = m.panel.get_meta("store_ids")
+	var middle := on_sale.size() / 2
+	var buying := str(on_sale[middle])
+	check(Game.buy_item(buying), "buying %s" % buying)
+	m.show_store("", -1, "upgrades", Callable(), buying)
+	await frames(3)
+	var after_list := (m.panel.get_meta("list") as Control).get_parent() as DragScroll
+	check(absf(float(after_list.scroll_vertical) - was_at) < 2.0, "after buying, the list stays where it was (%.0f, was %.0f)" % [after_list.scroll_vertical, was_at])
+	check((m.panel.find_children("*", "Label", true, false) as Array).any(func(l: Label) -> bool: return l.text == ShopDefs.ITEMS[str(on_sale[middle + 1])]["name"] and not after_list.is_ancestor_of(l)), "and the page beside it shows what came next (%s)" % ShopDefs.ITEMS[str(on_sale[middle + 1])]["name"])
 	Game.owned_items = saved_items
 	Game.switched_off = saved_off
 	Game.doubloons = saved_doubloons
@@ -966,7 +1008,9 @@ func _maps_weather_and_balance() -> void:
 	first._physics_process(0.5)
 	check(first.global_position.distance_to(first.perch) < 0.05, "and stays up there")
 	# Its two bows: the Long Bow for what comes up the lane, the Crossbow for what is at the gate.
-	check(first.hand == "longbow" and first._back_mesh != null and first._back_mesh.visible and first._back_mesh.mesh == WeaponDefs.mesh("crossbow"), "it holds a Long Bow, with a Crossbow slung on its back")
+	var held := first._hand_mesh as WeaponVisual
+	check(first.hand == "longbow" and held != null and held.weapon == "longbow" and is_equal_approx(held.body_size, WeaponDefs.held_size("longbow")), "it holds a Long Bow, at a player's size (%.2f)" % (held.body_size if held else 0.0))
+	check(first.find_children("*", "MeshInstance3D", true, false).filter(func(mi: MeshInstance3D) -> bool: return mi.mesh == WeaponDefs.mesh("crossbow") or mi.mesh == WeaponDefs.mesh("bow")).is_empty(), "and nothing else: no second bow on it")
 	var gate: Dictionary = bw.fort.gates[first.lane]
 	var out: Vector3 = gate["dir"]
 	for z: Zombie in bw.zombies.duplicate():
@@ -981,7 +1025,9 @@ func _maps_weather_and_balance() -> void:
 	var before := bw._projectiles.filter(func(pr: Projectile) -> bool: return pr.active and pr.garrison).size()
 	first._tick_perch(0.016)
 	var bolts := bw._projectiles.filter(func(pr: Projectile) -> bool: return pr.active and pr.garrison)
-	check(first.hand == "crossbow" and first._back_mesh.mesh == WeaponDefs.mesh("longbow"), "what is at the foot of its gate gets the Crossbow (%s)" % first.hand)
+	check(first.hand == "crossbow" and held.weapon == "crossbow" and held.mesh == WeaponDefs.mesh("crossbow"), "what is at the foot of its gate gets the Crossbow, in place of the Long Bow (%s)" % first.hand)
+	var crossbow_size := held.global_basis.get_scale().x
+	check(absf(crossbow_size - WeaponDefs.held_size("crossbow")) < 0.05, "a Crossbow the size a player's is (%.2f, a player's %.2f)" % [crossbow_size, WeaponDefs.held_size("crossbow")])
 	check(bolts.size() == before + 1 and is_equal_approx(first._cooldown, Ally.CROSSBOW_EVERY), "shot down at it, every %.2f s" % Ally.CROSSBOW_EVERY)
 	var lean := first._lean_point()
 	check(Vector2(lean.x - first.perch.x, lean.z - first.perch.z).dot(Vector2(out.x, out.z)) > 1.0, "leaning out over the parapet to do it")
@@ -1341,6 +1387,14 @@ func _wilds_of_mesenlla() -> void:
 	var familiar := p._familiars["raven"] as Node3D
 	var mini: BirdRig = familiar.get_child(0) as BirdRig
 	check(mini != null and mini.find_children("*", "MeshInstance3D", true, false).all(func(mi: MeshInstance3D) -> bool: return mi.layers == 2), "the Raven familiar is a little bird in view of your hands")
+	var span := AABB()
+	var first_part := true
+	for mi: MeshInstance3D in mini.find_children("*", "MeshInstance3D", true, false):
+		var part := familiar.global_transform.affine_inverse() * mi.global_transform * mi.get_aabb()
+		span = part if first_part else span.merge(part)
+		first_part = false
+	var daemon_width := PowerDefs.mesh("daemon").get_aabb().size.x * 0.22
+	check(span.size.x < daemon_width * 1.4 and span.size.x > daemon_width * 0.6, "no bigger than the other familiars beside it (%.2f m across, the Daemon %.2f m)" % [span.size.x, daemon_width])
 	var flap := mini.shoulders[0].rotation.z
 	await frames(10)
 	check(not is_equal_approx(flap, mini.shoulders[0].rotation.z), "beating its wings")
@@ -1362,7 +1416,7 @@ func _wilds_of_mesenlla() -> void:
 func _changelog_and_atlas() -> void:
 	var vs := ChangelogPanel.versions(ChangelogPanel.notes())
 	var current := str(ProjectSettings.get_setting("application/config/version")).get_slice("-dev.", 0)
-	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > 20, "the Changelog reads every version, newest first")
+	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > 5, "the Changelog reads every version, newest first")
 	var released: Dictionary = vs.filter(func(v: Dictionary) -> bool: return str(v["number"]) == "0.21.4")[0]
 	check(released["name"] == "A Portal Worth Defending" and released["date"] == "11 November 2026", "with each version's name and date")
 	check(ChangelogPanel.category("Fixes")[1] == "Fixes" and ChangelogPanel.category("The wilds of Mesenlla")[1] == "Enemies" and ChangelogPanel.category("Spectator Mode")[1] == "Playing together", "each part is marked by what it is about")
@@ -1481,3 +1535,1469 @@ func _text_audit() -> void:
 	for problem in problems:
 		check(false, problem)
 	check(problems.is_empty(), "every number on a class, path, ability and Class Upgrade is the game's own (%d wrong)" % problems.size())
+
+
+
+## Mario's list of 16 November: the Armory's locked classes, keeping places in Settings, the Codex and
+## the Sandbox, icons, the Raven familiar's size, freezing, the Woodland Cavalry, Mist Bastion's
+## soldiers, archers, battlements and hollows, and what Children of the Woods carry.
+func _requests_1116() -> void:
+	var m: Main = Main.new()
+	add_child(m)
+	await frames(2)
+	# Settings: a new difficulty, or a new graphics level, leaves the page where it was.
+	var saved_difficulty := Game.difficulty
+	var saved_quality := Game.quality
+	var saved_auto := Game.quality_auto
+	m.show_menu()
+	await frames(2)
+	# A window short enough for the Settings page to scroll.
+	var window_was := get_window().size
+	get_window().size = Vector2i(1152, 380)
+	m.show_settings()
+	await frames(3)
+	var settings := m.ui_layer.find_children("SettingsScroll", "DragScroll", true, false).back() as DragScroll
+	settings.scroll_to(160.0)
+	await frames(1)
+	var settings_at := float(settings.scroll_vertical)
+	check(settings_at > 40.0, "Settings scrolls (%.0f)" % settings_at)
+	var pressed := func(text: String) -> void:
+		for b: Button in m.ui_layer.find_children("*", "Button", true, false):
+			if b.text == text and b.is_visible_in_tree() and not b.is_queued_for_deletion():
+				b.pressed.emit()
+				return
+	pressed.call("Hard" if Game.difficulty != 2 else "Easy")
+	await frames(4)
+	var again := m.ui_layer.find_children("SettingsScroll", "DragScroll", true, false).filter(func(n: Node) -> bool: return not n.is_queued_for_deletion())
+	check(again.size() == 1 and absf(float((again[0] as DragScroll).scroll_vertical) - settings_at) < 2.0, "a new difficulty keeps Settings where it was (%.0f)" % (float((again[0] as DragScroll).scroll_vertical) if again.size() == 1 else -1.0))
+	var world_before := m.world
+	pressed.call("Low" if Game.quality != 0 or Game.quality_auto else "Medium")
+	await frames(4)
+	again = m.ui_layer.find_children("SettingsScroll", "DragScroll", true, false).filter(func(n: Node) -> bool: return not n.is_queued_for_deletion())
+	check(again.size() == 1 and absf(float((again[0] as DragScroll).scroll_vertical) - settings_at) < 2.0, "a new graphics level keeps you in Settings, where you were, not back at the main menu")
+	check(m.world != world_before and m.world.mode == Game.Mode.MENU, "with the scene behind it built again at that level")
+	get_window().size = window_was
+	Game.difficulty = saved_difficulty
+	Game.quality = saved_quality
+	Game.quality_auto = saved_auto
+	Game.apply_quality()
+	# The Codex and the Sandbox: no War Wyvern Rider of its own; the Fallen Revenant with the Fallen
+	# heroes; an enemy's description hidden until you have killed one.
+	check(CodexPanel.enemy_group("fallen_revenant") == CodexPanel.enemy_group("hero_infantry"), "the Fallen Revenant is one of the Fallen heroes")
+	var saved_kills := Game.killed_kinds.duplicate()
+	Game.killed_kinds = {"bear": true}
+	var codex := CodexPanel.new()
+	add_child(codex)
+	codex._list = VBoxContainer.new()
+	codex.add_child(codex._list)
+	codex._enemies()
+	var codex_texts: Array = codex._list.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(not codex_texts.has(ZombieDefs.ALL["wyvern_rider"]["name"]), "the Codex has no War Wyvern Rider of its own")
+	check(codex_texts.has(ZombieDefs.ALL["bear"]["desc"]) and not codex_texts.has(ZombieDefs.ALL["mist_bear"]["desc"]) and codex_texts.has(CodexPanel.HIDDEN_ENEMY), "it tells you about the enemies you have killed, and not yet the others")
+	codex.queue_free()
+	var saved_mode := Game.mode
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_killed("mist_bear")
+	check(not Game.has_killed("mist_bear"), "a kill in the Sandbox doesn't count")
+	Game.mode = Game.Mode.NIGHT
+	Game.note_killed("mist_bear")
+	check(Game.has_killed("mist_bear"), "a kill in a match does")
+	Game.mode = saved_mode
+	Game.killed_kinds = saved_kills
+	# Icons: the new ones exist and differ from what they replaced.
+	for pair: Array in [["mist_bear", "mist_bear"], ["mist_eagle", "mist_eagle"], ["mist_elemental", "mist_elemental"], ["storm_elemental", "storm_elemental"], ["woodland_cavalry", "woodland_cavalry"]]:
+		check(ZombieDefs.ALL[pair[0]]["icon"] == pair[1] and Icons.glyph(pair[1]) != null, "%s has its own icon" % pair[0])
+	check(str(ZombieDefs.ALL["veil_regent"]["icon"]).ends_with("+crown") and ["great_revenant_elemental", "war_wyvern"].all(func(b: String) -> bool: return str(ZombieDefs.ALL[b]["icon"]).ends_with("+crown")), "the Veil Regent wears a crown like the other bosses")
+	check(Icons.power("daemon") == "daemon" and Icons.power("daemon") != ZombieDefs.ALL["mimic"]["icon"], "the Daemon has an icon of its own")
+	var invisible_icon := ""
+	for entry: Dictionary in StatusCatalog.TIMED:
+		if entry["field"] == "invis_left":
+			invisible_icon = entry["icon"]
+	check(invisible_icon == "invisible" and BanditKit.ARTS[""]["icon"] == "invisible", "Invisible has its own icon, apart from Unseen's closed eye")
+	# Children of the Woods: mostly blades and flails; spears, bows and crossbows now and then.
+	var def: Dictionary = ZombieDefs.ALL["child_of_woods"]
+	var far := 0
+	for i in 4000:
+		var picked: String = def["weapons"][Zombie.pick_weighted(def["weapon_odds"])]
+		if WeaponDefs.is_ranged(picked) or picked == "spear":
+			far += 1
+	check(absf(far / 4000.0 - 3.0 / 11.0) < 0.03, "about 27%% of them carry a spear or something to shoot (%.1f%%)" % (far / 40.0))
+	# Mist Bastion: soldiers fall back through a broken gate from anywhere before it; battlements are
+	# walls to auto-jump; the dry hollows have no unseen walls.
+	var saved_map := Game.fort_map
+	Game.fort_map = "bastion"
+	Game.mode = Game.Mode.FORT
+	# A world of its own, so nothing of the title screen's map behind it gets in the way.
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var bw := World.new()
+	space.add_child(bw)
+	bw.setup(Game.Mode.FORT)
+	bw.director.running = false
+	for z: Zombie in bw.zombies.duplicate(): z.release()
+	var east: Dictionary = bw.fort.gates[2]
+	var out: Vector3 = east["dir"]
+	var heavy := bw.spawn_garrison("mist_heavy", 2, bw.garrison.mark(2, "post"), bw.garrison.mark(2, "post"))
+	bw.fort.hit_gate(east, 99999.0, east["at"])
+	# Where one stood still for good: 1.5 m from the gate's mouth, a metre off its middle.
+	heavy.global_position = (east["at"] as Vector3) + out * 5.1 + out.cross(Vector3.UP) * 1.05
+	heavy.global_position.y = bw.ground_at(heavy.global_position)
+	await frames(240)
+	check(bw.fort.inside(heavy.global_position) and heavy.fell_back, "a Mist Soldier before a fallen gate goes in to the portal, from anywhere (%s)" % heavy.global_position)
+	var merlon: Vector3 = bw.fort.merlons[bw.fort.merlons.size() / 2]
+	# Stand on the wall walk just inside a merlon, facing it.
+	var pl := bw.player
+	pl.set_physics_process(false)
+	var walk_out := Vector3.ZERO
+	for g: Dictionary in bw.fort.gates:
+		var d: Vector3 = g["dir"]
+		var rel := merlon - (g["at"] as Vector3)
+		if absf(rel.dot(d)) < Fort.WALL_T:
+			walk_out = d
+	if walk_out == Vector3.ZERO:
+		walk_out = (Vector3(merlon.x, 0, merlon.z) - Vector3(bw.fort.heart_at.x, 0, bw.fort.heart_at.z)).normalized()
+	pl.global_position = merlon - walk_out * 0.9 + Vector3.UP * 0.05
+	await frames(2)
+	check(not pl._should_auto_jump(walk_out), "walking up to a battlement, auto-jump leaves it alone")
+	for spot: Vector2 in [Vector2(-28.4, 57.9), Vector2(-59.6, 92.3)]:
+		var q := PhysicsShapeQueryParameters3D.new()
+		var ball := SphereShape3D.new()
+		ball.radius = 4.0
+		q.shape = ball
+		q.collision_mask = Terrain.BARRIER
+		q.transform = Transform3D(Basis(), Vector3(spot.x, bw.ground_at(Vector3(spot.x, 0, spot.y)) + 1.0, spot.y))
+		check(bw.get_world_3d().direct_space_state.intersect_shape(q, 4).is_empty() and bw.terrain.is_walkable(spot.x, spot.y), "no unseen wall in the dry hollow at %s" % spot)
+	# Both flyers leave their spawn when there is no player in their sight.
+	for kind: String in ["eagle", "mist_eagle"]:
+		var launch := bw.fort.heart_at + Vector3(0, 8, -55)
+		if not bw.spawn_zombie(kind, launch):
+			check(false, "%s spawns outside Mist Bastion" % kind)
+			continue
+		var bird: Zombie = bw.zombies.back()
+		bird._sees = false
+		bird._clear = false
+		var before := Vector2(bird.position.x - bw.fort.heart_at.x, bird.position.z - bw.fort.heart_at.z).length()
+		for i in 120:
+			bird._fly(pl, Vector3.ZERO, before, 1.0 / 60.0)
+		var after := Vector2(bird.position.x - bw.fort.heart_at.x, bird.position.z - bw.fort.heart_at.z).length()
+		check(before - after > 8.0, "%s approaches Mist Bastion while it has no target in sight" % kind)
+		bird.release()
+	# Freezing a Child of the Woods turns all of it to ice, its leaves and bark too; thawed, all comes back.
+	var at := bw.fort.heart_at + Vector3(0, 0, 8)
+	bw.spawn_zombie("child_of_woods", at)
+	var child := _nearest_zombie(at, bw)
+	check(child != null and child.type_id == "child_of_woods", "a Child of the Woods to freeze")
+	if child:
+		var worn := child._parts.filter(func(mi: MeshInstance3D) -> bool: return mi.has_meta("own_material"))
+		check(worn.size() >= 3, "its leaves, bark and eyes are of its body (%d parts)" % worn.size())
+		child.freeze(1.0)
+		check(child._parts.all(func(mi: MeshInstance3D) -> bool: return mi.material_override == Zombie.ice_material()), "frozen, every part of it is ice")
+		child._show_frozen(0.0)
+		check(worn.all(func(mi: MeshInstance3D) -> bool: return mi.material_override == mi.get_meta("own_material")), "and thawed, its own look comes back")
+		child.release()
+	# The Woodland Cavalry: a jointed bear in harness under a rider who sits in its saddle.
+	bw.spawn_zombie("woodland_cavalry", at)
+	var cav := _nearest_zombie(at, bw)
+	check(cav != null and cav.type_id == "woodland_cavalry" and cav._mounted, "a Woodland Cavalry rides out")
+	if cav:
+		cav.set_physics_process(false)
+		var bear := cav._horse_node
+		check(bear != null and not (bear is MeshInstance3D) and bear.get_node_or_null("Rig/Hind/Torso/Saddle") != null and bear.get_node_or_null("Rig/Hind/Torso/Head/Jaw") != null, "on a bear of jointed legs, head and jaw, with a saddle")
+		check(["Ride", "RideCharge", "RideThrust", "RideBrandish"].all(func(n: String) -> bool: return Net.ANIMS.has(n) and cav._anim.has_animation(n)), "the rider's riding moves, on every phone")
+		var leg := bear.get_node("Rig/Hind/Torso/LegFL") as Node3D
+		cav._current_anim = ""
+		cav._play("RideCharge", 1.0, 0.0)
+		var swings: Array[float] = []
+		for i in 30:
+			cav._tick_mount(1.0 / 30.0, 7.0)
+			swings.append(leg.rotation.x)
+		check(swings.max() - swings.min() > 0.4, "the spear couched, the bear gallops (%.2f rad of stride)" % (swings.max() - swings.min()))
+		var seat := (bear.get_node("Rig/Hind/Torso/Saddle") as Node3D).global_position
+		var hips := cav._visual.global_position + cav._visual.global_basis.y.normalized() * cav._rider_hip() * cav._visual.scale.y
+		check(hips.distance_to(seat) < 0.1, "with the rider in the saddle (%.2f m off)" % hips.distance_to(seat))
+		cav._current_anim = ""
+		cav._play("RideBrandish", 1.0, 0.0)
+		for i in 30:
+			cav._tick_mount(1.0 / 30.0, 2.0)
+		var hind := bear.get_node("Rig/Hind") as Node3D
+		check(hind.rotation.x < -0.25 and hind.rotation.x > -0.7, "wheeling round, the spear brandished, the bear half rears (%.2f rad)" % hind.rotation.x)
+		check(cav._visual.global_position.y > seat.y - 0.3, "and its rider goes up with it")
+		cav._current_anim = ""
+		cav._play("RideThrust", 1.0, 0.0)
+		cav._tick_mount(1.0 / 30.0, 7.0)
+		check(str(bear.get_meta("act_state", "")) == "m_swipe", "the spear driven home, the bear rakes with a paw")
+		cav.freeze(1.0)
+		check(bear.find_children("*", "MeshInstance3D", true, false).all(func(mi: MeshInstance3D) -> bool: return mi.material_override == Zombie.ice_material()), "frozen, the bear is ice too")
+		cav._show_frozen(0.0)
+		cav.hp = cav.max_hp * 0.3
+		cav._check_dismount()
+		check(not cav._mounted and bear.visible and bear.top_level and cav._mount_fall > 0.0, "brought down, the bear falls where it is and its rider fights on foot")
+		for i in 70:
+			cav._tick_mount_fall(1.0 / 30.0)
+		check(not bear.visible and not bear.top_level, "then it is gone")
+		cav.release()
+	space.queue_free()
+	Game.fort_map = saved_map
+	Game.mode = Game.Mode.NIGHT
+	m.queue_free()
+
+
+func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
+	var best: Zombie = null
+	for z: Zombie in in_world.zombies:
+		if z.active and (best == null or z.position.distance_to(at) < best.position.distance_to(at)):
+			best = z
+	return best
+
+
+
+## The Sunken Crown: the six weapons of the coast of Vael.
+## The Sunken Crown, stage 2: Port Vael, its Mist Tide, its salvage and its creatures.
+func _port_vael() -> void:
+	# Everywhere a place is listed, Port Vael is.
+	check(Game.MAPS.has("vael") and "vael" in Game.VERSUS_MAPS and "vael" in Board.MAPS, "Port Vael can be chosen for the night and for versus, and has its boards")
+	check(Places.ORDER.has("vael") and Places.ALL["vael"]["tips"].size() == 3 and str(Places.ALL["vael"]["lore"]).length() > 80, "it has its page, its lore and its tips")
+	check(WorldAtlas.SPOTS.has("vael") and WorldAtlas.LINKS.has(["mesenlla", "vael", false]), "the atlas road from Mesenlla leads to Port Vael")
+	check(PlaceVista.LOOKS.has("vael") and Icons.exists("map_vael"), "its loading view and its icon")
+	check(Sfx.MUSIC_SETS.has("vael") and (Sfx.MUSIC_SETS["vael"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
+	check(Director.DAWN_SOUNDS.get("vael", "") == "dawn_vael" and Sfx.NAMES.has("dawn_vael"), "and its own sound at dawn")
+	# The Sunken Crown's title screen: Port Vael under its aurora, and a theme of its own.
+	check(Sfx.MUSIC_SETS["menu"][0] == "menu_vael" and ResourceLoader.exists("res://assets/music/menu_vael.ogg"), "the main menu has The Sunken Crown's own theme")
+	check(World.MENU_TOUR_VAEL.size() >= 6 and World.MENU_TOUR_VAEL.all(func(p: Array) -> bool: return absf(p[0].x) < 110.0 and absf(p[0].z) < 110.0), "and its camera tours Port Vael, inside the map")
+	# The tide's clock.
+	check(is_equal_approx(MistTide.level_at(0.0), MistTide.LOW_Y) and not MistTide.is_high_at(10.0), "the night begins at low tide")
+	check(MistTide.is_high_at(MistTide.TURN + 1.0) and is_equal_approx(MistTide.level_at(MistTide.TURN + MistTide.RISE), MistTide.HIGH_Y), "after %d s it comes in, taking %d s" % [int(MistTide.TURN), int(MistTide.RISE)])
+	check(MistTide.level_at(MistTide.TURN + MistTide.RISE * 0.5) > MistTide.LOW_Y and MistTide.level_at(MistTide.TURN + MistTide.RISE * 0.5) < MistTide.HIGH_Y, "rising in between")
+	check(not MistTide.is_high_at(MistTide.TURN * 2.0 + 1.0) and is_equal_approx(MistTide.turns_in(10.0), MistTide.TURN - 10.0), "and turns again every %d s" % int(MistTide.TURN))
+	check(MistTide.ebb(0.0) == 0 and MistTide.ebb(MistTide.TURN * 2.0 + 1.0) == 1 and MistTide.ebb(MistTide.TURN * 4.0 + 1.0) == 2, "each low tide counted")
+	# The map itself.
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "vael"
+	Game.mode = Game.Mode.NIGHT
+	var vael := World.new()
+	space.add_child(vael)
+	vael.setup(Game.Mode.NIGHT)
+	vael.director.set_process(false)
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	var you := vael.player
+	you.set_physics_process(false)
+	check(vael.map_id == "vael" and vael.tide != null, "Port Vael loads, with its tide")
+	var t := vael.terrain
+	await get_tree().physics_frame
+	var lighthouse_hit := vael.get_world_3d().direct_space_state.intersect_ray(
+		PhysicsRayQueryParameters3D.create(Vector3(84, 2.7, 63), Vector3(84, 2.7, 70), 1))
+	check(not lighthouse_hit.is_empty() and (lighthouse_hit["position"] as Vector3).z < 67.0, "the lighthouse plinth stops characters on approach")
+	var road_end := Vector3(13, 0, -84)
+	var road_route := vael.grid.route(Vector3(0, 0, -53), road_end)
+	check(road_route.size() > 1 and Vector2(road_route[-1].x - road_end.x, road_route[-1].z - road_end.z).length() < 2.5, "the market is linked to the lower end of Valley Road")
+	await _vael_pass(vael)
+	check(t.height(40, -18) > 2.4 and t.height(40, -22) > 3.7, "the town terraces grade up from the Quay without a moat")
+	check(absf(t.height(0, -5) - 2.2) < 0.15 and t.height(0, -55) > 4.5, "the quay and the town above it")
+	check(t.height(0, 40) < MistTide.HIGH_Y - 0.3 and t.height(0, 40) > MistTide.LOW_Y + 0.2, "the flats between low and high water")
+	check(t.deep_water(0, 104) and not t.is_walkable(0, 104) and t.is_walkable(0, 40), "the open sea beyond them is no place to walk")
+	# Out of the tide flats the Drowned climb by the stairs and slipways, never up the face of the
+	# quay or the moles, which the path grid shuts wherever the ground rises too steeply.
+	var face := 0
+	var shut := 0
+	for x in range(-78, 79):
+		if [-55, -30, -12, 12, 30, 55].any(func(w: int) -> bool: return absi(x - w) <= 4):
+			continue
+		face += 1
+		if vael.grid.astar.is_point_solid(vael.grid.to_cell(Vector3(x, 0, 7.0))):
+			shut += 1
+	check(vael.grid.fine_only and vael.grid.closed_steep > 0 and shut == face, "the face of the quay is shut to paths all along, but for its stairs and slipways (%d of %d m; %d steep cells)" % [shut, face, vael.grid.closed_steep])
+	for trip: Array in [[Vector3(0, 0, 40), Vector3(0, 0, -6), "the quay"], [Vector3(-30, 0, 60), Vector3(0, 0, -55), "the market square"],
+			[Vector3(60, 0, 40), Vector3(84, 0, 45), "the east mole"], [Vector3(-60, 0, 40), Vector3(-84, 0, 45), "the west mole"]]:
+		var from: Vector3 = trip[0]
+		var to: Vector3 = trip[1]
+		var way := vael.grid.route(from, to)
+		var steepest := 0.0
+		for i in range(1, way.size()):
+			var rise := absf(t.height(way[i].x, way[i].z) - t.height(way[i - 1].x, way[i - 1].z))
+			steepest = maxf(steepest, rise / maxf(0.5, Vector2(way[i].x - way[i - 1].x, way[i].z - way[i - 1].z).length()))
+		var reaches := way.size() > 1 and Vector2(way[-1].x - to.x, way[-1].z - to.z).length() < 2.5
+		check(reaches and steepest < 0.95, "from the flats a path climbs to %s, by stairs or a slipway (%d points, steepest %.2f)" % [trip[2], way.size(), steepest])
+	check(t.height(-84, 40) > MistTide.HIGH_Y + 0.8 and t.height(84, 40) > MistTide.HIGH_Y + 0.8, "the breakwaters stand out of the highest tide")
+	await _vael_districts(vael)
+	check(vael.tide.salvage().size() >= 4, "every wreck keeps a sea chest (%d)" % vael.tide.salvage().size())
+	var flats := Vector3(0, t.height(0, 40), 40)
+	# Low tide: dry flats, chests to open.
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.level_at(20.0)
+	check(is_equal_approx(vael.tide.slow_at(flats), 1.0) and vael.tide.blind_for(flats) == 0.0, "at low tide the flats are dry")
+	var chest: Dictionary = vael.tide.salvage()[0]
+	var coins := Game.doubloons
+	you.global_position = chest["at"]
+	vael.tide._tick_salvage(20.0)
+	check(Game.doubloons > coins and int(chest["taken"]) == MistTide.ebb(20.0), "you open a sea chest by walking up to it")
+	coins = Game.doubloons
+	vael.tide._tick_salvage(21.0)
+	check(Game.doubloons == coins and not vael.tide.salvage_open(chest), "once each low tide")
+	# High tide: wading, sea-mist, the Drowned quicker.
+	var high_at := MistTide.TURN + MistTide.RISE + 2.0
+	vael.director.elapsed = high_at
+	vael.tide.level = MistTide.level_at(high_at)
+	var deep := Vector3(0, t.height(0, 70), 70)
+	check(vael.tide.slow_at(flats) < 1.0 and is_equal_approx(vael.tide.slow_at(deep), MistTide.SLOW) == (vael.tide.depth_at(deep) >= MistTide.SLOW_DEPTH), "at high tide wading slows you, to %d%% at its deepest" % roundi(MistTide.SLOW * 100.0))
+	check(vael.tide.blind_for(deep) > 0.0 and vael.tide.blind_for(deep) <= 0.5 and vael.tide.blind_for(Vector3(0, 2.2, -5)) == 0.0, "and the sea-mist half blinds you in it, not on the quay")
+	check(vael.tide.fog_scale() > 1.5, "and the fog over the harbour thickens")
+	check(not vael.tide.salvage_open(chest) or (chest["at"] as Vector3).y > vael.tide.level, "a chest under the water can't be opened")
+	check(vael.tide.status()["text"] == "High tide" and float(vael.tide.status()["turns_in"]) > 0.0, "the HUD shows the tide and when it turns")
+	# The creatures.
+	var ids := ["drowned_sailor", "barnacle_brute", "brine_hound", "lantern_jelly", "angler"]
+	for id: String in ids:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(SpawnRules.is_vael(d) and CodexPanel.enemy_group(id) == 5 and str(d.get("lore", "")).length() > 60 and Icons.exists(str(d["icon"])), "%s: of Vael, in the Codex with its lore and icon" % id)
+		check(ZombieDefs.roams(id, 999.0, "vael") and not ZombieDefs.roams(id, 999.0, "village") and not ZombieDefs.roams(id, 999.0, "mesenlla"), "%s keeps to the coast" % id)
+	check(not ZombieDefs.roams("normal", 999.0, "vael") and not ZombieDefs.roams("child_of_woods", 999.0, "vael"), "and nothing else walks in Port Vael")
+	var at := Vector3(0, t.height(0, 20), 20)
+	check(vael.spawn_zombie("drowned_sailor", at), "a Drowned Sailor comes up")
+	var sailor: Zombie = vael.zombies.back()
+	check(sailor.weapon_id in ["cutlass", "boarding_hook", "dagger"], "with a cutlass, a hook or a knife")
+	sailor.state = Zombie.State.CHASE
+	var quick := sailor._desired_speed()
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.LOW_Y
+	check(is_equal_approx(quick / sailor._desired_speed(), MistTide.QUICKEN), "a quarter quicker while the tide is high")
+	sailor.release()
+	check(vael.spawn_zombie("barnacle_brute", at), "a Barnacle Brute")
+	var brute: Zombie = vael.zombies.back()
+	brute.rotation.y = 0.0
+	var hp := brute.hp
+	brute.take_damage(40.0, Vector3(0, 0, -1), 0.0, brute.centre())
+	var front := hp - brute.hp
+	hp = brute.hp
+	brute.take_damage(40.0, Vector3(0, 0, 1), 0.0, brute.centre())
+	check(is_equal_approx(front, 20.0) and is_equal_approx(hp - brute.hp, 40.0), "its crust takes half a blow from in front (%.0f), none from behind (%.0f)" % [front, hp - brute.hp])
+	brute.release()
+	check(vael.spawn_zombie("brine_hound", at), "a Brine Hound")
+	var hound: Zombie = vael.zombies.back()
+	check(hound._custom and hound._visual.has_node("Rig") and hound.mesenlla_mind != null and int(ZombieDefs.ALL["brine_hound"]["pack"]) == 3, "on its own body, hunting in packs")
+	hound.release()
+	check(vael.spawn_zombie("angler", at), "an Angler")
+	var angler: Zombie = vael.zombies.back()
+	check(angler.dormant and (angler._visual.get_node("Body") as Node3D).position.y < 0.0 and angler._visual.get_meta("buried", false), "lying buried, its lure out of the sand")
+	angler._wake()
+	check(not angler.dormant, "it bursts out when you come close")
+	angler.release()
+	check(vael.spawn_zombie("lantern_jelly", at), "a Lantern Jelly")
+	var jelly: Zombie = vael.zombies.back()
+	check(jelly._visual.has_node("Float/Bell/Lantern") and jelly._visual.has_node("Float/Bell/Threads/Thread0/Joint/Joint"), "a bell with its lantern and its threads")
+	check(is_equal_approx(float(ZombieDefs.ALL["lantern_jelly"]["sting_stun"]), MistSeal.STING_STUN), "its sting stuns for as long as the Codex says")
+	you.global_position = jelly.position + Vector3(1.0, 0, 0)
+	you.frozen_left = 0.0
+	you._status_immune = 0.0
+	var life := you.hp
+	var seal := MistSeal.create(vael, Vector3(jelly.position.x, t.height(jelly.position.x, jelly.position.z), jelly.position.z), float(ZombieDefs.ALL["lantern_jelly"]["sting_reach"]), 0.0, 0.05, 10.0, jelly.net_id, MistSeal.Style.STING)
+	seal.strike()
+	check(you.hp < life and is_equal_approx(you.frozen_left, MistSeal.STING_STUN) and not you.is_iced, "stung: hurt and stunned")
+	seal.queue_free()
+	jelly.release()
+	you.frozen_left = 0.0
+	# What the night brings: hounds in a pack, jellies on the high tide, Anglers buried on the shore.
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.global_position = Vector3(0, t.height(0, 30), 30)
+	var d := vael.director
+	d.elapsed = 400.0 # the tide is low at 400 s
+	vael.tide.level = MistTide.level_at(400.0)
+	d._next_rider = 0.0
+	d._next_wyvern = 0.0
+	d._next_ambush = 0.0
+	d._tick_vael()
+	check(vael.count_type("brine_hound") == int(ZombieDefs.ALL["brine_hound"]["pack"]), "Brine Hounds come up in a pack of %d" % vael.count_type("brine_hound"))
+	check(vael.count_type("lantern_jelly") == 0, "no Lantern Jellies at low tide")
+	var buried := vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "angler")
+	check(buried.size() == 1 and buried[0].dormant and t.height(buried[0].position.x, buried[0].position.z) < MistTide.HIGH_Y + 0.4, "an Angler lies buried on the shore")
+	d.elapsed = MistTide.TURN * 5.0 + MistTide.RISE + 1.0 # high
+	vael.tide.level = MistTide.HIGH_Y
+	d._next_wyvern = 0.0
+	d._tick_vael()
+	var jellies := vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "lantern_jelly")
+	check(jellies.size() == Director.JELLIES_AT_ONCE and jellies.all(func(z: Zombie) -> bool: return vael.tide.flooded(z.position)), "the high tide brings Lantern Jellies in over the water")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	await _vael_sky(vael)
+	await _coastal_repairs(vael)
+	await _kraken_finale(vael)
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+	await get_tree().process_frame
+
+
+## Valley Road's rockfall, the border mesh and the shared obstacle traversal.
+func _vael_pass(vael: World) -> void:
+	var terrain := vael.terrain
+	var arch := Vector3(10.5, 0, -92)
+	var face := vael.ground_at(arch) + 1.0
+	var space := vael.get_world_3d().direct_space_state
+	var a := Vector3(arch.x, face, -90)
+	var b := Vector3(arch.x, face, -95)
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(a, b, 1))
+	check(not hit.is_empty() and (hit["position"] as Vector3).z > -91.8, "the outer boulders are solid at their visible front face")
+	check(not vael.vael_sites.accessible(Vector3(13, 0, -98.5)) and terrain.slope(13, -98.5) > Terrain.STEEP, "the slope behind the rockfall is too steep for paths")
+	check(terrain.coast_scenery_height(38, -119) > 42.0, "the Mesenlla skyline rises steeply beyond the playable coast")
+	var edge := float(terrain.half_extent)
+	var north: PackedVector3Array = terrain.skirt_mesh(0).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var seam_samples := 0
+	var seam_clear := true
+	for v: Vector3 in north:
+		if v.z == -edge:
+			seam_samples += 1
+			seam_clear = seam_clear and is_equal_approx(v.y, terrain.ground_height(v.x, v.z))
+	check(seam_samples >= terrain.vertices_per_side and seam_clear, "northern scenery meets the playable terrain at the exact seam")
+	var you := vael.player
+	var original := you.global_position
+	var facing := you.rotation
+	you.global_position = Vector3(arch.x, vael.ground_at(a) + 0.08, -89.6)
+	you.rotation.y = 0.0
+	you.velocity = Vector3.ZERO
+	you.input_move = Vector2(0, -1)
+	you.set_physics_process(true)
+	for i in 110:
+		if you.is_on_floor():
+			you.input_jump = true
+		await get_tree().physics_frame
+	check(you.global_position.z > -92.0, "a player running and jumping stops at the rockfall")
+	you.set_physics_process(false)
+	you.input_move = Vector2.ZERO
+	you.input_jump = false
+	you.velocity = Vector3.ZERO
+	# The low cargo on the quay is part of the map. The lane around the cargo stays open.
+	var floor_y := vael.ground_at(Vector3(5, 0, 3.7))
+	you.global_position = Vector3(5, floor_y, -2.5)
+	var started := vael.spawn_zombie("drowned_sailor", Vector3(3.93, floor_y, 2.69))
+	check(started, "a Drowned Sailor can start on the quayside of the cargo")
+	if started:
+		var sailor: Zombie = vael.zombies.back()
+		sailor.rotation.y = PI
+		sailor._flank = Vector3.ZERO
+		sailor._start_chase(you.global_position)
+		sailor._sees = true
+		sailor._think = 999.0
+		sailor._hop_cd = 0.0
+		var vaulted := false
+		for i in 150:
+			await get_tree().physics_frame
+			vaulted = vaulted or (sailor._airborne and sailor.global_position.y > floor_y + 0.65)
+			if vaulted and not sailor._airborne and sailor.global_position.z < 1.0:
+				break
+		check(vaulted and sailor.global_position.z < 1.0, "a Drowned Sailor vaults the quay's cargo and lands across it")
+		sailor.release()
+	var old_auto_jump := Game.auto_jump
+	you.global_position = Vector3(5, floor_y + 0.10, 5.7)
+	you.rotation.y = 0.0
+	you.velocity = Vector3.ZERO
+	Game.auto_jump = true
+	you.input_move = Vector2(0, -1)
+	you.set_physics_process(true)
+	var airborne := false
+	for i in 99:
+		await get_tree().physics_frame
+		airborne = airborne or you.global_position.y > floor_y + 0.65
+		if airborne and you.is_on_floor() and you.global_position.z < 0.0:
+			break
+	check(airborne and you.global_position.z < 0.0 and you.is_on_floor(), "player auto-jump carries the player over the quay's cargo")
+	you.set_physics_process(false)
+	you.input_move = Vector2.ZERO
+	you.velocity = Vector3.ZERO
+	you.rotation = facing
+	you.global_position = original
+	Game.auto_jump = old_auto_jump
+
+
+## The Port Vael districts, supply racks, and routes through the quay and its buildings.
+func _vael_districts(vael: World) -> void:
+	var sites := vael.vael_sites
+	var spawn_failures := 0
+	var you := vael.player
+	var start := you.global_position
+	for z: float in [-8.0, -50.0, -86.0, 30.0]:
+		var at := Vector3(0, 0, z)
+		at.y = vael.ground_at(at)
+		you.global_position = at
+		for i in 8:
+			var found := sites.enemy_site()
+			if found == Vector3.INF or not sites.accessible(found) or found.distance_to(you.global_position) < 16.0:
+				spawn_failures += 1
+	check(spawn_failures == 0, "enemy spawns find connected, unoccupied approaches from the coast, market and back lanes")
+	check(vael.vael_approaches.size() >= 30 and vael.vael_approaches.all(sites.accessible), "all marked enemy approaches are walkable and connected")
+	check(vael.loot_spots.size() >= 60 and vael.loot_spots.all(sites.accessible), "all marked supplies can be reached, including those inside buildings")
+	var highest_floor := -INF
+	for x in range(-56, -40):
+		for z in range(-16, -8):
+			highest_floor = maxf(highest_floor, vael.terrain.height(x + 0.5, z + 0.5))
+	check(highest_floor <= 2.25, "the west steps stay clear of the Ropewalk floor")
+	var roads := [
+		[Vector3(-74, 0, -4), Vector3(-89, 0, -52), "Gullwatch"],
+		[Vector3(-89, 0, -52), Vector3(-78, 0, -52), "Gullwatch's road to Market Row"],
+		[Vector3(80, 0, -4), Vector3(87, 0, -54), "East Headland"],
+		[Vector3(86, 0, -48), Vector3(77.5, 0, -83.9), "Pilgrims' Garden"],
+		[Vector3(77.5, 0, -83.9), Vector3(49, 0, -71), "the garden's return route to town"],
+	]
+	for road: Array in roads:
+		var route := vael.grid.astar.get_id_path(vael.grid.to_cell(road[0]), vael.grid.to_cell(road[1]))
+		check(route.size() >= 2, "a connected route for players and mobs to %s" % road[2])
+	# Check physics as well as the grid, since a route can still hit a model or turn too sharply.
+	you.global_position = Vector3(0, 5, -49)
+	for trip: Array in [
+			[Vector3(-12, 0, 17), Vector3(-12, 0, 2), "the western slipway"],
+			[Vector3(12, 0, 17), Vector3(12, 0, 2), "the eastern slipway"],
+			[Vector3(-70, 0, 34), Vector3(-84, 0, 34), "the West Mole landing"],
+			[Vector3(70, 0, 34), Vector3(84, 0, 34), "the East Mole landing"],
+			[Vector3(-51.5, 0, -6), Vector3(-39, 0, -12), "both Ropewalk doors"],
+			[Vector3(40, 0, -69), Vector3(40, 0, -82), "the Harbourmaster's House"],
+		]:
+		var at: Vector3 = trip[0]
+		at.y = vael.ground_at(at)
+		if not vael.spawn_zombie("drowned_sailor", at):
+			check(false, "spawn a Drowned Sailor for %s" % trip[2])
+			continue
+		var sailor: Zombie = vael.zombies.back()
+		sailor._think = 999.0
+		sailor.state = Zombie.State.INVESTIGATE
+		sailor._set_goal(trip[1])
+		for i in 570:
+			await get_tree().physics_frame
+			if sailor._arrived():
+				break
+		check(sailor._arrived(), "a Drowned Sailor walks through %s" % trip[2])
+		sailor.release()
+	you.global_position = start
+	check(vael.cache_spots.all(func(at: Vector3) -> bool: return not sites.can_stock(at + Vector3(0.4, 0, 0), false)), "ordinary loot stays out of the supply racks")
+	var old_pickups := vael.pickups.duplicate()
+	vael.director._tick_caches()
+	var caches := vael.pickups.filter(func(item: Pickup) -> bool: return sites.holds_supplies(item.global_position))
+	check(caches.size() == 4 and caches.all(func(item: Pickup) -> bool: return is_inf(item.life)), "exploration keeps a reward waiting at each of the four supply racks")
+	for item: Pickup in caches:
+		if not old_pickups.has(item):
+			vael.remove_pickup(item)
+	vael.director._cache_due.clear()
+	vael.director._cache_look = 0.0
+
+
+## Stage 3 of The Sunken Crown: the drowned court of Port Vael, the Hollow Sovereign and his crown.
+func _drowned_court() -> void:
+	var court := ["siren", "press_gang", "tide_witch", "harbourmaster", "lighthouse_keeper", "kraken_arm", "hollow_sovereign"]
+	for id: String in court:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(SpawnRules.is_vael(d) and VaelMind.handles(id) and str(d.get("lore", "")).length() > 60 and Icons.exists(str(d["icon"]).get_slice("+", 0)), "%s: of Vael, with its own mind, lore and icon" % id)
+		check(CodexPanel.enemy_group(id) == (6 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
+		var voices: Array = [Zombie.MESENLLA_VOICES.get(id, ""), Zombie.MESENLLA_HURT.get(id, ""), Zombie.MESENLLA_DEATHS.get(id, "")]
+		check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "%s has a voice, a hurt and a death of its own" % id)
+	var wanders := func(id: String) -> bool: return ZombieDefs.roams(id, 999.0, "vael") and float(ZombieDefs.ALL[id]["weight"]) > 0.0
+	check(wanders.call("tide_witch") and court.filter(func(id: String) -> bool: return id != "tide_witch").all(func(id: String) -> bool: return not wanders.call(id)), "Tide Witches roam; Sirens, the Press Gang and the court come when the night sends them")
+	check(["harbourmaster", "lighthouse_keeper", "kraken_arm"].all(func(id: String) -> bool: return ZombieDefs.ALL[id].get("miniboss", false)) and ZombieDefs.ALL["hollow_sovereign"].get("vael_boss", false), "three of the court are minibosses, and the Hollow Sovereign the boss")
+	check(Director.BOSS_CARDS.has("hollow_sovereign") and Sfx.NAMES.has("boss_bells_sovereign") and ResourceLoader.exists("res://assets/sounds/boss_bells_sovereign.ogg"), "he enters with his own card and bells")
+	check(Net.ANIMS.size() <= 64 and ["m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"].all(func(a: String) -> bool: return Net.ANIMS.has(a)), "every phone is sent what they are doing (%d states)" % Net.ANIMS.size())
+	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.Style.INK == 17 and MistSeal.LOOKS.size() == 18, "the new rings come after the old on the wire")
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "vael"
+	Game.mode = Game.Mode.NIGHT
+	var vael := World.new()
+	space.add_child(vael)
+	vael.setup(Game.Mode.NIGHT)
+	vael.director.running = false
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	var you := vael.player
+	you.set_physics_process(false)
+	var t := vael.terrain
+	var dt := 1.0 / 60.0
+	var ready_you := func() -> void:
+		you.frozen_left = 0.0
+		you._status_immune = 0.0
+		you.rooted_left = 0.0
+		you.slowed_left = 0.0
+		you.burn_time = 0.0
+		you._drag_left = 0.0
+		you._lure_left = 0.0
+		you.velocity = Vector3.ZERO
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+	var ground := func(x: float, z: float) -> Vector3: return Vector3(x, t.height(x, z), z)
+	var strike := func(at: Vector3, reach: float, kind: int, source: Zombie, amount := 10.0) -> void:
+		var seal := MistSeal.create(vael, at, reach, 0.0, 0.05, amount, source.net_id if source else -1, kind)
+		seal.strike()
+		seal.queue_free()
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.level_at(20.0)
+	# The Siren: her song draws you in, a fifth of her health struck off breaks it.
+	var siren_at: Vector3 = ground.call(0.0, 30.0)
+	check(vael.spawn_zombie("siren", siren_at), "a Siren")
+	var siren: Zombie = vael.zombies.back()
+	check(siren._custom and siren._visual.has_node("Body/Torso/Head/Hair") and siren._visual.has_node("Tail0/Tail1/Tail2") and siren._visual.has_node("Song"), "on her own body: a woman's above, an eel's tail below, her song's rings")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 30.0 + 10.0)
+	siren.mesenlla_mind.phase = "song"
+	siren.mesenlla_mind.left = VaelMind.SONG_TIME
+	siren._current_anim = "m_song"
+	siren.mesenlla_warning = false
+	VaelMind.sing(vael)
+	check(you.is_lured(), "while she sings, she draws you in from %d m" % int(you.global_position.distance_to(siren.position)))
+	var was := you.global_position.distance_to(siren.position)
+	for i in 30:
+		VaelMind.sing(vael)
+		you._physics_step(dt)
+	check(was - you.global_position.distance_to(siren.position) > VaelMind.SONG_PULL * 0.3, "toward her, standing still (%.2f m in half a second)" % (was - you.global_position.distance_to(siren.position)))
+	you.global_position = ground.call(0.0, 30.0 + VaelMind.SONG_REACH + 3.0)
+	you._lure_left = 0.0
+	VaelMind.sing(vael)
+	check(not you.is_lured(), "but not from beyond %d m" % int(VaelMind.SONG_REACH))
+	siren.mesenlla_mind._song_from = siren.hp
+	siren.take_damage(siren.max_hp * VaelMind.SONG_BREAK + 1.0, Vector3(0, 0, -1), 0.0, siren.centre())
+	siren.mesenlla_mind.tick(siren, you, you.global_position - siren.position, 10.0, dt)
+	check(siren.mesenlla_mind.phase == "" and siren._current_anim != "m_song", "a fifth of her health struck off breaks her song")
+	siren.mesenlla_mind.phase = "song"
+	siren._current_anim = "m_song"
+	siren.stun(1.0)
+	check(siren.mesenlla_mind.phase == "", "and so does a stun")
+	siren.release()
+	# The Press Gang's net holds you where you stand.
+	check(vael.spawn_zombie("press_gang", ground.call(4.0, 20.0)), "a Press Gang man")
+	var press: Zombie = vael.zombies.back()
+	check(press.weapon_id == "boarding_hook" and press._parts.size() >= 5, "dressed for the work, a boarding hook in hand")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 20.0)
+	strike.call(you.global_position, VaelMind.NET_RADIUS, MistSeal.Style.NET, press)
+	check(is_equal_approx(you.rooted_left, VaelMind.NET_HOLD), "caught in his net, you cannot move for %.1f s" % VaelMind.NET_HOLD)
+	var stood := you.global_position
+	press.set_physics_process(false)
+	you.input_move = Vector2(0, -1)
+	you.set_physics_process(true)
+	await frames(20)
+	you.set_physics_process(false)
+	you.input_move = Vector2.ZERO
+	check(Vector2(you.global_position.x - stood.x, you.global_position.z - stood.z).length() < 0.05, "however you try to walk")
+	press.release()
+	# The Tide Witch: a line of waves, and the drowned out of the high tide.
+	check(vael.spawn_zombie("tide_witch", ground.call(0.0, 12.0)), "a Tide Witch")
+	var witch: Zombie = vael.zombies.back()
+	ready_you.call()
+	you.global_position = ground.call(0.0, 26.0)
+	var seals := vael.mist_seals.size()
+	(witch.mesenlla_mind as VaelMind)._undertow(witch, you, VaelMind.WAVES, VaelMind.WAVE_RADIUS, VaelMind.WAVE_POWER)
+	check(vael.mist_seals.size() - seals == VaelMind.WAVES, "%d waves roll at you in a line" % (vael.mist_seals.size() - seals))
+	for seal: MistSeal in vael.mist_seals.duplicate(): seal.queue_free()
+	strike.call(you.global_position, VaelMind.WAVE_RADIUS, MistSeal.Style.WAVE, witch)
+	check(you.velocity.z > VaelMind.WAVE_KNOCK * 0.8 and is_equal_approx(you.slowed_left, VaelMind.WAVE_SLOW), "a wave throws you back, away from her, and slows you for %d s" % int(VaelMind.WAVE_SLOW))
+	vael.director.elapsed = MistTide.TURN + MistTide.RISE + 2.0
+	vael.tide.level = MistTide.HIGH_Y
+	var sailors := vael.count_type("drowned_sailor")
+	you.global_position = ground.call(0.0, 50.0)
+	(witch.mesenlla_mind as VaelMind)._raise_drowned(witch, you)
+	check(vael.count_type("drowned_sailor") - sailors == VaelMind.RAISE_COUNT, "at high tide she raises %d Drowned Sailors out of the water" % (vael.count_type("drowned_sailor") - sailors))
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	vael.director.elapsed = 20.0
+	vael.tide.level = MistTide.level_at(20.0)
+	# The Harbourmaster's hook drags you to him; at half health his bell brings a Press Gang.
+	check(vael.spawn_zombie("harbourmaster", ground.call(0.0, 12.0)), "the Harbourmaster")
+	var harbour: Zombie = vael.zombies.back()
+	check(harbour.named_bar() and harbour.is_miniboss() and not harbour.draggable() and is_equal_approx(harbour.max_hp, 700.0 * Game.enemy_health()), "a named foe, too big to drag, %d health" % int(harbour.max_hp))
+	ready_you.call()
+	you.global_position = ground.call(0.0, 26.0)
+	strike.call(you.global_position, VaelMind.HOOK_RADIUS, MistSeal.Style.HOOK, harbour)
+	check(you.is_dragged() and is_equal_approx(you.frozen_left, VaelMind.HOOK_STUN), "his hook catches you")
+	harbour.set_physics_process(false)
+	you.set_physics_process(true)
+	await frames(90)
+	you.set_physics_process(false)
+	var hauled := Vector2(you.global_position.x - harbour.position.x, you.global_position.z - harbour.position.z).length()
+	check(hauled < VaelMind.HOOK_STOP + 0.8 and not you.is_dragged(), "and hauls you to his feet (%.1f m off)" % hauled)
+	harbour.set_physics_process(true)
+	harbour.hp = harbour.max_hp * 0.45
+	var gangs := vael.count_type("press_gang")
+	for i in 80:
+		harbour.mesenlla_mind.tick(harbour, you, you.global_position - harbour.position, 6.0, 1.0 / 30.0)
+	check(vael.count_type("press_gang") - gangs == VaelMind.BELL_GANG, "below half health he rings his bell and a Press Gang answers (%d)" % (vael.count_type("press_gang") - gangs))
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	# The Lighthouse Keeper: oil lamps that set you alight; his great lamp dazzles whoever looks at it.
+	check(vael.spawn_zombie("lighthouse_keeper", ground.call(0.0, 12.0)), "the Mad Lighthouse Keeper")
+	var keeper: Zombie = vael.zombies.back()
+	check(keeper._court_light != null, "his great lamp lit on his back")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 20.0)
+	strike.call(you.global_position, VaelMind.LAMP_RADIUS, MistSeal.Style.LAMP, keeper)
+	check(you.burn_time > 0.0, "his lamps set you alight")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 18.0)
+	you.rotation.y = 0.0 # looking toward -Z: at him
+	you.camera.rotation = Vector3.ZERO
+	strike.call(keeper.position, VaelMind.FLASH_REACH, MistSeal.Style.FLASH, keeper, 0.0)
+	check(is_equal_approx(you.frozen_left, VaelMind.FLASH_STUN), "looking at him as the lamp blazes, you are dazzled for %.1f s" % VaelMind.FLASH_STUN)
+	ready_you.call()
+	you.rotation.y = PI # back turned
+	strike.call(keeper.position, VaelMind.FLASH_REACH, MistSeal.Style.FLASH, keeper, 0.0)
+	check(you.frozen_left == 0.0 and you.hp == you.max_hp(), "with your back to it, nothing")
+	you.rotation.y = 0.0
+	keeper.release()
+	# The Kraken's arms: up out of the flooded flats at high tide, back under when it goes out.
+	vael.director.elapsed = MistTide.TURN * 3.0 + MistTide.RISE + 2.0
+	vael.tide.level = MistTide.HIGH_Y
+	you.global_position = ground.call(-10.0, 40.0)
+	var arms := vael.raise_kraken()
+	check(arms >= 3 and vael.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "kraken_arm").all(func(z: Zombie) -> bool: return vael.tide.flooded(z.position)), "the Kraken's arms rise out of the flooded flats round you (%d)" % arms)
+	var arm: Zombie = vael.zombies.back()
+	check(arm._visual.has_node("Arm/Seg0/Seg1/Seg2") and arm.named_bar(), "each a great arm of twelve joints, named")
+	var was_at := arm.position
+	arm.take_damage(30.0, Vector3(1, 0, 0), 8.0, arm.centre())
+	for i in 10:
+		arm._physics_process(dt)
+	check(arm.position.distance_to(was_at) < 0.05, "rooted in the sea floor: no blow moves it")
+	ready_you.call()
+	strike.call(you.global_position, VaelMind.KRAKEN_RADIUS, MistSeal.Style.SLAM, arm)
+	check(is_equal_approx(you.frozen_left, VaelMind.KRAKEN_STUN), "its slam stuns")
+	vael.director.elapsed = MistTide.TURN * 4.0 + MistTide.RISE + 2.0 # the tide is out
+	vael.tide.level = MistTide.LOW_Y
+	arm.mesenlla_mind.phase = ""
+	for i in int((VaelMind.SINK_TIME + 0.5) * 30.0):
+		if arm.active:
+			arm.mesenlla_mind.tick(arm, you, you.global_position - arm.position, 8.0, 1.0 / 30.0)
+	check(not arm.active, "when the tide goes out, it sinks back into the sea")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	# The Hollow Sovereign: his decrees call the tide in and raise his court; the crown falls with him.
+	check(vael.director.requires_regent(), "the night at Port Vael ends only when he falls")
+	vael.director.elapsed = 40.0 # low tide
+	vael.tide.level = MistTide.level_at(40.0)
+	check(vael.spawn_zombie("hollow_sovereign", ground.call(0.0, 44.0)), "the Hollow Sovereign rises")
+	var king: Zombie = vael.zombies.back()
+	check(king.is_boss() and king.named_bar() and king._parts.size() >= 6, "the boss, in his robes and his crown")
+	ready_you.call()
+	you.global_position = ground.call(0.0, 30.0)
+	sailors = vael.count_type("drowned_sailor")
+	king.hp = king.max_hp * 0.6
+	for i in 50:
+		king.mesenlla_mind.tick(king, you, you.global_position - king.position, 14.0, 1.0 / 30.0)
+	check(vael.tide.surging() and vael.tide.high() and vael.count_type("drowned_sailor") - sailors == VaelMind.COURT, "at his decree the tide comes in out of its turn, and %d of his court rise" % (vael.count_type("drowned_sailor") - sailors))
+	check(is_equal_approx(vael.tide.surge_until - vael.tide.surge_from, VaelMind.SURGE) and vael.tide.level_now(vael.director.elapsed + MistTide.RISE) > MistTide.HIGH_Y - 0.05, "for %d s" % int(VaelMind.SURGE))
+	king.hp = king.max_hp * 0.45
+	king._sees = true
+	(king.mesenlla_mind as VaelMind)._cooldown_c = 0.0
+	king.mesenlla_mind.phase = ""
+	king.mesenlla_mind.tick(king, you, you.global_position - king.position, 14.0, 1.0 / 30.0)
+	check(vael.mist_seals.any(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.CROWN), "below half health, the crown's judgement")
+	ready_you.call()
+	strike.call(you.global_position, VaelMind.JUDGEMENT_RADIUS, MistSeal.Style.CROWN, king)
+	check(is_equal_approx(you.frozen_left, VaelMind.JUDGEMENT_STUN), "which stuns where it falls")
+	var crowns := func() -> int: return vael.pickups.filter(func(p: Pickup) -> bool: return p.item_id == PowerDefs.CROWN).size()
+	king.take_damage(king.hp + 1.0, Vector3(0, 0, 1), 0.0, king.centre())
+	check(crowns.call() == 1 and vael.director._mist_boss_defeated, "he falls, and the Sunken Crown with him")
+	# The crown: worn until you fall.
+	ready_you.call()
+	var mult := you.damage_multiplier()
+	you.activate_power(PowerDefs.CROWN)
+	check(is_equal_approx(you.damage_multiplier() / mult, PowerDefs.CROWN_DAMAGE) and you.skin_bits() & 2 != 0, "wearing it you hit a quarter harder, and everyone sees it on you")
+	you.hp = 50.0
+	you._tick_powers(1.0)
+	check(is_equal_approx(you.hp, 50.0 + PowerDefs.CROWN_REGEN), "and heal %d a second" % int(PowerDefs.CROWN_REGEN))
+	you._tick_powers(600.0)
+	check(you.has_power(PowerDefs.CROWN), "for as long as you stand")
+	for p: Pickup in vael.pickups.duplicate(): vael.remove_pickup(p)
+	you._kill()
+	check(not you.has_power(PowerDefs.CROWN) and crowns.call() == 1, "fall, and it falls where you do")
+	you.respawn(ground.call(0.0, 0.0))
+	var picked := {}
+	for i in 400:
+		picked[PowerDefs.pick_potion("vael")] = true
+	check(not picked.has(PowerDefs.CROWN), "it is never found lying about as a potion")
+	# The night sends the court at its hours.
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.global_position = ground.call(-10.0, 30.0)
+	var d := vael.director
+	d.elapsed = Director.HARBOURMASTER_AT + 1.0
+	vael.tide.level = MistTide.level_at(d.elapsed)
+	d._tick_court()
+	check(vael.count_type("harbourmaster") == 1, "around %d:00 the Harbourmaster climbs the quay stairs" % int(Director.HARBOURMASTER_AT / 60.0))
+	d._tick_court()
+	check(vael.count_type("harbourmaster") == 1, "once")
+	d.elapsed = Director.KRAKEN_AT
+	vael.tide.level = MistTide.HIGH_Y
+	var clear_rings := 0
+	for i in 16:
+		var sites := vael.vael_sites.kraken_sites(World.KRAKEN_RING, VaelMind.ARMS)
+		if sites.size() == VaelMind.ARMS and sites.all(vael.tide.flooded):
+			clear_rings += 1
+	check(clear_rings == 16, "the Kraken finds a whole flooded ring beside the pier and wrecks")
+	d._tick_court()
+	check(vael.count_type("kraken_arm") >= 3, "at the high tide after 4:30, the Kraken")
+	d.elapsed = Director.KEEPER_AT + 1.0
+	d._tick_court()
+	check(vael.count_type("lighthouse_keeper") == 1 and vael.zombies.any(func(z: Zombie) -> bool: return z.type_id == "lighthouse_keeper" and z.position.x > 70.0), "and around %d:00 the Lighthouse Keeper, down the East Mole" % int(Director.KEEPER_AT / 60.0))
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	d._next_siren = 0.0
+	d._next_press = 0.0
+	d.elapsed = 400.0
+	vael.tide.level = MistTide.level_at(400.0)
+	d._tick_court()
+	check(vael.count_type("siren") == 1 and vael.count_type("press_gang") == int(ZombieDefs.ALL["press_gang"]["pack"]), "Sirens come to the water's edge, and the Press Gang in threes")
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+	await get_tree().process_frame
+
+
+func _last_light() -> void:
+	# The map, and how it is known.
+	check(Game.MAPS.has("lantern_road") and Places.ALL.has("lantern_road") and Places.ORDER.has("lantern_road") and WorldAtlas.SPOTS.has("lantern_road") and Icons.exists("map_lantern_road"), "the Lantern Road is a map of its own, in the Places, on the atlas, with its icon")
+	check(ResourceLoader.exists("res://maps/lantern_road.tscn") and Sfx.MUSIC_SETS.has("lantern") and (Sfx.MUSIC_SETS["lantern"] as Array).all(func(m: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % m)), "with its own music")
+	var levi: Dictionary = ZombieDefs.ALL["leviathan"]
+	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 6, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
+	var voices: Array = [Zombie.MESENLLA_VOICES.get("leviathan", ""), Zombie.MESENLLA_HURT.get("leviathan", ""), Zombie.MESENLLA_DEATHS.get("leviathan", ""), "leviathan_bite", "leviathan_rise", "waystation", "lighthouse_lit", "boss_bells_leviathan"]
+	check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "it and the road have sounds of their own")
+	check(Director.BOSS_CARDS.has("leviathan"), "it enters with its own card")
+	check(Boons.ALL.size() >= Boons.OFFERED * 2 and Boons.ALL.values().all(func(b: Dictionary) -> bool: return Icons.exists(str(b["icon"]).get_slice("+", 0)) and str(b["desc"]).length() > 10), "the waystations' boons, each with an icon and words")
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "lantern_road"
+	Game.mode = Game.Mode.NIGHT
+	var road := World.new()
+	space.add_child(road)
+	road.setup(Game.Mode.NIGHT)
+	road.director.running = false
+	for z: Zombie in road.zombies.duplicate(): z.release()
+	var ll := road.last_light
+	check(ll != null and ll.length > 300.0, "Last Light: the barge's course runs %d m" % int(ll.length if ll else 0.0))
+	if ll == null:
+		space.queue_free()
+		Game.night_map = was_map
+		Game.mode = was_mode
+		return
+	ll.set_physics_process(false)
+	# The barge floats: every metre of its course, under it, beside it and just ahead of it, is under
+	# the Lantern Road's sea, which never goes out, and none of it crosses the road.
+	var dry := 0
+	var worst := -9.0
+	var d := 0.0
+	while d < ll.length:
+		var at := ll.path.sample_baked(d)
+		var ahead := ll.path.sample_baked(minf(ll.length, d + 1.0))
+		var dir := Vector3(ahead.x - at.x, 0, ahead.z - at.z).normalized()
+		if dir == Vector3.ZERO:
+			dir = Vector3.FORWARD
+		var side := dir.cross(Vector3.UP)
+		for off: Vector3 in [Vector3.ZERO, side * 2.1, -side * 2.1, dir * 4.0 + side * 2.1, dir * 4.0 - side * 2.1]:
+			var g := road.terrain.height(at.x + off.x, at.z + off.z)
+			worst = maxf(worst, g)
+			if g > MistTide.HIGH_Y - 0.3:
+				dry += 1
+		d += 1.0
+	check(road.tide.always_high and dry == 0, "the barge's whole course is water, never land (highest ground under it %.2f m, the sea %.2f m)" % [worst, MistTide.HIGH_Y])
+	check(ll.way_at.size() == 3 and road.road_lanterns.size() >= 20 and road.lighthouse_top != Vector3.INF, "three waystations, %d road lanterns, and the lighthouse at the end" % road.road_lanterns.size())
+	check(road.tide.level >= MistTide.HIGH_Y - 0.01, "the tide is in, and stays in")
+	var you := road.player
+	you.set_physics_process(false)
+	var dt := 1.0 / 30.0
+	var step := func(seconds: float) -> void:
+		for i in int(seconds / dt):
+			ll._physics_process(dt)
+	var start := ll.barge_at()
+	check(road.terrain.is_walkable(start.x + 5.4, start.z) or road.terrain.is_walkable(start.x - 5.4, start.z) or road.terrain.is_walkable(start.x, start.z), "the barge sets out beside the quay")
+	# Walk with it, and it goes; leave it, and it stops.
+	you.global_position = start + Vector3(-5.0, 0.6, 0)
+	step.call(2.0)
+	check(ll.moving and ll.progress > LastLight.BARGE_SPEED * 1.5, "with you beside it, the barge goes on (%.1f m in 2 s)" % ll.progress)
+	you.global_position = ll.barge_at() + Vector3(-30.0, 0.6, 0)
+	var was := ll.progress
+	step.call(1.0)
+	check(not ll.moving and is_equal_approx(ll.progress, was), "with nobody near it, it stops")
+	# Out of its light, the tide drowns you after a few seconds' grace.
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	ll._out.clear()
+	you.global_position = ll.barge_at() + Vector3(-30.0, 0.6, 0)
+	you.hp = you.max_hp()
+	step.call(LastLight.OUT_GRACE - 0.5)
+	check(is_equal_approx(you.hp, you.max_hp()), "%d s out of the light before the tide takes you" % int(LastLight.OUT_GRACE))
+	step.call(1.5)
+	var lost := you.max_hp() - you.hp
+	check(lost > LastLight.DROWN * 0.5 and lost < LastLight.DROWN * 1.6, "then %d health a second (%.1f lost)" % [int(LastLight.DROWN), lost])
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	you.hp = you.max_hp()
+	step.call(1.0)
+	check(is_equal_approx(you.hp, you.max_hp()) and ll.out_for(you) == 0.0, "back in the light, you are safe")
+	# Something of the sea in the barge holds it.
+	road.spawn_zombie("drowned_sailor", ll.barge_at() + Vector3(0, 0.5, 0))
+	var sailor: Zombie = road.zombies.back()
+	sailor.set_physics_process(false)
+	sailor.position = ll.barge_at() + Vector3(0, 0.5, 0)
+	was = ll.progress
+	step.call(1.0)
+	check(ll.held and not ll.moving and is_equal_approx(ll.progress, was), "a Drowned Sailor aboard holds the barge where it is")
+	sailor.release()
+	step.call(0.5)
+	check(ll.moving, "throw it off, and it goes on")
+	# The lanterns it passes light up.
+	ll.progress = 40.0
+	ll._place(0.0)
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	step.call(0.5)
+	check(ll.lanterns_lit() >= 1, "it lights the road's lanterns as it passes (%d)" % ll.lanterns_lit())
+	# The first waystation: healed, three boons, and the barge waits.
+	ll.progress = ll.way_at[0] - 0.5
+	ll._place(0.0)
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	you.hp = you.max_hp() * 0.3
+	step.call(0.6)
+	check(ll.docked == 0 and not ll.moving, "at a waystation the barge stops")
+	check(you.hp >= you.max_hp() * (0.3 + LastLight.WAY_HEAL) - 1.0, "everyone there is healed %d%% of their health" % int(LastLight.WAY_HEAL * 100.0))
+	check(ll.offer.size() == Boons.OFFERED and ll.offer == Boons.offer_for(you, 0), "and offered %d boons" % Boons.OFFERED)
+	ll.choose("salt_ward") if ll.offer.has("salt_ward") else ll.choose(ll.offer[0])
+	var took := you.boons[0] if not you.boons.is_empty() else ""
+	check(took != "" and ll.offer.is_empty() and not Boons.offer_for(you, 1).has(took), "one is chosen (%s), and never offered again" % took)
+	Boons.grant(you, "salt_ward")
+	Boons.grant(you, "lamplighter")
+	check(is_equal_approx(float(you.mods["damage_taken"]), 0.8) and is_equal_approx(float(you.mods["melee_damage"]), 1.2), "Salt Ward takes a fifth off every blow; Lamplighter's Fury adds a fifth to yours")
+	step.call(0.2)
+	check(ll.docked == -1 and road.count_type(LastLight.WAY_FOES[0][0]) == int(LastLight.WAY_FOES[0][1]), "once all have chosen it leaves, and a Press Gang waits on the road ahead")
+	for z: Zombie in road.zombies.duplicate(): z.release()
+	# Deep Lungs and the Lantern Bearer.
+	Boons.grant(you, "deep_lungs")
+	Boons.grant(you, "lantern_bearer")
+	check(Boons.grace(you) == Boons.DEEP_GRACE and Boons.drown_share(you) == Boons.DEEP_SHARE and Boons.light_bonus(you) == Boons.BEARER_REACH, "Deep Lungs: %d s of grace and half the drowning; the Lantern Bearer: the light %d m further" % [int(Boons.DEEP_GRACE), int(Boons.BEARER_REACH)])
+	you.global_position = ll.barge_at() + Vector3(-(LastLight.LIGHT_RADIUS + 2.0), 0.6, 0)
+	you.hp = you.max_hp()
+	step.call(1.0)
+	check(ll.out_for(you) == 0.0, "so %d m from the barge is still in its light for them" % int(LastLight.LIGHT_RADIUS + 2.0))
+	# The Isle of Lamps: the Leviathan rises.
+	ll.progress = ll.length - 0.3
+	ll.ways_done = ll.way_at.size()
+	ll._place(0.0)
+	you.global_position = ll.barge_at() + Vector3(-5.0, 0.6, 0)
+	step.call(0.5)
+	check(ll.arrived and road.count_type("leviathan") == 1, "at the Isle of Lamps the Leviathan rises from the sea")
+	var beast: Zombie = road.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "leviathan").front()
+	check(beast._custom and beast._visual.has_node("Body/Neck0") and beast.is_boss(), "a sea-serpent's neck of its own, and a boss")
+	check(road.director.dawn_amount() < 0.5, "and it is still night")
+	# It douses the barge's light.
+	var mind: VaelMind = beast.mesenlla_mind
+	mind.phase = ""
+	mind._cooldown_d = 99.0
+	mind._cooldown_e = 0.0
+	mind._leviathan(beast, you, 0.01)
+	check(ll.dim_left > 0.0 and is_equal_approx(ll.light_radius(), LastLight.DIM_RADIUS), "it spits the sea over the barge: the light shrinks to %d m for %d s" % [int(LastLight.DIM_RADIUS), int(LastLight.DIM_TIME)])
+	# It sinks, and rises somewhere else with Drowned Sailors.
+	var first := beast.position
+	mind.phase = "sink"
+	mind.left = 0.0
+	mind._leviathan(beast, you, 0.01)
+	check(beast.position.distance_to(first) > 3.0 and road.count_type("drowned_sailor") >= 1, "it dives and comes up elsewhere round the isle, with Drowned Sailors")
+	# It falls, and the lighthouse burns: the dawn.
+	road.director._mist_boss_defeated = true
+	step.call(0.2)
+	road.director.running = true
+	var dawn := road.director.dawn_amount()
+	road.director.running = false
+	check(ll.lit and dawn >= 1.0, "when it falls, the lighthouse burns again, and that is the dawn")
+	var counted := Game.lighthouses_lit
+	Game.note_last_light()
+	check(Game.lighthouses_lit == counted + 1, "and it is counted (%d)" % Game.lighthouses_lit)
+	Game.lighthouses_lit = counted
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+	await get_tree().process_frame
+
+
+func _vael_weapons() -> void:
+	var ids := ["cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar"]
+	# The Sandbox lays out every weapon, potion and familiar: all of them inside the play area, now
+	# that there are more weapons than fit in one row (they ran out past the edge of the yard).
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var was_mode := Game.mode
+	Game.mode = Game.Mode.SANDBOX
+	var yard := World.new()
+	space.add_child(yard)
+	yard.setup(Game.Mode.SANDBOX)
+	yard.player.set_physics_process(false)
+	var laid: Array[Dictionary] = yard._stand_items
+	var weapons_laid := laid.filter(func(s: Dictionary) -> bool: return s["kind"] == Pickup.Kind.WEAPON).map(func(s: Dictionary) -> String: return s["id"])
+	check(WeaponDefs.ALL.keys().filter(func(id: String) -> bool: return WeaponDefs.lies_around(id)).all(func(id: String) -> bool: return weapons_laid.has(id)), "the Sandbox lays out every weapon, the coast's too")
+	check(laid.all(func(s: Dictionary) -> bool: return yard._inside_play(s["at"], 2.0)), "every one of them inside the yard (%d things)" % laid.size())
+	var apart := true
+	for i in laid.size():
+		for j in range(i + 1, laid.size()):
+			if (laid[i]["at"] as Vector3).distance_to(laid[j]["at"]) < 2.0:
+				apart = false
+	check(apart, "and none on top of another")
+	space.queue_free()
+	Game.mode = was_mode
+	await get_tree().process_frame
+	for id: String in ids:
+		var d: Dictionary = WeaponDefs.ALL[id]
+		check(WeaponDefs.lies_around(id) and SpawnRules.allows(d, "vael") and SpawnRules.allows(d, "lantern_road") and not SpawnRules.allows(d, "village") and SpawnRules.names(d) == "Vael", "%s lies about only on the coast of Vael" % id)
+		check(WeaponDefs.mesh(id) != null and Icons.weapon(id) == id and ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s has its own model and icon" % id)
+		check(str(d.get("lore", "")).length() > 40 and not RegEx.create_from_string("\\d").search(str(d["lore"])), "%s has a story of its own, with no numbers in it" % id)
+	check(WeaponDefs.category("anchor") == "two_handed" and WeaponDefs.category("oar") == "two_handed" and WeaponDefs.category("cutlass") == "melee" and WeaponDefs.category("boarding_hook") == "melee" and WeaponDefs.category("harpoon") == "ranged" and WeaponDefs.category("flare_pistol") == "ranged", "two melee, two ranged, two two-handed")
+	for sound: String in ["cutlass_swing", "hook_swing", "hook_catch", "harpoon_throw", "harpoon_hit", "harpoon_reel", "flare_shot", "flare_burst", "anchor_heave", "anchor_slam", "oar_sweep"]:
+		check(ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound) and Sfx.NAMES.has(sound), "%s sound" % sound)
+	for key: String in ["slam", "hook", "row"]:
+		check(WeaponAnim.KEYS.has(key + "_a") and WeaponAnim.REST_DIRS.has(key), "a first-person %s" % key)
+	check(BodyAnim.attack_for("anchor") == "Overhead" and BodyAnim.attack_for("boarding_hook") == "Thrust" and BodyAnim.attack_for("flare_pistol") == "Spellcast_Shoot" and BodyAnim.attack_for("harpoon") == "Throw", "and their moves as others see them")
+	var codex := CodexPanel.new()
+	add_child(codex)
+	codex._list = VBoxContainer.new()
+	codex.add_child(codex._list)
+	codex._weapons()
+	var texts: Array = codex._list.find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+	check(ids.all(func(id: String) -> bool: return texts.has(WeaponDefs.ALL[id]["desc"] + "\n" + WeaponDefs.ALL[id]["lore"])), "the Codex tells what each does and where it comes from")
+	codex.queue_free()
+	p.setup_class("infantry")
+	p.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
+	p.rotation = Vector3.ZERO
+	p.camera.rotation = Vector3.ZERO
+	var at_front := func(dist: float, kind := "normal") -> Zombie:
+		w.spawn_zombie(kind, p.global_position + Vector3(0, 0, -dist))
+		var zz: Zombie = w.zombies.back()
+		zz.set_physics_process(false)
+		zz.position = p.global_position + Vector3(0, 0, -dist)
+		zz.hp = 5000.0
+		zz.max_hp = 5000.0
+		return zz
+	# Cutlass: each kill quickens the swings, up to three times, fading 3 s after the last.
+	p.slots = ["cutlass", null]
+	p.current = 0
+	p._equip()
+	var cut: Dictionary = WeaponDefs.ALL["cutlass"]
+	var base := p.attack_interval(cut)
+	for i in 4:
+		p._on_kill(at_front.call(30.0 + i))
+	check(p._fervour == 3 and is_equal_approx(p.attack_interval(cut), base / (1.0 + 3 * 0.15)), "four kills with a Cutlass: three times quicker by 15%% (%.3f s a swing, from %.3f)" % [p.attack_interval(cut), base])
+	check(p.readiness().any(func(r: Dictionary) -> bool: return r["key"] == "fervour" and r["have"] == 3), "the HUD shows it")
+	for i in 200:
+		p._process(1.0 / 60.0)
+	check(p._fervour == 0 and is_equal_approx(p.attack_interval(cut), base), "and it fades a few seconds after the last kill")
+	for zz: Zombie in w.zombies.duplicate(): zz.release()
+	# Boarding Hook: drags one in about 1.6 m, staggered; a boss is only staggered.
+	p.slots = ["boarding_hook", null]
+	p._equip()
+	var hooked: Zombie = at_front.call(2.8)
+	p._do_melee_hit()
+	check(hooked._stun > 0.2, "hooked, it is off balance")
+	# Knock fades at 8 a second, so a knock of K carries a body about K / 8 metres.
+	var pull := hooked._knock
+	check(pull.z > 0.0 and absf(pull.length() / 8.0 - 1.6) < 0.05, "and dragged towards you, about 1.6 m (%.2f m)" % (pull.length() / 8.0))
+	hooked.set_physics_process(true)
+	var was := hooked.position.distance_to(p.global_position)
+	for i in 20:
+		await get_tree().physics_frame
+	check(was - hooked.position.distance_to(p.global_position) > 0.8, "and it really comes")
+	hooked.release()
+	var big: Zombie = at_front.call(2.8)
+	big.def = big.def.duplicate()
+	big.def["mesenlla_boss"] = true # the village keeps no boss bodies: this one stands in for one
+	p._do_melee_hit()
+	check(not big.draggable() and big._knock.length() < 0.01 and big._stun == 0.0, "bosses resist the hook without stagger")
+	big.release()
+	# Whaler's Harpoon: pins what it strikes, lies where it lands, comes back when you walk over it.
+	p.slots = ["harpoon", "sword"]
+	p.current = 0
+	p.own_ammo.clear()
+	p._equip()
+	var whale: Zombie = at_front.call(10.0)
+	var arrows_before := p.arrows
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(p.harpoon_out and p.arrows == arrows_before and not p._vm_mesh.visible, "thrown: it is out of your hand, and spent no arrows")
+	for i in 60:
+		await get_tree().physics_frame
+	check(whale.root_left > 1.5 and whale.hp < 5000.0, "it struck and pinned what it hit (%.1f s)" % whale.root_left)
+	var lying: Node3D = w.harpoons.get(p.net_id(), null)
+	check(lying != null and lying.global_position.distance_to(whale.position) < 2.0, "and lies by it")
+	p._cooldown = 0.0
+	var flying := w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size()
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() == flying, "with it out, there is nothing to throw")
+	p.global_position = lying.global_position + Vector3(0.5, 0, 0)
+	p._tick_harpoon(0.02)
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p._vm_mesh.visible, "walking over it takes it back")
+	p.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
+	whale.release()
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	for i in 90:
+		await get_tree().physics_frame
+	check(p.harpoon_out and w.harpoons.has(p.net_id()), "thrown at nothing, it lies on the ground")
+	p._tick_harpoon(16.0)
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()), "and after 15 s it is back in your hand by itself")
+	# Flare Pistol: 6 flares a pistol; a flare burns all within 3 m and shows all within 7 m for 8 s.
+	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
+	p.slots = ["sword", null]
+	p._equip()
+	var gun := w.spawn_pickup_at(p.global_position + Vector3(0.6, 0, 0), Pickup.Kind.WEAPON, "flare_pistol")
+	check(gun.throws() == 6, "a Flare Pistol found lying about brings 6 flares")
+	w._scan_pickups_for(p)
+	check(p.carries("flare_pistol") and p.ammo_of("flare_pistol") == 6, "picked up, 6 flares")
+	p.current = p.slots.find("flare_pistol")
+	p._equip()
+	var near: Zombie = at_front.call(12.0)
+	var side: Zombie = at_front.call(12.0)
+	side.position += Vector3(2.0, 0, 0)
+	var far_one: Zombie = at_front.call(12.0)
+	far_one.position += Vector3(5.5, 0, 0)
+	p.camera.rotation.x = -0.12
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(p.ammo_of("flare_pistol") == 5, "a shot spends one flare")
+	var flares := []
+	for i in 90:
+		await get_tree().physics_frame
+		flares = w.find_children("Flare", "Flare", false, false)
+		if not flares.is_empty():
+			break
+	check(flares.size() == 1, "the flare lands and burns")
+	if flares.size() == 1:
+		var f: Flare = flares[0]
+		var burning := [near, side].filter(func(zz: Zombie) -> bool: return zz.burn_time > 0.0 and zz.position.distance_to(f.global_position) <= Flare.BURN_RADIUS + 0.8)
+		check(not burning.is_empty(), "setting alight what is close by")
+		for i in 40:
+			await get_tree().process_frame
+		check(far_one.position.distance_to(f.global_position) < Flare.REVEAL_RADIUS and far_one.revealed_left > 0.0, "and showing what stands in its light")
+		f.queue_free()
+	# Test a direct body hit separately from the ballistic shot that checks burning and reveal.
+	var lodged_shot := w.spawn_player_arrow(p, near.centre() + Vector3.BACK, Vector3.FORWARD * 24.0, 0.0, 12.0, 0.0, 1.0)
+	lodged_shot._hit_zombie(near, near.centre())
+	var lodged := w.get_children().back() as Flare
+	check(lodged != null and lodged._target == near, "a direct flare hit lodges in the enemy")
+	if lodged:
+		var hit_at := lodged.global_position
+		near.position.x += 1.0
+		lodged._process(0.01)
+		check(is_equal_approx(lodged.global_position.x, hit_at.x + 1.0), "a lodged flare follows its living target")
+		near.take_damage(10000.0, Vector3.ZERO, 0.0, near.centre())
+		lodged._process(0.01)
+		check(lodged._target == null and absf(lodged.global_position.y - w.ground_at(lodged.global_position)) < 0.15, "a lodged flare drops to the ground when its target dies")
+		lodged.queue_free()
+	for zz: Zombie in [near, side, far_one]: zz.release()
+	p.own_ammo["flare_pistol"] = 1
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(not p.carries("flare_pistol"), "the last flare fired, the pistol is gone")
+	# Ship's Anchor: the slam shakes everything within 4.5 m, and you walk slower carrying it.
+	p.slots = ["anchor", null]
+	p.current = 0
+	p._equip()
+	check(p.can_use("anchor"), "an Infantry can wield it")
+	var front: Zombie = at_front.call(1.8)
+	var behind: Zombie = at_front.call(-3.0)
+	p._do_melee_hit()
+	check(front.hp < 5000.0, "the anchor's blow lands")
+	check(behind.hp < 5000.0 and behind._stun > 0.3 and 5000.0 - behind.hp < (5000.0 - front.hp) * 0.75, "and the ground shakes behind you too: a share of the blow, staggered")
+	for zz: Zombie in [front, behind]: zz.release()
+	var slow_speed: float = p.weapon_def().get("burden", 1.0)
+	check(is_equal_approx(slow_speed, 0.9), "carrying it, 90% speed")
+	# Ferryman's Oar: wide, shoves far and slows.
+	p.slots = ["oar", null]
+	p._equip()
+	var rowed: Zombie = at_front.call(2.2)
+	p._do_melee_hit()
+	check(rowed._slow > 0.5, "struck by the oar, it is slowed")
+	rowed.release()
+	p.setup_class("infantry")
+	p.slots = ["sword", null]
+	p._equip()
+
+
+## Coastal flyers exercise real wind-ups, dodges, interruption, damage and pool reuse.
+func _vael_sky(vael: World) -> void:
+	for seal: MistSeal in vael.mist_seals.duplicate(): seal.queue_free()
+	await frames(1)
+	var you := vael.player
+	var saved := you.position
+	var at := Vector3(0, vael.ground_at(Vector3(0, 0, 40)), 40)
+	you.position = at
+	you.guard_left = 0.0
+	for id: String in VaelSkyMind.KINDS:
+		check(ZombieDefs.roams(id, 600, "vael") and not ZombieDefs.roams(id, 600, "lantern_road") and not ZombieDefs.roams(id, 600, "village"), id + " stays in Port Vael")
+		check(not ZombieDefs.roams(id, 10, "vael") and Icons.exists(id) and CodexPanel.enemy_group(id) == 5, id + " has a timed arrival, icon and Codex entry")
+		for suffix: String in ["call", "release", "hurt", "death"]:
+			check(Sfx.NAMES.has(id + "_" + suffix) and Net.SOUNDS.has(id + "_" + suffix), id + " has its own " + suffix)
+		check(vael.spawn_zombie(id, at + Vector3(0, 0, -10)), id + " spawns from its pool")
+		var z: Zombie = vael.zombies.back()
+		z.set_physics_process(false)
+		z._sees = true
+		var mind := z.mesenlla_mind as VaelSkyMind
+		check(z.flies and mind != null and z.position.y > vael.ground_at(z.position) + 2, id + " flies with its own mind")
+		mind.cooldown = 0
+		mind.tick(z, you, Vector3.ZERO, 10, 0)
+		check(mind.phase == "tell" and z.is_warning() and vael.mist_seals.is_empty(), id + " warns before releasing damage")
+		z._animate_custom(0.1, 1)
+		# Stun before release prevents any attack.
+		z.stun(0.6)
+		check(mind.phase == "" and not z.is_warning() and vael.mist_seals.is_empty(), id + " stun interrupts wind-up")
+		z._stun = 0
+		z._sees = true
+		mind.cooldown = 0
+		mind.tick(z, you, Vector3.ZERO, 10, 0)
+		mind.tick(z, you, Vector3.ZERO, 10, float(VaelSkyMind.TELLS[id]) + 0.01)
+		check(mind.phase == "recover" and not z.is_warning() and not vael.mist_seals.is_empty(), id + " releases and enters recovery")
+		var shots := vael.mist_seals.duplicate()
+		check(shots.size() == (3 if id == "storm_ray" else 1), id + " has the right attack pattern")
+		var seal: MistSeal = shots[0]
+		seal.set_physics_process(false)
+		var hit_at := seal.position + (Vector3.RIGHT * 2.7 if id == "bell_wraith" else Vector3.ZERO)
+		you.position = hit_at + Vector3.RIGHT * 10
+		you.hp = you.max_hp()
+		var hp_before := you.hp
+		seal.strike()
+		check(you.hp == hp_before, id + " can be dodged")
+		you.position = seal.position if id == "bell_wraith" else hit_at
+		if id == "bell_wraith":
+			seal.strike()
+			check(you.hp == hp_before and not seal.contains(you.position), "the knell has a safe centre")
+		you.position = hit_at
+		you._status_immune = 0
+		you.frozen_left = 0
+		you.guard_left = 0
+		seal.strike()
+		check(you.hp < hp_before, id + " hurts inside the marked area")
+		for s: MistSeal in shots: s.queue_free()
+		await frames(1)
+		# Joined phones display the same pose and tell from snapshot state.
+		z.puppet = true
+		z.net_apply(z.position, 0, 64, 1.0, "m_cast", 1.0)
+		z._animate_custom(0.1, 1)
+		check(z.is_warning() and z._current_anim == "m_cast", id + " receives its ranged pose on a joined phone")
+		z.puppet = false
+		# Low recovery reaches a hittable height; steering stays in the playable bounds.
+		you.position = at
+		mind.phase = "recover"
+		mind.left = VaelSkyMind.RECOVERY
+		for i in 108: mind.tick(z, you, Vector3.ZERO, 10, 1.0 / 60)
+		check(z.position.y < at.y + 2.5 and absf(z.position.x) < vael.half_size, id + " recovers low inside map bounds")
+		z.release()
+		check(vael.spawn_zombie(id, at + Vector3(0, 0, -10)), id + " reuses its pooled body")
+		z = vael.zombies.back()
+		check(z._current_anim == "" and not z.is_warning() and (z.mesenlla_mind as VaelSkyMind).phase == "", id + " clears its attack when reused")
+		z.set_physics_process(false)
+		z._die()
+		z._physics_process(0.1)
+		z.release()
+	check(MistSeal.Style.SALT == 14 and MistSeal.Style.KNELL == 16 and Net.ANIMS.size() <= 64, "coastal impacts append wire styles and reuse animation slots")
+	# With all three ranged slots occupied, the director keeps spawning ground enemies.
+	for id: String in VaelSkyMind.KINDS: vael.spawn_zombie(id, at + Vector3(0, 0, -15))
+	vael.director.elapsed = 600
+	for i in 50: check(vael.director._pick_roamer() not in VaelSkyMind.KINDS, "the ranged population is capped at three")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.position = at
+	vael.director.elapsed = 690.0
+	vael.director._tick_vael()
+	check(vael.count_type("leviathan") == 1, "the former road boss rises in the harbour at 11:30")
+	vael.director._tick_vael()
+	check(vael.count_type("leviathan") == 1, "the coastal Leviathan is summoned once")
+	for z: Zombie in vael.zombies.duplicate(): z.release()
+	you.position = saved
+
+
+## The Kraken, the end of Port Vael's night: it rises only once the Hollow Sovereign and the Leviathan
+## have both fallen, holds the tide in, can be struck by blade, arrow and Trident, uses each of its
+## arts in its own third of its health, and dawn waits for it.
+func _kraken_finale(coast: World) -> void:
+	var d := coast.director
+	var you := coast.player
+	var saved := you.position
+	for z: Zombie in coast.zombies.duplicate(): z.release()
+	var def: Dictionary = ZombieDefs.ALL[Director.KRAKEN]
+	check(def.get("vael_boss", false) and def.get("rooted", false) and VaelMind.handles(Director.KRAKEN) and Icons.exists("kraken") and Director.BOSS_CARDS.has(Director.KRAKEN)
+		and Game.zombie_pool_plan().has(Director.KRAKEN) and str(def.get("lore", "")).length() > 80, "the Kraken is the coast's last boss, with its card, its icon and its lore")
+	for sound: String in ["kraken_emerge", "kraken_roar", "kraken_ink", "kraken_whirlpool", "kraken_end", "boss_bells_kraken"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# It waits for both royals.
+	d._kraken_at = -1.0
+	d._kraken_risen = false
+	d._kraken_fallen = false
+	d._mist_boss_defeated = false
+	d._coastal_leviathan = true
+	d.elapsed = 800.0
+	d._tick_kraken()
+	check(d._kraken_at < 0.0 and coast.count_type(Director.KRAKEN) == 0, "not while the Hollow Sovereign stands")
+	d._mist_boss_defeated = true
+	coast.spawn_zombie("leviathan", coast.vael_sites.enemy_site(15.0, 190.0, VaelSites.Shore.WATERLINE))
+	d._tick_kraken()
+	check(d._kraken_at < 0.0, "nor while the Leviathan does")
+	for z: Zombie in coast.zombies.duplicate(): z.release()
+	d._tick_kraken()
+	check(d._kraken_at >= d.elapsed + Director.KRAKEN_AFTER - 0.01 and coast.count_type(Director.KRAKEN) == 0, "once both have fallen, the harbour goes still for %d s" % int(Director.KRAKEN_AFTER))
+	d.elapsed = d._kraken_at + 0.1
+	d._tick_kraken()
+	check(coast.count_type(Director.KRAKEN) == 1 and d._kraken_risen and coast.tide.surging(), "then the Kraken rises, and holds the tide in")
+	var beast: Zombie = coast.zombies.filter(func(z: Zombie) -> bool: return z.type_id == Director.KRAKEN).front()
+	check(Vector2(beast.position.x - Director.KRAKEN_FROM.x, beast.position.z - Director.KRAKEN_FROM.z).length() < 4.0, "in front of the quay")
+	check(beast._visual.find_children("Arm*", "Node3D", true, false).filter(func(n: Node) -> bool: return n.name.begins_with("Arm") and n.name.length() == 4).size() == KrakenModels.ARMS
+		and beast._visual.get_node_or_null("Body/Crown") != null and beast._visual.get_node_or_null("Body/Eyes") != null, "eight arms, its crown of drowned towers, its eyes")
+	# It can be struck: by a blade from the water's edge, by an arrow, by the Trident.
+	beast.set_physics_process(false)
+	var mind := beast.mesenlla_mind as VaelMind
+	mind.phase = ""
+	beast.hp = beast.max_hp
+	var edge := beast.position + Vector3(0, 0, -(VaelMind.KRAKEN_BODY + 2.0))
+	you.position = Vector3(edge.x, coast.ground_at(edge), edge.z)
+	you.look_at(Vector3(beast.position.x, you.position.y, beast.position.z), Vector3.UP)
+	you.yaw = you.rotation.y
+	var h0 := beast.hp
+	you.pitch = 0.0
+	you.camera.rotation = Vector3.ZERO
+	var sword: Dictionary = WeaponDefs.ALL["sword"]
+	var hit := coast.melee_hit(you, sword, you.melee_stats(sword))
+	check(hit > 0 and beast.hp < h0, "a blade from the water's edge reaches it (%.0f)" % (h0 - beast.hp))
+	# Struck, it flashes, but its whirlpool keeps its own shader: animating it must still find it.
+	var whirl := beast._visual.get_node("Whirl") as MeshInstance3D
+	check(beast._flash > 0.0 and whirl.material_override is ShaderMaterial and not beast._parts.has(whirl), "a blow flashes the Kraken but not its whirlpool")
+	var foams := beast._visual.find_children("*", "MeshInstance3D", true, false).filter(func(m: Node) -> bool: return m.has_meta("no_flash"))
+	check(foams.size() >= 2 and foams.all(func(m: Node) -> bool: return not beast._parts.has(m)), "nor the foam and water round it (%d)" % foams.size())
+	beast._current_anim = "m_pull"
+	MesenllaModels.animate(beast, beast._visual, 0.05, 0.0)
+	check((whirl.material_override as ShaderMaterial).get_shader_parameter("strength") > 0.0, "the whirlpool still turns while it flashes")
+	await get_tree().physics_frame # the physics world catches up with where everything stands
+	var space := coast.get_world_3d().direct_space_state
+	var ray := PhysicsRayQueryParameters3D.create(you.eye_position(), beast.centre(), Zombie.LAYER)
+	var found := space.intersect_ray(ray)
+	check(not found.is_empty() and found["collider"] == beast, "an arrow or a bolt finds its body (layer %d, %s)" % [beast.collision_layer, str(found.get("collider", null))])
+	# Its arts, each in its own third.
+	check(VaelMind.kraken_stage(beast) == 0, "whole, it is in its first third")
+	beast.hp = beast.max_hp * 0.6
+	check(VaelMind.kraken_stage(beast) == 1, "below two thirds, its second")
+	beast.hp = beast.max_hp * 0.3
+	check(VaelMind.kraken_stage(beast) == 2, "below one third, its last")
+	beast.hp = beast.max_hp
+	you.position = Vector3(edge.x, coast.ground_at(edge), edge.z) + Vector3(0, 0, -8)
+	you.guard_left = 0.0
+	mind._decreed = 0
+	mind.cooldown = 0.0
+	mind._cooldown_d = 99.0
+	mind._cooldown_e = 99.0
+	mind.cooldown_b = 99.0
+	mind._cooldown_c = 99.0
+	beast._sees = true
+	var seals_before := coast.mist_seals.size()
+	mind._kraken(beast, you, 0.016)
+	check(mind.phase == "slam" and beast.is_warning() and coast.mist_seals.size() > seals_before, "its arms rear over you and a ring shows where they will come down (%s, %d)" % [mind.phase, coast.mist_seals.size() - seals_before])
+	await get_tree().physics_frame
+	for s: MistSeal in coast.mist_seals.duplicate(): s.queue_free()
+	mind.phase = ""
+	beast.hp = beast.max_hp * 0.6
+	mind._kraken(beast, you, 0.016)
+	check(mind.phase == "pull" and beast._current_anim == "m_pull" and coast.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "drowned_sailor").size() > 0, "at two thirds it roars, turns the sea round itself and raises the drowned")
+	var was := you.position
+	you.global_position = beast.position + Vector3(0, 0, -(VaelMind.KRAKEN_BODY + 8.0))
+	you.global_position.y = coast.ground_at(you.global_position)
+	VaelMind.whirl(coast)
+	check(you.is_lured(), "its whirlpool draws you toward it")
+	you.position = was
+	mind.phase = ""
+	mind.cooldown_b = 0.0
+	mind.cooldown = 99.0
+	mind._kraken(beast, you, 0.016)
+	check(mind.phase == "ink" and coast.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.INK), "in its second third it spits ink (%s, %d rings)" % [mind.phase, coast.mist_seals.size()])
+	if not coast.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.INK):
+		return
+	var ink: MistSeal = coast.mist_seals.filter(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.INK).front()
+	you.global_position = ink.global_position
+	ink.elapsed = ink.warning
+	ink.strike()
+	check(you.night_blind_left > 0.0, "ink in your eyes: the dark closes in")
+	for s: MistSeal in coast.mist_seals.duplicate(): s.queue_free()
+	for z: Zombie in coast.zombies.duplicate():
+		if z != beast: z.release()
+	# Its fall: dawn can come, the tide is let go, and its hoard washes up.
+	var loot := coast.pickups.size()
+	beast.set_physics_process(true)
+	beast.take_damage(99999.0, Vector3.BACK, 0.0, beast.centre())
+	await get_tree().physics_frame
+	check(d._kraken_fallen and not coast.tide.surging() and coast.pickups.size() >= loot + VaelMind.KRAKEN_HOARD, "its fall: dawn can come, the tide goes free, and its hoard washes up")
+	for i in 400:
+		if coast.count_type(Director.KRAKEN) == 0:
+			break
+		await get_tree().physics_frame
+	for z: Zombie in coast.zombies.duplicate(): z.release()
+	for p: Pickup in coast.pickups.duplicate(): coast.remove_pickup(p)
+	d._kraken_fallen = false
+	d._kraken_risen = false
+	d._kraken_at = -1.0
+	you.position = saved
+
+
+func _coastal_campaign() -> void:
+	check(not Game.MAPS.has("lantern_road") and not Places.ORDER.has("lantern_road"), "Lantern Road is retired from selection and atlas")
+	var saved := Game.night_map
+	Game.night_map = "lantern_road"
+	check(Game.current_map() == "vael" and Game.night_length() == 900.0, "retired map migrates to the fifteen-minute coast")
+	Game.night_map = "vael"
+	check(Game.zombie_pool_plan().has("leviathan"), "the coast reserves the former road boss")
+	check(ZombieDefs.ALL["barnacle_brute"]["hp"] == 290.0 and ZombieDefs.ALL["harbourmaster"]["hp"] == 700.0, "coastal heavies have lower health")
+	check(VaelVault.RISE >= 1.8 and KrakenModels.SEGMENTS >= 20, "stone-wall vault and continuous tentacle joints")
+	Game.night_map = saved
+
+
+func _coastal_repairs(coast: World) -> void:
+	var you := coast.player
+	var at := Vector3(0,coast.ground_at(Vector3(0,0,40)),40)
+	for id: String in ["harbourmaster","hollow_sovereign","kraken_arm","leviathan","kraken"]:
+		check(coast.spawn_zombie(id,at), id+" immunity fixture spawns")
+		var boss: Zombie = coast.zombies.back()
+		boss.set_physics_process(false)
+		var from := boss.position
+		boss.stun(5)
+		boss.freeze(5)
+		boss.slow(5)
+		boss.root(5,true)
+		boss.pull_to(from+Vector3.RIGHT*10)
+		boss.haul_to(from+Vector3.RIGHT*10)
+		boss.drift_to(from+Vector3.RIGHT*10,10)
+		boss.blind_for(5)
+		boss.flinch(5)
+		var hp_before := boss.hp
+		boss.take_damage(1,Vector3.RIGHT,100,boss.centre())
+		check(boss._stun == 0 and boss._frozen == 0 and boss._slow == 0 and boss.root_left == 0 and boss._pull_left == 0 and boss._drift_left == 0 and boss._knock.is_zero_approx(), id+" cannot be controlled or displaced")
+		check(boss.hp < hp_before, id+" still takes damage")
+		boss.release()
+	for id: String in ["angler", "siren", "kraken_arm"]:
+		coast.spawn_zombie(id,at)
+		var actor: Zombie = coast.zombies.back()
+		actor.set_physics_process(false)
+		actor._current_anim = "m_bite" if id == "angler" else "m_song" if id == "siren" else "m_slam"
+		actor.mesenlla_warning = true
+		actor._animate_custom(0.01,0)
+		actor._animate_custom(0.8,0)
+		actor.mesenlla_warning = false
+		actor._animate_custom(1.0/60,0)
+		check(float(actor._visual.get_meta("act_t",9)) < 0.02,id+" restarts its strike timer after the tell")
+		actor.release()
+	var chest: Dictionary = coast.tide.salvage()[0]
+	var saved_mode := Game.mode
+	var taken: int = chest["taken"]
+	var slots := you.slots.duplicate()
+	var seen := false
+	Game.mode = Game.Mode.SANDBOX
+	for i in 20:
+		var before := coast.pickups.size()
+		seed(7080+i)
+		coast.tide._open(chest,you,0)
+		if coast.pickups.size() > before:
+			seen = true
+			break
+	check(seen and you.slots == slots,"salvage weapon appears on the ground without replacing any carried weapon")
+	check(not coast.tide.salvage_open(chest),"opened chest cannot be reopened in the same ebb")
+	chest["taken"] = taken
+	Game.mode = saved_mode
+	check(ClassDefs.disabled("ferryman") and not ClassDefs.available().has("ferryman"),"Ferryman stays out of selection even when owned")

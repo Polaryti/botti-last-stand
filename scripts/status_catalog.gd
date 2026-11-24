@@ -15,6 +15,12 @@ const TIMED := [
 		"desc": "A Vanguard's Shield Wall: the next 40 damage you take is stopped, until the shield is spent or its 8 s run out."
 	},
 	{
+		"field": "shell_left",
+		"name": "Tide Shell",
+		"icon": "shell",
+		"desc": "A Tidewarden's shell of seawater: it takes harm for you until it breaks or its time runs out. A Tidewarden's own fills again with every Trident blow and bursts outward when it goes."
+	},
+	{
 		"field": "dome_left",
 		"name": "Guardian Dome",
 		"icon": "shield_rect+up",
@@ -29,7 +35,7 @@ const TIMED := [
 	{
 		"field": "invis_left",
 		"name": "Invisible",
-		"icon": "eye_closed",
+		"icon": "invisible",
 		"desc": "Hides you from ordinary enemies until the timer ends or you attack. Some foes can see through it. Afterwards you cannot turn invisible again for 3 seconds."
 	},
 	{

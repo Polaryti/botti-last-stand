@@ -78,3 +78,35 @@ static func flame_mesh() -> Mesh:
 	m.shader = load("res://assets/shaders/flame.gdshader")
 	_flame.surface_set_material(0, m)
 	return _flame
+
+
+static var _brazier: Mesh
+
+
+## Curved, faceted tongues with intermediate vertices for the shader to bend in the sea wind.
+static func brazier_mesh() -> Mesh:
+	if _brazier:
+		return _brazier
+	var l := LowPoly.new()
+	const AMBER := Color(1.0, 0.53, 0.13)
+	const CORE := Color(1.0, 0.88, 0.48)
+	for i in 6:
+		var a := float(i) * TAU / 5.0
+		var centre := i == 5
+		var tilt := Vector3(cos(a), 0, sin(a))
+		var root := Vector3.ZERO if centre else tilt * 0.29
+		var height := 1.75 if centre else 0.98 + float(i % 3) * 0.25
+		var thick := 0.27 if centre else 0.24
+		var middle := root + tilt * 0.10 + Vector3.UP * height * 0.42
+		var shoulder := middle - tilt * 0.13 + Vector3.UP * height * 0.33
+		var tip := shoulder + tilt * 0.19 + Vector3.UP * height * 0.25
+		var bottom := CORE if centre else AMBER.darkened(0.12 + 0.04 * (i % 2))
+		l.prism(root, middle, thick, thick * 0.83, 5, bottom)
+		l.prism(middle, shoulder, thick * 0.83, thick * 0.46, 5, CORE if centre else AMBER)
+		l.prism(shoulder, tip, thick * 0.46, 0.0, 5, Color(1.0, 0.96, 0.74) if centre else AMBER.lightened(0.14))
+	_brazier = l.commit()
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/shaders/flame.gdshader")
+	material.set_shader_parameter("gust", 2.2)
+	_brazier.surface_set_material(0, material)
+	return _brazier

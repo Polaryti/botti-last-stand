@@ -3,7 +3,8 @@ extends Control
 ## A painted view of where a match is about to be played, for the loading screen: the place's sky,
 ## ridges fading into the distance, and what it is known for (the Village's church and lit windows,
 ## the Fort's walls, the Mists' islands over nothing, Mesenlla's forested valley with its waterfall,
-## arch and outpost, Mist Bastion's citadel and its turning Great Portal). Drawn from shapes, the same
+## arch and outpost, Mist Bastion's citadel and its turning Great Portal, Port Vael's drowned harbour
+## with its dark lighthouse and the Mist Tide moving on the flats). Drawn from shapes, the same
 ## every time for the same place; mist drifts, water falls and portals glow while the world loads.
 
 var place := "village"
@@ -18,6 +19,8 @@ const LOOKS := {
 	"mists": {"top": Color(0.01, 0.02, 0.06), "low": Color(0.12, 0.08, 0.26), "far": Color(0.12, 0.12, 0.24), "near": Color(0.05, 0.05, 0.1), "glow": Color(0.66, 0.42, 1.0), "accent": Color(0.45, 0.95, 0.92)},
 	"mesenlla": {"top": Color(0.11, 0.07, 0.22), "low": Color(0.96, 0.56, 0.34), "far": Color(0.33, 0.22, 0.37), "near": Color(0.12, 0.09, 0.17), "glow": Color(1.0, 0.75, 0.5), "accent": Color(0.45, 0.75, 1.0)},
 	"bastion": {"top": Color(0.07, 0.07, 0.19), "low": Color(0.78, 0.52, 0.58), "far": Color(0.27, 0.24, 0.38), "near": Color(0.1, 0.1, 0.17), "glow": Color(0.9, 0.78, 0.86), "accent": Color(0.45, 0.95, 0.92)},
+	"lantern_road": {"top": Color(0.02, 0.05, 0.09), "low": Color(0.2, 0.32, 0.36), "far": Color(0.1, 0.16, 0.2), "near": Color(0.04, 0.07, 0.09), "glow": Color(1.0, 0.82, 0.45), "accent": Color(0.5, 0.84, 0.76)},
+	"vael": {"top": Color(0.03, 0.07, 0.11), "low": Color(0.3, 0.42, 0.44), "far": Color(0.14, 0.2, 0.24), "near": Color(0.05, 0.08, 0.1), "glow": Color(0.96, 0.87, 0.65), "accent": Color(0.5, 0.84, 0.76)},
 }
 
 
@@ -44,7 +47,7 @@ func _plan() -> void:
 	_stars = PackedVector2Array()
 	for i in 90:
 		_stars.append(Vector2(r.randf() * size.x, r.randf() * size.y * 0.55))
-	var layers := 0 if place == "mists" else 3
+	var layers := 0 if place in ["mists", "lantern_road"] else 1 if place == "vael" else 3
 	for k in layers:
 		var line := PackedVector2Array()
 		var base := size.y * (0.56 + 0.1 * k)
@@ -90,6 +93,10 @@ func _draw() -> void:
 			_glow(Vector2(w * 0.5, h * 0.62), h * 0.35, _look("glow"), 0.22)
 		"mesenlla", "bastion":
 			_glow(Vector2(w * 0.3, h * 0.66), h * 0.5, _look("glow"), 0.18)
+		"vael":
+			_glow(Vector2(w * 0.24, h * 0.18), h * 0.2, _look("glow"), 0.3)
+			draw_circle(Vector2(w * 0.24, h * 0.18), h * 0.04, _look("glow"))
+			draw_circle(Vector2(w * 0.25, h * 0.17), h * 0.033, _look("top").lerp(_look("glow"), 0.15))
 	# Far ridges first, each one darker and nearer.
 	for k in _ridges.size():
 		var col := _look("far").lerp(_look("near"), float(k) / maxf(1.0, _ridges.size() - 1.0))
@@ -102,8 +109,10 @@ func _draw() -> void:
 		"mists": _mists(w, h)
 		"mesenlla": _mesenlla(w, h)
 		"bastion": _bastion(w, h)
+		"vael": _vael(w, h)
+		"lantern_road": _lantern_road(w, h)
 	# Mist drifting across the bottom of the view.
-	var mist := _look("accent") if place in ["mists", "mesenlla", "bastion"] else Color(0.7, 0.75, 0.85)
+	var mist := _look("accent") if place in ["mists", "mesenlla", "bastion", "vael", "lantern_road"] else Color(0.7, 0.75, 0.85)
 	for i in 6:
 		var x := fmod(i * w / 5.0 + _t * (12.0 + i * 3.0), w * 1.3) - w * 0.15
 		var y := h * (0.8 + 0.03 * sin(_t * 0.4 + i))
@@ -301,3 +310,105 @@ func _bastion(w: float, h: float) -> void:
 		draw_circle(c + Vector2(cos(a), sin(a)) * r, r * 0.05, _look("accent"))
 	# A pillar of mist rising from it.
 	draw_rect(Rect2(c.x - r * 0.15, 0, r * 0.3, c.y - r), Color(_look("accent"), 0.06 + 0.03 * pulse))
+
+
+## Port Vael at night: the sea to the horizon under the moon, its waves catching the light; the town
+## up on the left with a few windows lit; the harbour wall and a breakwater running out to the dark
+## lighthouse; a wreck and the drowned bell tower out on the flats, the Mist Tide moving round them.
+func _vael(w: float, h: float) -> void:
+	var sea_top := h * 0.56
+	draw_rect(Rect2(0, sea_top, w, h - sea_top), Color(0.05, 0.11, 0.13))
+	# The moon's path on the water.
+	for i in 14:
+		var y := sea_top + (h - sea_top) * (i + 0.5) / 14.0
+		var spread := w * (0.02 + 0.012 * i)
+		var flick := 0.5 + 0.5 * sin(_t * 2.0 + i * 1.9)
+		draw_line(Vector2(w * 0.24 - spread, y), Vector2(w * 0.24 + spread * (0.4 + 0.3 * flick), y), Color(_look("glow"), 0.1 + 0.12 * flick), 2.0)
+	for i in 10:
+		var y := sea_top + h * 0.02 + i * h * 0.04
+		var pts := PackedVector2Array()
+		for k in 25:
+			var f := k / 24.0
+			pts.append(Vector2(w * f, y + sin(f * 18.0 + _t * 1.1 + i * 0.7) * h * 0.004))
+		draw_polyline(pts, Color(_look("accent"), 0.07), 1.5, true)
+	# The town on its rise to the left, a few windows lit, the chapel's roof among them.
+	var town := _look("near").darkened(0.25)
+	var g := sea_top - h * 0.04
+	draw_colored_polygon(PackedVector2Array([Vector2(0, h), Vector2(0, g - h * 0.06), Vector2(w * 0.12, g - h * 0.07), Vector2(w * 0.3, g - h * 0.02), Vector2(w * 0.36, g + h * 0.05), Vector2(w * 0.36, h)]), town)
+	for i in 6:
+		var x := w * (0.02 + i * 0.05)
+		var top := g - h * (0.08 + 0.02 * (i % 3)) + i * h * 0.008
+		var hw := w * 0.02
+		draw_colored_polygon(PackedVector2Array([Vector2(x - hw, top + h * 0.06), Vector2(x - hw, top), Vector2(x, top - h * 0.03), Vector2(x + hw, top), Vector2(x + hw, top + h * 0.06)]), town.lightened(0.05))
+		var lit := 0.5 + 0.5 * sin(_t * 1.7 + i * 2.3)
+		if i % 2 == 0:
+			draw_rect(Rect2(x - hw * 0.4, top + h * 0.015, hw * 0.35, h * 0.018), Color(_look("glow"), 0.5 + 0.4 * lit))
+	# The harbour wall, and the breakwater running out to the lighthouse.
+	var wall := Color(0.2, 0.22, 0.24)
+	draw_rect(Rect2(0, g + h * 0.04, w * 0.6, h * 0.025), wall)
+	draw_colored_polygon(PackedVector2Array([Vector2(w * 0.56, g + h * 0.04), Vector2(w * 0.86, sea_top + h * 0.08), Vector2(w * 0.86, sea_top + h * 0.1), Vector2(w * 0.56, g + h * 0.065)]), wall)
+	var lx := w * 0.84
+	var ly := sea_top + h * 0.08
+	draw_colored_polygon(PackedVector2Array([Vector2(lx - w * 0.018, ly), Vector2(lx - w * 0.012, ly - h * 0.24), Vector2(lx + w * 0.012, ly - h * 0.24), Vector2(lx + w * 0.018, ly)]), Color(0.62, 0.6, 0.56))
+	for k in 2:
+		draw_rect(Rect2(lx - w * 0.016, ly - h * (0.08 + k * 0.08), w * 0.032, h * 0.02), Color(0.5, 0.16, 0.13))
+	draw_rect(Rect2(lx - w * 0.014, ly - h * 0.29, w * 0.028, h * 0.05), Color(0.12, 0.15, 0.17))
+	draw_colored_polygon(PackedVector2Array([Vector2(lx - w * 0.02, ly - h * 0.29), Vector2(lx, ly - h * 0.33), Vector2(lx + w * 0.02, ly - h * 0.29)]), Color(0.3, 0.45, 0.4))
+	# A wreck on the flats, and the drowned bell tower leaning.
+	var flats := Color(0.07, 0.1, 0.11)
+	var wx := w * 0.46
+	var wy := sea_top + h * 0.2
+	draw_colored_polygon(PackedVector2Array([Vector2(wx - w * 0.09, wy), Vector2(wx - w * 0.06, wy - h * 0.06), Vector2(wx + w * 0.07, wy - h * 0.08), Vector2(wx + w * 0.1, wy)]), flats)
+	draw_line(Vector2(wx, wy - h * 0.07), Vector2(wx + w * 0.05, wy - h * 0.2), flats, 3.0)
+	for k in 5:
+		var rx := wx - w * 0.05 + k * w * 0.025
+		draw_line(Vector2(rx, wy - h * 0.06), Vector2(rx + w * 0.004, wy - h * 0.1), flats, 2.0)
+	var bx := w * 0.68
+	var by := sea_top + h * 0.26
+	draw_colored_polygon(PackedVector2Array([Vector2(bx - w * 0.02, by), Vector2(bx - w * 0.008, by - h * 0.2), Vector2(bx + w * 0.026, by - h * 0.19), Vector2(bx + w * 0.022, by)]), flats)
+	draw_circle(Vector2(bx + w * 0.009, by - h * 0.15), h * 0.012, Color(0.32, 0.5, 0.42))
+	# The tide's mist, curling over the flats.
+	for i in 5:
+		var x := fmod(i * w / 4.0 + _t * (8.0 + i * 2.0), w * 1.2) - w * 0.1
+		_glow(Vector2(x, sea_top + h * (0.18 + 0.04 * (i % 3))), h * 0.1, _look("accent"), 0.1)
+
+
+## The Lantern Road: the drowned Sound under the stars, the causeway running out across it in a line
+## of cold lanterns, the barge's light on it, and far off on its isle the dark lighthouse.
+func _lantern_road(w: float, h: float) -> void:
+	var sea_top := h * 0.6
+	draw_rect(Rect2(0, sea_top, w, h - sea_top), Color(0.04, 0.09, 0.11))
+	for i in 10:
+		var y := sea_top + h * 0.02 + i * h * 0.04
+		var pts := PackedVector2Array()
+		for k in 25:
+			var f := k / 24.0
+			pts.append(Vector2(w * f, y + sin(f * 16.0 + _t * 0.9 + i * 0.7) * h * 0.004))
+		draw_polyline(pts, Color(_look("accent"), 0.07), 1.5, true)
+	# The isle and its dark lighthouse on the horizon.
+	var lx := w * 0.72
+	draw_colored_polygon(PackedVector2Array([Vector2(lx - w * 0.08, sea_top), Vector2(lx - w * 0.03, sea_top - h * 0.03), Vector2(lx + w * 0.04, sea_top - h * 0.025), Vector2(lx + w * 0.09, sea_top)]), _look("far").darkened(0.3))
+	draw_colored_polygon(PackedVector2Array([Vector2(lx - w * 0.01, sea_top - h * 0.025), Vector2(lx - w * 0.006, sea_top - h * 0.16), Vector2(lx + w * 0.006, sea_top - h * 0.16), Vector2(lx + w * 0.01, sea_top - h * 0.025)]), Color(0.36, 0.38, 0.38))
+	draw_rect(Rect2(lx - w * 0.007, sea_top - h * 0.19, w * 0.014, h * 0.03), Color(0.1, 0.12, 0.14))
+	# The causeway, from the near left out to the isle, its lanterns in a line (the nearest lit).
+	var road := PackedVector2Array()
+	var lamps: Array[Vector2] = []
+	for k in 21:
+		var f := k / 20.0
+		var x := lerpf(w * 0.05, lx - w * 0.04, f) + sin(f * 5.0) * w * 0.06 * (1.0 - f)
+		var y := lerpf(h * 0.98, sea_top + h * 0.01, pow(f, 0.6))
+		road.append(Vector2(x, y))
+		if k % 3 == 1:
+			lamps.append(Vector2(x, y))
+	draw_polyline(road, Color(0.42, 0.4, 0.37), maxf(2.0, h * 0.02), true)
+	for i in lamps.size():
+		var p := lamps[i]
+		var near := 1.0 - float(i) / lamps.size()
+		draw_line(p, p - Vector2(0, h * 0.05 * near + 2.0), Color(0.15, 0.15, 0.16), 2.0)
+		if i < 2:
+			_glow(p - Vector2(0, h * 0.05 * near + 2.0), h * 0.05 * near + 4.0, _look("glow"), 0.5)
+	# The barge's great light, on the water near the start of the road.
+	var b := road[3] + Vector2(w * 0.05, 0)
+	_glow(b, h * 0.18, _look("glow"), 0.3)
+	draw_colored_polygon(PackedVector2Array([b + Vector2(-w * 0.05, 0), b + Vector2(w * 0.05, 0), b + Vector2(w * 0.04, h * 0.02), b + Vector2(-w * 0.04, h * 0.02)]), Color(0.12, 0.09, 0.07))
+	draw_circle(b - Vector2(0, h * 0.06), h * 0.012, _look("glow"))

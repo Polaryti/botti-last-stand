@@ -4,7 +4,7 @@ extends Target
 ## body that zombies can hunt and that shots can hit, and anything that hurts them is sent over.
 
 const LAYER_AVATAR := 64
-const MODELS := {"commander": "clever", "monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever", "bandit": "clever", "cartographer": "clever"}
+const MODELS := {"commander": "clever", "monk": "clever", "adept": "clever", "plague_doctor": "magic", "infantry": "clever", "ranger": "clever", "heavy": "beast", "chivalry": "beast", "magician": "magic", "revenant": "clever", "artificer": "clever", "bandit": "clever", "cartographer": "clever", "harpooner": "clever", "tidecaller": "clever", "ferryman": "clever"}
 
 var world: World
 var peer := 0
@@ -12,7 +12,7 @@ var team := 0
 var display := ""
 var hp_fraction := 1.0
 var level := 1 # as their own phone last said
-var skin := 0 # Player.skin_bits: bit 0, the White Stag
+var skin := 0 # Player.skin_bits: bit 0, the White Stag; bit 1, the Sunken Crown
 var _stag: Node3D
 var down_since := -1.0 # world.now when this player fell, for the countdown beside their name
 var _target := Vector3.ZERO
@@ -116,6 +116,54 @@ func set_skin(bits: int) -> void:
 	if bits != skin:
 		skin = bits
 		_show_seat()
+		_show_crown(bits & 2 != 0)
+
+
+## The Sunken Crown on their head, and a pillar of gold light over them that shows from across the map:
+## whoever wears it can be seen by everyone.
+var _crown: Node3D
+var _crown_beam: MeshInstance3D
+func _show_crown(on: bool) -> void:
+	if on and _crown == null and _skeleton:
+		var at := BoneAttachment3D.new()
+		at.bone_name = "head"
+		_skeleton.add_child(at)
+		_crown = Node3D.new()
+		at.add_child(_crown)
+		var mi := MeshInstance3D.new()
+		mi.mesh = PowerDefs.mesh(PowerDefs.CROWN)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.position = Vector3(0, 0.95, 0)
+		mi.scale = Vector3.ONE * 2.6
+		_crown.add_child(mi)
+		_crown_beam = MeshInstance3D.new()
+		var cyl := CylinderMesh.new()
+		cyl.top_radius = 0.12
+		cyl.bottom_radius = 0.45
+		cyl.height = 22.0
+		cyl.radial_segments = 8
+		cyl.rings = 1
+		cyl.cap_top = false
+		cyl.cap_bottom = false
+		_crown_beam.mesh = cyl
+		var look := StandardMaterial3D.new()
+		look.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		look.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		look.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		look.cull_mode = BaseMaterial3D.CULL_DISABLED
+		look.disable_fog = true
+		look.albedo_color = Color(1.0, 0.8, 0.3, 0.22)
+		_crown_beam.material_override = look
+		_crown_beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_crown_beam.position.y = 2.2 + 11.0
+		add_child(_crown_beam)
+	if _crown:
+		_crown.visible = on
+		_crown_beam.visible = on
+
+
+func wears_crown() -> bool:
+	return skin & 2 != 0
 
 
 ## Riding: the horse under them if it is theirs, and either way they sit higher.
@@ -238,6 +286,33 @@ func set_fallen(on: bool) -> void:
 
 
 ## Straight there, without gliding across the map on the way.
+## A Psychopomp's souls, circling this avatar as they circle the player on their own phone.
+var _soul_ring: SoulRing
+## Someone's Tide Shell, as their phone says it is.
+var _tide_shell: TideShell
+func set_tide_shell(up: bool) -> void:
+	if up and (_tide_shell == null or not is_instance_valid(_tide_shell)):
+		_tide_shell = TideShell.new(false)
+		add_child(_tide_shell)
+	if _tide_shell and is_instance_valid(_tide_shell):
+		_tide_shell.set_fill(1.0 if up else 0.0)
+
+
+func _drop_tide_shell() -> void:
+	if _tide_shell and is_instance_valid(_tide_shell) and _tide_shell.gone():
+		_tide_shell.queue_free()
+		_tide_shell = null
+
+
+func set_souls(n: int) -> void:
+	if _soul_ring == null:
+		if n <= 0:
+			return
+		_soul_ring = SoulRing.new()
+		add_child(_soul_ring)
+	_soul_ring.set_count(n)
+
+
 func teleport(at: Vector3) -> void:
 	_target = at
 	global_position = at
@@ -341,6 +416,10 @@ func show_statuses(bits: int) -> void:
 
 func _process(delta: float) -> void:
 	bar_time = maxf(0.0, bar_time - delta)
+	if _tide_shell:
+		if dead:
+			_tide_shell.set_fill(0.0)
+		_drop_tide_shell()
 	if _flash > 0.0:
 		_flash -= delta
 		if _flash <= 0.0:

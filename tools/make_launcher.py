@@ -11,8 +11,10 @@ with a DEV band across it, so it is never mistaken for the real game on a phone 
   valleys           0.1 to 0.21: the village bell before the moon, lit from below by a fire.
   beyond_the_mists  0.22: the bell before the Great Portal's violet ring, lit from below by the teal
                     light of the Mists, over the peaks beyond them and their low mist.
+  sunken_crown      0.23: the bell in sea-green bronze wearing the Sunken Crown, under the aurora of
+                    Vael, over the night sea and the drowned city's spires with their green windows.
 
-The splash is the twilight of the lands beyond the Mists under the wordmark, so run
+The splash is the edition's backdrop, wide, under the wordmark and the update's name, so run
 tools/make_ui.py first if that changed."""
 import os, sys
 import numpy as np
@@ -209,10 +211,189 @@ def mists_backdrop(w, h, adaptive, seed=22):
     return im
 
 
+def _spire(draw, x, base, height, width, tone, lit, rng, scale):
+    """A drowned tower: a body, a needle roof, a little turret beside it, a few windows still lit."""
+    draw.rectangle((x - width / 2, base - height * 0.62, x + width / 2, base), fill=tone)
+    draw.polygon([(x - width * 0.62, base - height * 0.6), (x, base - height), (x + width * 0.62, base - height * 0.6)], fill=tone)
+    side = rng.choice([-1, 1])
+    tx = x + side * width * 0.78
+    draw.rectangle((tx - width * 0.24, base - height * 0.38, tx + width * 0.24, base), fill=tone)
+    draw.polygon([(tx - width * 0.32, base - height * 0.37), (tx, base - height * 0.55), (tx + width * 0.32, base - height * 0.37)], fill=tone)
+    windows = []
+    for _ in range(int(rng.integers(2, 5))):
+        wy = base - height * rng.uniform(0.12, 0.55)
+        wx = x + rng.uniform(-0.22, 0.22) * width
+        windows.append((wx - 0.7 * scale, wy - 1.8 * scale, wx + 0.7 * scale, wy + 1.8 * scale))
+    for box in windows:
+        lit.rectangle(box, fill=(120, 255, 205, 255))
+
+
+def crown_backdrop(w, h, adaptive, seed=23):
+    """The Sunken Crown: the night over Vael. A green aurora hangs in folds across the sky and lights
+    the sea under it; the drowned city's spires stand out of the water on the horizon, windows still lit."""
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:h, 0:w]
+    u, v = xx / w, yy / h
+    sea_y = 0.70 if adaptive else 0.72
+    rgb = np.array([0.012, 0.025, 0.06])[None, None] * (1 - v[..., None] ** 1.3) + np.array([0.03, 0.12, 0.15])[None, None] * v[..., None] ** 1.3
+    # The aurora: curtains that fold along the sky, brightest at their lower hem, fading upward.
+    hem = 0.36 + 0.07 * np.sin(u * 7.0 + 0.6) + 0.03 * np.sin(u * 17.0 + 1.3)
+    above = hem - v
+    folds = 0.55 + 0.45 * np.sin(u * 38.0 + np.sin(u * 9.0) * 2.4) ** 2
+    veil = np.where(above > 0, np.exp(-above / 0.17), np.exp(-(above / 0.025) ** 2)) * folds
+    veil *= 0.55 + 0.45 * np.sin(u * 3.2 + 0.4) ** 2
+    rgb = rgb + veil[..., None] * np.array([0.16, 0.62, 0.42]) * 0.9
+    rgb = rgb + (np.clip(veil - 0.65, 0, 1) ** 2)[..., None] * np.array([0.5, 1.0, 0.8]) * 0.8
+    # A violet fringe high up, as auroras have.
+    rgb = rgb + (np.exp(-((v - (hem - 0.22)) / 0.06) ** 2) * folds * 0.25)[..., None] * np.array([0.35, 0.18, 0.5])
+    # The green glow on the horizon, where the drowned city lies.
+    rgb = rgb + np.exp(-((v - sea_y) / 0.07) ** 2)[..., None] * np.array([0.05, 0.28, 0.22])
+    # The sea: dark, with the aurora's light lying on it in long broken streaks.
+    sea = v > sea_y
+    depth = np.clip((v - sea_y) / (1 - sea_y), 0, 1)
+    water = np.array([0.02, 0.08, 0.10])[None, None] * (1 - depth[..., None]) + np.array([0.01, 0.04, 0.06])[None, None] * depth[..., None]
+    # The horizon's glow lies on the water just under it.
+    water = water + np.exp(-((v - sea_y) / 0.035) ** 2)[..., None] * np.array([0.04, 0.2, 0.16])
+    rgb = np.where(sea[..., None], water, rgb)
+    im = Image.fromarray(np.uint8(np.clip(rgb, 0, 1) * 255 + 0.5)).convert("RGBA")
+    draw = ImageDraw.Draw(im)
+    for _ in range(int(w * h / 3400)):
+        x, y = rng.uniform(0, w), rng.uniform(0, h * sea_y * 0.75)
+        r = rng.uniform(0.3, 0.95) * h / 700
+        a = int(rng.uniform(70, 200))
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(225, 245, 240, a))
+    # The drowned city on the horizon: tall spires on both sides, low ones in the middle behind the bell.
+    city = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    lit = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    cd, ld = ImageDraw.Draw(city), ImageDraw.Draw(lit)
+    base = sea_y * h + 1
+    scale = h / 432
+    for x, tall in ((0.05, 0.27), (0.13, 0.19), (0.21, 0.31), (0.30, 0.12), (0.40, 0.08), (0.60, 0.09), (0.70, 0.14),
+            (0.79, 0.33), (0.87, 0.2), (0.96, 0.25)):
+        _spire(cd, x * w, base, tall * h * (0.8 if adaptive else 1.0), 0.028 * w, (6, 22, 26, 255), ld, rng, scale)
+    im.alpha_composite(city)
+    im.alpha_composite(lit.filter(ImageFilter.GaussianBlur(3 * scale)))
+    im.alpha_composite(lit)
+    # Their reflections, broken by the swell.
+    refl = city.transpose(Image.FLIP_TOP_BOTTOM)
+    shift = int(h - 2 * base)
+    mirror_im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    mirror_im.alpha_composite(refl, (0, -shift) if shift < 0 else (0, 0), (0, shift) if shift > 0 else (0, 0))
+    arr = np.asarray(mirror_im).copy()
+    arr[..., 3] = (arr[..., 3] * np.clip(0.55 - (v - sea_y) * 2.2, 0, 1) * (v > sea_y)).astype(np.uint8)
+    im.alpha_composite(Image.fromarray(arr, "RGBA").filter(ImageFilter.GaussianBlur(1.5 * scale)))
+    # The aurora's light on the swell: short broken dashes, longer and brighter near, where the sky
+    # above that part of the sea is brightest.
+    column = veil[: int(h * 0.5)].mean(axis=0)
+    column = column / max(column.max(), 1e-6)
+    dashes = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    dd = ImageDraw.Draw(dashes)
+    for _ in range(int(w * h / 2600)):
+        depth_share = rng.uniform(0, 1) ** 1.6
+        y = (sea_y + 0.012 + depth_share * (0.98 - sea_y)) * h
+        x = rng.uniform(0, w)
+        bright = column[min(w - 1, int(x))] * (0.35 + 0.65 * depth_share)
+        if rng.uniform() > 0.25 + bright:
+            continue
+        half = (0.004 + depth_share * 0.022) * w * rng.uniform(0.3, 1.0)
+        thick = max(1.0, (0.5 + depth_share * 1.4) * h / 432)
+        a = int(np.clip(30 + 120 * bright, 0, 170))
+        dd.line((x - half, y, x + half, y), fill=(110, 235, 190, a), width=int(round(thick)))
+    im.alpha_composite(dashes.filter(ImageFilter.GaussianBlur(0.6 * h / 432)))
+    # Corpse-lights drifting low over the water.
+    lights = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(lights)
+    for _ in range(7):
+        x, y = rng.uniform(0.05, 0.95) * w, rng.uniform(sea_y + 0.04, 0.95) * h
+        r = rng.uniform(0.005, 0.011) * h
+        gd.ellipse((x - r, y - r, x + r, y + r), fill=(110, 255, 200, 220))
+    im.alpha_composite(lights.filter(ImageFilter.GaussianBlur(h * 0.008)))
+    im.alpha_composite(lights)
+    return im
+
+
+CROWN_GOLD = {"dark": (0.30, 0.22, 0.09), "mid": (0.74, 0.58, 0.28), "light": (0.98, 0.88, 0.58)}
+
+
+def crown(size, tilt=-9.0):
+    """The Sunken Crown: a band of sea-dulled gold, five points of two heights each tipped with a pearl,
+    a green stone in the front, a little crust of verdigris. Drawn on its own, to sit on the bell's head."""
+    n = size * SS
+    shape = Image.new("L", (n, n), 0)
+    d = ImageDraw.Draw(shape)
+    left, right = 0.08 * n, 0.92 * n
+    band_top, band_low = 0.56 * n, 0.80 * n
+    pts = [(left, band_low), (left, band_top)]
+    peaks = [(0.08, 0.27), (0.29, 0.38), (0.5, 0.16), (0.71, 0.38), (0.92, 0.27)]
+    for i, (px, py) in enumerate(peaks):
+        x = left + (right - left) * (px - 0.08) / 0.84
+        pts.append((x, py * n + 0.06 * n))
+        if i < len(peaks) - 1:
+            nx = left + (right - left) * (peaks[i + 1][0] - 0.08) / 0.84
+            pts.append(((x + nx) / 2, band_top + 0.02 * n))
+    pts += [(right, band_top), (right, band_low)]
+    d.polygon(pts, fill=255)
+    pearls = []
+    for px, py in peaks:
+        x = left + (right - left) * (px - 0.08) / 0.84
+        r = 0.055 * n if py < 0.2 else 0.045 * n
+        d.ellipse((x - r, py * n + 0.06 * n - r * 1.6, x + r, py * n + 0.06 * n + r * 0.4), fill=255)
+        pearls.append((x, py * n + 0.06 * n - r * 0.6, r))
+    m = np.asarray(shape, dtype=float) / 255.0
+    yy, xx = np.mgrid[0:n, 0:n]
+    g = CROWN_GOLD
+    # Lit from below by the sea's glow and from above-left by the aurora: a soft vertical ramp.
+    t = np.clip((yy / n - 0.2) / 0.62, 0, 1)
+    shade = np.clip(0.25 + 0.75 * np.sin(np.clip((xx / n - 0.05) / 0.9, 0, 1) * np.pi) ** 0.6, 0, 1)
+    rgb = (np.array(g["light"]) * (1 - t[..., None]) + np.array(g["mid"]) * t[..., None]) * shade[..., None] + np.array(g["dark"]) * (1 - shade[..., None])
+    band = (yy > band_top) & (yy < band_low)
+    edge = (np.abs(yy - band_top) < 0.018 * n) | (np.abs(yy - band_low) < 0.02 * n)
+    rgb = np.where((band & edge)[..., None], rgb * 0.62, rgb)
+    # Verdigris where the sea has had it longest: low on the band, in patches.
+    crust = np.clip(np.sin(xx / n * 31.0) * np.sin(yy / n * 23.0 + 1.0) * 1.4 - 0.5, 0, 1) * np.clip((yy / n - 0.6) * 4.0, 0, 1)
+    rgb = rgb * (1 - crust[..., None] * 0.7) + np.array([0.24, 0.62, 0.52]) * crust[..., None] * 0.7
+    out = Image.fromarray(np.uint8(np.dstack([np.clip(rgb, 0, 1), m]) * 255 + 0.5), "RGBA")
+    od = ImageDraw.Draw(out)
+    for x, y, r in pearls:
+        od.ellipse((x - r * 0.8, y - r * 0.8, x + r * 0.8, y + r * 0.8), fill=(222, 240, 232, 255))
+        od.ellipse((x - r * 0.45, y - r * 0.55, x - r * 0.05, y - r * 0.15), fill=(255, 255, 255, 255))
+    gx, gy, gr = n * 0.5, (band_top + band_low) / 2, 0.075 * n
+    od.ellipse((gx - gr * 1.25, gy - gr * 1.25, gx + gr * 1.25, gy + gr * 1.25), fill=(86, 62, 22, 255))
+    od.ellipse((gx - gr, gy - gr, gx + gr, gy + gr), fill=(60, 230, 170, 255))
+    od.ellipse((gx - gr * 0.5, gy - gr * 0.6, gx - gr * 0.05, gy - gr * 0.15), fill=(200, 255, 235, 255))
+    for k in (-1, 1):
+        sx = n * 0.5 + k * 0.26 * n
+        od.ellipse((sx - gr * 0.55, gy - gr * 0.55, sx + gr * 0.55, gy + gr * 0.55), fill=(150, 40, 60, 255))
+    out = out.rotate(tilt, resample=Image.BICUBIC, center=(n / 2, n * 0.6))
+    return out.resize((size, size), Image.LANCZOS)
+
+
+def crowned_bell(size, metal):
+    """The bell with the Sunken Crown set at a tilt on its head, and the sea's light glowing round it.
+    The bell is drawn a little smaller and low in the square, so the crown has room above it."""
+    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    bs = int(size * 0.82)
+    b = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    b.alpha_composite(bell(bs, metal), ((size - bs) // 2, size - bs))
+    # A soft green halo round the bell, so it stands out of the night.
+    alpha = np.asarray(b)[..., 3].astype(float)
+    glow = np.zeros((size, size, 4), dtype=np.uint8)
+    glow[..., :3] = (70, 220, 170)
+    glow[..., 3] = np.uint8(np.clip(alpha * 0.55, 0, 255))
+    im.alpha_composite(Image.fromarray(glow, "RGBA").filter(ImageFilter.GaussianBlur(size * 0.03)))
+    im.alpha_composite(b)
+    top, height = size - bs + 0.15 * bs, 0.665 * bs
+    cw = int(height * 0.62)
+    im.alpha_composite(crown(cw), (int(size / 2 - cw * 0.5 + height * 0.02), int(top - height * 0.2 - cw * 0.5)))
+    return im
+
+
 THEMES = {
     "valleys": {"backdrop": valleys_backdrop, "metal": BELL_FIRE},
     "beyond_the_mists": {"backdrop": mists_backdrop,
         "metal": {"dark": (0.065, 0.055, 0.12), "warm": (0.22, 0.62, 0.68), "hot": (0.62, 0.98, 0.94), "rim": (0.80, 0.70, 1.0)}},
+    "sunken_crown": {"backdrop": crown_backdrop, "crowned": True, "title": "The Sunken Crown", "title_ink": (150, 240, 205),
+        "metal": {"dark": (0.07, 0.15, 0.15), "warm": (0.20, 0.58, 0.48), "hot": (0.62, 1.0, 0.84), "rim": (0.74, 0.96, 0.88)}},
 }
 EDITION = "beyond_the_mists"
 
@@ -258,7 +439,12 @@ def icons(edition=EDITION):
     background.convert("RGB").save("assets/ui/icon_background.png")
     background.convert("RGB").save("assets/ui/dev/icon_background.png")
     fg = Image.new("RGBA", (432, 432), (0, 0, 0, 0))
-    fg.alpha_composite(bell(292, theme["metal"]), ((432 - 292) // 2, (432 - 292) // 2))
+    if theme.get("crowned"):
+        # The crown stands above the bell's head, so the pair is drawn a little smaller and lower to
+        # stay inside the middle the launchers show.
+        fg.alpha_composite(crowned_bell(300, theme["metal"]), ((432 - 300) // 2, (432 - 300) // 2 + 4))
+    else:
+        fg.alpha_composite(bell(292, theme["metal"]), ((432 - 292) // 2, (432 - 292) // 2))
     fg.save("assets/ui/icon_foreground.png")
     dev_band(fg, 0.7, 0.5, 0.12).save("assets/ui/dev/icon_foreground.png")
     # Themed icons on newer Android: one flat shape.
@@ -269,7 +455,10 @@ def icons(edition=EDITION):
     mono_im.save("assets/ui/icon_monochrome.png")
     dev_band(mono_im, 0.7, 0.5, 0.12, mono=True).save("assets/ui/dev/icon_monochrome.png")
     plain = theme["backdrop"](512, 512, False).convert("RGBA")
-    plain.alpha_composite(bell(480, theme["metal"]), (16, 2))
+    if theme.get("crowned"):
+        plain.alpha_composite(crowned_bell(500, theme["metal"]), (6, 4))
+    else:
+        plain.alpha_composite(bell(480, theme["metal"]), (16, 2))
     rounded(plain, 96).save("icon.png")
     rounded(dev_band(plain, 0.74, 0.62, 0.15), 96).save("assets/ui/dev/icon.png")
 
@@ -372,9 +561,10 @@ def twilight(w, h, seed=11):
     return im
 
 
-def splash():
+def splash(edition=EDITION):
     w, h = 1280, 720
-    im = twilight(w, h)
+    theme = THEMES[edition]
+    im = theme["backdrop"](w, h, False).convert("RGBA") if "title" in theme else twilight(w, h)
     mark = Image.open("assets/ui/wordmark.png").convert("RGBA")
     scale = 860.0 / mark.width
     mark = mark.resize((860, int(mark.height * scale)), Image.LANCZOS)
@@ -382,20 +572,22 @@ def splash():
     im.alpha_composite(mark, ((w - mark.width) // 2, top))
     # The update's name under it, in the violet of the lands beyond the Mists.
     font = ImageFont.truetype("assets/fonts/Cinzel-Bold.ttf", 46)
-    text = "Beyond the Mists"
+    text = theme.get("title", "Beyond the Mists")
+    ink = theme.get("title_ink", (214, 198, 255))
+    glow = tuple(int(c * 0.75) for c in ink) if "title" in theme else VIOLET
     box = ImageDraw.Draw(im).textbbox((0, 0), text, font=font)
     at = ((w - (box[2] - box[0])) // 2 - box[0], top + mark.height - 6)
     shade = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     ImageDraw.Draw(shade).text(at, text, font=font, fill=(18, 10, 34, 210))
     im.alpha_composite(shade.filter(ImageFilter.GaussianBlur(5)))
     halo = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ImageDraw.Draw(halo).text(at, text, font=font, fill=VIOLET + (150,))
+    ImageDraw.Draw(halo).text(at, text, font=font, fill=glow + (150,))
     im.alpha_composite(halo.filter(ImageFilter.GaussianBlur(9)))
-    ImageDraw.Draw(im).text(at, text, font=font, fill=(214, 198, 255))
+    ImageDraw.Draw(im).text(at, text, font=font, fill=ink)
     im.convert("RGB").save("assets/ui/splash.png")
 
 
 if __name__ == "__main__":
     icons(sys.argv[1] if len(sys.argv) > 1 else EDITION)
-    splash()
+    splash(sys.argv[1] if len(sys.argv) > 1 else EDITION)
     print("launcher icons and splash done")

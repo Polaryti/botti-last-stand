@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT } # new ones go at the end: the number travels
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL, HAUL, DRIFT, BLIND } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -18,7 +18,9 @@ const LANE_REACH := 7.0 # how far to the side of that road someone may stand and
 const LANE_ENGAGE := 12.0 # and how near they must be: until then the way to them is the road itself
 const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its height
 ## Bodies that share another's animated model, dressed differently.
-const BODY_FILES := {"woods_child": "normal_b", "fallen_revenant": "clever"} # a Fallen Revenant is a Revenant's own body
+const BODY_FILES := {"woods_child": "normal_b", "fallen_revenant": "clever", # a Fallen Revenant is a Revenant's own body
+	"drowned": "normal_a", "barnacle_brute": "normal_a", # the drowned of Vael, dressed by VaelModels
+	"press_gang": "normal_b", "tide_witch": "magic", "harbourmaster": "normal_a", "lighthouse_keeper": "clever", "hollow_sovereign": "normal_a"}
 const FAR := 34.0
 const DUMMY_WINDOW := 5.0
 
@@ -38,13 +40,16 @@ const HOP_THINK := 0.4
 const HOP_LOOK := 30.0
 
 var mist_mind: MistMind
-var mesenlla_mind: MesenllaMind
+var mesenlla_mind: MesenllaMind # (a VaelMind for the drowned court of Port Vael)
+var _court_light: OmniLight3D # the Lighthouse Keeper's great lamp
+const KEEPER_LAMP := 1.4 # its light, until he lifts it and it blazes
 var mesenlla_warning := false # a creature of Mesenlla is showing the tell of a special move
 var world: World
 var model_id := ""
 var type_id := ""
 var def: Dictionary = {}
 var active := false
+var spawn_generation := 0
 var hp := 0.0
 var max_hp := 0.0
 var height := HEIGHT
@@ -53,6 +58,10 @@ var _pull_at := Vector3.ZERO
 var _pull_left := 0.0
 var weapon_id := ""
 var blind_left := 0.0 # inside an enemy Nightfall: sees only BLIND_SIGHT metres
+var soaked_left := 0.0 # soaked by a Stormcaller's Trident, on that Stormcaller's phone (TidecallerKit)
+var _drips: CPUParticles3D
+var _puddle: MeshInstance3D
+static var _puddle_mesh: Mesh
 var burn_time := 0.0
 var xp_value := 10
 var reveal_left := 0.0
@@ -146,6 +155,7 @@ var _gate_wait := 0.0
 var _stun_fx: CPUParticles3D
 var shown_debuffs := 0 # on another phone: which of them the host last told us about
 var _mark_time := 0.0
+var toll_until := 0.0 # pinned by a Highwayman's Toll: its plunder is sure while this lasts
 var _mark_mult := 1.0
 var _airborne := false
 var _air_vel := Vector3.ZERO
@@ -190,7 +200,9 @@ var _dummy_log: Array = []
 var _dummy_last := 0.0
 var _dummy_show := 0.0
 var _dummy_label: Label3D
-var _horse_node: MeshInstance3D
+var _horse_node: Node3D # a Dread Rider's horse (a MeshInstance3D), or a Woodland Cavalry's bear (MesenllaModels.cavalry_bear)
+var _mount_fall := 0.0 # seconds left of the cavalry's bear going down, once it is brought down
+var _seat_y := 0.0 # where the rider's body stands, from its feet, sitting on the bear
 var _ride_pass := 0.0
 var _ride_turn := 0.0
 var _ride_dir := Vector3.ZERO
@@ -213,6 +225,7 @@ var _hop_left := 0.0
 var _hop_line := -1
 var _hop_i := -1
 var _hop_walk := Vector3.INF
+var _vault_from := Vector3.INF
 var _perch_line := -1
 var _perch_i := -1
 var _perch_lost := 0.0
@@ -338,6 +351,8 @@ func _build_visual() -> void:
 		# A creature of Mesenlla is built of parts on pivots: all of them flash when struck.
 		var deep := model_id in MesenllaModels.KINDS or model_id == "crow" # (a Carrion Crow is a posed bird)
 		for mi in _visual.find_children("*", "MeshInstance3D", deep, false):
+			if mi.has_meta("no_flash"):
+				continue # the water and foam round it keep their own look when it is struck
 			_parts.append(mi as MeshInstance3D)
 			(mi as MeshInstance3D).set_meta("mist_rest", (mi as MeshInstance3D).transform)
 			# Its own look (glowing eyes, mist, a walking shader) comes back after a flash.
@@ -390,15 +405,67 @@ func _build_visual() -> void:
 			# A Child of the Woods: leaves, bark and twigs over a small body, green eyes, and a bear to ride.
 			_eyes.visible = false
 			var gear := MesenllaModels.child_gear()
+			var worn: Array[MeshInstance3D] = []
 			for bone: String in gear:
-				_attach(bone, gear[bone], Vector3.ZERO)
+				worn.append(_attach(bone, gear[bone], Vector3.ZERO))
 			var eyes := _attach("head", MesenllaModels.child_eyes(), Vector3.ZERO)
 			eyes.material_override = MesenllaModels.glow_material()
 			_eyes = eyes
-			_horse_node = MesenllaModels.bear_mount()
-			_horse_node.rotation.y = PI
-			_horse_node.visible = false
-			add_child(_horse_node)
+			worn.append(eyes)
+			# Its leaves, bark and eyes are of it too: they freeze, and flash when struck, with its
+			# body, and come back to their own look after. (So does its bear, made when it first rides.)
+			for piece in worn:
+				piece.set_meta("own_material", piece.material_override)
+				_parts.append(piece)
+		elif model_id in ["drowned", "barnacle_brute"]:
+			# One of the drowned of Vael: a sailor's cap, weed and rope, or a Brute's crust of barnacles
+			# and coral, and the pale sea-green eyes of all of them. Their gear flashes and freezes with them.
+			_eyes.visible = false
+			var gear := VaelModels.sailor_gear() if model_id == "drowned" else VaelModels.brute_gear()
+			var worn: Array[MeshInstance3D] = []
+			for bone: String in gear:
+				worn.append(_attach(bone, gear[bone], Vector3.ZERO))
+			var eyes := _attach("head", VaelModels.drowned_eyes(), Vector3.ZERO)
+			eyes.material_override = MesenllaModels.glow_material()
+			_eyes = eyes
+			worn.append(eyes)
+			for piece in worn:
+				piece.set_meta("own_material", piece.material_override)
+				_parts.append(piece)
+		elif model_id in VaelModels.GEARED:
+			# The drowned court of Vael: each in its own clothes, with what it carries (VaelModels.gear_for).
+			# Pieces keyed "bone:glow" are lit from inside: eyes, a lamp's lens, a witch's float.
+			_eyes.visible = false
+			var gear := VaelModels.gear_for(model_id)
+			var worn: Array[MeshInstance3D] = []
+			for key: String in gear:
+				if model_id == "hollow_sovereign" and key.begins_with("handslot"): continue
+				var piece := _attach(key.get_slice(":", 0), gear[key], Vector3.ZERO)
+				if key.begins_with("handslot"):
+					piece.rotation = Vector3(0, 0, -1.5) if model_id == "hollow_sovereign" else VaelModels.HELD_TURN
+				if key.ends_with(":glow"):
+					piece.material_override = MesenllaModels.glow_material()
+				worn.append(piece)
+				if model_id == "lighthouse_keeper" and key == "chest:glow":
+					# The great lamp on his back lights the ground around him, and blazes as he lifts it.
+					_court_light = OmniLight3D.new()
+					_court_light.light_color = Color(1.0, 0.86, 0.5)
+					_court_light.light_energy = KEEPER_LAMP
+					_court_light.omni_range = 9.0
+					_court_light.shadow_enabled = false
+					_court_light.visible = Game.quality > 0
+					_court_light.position = Vector3(0, 0.25, -0.95)
+					piece.get_parent().add_child(_court_light)
+			var eyes_mesh := VaelModels.court_eyes(model_id)
+			if eyes_mesh:
+				var eyes := _attach("head", eyes_mesh, Vector3.ZERO)
+				eyes.material_override = MesenllaModels.glow_material()
+				_eyes = eyes
+				worn.append(eyes)
+			for piece in worn:
+				piece.set_meta("own_material", piece.material_override)
+				_parts.append(piece)
+	if model_id == "hollow_sovereign": SovereignRegalia.install(self)
 	_shadow = World.make_blob_shadow(1.0)
 	add_child(_shadow)
 
@@ -459,10 +526,12 @@ func _set_enabled(on: bool) -> void:
 
 
 func spawn(id: String, at: Vector3, minute := 0) -> void:
+	spawn_generation += 1
 	type_id = id
 	element = ""
 	haste_left = 0.0
 	root_left = 0.0
+	revealed_left = 0.0
 	_root_again = -100.0
 	if _vines:
 		_vines.visible = false
@@ -474,8 +543,11 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	if model_id in MesenllaModels.KINDS or model_id == "crow":
 		# Back on its feet after the last time this body fell.
 		MesenllaModels.reset_pose(_visual)
+		if model_id == "angler":
+			_visual.set_meta("risen", 0.0)
+			VaelModels.bury(_visual) # it lies in wait in the sand
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
-	mesenlla_mind = MesenllaMind.new(id) if MesenllaMind.wants(id) else null
+	mesenlla_mind = VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
@@ -501,6 +573,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 	_hop_up = float(def.get("hop_up", HOP_UP))
 	_hop_cd = randf() * HOP_THINK
 	_hop_left = 0.0
+	_vault_from = Vector3.INF
 	_hop_line = -1
 	_hop_i = -1
 	_hop_walk = Vector3.INF
@@ -529,7 +602,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		_damage *= harder
 		_armed_damage *= harder
 		_speed *= 1.0 + ZombieDefs.NIGHT_SPEED * minute
-	if is_boss():
+	if is_boss() or def.get("miniboss", false):
 		hp *= 1.0 + 0.55 * maxi(0, (Net.roster.size() if Net.active() else world.players.size()) - 1)
 	hp *= Game.enemy_health()
 	_damage *= Game.enemy_damage()
@@ -596,9 +669,10 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		weapon_id = def["weapon"]
 		_show_weapon(weapon_id)
 	elif def.has("weapons"):
-		# Whatever it found: a blade, a spear or a bow.
+		# Whatever it found: a blade, a spear or a bow, each as often as its odds say.
 		var found: Array = def["weapons"]
-		weapon_id = str(found[randi() % found.size()])
+		var odds: Array = def.get("weapon_odds", [])
+		weapon_id = str(found[randi() % found.size()] if odds.size() != found.size() else found[pick_weighted(odds)])
 		_show_weapon(weapon_id)
 	for c: MeshInstance3D in _claws:
 		c.visible = def.get("claws", false)
@@ -653,20 +727,53 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		mesenlla_mind.start(self)
 
 
-func _show_mount(on: bool) -> void:
+func _show_mount(on: bool, falls := false) -> void:
+	var was := _mounted
 	_mounted = on
+	if on and _horse_node == null and model_id == "woods_child":
+		_make_bear_mount()
+	var bear := _horse_node != null and not (_horse_node is MeshInstance3D)
 	if _horse_node:
+		_mount_fall = 0.0
+		_horse_node.top_level = false
+		if bear:
+			MesenllaModels.reset_pose(_horse_node)
 		_horse_node.visible = on
-		_horse_node.rotation.z = 0.0
-		_horse_node.position.y = 0.0
+		_horse_node.rotation = Vector3(0, 0 if bear else PI, 0)
+		_horse_node.position = Vector3.ZERO
 		_visual.position.x = 0.0
-		_horse_node.scale = Vector3.ONE * _scale * HorseModel.RIDDEN_SIZE
-	_visual.position.y = HorseModel.SADDLE * _scale if on else 0.0
+		_horse_node.scale = Vector3.ONE * _scale * (MesenllaModels.CAVALRY_SIZE if bear else HorseModel.RIDDEN_SIZE)
+		if bear:
+			if not on and was and falls:
+				# Brought down: the bear stays where it fell and rolls over, and its rider jumps clear.
+				_horse_node.visible = true
+				_horse_node.top_level = true
+				_horse_node.global_transform = global_transform.scaled_local(Vector3.ONE * _scale * MesenllaModels.CAVALRY_SIZE)
+				_mount_fall = MOUNT_FALL_TIME
+	_visual.rotation = Vector3.ZERO
+	_visual.position.z = 0.0
+	if bear and on:
+		_seat_rider()
+	else:
+		_visual.position.y = HorseModel.SADDLE * _scale if on else 0.0
 	if def.get("rider", false):
 		# On horseback there is a lot more of it to hit.
 		_capsule.radius = (0.85 if on else 0.36) * _scale
 		_capsule.height = height + (1.1 * _scale if on else 0.0)
 		_shape.position = Vector3(0, _capsule.height * 0.5, 0)
+
+
+## Which of these weights wins a draw, each in proportion to its weight.
+static func pick_weighted(weights: Array) -> int:
+	var total := 0.0
+	for w: Variant in weights:
+		total += float(w)
+	var roll := randf() * total
+	for i in weights.size():
+		roll -= float(weights[i])
+		if roll < 0.0:
+			return i
+	return weights.size() - 1
 
 
 ## A training dummy cannot die or do anything back. It only says how hard it has been hit.
@@ -707,8 +814,11 @@ func _tick_dummy(delta: float) -> void:
 		_dummy_label.text = "Last hit %d\n%d a second" % [int(_dummy_last), int(total / DUMMY_WINDOW)]
 
 
-## The rider comes through at a gallop, turns wide, and comes through again.
+## The rider comes through at a gallop, turns wide, and comes through again. On a bear (the Woodland
+## Cavalry) it sits astride: the spear couched as the bear gallops in, driven home as they pass while
+## the bear rakes with a paw, then brandished overhead as the bear half rears and roars, wheeling.
 func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void:
+	var on_bear: bool = def.get("mount", "") == "bear"
 	if _attack_left > 0.0:
 		_attack_left -= delta
 	if _ride_pass > 0.0:
@@ -717,11 +827,16 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		rotation.y = lerp_angle(rotation.y, atan2(_ride_dir.x, _ride_dir.z), min(1.0, delta * 10.0))
 		move_and_slide()
 		position.y = world.ground_at(position)
+		if on_bear and _attack_left <= 0.0:
+			_play("RideCharge", 1.0, 0.15)
 		if not _ride_hit and dist < 2.7 and absf(target.global_position.y - position.y) < 2.6:
 			_ride_hit = true
 			_attack_left = ATTACK_TIME * 0.6
 			_current_anim = ""
-			_play("1H_Melee_Attack_Chop", 1.8, 0.05)
+			if on_bear:
+				_play("RideThrust", 1.0, 0.04)
+			else:
+				_play("1H_Melee_Attack_Chop", 1.8, 0.05)
 			target.hurt(_melee_damage(), position, self)
 			world.sfx_at("clang", position, -2.0)
 		if get_slide_collision_count() > 0:
@@ -736,6 +851,8 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		rotation.y += delta * 2.6
 		move_and_slide()
 		position.y = world.ground_at(position)
+		if on_bear and _attack_left <= 0.0:
+			_play("RideBrandish", 1.0, 0.15)
 		return
 	if _sees and dist > 1.0:
 		_ride_dir = to / dist
@@ -744,13 +861,86 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 		world.sfx_at("gallop", position, 0.0)
 		return
 	_move(target, to, dist, delta)
-	_play("Idle")
+	_play("Ride" if on_bear else "Idle")
+
+
+## The Woodland Cavalry's bear, the first time this body rides one.
+func _make_bear_mount() -> void:
+	_horse_node = MesenllaModels.cavalry_bear()
+	_horse_node.visible = false
+	add_child(_horse_node)
+	MesenllaModels.remember_pose(_horse_node)
+	for mi in _horse_node.find_children("*", "MeshInstance3D", true, false):
+		var piece := mi as MeshInstance3D
+		piece.set_meta("own_material", piece.material_override)
+		_parts.append(piece)
+	if _frozen > 0.0 or _flash > 0.0:
+		_restore_materials()
+
+
+const MOUNT_FALL_TIME := 1.8 # seconds the cavalry's bear takes to roll over and sink away, brought down
+
+
+## The rider sits in the bear's saddle and moves with its back: up and down with its gallop, tipped
+## back as it half rears.
+func _seat_rider() -> void:
+	var seat := _horse_node.get_node_or_null("Rig/Hind/Torso/Saddle") as Node3D
+	if seat == null or not seat.is_inside_tree():
+		return
+	var to := global_transform.affine_inverse() * seat.global_transform
+	var turn := Basis(to.basis.get_rotation_quaternion())
+	var size := _visual.scale
+	_visual.transform = Transform3D(turn.scaled(size), to.origin - turn.y * _rider_hip() * size.y)
+	_seat_y = _visual.position.y
+
+
+## How high the rider's hips are above its feet, in its body's own measure, sitting astride.
+func _rider_hip() -> float:
+	if not _fit.has("woods_child_hip"):
+		var hip := 0.42
+		if _skeleton:
+			var i := _skeleton.find_bone("hips")
+			if i >= 0:
+				var rest := _skeleton.get_bone_global_rest(i)
+				hip = ((_visual.global_transform.affine_inverse() * _skeleton.global_transform) * rest.origin).y
+		_fit["woods_child_hip"] = hip
+	return float(_fit["woods_child_hip"])
+
+
+## A mount under its rider: the horse's legs swinging with its pace, or the bear moving with what
+## its rider is doing, the rider sitting in its saddle. pace: metres a second.
+func _tick_mount(delta: float, pace: float) -> void:
+	if _horse_node is MeshInstance3D:
+		HorseModel.set_gait(_horse_node as MeshInstance3D, clampf(pace / 7.0, 0.0, 1.0))
+		return
+	MesenllaModels.ride_bear(self, _horse_node, delta, pace, _current_anim)
+	_seat_rider()
+
+
+## The cavalry's bear, brought down: it rolls over where it fell, then sinks away.
+func _tick_mount_fall(delta: float) -> void:
+	if _mount_fall <= 0.0 or _horse_node == null:
+		return
+	_mount_fall -= delta
+	var t := MOUNT_FALL_TIME - _mount_fall
+	var over := smoothstep(0.0, 0.7, t)
+	var rig := _horse_node.get_node("Rig") as Node3D
+	rig.rotation.z = 1.5 * over
+	rig.position.y = 0.42 * over
+	var head := rig.get_node("Hind/Torso/Head") as Node3D
+	head.rotation.x = lerpf(head.rotation.x, 0.5 * over, minf(1.0, delta * 6.0))
+	rig.position.y -= 1.2 * smoothstep(1.1, MOUNT_FALL_TIME, t)
+	if _mount_fall <= 0.0:
+		_horse_node.visible = false
+		_horse_node.top_level = false
+		rig.rotation.z = 0.0
+		rig.position = Vector3.ZERO
 
 
 ## Below 40% health the horse goes down, and whoever rode it fights on foot.
 func _check_dismount() -> void:
 	if _mounted and hp < max_hp * 0.4:
-		_show_mount(false)
+		_show_mount(false, true)
 		_speed = 3.6 * Game.enemy_speed()
 		_stun = maxf(_stun, 0.9)
 		_current_anim = ""
@@ -788,7 +978,9 @@ func _restore_materials() -> void:
 		return
 	var ghost: Variant = def.get("ghost")
 	for p in _parts:
-		if ghost != null:
+		if p.has_meta("own_material"):
+			p.material_override = p.get_meta("own_material")
+		elif ghost != null:
 			p.material_override = _ghost_material(ghost)
 		else:
 			p.material_override = _material_for(type_id, p.mesh.surface_get_material(0))
@@ -826,7 +1018,13 @@ func _play(anim_name: String, speed := 1.0, blend := 0.2) -> void:
 
 ## A boss of the Mists or of Mesenlla: shrugs off long stuns, and grows with the number of players.
 func is_boss() -> bool:
-	return def.get("mist_boss", false) or def.get("mesenlla_boss", false)
+	return def.get("mist_boss", false) or def.get("mesenlla_boss", false) or def.get("vael_boss", false)
+
+
+## The Harbourmaster, the Mad Lighthouse Keeper and the Kraken's Arms: not bosses (the night does not
+## wait for them), but each comes once, grows with the number of players and shrugs off half a stun.
+func is_miniboss() -> bool:
+	return def.get("miniboss", false)
 
 
 func is_alive() -> bool:
@@ -844,7 +1042,7 @@ func is_hunting() -> bool:
 ## The Fallen (the Fallen Heroes, and the Fallen Revenant of the Mists): a long bar with a name over
 ## them while they hunt.
 func named_bar() -> bool:
-	return hero or bool(def.get("fallen", false))
+	return hero or bool(def.get("fallen", false)) or is_miniboss() or def.get("vael_boss", false)
 
 
 func headshot_at(y: float) -> bool:
@@ -870,6 +1068,29 @@ func is_behind(from: Vector3) -> bool:
 	var to := from - position
 	to.y = 0.0
 	return to.length() > 0.01 and look.dot(to.normalized()) < -0.25
+
+
+## Shown by a flare's light: nothing hidden stays hidden in it (Anglers lying in wait, for one).
+var revealed_left := 0.0
+func reveal(seconds: float) -> void:
+	if puppet:
+		Net.effect_zombie(self, Effect.REVEAL, seconds)
+		return
+	revealed_left = maxf(revealed_left, seconds)
+
+
+## Small enough for a Boarding Hook to drag: not a boss, nor anything much bigger than a person.
+func control_immune() -> bool:
+	return is_boss() or is_miniboss()
+
+
+func draggable() -> bool:
+	return not is_boss() and not def.get("miniboss", false) and _scale < 1.5 and not flies and carrier == null
+
+
+## Pinned by a Toll knife, on this phone (only the Highwayman's phone counts it).
+func tolled() -> bool:
+	return world != null and world.now < toll_until
 
 
 func mark(mult: float, seconds: float) -> void:
@@ -1008,12 +1229,13 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		hp = maxf(hp, 1.0)
 	bar_time = 2.5
 	_flash_on()
-	if flies and (_dive > 0.0 or _windup > 0.0):
+	if not control_immune() and flies and (_dive > 0.0 or _windup > 0.0):
 		# A blow knocks it out of its dive, and it hangs there for a moment.
 		_dive = 0.0
 		_windup = 0.0
 		_recover = maxf(_recover, 0.8)
-	_knock += Vector3(from_dir.x, 0, from_dir.z).normalized() * knock / _scale
+	if not control_immune() and not def.get("rooted", false): # (a Kraken's Arm stands in the sea floor)
+		_knock += Vector3(from_dir.x, 0, from_dir.z).normalized() * knock / _scale
 	world.fx_gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
 	if Net.is_host():
 		Net.gore(hit_pos, def.get("tint", Color(0.3, 0.3, 0.3)))
@@ -1025,7 +1247,7 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		return
 	_check_dismount()
 	world.sfx_at(_hurt_sound(), position, -8.0)
-	if type_id != "beast":
+	if type_id != "beast" and not control_immune():
 		_hurt_stun = 0.1
 	var p := world.nearest_player(position)
 	if p:
@@ -1036,17 +1258,29 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", "mist_bear": "bear_roar", "eagle": "eagle_cry", "mist_eagle": "eagle_cry",
 	"shapeshifter": "shapeshift", "child_of_woods": "woods_chatter", "woodland_cavalry": "woods_chatter", "earth_elemental": "stone_grind",
 	"mist_elemental": "mist_blink", "storm_elemental": "storm_call", "wyvern": "wyvern_roar", "great_revenant_elemental": "stone_grind",
-	"war_wyvern": "wyvern_roar"}
+	"war_wyvern": "wyvern_roar",
+	"wreck_gull": "wreck_gull_call", "storm_ray": "storm_ray_call", "bell_wraith": "bell_wraith_call",
+	"drowned_sailor": "drowned_moan", "barnacle_brute": "drowned_moan", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum",
+	"siren": "siren_hum", "press_gang": "press_shout", "tide_witch": "witch_call", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_laugh",
+	"kraken_arm": "kraken_rise", "hollow_sovereign": "sovereign_voice", "leviathan": "leviathan_roar", "kraken": "kraken_roar"}
 
 
 ## How each of them sounds when struck, and when it dies.
 const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist_bear": "bear_hurt", "eagle": "eagle_hurt", "mist_eagle": "eagle_hurt",
 	"child_of_woods": "woods_hurt", "woodland_cavalry": "woods_hurt", "earth_elemental": "stone_hit", "great_revenant_elemental": "stone_hit",
-	"mist_elemental": "mist_hurt", "storm_elemental": "storm_hurt", "wyvern": "wyvern_hurt", "war_wyvern": "wyvern_hurt"}
+	"mist_elemental": "mist_hurt", "storm_elemental": "storm_hurt", "wyvern": "wyvern_hurt", "war_wyvern": "wyvern_hurt",
+	"wreck_gull": "wreck_gull_hurt", "storm_ray": "storm_ray_hurt", "bell_wraith": "bell_wraith_hurt",
+	"drowned_sailor": "drowned_hurt", "barnacle_brute": "brute_hurt", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum", "angler": "angler_bite",
+	"siren": "siren_shriek", "press_gang": "drowned_hurt", "tide_witch": "drowned_hurt", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_hurt",
+	"kraken_arm": "kraken_hurt", "hollow_sovereign": "sovereign_hurt", "leviathan": "leviathan_hurt", "kraken": "kraken_hurt"}
 const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
-	"war_wyvern": "wyvern_death"}
+	"war_wyvern": "wyvern_death",
+	"wreck_gull": "wreck_gull_death", "storm_ray": "storm_ray_death", "bell_wraith": "bell_wraith_death",
+	"drowned_sailor": "drowned_death", "barnacle_brute": "brute_death", "brine_hound": "hound_death", "lantern_jelly": "jelly_burst", "angler": "angler_death",
+	"siren": "siren_death", "press_gang": "drowned_death", "tide_witch": "witch_death", "harbourmaster": "brute_death", "lighthouse_keeper": "keeper_hurt",
+	"kraken_arm": "kraken_death", "hollow_sovereign": "sovereign_death", "leviathan": "leviathan_death", "kraken": "kraken_end"}
 
 
 ## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.
@@ -1108,6 +1342,10 @@ func net_wake() -> void:
 func _show_awake() -> void:
 	dormant = false
 	_special_left = 0.0
+	if model_id == "angler":
+		# Out of the sand in a spray of it (VaelModels.animate_angler plays the rise).
+		world.sfx_at("angler_rise", position, 0.0)
+		world.fx_gore(position + Vector3.UP * 0.3, Color(0.55, 0.5, 0.4))
 	if _lure:
 		_lure.visible = false
 		_beam.visible = false
@@ -1120,6 +1358,7 @@ func _show_awake() -> void:
 ## Caught off guard: whatever blow it was winding up comes to nothing, and it cannot start another for
 ## a moment. It still moves and sees. (A Thief appearing in front of it with a blade, for one.)
 func flinch(seconds: float) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1133,6 +1372,7 @@ func flinch(seconds: float) -> void:
 
 
 func stun(seconds: float) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1140,6 +1380,8 @@ func stun(seconds: float) -> void:
 		return
 	if is_boss():
 		seconds = minf(seconds * 0.35, 0.6)
+	elif is_miniboss():
+		seconds *= 0.5
 	if dormant:
 		_wake()
 	if mesenlla_mind:
@@ -1157,6 +1399,7 @@ func stun(seconds: float) -> void:
 
 ## Mist Burst: frozen solid, and a hit does not thaw it.
 func freeze(seconds: float) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1174,6 +1417,7 @@ func _show_frozen(seconds: float) -> void:
 
 
 func slow(seconds: float) -> void:
+	if control_immune(): return
 	if puppet:
 		Net.effect_zombie(self, Effect.SLOW, seconds)
 		return
@@ -1247,6 +1491,7 @@ func _die() -> void:
 
 
 func blind(seconds: float) -> void:
+	if control_immune(): return
 	blind_left = maxf(blind_left, seconds)
 
 
@@ -1256,6 +1501,7 @@ func blind(seconds: float) -> void:
 ## On a phone that is not the host this one is only a copy, so the host is told to do it for real:
 ## the host drops the weapon and tells every phone the creature is unarmed.
 func disarm(drop := true) -> String:
+	if control_immune(): return ""
 	if weapon_id == "" or not WeaponDefs.lies_around(weapon_id):
 		return ""
 	var held := weapon_id
@@ -1318,23 +1564,28 @@ func _show_death() -> void:
 		world.sfx_at(_death_sound(), position, -6.0)
 
 
-## Caught by an Antler Charm's vines (PowerDefs.ANTLER_ROOT).
-func root(seconds: float) -> void:
+## Caught by an Antler Charm's vines (PowerDefs.ANTLER_ROOT), or pinned by a harpoon (pinned: no
+## wait between one and the next).
+func root(seconds: float, pinned := false) -> void:
+	if control_immune(): return
 	if not is_alive() or flies or carrier:
 		return
 	if puppet:
-		Net.effect_zombie(self, Effect.ROOT, seconds)
+		Net.effect_zombie(self, Effect.PIN if pinned else Effect.ROOT, seconds)
 		return
-	if world.now < _root_again:
+	if world.now < _root_again and not pinned:
 		return
 	if is_boss():
 		seconds *= 0.5
-	root_left = seconds
-	_root_again = world.now + PowerDefs.ANTLER_AGAIN
+	root_left = maxf(root_left, seconds)
+	if not pinned:
+		_root_again = world.now + PowerDefs.ANTLER_AGAIN
 	velocity = Vector3.ZERO
 	# A charge or a lunge ends where the vines catch it.
 	if mesenlla_mind and mesenlla_mind.phase in ["charge", "leap"]:
 		mesenlla_mind.interrupt(self)
+	if pinned:
+		return # held by the harpoon in it: no vines
 	show_roots(seconds)
 	if Net.is_host():
 		Net.zombie_rooted(self, seconds)
@@ -1461,6 +1712,10 @@ func _tick_carried(delta: float) -> void:
 func release() -> void:
 	if not active:
 		return
+	soaked_left = 0.0
+	if _drips:
+		_drips.emitting = false
+		_puddle.visible = false
 	_set_enabled(false)
 	world.recycle_zombie(self)
 	if Net.is_host():
@@ -1468,6 +1723,60 @@ func release() -> void:
 
 
 # --- On a joined phone -------------------------------------------------------
+
+## Soaked by a Stormcaller's Trident: seawater runs off it, and its Stormspear's lightning leaps to it.
+func soak(seconds: float) -> void:
+	if not is_alive():
+		return
+	soaked_left = maxf(soaked_left, seconds)
+	if _drips == null:
+		_drips = CPUParticles3D.new()
+		_drips.amount = 22
+		_drips.lifetime = 0.6
+		_drips.local_coords = false
+		_drips.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		_drips.emission_box_extents = Vector3(body_radius() * 0.8, HEIGHT * _scale * 0.35, body_radius() * 0.8)
+		_drips.direction = Vector3.DOWN
+		_drips.spread = 12.0
+		_drips.gravity = Vector3(0, -9.0, 0)
+		_drips.initial_velocity_min = 0.4
+		_drips.initial_velocity_max = 1.2
+		_drips.scale_amount_min = 0.6
+		_drips.scale_amount_max = 1.0
+		var drop := SphereMesh.new()
+		drop.radius = 0.045
+		drop.height = 0.13
+		drop.radial_segments = 4
+		drop.rings = 2
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.albedo_color = Color(0.6, 0.92, 1.0)
+		drop.material = m
+		_drips.mesh = drop
+		_drips.position = Vector3.UP * HEIGHT * _scale * 0.55
+		_drips.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_drips)
+		# The seawater running off it pools round its feet, glinting.
+		if _puddle_mesh == null:
+			var ring := TorusMesh.new()
+			ring.inner_radius = 0.7
+			ring.outer_radius = 1.0
+			ring.rings = 18
+			ring.ring_segments = 4
+			var glint := StandardMaterial3D.new()
+			glint.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			glint.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			glint.albedo_color = Color(0.5, 0.85, 1.0, 0.45)
+			ring.material = glint
+			_puddle_mesh = ring
+		_puddle = MeshInstance3D.new()
+		_puddle.mesh = _puddle_mesh
+		_puddle.position.y = 0.06
+		_puddle.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_puddle)
+	_drips.emitting = true
+	_puddle.visible = true
+
 
 ## True while this flyer is about to come down on someone.
 func is_warning() -> bool:
@@ -1496,7 +1805,7 @@ func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_nam
 	_show_stun(flags & 16 != 0)
 	net_warning = flags & 64 != 0
 	if def.get("rider", false) and (flags & 128 != 0) != _mounted:
-		_show_mount(flags & 128 != 0)
+		_show_mount(flags & 128 != 0, true)
 	_show_frozen(0.25 if flags & 32 != 0 else 0.0)
 	var burning := flags & 8 != 0
 	if burning and burn_time <= 0.0:
@@ -1535,13 +1844,16 @@ func _puppet_tick(delta: float) -> void:
 		if root_left <= 0.0:
 			show_roots(0.0)
 	if _mounted:
-		HorseModel.set_gait(_horse_node, clampf(was.distance_to(position) / maxf(delta, 0.001) / 7.0, 0.0, 1.0))
+		_tick_mount(delta, was.distance_to(position) / maxf(delta, 0.001))
+	_tick_mount_fall(delta)
 	if _custom and not dormant:
 		# The host's creatures move here by snapshots: their pace is how far they came this frame.
 		var pace := was.distance_to(position) / maxf(delta, 0.001) if model_id in MesenllaModels.KINDS else was.distance_squared_to(position)
 		_animate_custom(delta, pace)
 	elif _lure and dormant:
 		_lure.rotation.y += delta * 1.6
+	elif dormant and model_id == "angler":
+		VaelModels.lure_idle(_visual, world.now + float(net_id) * 0.37) # its lure, swaying over the sand
 	_think -= delta
 	if _think <= 0.0:
 		_think = 0.4
@@ -1555,6 +1867,7 @@ func _puppet_tick(delta: float) -> void:
 # --- Senses ------------------------------------------------------------------
 
 func forget() -> void:
+	if control_immune(): return
 	if type_id == "beast" or not is_alive():
 		return
 	if puppet:
@@ -1568,6 +1881,7 @@ func forget() -> void:
 
 ## A Guardian's challenge: everything comes for them, even what had lost interest.
 func taunted_by(at: Vector3) -> void:
+	if control_immune(): return
 	if puppet:
 		Net.effect_zombie(self, Effect.TAUNT, at.x, at.z)
 	elif not dormant:
@@ -1576,6 +1890,7 @@ func taunted_by(at: Vector3) -> void:
 
 ## Dragged to a point, as if on a rope.
 func pull_to(at: Vector3) -> void:
+	if control_immune(): return
 	if not is_alive():
 		return
 	if puppet:
@@ -1583,6 +1898,44 @@ func pull_to(at: Vector3) -> void:
 		return
 	_pull_at = at
 	_pull_left = 0.7
+
+
+## Drawn by an Adept's Event Horizon: carried slowly toward a point for a moment, while it still walks and
+## fights as it would (unlike a pull, which takes it off its feet).
+func drift_to(at: Vector3, speed: float) -> void:
+	if not is_alive() or not draggable():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.DRIFT, at.x, at.z)
+		return
+	var to := Vector3(at.x - position.x, 0, at.z - position.z)
+	_drift = to.normalized() * speed if to.length() > 0.1 else Vector3.ZERO
+	_drift_left = 0.35
+var _drift := Vector3.ZERO
+var _drift_left := 0.0
+
+
+## Blinded: it sees only a few metres for a while (on every phone, by way of the host).
+func blind_for(seconds: float) -> void:
+	if control_immune(): return
+	if not is_alive():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.BLIND, seconds, 0.0)
+		return
+	blind(seconds)
+
+
+## Hauled in on a Harpooner's rope: dragged all the way to a point, however far (pull_to stops after
+## a few metres), at the pace a rope hauls.
+func haul_to(at: Vector3) -> void:
+	if not is_alive() or not draggable():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.HAUL, at.x, at.z)
+		return
+	_pull_at = at
+	_pull_left = clampf(Vector2(at.x - position.x, at.z - position.z).length() / HarpoonerKit.HAUL_SPEED + 0.1, 0.2, 2.2)
 
 
 func hear(at: Vector3) -> void:
@@ -1610,7 +1963,7 @@ func _start_chase(at: Vector3) -> void:
 	# The further away it is, the less a small move changes the way there.
 	var spot := at + _flank * 2.5
 	# Coming at someone from the side must not mean stopping on the wrong side of their fence.
-	if not world.grid.line_is_open(at, spot):
+	if not world.grid.line_is_open(at, spot) or (world.vael_sites and not world.vael_sites.accessible(spot)):
 		spot = at
 	var slack := maxf(2.0, position.distance_to(at) * 0.2)
 	if not _has_goal or _goal.distance_squared_to(spot) > slack * slack:
@@ -1659,7 +2012,10 @@ func _arrived() -> bool:
 func _random_spot(radius: float) -> Vector3:
 	for i in 6:
 		var p := position + Vector3(randf_range(-radius, radius), 0, randf_range(-radius, radius))
-		if absf(p.x) < world.half_size - 1.0 and absf(p.z) < world.half_size - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
+		if world.vael_sites:
+			if world.vael_sites.accessible(p):
+				return p
+		elif absf(p.x) < world.half_size - 1.0 and absf(p.z) < world.half_size - 1.0 and world.grid.is_free(world.grid.to_cell(p)):
 			return p
 	return position
 
@@ -1878,7 +2234,8 @@ func _roam(dt: float) -> void:
 			if type_id == "magic" and not world.pois.is_empty():
 				_set_goal(world.pois[randi() % world.pois.size()])
 			else:
-				_set_goal(_random_spot(18.0))
+				var next := world.vael_sites.patrol(position) if world.vael_sites else position
+				_set_goal(next if next != position else _random_spot(18.0))
 
 
 func _nearby_poi() -> Vector3:
@@ -1987,9 +2344,12 @@ func _physics_process(delta: float) -> void:
 			var over := k * k * (3.0 - 2.0 * k)
 			_horse_node.rotation.z = 1.45 * over
 			_horse_node.position.y = 0.45 * over * _scale
-			_visual.position.y = HorseModel.SADDLE * _scale * (1.0 - over)
+			var bear := not (_horse_node is MeshInstance3D)
+			_visual.rotation = Vector3.ZERO
+			_visual.position.y = (_seat_y if bear else HorseModel.SADDLE * _scale) * (1.0 - over)
 			_visual.position.x = -0.7 * over * _scale
-			HorseModel.set_gait(_horse_node, 0.0)
+			if not bear:
+				HorseModel.set_gait(_horse_node as MeshInstance3D, 0.0)
 		if _dying <= 0.0:
 			release()
 		return
@@ -1999,12 +2359,15 @@ func _physics_process(delta: float) -> void:
 	if puppet:
 		_puppet_tick(delta)
 		return
+	_tick_mount_fall(delta)
 	if _frozen > 0.0:
 		_frozen -= delta
 		if _frozen <= 0.0:
 			_show_frozen(0.0)
 	if _pull_left > 0.0:
 		_pull_left -= delta
+		_tick_flash(delta) # a blow's flash fades as usual while it is dragged
+		_drift_left = 0.0
 		var to_pull := Vector3(_pull_at.x - position.x, 0.0, _pull_at.z - position.z)
 		if to_pull.length() > 1.0:
 			position += to_pull.normalized() * minf(16.0 * delta, to_pull.length())
@@ -2051,11 +2414,20 @@ func _physics_process(delta: float) -> void:
 		root_left -= delta
 		if root_left <= 0.0:
 			show_roots(0.0)
+	revealed_left = maxf(0.0, revealed_left - delta)
 	blind_left = maxf(0.0, blind_left - delta)
 	_tick_flash(delta)
+	if _drift_left > 0.0:
+		_drift_left -= delta
+		position += _drift * delta
+		if not flies:
+			position.y = world.ground_at(position)
 	if _airborne:
 		# A leap always finishes, even if something stuns it in mid-air.
-		_tick_leap(target, delta)
+		if _vault_from != Vector3.INF:
+			_tick_vael_vault(delta)
+		else:
+			_tick_leap(target, delta)
 		return
 	if _stun > 0.0:
 		_stun -= delta
@@ -2108,7 +2480,7 @@ func _physics_process(delta: float) -> void:
 		return
 	if _mounted:
 		_tick_rider(target, to, dist, delta)
-		HorseModel.set_gait(_horse_node, clampf(velocity.length() / 7.0, 0.0, 1.0))
+		_tick_mount(delta, velocity.length())
 		return
 	if _can_hop:
 		_hop_cd -= delta
@@ -2119,6 +2491,12 @@ func _physics_process(delta: float) -> void:
 			_hop_cd = HOP_THINK
 			_think_hop(target, dist)
 			if _airborne:
+				return
+	elif world.vael_sites and state == State.CHASE and dist < 18.0:
+		_hop_cd -= delta
+		if _hop_cd <= 0.0:
+			_hop_cd = 0.55
+			if _try_vael_vault(to, dist):
 				return
 	_tick_hero(target, dist, delta)
 	_try_leap(target, dist)
@@ -2222,6 +2600,53 @@ func _tick_leap(target: Target, delta: float) -> void:
 			var free := world.grid.to_world(world.grid.nearest_free(c))
 			position.x = free.x
 			position.z = free.z
+
+
+## Drowned walkers vault low obstacles in pursuit. A blocked arc leaves their route alone so they
+## can take a nearby door or the path around a wall.
+func _try_vael_vault(to: Vector3, dist: float) -> bool:
+	if phases or is_boss() or dormant or _hold or _attack_left > 0.0 or root_left > 0.0 or dist < 1.6:
+		return false
+	# Once out of sight, follow the known target position rather than reacting through buildings.
+	var heading := to if _sees else _last_seen - position
+	var there := VaelVault.landing(self, world, heading)
+	if there == Vector3.INF:
+		return false
+	_vault_from = global_position
+	_hop_to = there
+	_hop_left = VaelVault.TIME
+	_airborne = true
+	_tick_every = 1
+	_shadow.visible = false
+	var facing := there - global_position
+	rotation.y = atan2(facing.x, facing.z)
+	_current_anim = ""
+	_play("Running_A", 1.55, 0.05)
+	world.sfx_at("jump_a", position, -7.0)
+	return true
+
+
+func _tick_vael_vault(delta: float) -> void:
+	_hop_left = maxf(0.0, _hop_left - delta)
+	var progress := 1.0 - _hop_left / VaelVault.TIME
+	var there := VaelVault.point(_vault_from, _hop_to, progress)
+	var blocked := move_and_collide(there - global_position) != null
+	blocked = blocked or global_position.distance_squared_to(there) > 0.04
+	if not blocked and _hop_left > 0.0:
+		return
+	if blocked:
+		# A collider changed during the jump: recover on the known safe takeoff side.
+		global_position = _vault_from
+		_walk_around_until = world.now + 2.0
+		_direct = false
+	else:
+		world.sfx_at("land", position, -13.0)
+	_vault_from = Vector3.INF
+	_hop_left = 0.0
+	_airborne = false
+	_hop_cd = 1.1
+	_shadow.visible = true
+	_clear_path_only()
 
 
 # --- Jumping about the Mists --------------------------------------------------
@@ -2513,6 +2938,8 @@ func _fly(target: Target, _to: Vector3, dist: float, delta: float) -> void:
 			_dive = 0.0
 	else:
 		var ground := target.global_position if (state == State.CHASE or dist < _sight) else _home
+		if world.map_id == "bastion" and world.fort and (type_id == "eagle" or type_id == "mist_eagle") and not _sees:
+			ground = world.fort.heart_at
 		aim = ground + Vector3(cos(_orbit) * 6.0, high, sin(_orbit) * 6.0)
 		if _clear and _special_cd <= 0.0 and dist < _sight and (_statue or world.take_dive_turn()):
 			_windup = DIVE_WARNING
@@ -2575,6 +3002,8 @@ func _desired_speed() -> float:
 		mult *= 2.6
 	if haste_left > 0.0:
 		mult *= HASTE
+	if world.tide:
+		mult *= world.tide.quickens(self) # the Drowned, at high tide
 	if _marching:
 		return _speed * mult
 	match state:
@@ -2623,6 +3052,8 @@ func _move(_target: Target, to: Vector3, dist: float, delta: float) -> void:
 				# Spreading out to surround you is for open ground. On a bridge there is only the one way.
 				var spread := 0.0 if world.terrain.has_islands() and world.terrain.near_deck(position.x, position.z) else 1.0
 				var approach := to + _flank * clampf(dist - 2.5, 0.0, 4.0) * spread
+				if world.vael_sites and not world.grid.line_is_open(position, position + approach):
+					approach = to # take the doorway or the ramp straight on
 				dir = approach.normalized()
 				_check_blocked(delta)
 			_clear_path_only()
@@ -2803,6 +3234,18 @@ func _tick_flash(delta: float) -> void:
 func _process(delta: float) -> void:
 	_anim_accum += delta
 	_frame += 1
+	if soaked_left > 0.0:
+		soaked_left -= delta
+		if _drips:
+			_drips.emitting = soaked_left > 0.0 and is_alive()
+			_puddle.visible = _drips.emitting
+			_puddle.scale = Vector3.ONE * body_radius() * (1.6 + 0.12 * sin(_anim_accum * 5.0))
+	if _court_light:
+		# The Keeper's lamp swells as he lifts it, and blazes as it is held up (here and on every phone).
+		var lifting := _current_anim == "Raise" and is_alive()
+		var want := KEEPER_LAMP * (6.0 if lifting and is_warning() else 9.0 if lifting else 1.0)
+		_court_light.light_energy = move_toward(_court_light.light_energy, want, delta * 14.0)
+		_court_light.omni_range = 9.0 + (_court_light.light_energy - KEEPER_LAMP) * 0.8
 	var p := world.player
 	var every := 1
 	if p:

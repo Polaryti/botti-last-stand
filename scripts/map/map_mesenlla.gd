@@ -8,7 +8,7 @@ extends MapPiece
 ## the south the ruins of an old hall, the mouth of an old mine and the shrines of the valley folk.
 ## A floating island is placed at its height above the ground with lift.
 
-@export_enum("floating_island", "rift", "mist_gate", "standing_stones", "crystals", "palisade", "watchtower", "lodge_fire", "waterfall", "arch", "tent", "bunting", "wall_banners", "undergrowth", "shrine", "ruins", "mine") var kind := "floating_island":
+@export_enum("floating_island", "rift", "mist_gate", "standing_stones", "crystals", "palisade", "watchtower", "lodge_fire", "waterfall", "arch", "tent", "bunting", "wall_banners", "undergrowth", "shrine", "ruins", "mine", "distant_island") var kind := "floating_island":
 	set(v):
 		kind = v
 		refresh()
@@ -40,6 +40,7 @@ extends MapPiece
 func build(b: MapBuilder) -> void:
 	match kind:
 		"floating_island": MesenllaBuilder.floating_island(b, size)
+		"distant_island": MesenllaBuilder.floating_island(b, size, true)
 		"rift": MesenllaBuilder.rift(b, size)
 		"mist_gate": MesenllaBuilder.mist_gate(b, size)
 		"standing_stones": MesenllaBuilder.standing_stones(b, size)

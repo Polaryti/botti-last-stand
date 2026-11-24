@@ -17,6 +17,9 @@ const REST_DIRS := {
 	"overhead": Vector3(-0.1, 0.94, -0.3),
 	"punch": Vector3(-0.08, 0.5, -0.86),
 	"bo": Vector3(-0.56, 0.76, -0.32),
+	"hook": Vector3(-0.12, 0.86, -0.5),
+	"slam": Vector3(-0.2, 0.72, -0.42),
+	"row": Vector3(-0.42, 0.78, -0.46),
 }
 
 ## name -> list of [time, hand offset, blade direction, roll around the blade]
@@ -142,6 +145,31 @@ const KEYS := {
 		[0.3, Vector3(-0.14, -0.02, -0.7), Vector3(0.05, 0.08, 0.0), 0.0],
 		[0.44, Vector3(-0.12, -0.03, -0.6), Vector3(0.04, 0.06, 0.0), -0.3],
 		[1.0, Vector3.ZERO, Vector3.ZERO, 0.0]],
+	# A boarding hook: reach out and over, bite, and haul it back towards you.
+	"hook_a": [
+		[0.0, Vector3.ZERO, Vector3(-0.12, 0.86, -0.5), 0.0],
+		[0.16, Vector3(0.06, 0.14, 0.04), Vector3(0.1, 0.9, 0.42), 0.0],
+		[0.3, Vector3(-0.06, 0.08, -0.36), Vector3(-0.06, 0.2, -0.98), 0.0],
+		[0.48, Vector3(-0.04, -0.02, 0.06), Vector3(-0.1, 0.6, -0.8), 0.0],
+		[0.62, Vector3(0.0, -0.06, 0.16), Vector3(-0.1, 0.86, -0.5), 0.0],
+		[1.0, Vector3.ZERO, Vector3(-0.12, 0.86, -0.5), 0.0]],
+	# A ferryman's oar: held leaning across the body, drawn back to the right and swept flat
+	# across in front, the way you would push a boat off with it.
+	"row_a": [
+		[0.0, Vector3.ZERO, Vector3(-0.42, 0.78, -0.46), 0.0],
+		[0.2, Vector3(0.22, 0.02, 0.1), Vector3(0.8, 0.35, -0.48), -0.2],
+		[0.32, Vector3(-0.1, -0.1, -0.22), Vector3(0.05, 0.25, -0.97), 0.0],
+		[0.5, Vector3(-0.6, -0.12, -0.06), Vector3(-0.92, 0.25, -0.3), 0.15],
+		[0.75, Vector3(-0.3, -0.12, 0.08), Vector3(-0.62, 0.6, -0.48), 0.05],
+		[1.0, Vector3.ZERO, Vector3(-0.42, 0.78, -0.46), 0.0]],
+	# A ship's anchor: hauled up over the shoulder, a heavy pause, and down into the ground.
+	"slam_a": [
+		[0.0, Vector3.ZERO, Vector3(-0.2, 0.72, -0.42), 0.4],
+		[0.18, Vector3(0.1, 0.2, 0.18), Vector3(0.12, 0.62, 0.78), 0.2],
+		[0.24, Vector3(0.1, 0.22, 0.2), Vector3(0.12, 0.6, 0.79), 0.2],
+		[0.3, Vector3(-0.18, -0.2, -0.3), Vector3(-0.08, -0.06, -0.99), 0.0],
+		[0.62, Vector3(-0.17, -0.18, -0.28), Vector3(-0.08, -0.03, -1.0), 0.0],
+		[1.0, Vector3.ZERO, Vector3(-0.2, 0.72, -0.42), 0.4]],
 	"cast": [
 		[0.0, Vector3.ZERO, Vector3(-0.1, 0.96, -0.2), 0.0],
 		[0.16, Vector3(0.02, -0.03, 0.1), Vector3(-0.02, 0.92, 0.3), 0.0],
@@ -170,7 +198,9 @@ static func both_hands(d: Dictionary) -> bool:
 static func keys_for(swing: String, side: bool) -> String:
 	if swing == "":
 		return ""
-	return "reap_a" if swing == "reap" else "flail_a" if swing == "flail" else swing + ("_a" if side else "_b")
+	if swing in ["reap", "flail", "hook", "slam", "row"]:
+		return swing + "_a"
+	return swing + ("_a" if side else "_b")
 
 
 ## The blade's +Y axis points along dir, and roll turns the edge to face the swing.
@@ -234,19 +264,21 @@ static func smear_roll(keys: String) -> float:
 		"claw_b": return -0.5
 		"slash_a", "bo_a": return 0.28
 		"slash_b", "bo_b": return -0.28
-		"reap_a": return 0.1
+		"reap_a", "row_a": return 0.1
 		"flail_a": return 0.55
 		"smash_a": return 1.35
 		"smash_b": return 0.95
+		"slam_a": return 1.57
+		"hook_a": return 1.4
 	return NAN
 
 
 ## Which way the trail travels while it fades.
 static func smear_turn(keys: String) -> float:
 	match keys:
-		"slash_a", "reap_a", "claw_a", "bo_a": return 0.9
+		"slash_a", "reap_a", "row_a", "claw_a", "bo_a": return 0.9
 		"slash_b", "claw_b", "bo_b": return -0.9
-		"smash_a", "smash_b", "flail_a": return 0.6
+		"smash_a", "smash_b", "flail_a", "slam_a": return 0.6
 	return 0.0
 
 

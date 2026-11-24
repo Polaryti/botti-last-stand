@@ -14,7 +14,14 @@ const CODES := {"c734137a1f7468ebdb5cf20deae67c89b15dc5de26ff06b497548a4a62a3370
 	"28e314800565692691a7af4606286f26fc0f53b2201fe1fb4c8feaa018e3a6ad": "artificer",
 	"d9bd0d6b1b8a6dc2c11e699df4d908344b17a609e2064940b19008fa3e1419be": "adept",
 	"4a5310c45bc88862d35f592b3cb4f69b664f0b651a56b3503e99539386f7edb3": "bandit",
-	"feaeebd2dba326079890fb1cac967ee57f83292db887f82f4a1d8e54161dff7f": "cartographer"}
+	"feaeebd2dba326079890fb1cac967ee57f83292db887f82f4a1d8e54161dff7f": "cartographer",
+	"8134ddbc51238f953f50369be83a1f67d15ff1a9bf15af44fc9da01b9b8f9c19": "harpooner",
+	"b467740d07272196d7ca893ee099a0f27cf2b91ea0c6f5826b3cc12862cba55c": "tidecaller",
+	"198dc481de37e02396478059dbf04e3edbb784f5b86f4e8cbc75989ae71b5c3f": "ferryman",
+	"0737b22b9c93c1bbf0a043d938dfb28e119d6c542908f2003d191607b5f03275": "revenant",
+	"7d81bbae5f2dc15cbe7ef6021dad08e08235c315458fde23654b3a3fc88e2031": "artificer",
+	"851722ee3f2991091bcf1a11d634ff05ea3ea54ed49811ef83a8b7b4d2026312": "chivalry",
+	"5bcc253292a148a30155854fa4b4e72aeeb81c3cacbc35fd77c0aeed845eb305": "magician"}
 ## Codes that pay Doubloons, every time they are entered (also kept only as hashes).
 const DOUBLOON_CODES := {"56adbe46b05e15e74db8a9d637126086b142ac23ed9740786457771953e93791": 2000}
 
@@ -30,10 +37,15 @@ var doubloons := 0
 var board_prizes := {} # week -> doubloons, for leaderboard prizes already paid
 var finished_games := 0
 var mists_wins := 0
+var lighthouses_lit := 0 # Last Light won: the Isle of Lamps' lighthouse burning again (counted only)
+const VAEL_NIGHTS_FOR_FERRYMAN := 3
+var vael_nights := 0 # nights survived to the dawn in Port Vael: three earn the Ferryman
+var harbourmasters_beaten := 0 # Harbourmasters defeated in matches you played
 var mesenlla_wins := 0 # matches won in the Valleys of Mesenlla, and in Mist Bastion: three of each earn the Cartographer
 var bastion_wins := 0
 var changelog_seen := "" # ChangelogPanel.signature() when the notes were last opened
 var poison_dealt := 0.0
+var killed_kinds := {} # every kind of enemy you have killed at least once: the Codex tells you about those
 var owned_items := {} # things bought in the Store, other than classes
 var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
@@ -41,12 +53,13 @@ var night_map := "village"
 var fort_map := "fort"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
-	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."}}
+	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."},
+	"vael": {"name": "Port Vael", "desc": "A drowned harbour. Survive fifteen minutes of Mist Tide."}}
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
 const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
 	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
-const VERSUS_MAPS := ["village", "mesenlla"]
+const VERSUS_MAPS := ["village", "mesenlla", "vael"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
@@ -134,16 +147,20 @@ func owns_class(id: String) -> bool:
 
 
 ## Which map a night is played on: the host decides in a game together.
+func night_length() -> float:
+	return 900.0 if current_map() == "vael" else NIGHT_LENGTH
+
+
 func current_map() -> String:
 	if Net.active():
 		if Net.rules == Net.Rules.FORT:
 			return Net.fort_map if FORT_MAPS.has(Net.fort_map) else "fort"
 		if Net.pvp():
 			return Net.night_map if Net.night_map in VERSUS_MAPS else "village"
-		return Net.night_map
+		return "vael" if Net.night_map == "lantern_road" else Net.night_map
 	if mode == Mode.FORT:
 		return fort_map
-	return night_map
+	return "vael" if night_map == "lantern_road" else night_map
 
 
 func owns_item(id: String) -> bool:
@@ -198,6 +215,12 @@ func earn_text(id: String) -> String:
 			return "Survive until dawn %d times in The Mists to unlock this class. So far: %d." % [WINS_FOR_REVENANT, mini(mists_wins, WINS_FOR_REVENANT)]
 		"poison":
 			return "Deal %d poison damage to unlock this class. So far: %d." % [POISON_FOR_PLAGUE, mini(int(poison_dealt), POISON_FOR_PLAGUE)]
+		"vael_nights":
+			return "Survive %d nights in Port Vael (reach the dawn there, alone or with friends) to unlock this class. So far: %d." % [VAEL_NIGHTS_FOR_FERRYMAN, mini(vael_nights, VAEL_NIGHTS_FOR_FERRYMAN)]
+		"vael_win":
+			return "Win a match in Port Vael to unlock this class: reach the dawn there, alone or with friends, or win a versus match there."
+		"harbourmaster":
+			return "Defeat the Harbourmaster of Port Vael to unlock this class: be in the match when he falls."
 		"beyond":
 			return "Win %d matches in the Valleys of Mesenlla and %d in Mist Bastion to unlock this class. So far: %d and %d." % [WINS_FOR_CARTOGRAPHER, WINS_FOR_CARTOGRAPHER, mini(mesenlla_wins, WINS_FOR_CARTOGRAPHER), mini(bastion_wins, WINS_FOR_CARTOGRAPHER)]
 	return ""
@@ -222,12 +245,47 @@ func note_mists_win() -> void:
 	save_settings()
 
 
-## A match won beyond the Mists: dawn reached in the Valleys of Mesenlla or at Mist Bastion, or a
-## versus match won in the Valleys. Three wins in each earn the Cartographer.
+## The Harbourmaster fell in a match this phone's player was in (alone or with friends, whoever struck
+## the last blow).
+func note_harbourmaster() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	harbourmasters_beaten += 1
+	if not ClassDefs.disabled("harpooner") and not unlocked.has("harpooner"):
+		_earn("harpooner")
+	save_settings()
+
+
+## Last Light won: the Lantern Barge brought to the Isle of Lamps and the lighthouse lit again.
+## Dawn reached in Port Vael. Three nights earn the Ferryman.
+func note_vael_night() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	vael_nights += 1
+	if vael_nights >= VAEL_NIGHTS_FOR_FERRYMAN and not unlocked.has("ferryman"):
+		_earn("ferryman")
+	save_settings()
+
+
+## Last Light won (the Lantern Road is retired; the count is kept).
+func note_last_light() -> void:
+	if mode == Mode.SANDBOX:
+		return
+	lighthouses_lit += 1
+	save_settings()
+
+
+## A match won beyond the Mists: dawn reached in the Valleys of Mesenlla, at Mist Bastion or in Port
+## Vael, or a versus match won there. Three wins in each of the first two earn the Cartographer; the
+## first win in Port Vael earns the Tidecaller.
 func note_beyond_win() -> void:
 	if mode == Mode.SANDBOX:
 		return
 	match current_map():
+		"vael":
+			if not unlocked.has("tidecaller"):
+				_earn("tidecaller")
+			return
 		"mesenlla":
 			mesenlla_wins += 1
 		"bastion":
@@ -237,6 +295,18 @@ func note_beyond_win() -> void:
 	if mesenlla_wins >= WINS_FOR_CARTOGRAPHER and bastion_wins >= WINS_FOR_CARTOGRAPHER and not unlocked.has("cartographer"):
 		_earn("cartographer")
 	save_settings()
+
+
+## Your first kill of a kind of enemy opens its Codex entry. Kills in the Sandbox don't count.
+func note_killed(kind: String) -> void:
+	if mode == Mode.SANDBOX or kind == "" or killed_kinds.has(kind):
+		return
+	killed_kinds[kind] = true
+	save_settings()
+
+
+func has_killed(kind: String) -> bool:
+	return killed_kinds.has(kind)
 
 
 func note_rider_killed() -> void:
@@ -255,6 +325,7 @@ func note_game_finished() -> void:
 
 
 func _earn(id: String) -> void:
+	if ClassDefs.disabled(id): return
 	unlocked[id] = true
 	fresh_unlocks.append(id)
 	save_settings()
@@ -329,6 +400,12 @@ const MESENLLA_POOLS := {"woods_child": 12, "bear": 3, "mist_bear": 2, "eagle": 
 	"earth_elemental": 2, "mist_elemental": 2, "storm_elemental": 2, "wyvern": 2, "great_revenant_elemental": 1, "war_wyvern": 1}
 
 
+## Port Vael: the drowned and what the Mist Tide brings in, and the drowned court: two gangs of the
+## Press Gang and one more at the Harbourmaster's bell; a Kraken's four arms; and one of each of the rest.
+const VAEL_POOLS := {"drowned": 18, "barnacle_brute": 3, "brine_hound": 6, "lantern_jelly": 6, "angler": 3,
+	"wreck_gull": 3, "storm_ray": 2, "bell_wraith": 2, "siren": 2, "press_gang": 9, "tide_witch": 2, "harbourmaster": 1, "lighthouse_keeper": 1, "kraken_arm": 4, "hollow_sovereign": 1, "leviathan": 1, "kraken": 1}
+
+
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
 const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6, "mist_eagle": 3, "shapeshifter": 3,
 	"earth_elemental": 4, "mist_elemental": 3, "storm_elemental": 3, "wyvern": 2, "war_wyvern": 1}
@@ -339,11 +416,27 @@ func zombie_pool_plan() -> Dictionary:
 		return BASTION_POOLS.duplicate()
 	if mode == Mode.NIGHT and current_map() in SpawnRules.MESENLLA:
 		return MESENLLA_POOLS.duplicate()
+	if mode == Mode.NIGHT and current_map() == "lantern_road":
+		# Last Light: no Hollow Sovereign, no Kraken; the Leviathan at the end, and Drowned climbing aboard.
+		var road := VAEL_POOLS.duplicate()
+		for flyer: String in VaelSkyMind.KINDS:
+			road.erase(flyer)
+		road.erase("hollow_sovereign")
+		road.erase("kraken_arm")
+		road.erase("kraken")
+		road["drowned"] = 22
+		road["leviathan"] = 1
+		return road
+	if mode == Mode.NIGHT and current_map() in SpawnRules.VAEL:
+		return VAEL_POOLS.duplicate()
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:
 		plan["dummy"] = 6
 		for model: String in MESENLLA_POOLS:
 			plan[model] = mini(int(MESENLLA_POOLS[model]), 4)
+		for model: String in VAEL_POOLS:
+			plan[model] = mini(int(VAEL_POOLS[model]), 4)
+		plan["leviathan"] = 1
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent
@@ -407,16 +500,25 @@ func load_settings() -> void:
 	board_prizes = _saved(c, "progress", "board_prizes", {})
 	finished_games = maxi(0, _saved(c, "progress", "finished_games", 0))
 	mists_wins = maxi(0, _saved(c, "progress", "mists_wins", 0))
+	lighthouses_lit = maxi(0, _saved(c, "progress", "lighthouses_lit", 0))
+	harbourmasters_beaten = maxi(0, _saved(c, "progress", "harbourmasters_beaten", 0))
+	vael_nights = maxi(0, _saved(c, "progress", "vael_nights", 0))
+	if vael_nights > 0 and not unlocked.has("tidecaller") and not ClassDefs.disabled("tidecaller"):
+		# Already won in Port Vael before one win was enough: the Tidecaller is theirs.
+		unlocked["tidecaller"] = true
+		fresh_unlocks.append("tidecaller")
 	mesenlla_wins = maxi(0, _saved(c, "progress", "mesenlla_wins", 0))
 	bastion_wins = maxi(0, _saved(c, "progress", "bastion_wins", 0))
 	changelog_seen = str(_saved(c, "progress", "changelog_seen", ""))
 	poison_dealt = maxf(0.0, _saved(c, "progress", "poison_dealt", 0.0))
+	killed_kinds = _saved(c, "progress", "killed_kinds", {})
 	owned_items = _saved(c, "progress", "owned_items", {})
 	switched_off = _saved(c, "progress", "switched_off", {})
 	migrate_items(owned_items)
 	migrate_items(switched_off)
 	pet = _saved(c, "progress", "pet", "wolf")
 	night_map = _saved(c, "progress", "night_map", "village")
+	if night_map == "lantern_road": night_map = "vael"
 	if not MAPS.has(night_map):
 		night_map = "village"
 	fort_map = _saved(c, "progress", "fort_map", "fort")
@@ -453,10 +555,14 @@ func save_settings() -> void:
 	c.set_value("progress", "board_prizes", board_prizes)
 	c.set_value("progress", "finished_games", finished_games)
 	c.set_value("progress", "mists_wins", mists_wins)
+	c.set_value("progress", "lighthouses_lit", lighthouses_lit)
+	c.set_value("progress", "harbourmasters_beaten", harbourmasters_beaten)
+	c.set_value("progress", "vael_nights", vael_nights)
 	c.set_value("progress", "mesenlla_wins", mesenlla_wins)
 	c.set_value("progress", "bastion_wins", bastion_wins)
 	c.set_value("progress", "changelog_seen", changelog_seen)
 	c.set_value("progress", "poison_dealt", poison_dealt)
+	c.set_value("progress", "killed_kinds", killed_kinds)
 	c.set_value("progress", "owned_items", owned_items)
 	c.set_value("progress", "switched_off", switched_off)
 	c.set_value("progress", "pet", pet)

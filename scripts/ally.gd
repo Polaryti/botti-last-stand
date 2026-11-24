@@ -9,15 +9,18 @@ extends Target
 const ATTACK_RANGE := 1.8
 const ATTACK_EVERY := 1.0
 const HEALTH := {"magician": 75.0, "artificer": 100.0, "infantry": 140.0, "rat": 40.0, "raven": 70.0, "snake": 90.0, "fox": 100.0, "ghost": 200.0, "wolf": 110.0, "decoy": 70.0, "body": 160.0, "mirror": 50.0, "skeleton": 70.0, "revenant": 110.0, "ranger": 90.0,
-	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0}
+	"mist_infantry": 117.0, "mist_ranger": 72.0, "mist_heavy": 221.0, "lodge_hunter": 90.0, "sea_serpent": TidecallerKit.SERPENT_HP}
 const KINDS := ["ghost", "wolf", "decoy", "mirror", "skeleton", "revenant", "raven", "snake", "fox", "rat", "body", "magician", "artificer", "infantry", "ranger",
-	"mist_infantry", "mist_ranger", "mist_heavy"] # new kinds go at the end: their index travels between phones
+	"mist_infantry", "mist_ranger", "mist_heavy", "lodge_hunter", "sea_serpent"] # new kinds go at the end: their index travels between phones
 ## Mist Bastion's garrison: who they are, what they hit for (a weapon blow is 1) and how far from
 ## their post they will go after an enemy.
-const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy"]
+## The Lodge hunters of the Trappers' Guild (TrappersGuild) keep watch the same way, bow in hand.
+const GARRISON := ["mist_infantry", "mist_ranger", "mist_heavy", "lodge_hunter"]
+const ARCHERS := ["mist_ranger", "lodge_hunter"] # the garrison's bowmen: they shoot from where they stand
 const GARRISON_BLOW := {"mist_infantry": 0.65, "mist_heavy": 1.04}
-const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2}
+const GARRISON_SPEED := {"mist_infantry": 5.2, "mist_ranger": 5.2, "mist_heavy": 4.2, "lodge_hunter": 5.4}
 const GARRISON_SIGHT := 18.0
+const GARRISON_THERE := 1.5 # metres from a spot a Mist Soldier walking to it counts as there
 const GARRISON_LEASH := 16.0
 const GARRISON_GATE_OUT := 4.0 # metres before its gate that a Mist Soldier stands
 const GARRISON_PORTAL_OUT := 5.0 # and from the portal, once its gate has fallen
@@ -25,9 +28,9 @@ const GARRISON_ABREAST := 1.7 # between soldiers side by side
 const GARRISON_RANGER_ROOM := 6.0 # how far from its place a Mist Ranger backs away from what comes at it
 const HEAVY_GUARD := 0.3 # the Mist Heavy's tower shield takes this much off every blow
 const RANGER_SHOT := 0.585 # of a weapon blow, every 1.1 seconds
-const BEASTS := ["wolf", "raven", "snake", "fox", "rat"]
-const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4}
-const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5}
+const BEASTS := ["wolf", "raven", "snake", "fox", "rat", "sea_serpent"]
+const BEAST_BITE := {"wolf": 1.0, "raven": 0.8, "snake": 0.7, "fox": 0.75, "rat": 0.4, "sea_serpent": TidecallerKit.SERPENT_BITE}
+const BEAST_SPEED := {"wolf": 7.0, "raven": 8.0, "snake": 7.4, "fox": 7.5, "rat": 7.5, "sea_serpent": 6.4}
 const RAVEN_HEIGHT := 2.1
 const SNAKE_POISON := 0.35
 const FOX_FOOD := 0.07 # a bite that turns something up, and of those, how many are food
@@ -62,8 +65,7 @@ var arrow_kind := "" # a Mist Ranger on a gate at Level 3 of Mist Reinforcements
 var perch_out := Vector3.ZERO
 var hand := ""
 var net_hand := 0 # another phone's word on what it holds: 0 bow, 1 longbow, 2 crossbow
-var _hand_mesh: MeshInstance3D
-var _back_mesh: MeshInstance3D
+var _hand_mesh: MeshInstance3D # a WeaponVisual for a bow or crossbow, else a plain mesh
 var _close_foe: Zombie
 var _lean := 0.0
 var _lean_to := 0.0
@@ -105,6 +107,8 @@ var _head: Node3D
 var _tail: Node3D
 var _idle_time := 0.0
 var _raven: BirdRig
+var _serpent: SeaSerpentBody
+var grown := 1.0 # a Deepcaller's serpent with Leviathan's Child is bigger
 var _was_striking := false
 var _last_yaw := 0.0
 
@@ -125,7 +129,7 @@ func _init(owner_world: World, ally_kind: String) -> void:
 		_build_beast(_visual_root())
 		return
 	var model: String = {"ghost": "beast", "decoy": "magic", "mirror": "magic", "revenant": "clever", "body": "clever", "magician": "magic", "artificer": "clever", "infantry": "clever", "ranger": "clever",
-		"mist_infantry": "clever", "mist_ranger": "clever", "mist_heavy": "beast"}.get(ally_kind, "skeleton")
+		"mist_infantry": "clever", "mist_ranger": "clever", "mist_heavy": "beast", "lodge_hunter": "clever"}.get(ally_kind, "skeleton")
 	if not _scenes.has(model):
 		_scenes[model] = load("res://assets/characters/%s.glb" % model)
 	_visual = (_scenes[model] as PackedScene).instantiate()
@@ -158,6 +162,10 @@ func activate(seconds: float) -> void:
 	net_biting = false
 	_was_striking = false
 	if _snake: _snake.reset_pose()
+	if _serpent:
+		_serpent.rise()
+		grown = 1.0
+		_visual.scale = Vector3.ONE
 	life = seconds
 	remote_owner = 0
 	master = null
@@ -168,7 +176,7 @@ func activate(seconds: float) -> void:
 	arrow_kind = ""
 	net_hand = 0
 	_close_foe = null
-	if kind == "mist_ranger":
+	if kind in ARCHERS:
 		arm("bow")
 		_lean = 0.0
 		if _visual:
@@ -213,6 +221,7 @@ func _build_beast(root: Node3D) -> void:
 	_legs.assign(made["legs"])
 	_snake = made.get("snake")
 	_raven = made.get("raven")
+	_serpent = made.get("serpent")
 
 
 static func _part(root: Node3D, mesh: Mesh, at: Vector3) -> MeshInstance3D:
@@ -228,6 +237,10 @@ static func build_beast_model(beast: String, root: Node3D) -> Dictionary:
 	match beast:
 		"raven": return _raven_model(root)
 		"snake": return _snake_model(root)
+		"sea_serpent":
+			var body := SeaSerpentBody.new()
+			root.add_child(body)
+			return {"head": body, "tail": body, "legs": [] as Array[Node3D], "serpent": body}
 	return _four_legs_model(beast, root)
 
 
@@ -337,6 +350,50 @@ func _tick_body(delta: float) -> void:
 		PathUpgrades.body_strikes(self, me)
 
 
+# --- A Deepcaller's sea serpent (TidecallerKit) ---------------------------------------------------
+
+## Pack Hunter: what the Deepcaller's Trident struck last, if it is still there and near.
+func _serpent_prey(seen: Zombie) -> Zombie:
+	var me := _master()
+	if me and me.has_flag("pack_hunter") and me.trident_prey and is_instance_valid(me.trident_prey) and me.trident_prey.is_alive() \
+			and me.trident_prey.position.distance_to(position) <= 16.0:
+		return me.trident_prey
+	return seen
+
+
+func _serpent_bite(z: Zombie, bite: float, me: Player) -> float:
+	if me == null:
+		return bite
+	if me.has_flag("pack_hunter") and z == me.trident_prey:
+		bite *= 1.0 + TidecallerKit.PACK_HUNTER
+	if me.has_flag("venom_of_the_deep"):
+		z.add_dot(TidecallerKit.VENOM.x, TidecallerKit.VENOM.y)
+	if me.has_flag("coil"):
+		z.root(TidecallerKit.COIL_HOLD, true)
+	return bite
+
+
+## Leviathan's Child: it lashes what the Trident just struck.
+func lash(z: Zombie, amount: float) -> void:
+	if dead or not z.is_alive():
+		return
+	var to := z.position - position
+	rotation.y = atan2(to.x, to.z)
+	_attack_left = 0.35
+	var me := _master()
+	var was := world.begin_act(me)
+	z.take_damage(amount, to, 1.5, z.centre())
+	world.end_act(was)
+	if not z.is_alive() and me:
+		me.on_ally_kill()
+
+
+## Called up again while it is still here: it dives and rises anew.
+func rise_again() -> void:
+	if _serpent:
+		_serpent.rise()
+
+
 func strike_anim() -> void:
 	_strike_left = 0.5
 	_current = ""
@@ -354,9 +411,13 @@ func _die() -> void:
 		me.mist_burst_at(position + Vector3.UP, 0.4)
 	if kind == "revenant" and me and not _faded:
 		PathUpgrades.soul_returns(me)
+	if kind == "sea_serpent" and me and not _faded:
+		TidecallerKit.serpent_fell(me)
+	if _serpent:
+		_serpent.sink()
 	dead = true
 	collision_layer = 0
-	_dying = 1.2 if _anim else 0.3
+	_dying = 1.2 if _anim else 1.0 if _serpent else 0.3
 	_current = ""
 	_play("Death_A", 1.3)
 	if me:
@@ -376,7 +437,7 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, net_yaw, minf(1.0, delta * 9.0))
 		var moving := was.distance_squared_to(global_position) > 0.000004
 		_attack_left = 0.25 if net_biting else 0.0
-		if kind == "mist_ranger":
+		if kind in ARCHERS:
 			arm(HANDS[net_hand])
 			_tick_lean(delta)
 			if hand == "crossbow":
@@ -419,6 +480,8 @@ func _tick_own(delta: float) -> void:
 		_think = 0.25
 		_foe = world.nearest_zombie(global_position + Vector3.UP, 16.0, true)
 		_rival = world.nearest_rival(global_position + Vector3.UP, 16.0)
+		if kind == "sea_serpent":
+			_foe = _serpent_prey(_foe)
 		if kind == "decoy" or kind == "body":
 			_foe = null
 			_rival = null
@@ -461,7 +524,7 @@ func _tick_own(delta: float) -> void:
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
 			world.hit_rival(_rival, WeaponDefs.DAMAGE * dmg_mult * 0.7, position)
-			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
+			world.sfx_at("serpent_bite" if kind == "sea_serpent" else "wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -6.0 if kind == "sea_serpent" else -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
 	elif _foe and _foe.is_alive():
@@ -474,7 +537,10 @@ func _tick_own(delta: float) -> void:
 			_attack_left = 0.5 if _anim else 0.25
 			_current = ""
 			_play("1H_Melee_Attack_Chop", 1.5)
-			_foe.take_damage(WeaponDefs.DAMAGE * dmg_mult * float(BEAST_BITE.get(kind, 0.7 if kind == "revenant" else 0.8 if kind == "skeleton" else 1.0)), to, 2.0, _foe.centre())
+			var bite := WeaponDefs.DAMAGE * dmg_mult * float(BEAST_BITE.get(kind, 0.7 if kind == "revenant" else 0.8 if kind == "skeleton" else 1.0))
+			if kind == "sea_serpent":
+				bite = _serpent_bite(_foe, bite, player)
+			_foe.take_damage(bite, to, 2.0, _foe.centre())
 			if _foe.is_alive() and kind == "artificer":
 				_foe.ignite(ZombieDefs.BURN_SECONDS)
 			if not _foe.is_alive() and player:
@@ -491,7 +557,9 @@ func _tick_own(delta: float) -> void:
 					Game.note_poison(40.0)
 			if kind == "fox":
 				_forage()
-			world.sfx_at("wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -10.0)
+			if kind == "sea_serpent":
+				world.fx_water(_foe.centre(), 0.7)
+			world.sfx_at("serpent_bite" if kind == "sea_serpent" else "wolf" if kind in ["wolf", "fox"] else "thunk" if BEASTS.has(kind) else "clang", position, -6.0 if kind == "sea_serpent" else -10.0)
 		if to.length() > 0.01:
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), min(1.0, delta * 9.0))
 	elif player:
@@ -524,7 +592,10 @@ func _tick_garrison(delta: float) -> void:
 	if _foe and not _foe.is_alive():
 		_foe = null
 	if perch != Vector3.INF:
-		_tick_perch(delta)
+		if kind == "lodge_hunter":
+			_tick_watch(delta)
+		else:
+			_tick_perch(delta)
 		return
 	var home := _garrison_home()
 	var fort := world.fort
@@ -544,7 +615,7 @@ func _tick_garrison(delta: float) -> void:
 	if _foe:
 		var to := _foe.position - position
 		to.y = 0.0
-		if kind == "mist_ranger":
+		if kind in ARCHERS:
 			if _cooldown <= 0.0:
 				_cooldown = 1.1
 				world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * _garrison_power())
@@ -572,7 +643,7 @@ func _tick_garrison(delta: float) -> void:
 	elif home != Vector3.INF:
 		var to := _garrison_step(home) - position
 		to.y = 0.0
-		if to.length() > 1.5:
+		if to.length() > GARRISON_THERE:
 			dir = to.normalized()
 			rotation.y = lerp_angle(rotation.y, atan2(to.x, to.z), minf(1.0, delta * 7.0))
 	if _attack_left > 0.0:
@@ -625,6 +696,31 @@ func _tick_perch(delta: float) -> void:
 		_play(_shoot_anim(), 1.0 if close else 1.5)
 
 
+## A Lodge hunter keeping watch from a tower (TrappersGuild): it stays up there and shoots its Long
+## Bow at the nearest creature it can see within PERCH_REACH.
+func _tick_watch(_delta: float) -> void:
+	global_position = perch
+	velocity = Vector3.ZERO
+	if _think <= 0.0:
+		_think = 0.3
+		_foe = world.nearest_zombie(global_position + Vector3.UP, PERCH_REACH, true)
+		if _foe and not world.has_line_of_sight(global_position + Vector3.UP * 1.4, _foe.centre()):
+			_foe = null
+	arm("longbow")
+	if _foe == null or not _foe.is_alive():
+		if _attack_left <= 0.0:
+			_play("Idle")
+		return
+	var to := _foe.position - position
+	rotation.y = atan2(to.x, to.z)
+	if _cooldown <= 0.0:
+		_cooldown = LONGBOW_EVERY
+		world.garrison_arrow(position + Vector3.UP * 1.4, _foe.centre(), WeaponDefs.DAMAGE * RANGER_SHOT * LONGBOW_SHOT * _garrison_power(), "", "longbow")
+		_attack_left = 0.35
+		_current = ""
+		_play(_shoot_anim(), 1.5)
+
+
 ## Where a Ranger on a gate shoots down from: leaning out beyond the parapet.
 func _lean_point() -> Vector3:
 	return perch + perch_out * LEAN_OUT + Vector3.UP * 1.0
@@ -652,7 +748,7 @@ func _foe_below() -> Zombie:
 func _shoot_anim() -> String:
 	if hand == "crossbow":
 		return "CrossbowDown"
-	return "2H_Ranged_Shoot" if kind in ["ranger", "mist_ranger"] else "Spellcast_Shoot"
+	return "2H_Ranged_Shoot" if kind in ["ranger", "mist_ranger", "lodge_hunter"] else "Spellcast_Shoot"
 
 
 ## Holds this bow in its hand; on a gate, the other one is slung on its back. With the Crossbow it
@@ -662,12 +758,20 @@ func arm(weapon: String) -> void:
 		return
 	hand = weapon
 	_lean_to = LEAN_TILT * 0.7 if weapon == "crossbow" else 0.0
-	_hand_mesh.mesh = WeaponDefs.mesh(weapon)
-	_hand_mesh.rotation = WeaponDefs.hand_rotation(weapon)
-	if _back_mesh:
-		_back_mesh.visible = weapon != "bow"
-		var slung := "crossbow" if weapon == "longbow" else "longbow"
-		_back_mesh.mesh = WeaponDefs.mesh(slung)
+	_hold(_hand_mesh as WeaponVisual, weapon)
+
+
+## A bow or a crossbow in the hand at the size a player's is (WeaponDefs.held_size), one at a time.
+## A bow is laid along where it faces, as a player's is; a crossbow follows the hand, so it aims
+## down with the arms when it leans out over a parapet.
+func _hold(held: WeaponVisual, weapon: String) -> void:
+	held.equip(weapon)
+	held.rotation = WeaponDefs.hand_rotation(weapon)
+	if weapon == "crossbow":
+		held.scale = Vector3.ONE * WeaponDefs.held_size(weapon) / maxf(0.01, _visual.global_basis.get_scale().x if _visual.is_inside_tree() else _visual.scale.x * scale.x)
+	else:
+		held.scale = Vector3.ONE
+		held.hold(self, true, WeaponDefs.held_size(weapon))
 
 
 ## Leans out over the parapet, or straightens up, a little at a time.
@@ -707,8 +811,13 @@ func _garrison_step(home: Vector3) -> Vector3:
 	from.y = 0.0
 	var along := from.dot(out)
 	var aside := (from - out * along).length()
-	if aside > 1.0 and along > -1.0:
-		return (g["at"] as Vector3) + out * maxf(2.0, minf(along, 4.0))
+	var mouth := (g["at"] as Vector3) + out * maxf(2.0, minf(along, 4.0))
+	var to_mouth := mouth - position
+	to_mouth.y = 0.0
+	# Off to the side of the gateway, it first comes in front of it; once there (as close as it counts
+	# as having arrived anywhere), straight on through to the far side.
+	if aside > 1.0 and along > -1.0 and to_mouth.length() > GARRISON_THERE:
+		return mouth
 	return (g["at"] as Vector3) - out * (Fort.WALL_T * 0.5 + 2.5)
 
 
@@ -738,6 +847,11 @@ func _move_wolf(delta: float, moving: bool) -> void:
 	if _snake:
 		_snake.moving = moving
 		_snake.biting = _attack_left > 0.0
+		return
+	if _serpent:
+		_serpent.moving = moving
+		_serpent.biting = _attack_left > 0.0 or net_biting
+		_visual.scale = _visual.scale.lerp(Vector3.ONE * grown, minf(1.0, delta * 3.0))
 		return
 	if _legs.is_empty():
 		return
@@ -777,31 +891,23 @@ func _equip_retinue() -> void:
 	var attachment := BoneAttachment3D.new()
 	attachment.bone_name = bone
 	skeleton.add_child(attachment)
-	var held := MeshInstance3D.new()
-	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind in ["ranger", "mist_ranger"] else "battleaxe" if kind == "mist_heavy" else "sword"
-	held.mesh = WeaponDefs.mesh(weapon)
-	held.rotation = WeaponDefs.hand_rotation(weapon)
-	held.scale = Vector3.ONE * 0.8 / _visual.scale.x
-	held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	attachment.add_child(held)
-	if kind == "mist_ranger":
+	var weapon := "staff" if kind == "magician" else "torch" if kind == "artificer" else "bow" if kind in ["ranger", "mist_ranger", "lodge_hunter"] else "battleaxe" if kind == "mist_heavy" else "sword"
+	var held: MeshInstance3D
+	if weapon == "bow":
+		# Bows (and a gate's Crossbow) at a player's size, one in the hand at a time.
+		held = WeaponVisual.new()
+		held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		attachment.add_child(held)
 		_hand_mesh = held
 		hand = weapon
-		# The bow it is not using, slung across its back (shown on a gate, where it carries two).
-		for back_bone: String in ["chest", "spine", "torso"]:
-			if skeleton.find_bone(back_bone) >= 0:
-				var on_back := BoneAttachment3D.new()
-				on_back.bone_name = back_bone
-				skeleton.add_child(on_back)
-				_back_mesh = MeshInstance3D.new()
-				_back_mesh.mesh = WeaponDefs.mesh("crossbow")
-				_back_mesh.position = Vector3(0.0, 0.1, -0.22) / _visual.scale.x
-				_back_mesh.rotation = Vector3(0.0, 0.0, 0.9)
-				_back_mesh.scale = Vector3.ONE * 0.8 / _visual.scale.x
-				_back_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				_back_mesh.visible = false
-				on_back.add_child(_back_mesh)
-				break
+		_hold(held as WeaponVisual, weapon)
+	else:
+		held = MeshInstance3D.new()
+		held.mesh = WeaponDefs.mesh(weapon)
+		held.rotation = WeaponDefs.hand_rotation(weapon)
+		held.scale = Vector3.ONE * 0.8 / _visual.scale.x
+		held.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		attachment.add_child(held)
 	if weapon == "torch":
 		var flame := MeshInstance3D.new()
 		flame.mesh = WorldLight.flame_mesh()

@@ -31,6 +31,7 @@ static var _arrow_mesh: Mesh
 static var _stone_mesh: Mesh
 static var _pellet_mesh: Mesh
 static var _keg_mesh: Mesh
+static var _shard_mesh: Mesh
 var _ember_spark_mat: StandardMaterial3D
 static var _fireball_mesh: Mesh
 static var _bolt_mesh: ArrayMesh
@@ -70,6 +71,8 @@ var dummy_spots: Array[Vector3] = []
 var rival_spots: Array[Vector3] = []
 ## On a stronghold with lanes: {kind: lane, muster or post, gate, at} (see MapSpot).
 var lane_marks: Array[Dictionary] = []
+var guild_marks: Array[Dictionary] = [] # the Trappers' Guild's places on the Valleys (MapSpot)
+var guild: TrappersGuild
 ## Mist Bastion's Mist Soldiers (null on every other map).
 var garrison: Garrison
 var stands: Array[Dictionary] = [] # the Sandbox's rows of things to try
@@ -101,11 +104,25 @@ var zombies: Array[Zombie] = []
 var pickups: Array[Pickup] = []
 var loot_spots: Array[Vector3] = []
 var cache_spots: Array[Vector3] = [] # where the ruins keep better things than lie about elsewhere
+var salvage_spots: Array[Transform3D] = [] # Port Vael: the wrecks' sea chests (MistTide)
+var vael_approaches: Array[Vector3] = []
+var vael_sites: VaelSites
+# The Lantern Road (Last Light): its road lanterns (where each flame hangs), its waystations, the top
+# of its lighthouse, and the run itself.
+var road_lanterns: Array[Vector3] = []
+var waystations: Array[Transform3D] = []
+var lighthouse_top := Vector3.INF
+var last_light: LastLight
+var tide: MistTide # Port Vael's Mist Tide, or null
+var _tide_fog := 1.0 # how much thicker the tide makes the fog
 var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
 var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
 var camp_fallen := false # the Valleys' camp, shelled and lost to the mist
+var fallen_camp := Vector3.INF # where it was, and how far it reached (w: radius)
+var fallen_radius := 0.0
 const PICKUP_APART := 6.0
 const WOOD_GATE_CLEARANCE := 18.0 # forest wood: out of the gates' approaches
+const STEEP_RISE := 0.9 # metres a metre: steeper than this, mobs cannot walk up it (they slide at 45°)
 const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itself
 ## Where new Fort wood lies: by the walls (6 to 15 m out), in the field (15 to 30 m) or in the woods.
 const WOOD_BANDS := {"near": 0.45, "field": 0.3, "forest": 0.25}
@@ -253,7 +270,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "lantern" if file.contains("lantern") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
@@ -310,6 +327,9 @@ func setup(game_mode: int) -> void:
 			elif mark["kind"] == "lane_way":
 				fort.add_lane_way(int(mark["gate"]), mark["at"])
 		fort.lay_ways()
+	if not terrain.coast.is_empty() or not terrain.sea.is_empty():
+		grid.block_steep(terrain, STEEP_RISE)
+		grid.fine_only = true
 	grid.astar.update()
 	grid.build_far_grid()
 	prepare_forest_wood()
@@ -317,6 +337,10 @@ func setup(game_mode: int) -> void:
 		_mists_look()
 	elif map_id in SpawnRules.MESENLLA:
 		_mesenlla_look()
+	elif map_id in SpawnRules.VAEL:
+		_vael_look()
+		if map_id == "vael" and mode != Game.Mode.MENU:
+			vael_sites = VaelSites.new(self)
 	elif mode in [Game.Mode.NIGHT, Game.Mode.FORT]:
 		var atmosphere := MistAtmosphere.new()
 		atmosphere.name = "VillageAura" if fort == null else "FortAura"
@@ -348,6 +372,11 @@ func setup(game_mode: int) -> void:
 		garrison = Garrison.new(self)
 		for kind: String in Garrison.ORDER:
 			prepare_allies(kind, 3)
+	if TrappersGuild.wanted(self):
+		guild = TrappersGuild.new(self, ShopDefs.map_upgrade_level(TrappersGuild.ID))
+		add_child(guild)
+		if guild.level >= 2:
+			prepare_allies("lodge_hunter", 4 if guild.level >= 4 else 2)
 	player = Player.new(self)
 	add_child(player)
 	var start: Vector3 = start_spots[0] if not start_spots.is_empty() else Vector3.ZERO
@@ -431,6 +460,8 @@ func fall_camp(centre: Vector3, radius: float) -> void:
 	if camp_fallen:
 		return
 	camp_fallen = true
+	fallen_camp = centre
+	fallen_radius = radius
 	for tower: Dictionary in watchtowers:
 		var at: Vector3 = tower["at"]
 		if not tower.get("ruined", false) and Vector2(at.x - centre.x, at.z - centre.z).length() <= radius + 4.0:
@@ -460,7 +491,7 @@ func in_reach(at: Vector3) -> bool:
 		var half := grid.half
 		_reach = grid.reach_from(starts, func(c: Vector2i) -> bool:
 			return c.x >= edge and c.y >= edge and c.x < side - edge and c.y < side - edge and terrain.is_walkable(c.x + 0.5 - half, c.y + 0.5 - half))
-		if _reach.count(1) < 400:
+		if _reach.count(1) < 400 and map_id != "vael":
 			_reach.fill(1) # the start itself was on a ledge: better everything than nothing
 	var cell := grid.to_cell(at)
 	return _reach[cell.y * grid.size + cell.x] == 1
@@ -527,7 +558,14 @@ func storm_air() -> void:
 func set_fog_thickness(amount: float) -> void:
 	if not is_equal_approx(amount, _fog_thick):
 		_fog_thick = amount
-		_env.fog_density = _fog_now * _fog_thick
+		_env.fog_density = _fog_now * _fog_thick * _tide_fog
+
+
+## The Mist Tide rolling in thickens the fog over all of Port Vael.
+func set_tide_fog(amount: float) -> void:
+	if not is_equal_approx(amount, _tide_fog):
+		_tide_fog = amount
+		_env.fog_density = _fog_now * _fog_thick * _tide_fog
 
 
 ## Lightning lights up the whole world for a moment.
@@ -556,15 +594,28 @@ const MENU_TOUR := [
 	[Vector3(-34, 34, 28), Vector3(-8, 2, 58)],
 	[Vector3(-14, 13, 60), Vector3(20, 8, 30)],
 ]
+## The title screen of The Sunken Crown flies over Port Vael: in from the open sea toward the Tide
+## King's statue, over the whale bones on the flats, up over the roofs to look out at the drowned
+## city's spires under the aurora, round by the Sea Gate in the west and low over the fallen king.
+const MENU_TOUR_VAEL := [
+	[Vector3(0, 9, 104), Vector3(0, 6, -24)],
+	[Vector3(46, 13, 64), Vector3(6, 4, 12)],
+	[Vector3(42, 22, -18), Vector3(-8, 4, 70)],
+	[Vector3(-6, 30, -82), Vector3(0, 10, 60)],
+	[Vector3(-62, 18, -22), Vector3(-48, 2, 48)],
+	[Vector3(-58, 10, 66), Vector3(14, 10, 170)],
+	[Vector3(-24, 9, 98), Vector3(4, 6, -10)],
+]
 const MENU_LEG := 22.0 # seconds from one point of the tour to the next
 
 
 func _menu_view() -> void:
-	if map_id != "mesenlla":
+	var tour := _menu_tour()
+	if tour.is_empty():
 		menu_camera.position = Vector3(cos(_orbit) * 38.0, 24.0, sin(_orbit) * 38.0)
 		menu_camera.look_at(Vector3(0, 18.0, 0))
 		return
-	var n := MENU_TOUR.size()
+	var n := tour.size()
 	var t := fmod(_orbit / 0.05 / MENU_LEG, float(n))
 	var i := int(t)
 	var f := t - i
@@ -575,13 +626,21 @@ func _menu_view() -> void:
 	menu_camera.look_at(look)
 
 
+func _menu_tour() -> Array:
+	match map_id:
+		"mesenlla": return MENU_TOUR
+		"vael": return MENU_TOUR_VAEL
+	return []
+
+
 ## A Catmull-Rom curve through the tour, so it passes through every point smoothly.
 func _tour_point(i: int, f: float, which: int) -> Vector3:
-	var n := MENU_TOUR.size()
-	var p0: Vector3 = MENU_TOUR[posmod(i - 1, n)][which]
-	var p1: Vector3 = MENU_TOUR[i % n][which]
-	var p2: Vector3 = MENU_TOUR[(i + 1) % n][which]
-	var p3: Vector3 = MENU_TOUR[(i + 2) % n][which]
+	var tour := _menu_tour()
+	var n := tour.size()
+	var p0: Vector3 = tour[posmod(i - 1, n)][which]
+	var p1: Vector3 = tour[i % n][which]
+	var p2: Vector3 = tour[(i + 1) % n][which]
+	var p3: Vector3 = tour[(i + 2) % n][which]
 	return 0.5 * ((2.0 * p1) + (-p0 + p2) * f + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * f * f + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * f * f * f)
 
 
@@ -590,7 +649,7 @@ func _map_file() -> String:
 	if Game.test_map != "":
 		return Game.test_map
 	match mode:
-		Game.Mode.MENU: return "res://maps/mesenlla.tscn"
+		Game.Mode.MENU: return "res://maps/vael.tscn" # the title screen of The Sunken Crown
 		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
@@ -598,6 +657,10 @@ func _map_file() -> String:
 				return "res://maps/mists.tscn"
 			if Game.current_map() == "mesenlla":
 				return "res://maps/mesenlla.tscn"
+			if Game.current_map() == "vael":
+				return "res://maps/vael.tscn"
+			if Game.current_map() == "lantern_road":
+				return "res://maps/lantern_road.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -702,14 +765,17 @@ func add_window_xf(t: Transform3D, size: Vector3) -> void:
 	_windows.add_child(cs)
 
 
-func add_barrier(at: Vector3, size: Vector3) -> void:
+## An unseen wall that stops bodies. With closes_paths, nothing paths through it either (pass false for
+## one high off the ground, over ground that stays open below, such as over a gateway).
+func add_barrier(at: Vector3, size: Vector3, closes_paths := true) -> void:
 	var shape := BoxShape3D.new()
 	shape.size = size
 	var cs := CollisionShape3D.new()
 	cs.shape = shape
 	cs.position = at
 	_barriers.add_child(cs)
-	grid.block_box(at, size)
+	if closes_paths:
+		grid.block_box(at, size)
 
 
 ## A flock takes turns, so there is always time to deal with the crow that is coming.
@@ -898,6 +964,18 @@ func add_collider(at: Vector3, size: Vector3) -> void:
 	_body.add_child(cs)
 
 
+func add_round_solid(at: Vector3, radius: float, height: float) -> void:
+	var shape := CylinderShape3D.new()
+	shape.radius = radius
+	shape.height = height
+	var collider := CollisionShape3D.new()
+	collider.shape = shape
+	collider.position = at
+	_body.add_child(collider)
+	if at.y - height * 0.5 - ground_at(at) < 1.8:
+		grid.block_box(at, Vector3(radius * 2.0, height, radius * 2.0))
+
+
 func add_solid(at: Vector3, size: Vector3) -> void:
 	add_collider(at, size)
 	if at.y - size.y * 0.5 - ground_at(at) < 1.8:
@@ -1047,6 +1125,47 @@ func _mesenlla_look() -> void:
 	_apply_sky(_last_dawn)
 
 
+## Port Vael: a cold grey-green night over the sea, a low white moon, sea-mist on the ground, and the
+## Mist Tide coming in and going out over the flats (MistTide), the wrecks' sea chests on them.
+func _vael_look() -> void:
+	night_bg = Color(0.03, 0.07, 0.1)
+	night_fog_colour = Color(0.13, 0.21, 0.23)
+	night_fog = 0.012 if Game.quality > 0 else 0.015
+	day_fog = 0.005 if Game.quality > 0 else 0.008
+	night_ambient = Color(0.4, 0.5, 0.56)
+	night_sky_shows = true
+	night_moon_colour = Color(0.8, 0.9, 1.0)
+	night_moon = 0.6
+	if map_id == "vael":
+		night_fog_colour = Color(0.19, 0.20, 0.28)
+		night_ambient = Color(0.47, 0.47, 0.61)
+		night_moon_colour = Color(0.91, 0.84, 1.0)
+		_sky_material.set_shader_parameter("highland_dusk", 0.92)
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.name = "VaelAura"
+	atmosphere.world = self
+	atmosphere.place = MistAtmosphere.Place.VAEL_COAST if map_id == "vael" else MistAtmosphere.Place.VAEL
+	add_child(atmosphere)
+	# The Mists glow green over the drowned kingdom: out to sea (south) at Port Vael, all round on
+	# the Lantern Road.
+	_sky_material.set_shader_parameter("sea", 1.0)
+	_sky_material.set_shader_parameter("aurora", 1.0 if map_id == "vael" else 0.0)
+	# The drowned city stands far out at sea: the sky has to be further away than its spires.
+	_sky_root.scale = Vector3.ONE * 2.85 # 274 m: inside the camera's 300
+	_sky_material.set_shader_parameter("sea_dir", Vector3(0, 0, 1) if map_id == "vael" else Vector3(0, 0, -1))
+	if Ambience.wanted(self):
+		add_child(Ambience.new(self))
+	tide = MistTide.new(self, map_id == "lantern_road") # on the Lantern Road the tide never goes out
+	add_child(tide)
+	if map_id == "lantern_road" and mode == Game.Mode.NIGHT:
+		last_light = LastLight.new(self)
+		add_child(last_light)
+	for spot: Transform3D in salvage_spots:
+		tide.add_salvage(Vector3(spot.origin.x, ground_at(spot.origin), spot.origin.z), spot.basis.get_euler().y)
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
+
+
 ## A violet night with nothing under it.
 func _mists_look() -> void:
 	night_bg = Color(0.012, 0.025, 0.055)
@@ -1124,6 +1243,8 @@ func _apply_sky(dawn: float) -> void:
 	_sky_material.set_shader_parameter("dawn", dawn)
 	if _water_material:
 		_water_material.set_shader_parameter("dawn", bright)
+	if tide:
+		tide.set_dawn(bright)
 	_sky_material.set_shader_parameter("sun_dir", _sun_direction(dawn))
 	_star_material.albedo_color = Color(1, 1, 1, clampf(1.0 - dawn * 1.8, 0.0, 1.0))
 	_night_dome.visible = dawn < 0.56 and not wet and night_sky_shows
@@ -1133,7 +1254,7 @@ func _apply_sky(dawn: float) -> void:
 	_env.ambient_light_energy = _ambient_now
 	_env.fog_light_color = night_fog_colour.lerp(DAWN_FOG, warm)
 	_fog_now = lerpf(night_fog, day_fog, bright) * (1.35 if wet else 1.0)
-	_env.fog_density = _fog_now * _fog_thick
+	_env.fog_density = _fog_now * _fog_thick * _tide_fog
 	_moon.rotation_degrees = Vector3(lerpf(-48.0, -13.0, bright), lerpf(-32.0, -150.0, bright), 0.0)
 	_moon_colour = night_moon_colour.lerp(Color(1.0, 0.68, 0.42), warm)
 	_moon.light_color = _moon_colour
@@ -1175,6 +1296,8 @@ func take_path_budget() -> bool:
 
 func _process(delta: float) -> void:
 	_tick_fx(delta)
+	VaelMind.sing(self) # any Siren singing draws this phone's players in (at Port Vael, or in the Sandbox)
+	VaelMind.whirl(self) # and so does the Kraken's whirlpool
 	for s: Dictionary in _spinners:
 		(s["node"] as Node3D).rotate_object_local(s["axis"], float(s["speed"]) * delta)
 	_tick_fires(delta)
@@ -1564,6 +1687,7 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 	var cos_limit := cos(half_cone)
 	var left: int = stats["hits"]
 	var hits := 0
+	last_melee.clear()
 	for z: Zombie in zombies.duplicate():
 		if left <= 0:
 			break
@@ -1575,14 +1699,25 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 		var dist := flat.length()
 		# What counts is the edge of the body, not its middle.
 		var body := z.body_radius()
-		if dist > range_m + body or absf(to.y) > 3.0:
+		# A tall body (the Leviathan, the Kraken) can be struck anywhere up its height.
+		if dist > range_m + body or absf(to.y) > maxf(3.0, z.height * 0.55):
 			continue
 		if dist > 0.7 and (flat / dist).dot(flat_forward) < cos(minf(half_cone + atan2(body, dist), PI)):
 			continue
 		# A blade cannot reach through a wall, nor through a window.
 		if not _reachable(origin, centre):
 			continue
-		damage_zombie(z, attacker.modify_damage(z, float(stats["damage"])), forward, float(stats["knock"]), centre, false)
+		var push := forward
+		var knock := float(stats["knock"])
+		if d.has("drags"):
+			# A Boarding Hook pulls what it catches towards you: about drags metres, if it can be dragged.
+			push = Vector3(origin.x - centre.x, 0, origin.z - centre.z).normalized()
+			knock = float(d["drags"]) * 8.0 * z._scale if z.draggable() else 0.0
+		var blow := attacker.modify_damage(z, float(stats["damage"]))
+		if d.has("tide") and attacker.class_id == "tidecaller":
+			blow *= TidecallerKit.trident_scale(attacker, z) # the Trident's own tree: Skewer, Brine, Charged Tines
+		damage_zombie(z, blow, push, knock, centre, false)
+		last_melee.append(z)
 		attacker.on_melee_connect(z, d)
 		hits += 1
 		left -= 1
@@ -1628,6 +1763,10 @@ func _shot_mesh(id: String) -> Mesh:
 			return WeaponDefs.chakram_mesh()
 		"bolas":
 			return WeaponDefs.bolas_mesh()
+		"harpoon":
+			return WeaponDefs.harpoon_mesh()
+		"flare":
+			return WeaponDefs.flare_mesh()
 		"stone":
 			if _stone_mesh == null:
 				var l := LowPoly.new()
@@ -1646,6 +1785,14 @@ func _shot_mesh(id: String) -> Mesh:
 				l.box(Vector3(0.035, 0.235, 0), Vector3(0.035, 0.035, 0.035), Color(1.0, 0.75, 0.25))
 				_keg_mesh = l.commit()
 			return _keg_mesh
+		"shard":
+			# Shattered Mirror: a long sliver of silvered glass, pale blue at its bright edge.
+			if _shard_mesh == null:
+				var l := LowPoly.new()
+				l.prism(Vector3(0, 0, 0.16), Vector3(0, 0, -0.2), 0.045, 0.0, 3, Color(0.78, 0.92, 1.0))
+				l.prism(Vector3(0, 0, 0.16), Vector3(0, 0, 0.22), 0.045, 0.02, 3, Color(0.55, 0.7, 0.85))
+				_shard_mesh = l.commit()
+			return _shard_mesh
 		"pellet":
 			# Grapeshot: a lump of hot iron, a little star of two crossed cubes glowing like a coal.
 			if _pellet_mesh == null:
@@ -1671,6 +1818,17 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 			shot.hit_sound = "chakram_hit"
 		elif kind == "bolas":
 			shot.hit_sound = "bolas_wrap"
+		elif kind == "harpoon":
+			shot.hit_sound = "harpoon_hit"
+			shot.pins = float(d.get("pins", 0.0))
+			shot.tether = true
+			shot.harpoon_mark = p.class_id == "harpooner"
+		elif kind == "flare":
+			shot.is_flare = true
+			shot.blast_radius = 0.01
+			shot.glow = Flare.COLOR
+			var by := p
+			shot.on_burst = func(at: Vector3) -> void: flare(at, by)
 		shot.slow_secs = float(d.get("slows", 0.0))
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
@@ -1681,7 +1839,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 		shot.sharp = p.has_flag("sharpshooter")
 		shot.from_player = from_hand
 		if Net.active():
-			Net.shot(6 if look == "pellet" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
+			Net.shot(6 if look == "pellet" else 11 if look == "shard" else 8 if kind == "harpoon" else 9 if kind == "flare" else 5 if kind == "bolas" else 3 if shot.spins else 0, at, vel, grav, max_range, burning, Color(0.2, 0.9, 0.1) if shot.poison.y > 0 or shot.poison_trail else Color.WHITE)
 	return shot
 
 
@@ -1693,8 +1851,116 @@ func familiar_arrow(p: Player, target: Node3D) -> void:
 	sfx_at("bow", from, -9.0)
 
 
+## A Leviathan Hunter's Great Harpoon: a heavy iron that flies through everything in its way, pinning
+## and marking all it strikes.
+func spawn_great_harpoon(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float) -> void:
+	var shot := _launch(Projectile.Kind.ARROW, great_harpoon_mesh(), at, vel, 2.0, max_range, dmg, 3.0, false, 0)
+	if shot == null:
+		return
+	shot.set_owner_player(p)
+	shot.from_player = true
+	shot.hit_sound = "harpoon_hit"
+	shot.pins = HarpoonerKit.GREAT_PIN
+	shot.pierce = 99
+	shot.harpoon_mark = true
+	if Net.active():
+		Net.shot(10, at, vel, 2.0, max_range, false, Color.WHITE)
+
+
+## The Great Harpoon: the whaler's iron, half as big again, with a broad flued head.
+var _great_harpoon: Mesh
+func great_harpoon_mesh() -> Mesh:
+	if _great_harpoon == null:
+		var l := LowPoly.new()
+		var wood := Color(0.42, 0.3, 0.18)
+		var iron := Color(0.32, 0.34, 0.36)
+		l.prism(Vector3(0, 0, 0.9), Vector3(0, 0, -1.5), 0.04, 0.036, 6, wood)
+		for z: float in [-1.35, -1.25, 0.6, 0.7]:
+			l.prism(Vector3(0, 0, z), Vector3(0, 0, z - 0.05), 0.045, 0.045, 6, Color(0.12, 0.1, 0.09))
+		l.prism(Vector3(0, 0, -1.5), Vector3(0, 0, -1.85), 0.022, 0.02, 5, iron)
+		l.prism(Vector3(0, 0, -1.85), Vector3(0, 0, -2.2), 0.08, 0.0, 4, Color(0.72, 0.75, 0.8))
+		for side: float in [-1.0, 1.0]:
+			l.prism(Vector3(side * 0.05, 0, -1.92), Vector3(side * 0.13, 0, -1.8), 0.02, 0.0, 3, Color(0.62, 0.65, 0.7))
+		_great_harpoon = l.commit()
+	return _great_harpoon
+
+
+## A Tidecaller's wave, a Stormcaller's lightning and Maelstrom, a Tidewarden's burst: each phone has
+## its own copy, and the caster's phone (or the host, for a bot) does the sums.
+func tide_wave(owner_peer: int, from: Vector3, dir: Vector3, width: float, length: float, damage: float) -> TideWave:
+	var wave := TideWave.new(self, owner_peer, from, dir, width, length, damage)
+	add_child(wave)
+	return wave
+
+
+## The Stormspear's flight and every leap of its lightning, through these points in turn.
+func storm_arcs(points: PackedVector3Array) -> void:
+	if points.size() < 2:
+		return
+	var arcs := StormArc.new(points)
+	add_child(arcs)
+
+
+func maelstrom(owner_peer: int, at: Vector3) -> Maelstrom:
+	var cell := Maelstrom.new(self, owner_peer, at)
+	add_child(cell)
+	return cell
+
+
+## A Tide Shell gives way: a ring of seawater thrown out over the ground.
+func tide_burst(at: Vector3, reach: float) -> void:
+	var ground := Vector3(at.x, ground_at(at), at.z)
+	fx_ring(ground, reach, Color(0.55, 0.95, 0.95))
+	fx_ring(ground, reach * 0.6, Color(0.8, 1.0, 0.98))
+	fx_mist(ground + Vector3.UP * 0.5, reach * 0.22)
+	for i in 10:
+		var a := TAU * i / 10.0
+		fx_gore(ground + Vector3(cos(a) * reach * 0.7, 0.5, sin(a) * reach * 0.7), Color(0.82, 0.98, 1.0))
+	sfx_here("shell_burst", ground, -1.0)
+
+
+func black_water(owner_peer: int, from: Vector3, to: Vector3, seconds: float) -> BlackWater:
+	var wake := BlackWater.new(self, owner_peer, from, to, seconds)
+	add_child(wake)
+	return wake
+
+
+## A Rigger's lines on this phone, everyone's.
+var rig_lines: Array[RigLine] = []
+
+
+## A Rigger stakes a line. The oldest of theirs comes up when they have more than they may keep, and with
+## Cat's Cradle the new line also ties itself to the far ends of the others.
+func rig_line(owner_peer: int, from: Vector3, to: Vector3, seconds: float, bits: int, keep: int, cradle: bool) -> RigLine:
+	var line := RigLine.new(self, owner_peer, from, to, seconds, bits)
+	add_child(line)
+	var own: Array[RigLine] = []
+	for l: RigLine in rig_lines:
+		if is_instance_valid(l) and l.owner_peer == owner_peer and not l.cradle:
+			own.append(l)
+	while own.size() >= keep:
+		remove_rig_line(own.pop_front())
+	rig_lines.append(line)
+	if cradle:
+		for other: RigLine in own:
+			if Vector2(other.b.x - to.x, other.b.z - to.z).length() <= HarpoonerKit.RIG_REACH * 1.5:
+				var tie := RigLine.new(self, owner_peer, to, other.b, minf(seconds, other.left), bits)
+				tie.cradle = true
+				tie.tied_to = line
+				tie.tied_also = other
+				add_child(tie)
+				rig_lines.append(tie)
+	return line
+
+
+func remove_rig_line(line: RigLine) -> void:
+	rig_lines.erase(line)
+	if is_instance_valid(line):
+		line.queue_free()
+
+
 ## A Highwayman's thrown knife.
-func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float, bounce: int, bleed: bool, slows: bool, close: bool) -> void:
+func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: float, bounce: int, bleed: bool, slows: bool, close: bool, toll := false) -> void:
 	var shot := _launch(Projectile.Kind.ARROW, WeaponDefs.mesh("dagger"), at, vel, 0.0, max_range, dmg, 1.0, false, bounce)
 	if shot == null:
 		return
@@ -1708,8 +1974,12 @@ func spawn_knife(p: Player, at: Vector3, vel: Vector3, max_range: float, dmg: fl
 		shot.slow_secs = AbilityNumbers.FAN_SLOW
 	if close:
 		shot.close_from = at
+	if toll:
+		# The Toll: the knife pins what it strikes, and gleams gold as it flies.
+		shot.pins = CrownUpgrades.TOLL_PIN
+		shot.toll = true
 	if Net.active():
-		Net.shot(4, at, vel, 0.0, max_range, false, Color.WHITE)
+		Net.shot(4, at, vel, 0.0, max_range, false, CrownUpgrades.COIN if toll else Color.WHITE)
 
 
 ## A Mercenary's Nightfall, on this phone.
@@ -1724,6 +1994,25 @@ func plant_beacon(owner_peer: int, at: Vector3, cfg: Dictionary, yaw: float) -> 
 	at.y = ground_at(at)
 	survey.add(at, cfg, yaw)
 	return survey
+
+
+## A Cartographer's beacons, if it has any standing, else null.
+func survey_of(owner_peer: int) -> SurveyNet:
+	var found: Variant = surveys.get(owner_peer)
+	return found if found != null and is_instance_valid(found) else null
+
+
+## A Mercenary's Contract on a creature, as this phone shows it: a gold seal turning over its head.
+func show_contract(z: Zombie, secs: float) -> void:
+	if z == null or not z.is_alive():
+		return
+	var old := z.get_node_or_null("ContractSeal")
+	if old:
+		old.queue_free()
+	var seal := ContractSeal.new(z, secs)
+	seal.name = "ContractSeal"
+	z.add_child(seal)
+	sfx_at("contract_seal", z.position, -3.0)
 
 
 ## A Cartographer's beacons take up its new settings.
@@ -1747,7 +2036,14 @@ func spawn_path_field(owner_peer: int, kind: String, at: Vector3) -> PathField:
 	at.y = ground_at(at)
 	var f := PathField.new(self, owner_peer, kind, at)
 	add_child(f)
+	if kind == "blaze":
+		# A trail mark points on from the one before it, on every phone alike.
+		var last: Variant = _last_blaze.get(owner_peer)
+		if last != null and (last as Vector3).distance_to(at) < CrownUpgrades.BLAZE_GAP * 2.5:
+			f.turn_to(at - (last as Vector3))
+		_last_blaze[owner_peer] = at
 	return f
+var _last_blaze := {} # peer -> where that Pathfinder's last trail mark went down
 
 
 ## A Rat King's Rat Tide, as seen on this phone.
@@ -1925,7 +2221,16 @@ func spawn_enemy_arrow(at: Vector3, target: Vector3, damage: float, max_range: f
 
 # --- The Sandbox ----------------------------------------------------------------
 
+const STAND_GAP := 3.6 # metres between things on a stand
+const STAND_MARGIN := 3.0 # how far in from the edge of the play area a stand row stops
+
+
+func _inside_play(at: Vector3, margin: float) -> bool:
+	return absf(at.x) <= play_half - margin and absf(at.z) <= play_half - margin
+
+
 ## Lays out one of everything along the rows the map marks, each taken thing coming back soon after.
+## A row that would run past the edge of the play area wraps into further rows, in towards the middle.
 func set_up_stands() -> void:
 	_stand_items.clear()
 	for row: Dictionary in stands:
@@ -1938,7 +2243,7 @@ func set_up_stands() -> void:
 						entries.append([Pickup.Kind.WEAPON, id])
 			"item":
 				for id: String in PowerDefs.ALL:
-					if not PowerDefs.ALL[id]["familiar"] and not PowerDefs.ALL[id].has("spec"):
+					if not PowerDefs.ALL[id]["familiar"] and not PowerDefs.ALL[id].has("spec") and not PowerDefs.ALL[id].get("relic", false):
 						entries.append([Pickup.Kind.POWER, id])
 				for id: String in PowerDefs.FOODS:
 					entries.append([Pickup.Kind.FOOD, id])
@@ -1947,9 +2252,18 @@ func set_up_stands() -> void:
 				for id: String in PowerDefs.ALL:
 					if PowerDefs.ALL[id]["familiar"]:
 						entries.append([Pickup.Kind.POWER, id])
+		# As many to a row as fit inside the play area; the rest in rows further in towards the middle.
+		var start: Vector3 = row["at"]
+		var inward := along.cross(Vector3.UP)
+		if inward.dot(-start) < 0.0:
+			inward = -inward
+		var per_row := 1
+		while per_row < entries.size() and _inside_play(start + along * (per_row * STAND_GAP), STAND_MARGIN):
+			per_row += 1
 		for i in entries.size():
-			var at: Vector3 = row["at"] + along * (i * 3.6)
+			var at: Vector3 = start + along * ((i % per_row) * STAND_GAP) + inward * ((i / per_row) * STAND_GAP)
 			_stand_items.append({"kind": entries[i][0], "id": entries[i][1], "at": at, "item": null, "wait": 0.0})
+		var first_row := mini(per_row, entries.size())
 		var sign_post := Label3D.new()
 		sign_post.text = {"weapon": "Weapons", "item": "Potions and food", "familiar": "Familiars"}[str(row["kind"])]
 		sign_post.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -1958,7 +2272,7 @@ func set_up_stands() -> void:
 		sign_post.pixel_size = 0.012
 		sign_post.modulate = UiTheme.BONE
 		sign_post.outline_size = 12
-		sign_post.position = (row["at"] as Vector3) + along * (entries.size() - 1) * 1.8 + Vector3.UP * 3.2
+		sign_post.position = start + along * (first_row - 1) * STAND_GAP * 0.5 - inward * 1.2 + Vector3.UP * 3.2
 		add_child(sign_post)
 
 
@@ -2215,6 +2529,8 @@ func spawn_zombie(id: String, at := Vector3.INF) -> bool:
 	zombies.append(z)
 	var minute := director.minute() if director else 0
 	z.spawn(id, at, minute)
+	if vael_sites and not _warming and not Net.is_client() and not players.is_empty() and not z.dormant and not z.def.get("rooted", false):
+		z._start_chase(random_player_position())
 	if z.is_boss() and director and not _warming and not Net.is_client():
 		director.boss_entrance(id) # every boss enters with its card (Director.BOSS_CARDS)
 	z.fort_gate = gate
@@ -2284,6 +2600,8 @@ func net_spawn_pickup(net_id: int, kind: int, item: String, bonus: int, at: Vect
 	p.setup(kind, item, bonus)
 	add_child(p)
 	p.global_position = at
+	if vael_sites and vael_sites.holds_supplies(at):
+		p.life = INF
 	p.net_id = net_id
 	_pickup_ids[net_id] = p
 	pickups.append(p)
@@ -2311,12 +2629,23 @@ func net_visual_shot(mesh: int, at: Vector3, vel: Vector3, grav: float, reach: f
 		m = _shot_mesh("pellet")
 	elif mesh == 7:
 		m = _shot_mesh("keg")
+	elif mesh == 8:
+		m = WeaponDefs.harpoon_mesh()
+	elif mesh == 9:
+		m = WeaponDefs.flare_mesh()
+	elif mesh == 10:
+		m = great_harpoon_mesh()
+	elif mesh == 11:
+		m = _shot_mesh("shard")
 	var shot := _launch(Projectile.Kind.ARROW, m, at, vel, grav, reach, 0.0, 0.0, fire)
 	if shot:
 		shot.visual = true
+		if mesh == 9:
+			shot.glow = Flare.COLOR
 		shot.spins = mesh == 3 or mesh == 4 or mesh == 5 or mesh == 7
 		if mesh == 4:
 			shot.spin_axis = Vector3.RIGHT
+			shot.toll = col.is_equal_approx(CrownUpgrades.COIN)
 		if mesh == 0 and col.g > col.r + 0.3:
 			shot.poison_trail = true
 
@@ -2472,6 +2801,66 @@ func random_player_position() -> Vector3:
 	return players[randi() % players.size()].global_position
 
 
+## Somewhere open between lo and hi metres from `near`, or Vector3.INF if no try found one.
+func spawn_point_near(near: Vector3, lo: float, hi: float, test := Callable()) -> Vector3:
+	for i in 14:
+		var a := randf() * TAU
+		var at := near + Vector3(cos(a), 0, sin(a)) * randf_range(lo, hi)
+		if absf(at.x) > play_half - 3.0 or absf(at.z) > play_half - 3.0:
+			continue
+		if not terrain.is_walkable(at.x, at.z) or not grid.is_free(grid.to_cell(at)):
+			continue
+		if test.is_valid() and not test.call(at):
+			continue
+		at.y = ground_at(at)
+		return at
+	return Vector3.INF
+
+
+## Port Vael: something the high tide carries in, out over the flooded flats near someone.
+func spawn_on_tide(id: String) -> bool:
+	if vael_sites:
+		var shore := vael_sites.enemy_site(14.0, 80.0, VaelSites.Shore.FLOODED)
+		return shore != Vector3.INF and spawn_zombie(id, shore)
+	if tide == null:
+		return false
+	var at := spawn_point_near(random_player_position(), 14.0, 36.0, func(p: Vector3) -> bool: return tide.flooded(p))
+	return at != Vector3.INF and spawn_zombie(id, at)
+
+
+## Port Vael: an Angler buried on the shore or the seabed, its lure showing, a little way from anyone.
+func spawn_angler() -> bool:
+	if vael_sites:
+		var shore := vael_sites.enemy_site(12.0, 75.0, VaelSites.Shore.EXPOSED)
+		return shore != Vector3.INF and spawn_zombie("angler", shore)
+	var at := spawn_point_near(random_player_position(), 12.0, 40.0, func(p: Vector3) -> bool:
+		return terrain.height(p.x, p.z) < MistTide.HIGH_Y + 0.4 and (tide == null or not tide.flooded(p)))
+	return at != Vector3.INF and spawn_zombie("angler", at)
+
+
+## Port Vael: a Siren at the water's edge, down on the flats a way off from someone.
+func spawn_siren() -> bool:
+	if vael_sites:
+		var shore := vael_sites.enemy_site(18.0, 85.0, VaelSites.Shore.WATERLINE)
+		return shore != Vector3.INF and spawn_zombie("siren", shore)
+	var at := spawn_point_near(random_player_position(), 18.0, 34.0, func(p: Vector3) -> bool:
+		return terrain.height(p.x, p.z) < MistTide.HIGH_Y + 0.4 and not terrain.open_sea(p.x, p.z))
+	return at != Vector3.INF and spawn_zombie("siren", at)
+
+
+## Port Vael: the Kraken rises in a ring around a flooded approach.
+const KRAKEN_RING := 5.5
+func raise_kraken() -> int:
+	if not vael_sites:
+		return 0
+	var risen := 0
+	for at: Vector3 in vael_sites.kraken_sites(KRAKEN_RING, VaelMind.ARMS):
+		if spawn_zombie("kraken_arm", at):
+			risen += 1
+			fx_water(at, 2.4, Color(0.72, 0.9, 0.92), true)
+	return risen
+
+
 func spawn_mimic() -> bool:
 	for i in 8:
 		var at: Vector3 = _loot_near_players()
@@ -2508,6 +2897,8 @@ func banner(text: String, seconds: float) -> void:
 ## Out of sight and far from every player, at the edge of what they can hear. The map is big,
 ## so the search stays around the players: a zombie across the river would never find them.
 func _pick_spawn_point(fort_gate := -1) -> Vector3:
+	if vael_sites and not _warming:
+		return vael_sites.enemy_site()
 	var best := Vector3.INF
 	var best_score := -INF
 	for i in 16:
@@ -2572,11 +2963,22 @@ func recycle_zombie(z: Zombie) -> void:
 func on_zombie_killed(z: Zombie) -> void:
 	if z.is_boss():
 		director.boss_fallen(z)
+	note_defeated(z)
 	make_noise(z.position, 6.0)
 	if Net.is_host():
 		Net.zombie_died(z, z.last_hitter)
 	elif player and z.last_hitter >= 0:
 		player.on_kill(z)
+
+
+## A foe whose fall earns something for everyone in the match (on every phone, once), and whose soul a
+## Psychopomp nearby gathers.
+func note_defeated(z: Zombie) -> void:
+	for p: Player in local_players():
+		if p.class_id == "ferryman":
+			FerrymanKit.gather(p, z.position, z.last_hitter == p.net_id())
+	if z.type_id == "harbourmaster" and player and not Net.spectating and not director.sandbox:
+		Game.note_harbourmaster()
 
 
 func on_player_died(p: Player) -> void:
@@ -2623,7 +3025,10 @@ func spawn_pickup_near_player(kind: int, id: String, near: float, far: float, ar
 	for i in 14:
 		var a := randf() * TAU
 		var at := centre_at + Vector3(cos(a), 0, sin(a)) * randf_range(near, far)
-		if absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null and in_reach(at):
+		if vael_sites:
+			if vael_sites.can_stock(at, false, 3.0):
+				return spawn_pickup_at(at, kind, id)
+		elif absf(at.x) < half_size - 2.0 and absf(at.z) < half_size - 2.0 and grid.is_free(grid.to_cell(at)) and not terrain.in_water(at.x, at.z) and storm_at(at) == null and in_reach(at):
 			return spawn_pickup_at(at, kind, id)
 	return spawn_pickup_random(kind, id)
 
@@ -2636,6 +3041,8 @@ func spawn_pickup_at(at: Vector3, kind: int, id: String, bonus := 0) -> Pickup:
 	p.setup(kind, id, bonus)
 	add_child(p)
 	p.global_position = Vector3(at.x, ground_at(at), at.z)
+	if vael_sites and vael_sites.holds_supplies(at):
+		p.life = INF
 	pickups.append(p)
 	if Net.is_host():
 		p.net_id = _next_pickup_id
@@ -2647,6 +3054,12 @@ func spawn_pickup_at(at: Vector3, kind: int, id: String, bonus := 0) -> Pickup:
 
 ## Half of all supplies land in buildings and yards, so exploring pays off.
 func spawn_pickup_random(kind: int, id: String) -> Pickup:
+	if vael_sites:
+		var site := vael_sites.pickup_site(kind)
+		if site == Vector3.INF:
+			return null
+		var arrows := 8 if kind == Pickup.Kind.WEAPON and WeaponDefs.is_ranged(id) else 0
+		return spawn_pickup_at(site, kind, id, arrows)
 	for i in 14:
 		var at: Vector3
 		if terrain.has_islands() and not loot_spots.is_empty():
@@ -3015,8 +3428,170 @@ func _dress_puddle(pd: MeshInstance3D, seed_from: int) -> void:
 ## A patch of the Mistberry Draught's mist (PowerDefs.MIST_TRAIL_RADIUS across, for `life` seconds):
 ## pale mist welling up off the ground. Only a look: what it does is the drinker's (Player._tick_mistberry).
 var _mist_patches: Array[CPUParticles3D] = []
+var harpoons := {} # thrown Whaler's Harpoons lying in the world, by their owner's peer (0 alone)
+var last_melee: Array[Zombie] = [] # what the last melee swing struck
 var _next_mist_patch := 0
 const MIST_PATCHES := 16
+
+
+## Resolve the surface directly below an impact, including walkable props and structures.
+func floor_contact(at: Vector3) -> Vector3:
+	var floor := ground_at(at)
+	var query := PhysicsRayQueryParameters3D.create(at + Vector3.UP * 0.15, Vector3(at.x, minf(floor, at.y) - 2.0, at.z), 1 | Terrain.LAYER)
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	return Vector3(hit.get("position", Vector3(at.x, floor, at.z)))
+
+
+## Only the firing peer applies the flare's effects.
+func flare(at: Vector3, by: Player, shown_only := false, attached: Zombie = null) -> void:
+	var f := Flare.new(self, by, shown_only)
+	f.position = at
+	if is_instance_valid(attached) and attached.is_alive():
+		f.attach_to(attached, at)
+	else:
+		f.position = floor_contact(at)
+	add_child(f)
+	sfx_at("flare_burst", at, -2.0)
+	if not shown_only and Net.active():
+		Net.world_fx(Net.Fx.FLARE, at, Vector3(attached.net_id + 1 if is_instance_valid(attached) else 0, 0, 0))
+
+
+## A thrown Whaler's Harpoon, stuck where it landed (`dir` the way it flew), with a little lamp of
+## light round it so its owner can find it again.
+func lay_harpoon(peer: int, at: Vector3, dir: Vector3, shown_only := false) -> void:
+	take_harpoon(peer)
+	var root := Node3D.new()
+	root.name = "ThrownHarpoon"
+	var mi := MeshInstance3D.new()
+	mi.mesh = WeaponDefs.harpoon_mesh()
+	mi.position = Vector3(0, 0, 1.22) # the head 0.3 m in; the shaft standing out behind it
+	root.add_child(mi)
+	add_child(root)
+	var fly := dir.normalized() if dir.length_squared() > 0.001 else Vector3.FORWARD
+	# Stuck in at a slant, its head a little way into the ground or the wall.
+	if at.y <= ground_at(at) + 0.25:
+		# In the ground it stands up steeply, shaft high, so it can be seen from any side.
+		var flat := Vector2(fly.x, fly.z).normalized() if Vector2(fly.x, fly.z).length() > 0.01 else Vector2(0, -1)
+		fly = Vector3(flat.x * 0.5, -0.87, flat.y * 0.5)
+	if absf(fly.y) > 0.98:
+		fly = Vector3(0.2, fly.y, 0).normalized()
+	root.global_position = at
+	root.look_at(root.global_position + fly, Vector3.UP if absf(fly.y) < 0.98 else Vector3.RIGHT)
+	var glow := OmniLight3D.new()
+	glow.light_color = Color(0.95, 0.8, 0.5)
+	glow.light_energy = 0.6
+	glow.omni_range = 2.2
+	glow.position = Vector3(0, 0, 0.9)
+	root.add_child(glow)
+	harpoons[peer] = root
+	if not shown_only and Net.active():
+		Net.world_fx(Net.Fx.HARPOON_LIE, at, dir, peer)
+
+
+func take_harpoon(peer: int) -> void:
+	var lying: Node3D = harpoons.get(peer, null)
+	harpoons.erase(peer)
+	if lying and is_instance_valid(lying):
+		lying.queue_free()
+
+
+## A Ship's Anchor's slam, seen: a ring of dust running out over the ground, cracks under it, a blast.
+func anchor_quake_fx(at: Vector3, reach: float) -> void:
+	fx_blast(at + Vector3.UP * 0.3, reach * 0.6, Color(0.7, 0.62, 0.5, 0.4))
+	sfx_at("anchor_slam", at, 0.0)
+	var dust := CPUParticles3D.new()
+	dust.mesh = WyvernRig.puff_mesh()
+	dust.one_shot = true
+	dust.explosiveness = 0.95
+	dust.amount = 26
+	dust.lifetime = 1.1
+	dust.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	dust.emission_ring_axis = Vector3.UP
+	dust.emission_ring_radius = 0.34
+	dust.emission_ring_inner_radius = 0.12
+	dust.emission_ring_height = 0.1
+	dust.direction = Vector3(1, 0.25, 0)
+	dust.spread = 180.0
+	dust.flatness = 0.85
+	dust.gravity = Vector3(0, -0.6, 0)
+	dust.initial_velocity_min = reach * 0.85
+	dust.initial_velocity_max = reach * 1.3
+	dust.damping_min = reach * 1.2
+	dust.damping_max = reach * 1.6
+	dust.scale_amount_min = 1.2
+	dust.scale_amount_max = 2.2
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	ramp.colors = PackedColorArray([Color(0.7, 0.62, 0.5, 0.0), Color(0.62, 0.56, 0.46, 0.6), Color(0.5, 0.46, 0.4, 0.0)])
+	dust.color_ramp = ramp
+	dust.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(dust)
+	dust.global_position = at + Vector3.UP * 0.15
+	dust.emitting = true
+	# Stones and clods thrown up where it struck.
+	var clods := CPUParticles3D.new()
+	var clod := BoxMesh.new()
+	clod.size = Vector3(0.09, 0.07, 0.08)
+	var clod_mat := StandardMaterial3D.new()
+	clod_mat.vertex_color_use_as_albedo = true
+	clod.material = clod_mat
+	clods.mesh = clod
+	clods.one_shot = true
+	clods.explosiveness = 1.0
+	clods.amount = 14
+	clods.lifetime = 0.9
+	clods.direction = Vector3.UP
+	clods.spread = 23.0
+	clods.gravity = Vector3(0, -14.0, 0)
+	clods.initial_velocity_min = 3.0
+	clods.initial_velocity_max = 5.5
+	clods.angular_velocity_min = -400.0
+	clods.angular_velocity_max = 400.0
+	clods.scale_amount_min = 0.6
+	clods.scale_amount_max = 1.4
+	var clod_ramp := Gradient.new()
+	clod_ramp.set_color(0, Color(0.42, 0.34, 0.26))
+	clod_ramp.set_color(1, Color(0.3, 0.26, 0.22))
+	clods.color_ramp = clod_ramp
+	add_child(clods)
+	clods.global_position = at + Vector3.UP * 0.1
+	clods.emitting = true
+	# Cracks: dark jagged lines out from where it struck, widest at the middle, fading away.
+	var l := LowPoly.new()
+	var crack_col := Color(0.2, 0.15, 0.11, 0.85)
+	for i in 9:
+		var a := TAU * i / 9.0 + randf() * 0.35
+		var p0 := Vector3(cos(a), 0, sin(a)) * 0.3
+		var turn := a
+		for j in 4:
+			turn += randf_range(-0.5, 0.5)
+			var p1 := p0 + Vector3(cos(turn), 0, sin(turn)) * randf_range(0.12, 0.34)
+			var wide := 0.045 - j * 0.009
+			l.box((p0 + p1) * 0.5, Vector3(p0.distance_to(p1) + wide, 0.02, wide), crack_col, Vector3(0, -rad_to_deg(turn), 0))
+			if j == 1 and randf() < 0.6:
+				# A side crack splitting off.
+				var fork := turn + (0.7 if randf() < 0.5 else -0.7)
+				var p2 := p1 + Vector3(cos(fork), 0, sin(fork)) * randf_range(0.15, 0.25)
+				l.box((p1 + p2) * 0.5, Vector3(p1.distance_to(p2), 0.02, 0.018), crack_col, Vector3(0, -rad_to_deg(fork), 0))
+			p0 = p1
+	# The dent the crown of the anchor left.
+	l.prism(Vector3(0, -0.005, 0), Vector3(0, 0.01, 0), 0.42, 0.36, 10, crack_col.lightened(0.08))
+	var cracks := MeshInstance3D.new()
+	cracks.mesh = l.commit()
+	var crack_mat := StandardMaterial3D.new()
+	crack_mat.vertex_color_use_as_albedo = true
+	crack_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	cracks.material_override = crack_mat
+	cracks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(cracks)
+	cracks.global_position = Vector3(at.x, ground_at(at) + 0.03, at.z)
+	cracks.rotation.y = randf() * TAU
+	var gone := create_tween()
+	gone.tween_interval(1.4)
+	gone.tween_property(crack_mat, "albedo_color:a", 0.0, 0.9)
+	gone.tween_callback(cracks.queue_free)
+	get_tree().create_timer(1.4).timeout.connect(clods.queue_free)
+	get_tree().create_timer(1.4).timeout.connect(dust.queue_free)
 
 
 func drop_mist_patch(at: Vector3, life: float, shown_only := false) -> void:
@@ -3545,6 +4120,12 @@ static func _make_bolt() -> ArrayMesh:
 	return m
 
 
+## A sound only this phone hears: for what every phone makes its own copy of anyway.
+func sfx_here(sound: String, at: Vector3, volume := 0.0) -> void:
+	if player:
+		Sfx.play_at(sound, at, _player_camera_position(), volume)
+
+
 func sfx_at(sound: String, at: Vector3, volume := 0.0) -> void:
 	if player:
 		Sfx.play_at(sound, at, _player_camera_position(), volume)
@@ -3852,6 +4433,30 @@ func fx_impact(at: Vector3) -> void:
 	_next_impact = (_next_impact + 1) % _impacts.size()
 	s.global_position = at
 	s.visible = true
+
+
+## Sea water thrown up and falling back: something rising out of the tide, a wave breaking. On the
+## host, `share` shows the spray on every phone too.
+func fx_water(at: Vector3, size: float, col := Color(0.72, 0.9, 0.92), share := false) -> void:
+	fx_gore(at + Vector3.UP * 0.3, col.lightened(0.35))
+	fx_mist(at + Vector3.UP * 0.4, size * 0.6)
+	if share and Net.is_host():
+		Net.gore(at + Vector3.UP * 0.3, col.lightened(0.35))
+
+
+## Burning oil spread over the ground for a moment (a Lighthouse Keeper's lamp breaking).
+func fx_fire_patch(at: Vector3, radius: float) -> void:
+	var fire := make_flames()
+	fire.amount = 26
+	fire.emission_box_extents = Vector3(radius * 0.7, 0.15, radius * 0.7)
+	fire.lifetime = 0.7
+	add_child(fire)
+	fire.global_position = Vector3(at.x, ground_at(at) + 0.2, at.z)
+	fire.emitting = true
+	get_tree().create_timer(1.4).timeout.connect(func() -> void:
+		if is_instance_valid(fire):
+			fire.emitting = false
+			get_tree().create_timer(0.8).timeout.connect(fire.queue_free))
 
 
 func fx_gore(at: Vector3, col: Color) -> void:

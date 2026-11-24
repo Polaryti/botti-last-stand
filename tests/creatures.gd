@@ -172,7 +172,7 @@ func _entries() -> void:
 	check(strays == 0, "the Village never picks a creature of Mesenlla to roam (%d)" % strays)
 	var bosses := ["great_revenant_elemental", "war_wyvern"]
 	for id: String in bosses:
-		check(ZombieDefs.ALL[id].get("mesenlla_boss", false) and CodexPanel.enemy_group(id) == 5, "%s is listed with the bosses" % id)
+		check(ZombieDefs.ALL[id].get("mesenlla_boss", false) and CodexPanel.enemy_group(id) == 6, "%s is listed with the bosses" % id)
 	check(CodexPanel.enemy_group("bear") == 4, "the others are Creatures of Mesenlla")
 
 
@@ -506,7 +506,7 @@ func _children() -> void:
 	var after := [count_of.call(Pickup.Kind.WEAPON) - before[0], count_of.call(Pickup.Kind.ARROWS) - before[1], count_of.call(Pickup.Kind.FOOD) - before[2]]
 	check(after[0] + after[1] + after[2] > 0 and after[0] + after[1] + after[2] < 15, "thirty Children fallen leave a few things on the ground: %s weapons, arrows, food" % str(after))
 	var rider := raise("woodland_cavalry", at + Vector3(0, 0, -14))
-	check(rider._mounted and rider._horse_node.visible and (rider._horse_node.material_override as ShaderMaterial).get_shader_parameter("belly") != null, "Woodland Cavalry ride bears")
+	check(rider._mounted and rider._horse_node.visible and rider._horse_node.get_node_or_null("Rig/Hind/Torso/Saddle") != null, "Woodland Cavalry ride bears, in a saddle")
 	check(rider.weapon_id == "spear", "with spears")
 	rider.take_damage(rider.max_hp * 0.65, Vector3.ZERO, 0.0, rider.centre())
 	check(not rider._mounted, "bring the bear down and the rider fights on foot")
@@ -968,7 +968,7 @@ func _bastion_map() -> void:
 	var hp_full := heavy.hp
 	heavy.hurt(100.0, heavy.global_position)
 	check(is_equal_approx(hp_full - heavy.hp, 100.0 * (1.0 - Ally.HEAVY_GUARD)), "the Mist Heavy's shield takes %d%% off every blow" % int(Ally.HEAVY_GUARD * 100.0))
-	check(Ally.KINDS.slice(-3) == Garrison.ORDER, "the soldiers travel to other phones by their place among the summons")
+	check(Ally.KINDS.find(Garrison.ORDER[0]) == 15 and Ally.KINDS.slice(15, 18) == Garrison.ORDER, "the soldiers travel to other phones by their place among the summons, which never changes")
 	# The Great Portal: what lands on it hurts it.
 	var portal_hp := fort.heart_hp
 	var seal := MistSeal.create(w, fort.heart_at, 3.0, 0.0, 0.1, 20.0, -1, MistSeal.Style.FIRE)

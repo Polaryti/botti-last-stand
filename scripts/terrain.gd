@@ -43,6 +43,12 @@ var bake_revision := 0
 var _fords: Array[Dictionary] = []
 
 
+## A shore (Port Vael), or empty: from the harbour wall at z = "z" the land falls to tidal flats,
+## sloping from "top" down to "low" at z = "end", beyond which the open sea is deep (SEA_Y). The bay is
+## "half" metres either side of x = 0; past it the headlands keep their own ground until the sea.
+var coast := {}
+const SEA_Y := -3.6
+const SEA_DEEP := -2.2 # past the flats and deeper than this: the open sea, which no one walks into
 var _pools: Array[Vector3] = []
 var _streams: Array = []
 
@@ -194,13 +200,51 @@ func bake() -> void:
 func _natural(x: float, z: float) -> float:
 	var d := Vector2(x, z).length()
 	var h := (_noise.get_noise_2d(x, z) * roughness + _detail.get_noise_2d(x, z) * 0.5) * smoothstep(calm_radius, calm_radius + 48.0, d)
+	if not sea.is_empty():
+		# All of it the seabed, rippled with sand bars, and the hills islands standing out of it.
+		h = float(sea["floor"]) + _detail.get_noise_2d(x * 0.6, z * 0.6) * 0.22 + _noise.get_noise_2d(x * 1.7 + 300.0, z * 1.7) * 0.25
 	for g in _hills:
 		var dx := x - g.x
 		var dz := z - g.y
 		h += g.z * exp(-(dx * dx + dz * dz) / (2.0 * g.w * g.w))
+	if not coast.is_empty():
+		h = _shore(x, z, h)
 	for p: Dictionary in _pads:
 		h = _apply_pad(p, x, z, h)
 	return h
+
+
+## The Lantern Road: the whole map is drowned flats at this height, with no shore at all. Hills are
+## islands standing out of it, and roads cut across it are causeways.
+var sea := {}
+func set_sea(floor_y: float) -> void:
+	sea = {"floor": floor_y}
+
+
+## Sets the shore (see coast).
+func set_coast(wall_z: float, flats_end: float, top: float, low: float, bay_half: float) -> void:
+	coast = {"z": wall_z, "end": flats_end, "top": top, "low": low, "half": bay_half}
+
+
+## The land along the shore: the flats sloping away from the harbour wall, rippled with sand bars and
+## shallow channels; the open sea beyond them; the headlands either side keeping their own ground
+## until they too end in the sea.
+func _shore(x: float, z: float, h: float) -> float:
+	var z0: float = coast["z"]
+	var z1: float = coast["end"]
+	if z <= z0 - 2.0:
+		return h
+	var flats := lerpf(float(coast["top"]), float(coast["low"]), clampf((z - z0) / (z1 - z0), 0.0, 1.0))
+	flats += _detail.get_noise_2d(x * 0.6, z * 0.6) * 0.22 + _noise.get_noise_2d(x * 1.7 + 300.0, z * 1.7) * 0.3
+	var sea := lerpf(flats, SEA_Y, smoothstep(z1, z1 + 10.0, z))
+	var bay := 1.0 - smoothstep(float(coast["half"]), float(coast["half"]) + 12.0, absf(x))
+	var shore := lerpf(h, sea, smoothstep(z0 - 2.0, z0 + 1.0, z) * bay)
+	return lerpf(shore, SEA_Y, smoothstep(z1 + 10.0, z1 + 22.0, z))
+
+
+## Whether this is the open sea beyond the flats.
+func open_sea(x: float, z: float) -> bool:
+	return not coast.is_empty() and z > float(coast["end"]) and height(x, z) < SEA_DEEP
 
 
 func _apply_pad(p: Dictionary, x: float, z: float, h: float) -> float:
@@ -471,9 +515,25 @@ func is_walkable(x: float, z: float) -> bool:
 		var dx := ground_height(x + 0.5, z) - ground_height(x - 0.5, z)
 		var dz := ground_height(x, z + 0.5) - ground_height(x, z - 0.5)
 		return ground_height(x, z) > 0.0 and Vector2(dx, dz).length() < STEEP
-	if height(x, z) < WATER_Y - WADE:
+	if deep_water(x, z):
 		return false
 	return on_deck(x, z) or slope(x, z) < STEEP
+
+
+## Water too deep to wade: only in the river's own bed. Low ground anywhere else (Mist Bastion has
+## no river at all) is a dry hollow you walk through.
+func deep_water(x: float, z: float) -> bool:
+	return (height(x, z) < WATER_Y - WADE and by_river(x, z)) or open_sea(x, z)
+
+
+## Whether this spot is in or beside the river's course.
+func by_river(x: float, z: float) -> bool:
+	var at := Vector2(x, z)
+	var reach := river_width + BANK * 0.5
+	for i in river.size() - 1:
+		if at.distance_to(Geometry2D.get_closest_point_to_segment(at, river[i], river[i + 1])) <= reach:
+			return true
+	return false
 
 
 ## The physics ground, 1 m a sample, as big as the map.
@@ -596,6 +656,8 @@ func _all_void(i: int, j: int) -> bool:
 
 ## Land beyond the edge of the map, rising away so the world seems to go on.
 func skirt_mesh(sector: int) -> ArrayMesh:
+	if not coast.is_empty():
+		return _coast_skirt_mesh(sector)
 	const STEP := 10.0
 	const RINGS := 16
 	var st := SurfaceTool.new()
@@ -608,6 +670,9 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 			var near := Vector2(clampf(p.x, -half_extent, half_extent), clampf(p.y, -half_extent, half_extent))
 			var out := p.distance_to(near)
 			var y := ground_height(near.x, near.y) + out * 0.16 + (_noise.get_noise_2d(p.x, p.y) + 0.5) * minf(out * 0.2, 14.0)
+			if not sea.is_empty():
+				# Out to sea the world goes on as open water, not as hills: the seabed stays deep.
+				y = SEA_Y - 2.0
 			points[Vector2i(u, v)] = Vector3(p.x, y, p.y)
 	for u in along:
 		for v in RINGS:
@@ -627,6 +692,63 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 					st.set_uv(Vector2(q.x, q.z) / 4.0)
 					st.add_vertex(q)
 	return st.commit()
+
+
+## Scenery outside the playable coast continues the same hills and cut roads as the land inside.
+func coast_scenery_height(x: float, z: float) -> float:
+	if maxf(absf(x), absf(z)) <= float(half_extent):
+		return ground_height(x, z)
+	return _shape(x, z)
+
+
+## Leave room for a cut road continuing through the scenery beyond the land mesh.
+func near_cut_road(at: Vector2, margin: float) -> bool:
+	for cut: Dictionary in _cuts:
+		var pts: Array[Vector3] = cut["p"]
+		var width := float(cut["w"]) + margin
+		for i in pts.size() - 1:
+			var a := Vector2(pts[i].x, pts[i].z)
+			var b := Vector2(pts[i + 1].x, pts[i + 1].z)
+			if Geometry2D.get_closest_point_to_segment(at, a, b).distance_squared_to(at) < width * width:
+				return true
+	return false
+
+
+## Join every baked border vertex exactly, including the corners. Four widening strips take the
+## hills and the sea out beyond the play area without overlapping at the corners.
+func _coast_skirt_mesh(sector: int) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var inner := PackedVector3Array()
+	for step: float in [0.0, 3.0, 7.0, 14.0, 24.0, 40.0, 64.0, 104.0, 156.0]:
+		var edge := float(half_extent) + step
+		var outer := PackedVector3Array()
+		for i in vertices_per_side:
+			var s := (float(i) / float(vertices_per_side - 1) * 2.0 - 1.0) * edge
+			var p := Vector2(s, -edge)
+			match sector:
+				1: p.y = edge
+				2: p = Vector2(-edge, s)
+				3: p = Vector2(edge, s)
+			outer.append(Vector3(p.x, coast_scenery_height(p.x, p.y), p.y))
+		if not inner.is_empty():
+			for i in vertices_per_side - 1:
+				_coast_skirt_triangle(st, inner[i], inner[i + 1], outer[i])
+				_coast_skirt_triangle(st, inner[i + 1], outer[i + 1], outer[i])
+		inner = outer
+	return st.commit()
+
+
+func _coast_skirt_triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	var n := (b - a).cross(c - a).normalized()
+	var points := [a, b, c] if n.y <= 0.0 else [c, b, a]
+	if n.y < 0.0:
+		n = -n
+	for v: Vector3 in points:
+		st.set_normal(n)
+		st.set_color(Color(0.17, 0.27, 0.16).lerp(Color(0.28, 0.33, 0.24), clampf(v.y / 30.0, 0.0, 1.0)))
+		st.set_uv(Vector2(v.x, v.z) / 4.0)
+		st.add_vertex(v)
 
 
 func _skirt_point(sector: int, u: int, v: int, step: float, along: int) -> Vector2:
