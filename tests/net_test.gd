@@ -2041,6 +2041,22 @@ func _fontanova() -> void:
 		for z: Zombie in w.zombies.duplicate():
 			z.release()
 	await sync(707)
+	# The Oracle's braziers and the altars: the host decides, every phone follows.
+	ok(w.fonta_rites != null and w.fonta_rites.lit == 0 and not w.fonta_rites.door_open, "the Oracle's braziers are cold on both phones")
+	if host:
+		var rites := w.fonta_rites
+		var keep := pl.global_position
+		for at: Vector3 in w.grotto_rites["braziers"]:
+			pl.global_position = at + Vector3(0.5, 0, 0)
+			rites._tick_braziers(FontaRites.BRAZIER_HOLD + 0.1)
+		rites.claims = 1
+		pl.global_position = keep
+	await wait(1.0)
+	await sync(708)
+	ok(w.fonta_rites.lit == 7 and w.fonta_rites.door_open, "all three lit and the sanctum open, on this phone too")
+	ok(w.fonta_rites.claims == 1, "and the held altars counted alike")
+	ok(w.pickups.any(func(p: Pickup) -> bool: return p.kind == Pickup.Kind.POWER and p.item_id == PowerDefs.EYE), "the Oracle's Eye lies in the sanctum on both phones")
+	await sync(709)
 
 
 func _vael() -> void:

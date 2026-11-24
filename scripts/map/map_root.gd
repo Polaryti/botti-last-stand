@@ -146,7 +146,7 @@ func _snap(p: Node) -> void:
 	if p is MapPiece and (p as MapPiece).on_ground and terrain:
 		var piece := p as MapPiece
 		var g := piece.global_position
-		var y := terrain.height(g.x, g.z) + piece.lift
+		var y := MapBuilder.settle_static(terrain, piece.global_transform, piece)
 		if absf(g.y - y) > 0.001:
 			_snapping = true
 			piece.global_position = Vector3(g.x, y, g.z)

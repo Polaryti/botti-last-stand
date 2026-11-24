@@ -46,6 +46,7 @@ var _trees := {}
 var _indoors: Array[Rect2] = []
 var _plant_clearings: Array[Vector3] = []
 var _plant_rooms: Array[Dictionary] = []
+var tree_clearings: Array[Vector3] = [] # (x, z, radius) kept clear of trees only: a cave's mouth
 var _cells := {} # small things, merged by map area into one mesh each
 static var _cow_mesh: Mesh
 
@@ -79,11 +80,30 @@ func _walk(node: Node, parent: Transform3D) -> void:
 			continue
 		var at := parent * (c as Node3D).transform
 		if c is MapPiece and (c as MapPiece).on_ground:
-			at.origin.y = terrain.height(at.origin.x, at.origin.z) + (c as MapPiece).lift
+			at.origin.y = settle(at, c as MapPiece)
 		if c.has_method("build"):
 			stand_at(at)
 			c.call("build", self)
 		_walk(c, at)
+
+
+## Where a piece on the ground stands: at the lowest ground under its footprint (its half extents
+## along its own X and Z, if it has one), so on a slope no side of it hangs in the air.
+func settle(at: Transform3D, piece: MapPiece) -> float:
+	return settle_static(terrain, at, piece)
+
+
+static func settle_static(terrain: Terrain, at: Transform3D, piece: MapPiece) -> float:
+	var y := terrain.height(at.origin.x, at.origin.z)
+	if piece.has_method("footprint"):
+		var half: Vector2 = piece.call("footprint")
+		if half != Vector2.ZERO:
+			var b := at.basis.orthonormalized()
+			for i: float in [-1.0, 0.0, 1.0]:
+				for j: float in [-1.0, 0.0, 1.0]:
+					var p := at.origin + b.x * half.x * i + b.z * half.y * j
+					y = minf(y, terrain.height(p.x, p.z))
+	return y + piece.lift
 
 
 func stand_at(at: Transform3D) -> void:

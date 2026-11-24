@@ -122,6 +122,8 @@ func on_death(z: Zombie) -> void:
 			for i in HIVE_HONEY:
 				var a := TAU * i / HIVE_HONEY + randf() * 0.4
 				z.world.spawn_pickup_at(_ground(z, z.position + Vector3(cos(a), 0, sin(a)) * 1.6), Pickup.Kind.FOOD, "honey")
+			# And in its heart, the Royal Jelly.
+			z.world.spawn_pickup_at(_ground(z, z.position), Pickup.Kind.FOOD, "royal_jelly")
 
 
 ## Struck: a hive sends out its bees; a perched spider drops at once.
@@ -413,7 +415,8 @@ func _ostrich(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 					if not p.dead and p.global_position.distance_to(z.position) < KICK_REACH:
 						MistSeal.cast(z, p.global_position, KICK_REACH, 0.05, z._damage * KICK_POWER, 0.0, MistSeal.Style.KICK)
 						struck = true
-						left = minf(left, 0.25)
+						left = minf(left, 0.4)
+						_show(z, "m_bite") # the kick, on every phone
 						break
 			if left <= 0.0 or z.position.distance_to(before) < z._speed * CHARGE_BURST * delta * 0.3:
 				phase = ""

@@ -6,15 +6,21 @@
 
 ### Fontanova, a new map
 - **An island in the open sea**, for Survive the Night, Co-op, All vs All and Teams. The night lasts 15 minutes.
-- You land in a cove beside the sailboat that brought you, run up on the beach.
-- Olive terraces and dry-stone walls, the ruined village of the god's worshippers, and the Fallen Colossus.
-- The West Ridge's limestone cliffs, split by the Ravine and crossed by two rope bridges.
-- The Holm Wood, and the Oracle's Grotto running through the east hill, lit by a glowing pool.
-- The Temple of Al'quimelea on the Acropolis, with the shattered statues of five gods round it.
-- The other islands of the archipelago stand on the horizon.
-- **Mediterranean flora:** olives, holm oaks, strawberry trees, carobs, cypresses, maquis and wildflower meadows, all moving in the wind, harder on windy nights.
+- You land in a cove beside the old merchant ship that brought you, run aground on the beach.
+- Olive terraces climb from the shore; the Sacred Way's stair climbs on to the temple on the Acropolis crag, 34 m up.
+- The worshippers' village stands on the rim of the Ravine. Two rope bridges cross it to the West Ridge and Kerys' Watch. A fall into the Ravine kills.
+- The Holm Wood on its height, the Fallen Colossus, and the shattered statues of five gods.
+- **Dense Mediterranean flora:** ten kinds of tree, a carpet of grass, and drifts of flowers and shrubs, all swaying in the wind.
+- Fireflies, falling petals and leaves, shooting stars, and its own music.
 - **The sea:** wading slows you, and out of your depth it drowns you after 2.5 s.
-- Fireflies, petals on the wind and a violet haze; its own night, hunted and dawn music.
+
+### Rites of Fontanova
+- **The Oracle's Grotto:** light its three braziers to open the sanctum, which holds a rare weapon and the Oracle's Eye.
+- **Oracle's Eye:** marks every enemy within 36 m, through rock, and your blows land 20% harder.
+- **Waking altars:** from 2:30, one god's altar wakes every 2 minutes. Hold it for 10 s to earn that god's blessing for a minute.
+- **The rising sea:** at 4:00, 8:00 and 12:00 the sea floods the beaches for a minute.
+- **Transmutation blooms:** from 3:20, violet blooms break through somewhere on the island. Once open, they poison and hurt whoever stands among them.
+- **Royal Jelly:** a broken Beehive also leaves Royal Jelly. It restores your health, mana and every ability, and quickens you for 45 s.
 
 ### Creatures of Fontanova
 - **Mutant Bee:** curls its stinger forward, then dives where you stood. Its sting poisons for 4 s.
@@ -27,7 +33,8 @@
 - **Ember Moth:** spreads its wings for 1 s, then claps; the dust dazzles and burns.
 - **Thornback:** a great tortoise; blows from the front glance off for half.
 - **Honey:** heals 25 and quickens you for 6 s, so it is worth eating unhurt.
-- Every creature has its own model, sounds, icon and Codex page.
+- Every creature has its own model, sounds, icon, Codex page and death.
+- The wasp's stinger is a venomous dart of its own, not an arrow.
 
 ### Title screen
 - New app icon and splash. The menu tours Fontanova to the Archipelagos' own theme.

@@ -32,8 +32,13 @@ ISLE_WOBBLE = 0.035
 # the West Ridge, the Acropolis on its northern cliffs, a bay in the north-east, the east hill's shore.
 SHORE = [124, 130, 142, 134, 122, 98, 78, 92, 128, 112, 124, 118, 130, 136, 128, 114,
          124, 136, 130, 120, 138, 116, 100, 112]
-TEMPLE_Y = 19.0
-RAVINE_Y = 2.6
+ACRO_Y = 34.0
+TEMPLE_Y = ACRO_Y
+RIM_Y = 19.0
+RIDGE_Y = 21.0
+WATCH_Y = 28.0
+WOOD_Y = 20.0
+GROTTO_Y = 11.6
 
 nodes = []
 curves = []
@@ -74,7 +79,7 @@ def group(name, parent="."):
     return name if parent == "." else parent + "/" + name
 
 
-def road(name, parent, points, width, cut=False, draw=True, blend=None):
+def road(name, parent, points, width, cut=False, draw=True, blend=None, chasm=False):
     cid = "Curve_%d" % (len(curves) + 1)
     flat = ", ".join("0, 0, 0, 0, 0, 0, %s, %s, %s" % (p[0], p[1], p[2]) for p in points)
     curves.append('[sub_resource type="Curve3D" id="%s"]\n_data = {\n"points": PackedVector3Array(%s),\n"tilts": PackedFloat32Array(%s)\n}\npoint_count = %d'
@@ -87,6 +92,8 @@ def road(name, parent, points, width, cut=False, draw=True, blend=None):
         lines.append("draw = false")
     if blend is not None:
         lines.append("cut_blend = %s" % blend)
+    if chasm:
+        lines.append("chasm = true")
     nodes.append("\n".join(lines))
 
 
@@ -99,160 +106,139 @@ def spot(parent, kind, at, text=None, on_ground=True):
     node(kind.capitalize(), parent, "spot", at, **props)
 
 
-def fonta(name, parent, kind, at, **props):
+def fonta(name, parent, kind, at, yaw_deg=None, **props):
+    if yaw_deg is not None:
+        at = (at[0], at[1], at[2], yaw_deg)
     return node(name, parent, "fonta", at, kind=kind, **props)
 
 
 # --- The land ------------------------------------------------------------------------------------
+# Heights (the sea is at -0.2): the Landing's beach 0-2; the olive terraces climbing from 3 to 14 in
+# shelves; the Ravine rim and the village shelf at 18-19; the Holm Wood's height 20; the West Ridge 21,
+# Kerys' Watch on it 28; the Acropolis 34, sheer all round but for the Sacred Way.
 land = group("Land")
 fonta("Isle", land, "isle", (0, 0, 0), size=ISLE_R, wide=ISLE_WOBBLE, shore="PackedFloat32Array(%s)" % ", ".join("%.1f" % r for r in SHORE), on_ground=False)
-# The Acropolis: the height in the north, levelled on top for the temple and its court.
-for (x, z, h, r) in [(0, -80, 21.0, 26.0), (-26, -92, 12.0, 16.0), (28, -94, 12.0, 16.0)]:
-    node("Acropolis", land, "hill", (x, 0, z), height=h, radius=r)
-node("TempleCourt", land, "level", (0, TEMPLE_Y, -84), size="Vector2(46, 34)", blend=7.0)
-# The West Ridge, high over the sea, and the north-west cliffs.
-for (x, z, h, r) in [(-94, -6, 17.0, 19.0), (-88, 34, 14.0, 17.0), (-96, -48, 18.0, 18.0), (-62, -96, 15.0, 18.0), (-78, 70, 9.0, 16.0)]:
-    node("WestRidge", land, "hill", (x, 0, z), height=h, radius=r)
-# The east hill and its woods, the Oracle's Grotto running through it, and the north-east height.
-for (x, z, h, r) in [(84, -28, 15.0, 21.0), (96, 14, 12.0, 17.0), (58, -96, 13.0, 19.0)]:
-    node("EastHill", land, "hill", (x, 0, z), height=h, radius=r)
-# The olive slopes rising gently from the Landing to the Acropolis, and the headlands either side of
-# the cove.
-for (x, z, h, r) in [(0, -8, 6.5, 40.0), (-34, -36, 8.0, 22.0), (32, -46, 7.0, 22.0), (30, 30, 3.5, 22.0), (-30, 34, 3.0, 20.0),
-                     (44, -6, 6.0, 14.0), (-52, -26, 7.0, 13.0), (56, 46, 5.0, 14.0), (-46, 60, 4.0, 12.0), (12, -36, 3.0, 12.0)]:
-    node("OliveSlopes", land, "hill", (x, 0, z), height=h, radius=r)
-for (x, z, h, r) in [(86, 96, 13.0, 14.0), (-58, 98, 9.0, 13.0)]:
-    node("Headland", land, "hill", (x, 0, z), height=h, radius=r)
-# The Ravine: a cleft through the West Ridge, its floor a dry torrent bed running down to the sea.
-road("Ravine", land, [(-58, 8.0, -78), (-63, RAVINE_Y + 1.5, -50), (-66, RAVINE_Y, -18), (-68, RAVINE_Y, 14),
-                      (-74, RAVINE_Y - 0.8, 44), (-88, 0.0, 74)], 7.0, cut=True, draw=False, blend=2.2)
+# The long rise from the cove to the foot of the Acropolis, and swells across it.
+for (x, z, h, r) in [(0, -30, 10.0, 52.0), (-24, 10, 4.0, 26.0), (30, 8, 4.0, 24.0), (40, -40, 5.0, 20.0), (-30, -48, 5.0, 18.0)]:
+    node("Rise", land, "hill", (x, 0, z), height=h, radius=r)
+# The olive terraces: shelves 2.2 m apart from the cove up to the plateau.
+fonta("OliveTerraces", land, "terraces", (0, 0, 30), size=52.0, wide=2.2, on_ground=False)
+fonta("UpperTerraces", land, "terraces", (8, 0, -22), size=30.0, wide=2.2, on_ground=False)
+# The Acropolis: a crag of limestone, its top levelled for the temple court.
+fonta("Acropolis", land, "mesa", (0, ACRO_Y, -88), size=29.0, wide=6.0, on_ground=False)
+node("TempleCourt", land, "level", (0, ACRO_Y, -86), size="Vector2(50, 38)", blend=4.0)
+# The Ravine rim: the high shelf on the near side of the Ravine, the village below it.
+fonta("RavineRim", land, "mesa", (-50, RIM_Y, -10), size=17.0, wide=5.0, stretch=2.1, on_ground=False, yaw_deg=90)
+# The West Ridge over the sea, Kerys' Watch a crag on top of it.
+fonta("WestRidge", land, "mesa", (-94, RIDGE_Y, -8), size=28.0, wide=4.0, stretch=2.5, on_ground=False, yaw_deg=90)
+fonta("WestRidgeSouth", land, "mesa", (-92, RIDGE_Y - 3.0, 40), size=15.0, wide=4.0, stretch=1.4, on_ground=False, yaw_deg=70)
+fonta("KerysWatch", land, "mesa", (-104, WATCH_Y, -22), size=9.0, wide=3.0, on_ground=False)
+fonta("AcropolisWest", land, "mesa", (-22, ACRO_Y - 6.0, -96), size=14.0, wide=5.0, on_ground=False)
+fonta("AcropolisEast", land, "mesa", (24, ACRO_Y - 4.0, -100), size=13.0, wide=5.0, on_ground=False)
+# The Holm Wood's height in the east, the Oracle's Grotto cut into it.
+fonta("HolmHeight", land, "mesa", (84, WOOD_Y, -22), size=21.0, wide=8.0, stretch=1.3, on_ground=False, yaw_deg=90)
+# The northern crags either side of the Acropolis, and the headlands round the cove.
+fonta("NorthEastCrag", land, "mesa", (60, 24.0, -98), size=15.0, wide=5.0, on_ground=False)
+fonta("NorthWestCrag", land, "mesa", (-58, 22.0, -98), size=14.0, wide=5.0, on_ground=False)
+fonta("EastHeadland", land, "mesa", (88, 15.0, 92), size=13.0, wide=4.0, on_ground=False)
+fonta("WestHeadland", land, "mesa", (-62, 11.0, 96), size=11.0, wide=4.0, on_ground=False)
+# The Ravine: a sheer cleft from the northern crags down to the sea at its cove, the sea far below in it.
+road("Ravine", land, [(-60, -7.0, -90), (-62, -7.0, -56), (-65, -7.0, -24), (-66, -7.0, 10), (-70, -7.0, 40), (-82, -7.0, 68), (-96, -7.0, 84)],
+     8.0, cut=True, draw=False, blend=1.0, chasm=True)
 
 # --- Roads and paths -----------------------------------------------------------------------------
 roads = group("Roads")
-road("LandingPath", roads, [(4, 1.2, 90), (6, 2.0, 78), (2, 3.4, 64), (0, 5.0, 40)], 3.6)
-road("OliveWay", roads, [(0, 5.0, 40), (-4, 6.2, 16), (0, 6.6, -8), (4, 8.0, -34), (0, 11.0, -52)], 3.6)
-# The Sacred Way climbs the Acropolis in two turns.
-road("SacredWay", roads, [(0, 11.0, -52), (-12, 14.0, -58), (-6, 17.0, -64), (0, TEMPLE_Y, -68)], 4.0, cut=True, blend=3.0)
-road("RidgePath", roads, [(-4, 6.2, 16), (-28, 6.5, 8), (-50, 8.5, -2)], 3.0)
-road("WoodPath", roads, [(0, 6.6, -8), (30, 7.0, -12), (56, 7.0, -18), (70, 5.5, -40)], 3.0)
-road("CoveShore", roads, [(-34, 1.1, 92), (4, 1.2, 90), (40, 1.2, 92)], 3.0)
+road("LandingPath", roads, [(4, 1.2, 92), (6, 2.6, 78), (2, 4.4, 62), (0, 6.6, 44)], 3.6)
+road("OliveWay", roads, [(0, 6.6, 44), (-4, 9.0, 20), (0, 11.4, -6), (2, 12.0, -30), (0, 11.5, -40)], 3.6)
+# The Sacred Way: the only way up the Acropolis, a processional stair carved straight up its south
+# face, a landing halfway (FontaBuilder.sacred_stair draws the steps).
+road("SacredWay", roads, [(0, 11.5, -40), (0, 22.0, -55), (0, 23.0, -59), (0, ACRO_Y, -74)], 6.0, cut=True, blend=1.0, draw=False)
+# Up onto the Ravine rim from the village, and up onto the Holm Wood's height.
+road("RimPath", roads, [(-20, 8.8, 20), (-28, 12.0, 14), (-34, 16.0, 8), (-40, RIM_Y, 2)], 3.4, cut=True, blend=2.5)
+road("WatchPath", roads, [(-86, RIDGE_Y, 2), (-96, WATCH_Y - 0.5, -14)], 3.0, cut=True, blend=2.0)
+road("WoodPath", roads, [(0, 11.4, -6), (30, 12.0, -8), (48, 14.0, -6), (60, 17.0, -4), (70, WOOD_Y, -2)], 3.2, cut=True, blend=2.5)
+road("CoveShore", roads, [(-34, 1.1, 94), (4, 1.2, 92), (40, 1.2, 94)], 3.0)
 
 
 # --- The Landing ---------------------------------------------------------------------------------
 landing = group("Landing")
-fonta("Sailboat", landing, "sailboat", (16, 0, 82, 160), size=17.0)
-fonta("ShoreCrates", landing, "shore_crates", (2, 0, 70, 20))
-fonta("ShoreCrates", landing, "shore_crates", (-9, 0, 72, -35))
-fonta("Amphorae", landing, "amphorae", (24, 0, 68))
-for (x, z) in [(-2, 64), (6, 62), (-8, 66), (10, 66)]:
+fonta("Sailboat", landing, "sailboat", (14, 0, 86, 172), size=26.0)
+fonta("ShoreCrates", landing, "shore_crates", (0, 0, 68, 20))
+fonta("ShoreCrates", landing, "shore_crates", (-12, 0, 70, -35))
+fonta("Amphorae", landing, "amphorae", (26, 0, 70))
+for (x, z) in [(-2, 70), (6, 68), (-8, 72), (10, 72)]:
     spot(landing, "start", (x, 0, z))
-for (x, z, s) in [(118, 104, 16.0), (128, 88, 12.0), (-104, 98, 14.0), (-118, 84, 10.0), (60, -128, 13.0), (-40, -132, 11.0)]:
+for (x, z, s) in [(118, 104, 16.0), (128, 88, 12.0), (-112, 102, 14.0), (-124, 84, 10.0), (60, -128, 13.0), (-40, -132, 11.0), (132, -40, 12.0)]:
     fonta("SeaStack", landing, "sea_stack", (x, 0, z, x * 7 % 360), size=s, on_ground=False)
-for (x, z, s) in [(64, 92, 4.0), (78, 80, 5.0), (-48, 92, 3.5), (-60, 84, 4.5), (40, 88, 2.5)]:
+for (x, z, s) in [(64, 92, 4.0), (78, 80, 5.0), (-48, 92, 3.5), (-58, 82, 4.5), (40, 96, 2.5), (-24, 100, 3.0)]:
     fonta("Limestone", landing, "limestone", (x, 0, z, x * 13 % 360), size=s)
-for (x, z) in [(36, 70), (-30, 74), (56, 66)]:
-    fonta("Maquis", landing, "maquis", (x, 0, z), size=9.0)
 
-# --- The olive terraces and the worshippers' village ---------------------------------------------
+# --- The olive terraces --------------------------------------------------------------------------
 groves = group("Groves")
-for z in (54, 36, 18, -2, -22):
-    for (x0, x1) in [(-44, -6), (6, 44)]:
-        fonta("TerraceWall", groves, "terrace_wall", ((x0 + x1) * 0.5, 0, z, 0), size=float(x1 - x0), wide=1.0)
-olives = 0
-for zi, z in enumerate(range(48, -34, -9)):
-    for xi, x in enumerate(range(-42, 46, 8)):
-        if abs(x) < 7:
-            continue # the path
-        if -40 < x < -18 and 8 < z < 34:
-            continue # the village
-        if 14 < x < 36 and -4 < z < 22:
-            continue # the colossus' meadow
-        jx = ((xi * 37 + zi * 11) % 7) - 3
-        jz = ((xi * 13 + zi * 29) % 5) - 2
-        kind = "carob" if (xi + zi * 3) % 11 == 0 else "olive"
-        size = 6.5 if kind == "carob" else 4.0 + ((xi * 7 + zi) % 5) * 0.35
-        fonta("Olive" if kind == "olive" else "Carob", groves, kind, (x + jx, 0, z + jz), size=size)
-        olives += 1
-for (x, z, s) in [(-12, 60, 14.0), (14, 62, 12.0), (24, 44, 10.0), (-26, 46, 12.0), (30, 4, 16.0), (-6, 22, 9.0), (10, -14, 10.0),
-                  (-20, -28, 12.0), (36, -30, 10.0), (-48, 54, 14.0), (52, 40, 13.0), (-54, -10, 9.0)]:
-    fonta("Wildflowers", groves, "wildflowers", (x, 0, z), size=s)
-village = group("WorshippersVillage")
-for (x, z, yaw, length, high) in [(-36, 14, 0, 8.0, 2.6), (-36, 22, 0, 8.0, 1.8), (-40, 18, 90, 8.0, 2.2), (-32, 18, 90, 8.0, 1.2),
-                                  (-24, 26, 0, 7.0, 2.4), (-24, 32, 0, 7.0, 1.6), (-27.5, 29, 90, 6.0, 2.0),
-                                  (-34, 32, 0, 6.0, 1.4)]:
-    fonta("RuinWall", village, "ruin_wall", (x, 0, z, yaw), size=length, wide=high)
-fonta("ShrineAltar", village, "altar", (-22, 0, 16, 180))
-fonta("Stele", village, "stele", (-19, 0, 14, 200), size=2.4, variant=0)
-for (x, z) in [(-38, 26), (-28, 12), (-20, 30)]:
-    fonta("Amphorae", village, "amphorae", (x, 0, z))
-fonta("Cauldron", village, "cauldron", (-30, 0, 20), size=1.3)
 colossus = group("FallenColossus")
 fonta("ColossusHead", colossus, "god_head", (24, 0, 10, 205), size=5.0, variant=1)
-fonta("ColossusHand", colossus, "god_hand", (32, 0, 2, 60), size=5.5)
-for (x, z) in [(18, 2), (30, 16)]:
+fonta("ColossusHand", colossus, "god_hand", (33, 0, 2, 60), size=5.5)
+fonta("ColossusBody", colossus, "fallen_god", (30, 0, 18, 120), size=9.0, variant=1)
+for (x, z) in [(17, 2), (31, 26)]:
     fonta("BrokenColumn", colossus, "broken_column", (x, 0, z, x * 9 % 360), size=6.0)
+fonta("WaysideStele", groves, "stele", (-6, 0, 30, 160), size=2.2, variant=2)
+fonta("WaysideAltar", groves, "altar", (8, 0, -14, 200))
 
-# --- The West Ridge and the Ravine ---------------------------------------------------------------
+# --- The Ravine rim and the Worshippers' Village ---------------------------------------------------
+village = group("WorshippersVillage")
+for (x, z, yaw, length, high) in [(-52, -10, 0, 8.0, 2.6), (-52, -2, 0, 8.0, 1.8), (-56, -6, 90, 8.0, 2.2), (-48, -6, 90, 8.0, 1.2),
+                                  (-40, 6, 0, 7.0, 2.4), (-40, 12, 0, 7.0, 1.6), (-43.5, 9, 90, 6.0, 2.0), (-48, 14, 0, 6.0, 1.4),
+                                  (-38, -16, 90, 7.0, 2.2), (-34, -20, 0, 6.0, 1.5)]:
+    fonta("RuinWall", village, "ruin_wall", (x, 0, z, yaw), size=length, wide=high)
+fonta("ShrineAltar", village, "altar", (-42, 0, -4, 180))
+fonta("Stele", village, "stele", (-39, 0, -6, 200), size=2.4, variant=0)
+for (x, z) in [(-54, 4), (-44, 0), (-36, 10)]:
+    fonta("Amphorae", village, "amphorae", (x, 0, z))
+fonta("Cauldron", village, "cauldron", (-46, 0, -12), size=1.3)
 ridge = group("WestRidge")
-fonta("RavineBridgeNorth", ridge, "rope_bridge", (-65, 0, -28, 90), size=18.0, on_ground=False)
-fonta("RavineBridgeSouth", ridge, "rope_bridge", (-67.5, 0, 8, 90), size=18.0, on_ground=False)
-fonta("Kerys", ridge, "god_statue", (-96, 0, -14, 70), size=6.0, variant=4)
-fonta("Orvane", ridge, "fallen_god", (-90, 0, 34, 110), size=6.0, variant=3)
-for (x, z, s) in [(-104, -30, 5.0), (-100, 16, 4.0), (-86, -54, 5.5), (-108, 46, 4.5), (-58, -84, 5.0), (-80, -74, 4.0), (-76, -40, 3.5), (-80, 20, 3.0)]:
+fonta("RavineBridgeNorth", ridge, "rope_bridge", (-64, 0, -28, 90), size=20.0, on_ground=False)
+fonta("RavineBridgeSouth", ridge, "rope_bridge", (-66, 0, 8, 90), size=20.0, on_ground=False)
+fonta("Kerys", ridge, "god_statue", (-104, 0, -22, 70), size=6.0, variant=4)
+fonta("Orvane", ridge, "fallen_god", (-94, 0, 34, 110), size=6.0, variant=3)
+for (x, z, s) in [(-108, -40, 5.0), (-100, 18, 4.0), (-86, -54, 5.5), (-110, 44, 4.5), (-82, 20, 3.0)]:
     fonta("Limestone", ridge, "limestone", (x, 0, z, x * 17 % 360), size=s)
-for (x, z, s) in [(-84, -20, 10.0), (-92, 4, 9.0), (-78, 48, 12.0), (-96, -40, 8.0), (-70, -66, 10.0), (-54, 70, 9.0)]:
-    fonta("Maquis", ridge, "maquis", (x, 0, z), size=s)
-for (x, z) in [(-54, -30), (-56, -24), (-56, 6), (-56, 12), (-77, -32), (-79, 4), (-48, -2), (-44, 2)]:
-    fonta("Cypress", ridge, "cypress", (x, 0, z), size=10.0 + (x * z) % 3)
 
 # --- The Holm Wood and the Oracle's Grotto -------------------------------------------------------
 wood = group("HolmWood")
-fonta("OraclesGrotto", wood, "grotto", (82, 5.5, -29, 0), size=30.0, wide=5.0, on_ground=False)
-fonta("OracleAltar", wood, "altar", (79.2, 5.5, -29, 90), on_ground=False)
-fonta("OracleStele", wood, "stele", (79.0, 5.5, -26.5, 90), size=2.0, variant=1, on_ground=False)
+fonta("OraclesGrotto", wood, "grotto", (72, GROTTO_Y, -24, -90), size=26.0, wide=5.0, on_ground=False)
 fonta("Ilyria", wood, "god_statue", (58, 0, 22, 220), size=6.0, variant=2)
-trees = 0
-for k in range(48):
-    a = k * 2.399
-    r = 6 + (k * 53 % 37)
-    x = 80 + math.cos(a) * r * 0.9
-    z = -18 + math.sin(a) * r * 1.2
-    if abs(x - 82) < 6 and -50 < z < -8:
-        continue # the grotto's line
-    kind = "madrono" if k % 4 == 1 else "holm_oak"
-    fonta("HolmOak" if kind == "holm_oak" else "Madrono", wood, kind, (round(x, 1), 0, round(z, 1)), size=7.0 + (k % 3) * 0.8 if kind == "holm_oak" else 5.0)
-    trees += 1
-for (x, z, s) in [(64, -6, 10.0), (100, -2, 9.0), (70, -56, 11.0), (104, -44, 8.0), (52, 6, 9.0)]:
-    fonta("Maquis", wood, "maquis", (x, 0, z), size=s)
-for (x, z, s) in [(96, 40, 4.0), (108, -16, 5.0), (90, -62, 4.5)]:
+for (x, z, s) in [(96, 40, 4.0), (108, -16, 5.0), (90, -62, 4.5), (60, -40, 3.5)]:
     fonta("Limestone", wood, "limestone", (x, 0, z, x * 3 % 360), size=s)
 
 # --- The Acropolis: the Temple of Al'quimelea ----------------------------------------------------
 acro = group("Acropolis")
-fonta("TempleOfAlquimelea", acro, "temple", (0, TEMPLE_Y, -90, 0), size=26.0, wide=18.0, on_ground=False)
-fonta("Alquimelea", acro, "god_statue", (0, TEMPLE_Y, -75, 0), size=9.0, variant=0, on_ground=False)
-for (x, z, yaw, v) in [(-18, -78, 130, 1), (19, -80, 230, 2), (-17, -98, 60, 3), (18, -99, 300, 4)]:
+fonta("TempleOfAlquimelea", acro, "temple", (0, TEMPLE_Y, -94, 0), size=26.0, wide=18.0, on_ground=False)
+fonta("Alquimelea", acro, "god_statue", (0, TEMPLE_Y, -80, 0), size=9.0, variant=0, on_ground=False)
+for (x, z, yaw, v) in [(-18, -80, 130, 1), (19, -82, 230, 2), (-17, -100, 60, 3), (18, -101, 300, 4)]:
     fonta("FallenGod", acro, "fallen_god", (x, TEMPLE_Y, z, yaw), size=6.0, variant=v, on_ground=False)
-fonta("GodHead", acro, "god_head", (-12, TEMPLE_Y, -70, 160), size=3.2, variant=0, on_ground=False)
-for (x, z) in [(12, -71), (-21, -88), (21, -90)]:
+fonta("GodHead", acro, "god_head", (-12, TEMPLE_Y, -74, 160), size=3.2, variant=0, on_ground=False)
+for (x, z) in [(12, -75), (-21, -90), (21, -92)]:
     fonta("Cauldron", acro, "cauldron", (x, TEMPLE_Y, z), size=1.6, on_ground=False)
-for (x, z) in [(-8, -69), (8, -69)]:
+for (x, z) in [(-8, -76), (8, -76)]:
     fonta("Altar", acro, "altar", (x, TEMPLE_Y, z, 0), on_ground=False)
-# The Sacred Way's columns, two by two up the hill.
-for (x, z, broken) in [(-4, -52, False), (4, -52, True), (-15, -57, False), (-9, -61, True), (-3, -63, False), (5, -64, True)]:
-    fonta("SacredColumn", acro, "broken_column" if broken else "column", (x, 0, z), size=6.5)
-for (x, z) in [(-5, -67), (5, -67)]:
+fonta("SacredStair", acro, "sacred_stair", (0, 0, -40, 0), size=34.0, wide=6.0, on_ground=False)
+# The Sacred Way's columns, two by two up the stair, some fallen.
+for k, z in enumerate([-44, -50, -61, -67]):
+    for side in (-1, 1):
+        broken = (k + (side > 0)) % 3 == 1
+        fonta("SacredColumn", acro, "broken_column" if broken else "column", (side * 4.6, 0, z), size=6.5)
+for (x, z) in [(-6, -74), (6, -74)]:
     fonta("Cypress", acro, "cypress", (x, TEMPLE_Y, z), size=11.0, on_ground=False)
-for (x, z) in [(-14, -64), (14, -66)]:
+for (x, z) in [(-8, -40), (8, -40)]:
     fonta("Stele", acro, "stele", (x, 0, z, 180), size=2.2, variant=0)
-for (x, z, s) in [(-40, -100, 5.0), (40, -104, 5.0), (-30, -110, 4.0), (26, -112, 4.5), (52, -110, 6.0), (-64, -108, 4.0)]:
-    fonta("Limestone", acro, "limestone", (x, 0, z, x * 11 % 360), size=s)
-for (x, z, s) in [(-34, -66, 9.0), (34, -70, 10.0), (46, -90, 8.0), (-46, -88, 9.0)]:
-    fonta("Maquis", acro, "maquis", (x, 0, z), size=s)
-for (x, z, s) in [(-22, -50, 12.0), (24, -54, 11.0)]:
-    fonta("Wildflowers", acro, "wildflowers", (x, 0, z), size=s)
-for (x, z) in [(-28, -60), (30, -62), (46, -76), (-44, -74)]:
-    fonta("Olive", acro, "olive", (x, 0, z), size=4.4)
+
+# --- The lesser gods' altars: one wakes now and then in the night (FontaRites) ----------------------
+altars = group("GodAltars")
+fonta("Thaleon", altars, "god_statue", (-34, 0, 78, 200), size=6.0, variant=1)
+fonta("ThaleonAltar", altars, "god_altar", (-30, 0, 72, 200), variant=1)
+fonta("IlyriaAltar", altars, "god_altar", (54, 0, 17, 220), variant=2)
+fonta("OrvaneAltar", altars, "god_altar", (-89, 0, 29, 110), variant=3)
+fonta("KerysAltar", altars, "god_altar", (-99, 0, -17, 70), variant=4)
 
 # --- The archipelago, far out at sea -------------------------------------------------------------
 far = group("Archipelago")
@@ -261,27 +247,30 @@ for (x, z, s) in [(-232, -70, 70.0), (205, -150, 80.0), (150, 205, 55.0), (-190,
 
 # --- The hives: where the night's beehives grow ----------------------------------------------------
 hives = group("Hives")
-for (x, z) in [(-14, 44), (22, 52), (-38, -10), (40, -28), (60, 2), (-24, -58)]:
+for (x, z) in [(-14, 44), (22, 52), (-46, -26), (40, -28), (60, 2), (-24, -40)]:
     spot(hives, "hive", (x, 0, z))
 
 # --- Versus: where rivals begin ------------------------------------------------------------------
 rivals = group("Rivals")
-for (x, z) in [(0, 70), (-30, 30), (30, 30), (-60, -10), (60, -10), (0, -40), (-40, -60), (40, -60)]:
+for (x, z) in [(0, 70), (-24, 30), (30, 30), (-46, -6), (60, -10), (0, -30), (-96, 0), (84, -24)]:
     spot(rivals, "rival", (x, 0, z))
 
 # --- Supplies ------------------------------------------------------------------------------------
 loot = group("Loot")
-for (x, z) in [(-28, 20), (-22, 28), (8, 76), (26, 6), (82, -30), (-66, -32), (-66, 12), (0, -76), (14, -86), (-14, -86), (60, 18), (-92, -10), (100, 6)]:
+for (x, z) in [(-46, 2), (-40, 10), (8, 80), (26, 6), (-66, -36), (-66, 14), (0, -84), (14, -90), (-14, -90), (60, 18), (-100, -10), (96, 6), (-104, -22)]:
     spot(loot, "loot", (x, 0, z))
 for (x, z) in [(0, 0), (-50, 40), (50, -40), (-40, -40), (40, 50)]:
     spot(loot, "poi", (x, 0, z))
 
 # --- Names on the map screen ---------------------------------------------------------------------
 places = group("Places")
-for (x, z, text) in [(10, 80, "The Landing"), (-30, 20, "Worshippers' Village"), (26, 8, "Fallen Colossus"), (0, 30, "Olive Terraces"),
-                     (-66, -10, "The Ravine"), (-96, -14, "Kerys' Watch"), (82, -30, "Oracle's Grotto"), (78, -10, "Holm Wood"),
-                     (58, 22, "Ilyria's Grove"), (0, -88, "Temple of Al'quimelea"), (0, -58, "Sacred Way")]:
+for (x, z, text) in [(10, 84, "The Landing"), (-46, -2, "Worshippers' Village"), (26, 10, "Fallen Colossus"), (0, 30, "Olive Terraces"),
+                     (-66, -10, "The Ravine"), (-104, -22, "Kerys' Watch"), (60, -24, "Oracle's Grotto"), (88, -10, "Holm Wood"),
+                     (58, 22, "Ilyria's Grove"), (0, -92, "Temple of Al'quimelea"), (0, -56, "Sacred Way")]:
     spot(places, "place", (x, 0, z), text=text)
+
+# --- Everything that grows: planted last, round all of the above ---------------------------------
+fonta("Flora", ".", "flora", (0, 0, 0), size=140.0, on_ground=False)
 
 
 def write():

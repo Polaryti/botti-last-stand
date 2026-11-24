@@ -1439,6 +1439,10 @@ static func reset_pose(root: Node3D) -> void:
 		if node is MeshInstance3D or node is Label3D:
 			node.visible = true
 	root.remove_meta("side")
+	# A Fontanova mutant's death beats (FontaModels.fall) start over.
+	for key: StringName in root.get_meta_list():
+		if str(key).begins_with("did_") or key == &"landed_at":
+			root.remove_meta(key)
 	# The Shapeshifter stands as a stag again, the Revenant's stones are still.
 	var beast := root.get_node_or_null("Beast") as Node3D
 	if beast:
@@ -1523,7 +1527,7 @@ static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> vo
 		VaelSkyModels.fall(root, k, delta)
 		return
 	if z.model_id in FontaModels.KINDS:
-		FontaModels.fall(root, k, delta)
+		FontaModels.fall(z, root, k, delta)
 		return
 	var side := float(root.get_meta("side", 1.0))
 	var total := death_time(z.model_id)

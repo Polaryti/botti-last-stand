@@ -1784,9 +1784,8 @@ func _fontanova() -> void:
 			gods[p.variant] = true
 	check(kinds.get("sailboat", 0) == 1 and kinds.get("rope_bridge", 0) == 2 and kinds.get("grotto", 0) == 1 and kinds.get("temple", 0) == 1, "a beached sailboat, two rope bridges, a grotto and the god's temple")
 	check(gods.size() == FontaBuilder.GODS.size() and kinds.get("horizon_isle", 0) >= 4, "every god of the archipelago is shown somewhere, and the other islands stand on the horizon")
-	for tree: String in ["olive", "holm_oak", "madrono", "carob"]:
-		check(kinds.get(tree, 0) >= 5, "%s trees grow there (%d)" % [tree, kinds.get(tree, 0)])
-	check(kinds.get("wildflowers", 0) >= 8 and kinds.get("maquis", 0) >= 8, "wildflower meadows and maquis")
+	check(kinds.get("flora", 0) == 1 and kinds.get("mesa", 0) >= 8 and kinds.get("terraces", 0) == 2 and kinds.get("sacred_stair", 0) == 1 and kinds.get("god_altar", 0) == 4,
+		"the island is planted from its land, has its crags and terraces, the Sacred Way's stair, and an altar for each god")
 	scene.free()
 	# The flora moves in the wind, harder on a windy night.
 	check((FontaFlora.tree_mesh("olive") as ArrayMesh).surface_get_material(0) == FontaFlora.tree_material(), "its trees are drawn to sway")
@@ -1828,9 +1827,8 @@ func _fontanova() -> void:
 		var mid := (Vector2(d["a"]) + Vector2(d["b"])) * 0.5
 		check(t.deck_y(d, 0.5) > t.ground_height(mid.x, mid.y) + 3.0 and Vector2(d["a"]).distance_to(d["b"]) > 8.0, "a bridge spans the Ravine, high over its floor (%.1f m)" % (t.deck_y(d, 0.5) - t.ground_height(mid.x, mid.y)))
 		check(t.on_deck(mid.x, mid.y), "and can be walked")
-	# The Oracle's Grotto: a way through the east hill.
-	var through := isle.grid.route(Vector3(82, 0, -48), Vector3(82, 0, -10))
-	check(through.size() > 1 and Array(through).all(func(p: Vector3) -> bool: return absf(p.x - 82.0) < 12.0) and t.is_walkable(82, -29), "the Oracle's Grotto runs through the east hill")
+	await _fonta_land(isle)
+	await _fonta_rites(isle)
 	await _fonta_mutants(isle)
 	space.queue_free()
 	Game.night_map = was_map
@@ -2835,6 +2833,149 @@ func _vael_weapons() -> void:
 
 ## The mutants of Fontanova: each one's tell, what lands and how to step out of it, what it leaves
 ## behind, and where the night puts them.
+## Fontanova's land: high ground you can reach, a Ravine that kills, nothing floating, a full island.
+func _fonta_land(isle: World) -> void:
+	var t := isle.terrain
+	check(t.height(0, -88) > 30.0 and t.height(-94, -8) > 18.0 and t.height(-104, -22) > 25.0 and t.height(84, -8) > 17.0,
+		"real heights: the Acropolis (%.0f m), the West Ridge, Kerys' Watch and the Holm Wood's height" % t.height(0, -88))
+	for trip: Array in [[Vector3(0, 0, 70), Vector3(0, 0, -84), "the temple, up the Sacred Way"], [Vector3(0, 0, 70), Vector3(-46, 0, -2), "the village on the Ravine's rim"],
+			[Vector3(0, 0, 70), Vector3(-94, 0, 6), "the West Ridge, over a bridge"], [Vector3(0, 0, 70), Vector3(60, 0, -24), "the Oracle's Grotto"]]:
+		var way := isle.grid.route(trip[0], trip[1])
+		check(way.size() > 1 and Vector2(way[-1].x - trip[1].x, way[-1].z - trip[1].z).length() < 4.0, "a way on foot from the Landing to %s" % trip[2])
+	# The Ravine: deep, and a fall into it is death.
+	var floor_at := Vector3.INF
+	for z in range(-40, 30, 2):
+		for x in range(-80, -40, 2):
+			if t.in_chasm(x, z) and t.height(x, z) < Terrain.CHASM_DEATH - 1.0:
+				floor_at = Vector3(x, t.height(x, z), z)
+				break
+		if floor_at != Vector3.INF:
+			break
+	check(floor_at != Vector3.INF and floor_at.y < Terrain.CHASM_DEATH, "the Ravine's floor lies deep below the rims (%.1f m)" % floor_at.y)
+	var you := isle.player
+	you.hp = you.max_hp()
+	you.global_position = floor_at
+	you._tick_sea(0.1)
+	check(you.dead or you.hp <= 0.0, "falling into the Ravine kills you")
+	if you.dead:
+		you.respawn(Vector3(2, t.height(2, 64), 64))
+	you.guard_left = 0.0
+	if isle.spawn_zombie("thornback", floor_at + Vector3(0, 0.5, 0)):
+		var z: Zombie = isle.zombies.back()
+		z.position = floor_at
+		z._physics_process(0.05)
+		check(not z.is_alive(), "and kills whatever is knocked into it")
+	# Nothing in the air: every tree's root is on the ground, every prop on the lowest ground under it.
+	var adrift := 0
+	for at: Vector3 in isle.tree_spots:
+		if absf(at.y - t.height(at.x, at.z)) > 0.06:
+			adrift += 1
+	check(isle.tree_spots.size() >= 250 and adrift == 0, "%d trees, every one rooted in the ground (%d adrift)" % [isle.tree_spots.size(), adrift])
+	var column := MapFonta.new()
+	column.kind = "column"
+	column.size = 4.0
+	var on_slope := Transform3D(Basis.IDENTITY, Vector3(0, 0, 40))
+	var base := MapBuilder.settle_static(t, on_slope, column)
+	var half := column.footprint()
+	var under := INF
+	for i: float in [-1.0, 1.0]:
+		for j: float in [-1.0, 1.0]:
+			under = minf(under, t.height(on_slope.origin.x + half.x * i, on_slope.origin.z + half.y * j))
+	check(base <= under + 0.001, "a column on a slope is set down on its lowest corner, never left hanging")
+	column.free()
+	# The flora: a carpet of grass, flowers and shrubs, the cliffs dressed in strata.
+	var tufts := 0
+	var carpets := 0
+	for n in isle.find_children("*", "MultiMeshInstance3D", true, false):
+		var mm := (n as MultiMeshInstance3D).multimesh
+		if (n as MultiMeshInstance3D).material_override == FontaFlora.grass_material():
+			carpets += 1
+			tufts += mm.instance_count
+	check(carpets > 50 and tufts > 20000, "a carpet of grass over the island (%d tufts)" % tufts)
+	check(FontaFlora.FIELD_ZONES.size() >= 9 and FontaFlora.NOMINAL.size() >= 10, "%d kinds of tree, planted by %d parts of the island" % [FontaFlora.NOMINAL.size(), FontaFlora.FIELD_ZONES.size()])
+	FontaFlora.set_wind(1.0, Vector3(0, 0, 1))
+	check(is_equal_approx(float(FontaFlora.grass_material().get_shader_parameter("gust")), 1.0), "the grass bends in the wind too")
+	FontaFlora.set_wind(0.0, Vector3(1, 0, 0.3))
+
+
+## Fontanova's rites: the Oracle's braziers and sanctum, the waking altars, the rising sea, the blooms.
+func _fonta_rites(isle: World) -> void:
+	var rites := isle.fonta_rites
+	check(rites != null and (isle.grotto_rites["braziers"] as Array).size() == 3 and isle.altar_spots.size() == 4, "the Oracle's Grotto has its three braziers, and each god an altar")
+	var you := isle.player
+	var gate := isle.grid.route(Vector3(60, 0, -24), (isle.grotto_rites["relic"] as Vector3))
+	var shut := gate.size() < 2 or Vector2(gate[-1].x, gate[-1].z).distance_to(Vector2((isle.grotto_rites["relic"] as Vector3).x, (isle.grotto_rites["relic"] as Vector3).z)) > 3.0
+	check(shut, "the sanctum is sealed at first")
+	var pickups_before := isle.pickups.size()
+	for i in 3:
+		var at: Vector3 = (isle.grotto_rites["braziers"] as Array)[i]
+		you.global_position = at + Vector3(0.5, 0, 0)
+		rites._tick_braziers(FontaRites.BRAZIER_HOLD * 0.5)
+		if i == 0:
+			check(not rites.lit & 1, "a brazier takes a moment to light")
+		rites._tick_braziers(FontaRites.BRAZIER_HOLD * 0.6)
+	check(rites.lit == 7 and rites.door_open, "light all three braziers and the sanctum's door opens")
+	var pickups_after := isle.pickups.size()
+	check(pickups_after >= pickups_before + 2, "inside: a rare weapon and the Oracle's Eye")
+	# The Oracle's Eye: harder blows, and the enemies near you shown.
+	var dmg := you.damage_multiplier()
+	you.powers[PowerDefs.EYE] = 30.0
+	check(is_equal_approx(you.damage_multiplier(), dmg * PowerDefs.EYE_DAMAGE), "the Oracle's Eye: blows %d%% harder" % int(round((PowerDefs.EYE_DAMAGE - 1.0) * 100.0)))
+	you.powers.erase(PowerDefs.EYE)
+	# The altars wake one at a time.
+	check(FontaRites.awake_at(FontaRites.ALTAR_FIRST - 1.0).x == 0 and int(FontaRites.awake_at(FontaRites.ALTAR_FIRST + 1.0).x) == FontaRites.ALTAR_ORDER[0], "the first altar wakes after %d s" % int(FontaRites.ALTAR_FIRST))
+	check(FontaRites.awake_at(FontaRites.ALTAR_FIRST + FontaRites.ALTAR_AWAKE + 1.0).x == 0 and int(FontaRites.awake_at(FontaRites.ALTAR_FIRST + FontaRites.ALTAR_EVERY + 1.0).x) == FontaRites.ALTAR_ORDER[1], "sleeps after %d s, and the next wakes %d s after the first" % [int(FontaRites.ALTAR_AWAKE), int(FontaRites.ALTAR_EVERY)])
+	isle.director.elapsed = FontaRites.ALTAR_FIRST + 1.0
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	rites._tick_altars(0.0)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	var god := rites.altar_god
+	var altar := rites._altar_at(god)
+	check(god == FontaRites.ALTAR_ORDER[0] and altar != Vector3.INF, "%s's altar is awake" % FontaRites.GOD_NAMES.get(god, "?"))
+	you.global_position = altar + Vector3(1, 0, 0)
+	rites._tick_altars(FontaRites.ALTAR_HOLD * 0.5)
+	check(rites.claims == 0, "it has to be held")
+	rites._bless_claimed() # (every frame, as the altar burns, it notes whose it is)
+	rites._tick_altars(FontaRites.ALTAR_HOLD * 0.6)
+	rites._bless_claimed()
+	check(rites.claims == 1 and you._buffs.has("god_ilyria_melee_damage"), "held for %d s, Ilyria blesses whoever stands there: blows %d%% harder" % [int(FontaRites.ALTAR_HOLD), int(Player.GOD_DAMAGE * 100.0)])
+	for key: String in you._buffs.keys():
+		if key.begins_with("god_"):
+			you._buffs.erase(key)
+	# The sea rises, three times a night, and goes down again.
+	check(FontaRites.tide_at(FontaRites.TIDES[0] - 1.0) == 0.0 and is_equal_approx(FontaRites.tide_at(FontaRites.TIDES[0] + FontaRites.TIDE_RAMP + 1.0), FontaRites.TIDE_RISE), "at %d s the sea rises %.1f m" % [int(FontaRites.TIDES[0]), FontaRites.TIDE_RISE])
+	check(FontaRites.tide_at(FontaRites.TIDES[0] + FontaRites.TIDE_HIGH + FontaRites.TIDE_RAMP + 1.0) == 0.0 and FontaRites.TIDES.size() == 3, "and falls again after %d s, three times a night" % int(FontaRites.TIDE_HIGH))
+	isle.director.elapsed = FontaRites.TIDES[0] + FontaRites.TIDE_RAMP + 1.0
+	rites._tick_tide()
+	var beach := Vector3(4, 0, 80)
+	check(isle.isle_sea.slow_at(beach) < 1.0 or isle.terrain.height(beach.x, beach.z) < Terrain.ISLE_SEA_Y + FontaRites.TIDE_RISE, "the high sea covers the beach")
+	# The blooms.
+	check(FontaRites.bloom_at(FontaRites.BLOOM_FIRST - 1.0).x < 0 and FontaRites.bloom_at(FontaRites.BLOOM_FIRST + 1.0).z == 1 and FontaRites.bloom_at(FontaRites.BLOOM_FIRST + FontaRites.BLOOM_WARN + 1.0).z == 2,
+		"violet buds break through after %d s, and open %d s later" % [int(FontaRites.BLOOM_FIRST), int(FontaRites.BLOOM_WARN)])
+	isle.director.elapsed = FontaRites.BLOOM_FIRST + FontaRites.BLOOM_WARN + 1.0
+	rites._tick_blooms(0.0)
+	check(rites._bloom != null and rites._bloom_at != Vector3.INF and rites.in_bloom(rites._bloom_at), "they open at %s" % FontaRites.BLOOM_PLACES[FontaRites.bloom_at(isle.director.elapsed).y])
+	you.hp = you.max_hp()
+	you.global_position = rites._bloom_at
+	rites._hurt_tick = 0.0
+	rites._tick_blooms(0.6)
+	check(you.hp < you.max_hp() and you.poison_left > 0.0, "standing in them poisons and hurts you")
+	you.global_position = rites._bloom_at + Vector3(FontaRites.BLOOM_RADIUS + 2.0, 0, 0)
+	check(not rites.in_bloom(you.global_position), "step out of the ring and you are clear")
+	isle.director.elapsed = 0.0
+	rites._tick_tide()
+	rites._tick_blooms(0.0)
+	you.hp = you.max_hp()
+	you.poison_left = 0.0
+	# Royal Jelly, from a broken hive.
+	you.hp = 10.0
+	you._rage_cd = 9.0
+	you.royal_jelly()
+	check(is_equal_approx(you.hp, you.max_hp()) and you._rage_cd == 0.0 and you._buffs.has("royal_jelly_melee_rate"), "Royal Jelly: full health, every ability ready, and %d%% quicker for %d s" % [int(PowerDefs.JELLY_RATE * 100.0), int(PowerDefs.JELLY_TIME)])
+	you._buffs.erase("royal_jelly_melee_rate")
+	you._buffs.erase("royal_jelly_spell_rate")
+
+
 func _fonta_mutants(isle: World) -> void:
 	var you := isle.player
 	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
@@ -3141,6 +3282,57 @@ func _fonta_mutants(isle: World) -> void:
 	check(isle.count_type("mutant_spider") == Director.MAX_SPIDERS, "from %d:%02d spiders wait in the trees, %d at most" % [int(Director.SPIDERS_FROM) / 60, int(Director.SPIDERS_FROM) % 60, Director.MAX_SPIDERS])
 	for z: Zombie in isle.zombies.duplicate(): z.release()
 	ready_you.call()
+	# How each of them dies: in stages, the body moving through them, the god's glow going out, and
+	# whole again when the same creature comes back.
+	for id: String in FontaModels.KINDS:
+		var spot := at + Vector3(0, 2.2 if id in FontaModels.FLYERS else 0.0, -8)
+		if not isle.spawn_zombie(id, spot):
+			check(false, id + " spawns to be killed")
+			continue
+		var z: Zombie = isle.zombies.back()
+		z.position = spot
+		var rig := z._visual.get_node("Rig") as Node3D
+		var pose_of := func() -> Array:
+			var out: Array = [z._visual.transform]
+			for n in z._visual.find_children("*", "Node3D", true, false):
+				out.append((n as Node3D).transform)
+			return out
+		var rest: Array = pose_of.call()
+		z.take_damage(z.hp + 1000.0, Vector3.ZERO, 0.0, z.centre())
+		var poses: Array[Array] = []
+		var t := 0.0
+		while z.active and t < 4.0:
+			z._physics_process(1.0 / 30.0)
+			t += 1.0 / 30.0
+			if absf(fmod(t, 0.5)) < 1.0 / 30.0:
+				poses.append(pose_of.call())
+		var same := func(a: Array, b: Array) -> bool:
+			for i in a.size():
+				if not (a[i] as Transform3D).is_equal_approx(b[i]):
+					return false
+			return true
+		var moved := poses.filter(func(p: Array) -> bool: return not same.call(p, rest)).size()
+		var distinct := 0
+		for i in range(1, poses.size()):
+			if not same.call(poses[i], poses[i - 1]):
+				distinct += 1
+		check(t >= FontaModels.death_time(id) - 0.1 and moved >= 3 and distinct >= 2, "%s dies in stages over %.1f s (%d poses)" % [id, FontaModels.death_time(id), distinct + 1])
+		var beat := "splash" if id in ["mutant_bee", "mutant_wasp"] else "dust" if id == "ember_moth" else "slump" if id == "mutant_spider" else "spill" if id in FontaModels.SNAILS else "crack" if id == "beehive" else "thud"
+		check(not z.active and z._visual.has_meta("did_" + beat), "%s: the moment it hits the ground is marked (%s), and the body is gone after" % [id, beat])
+		isle.spawn_zombie(id, spot)
+		var again: Zombie = isle.zombies.back()
+		if again == z:
+			check(same.call(pose_of.call(), rest) and not z._visual.has_meta("landed_at") and z._visual.find_children("*", "MeshInstance3D", true, false).all(func(m: Node) -> bool: return (m as MeshInstance3D).visible), "%s comes back whole" % id)
+		for other: Zombie in isle.zombies.duplicate(): other.release()
+	# The wasp's stinger is its own, not an arrow.
+	isle.spawn_enemy_arrow(at + Vector3(0, 2, 0), at + Vector3(0, 2, 10), 5.0, 30.0, false, "mutant_wasp")
+	var shot: Projectile = null
+	for n in isle.find_children("*", "Projectile", true, false):
+		if (n as Projectile).active and (n as Projectile).source == "mutant_wasp":
+			shot = n
+	check(shot != null and shot.mesh != World._arrow_mesh and shot.spins and shot.poison_trail, "a Mutant Wasp's stinger flies as a stinger, corkscrewing and venomous, not as an arrow")
+	if shot:
+		shot.stop()
 
 
 ## Coastal flyers exercise real wind-ups, dodges, interruption, damage and pool reuse.

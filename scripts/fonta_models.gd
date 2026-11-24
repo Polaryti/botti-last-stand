@@ -350,7 +350,7 @@ static func _snail(root: Node3D, nest: bool) -> void:
 				var w := 0.62 * sin(clampf((y - 0.15) / 1.7, 0.0, 1.0) * PI) + 0.12
 				l.prism(Vector3(cos(a) * w * 0.98, y, sin(a) * w * 0.98), Vector3(cos(a) * (w + 0.03), y, sin(a) * (w + 0.03)), 0.07, 0.07, 6, BLACK)
 			l.prism(Vector3(0, 1.72, 0), Vector3(0, 2.0, 0), 0.12, 0.03, 6, PAPER.darkened(0.2)))
-		_part(shell, "nest_crawlers", func(l: LowPoly) -> void:
+		var crawlers := _part(shell, "nest_crawlers", func(l: LowPoly) -> void:
 			var r := RandomNumberGenerator.new()
 			r.seed = 137
 			for k in 9:
@@ -359,6 +359,7 @@ static func _snail(root: Node3D, nest: bool) -> void:
 				var w := 0.62 * sin(clampf((y - 0.15) / 1.7, 0.0, 1.0) * PI) + 0.16
 				var at := Vector3(cos(a) * w, y, sin(a) * w)
 				l.prism(at, at + Vector3(0, 0.03, 0.12).rotated(Vector3.UP, a), 0.035, 0.02, 4, YELLOW if k % 2 else WASP_RED))
+		crawlers.name = "Crawlers"
 	else:
 		# A true coiled shell: a tube winding inward round a sideways axis, each whorl narrower,
 		# growth bands across it, limestone knobs on the outer whorl.
@@ -474,23 +475,27 @@ static func _ostrich(root: Node3D) -> void:
 				l.leaf(base - w, tip, base + w, OSTRICH.lightened(0.05 + 0.04 * (k % 2)))
 				l.leaf(base + w, tip, base - w, OSTRICH.lightened(0.05 + 0.04 * (k % 2)))
 				l.leaf(tip - w * 0.4, tip + down * 0.08, tip + w * 0.4, OSTRICH.lightened(0.3)))
-	_part(rig, "ostrich_plumes", func(l: LowPoly) -> void:
-		# The wings: fans of white plumes held half out from the flanks, grey at their roots.
-		for side: float in [-1.0, 1.0]:
-			var shoulder := Vector3(side * 0.4, 0.12, 0.22)
+	# The wings: fans of white plumes held half out from the flanks, grey at their roots, each on its
+	# own pivot at the shoulder so they can beat, spread and flare.
+	for side: float in [-1.0, 1.0]:
+		var shoulder := Vector3(side * 0.4, 0.12, 0.22)
+		var wing := _pivot(rig, shoulder, "WingL" if side < 0 else "WingR")
+		_part(wing, "ostrich_wing_%s" % side, func(l: LowPoly) -> void:
 			for f in 7:
 				var a := -0.2 + f * 0.22
-				var tip := shoulder + Vector3(side * (0.32 + 0.06 * sin(f)), -0.15 - f * 0.05, -0.25 - f * 0.11).rotated(Vector3.FORWARD, side * a * 0.2)
-				var mid := shoulder.lerp(tip, 0.45)
+				var tip := Vector3(side * (0.32 + 0.06 * sin(f)), -0.15 - f * 0.05, -0.25 - f * 0.11).rotated(Vector3.FORWARD, side * a * 0.2)
+				var mid := tip * 0.45
 				var w := Vector3(0, 0.07, 0.06)
-				l.leaf(shoulder, mid + w, mid - w, PLUME.darkened(0.35))
-				l.leaf(shoulder, mid - w, mid + w, PLUME.darkened(0.35))
+				l.leaf(Vector3.ZERO, mid + w, mid - w, PLUME.darkened(0.35))
+				l.leaf(Vector3.ZERO, mid - w, mid + w, PLUME.darkened(0.35))
 				l.leaf(mid + w, tip, mid - w, PLUME.darkened(0.03 * f))
-				l.leaf(mid - w, tip, mid + w, PLUME.darkened(0.03 * f))
-		# The tail: a fountain of white plumes, up and back.
+				l.leaf(mid - w, tip, mid + w, PLUME.darkened(0.03 * f)))
+	# The tail: a fountain of white plumes, up and back, that bounces as it runs.
+	var tail := _pivot(rig, Vector3(0, 0.18, -0.62), "Tail")
+	_part(tail, "ostrich_tail", func(l: LowPoly) -> void:
 		for f in 8:
 			var a := -0.75 + f * 0.21
-			var root_at := Vector3(sin(a) * 0.12, 0.18, -0.62)
+			var root_at := Vector3(sin(a) * 0.12, 0.0, 0.0)
 			var tip := root_at + Vector3(sin(a) * 0.32, 0.38 - absf(a) * 0.2, -0.3)
 			var w := Vector3(0.06, 0, 0.04)
 			l.leaf(root_at - w, tip, root_at + w, PLUME)
@@ -617,8 +622,12 @@ static func _thornback(root: Node3D) -> void:
 	var head := _pivot(rig, Vector3(0, 0.5, 1.05), "Head")
 	_part(head, "thornback_head", func(l: LowPoly) -> void:
 		l.prism(Vector3(0, -0.05, -0.3), Vector3(0, 0.0, 0.15), 0.2, 0.22, 8, Color(0.45, 0.42, 0.3))
-		l.prism(Vector3(0, 0.0, 0.15), Vector3(0, -0.06, 0.42), 0.22, 0.08, 8, Color(0.5, 0.47, 0.34))
-		l.prism(Vector3(0, -0.06, 0.38), Vector3(0, -0.14, 0.5), 0.08, 0.0, 5, BLACK))
+		l.prism(Vector3(0, 0.0, 0.15), Vector3(0, -0.03, 0.42), 0.22, 0.08, 8, Color(0.5, 0.47, 0.34))
+		l.prism(Vector3(0, -0.03, 0.38), Vector3(0, -0.12, 0.52), 0.08, 0.0, 5, BLACK)) # the hooked upper beak
+	var jaw := _pivot(head, Vector3(0, -0.12, 0.14), "Jaw")
+	_part(jaw, "thornback_jaw", func(l: LowPoly) -> void:
+		l.prism(Vector3(0, 0, -0.1), Vector3(0, -0.02, 0.24), 0.17, 0.06, 7, Color(0.42, 0.39, 0.28))
+		l.prism(Vector3(0, -0.02, 0.22), Vector3(0, 0.02, 0.33), 0.06, 0.0, 5, BLACK))
 	_part(head, "thornback_eyes", func(l: LowPoly) -> void:
 		for side: float in [-1.0, 1.0]:
 			l.box(Vector3(side * 0.16, 0.06, 0.22), Vector3(0.03, 0.04, 0.05), GOD_GREEN), true)
@@ -785,100 +794,450 @@ static func _scuttle_spider(z: Zombie, rig: Node3D, delta: float, k: float, movi
 			knee.rotation.z = lerpf(knee.rotation.z, s * (0.9 if leaping else 0.25 if tell else 0.0), minf(1.0, delta * 14.0))
 
 
-## The ostrich running: long legs scissoring, neck pumping; the tell (m_cast) paws the ground with
-## its head held low and forward; the charge (m_charge) stretches it flat out; a kick (m_bite) swings
-## one leg forward hard.
+## The ostrich. Running: a real stride, each leg folding up as it swings through and reaching
+## straight to plant, the body bobbing twice a stride and rolling a little, the neck pumping, the
+## wings held out and beating for balance, the tail bouncing. Standing: it looks about in quick bird
+## jerks. The tell (m_cast) is a threat display: wings up and spread, head low and forward, one foot
+## scraping the ground back. The charge (m_charge) is flat out, neck level, wings wide. The kick
+## (m_bite): a wind-up, knee drawn high and the body leaning back, wings flaring, then the leg slashes
+## forward and down, and is set back.
 static func _run_ostrich(z: Zombie, rig: Node3D, delta: float, k: float, moving: float, state: String, tell: bool, age: float, t: float) -> void:
 	var charging := state == "m_charge"
-	var stride := t * (moving * 1.9 if moving > 0.2 else 0.0) + float(rig.get_meta("stride", 0.0))
-	var reach := 0.75 if charging else clampf(moving / 6.0, 0.15, 0.6)
-	var kick := 0.0
-	if z._attack_left > 0.0:
-		kick = sin(clampf(1.0 - z._attack_left / 0.5, 0.0, 1.0) * PI)
+	var running := moving > 0.2 or charging
+	var pace := (2.6 if charging else clampf(moving * 0.55, 0.9, 2.4))
+	var stride := float(rig.get_meta("stride", 0.0)) + delta * pace * TAU * (1.0 if running else 0.0)
+	rig.set_meta("stride", fmod(stride, TAU * 8.0))
+	var reach := 0.8 if charging else clampf(moving / 7.0, 0.3, 0.6)
+	# The kick, from the state's own clock (a charge's kick and a melee kick alike).
+	var kicking := state == "m_bite"
+	var wind := _ease(0.0, 0.22, age) if kicking else 0.0
+	var slash := _ease(0.22, 0.34, age) if kicking else 0.0
+	var back := _ease(0.45, 0.7, age) if kicking else 0.0
+	var kick_leg := 1.0 - back
 	for label: String in ["LegL", "LegR"]:
 		var hip := rig.get_node(label) as Node3D
 		var knee := hip.get_node("Knee") as Node3D
 		var phase := stride + (0.0 if label == "LegL" else PI)
-		var swing := sin(phase) * reach if moving > 0.2 else 0.0
+		var swing_x := 0.0
+		var fold := 0.0
+		if running:
+			# Forward through the air (sin > 0) folded, back along the ground straight.
+			swing_x = -sin(phase) * reach
+			fold = maxf(0.0, sin(phase + 0.6)) * (0.9 + reach)
 		if tell and label == "LegR":
-			swing = sin(age * 9.0) * 0.35 - 0.2 # pawing
-		if label == "LegR" and kick > 0.0:
-			swing = -kick * 1.2
-		hip.rotation.x = lerpf(hip.rotation.x, swing, minf(1.0, delta * 18.0))
-		knee.rotation.x = lerpf(knee.rotation.x, maxf(0.0, -cos(phase)) * reach * 0.9 if moving > 0.2 else 0.0, minf(1.0, delta * 18.0))
-	rig.position.y = 1.25 + absf(sin(stride)) * (0.12 if moving > 0.2 else 0.0)
-	rig.rotation.x = lerpf(rig.rotation.x, 0.3 if charging else 0.12 if tell else 0.0, k)
+			# Scraping: forward lightly, then dragged back hard along the ground.
+			var scrape := fmod(age * 1.6, 1.0)
+			swing_x = lerpf(-0.45, 0.4, _ease(0.35, 0.8, scrape))
+			fold = 0.5 * (1.0 - _ease(0.2, 0.4, scrape))
+		if kicking and label == "LegR":
+			swing_x = lerpf(lerpf(0.0, -1.5, wind), -0.55, slash) * kick_leg
+			fold = lerpf(lerpf(0.0, 1.7, wind), -0.15, slash) * kick_leg
+		hip.rotation.x = lerpf(hip.rotation.x, swing_x, minf(1.0, delta * 20.0))
+		knee.rotation.x = lerpf(knee.rotation.x, fold, minf(1.0, delta * 20.0))
+	# The body: two bobs a stride, a little roll, leaning into the run; back on its heels to kick.
+	var bob := absf(cos(stride)) * (0.1 if running else 0.0)
+	var breathe := sin(t * 1.8) * 0.015
+	rig.position.y = 1.25 - bob + breathe - 0.12 * float(tell) + 0.06 * wind * (1.0 - slash)
+	rig.rotation.z = lerpf(rig.rotation.z, sin(stride) * 0.06 * float(running), k)
+	var lean := 0.32 if charging else 0.18 if tell else 0.08 * float(running)
+	lean += -0.3 * wind * (1.0 - slash) + 0.15 * slash * kick_leg
+	rig.rotation.x = lerpf(rig.rotation.x, lean, minf(1.0, delta * 10.0))
+	# The neck: pumping with the stride, low and forward for the display, level in the charge,
+	# drawn back for the kick; the head kept level, and when it stands, glancing about in jerks.
 	var neck := rig.get_node("Neck") as Node3D
 	var upper := neck.get_node("NeckUp") as Node3D
-	neck.rotation.x = lerpf(neck.rotation.x, (1.0 if charging else 0.7 if tell else 0.0) + sin(stride * 2.0) * 0.12 * minf(1.0, moving / 4.0), k)
-	upper.rotation.x = lerpf(upper.rotation.x, (0.3 if charging else 0.0) - sin(stride * 2.0) * 0.08, k)
-	(upper.get_node("Head") as Node3D).rotation.x = lerpf((upper.get_node("Head") as Node3D).rotation.x, -neck.rotation.x * 0.8, k)
+	var head := upper.get_node("Head") as Node3D
+	var pump := sin(stride * 2.0) * 0.14 * float(running)
+	var bend := (1.15 if charging else 0.85 if tell else 0.2 * float(running)) - 0.45 * wind * (1.0 - slash)
+	neck.rotation.x = lerpf(neck.rotation.x, bend + pump, k)
+	upper.rotation.x = lerpf(upper.rotation.x, (0.35 if charging else -0.2 if tell else 0.0) - pump * 0.6, k)
+	head.rotation.x = lerpf(head.rotation.x, -(neck.rotation.x + upper.rotation.x) * 0.85, k)
+	var glance := 0.0
+	if not running and not tell and not kicking:
+		glance = (floorf(fmod(t * 0.9, 4.0)) - 1.5) * 0.35 # a new look every second or so, snapped to
+	head.rotation.y = lerpf(head.rotation.y, glance, minf(1.0, delta * 18.0))
+	if tell:
+		head.rotation.z = sin(age * 7.0) * 0.12 # a hissing sway
+	else:
+		head.rotation.z = lerpf(head.rotation.z, 0.0, k)
+	# Wings: folded at rest, held out and beating as it runs, spread high for the display, wide in
+	# the charge, flared for the kick.
+	for label: String in ["WingL", "WingR"]:
+		var wing := rig.get_node(label) as Node3D
+		var s := -1.0 if label == "WingL" else 1.0
+		var open := 0.0
+		var lift := 0.0
+		if running:
+			open = (0.9 if charging else 0.45) + sin(stride * 2.0 + 0.5) * 0.25
+		if tell:
+			open = 1.1 + sin(age * 9.0) * 0.12
+			lift = 0.7
+		if kicking:
+			open = maxf(open, 1.2 * (wind + slash * 0.5) * kick_leg)
+		wing.rotation.z = lerpf(wing.rotation.z, s * open, minf(1.0, delta * 12.0))
+		wing.rotation.x = lerpf(wing.rotation.x, -lift, minf(1.0, delta * 10.0))
+	var tail := rig.get_node("Tail") as Node3D
+	tail.rotation.x = lerpf(tail.rotation.x, (0.25 if charging else -0.35 if tell else 0.0) + cos(stride * 2.0) * 0.12 * float(running), minf(1.0, delta * 12.0))
 
 
-## The thornback plodding: legs in slow diagonal pairs, the shell swaying; snapping, it shoots its
-## head out.
+## The thornback. Walking: diagonal pairs of legs, each lifted and set down heavily, the shell
+## rising and settling and rolling a little with each step, the head pushed out ahead, nodding with
+## the steps. Standing: slow breathing, the head turning to look. Biting (m_bite): it draws its head
+## back and rears its front a little, then lunges, the whole body lurching forward, the head shooting
+## out with the beak open, snapping shut; then it settles back.
 static func _plod_thornback(rig: Node3D, delta: float, k: float, moving: float, state: String, age: float, t: float) -> void:
-	var step := t * (2.2 if moving > 0.2 else 0.0)
+	var walking := moving > 0.2
+	var step := float(rig.get_meta("step", 0.0)) + delta * 1.3 * TAU * float(walking)
+	rig.set_meta("step", fmod(step, TAU * 8.0))
+	var biting := state == "m_bite"
+	var wind := _ease(0.0, 0.25, age) if biting else 0.0
+	var lunge := _ease(0.25, 0.36, age) if biting else 0.0
+	var settle := _ease(0.45, 0.85, age) if biting else 0.0
+	var strike := lunge * (1.0 - settle)
+	var draw := wind * (1.0 - lunge)
 	for n in 4:
 		var leg := rig.get_node("Leg%d" % n) as Node3D
+		var sx := -1.0 if n % 2 == 0 else 1.0
+		var front := 1.0 if n < 2 else -1.0
 		var phase := step + (0.0 if n in [0, 3] else PI)
-		leg.rotation.x = sin(phase) * 0.35 if moving > 0.2 else 0.0
-	(rig.get_node("Shell") as Node3D).rotation.z = sin(step) * 0.04
+		var rest := Vector3(sx * 0.72, 0.35, front * 0.55)
+		var lift := maxf(0.0, sin(phase)) * 0.16 * float(walking)
+		var swing := -cos(phase) * 0.4 * float(walking)
+		if biting and front > 0.0:
+			swing = -0.35 * strike + 0.25 * draw # front legs braced for the lunge
+		leg.position = rest + Vector3(0, lift, 0)
+		leg.rotation.x = lerpf(leg.rotation.x, swing, minf(1.0, delta * 10.0))
+	var shell := rig.get_node("Shell") as Node3D
+	var thump := (1.0 - absf(sin(step))) * float(walking)
+	shell.position.y = 0.5 + 0.06 * (1.0 - thump) + sin(t * 1.2) * 0.012 * float(not walking)
+	shell.rotation.z = sin(step) * 0.05 * float(walking)
+	shell.rotation.x = lerpf(shell.rotation.x, -0.12 * draw + 0.1 * strike, minf(1.0, delta * 14.0))
+	rig.position.z = lerpf(rig.position.z, -0.15 * draw + 0.3 * strike, minf(1.0, delta * 16.0))
 	var head := rig.get_node("Head") as Node3D
-	var snap := exp(-age * 7.0) if state == "m_bite" else 0.0
-	head.position.z = lerpf(head.position.z, 1.05 + snap * 0.45, minf(1.0, delta * 20.0))
-	head.rotation.y = sin(t * 0.6) * 0.25
+	var jaw := head.get_node("Jaw") as Node3D
+	var out := (0.12 if walking else 0.0) - 0.4 * draw + 0.55 * strike
+	head.position.z = lerpf(head.position.z, 1.05 + out, minf(1.0, delta * 22.0))
+	head.position.y = 0.5 + 0.04 * sin(step * 2.0) * float(walking) + 0.08 * draw
+	head.rotation.x = lerpf(head.rotation.x, 0.08 * sin(step * 2.0) * float(walking) - 0.25 * draw + 0.1 * strike, minf(1.0, delta * 14.0))
+	var look := sin(t * 0.45) * 0.45 if not walking and not biting else sin(step * 0.5) * 0.12
+	head.rotation.y = lerpf(head.rotation.y, look, minf(1.0, delta * 3.0))
+	# The beak: open as it lunges, snapping shut at full reach.
+	var gape := 0.55 * _ease(0.15, 0.28, age) * (1.0 - _ease(0.33, 0.38, age)) if biting else 0.0
+	jaw.rotation.x = lerpf(jaw.rotation.x, gape, minf(1.0, delta * 30.0))
 
 
-## Dying: flyers tumble down, wings limp; the hive sags and its swarm scatters; snails sink into their
-## shells and collapse; the spider curls its legs in; the ostrich and the thornback fall over.
-static func fall(root: Node3D, age: float, delta: float) -> void:
+## Dying. Every one of them dies in stages, the way the beasts of Mesenlla do: a last spasm, the fall,
+## the moment it hits the ground, a few twitches, stillness, and then it sinks away. Each frame, `age`
+## seconds after it began; side (-1 or 1) is which way it goes over.
+##   bees and wasps  a jolt, wings flared and the abdomen curled hard under; they tumble out of the
+##                   air, land on their backs with a splash of ichor, legs curl up and twitch.
+##   ember moth      one last clap of the wings and a burst of burning dust; it spirals down slowly,
+##                   wings limp, and lies spread on the ground, one wing lifting twice, its eyes going out.
+##   spider          rears up, front legs raised; slumps onto its belly, legs splayed; rolls onto its
+##                   back and its legs fold in over it, twitching.
+##   battle ostrich  staggers, legs buckling, neck flung up; drops onto its keel and over onto its
+##                   side, neck flopping to the ground, a leg kicking out twice.
+##   thornback       a last snap of the beak; head and legs pull into the shell, which drops with a
+##                   thud and rocks, then rolls over onto its back, legs paddling at the air; the god's
+##                   seams flicker out.
+##   snails          the eye-stalks pull in, the head rears and shudders; head and foot shrink into
+##                   the shell, which tips over; the mutant snail's seams spill a last pool, the
+##                   wasp-snail's nest bursts and its wasps boil out of it.
+##   beehive         the comb cracks and sags off its stump, honey bursting, the swarm scattering.
+static func fall(z: Zombie, root: Node3D, age: float, delta: float) -> void:
 	var rig := root.get_node("Rig") as Node3D
 	var id := str(root.get_meta("kind", ""))
-	var k := minf(1.0, delta * 5.0)
+	var side := float(root.get_meta("side", 1.0))
+	var total := death_time(id)
+	var sink := clampf((age - (total - 0.6)) / 0.6, 0.0, 1.0)
 	match id:
-		"mutant_bee", "mutant_wasp", "ember_moth":
-			rig.rotation.z += delta * 6.0 * exp(-age * 0.8)
-			rig.rotation.x = lerpf(rig.rotation.x, 1.1, k)
-			rig.position.y = maxf(0.1, rig.position.y - delta * 2.5)
-			for label: String in ["WingL", "WingR", "WingL2", "WingR2"]:
-				if rig.has_node(label):
-					var side := -1.0 if label.begins_with("WingL") else 1.0
-					(rig.get_node(label) as Node3D).rotation.z = lerpf((rig.get_node(label) as Node3D).rotation.z, side * -0.6, k)
-		"beehive":
-			(rig.get_node("Comb") as Node3D).position.y = lerpf((rig.get_node("Comb") as Node3D).position.y, 0.6, k * 0.5)
-			(rig.get_node("Comb") as Node3D).rotation.z = lerpf((rig.get_node("Comb") as Node3D).rotation.z, 0.5, k * 0.5)
-			var swarm := rig.get_node("Swarm") as Node3D
-			swarm.scale = Vector3.ONE * (1.0 + age * 2.0)
-			swarm.position.y += delta * 2.0
-		"mutant_snail", "wasp_hive_snail":
-			var foot := rig.get_node("Foot") as Node3D
-			foot.scale.y = lerpf(foot.scale.y, 0.4, k)
-			(foot.get_node("Neck") as Node3D).position.z = lerpf((foot.get_node("Neck") as Node3D).position.z, 0.4, k)
-			rig.rotation.z = lerpf(rig.rotation.z, 0.35, k * 0.5)
-		"mutant_spider":
-			rig.rotation.z = lerpf(rig.rotation.z, PI, k * 0.7)
-			rig.position.y = lerpf(rig.position.y, 0.5, k)
-			for side: String in ["L", "R"]:
-				for n in 4:
-					var hip := rig.get_node("Leg%s%d" % [side, n]) as Node3D
-					hip.rotation.z = lerpf(hip.rotation.z, (-1.0 if side == "L" else 1.0) * 0.9, k)
-					(hip.get_node("Knee") as Node3D).rotation.z = lerpf((hip.get_node("Knee") as Node3D).rotation.z, (-1.0 if side == "L" else 1.0) * -1.2, k)
-		"battle_ostrich":
-			rig.rotation.z = lerpf(rig.rotation.z, 1.4, k * 0.6)
-			rig.position.y = lerpf(rig.position.y, 0.55, k * 0.6)
-			(rig.get_node("Neck") as Node3D).rotation.x = lerpf((rig.get_node("Neck") as Node3D).rotation.x, 1.4, k)
-		"thornback":
-			(rig.get_node("Head") as Node3D).position.z = lerpf((rig.get_node("Head") as Node3D).position.z, 0.6, k)
-			for n in 4:
-				(rig.get_node("Leg%d" % n) as Node3D).scale = Vector3.ONE * maxf(0.2, 1.0 - age)
-			rig.rotation.z = lerpf(rig.rotation.z, 0.25, k * 0.4)
-	if age > 2.0:
-		root.position.y -= delta * 0.6
+		"mutant_bee", "mutant_wasp": _die_insect(z, root, rig, age, delta, side)
+		"ember_moth": _die_moth(z, root, rig, age, delta, side)
+		"mutant_spider": _die_spider(z, root, rig, age, delta, side)
+		"battle_ostrich": _die_ostrich(z, root, rig, age, delta, side)
+		"thornback": _die_thornback(z, root, rig, age, delta, side)
+		"mutant_snail", "wasp_hive_snail": _die_snail(z, root, rig, age, delta, side)
+		"beehive": _die_hive(z, root, rig, age, delta)
+	root.position.y = -sink * (0.9 if id in ["thornback", "beehive", "wasp_hive_snail"] else 0.6)
 
 
 static func death_time(id: String) -> float:
 	match id:
-		"beehive": return 2.8
-		"mutant_bee", "mutant_wasp": return 2.0
-	return 2.6
+		"mutant_bee", "mutant_wasp": return 2.6
+		"ember_moth", "mutant_spider", "beehive": return 3.0
+		"battle_ostrich", "mutant_snail", "wasp_hive_snail": return 3.2
+		"thornback": return 3.4
+	return 3.0
+
+
+## Once only, the first frame `age` passes `at`.
+static func _once(root: Node3D, label: String, age: float, at: float) -> bool:
+	if age < at or root.has_meta("did_" + label):
+		return false
+	root.set_meta("did_" + label, true)
+	return true
+
+
+## Whether the body has come down to the ground yet, and how long ago (-1 still falling).
+static func _landed(z: Zombie, root: Node3D, age: float) -> float:
+	if z.position.y - z.world.ground_at(z.position) > 0.05:
+		return -1.0
+	if not root.has_meta("landed_at"):
+		root.set_meta("landed_at", age)
+	return age - float(root.get_meta("landed_at"))
+
+
+static func _ease(a: float, b: float, t: float) -> float:
+	var k := clampf((t - a) / maxf(b - a, 0.001), 0.0, 1.0)
+	return k * k * (3.0 - 2.0 * k)
+
+
+static func _die_insect(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float) -> void:
+	var abdomen := rig.get_node("Abdomen") as Node3D
+	var legs := rig.get_node("Legs") as Node3D
+	var head := rig.get_node("Head") as Node3D
+	var down := _landed(z, root, age)
+	var jolt := _ease(0.0, 0.08, age) * (1.0 - _ease(0.12, 0.3, age))
+	if down < 0.0:
+		# The jolt, then the tumble: spinning over, wings flared and stuttering, legs clutching.
+		var flutter := sin(age * 38.0) * 0.5 * exp(-age * 1.5)
+		for label: String in ["WingL", "WingR", "WingL2", "WingR2"]:
+			var wing := rig.get_node(label) as Node3D
+			var s := -1.0 if label.begins_with("WingL") else 1.0
+			wing.rotation.z = s * (0.9 + flutter)
+			wing.rotation.y = s * 0.4
+		rig.rotation.z += delta * side * (3.0 + age * 6.0)
+		rig.rotation.x = lerpf(rig.rotation.x, 0.6, minf(1.0, delta * 4.0))
+		rig.position.y = 0.55 + jolt * 0.15
+		abdomen.rotation.x = lerpf(abdomen.rotation.x, -1.1, minf(1.0, delta * 16.0))
+		legs.rotation.x = lerpf(legs.rotation.x, 0.9, minf(1.0, delta * 10.0))
+		return
+	if _once(root, "splash", age, 0.0):
+		z.world.fx_gore(z.position + Vector3.UP * 0.2, GOD_GREEN.lerp(AMBER, 0.5) if z.model_id == "mutant_bee" else GOD_GREEN)
+		z.world.show_ring(z.position + Vector3.UP * 0.05, 0.6, GOD.darkened(0.3))
+	# On its back: the body rolls over and settles, wings flat out, legs curled up and twitching.
+	var settle := _ease(0.0, 0.35, down)
+	rig.rotation.z = lerpf(rig.rotation.z, side * PI * 0.92, minf(1.0, delta * 10.0))
+	rig.rotation.x = lerpf(rig.rotation.x, 0.0, minf(1.0, delta * 8.0))
+	rig.position.y = lerpf(0.55, 0.3, settle) + absf(sin(down * 9.0)) * 0.12 * exp(-down * 6.0) # a bounce
+	for label: String in ["WingL", "WingR", "WingL2", "WingR2"]:
+		var wing := rig.get_node(label) as Node3D
+		var s := -1.0 if label.begins_with("WingL") else 1.0
+		wing.rotation.z = lerpf(wing.rotation.z, s * -0.15, minf(1.0, delta * 8.0))
+		wing.rotation.y = lerpf(wing.rotation.y, s * 0.6, minf(1.0, delta * 6.0))
+	var twitch := sin(down * 24.0) * 0.35 * _ease(0.2, 0.3, down) * (1.0 - _ease(0.9, 1.6, down))
+	legs.rotation.x = 1.35 + twitch
+	legs.scale = Vector3(1.0, lerpf(1.0, 0.65, settle), 1.0)
+	abdomen.rotation.x = -0.5 * (1.0 - settle) + sin(down * 17.0) * 0.12 * (1.0 - _ease(0.6, 1.3, down))
+	head.rotation.x = lerpf(head.rotation.x, 0.4, settle)
+	_fade_glow(rig, 1.0 - _ease(0.8, 1.8, down))
+
+
+static func _die_moth(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float) -> void:
+	var down := _landed(z, root, age)
+	if _once(root, "dust", age, 0.12):
+		z.world.fx_rise(z.position + Vector3.UP * 0.6, MOTH_DUST)
+	if down < 0.0:
+		# One last clap, then the wings go limp and it spirals down, slowly.
+		var clap := sin(_ease(0.0, 0.3, age) * PI)
+		for label: String in ["WingL", "WingR", "WingL2", "WingR2"]:
+			var wing := rig.get_node(label) as Node3D
+			var s := -1.0 if label.begins_with("WingL") else 1.0
+			var limp := 0.25 + sin(age * 4.0) * 0.1
+			wing.rotation.z = lerpf(wing.rotation.z, s * (clap * 1.3 + limp * (1.0 - clap)), minf(1.0, delta * 14.0))
+		root.rotation.y += delta * side * 2.2
+		rig.rotation.z = lerpf(rig.rotation.z, side * 0.5, minf(1.0, delta * 2.0))
+		rig.rotation.x = lerpf(rig.rotation.x, 0.35, minf(1.0, delta * 2.0))
+		return
+	if _once(root, "thud", age, 0.0):
+		z.world.fx_gore(z.position + Vector3.UP * 0.1, MOTH_DUST.darkened(0.2))
+	# Spread on the ground, wings flat; one wing lifts twice, feebly; the eye-spots go out.
+	var settle := _ease(0.0, 0.4, down)
+	rig.rotation.z = lerpf(rig.rotation.z, side * 0.12, settle)
+	rig.rotation.x = lerpf(rig.rotation.x, 0.08, settle)
+	rig.position.y = lerpf(rig.position.y, 0.12, minf(1.0, delta * 6.0))
+	var lift := absf(sin(_ease(0.5, 1.5, down) * TAU)) * 0.45 * (1.0 - _ease(1.2, 1.6, down))
+	for label: String in ["WingL", "WingR", "WingL2", "WingR2"]:
+		var wing := rig.get_node(label) as Node3D
+		var s := -1.0 if label.begins_with("WingL") else 1.0
+		var raise := lift if (s > 0.0) == (side > 0.0) and not label.ends_with("2") else 0.0
+		wing.rotation.z = lerpf(wing.rotation.z, s * (-0.06 + raise), minf(1.0, delta * 10.0))
+	_fade_glow(rig, 1.0 - _ease(0.6, 1.6, down))
+
+
+static func _die_spider(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float) -> void:
+	# Rearing (0-0.45), slumped (0.45-0.9), over onto its back (0.9-1.5), legs folding in, twitching.
+	var rear := sin(_ease(0.0, 0.45, age) * PI) * (1.0 - _ease(0.4, 0.6, age))
+	var slump := _ease(0.4, 0.75, age)
+	var over := _ease(0.9, 1.45, age)
+	if _once(root, "slump", age, 0.62):
+		z.world.fx_gore(z.position + Vector3.UP * 0.3, GOD.darkened(0.35))
+	if _once(root, "over", age, 1.4):
+		z.world.show_ring(z.position + Vector3.UP * 0.05, 1.0, GOD.darkened(0.4))
+	rig.rotation.x = -0.55 * rear
+	rig.rotation.z = side * PI * over
+	rig.position.y = lerpf(0.55 + rear * 0.15, 0.22, slump) + over * 0.5 + sin(over * PI) * 0.25
+	var twitch_on := _ease(1.4, 1.5, age) * (1.0 - _ease(2.0, 2.5, age))
+	for leg_side: String in ["L", "R"]:
+		var s := -1.0 if leg_side == "L" else 1.0
+		for n in 4:
+			var hip := rig.get_node("Leg%s%d" % [leg_side, n]) as Node3D
+			var knee := hip.get_node("Knee") as Node3D
+			var raised := rear * (0.9 if n < 2 else 0.0)
+			var splay := slump * (1.0 - over) * 0.35
+			var curl := over
+			var twitch := sin(age * 21.0 + n * 1.7 + s) * 0.3 * twitch_on
+			hip.rotation.z = s * (-raised * 0.8 + splay - curl * 0.75 + twitch)
+			hip.rotation.x = (-0.5 if n < 2 else 0.0) * raised
+			knee.rotation.z = s * (-0.2 * raised + curl * 2.3 + twitch * 0.6)
+	_fade_glow(rig, 1.0 - _ease(1.6, 2.4, age))
+
+
+static func _die_ostrich(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float) -> void:
+	var neck := rig.get_node("Neck") as Node3D
+	var upper := neck.get_node("NeckUp") as Node3D
+	var head := upper.get_node("Head") as Node3D
+	# Struck (0-0.15), a stagger, the legs buckling (to 0.4); dropping onto its keel (0.3-0.75) and
+	# over onto its side (0.6-1.05); a leg kicks.
+	var struck := sin(_ease(0.0, 0.3, age) * PI)
+	var stagger := _ease(0.05, 0.4, age)
+	var drop := _ease(0.3, 0.75, age)
+	var over := _ease(0.6, 1.05, age)
+	if _once(root, "thud", age, 0.95):
+		z.world.fx_gore(z.position + Vector3.UP * 0.4, Color(0.45, 0.4, 0.34))
+		z.world.show_ring(z.position + Vector3.UP * 0.05, 1.4, Color(0.55, 0.5, 0.42))
+	var lurch := sin(stagger * PI) * (1.0 - drop)
+	rig.position.y = lerpf(1.25, 0.5, drop) - lurch * 0.15 + absf(sin(_ease(0.95, 1.3, age) * PI)) * 0.08
+	rig.position.x = side * lurch * 0.3
+	rig.rotation.x = -0.35 * struck + 0.25 * lurch + 0.15 * drop * (1.0 - over)
+	rig.rotation.z = side * (0.25 * lurch + 1.35 * over)
+	# The neck flung back as it is struck, whipping forward as it goes down, and once down the long
+	# neck lies curved along the ground, the head turned over at its end.
+	# (Rolled onto its side, the ground lies off the rig's -X for side 1: the neck is swung round
+	# towards it about its yaw, and the upper neck curls the same way.)
+	neck.rotation.x = -0.8 * struck + lerpf(0.0, 1.35, drop)
+	neck.rotation.y = -side * 0.75 * over
+	upper.rotation.x = -0.5 * struck + 0.6 * drop - 0.5 * over
+	upper.rotation.z = side * 0.7 * over
+	head.rotation.x = 0.4 * struck - 0.2 * drop + 0.3 * over
+	head.rotation.z = side * 0.9 * over
+	var kicks := sin(_ease(1.3, 2.1, age) * TAU * 2.0) * 0.5 * (1.0 - _ease(1.9, 2.3, age))
+	for label: String in ["LegL", "LegR"]:
+		var hip := rig.get_node(label) as Node3D
+		var knee := hip.get_node("Knee") as Node3D
+		var near := (label == "LegR") == (side > 0.0)
+		# Buckling: thighs forward, shanks folding back; once down, the legs stiffen out and one kicks.
+		var buckle := (0.7 if near else 1.0) * stagger * (1.0 - over)
+		hip.rotation.x = -buckle - 0.5 * over + (kicks if not near else 0.0)
+		knee.rotation.x = 1.3 * buckle * (1.0 - over) + 0.25 * over + (absf(kicks) * 0.6 if not near else 0.0)
+	_fade_glow(rig, 1.0 - _ease(1.6, 2.4, age))
+
+
+static func _die_thornback(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float) -> void:
+	var head := rig.get_node("Head") as Node3D
+	# The last snap (0-0.3); head and legs drawn in (0.3-0.8); down with a thud (0.75-0.9); then its
+	# own weight rolls it over the edge of a stone onto its back (1.1-1.7), where the legs come out
+	# again and paddle at the air, slower and slower, and stop.
+	var snap := sin(_ease(0.0, 0.3, age) * PI)
+	var withdraw := _ease(0.3, 0.8, age) * (1.0 - _ease(1.5, 1.8, age))
+	var drop := _ease(0.75, 0.9, age)
+	var over := _ease(1.1, 1.7, age)
+	if _once(root, "thud", age, 0.88):
+		z.world.fx_gore(z.position + Vector3.UP * 0.2, LIMESTONE.darkened(0.3))
+		z.world.show_ring(z.position + Vector3.UP * 0.05, 1.8, LIMESTONE.darkened(0.2))
+	if _once(root, "roll", age, 1.65):
+		z.world.fx_gore(z.position + Vector3(side * 0.6, 0.3, 0), LIMESTONE.darkened(0.2))
+	head.position.z = 1.05 + snap * 0.45 - withdraw * 0.55
+	head.scale = Vector3.ONE * lerpf(1.0, 0.6, withdraw)
+	head.rotation.x = -0.4 * snap + 0.25 * withdraw + 0.5 * over
+	var paddle := sin(maxf(0.0, age - 1.6) * 7.0) * 0.6 * _ease(1.6, 1.75, age) * (1.0 - _ease(2.2, 2.7, age))
+	for n in 4:
+		var leg := rig.get_node("Leg%d" % n) as Node3D
+		var sx := -1.0 if n % 2 == 0 else 1.0
+		var front := 1.0 if n < 2 else -1.0
+		leg.position = Vector3(sx * 0.72, 0.35, front * 0.55).lerp(Vector3(sx * 0.5, 0.45, front * 0.4), withdraw)
+		leg.scale = Vector3.ONE * lerpf(1.0, 0.25, withdraw)
+		leg.rotation.x = paddle * (1.0 if n in [0, 3] else -1.0)
+	# Down, a rocking that dies away, then over: lifted onto the edge of its shell and onto its dome.
+	var rock := sin(maxf(0.0, age - 0.9) * 11.0) * 0.07 * exp(-maxf(0.0, age - 0.9) * 3.0) * drop * (1.0 - over)
+	rig.rotation.z = side * (rock + PI * 0.94 * over)
+	rig.rotation.x = rock * 0.6
+	rig.position.y = -0.25 * drop * (1.0 - over) + sin(over * PI) * 0.9 + over * 1.05
+	rig.position.x = side * 0.7 * sin(over * PI * 0.5)
+	# The god's seams flicker and go out.
+	var left := 1.0 - _ease(1.8, 2.6, age)
+	_fade_glow(rig, left * (0.4 + 0.6 * float(fmod(age * 13.0, 1.0) > 0.3)) if age > 1.8 else 1.0)
+
+
+static func _die_snail(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float) -> void:
+	var foot := rig.get_node("Foot") as Node3D
+	var neck := foot.get_node("Neck") as Node3D
+	var shell := foot.get_node("Shell") as Node3D
+	var nest := z.model_id == "wasp_hive_snail"
+	# Stalks pull in and the head rears, shuddering (0-0.6); everything shrinks into the shell
+	# (0.5-1.3); the shell tips over (1.1-1.6).
+	var rear := sin(_ease(0.0, 0.6, age) * PI)
+	var shrink := _ease(0.5, 1.3, age)
+	var tip := _ease(1.1, 1.6, age)
+	for label: String in ["StalkL", "StalkR"]:
+		var stalk := neck.get_node(label) as Node3D
+		stalk.scale = Vector3.ONE * lerpf(1.0, 0.15, _ease(0.0, 0.4, age))
+		stalk.rotation.x = 0.6 * _ease(0.0, 0.4, age)
+	neck.rotation.x = -0.5 * rear + sin(age * 30.0) * 0.06 * rear
+	neck.position.z = lerpf(0.95, 0.15, shrink)
+	neck.scale = Vector3.ONE * lerpf(1.0, 0.3, shrink)
+	foot.scale = Vector3(lerpf(1.0, 0.75, shrink), lerpf(1.0, 0.35, shrink), lerpf(1.0, 0.6, shrink))
+	shell.position.y = lerpf(0.25, 0.12, shrink) / foot.scale.y # the shell settles a little as the foot shrinks under it
+	shell.scale = Vector3(1.0 / foot.scale.x, 1.0 / foot.scale.y, 1.0 / foot.scale.z) # (and keeps its size)
+	rig.rotation.z = side * 0.9 * tip
+	rig.position.y = sin(tip * PI) * 0.15
+	if _once(root, "spill", age, 0.55):
+		if nest:
+			z.world.fx_gore(z.position + Vector3.UP * 1.2, PAPER)
+		else:
+			z.world.fx_gore(z.position + Vector3.UP * 0.4, FontaMind.trail_colour(z))
+			z.world.show_ring(z.position + Vector3.UP * 0.05, 1.5, FontaMind.trail_colour(z))
+	if _once(root, "thud", age, 1.55):
+		z.world.fx_gore(z.position + Vector3.UP * 0.3, SNAIL_SKIN)
+	if nest:
+		# The nest bursts: its wasps boil out and scatter.
+		var crawlers := shell.get_node_or_null("Crawlers") as Node3D
+		if crawlers:
+			var burst := _ease(0.35, 0.8, age)
+			crawlers.scale = Vector3.ONE * (1.0 + burst * 0.35)
+			crawlers.position.y = burst * 0.5
+			crawlers.rotation.y += delta * 5.0 * burst
+			crawlers.visible = burst < 0.95
+		if _once(root, "swarm", age, 0.7):
+			z.world.fx_rise(z.position + Vector3.UP * 1.4, YELLOW)
+	_fade_glow(rig, 1.0 - _ease(1.0, 2.0, age))
+
+
+static func _die_hive(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float) -> void:
+	var comb := rig.get_node("Comb") as Node3D
+	var swarm := rig.get_node("Swarm") as Node3D
+	# It shudders (0-0.4), cracks and sags off the stump (0.35-1.2), the swarm flies apart.
+	var shake := (1.0 - _ease(0.3, 0.45, age)) * sin(age * 50.0) * 0.08
+	var sag := _ease(0.35, 1.2, age)
+	if _once(root, "crack", age, 0.4):
+		z.world.fx_gore(z.position + Vector3.UP * 1.4, HONEY)
+	if _once(root, "land", age, 1.15):
+		z.world.fx_gore(z.position + Vector3.UP * 0.4, HONEY.darkened(0.2))
+		z.world.show_ring(z.position + Vector3.UP * 0.05, 1.6, HONEY.darkened(0.3))
+	comb.rotation.z = shake + 0.55 * sag
+	comb.position.y = -0.7 * sag
+	comb.position.x = 0.35 * sag
+	swarm.scale = Vector3.ONE * (1.0 + _ease(0.2, 1.6, age) * 3.5)
+	swarm.position.y += delta * 1.5
+	swarm.rotation.y += delta * 5.0
+	swarm.visible = age < 1.8
+	_fade_glow(rig, 1.0 - _ease(0.8, 1.8, age))
+
+
+## The god's glow going out of a dead thing: every lit part shrinks away as `left` falls to 0.
+static func _fade_glow(rig: Node3D, left: float) -> void:
+	for mi in rig.find_children("*", "MeshInstance3D", true, false):
+		var part := mi as MeshInstance3D
+		if part.material_override == MesenllaModels.glow_material() or part.name == "Seams" or part.has_meta("glow"):
+			part.set_meta("glow", true)
+			part.visible = left > 0.02

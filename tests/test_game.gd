@@ -4089,7 +4089,7 @@ func test_items() -> void:
 		var heal: float = PowerDefs.FOODS[food]["heal"]
 		w.spawn_pickup_at(pl.global_position, Pickup.Kind.FOOD, food)
 		await seconds(0.3)
-		ok(is_equal_approx(pl.hp, 50.0 + heal), "%s heals %d" % [food, heal])
+		ok(is_equal_approx(pl.hp, minf(pl.max_hp(), 50.0 + heal)), "%s heals %d" % [food, heal] if heal < 900.0 else "%s heals you fully" % food)
 	pl.hp = pl.max_hp()
 	var apple := w.spawn_pickup_at(pl.global_position, Pickup.Kind.FOOD, "apple")
 	await seconds(0.3)

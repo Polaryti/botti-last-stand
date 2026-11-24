@@ -47,8 +47,9 @@ func block_box(centre: Vector3, box: Vector3) -> void:
 			astar.set_point_solid(Vector2i(x, y), true)
 
 
-## A box that is not lined up with the grid. A cell closes if its middle is in the box or very near it.
-func block_turned(t: Transform3D, box: Vector3) -> void:
+## A box that is not lined up with the grid. A cell closes if its middle is in the box or very near it
+## (or, with solid false, opens again: a door that has gone).
+func block_turned(t: Transform3D, box: Vector3, solid := true) -> void:
 	var half_x := box.x * 0.5 + 0.35
 	var half_z := box.z * 0.5 + 0.35
 	var reach := Vector2(half_x, half_z).length()
@@ -59,7 +60,7 @@ func block_turned(t: Transform3D, box: Vector3) -> void:
 		for x in range(a.x, b.x + 1):
 			var local := inv * (to_world(Vector2i(x, y)) - Vector3(t.origin.x, 0.0, t.origin.z))
 			if absf(local.x) < half_x and absf(local.z) < half_z:
-				astar.set_point_solid(Vector2i(x, y), true)
+				astar.set_point_solid(Vector2i(x, y), solid)
 
 
 ## Ground too steep to walk up (rising more than `rise` metres a metre between neighbouring points of
@@ -84,6 +85,9 @@ func block_steep(t: Terrain, rise: float) -> int:
 			var hi := to_cell(Vector3(x0 + Terrain.CELL - 0.05, 0, z0 + Terrain.CELL - 0.05))
 			for y in range(lo.y, hi.y + 1):
 				for x in range(lo.x, hi.x + 1):
+					var middle := to_world(Vector2i(x, y))
+					if t.on_deck(middle.x, middle.z):
+						continue # a bridge's deck spans it: walked over, not climbed (Fontanova's rope bridges)
 					if not astar.is_point_solid(Vector2i(x, y)):
 						astar.set_point_solid(Vector2i(x, y), true)
 						closed += 1

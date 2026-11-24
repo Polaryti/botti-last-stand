@@ -295,6 +295,53 @@ def thornback_death():
     return groan + thud(m, 1.0, 1.0, 80) + at(band(noise(n(0.1)), 800, 4000) * env(n(0.1), 0.002, 20) * 0.4, 1.0, 1.8)
 
 
+# --- Fontanova's rites -----------------------------------------------------------------------------
+
+def brazier_lit():
+    """A brazier catching: a whoomph of flame, and the fire crackling up."""
+    m = n(1.6)
+    whoomph = lowp(noise(m), 600) * env(m, 0.03, 4) * 0.8
+    crackle = sum(at(band(noise(n(0.015)), 2000, 7000) * env(n(0.015), 0.001, 50) * rng.uniform(0.1, 0.35), rng.uniform(0.15, 1.5), 1.6) for k in range(26))
+    roar = band(noise(m), 200, 900) * np.minimum(1, t_(m) / 0.3) * env(m, 0.2, 1.2) * 0.3
+    return whoomph + crackle + roar
+
+
+def sanctum_open():
+    """The sanctum's door sinking: stone grinding on stone, a deep boom, a breath of air from inside."""
+    m = n(3.2)
+    grind = band(noise(m), 80, 700) * (0.6 + 0.4 * np.sin(2 * np.pi * 7 * t_(m))) * env(m, 0.3, 0.7) * 0.7
+    boom = thud(m, 2.6, 1.2, 60)
+    breath = band(noise(m), 300, 1500) * env(m, 1.5, 1.0) * 0.2
+    chime = at(glass(660, 2.0, 2.0) * 0.25 + glass(990, 2.0, 2.5) * 0.15, 2.7, 3.2)
+    return grind + boom + breath + chime
+
+
+def altar_wake():
+    """A god's altar waking: a low swell, a bell, a choir-like chord rising."""
+    m = n(3.0)
+    chord = sum(np.sin(2 * np.pi * f * t_(m)) * (0.5 + 0.5 * np.sin(2 * np.pi * 0.7 * t_(m) + f)) for f in (110, 165, 220, 277)) * 0.12
+    bell = metal(440, 4.0, 3.0) * bell_env(m, 2.5) * 0.25
+    return reverb(chord * np.minimum(1, t_(m) / 1.2) * env(m, 0.5, 0.6) + bell, 1.6, 0.4)
+
+
+def altar_bless():
+    """A blessing given: a bright shimmer falling."""
+    m = n(2.0)
+    return reverb(sum(at(glass(f, 1.2, 3.0) * 0.22, k * 0.07, 2.0) for k, f in enumerate((1760, 1480, 1319, 1109, 880))), 1.2, 0.35)
+
+
+def tide_rising():
+    """The sea rising: a long roar of surf swelling, and a deep conch."""
+    m = n(3.5)
+    surf = band(noise(m), 150, 1200) * np.minimum(1, t_(m) / 1.5) * env(m, 0.5, 0.6) * 0.5
+    conch = throat(m, curve(m, (0, 98), (0.5, 110), (1, 98)), ((420, 0.3, 1.0), (900, 0.3, 0.4)), breath=0.3, rough=0.1, sub=0.3) * env(m, 0.4, 1.2) * 0.6
+    return surf + conch
+
+
+SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
+    ("brazier_lit", 0.75), ("sanctum_open", 0.8), ("altar_wake", 0.7), ("altar_bless", 0.6), ("tide_rising", 0.75))})
+
+
 SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
     ("bee_buzz", 0.6), ("bee_sting", 0.75), ("wasp_buzz", 0.6), ("wasp_shot", 0.7), ("wasp_bite", 0.75),
     ("hive_hum", 0.5), ("hive_hurt", 0.7), ("hive_swarm", 0.7), ("hive_break", 0.8), ("nest_shudder", 0.65),

@@ -20,6 +20,11 @@ extends Path3D
 	set(v):
 		cut_blend = v
 		_refresh()
+## A chasm: falling in is death (Terrain.chasm), across its whole width.
+@export var chasm := false:
+	set(v):
+		chasm = v
+		_refresh()
 
 
 func points(at: Transform3D) -> Array[Vector3]:
@@ -33,6 +38,11 @@ func points(at: Transform3D) -> Array[Vector3]:
 func land(t: Terrain, at: Transform3D) -> void:
 	if cut:
 		t.cut(points(at), width * 0.5 + 0.6, cut_blend)
+	if chasm:
+		var line: Array[Vector2] = []
+		for p: Vector3 in points(at):
+			line.append(Vector2(p.x, p.z))
+		t.chasm(line, width * 0.5 + 0.6)
 
 
 func build(b: MapBuilder) -> void:

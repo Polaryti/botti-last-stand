@@ -45,6 +45,16 @@ func slow_at(at: Vector3) -> float:
 	return lerpf(1.0, SLOW, clampf(d / SLOW_DEPTH, 0.0, 1.0))
 
 
+## The sea rising and falling (Fontanova's rising tide, FontaRites): the water is laid over all the
+## ground the highest tide can reach, and the shader keeps it to the level.
+func set_level(y: float) -> void:
+	if is_equal_approx(y, level):
+		return
+	level = y
+	if _mat:
+		_mat.set_shader_parameter("level", level)
+
+
 ## The sea brightens with the dawn.
 func set_dawn(k: float) -> void:
 	if _mat:
@@ -65,7 +75,7 @@ func _build_water() -> void:
 			var lowest := INF
 			for c: Vector2 in corners:
 				lowest = minf(lowest, t.ground_height(c.x, c.y))
-			if lowest > level + 0.05:
+			if lowest > Terrain.ISLE_SEA_Y + FontaRites.TIDE_RISE + 0.05:
 				continue
 			for k: int in [0, 1, 2, 0, 2, 3]:
 				var c: Vector2 = corners[k]

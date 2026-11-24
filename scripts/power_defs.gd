@@ -9,6 +9,13 @@ const SENSOR_RANGE := 20.0
 const CROWN := "sunken_crown"
 const CROWN_TIME := 99999.0
 const CROWN_DAMAGE := 1.25
+## Fontanova's relic, from the oracle's sanctum (FontaRites): it marks and it sharpens.
+const EYE := "oracle_eye"
+const EYE_RANGE := 36.0
+const EYE_DAMAGE := 1.2
+## Royal Jelly, from a broken Beehive (FontaMind): all your strength back at once, and quicker hands.
+const JELLY_TIME := 45.0
+const JELLY_RATE := 0.25
 const CROWN_REGEN := 2.0 # health a second
 
 const ALL := {
@@ -32,6 +39,7 @@ const ALL := {
 	"mistberry_draught": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Mistberry Draught", "desc": "You leave a trail of mist behind you. While you stand in it, enemies cannot see you and you heal 3 health a second.", "time": POTION_TIME, "color": Color(0.62, 0.78, 0.95), "familiar": false, "weight": 2.0},
 	# A relic: never random loot, never in the Sandbox's rows.
 	"sunken_crown": {"maps": ["vael"], "relic": true, "named": true, "name": "Sunken Crown", "desc": "The Hollow Sovereign's crown, dropped where he falls (in All vs All at Port Vael, washed up at the Drowned Bell at 2:00). While you wear it everything you do hits 25% harder and you heal 2 health a second, but everyone can see where you are. Fall, and it falls with you.", "time": CROWN_TIME, "color": Color(0.98, 0.78, 0.3), "familiar": false, "weight": 0.0},
+	"oracle_eye": {"maps": ["fontanova"], "relic": true, "named": true, "name": "Oracle's Eye", "desc": "The oracle's sight, from her sanctum deep in the Oracle's Grotto: every enemy within 36 metres is marked, even through rock, and your blows land 20% harder.", "time": CROWN_TIME, "color": Color(0.72, 0.5, 1.0), "familiar": false, "weight": 0.0},
 	"antler_charm": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Antler Charm", "desc": "Vines from the valley: your hits root enemies to the ground for 1.5 seconds. The same enemy cannot be rooted again for 4 seconds after it is caught, and fliers are out of the vines' reach.", "time": POTION_TIME, "color": Color(0.55, 0.78, 0.32), "familiar": false, "weight": 2.0},
 }
 
@@ -41,6 +49,7 @@ const FOODS := {
 	"cheese": {"name": "Cheese", "heal": 25.0, "weight": 2.0},
 	"meat": {"name": "Roast Meat", "heal": 40.0, "weight": 1.0},
 	# Fontanova: never random food, only from its bees and its hives (FontaMind).
+	"royal_jelly": {"name": "Royal Jelly", "heal": 999.0, "weight": 0.0, "maps": ["fontanova"], "jelly": true},
 	"honey": {"name": "Honey", "heal": 25.0, "weight": 0.0, "maps": ["fontanova"], "haste": true},
 }
 ## Honey runs through you: this much faster for this many seconds.
@@ -154,6 +163,14 @@ static func mesh(id: String) -> Mesh:
 		"meat":
 			l.prism(Vector3(-0.3, 0, 0), Vector3(0.1, 0, 0), 0.05, 0.05, 5, Color(0.9, 0.88, 0.78))
 			l.prism(Vector3(-0.08, 0, 0), Vector3(0.28, 0, 0), 0.13, 0.2, 7, Color(0.5, 0.22, 0.12))
+		"royal_jelly":
+			# A little glass jar of royal jelly, gold and glowing, sealed with dark wax, wrapped in comb.
+			l.prism(Vector3(0, -0.14, 0), Vector3(0, 0.1, 0), 0.12, 0.12, 8, Color(1.0, 0.86, 0.35))
+			l.prism(Vector3(0, 0.1, 0), Vector3(0, 0.15, 0), 0.12, 0.08, 8, Color(0.98, 0.9, 0.6))
+			l.prism(Vector3(0, 0.15, 0), Vector3(0, 0.21, 0), 0.085, 0.08, 8, Color(0.4, 0.22, 0.1))
+			for k in 6:
+				var a := TAU * k / 6.0
+				l.prism(Vector3(cos(a) * 0.13, -0.12, sin(a) * 0.13), Vector3(cos(a) * 0.13, -0.04, sin(a) * 0.13), 0.035, 0.035, 6, Color(0.9, 0.62, 0.15))
 		"honey":
 			# A clay pot of honey, a waxed cloth tied over it, honey run down its side.
 			l.prism(Vector3(0, -0.16, 0), Vector3(0, 0.08, 0), 0.13, 0.17, 8, Color(0.66, 0.36, 0.2))

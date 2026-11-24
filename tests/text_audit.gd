@@ -358,6 +358,7 @@ func run() -> Array[String]:
 		if SpawnRules.is_vael(ZombieDefs.ALL[zid]):
 			_audit("enemy:" + zid, str(ZombieDefs.ALL[zid]["desc"]), [ZombieDefs.ALL[zid], [VaelSkyMind.REACH, VaelSkyMind.RECOVERY, 1.5, 2.0]] if zid in VaelSkyMind.KINDS else [ZombieDefs.ALL[zid]])
 	_audit("power:sunken_crown", str(PowerDefs.ALL[PowerDefs.CROWN]["desc"]), [PowerDefs.CROWN_DAMAGE])
+	_audit("power:oracle_eye", str(PowerDefs.ALL[PowerDefs.EYE]["desc"]), [PowerDefs.EYE_RANGE, roundf((PowerDefs.EYE_DAMAGE - 1.0) * 100.0)])
 	for bid: String in Boons.ALL:
 		_audit("boon:" + bid, str(Boons.ALL[bid]["desc"]), [Boons.ALL[bid].get("add", {})])
 	# Weapons: every number a weapon's words quote (Codex, Armory) is one of its own, or a fact.

@@ -2342,7 +2342,12 @@ func _physics_process(delta: float) -> void:
 				_parts[i].scale *= maxf(0.01, 1.0 - t)
 		var floor_y := world.ground_at(position)
 		if position.y > floor_y:
-			position.y = maxf(floor_y, position.y - 14.0 * delta) # flyers and leapers fall out of the air
+			# Flyers and leapers fall out of the air; Fontanova's insects tumble down under their own
+			# weight, so the fall can be seen, and the great moth glides down on its dead wings.
+			var drop := 14.0
+			if model_id in FontaModels.FLYERS:
+				drop = 1.4 if model_id == "ember_moth" else minf(14.0, 1.5 + 9.0 * (_death_total - _dying))
+			position.y = maxf(floor_y, position.y - drop * delta)
 		if model_id in MesenllaModels.KINDS or model_id == "crow":
 			MesenllaModels.animate_death(self, _visual, _death_total - _dying, delta)
 		elif _mounted and _horse_node:
@@ -2386,6 +2391,10 @@ func _physics_process(delta: float) -> void:
 		_tick_dummy(delta)
 		return
 	_update_ground_shadow()
+	# Knocked into the Ravine: a long way down onto the rocks.
+	if not flies and position.y < Terrain.CHASM_DEATH and not world.terrain.chasms.is_empty() and world.terrain.in_chasm(position.x, position.z):
+		take_damage(hp + 1000.0, Vector3.DOWN, 0.0, position)
+		return
 	_tick_time += delta
 	_tick_count += 1
 	if _tick_every > 1 and _tick_count % _tick_every != 0:

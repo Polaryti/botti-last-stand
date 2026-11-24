@@ -70,7 +70,8 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
 	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop",
 	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike", "dawn_fontanova",
-	"bee_buzz", "bee_sting", "wasp_buzz", "wasp_shot", "wasp_bite", "hive_hum", "hive_hurt", "hive_swarm", "hive_break", "nest_shudder", "snail_squelch", "snail_hurt", "snail_death", "spider_hiss", "spider_pounce", "spider_bite", "spider_hurt", "spider_death", "ostrich_screech", "ostrich_hiss", "ostrich_kick", "ostrich_hurt", "ostrich_death", "moth_flutter", "moth_dust", "insect_hurt", "insect_death", "thornback_grunt", "thornback_death"]
+	"bee_buzz", "bee_sting", "wasp_buzz", "wasp_shot", "wasp_bite", "hive_hum", "hive_hurt", "hive_swarm", "hive_break", "nest_shudder", "snail_squelch", "snail_hurt", "snail_death", "spider_hiss", "spider_pounce", "spider_bite", "spider_hurt", "spider_death", "ostrich_screech", "ostrich_hiss", "ostrich_kick", "ostrich_hurt", "ostrich_death", "moth_flutter", "moth_dust", "insect_hurt", "insect_death", "thornback_grunt", "thornback_death",
+	"brazier_lit", "sanctum_open", "altar_wake", "altar_bless", "tide_rising"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -2244,6 +2245,18 @@ func _healed_by_you(healed: int, amount: float) -> void:
 ## A boss of Beyond the Mists enters: every phone shows its card and rings its bells.
 ## Last Light: where the Lantern Barge is on its course, and how it stands (LastLight.state_bits),
 ## sent by the host every LastLight.SEND_EVERY.
+## Fontanova's rites (FontaRites): the braziers lit, the sanctum's door, the altar awake and how far
+## it is held, and how many altars have been held.
+func fonta_rites(lit: int, door: bool, god: int, hold: float, claims: int) -> void:
+	_fonta_rites.rpc(lit, door, god, hold, claims)
+
+
+@rpc("authority", "unreliable_ordered")
+func _fonta_rites(lit: int, door: bool, god: int, hold: float, claims: int) -> void:
+	if world and is_instance_valid(world) and world.fonta_rites and is_finite(hold):
+		world.fonta_rites.follow(lit & 7, door, clampi(god, 0, 4), clampf(hold, 0.0, 60.0), maxi(claims, 0))
+
+
 func last_light(progress: float, bits: int, dim: float) -> void:
 	_last_light.rpc(progress, bits, dim)
 

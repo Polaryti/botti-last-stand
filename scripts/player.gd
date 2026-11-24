@@ -1230,7 +1230,7 @@ func drown(amount: float, by := "the Mist Tide") -> void:
 	if dead or guard_left > 0.0:
 		return
 	hp -= amount
-	damaged.emit(amount, "the tide" if by == "the Mist Tide" else "the sea")
+	damaged.emit(amount, "the tide" if by == "the Mist Tide" else by)
 	hurt_flash = maxf(hurt_flash, 0.25)
 	if hp <= 0.0:
 		hit_by = by
@@ -1243,7 +1243,25 @@ var _under_sea := 0.0 # seconds out of your depth in an island's sea
 ## Out of your depth in the sea round an island: a few seconds to turn back, then you drown until you
 ## reach water you can stand in. Riding does not save you.
 func _tick_sea(delta: float) -> void:
-	if dead or not world.isle_sea.too_deep(global_position):
+	if dead:
+		return
+	# The Ravine: a long way down onto rocks and surf. Nobody climbs back out.
+	var t := world.terrain
+	if not t.chasms.is_empty():
+		if is_on_floor() and not t.in_chasm(global_position.x, global_position.z):
+			_safe_spot = global_position
+		if global_position.y < Terrain.CHASM_DEATH and t.in_chasm(global_position.x, global_position.z):
+			if spirit_left > 0.0:
+				_come_back()
+				return
+			hit_by = "the fall"
+			guard_left = 0.0
+			_kill()
+			if not dead:
+				global_position = _safe_spot # Undying Rage brings you back up
+				velocity = Vector3.ZERO
+			return
+	if not world.isle_sea.too_deep(global_position):
 		_under_sea = 0.0
 		return
 	if _under_sea == 0.0:
@@ -1537,9 +1555,33 @@ func _check_low() -> void:
 ## Standing up again, in a multiplayer game.
 ## A shrine's blessing (MesenllaBuilder.shrine): the stag's swiftness, the bear's strength in every
 ## kind of blow, or the spring's healing, for a while.
-const BLESSING_TIME := {"stag": 30.0, "bear": 30.0, "spring": 15.0}
+const BLESSING_TIME := {"stag": 30.0, "bear": 30.0, "spring": 15.0, "god_1": 60.0, "god_2": 60.0, "god_3": 60.0, "god_4": 60.0}
 const BLESSING_WORDS := {"stag": "Shrine of the Stag: swifter for 30 seconds", "bear": "Shrine of the Bear: harder blows for 30 seconds",
-	"spring": "Shrine of the Spring: healing for 15 seconds"}
+	"spring": "Shrine of the Spring: healing for 15 seconds", "god_1": "Thaleon's blessing: healing for a minute",
+	"god_2": "Ilyria's blessing: harder blows for a minute", "god_3": "Orvane's blessing: swifter and harder to hurt for a minute",
+	"god_4": "Kerys' blessing: truer shots for a minute"}
+## Royal Jelly (a broken Beehive's): all your strength back at once. Every ability's wait is over, a
+## caster's mana is full, and for a while you strike and cast a quarter quicker.
+func royal_jelly() -> void:
+	heal(max_hp())
+	mana = max_mana()
+	_riposte_cd = 0.0
+	_kill_shot_cd = 0.0
+	_sacred_cd = 0.0
+	_rage_cd = 0.0
+	unbroken_cd = 0.0
+	for stat: String in ["melee_rate", "spell_rate"]:
+		_buffs["royal_jelly_" + stat] = {"stat": stat, "val": PowerDefs.JELLY_RATE, "left": PowerDefs.JELLY_TIME, "stacks": 1}
+	say("Royal Jelly: all your strength back, and quicker hands for %d s" % int(PowerDefs.JELLY_TIME))
+	sfx("level", -2.0)
+
+
+## Fontanova's gods (FontaRites): what each one's blessing gives.
+const GOD_REGEN := 5.0
+const GOD_DAMAGE := 0.3
+const GOD_SPEED := 0.25
+const GOD_GUARD := -0.2
+const GOD_AIM := 0.4
 func bless(blessing: String) -> void:
 	var secs: float = BLESSING_TIME.get(blessing, 20.0)
 	match blessing:
@@ -1548,9 +1590,22 @@ func bless(blessing: String) -> void:
 		"bear":
 			for stat: String in ["melee_damage", "ranged_damage", "spell_damage"]:
 				_buffs["shrine_bear_" + stat] = {"stat": stat, "val": 0.25, "left": secs, "stacks": 1}
+		"god_1":
+			_buffs["god_thaleon"] = {"stat": "regen", "val": GOD_REGEN, "left": secs, "stacks": 1}
+			heal(30.0)
+		"god_2":
+			for stat: String in ["melee_damage", "ranged_damage", "spell_damage"]:
+				_buffs["god_ilyria_" + stat] = {"stat": stat, "val": GOD_DAMAGE, "left": secs, "stacks": 1}
+		"god_3":
+			_buffs["god_orvane"] = {"stat": "speed", "val": GOD_SPEED, "left": secs, "stacks": 1}
+			_buffs["god_orvane_guard"] = {"stat": "damage_taken", "val": GOD_GUARD, "left": secs, "stacks": 1}
+		"god_4":
+			_buffs["god_kerys"] = {"stat": "ranged_damage", "val": GOD_AIM, "left": secs, "stacks": 1}
 		_:
 			_buffs["shrine_spring"] = {"stat": "regen", "val": 4.0, "left": secs, "stacks": 1}
 			heal(20.0)
+	if blessing.begins_with("god_"):
+		say(BLESSING_WORDS[blessing])
 	sfx("level", -4.0)
 
 
@@ -3871,6 +3926,8 @@ func damage_multiplier() -> float:
 	var mult := PowerDefs.DAEMON_MULTIPLIER if has_power("daemon") else 1.0
 	if has_power(PowerDefs.CROWN):
 		mult *= PowerDefs.CROWN_DAMAGE
+	if has_power(PowerDefs.EYE):
+		mult *= PowerDefs.EYE_DAMAGE
 	if void_left > 0.0:
 		mult *= 2.0
 	if has_flag("rage"):

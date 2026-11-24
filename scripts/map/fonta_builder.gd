@@ -15,6 +15,9 @@ const BRIDGE_HALF := 1.1
 
 const LIMESTONE := Color(0.74, 0.7, 0.62)
 const LIMESTONE_DARK := Color(0.55, 0.51, 0.45)
+const COURSE := 1.4 # metres in one course of the cliffs' strata
+const CLIFF_GREY := Color(0.58, 0.57, 0.54)
+const CLIFF_OCHRE := Color(0.55, 0.48, 0.4)
 const MARBLE := Color(0.82, 0.8, 0.75)
 const MARBLE_SHADE := Color(0.66, 0.64, 0.6)
 const OCHRE := Color(0.62, 0.5, 0.36)
@@ -30,6 +33,8 @@ const WOOD_DARK := Color(0.29, 0.21, 0.15)
 const ROPE := Color(0.62, 0.53, 0.38)
 const SAILCLOTH := Color(0.82, 0.77, 0.66)
 const HULL_PAINT := Color(0.18, 0.32, 0.46)
+const HULL_OCHRE := Color(0.7, 0.46, 0.2)
+const HULL_TAR := Color(0.12, 0.1, 0.09)
 const SEA_GLOW := Color(0.3, 0.9, 0.85)
 
 
@@ -314,8 +319,11 @@ static func temple(b: MapBuilder, size: float, wide: float) -> void:
 		l.box(Vector3(0, k * 0.35 + 0.17, 0), Vector3(w - k * 1.0, 0.35, d - k * 1.0), MARBLE_SHADE.darkened(0.04 * (2 - k)))
 	var floor_y := 1.05
 	b.solid(Vector3(0, 0.5, 0), Vector3(w - 2.0, 1.0, d - 2.0))
-	# Steps up at the front, as a slope you can walk.
-	b.w.add_ledge(b.xf * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-16)), Vector3(0, 0.45, d * 0.5 - 0.4)), Vector3(6.0, 0.4, 3.6))
+	# The steps are walked as slopes across the whole front and both sides, so no step is a wall.
+	b.w.add_ledge(b.xf * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-16)), Vector3(0, 0.45, d * 0.5 - 0.4)), Vector3(w - 0.4, 0.4, 3.6))
+	for side: float in [-1.0, 1.0]:
+		var turn := Basis(Vector3.UP, side * PI * 0.5) * Basis(Vector3.RIGHT, deg_to_rad(-16))
+		b.w.add_ledge(b.xf * Transform3D(turn, Vector3(side * (w * 0.5 - 0.4), 0.45, 0)), Vector3(d - 0.4, 0.4, 3.6))
 	# The peristyle: columns all round, some gone, some broken.
 	var col_h := 7.5
 	var cols := 0
@@ -496,45 +504,62 @@ static func terrace_wall(b: MapBuilder, size: float, wide: float) -> void:
 
 # --- The Landing ---------------------------------------------------------------------------------
 
-## The sailboat that brought you, size metres long, run up on the beach and heeled over on its side:
-## bow up the sand along +Z, its mast leaning, its sail torn and flapping in the wind.
+## The ship that brought you: a merchantman of the old Mediterranean, size metres long, run up on the
+## sand and heeled over on her side. A round-bellied hull of painted planks, sharp at both ends, her
+## stern post sweeping up and curling forward over the deck, her stem rising to a carved head, an eye
+## painted either side of the bow to see her way. Two steering oars at her quarters, one snapped. A
+## single mast with its yard and square sail, torn, the cloth hanging and moving in the wind. On deck: a
+## little deckhouse aft, a rack of amphorae, coiled ropes, a stone anchor, the hatch open. A hole stove
+## in her low side, ribs showing. Everything is drawn on every side, stern and keel included.
 static func sailboat(b: MapBuilder, size: float) -> void:
 	var rng := b.seeded()
 	var len := size
-	var beam := size * 0.28
-	var depth := size * 0.16
-	var heel := Basis(Vector3.FORWARD, deg_to_rad(-24.0)) * Basis(Vector3.RIGHT, deg_to_rad(-4.0))
-	var base := b.xf * Transform3D(heel, Vector3(0, -depth * 0.15, 0))
+	var beam := size * 0.3
+	var depth := size * 0.15
+	var heel := Basis(Vector3.FORWARD, deg_to_rad(-22.0)) * Basis(Vector3.RIGHT, deg_to_rad(-3.0))
+	var base := b.xf * Transform3D(heel, Vector3(0, -depth * 0.35, 0))
 	var hull := LowPoly.new()
 	hull.base = base
-	const STATIONS := 12
-	const ROUND := 5
+	const STATIONS := 18
+	const ROUND := 6
 	var rings: Array = []
 	for k in STATIONS + 1:
 		var t := float(k) / STATIONS # 0 at the stern, 1 at the bow
 		var z := lerpf(-len * 0.5, len * 0.5, t)
-		var half := beam * 0.5 * (pow(sin(clampf(t * 0.92 + 0.08, 0.0, 1.0) * PI), 0.55) if t > 0.45 else lerpf(0.72, 1.0, t / 0.45))
-		var sheer := depth * (1.0 + 0.35 * pow(t, 2.0) + 0.12 * pow(1.0 - t, 2.0))
-		# The keel rises towards bow and stern, so the hull is a boat's shape from the side, not a box.
-		var keel := sheer * (0.25 + 0.75 * pow(sin(clampf(t * 0.95 + 0.04, 0.0, 1.0) * PI), 0.7))
+		# Sharp at both ends, fullest just aft of the middle.
+		var half := beam * 0.5 * pow(sin(clampf(t, 0.0, 1.0) * PI), 0.62) * (1.0 - 0.08 * t)
+		half = maxf(half, 0.06)
+		var sheer := depth * (1.0 + 0.45 * pow(absf(t - 0.45) * 2.0, 2.2))
+		var keel := sheer * (0.18 + 0.82 * pow(sin(clampf(t, 0.0, 1.0) * PI), 0.55))
 		var ring: Array[Vector3] = []
 		for q in ROUND * 2 + 1:
 			var a := PI * float(q) / (ROUND * 2) # 0 port gunwale, PI starboard gunwale
-			var x := -cos(a) * half * (1.0 - 0.15 * pow(sin(a), 4.0))
-			var y := sheer - pow(sin(a), 0.8) * keel
+			var x := -cos(a) * half * (1.0 - 0.12 * pow(sin(a), 4.0))
+			var y := sheer - pow(sin(a), 0.75) * keel
 			ring.append(Vector3(x, y, z))
 		rings.append(ring)
+	# The planking: painted strakes above, a band of ochre at the wale, tarred below the waterline.
 	for k in STATIONS:
 		var r0: Array[Vector3] = rings[k]
 		var r1: Array[Vector3] = rings[k + 1]
 		for q in ROUND * 2:
-			# Painted strakes above the waterline, tarred below; each plank runs the length of the hull.
-			var col := HULL_PAINT if q < 3 or q > ROUND * 2 - 4 else WOOD_DARK
-			col = col.lightened(0.06 * (q % 2))
-			var c := Vector3(0, depth * 1.2, (r0[q].z + r1[q].z) * 0.5)
+			var from_top := mini(q, ROUND * 2 - 1 - q)
+			var col := HULL_PAINT if from_top < 2 else (HULL_OCHRE if from_top == 2 else (WOOD_DARK if from_top < 4 else HULL_TAR))
+			col = col.darkened(0.07 * (q % 2) + rng.randf() * 0.04)
+			var c := Vector3(0, depth * 0.9, (r0[q].z + r1[q].z) * 0.5)
 			hull._tri(r0[q], r1[q], r1[q + 1], c, col)
 			hull._tri(r0[q], r1[q + 1], r0[q + 1], c, col)
-	# The deck, and a white stripe under the gunwale.
+	# Plank seams and the two wales, running the length of her.
+	for q in [2, 3, 4, ROUND * 2 - 2, ROUND * 2 - 3, ROUND * 2 - 4]:
+		for k in STATIONS:
+			var a: Vector3 = rings[k][q]
+			var e: Vector3 = rings[k + 1][q]
+			var out := Vector3(a.x, 0, 0).normalized() * 0.04
+			hull.prism(a + out, e + out, 0.05 if q in [3, ROUND * 2 - 3] else 0.025, 0.05 if q in [3, ROUND * 2 - 3] else 0.025, 4, WOOD_DARK.darkened(0.3) if q in [3, ROUND * 2 - 3] else WOOD_DARK)
+	# The keel, under all of her.
+	for k in STATIONS:
+		hull.prism(rings[k][ROUND], rings[k + 1][ROUND], 0.18, 0.18, 5, WOOD_DARK.darkened(0.2))
+	# The deck: planks across her, gunwale capping along both sides.
 	for k in STATIONS:
 		var r0: Array[Vector3] = rings[k]
 		var r1: Array[Vector3] = rings[k + 1]
@@ -543,49 +568,110 @@ static func sailboat(b: MapBuilder, size: float) -> void:
 		var a1 := r1[0]
 		var b1 := r1[ROUND * 2]
 		var c := (a0 + b1) * 0.5 + Vector3.DOWN
-		hull._tri(a0, b0, b1, c, WOOD.lightened(0.08 * (k % 2)))
-		hull._tri(a0, b1, a1, c, WOOD.lightened(0.08 * (k % 2)))
+		hull._tri(a0, b0, b1, c, WOOD.lightened(0.06 * (k % 2)))
+		hull._tri(a0, b1, a1, c, WOOD.lightened(0.06 * (k % 2)))
 		for edge: Array in [[a0, a1], [b0, b1]]:
-			hull.prism((edge[0] as Vector3) + Vector3.DOWN * 0.18, (edge[1] as Vector3) + Vector3.DOWN * 0.18, 0.08, 0.08, 4, SAILCLOTH)
-	# A cabin aft, its hatch open.
-	hull.box(Vector3(0, depth * 1.2 + 0.5, -len * 0.22), Vector3(beam * 0.55, 1.0, len * 0.22), WOOD)
-	hull.box(Vector3(0, depth * 1.2 + 1.03, -len * 0.22), Vector3(beam * 0.6, 0.08, len * 0.24), WOOD_DARK)
-	# The bowsprit, the mast, the boom.
-	hull.prism(Vector3(0, depth * 1.5, len * 0.45), Vector3(0, depth * 1.9, len * 0.68), 0.12, 0.07, 6, WOOD_DARK)
-	var mast_top := Vector3(0, depth * 1.2 + size * 0.75, len * 0.08)
-	hull.prism(Vector3(0, depth * 0.6, len * 0.08), mast_top, 0.2, 0.12, 7, WOOD_DARK)
-	hull.prism(Vector3(0, depth * 1.2 + 1.6, len * 0.08), Vector3(0, depth * 1.2 + 1.4, -len * 0.35), 0.1, 0.08, 6, WOOD_DARK)
-	# Shrouds and stays.
-	for p: Vector3 in [Vector3(beam * 0.48, depth * 1.2, len * 0.05), Vector3(-beam * 0.48, depth * 1.2, len * 0.05), Vector3(0, depth * 1.9, len * 0.68)]:
-		hull.prism(p, mast_top - Vector3(0, 0.3, 0), 0.025, 0.025, 3, ROPE)
-	# Barnacles and weed along the waterline.
-	for k in 30:
-		var t := rng.randf()
-		var ring: Array[Vector3] = rings[int(t * STATIONS)]
-		var p: Vector3 = ring[rng.randi_range(3, ROUND * 2 - 3)]
-		hull.box(p, Vector3(0.12, 0.08, 0.12), Color(0.55, 0.55, 0.5) if k % 2 else Color(0.2, 0.3, 0.16))
+			hull.prism((edge[0] as Vector3) + Vector3.UP * 0.08, (edge[1] as Vector3) + Vector3.UP * 0.08, 0.11, 0.11, 4, WOOD_DARK)
+	# The stern post sweeping up and curling forward over the deck; the stem rising to a carved head.
+	var stern: Vector3 = rings[0][ROUND]
+	var last := stern
+	for k in 9:
+		var a := k / 8.0 * PI * 0.95
+		var p := Vector3(0, stern.y + depth * 0.6 + sin(a) * depth * 1.2 + (1.0 - cos(a)) * depth * 0.5, -len * 0.5 - sin(a * 0.9) * depth * 0.5 + (1.0 - cos(a)) * depth * 0.55)
+		hull.prism(last, p, 0.28 - k * 0.022, 0.26 - k * 0.022, 6, WOOD_DARK.lightened(0.05 * (k % 2)))
+		last = p
+	var stem: Vector3 = rings[STATIONS][ROUND]
+	last = stem
+	for k in 7:
+		var p := Vector3(0, stem.y + k * depth * 0.2, len * 0.5 + sin(k / 6.0 * PI * 0.5) * depth * 0.4)
+		hull.prism(last, p, 0.26, 0.24, 6, WOOD_DARK)
+		last = p
+	hull.ovoid(last + Vector3(0, 0.25, 0.1), Vector3(0.32, 0.4, 0.45), HULL_OCHRE, HULL_OCHRE.darkened(0.3), 3, 6)
+	# The eyes on her bow, to see her way.
+	for side: float in [-1.0, 1.0]:
+		var ring: Array[Vector3] = rings[STATIONS - 2]
+		var at: Vector3 = ring[1 if side < 0 else ROUND * 2 - 1]
+		var out := Vector3(side, 0, 0) * 0.08
+		var eye_turn := Vector3(0, -side * 18.0, 0)
+		hull.box(at + out + Vector3(0, -0.45, 0), Vector3(0.12, 0.55, 1.2), Color(0.95, 0.93, 0.86), eye_turn)
+		hull.box(at + out * 2.0 + Vector3(0, -0.45, 0.05), Vector3(0.1, 0.42, 0.42), Color(0.08, 0.08, 0.1), eye_turn)
+		hull.box(at + out * 2.0 + Vector3(0, -0.15, 0), Vector3(0.1, 0.08, 1.3), HULL_OCHRE.darkened(0.2), eye_turn)
+	# A hole stove in her low side, ribs showing through.
+	var holed: Array[Vector3] = rings[7]
+	var hole_at: Vector3 = holed[ROUND * 2 - 3]
+	hull.box(hole_at + Vector3(0.2, 0, 0.6), Vector3(0.16, 1.3, 2.4), Color(0.05, 0.04, 0.04))
+	for k in 4:
+		hull.prism(hole_at + Vector3(0.3, -0.7, -0.3 + k * 0.65), hole_at + Vector3(0.3, 0.7, -0.3 + k * 0.65), 0.07, 0.07, 4, WOOD)
+	for k in 5:
+		hull.box(hole_at + Vector3(0.35, rng.randf_range(-0.8, 0.8), rng.randf_range(-0.6, 1.6)), Vector3(0.05, 0.12, rng.randf_range(0.5, 1.1)), WOOD_DARK, Vector3(rng.randf_range(-30, 30), 0, rng.randf_range(-40, 40)))
+	# Steering oars at her quarters: the port one still shipped, the starboard snapped.
+	for side: float in [-1.0, 1.0]:
+		var at: Vector3 = rings[2][0 if side < 0 else ROUND * 2]
+		var blade_end := at + Vector3(side * 1.0, -depth * 1.4, -1.6)
+		if side > 0:
+			blade_end = at.lerp(blade_end, 0.45)
+		hull.prism(at + Vector3(0, 0.9, 0.4), blade_end, 0.12, 0.1, 6, WOOD)
+		if side < 0:
+			hull.box(blade_end + Vector3(0, 0.6, -0.1), Vector3(0.12, 1.6, 0.7), WOOD.darkened(0.1), Vector3(-20, 0, side * 10))
+	# The deckhouse aft, its roof tiled.
+	var deck_y := depth * 1.02
+	hull.box(Vector3(0, deck_y + 0.75, -len * 0.3), Vector3(beam * 0.5, 1.5, len * 0.14), WOOD)
+	for k in 5:
+		hull.box(Vector3(0, deck_y + 1.55 + k * 0.0, -len * 0.3 - len * 0.06 + k * len * 0.03), Vector3(beam * 0.56, 0.1, len * 0.034), Color(0.62, 0.3, 0.2).darkened(0.08 * (k % 2)))
+	hull.box(Vector3(beam * 0.25 + 0.02, deck_y + 0.7, -len * 0.3), Vector3(0.04, 1.0, 0.6), Color(0.08, 0.06, 0.05))
+	# A rack of amphorae amidships, a coil of rope, a stone anchor, the hatch open.
+	for row in 2:
+		for k in 4:
+			var at := Vector3(-beam * 0.18 + row * beam * 0.36 - beam * 0.18 * 0.0, deck_y, -len * 0.08 + k * 0.8)
+			hull.prism(at, at + Vector3(0, 0.7, 0), 0.22, 0.26, 7, Color(0.66, 0.38, 0.22).darkened(0.08 * ((row + k) % 2)))
+			hull.prism(at + Vector3(0, 0.7, 0), at + Vector3(0, 0.95, 0), 0.26, 0.09, 7, Color(0.62, 0.35, 0.2))
+	hull.box(Vector3(0, deck_y + 0.04, len * 0.16), Vector3(beam * 0.36, 0.1, 1.6), Color(0.06, 0.05, 0.04))
+	hull.prism(Vector3(beam * 0.25, deck_y, len * 0.28), Vector3(beam * 0.25, deck_y + 0.25, len * 0.28), 0.6, 0.6, 12, ROPE)
+	hull.prism(Vector3(beam * 0.25, deck_y + 0.25, len * 0.28), Vector3(beam * 0.25, deck_y + 0.27, len * 0.28), 0.25, 0.25, 10, ROPE.darkened(0.4))
+	hull.prism(Vector3(-beam * 0.2, deck_y, len * 0.33), Vector3(-beam * 0.2, deck_y + 0.35, len * 0.33), 0.45, 0.4, 7, CLIFF_GREY)
+	hull.prism(Vector3(-beam * 0.2, deck_y + 0.15, len * 0.33), Vector3(-beam * 0.2, deck_y + 0.2, len * 0.33), 0.12, 0.12, 6, Color(0.1, 0.1, 0.1))
+	# The mast and its yard, braced round, and the rigging.
+	var mast_foot := Vector3(0, depth * 0.5, len * 0.02)
+	var mast_top := Vector3(0, deck_y + size * 0.62, len * 0.02)
+	hull.prism(mast_foot, mast_top, 0.26, 0.16, 8, WOOD_DARK)
+	hull.prism(mast_top, mast_top + Vector3(0, 0.5, 0), 0.2, 0.2, 6, WOOD_DARK.darkened(0.2))
+	var yard_y := deck_y + size * 0.56
+	var yard := Basis(Vector3.UP, deg_to_rad(25.0))
+	hull.prism(Vector3(0, yard_y, len * 0.02) + yard * Vector3(-beam * 1.0, 0.4, 0), Vector3(0, yard_y, len * 0.02) + yard * Vector3(beam * 1.0, -0.2, 0), 0.12, 0.12, 6, WOOD_DARK)
+	for p: Vector3 in [rings[STATIONS - 1][ROUND], rings[1][ROUND], rings[9][0], rings[9][ROUND * 2]]:
+		var tie := Vector3(p.x, maxf(p.y, deck_y), p.z)
+		hull.prism(tie, mast_top - Vector3(0, 0.3, 0), 0.035, 0.035, 3, ROPE)
+	# Barnacles and weed along her waterline.
+	for k in 50:
+		var ring: Array[Vector3] = rings[rng.randi_range(1, STATIONS - 1)]
+		var p: Vector3 = ring[rng.randi_range(4, ROUND * 2 - 4)]
+		hull.box(p, Vector3(0.14, 0.1, 0.14), Color(0.58, 0.57, 0.52) if k % 2 else Color(0.2, 0.32, 0.17))
 	b.add(hull)
-	# The sail, torn, half lowered, flapping: its own mesh, moving in the wind like the trees.
+	# The sail: square, hung from the yard, torn and half fallen, moving in the wind like the trees.
 	var sail := LowPoly.new()
 	sail.base = base
-	var foot_y := depth * 1.2 + 1.7
-	var head_y := depth * 1.2 + size * 0.62
-	var cols := 5
-	var rows := 6
+	var cols := 6
+	var rows := 7
+	var sail_top := yard_y - 0.1
+	var sail_drop := size * 0.42
 	for i in cols:
 		for j in rows:
-			if (i == 3 and j > 2) or (i == 4 and j > 3):
+			if (i >= 4 and j > 3) or (i == 3 and j > 5) or (i == 0 and j == 6):
 				continue # torn away
-			var z0 := lerpf(len * 0.06, -len * 0.33, float(i) / cols)
-			var z1 := lerpf(len * 0.06, -len * 0.33, float(i + 1) / cols)
-			var y0 := lerpf(foot_y, head_y, float(j) / rows)
-			var y1 := lerpf(foot_y, head_y, float(j + 1) / rows)
-			var belly := func(z: float, y: float) -> float: return sin(clampf((z - len * 0.06) / (-len * 0.39), 0, 1) * PI) * sin(clampf((y - foot_y) / (head_y - foot_y), 0, 1) * PI) * 0.9
-			var p := [Vector3(belly.call(z0, y0), y0, z0), Vector3(belly.call(z1, y0), y0, z1), Vector3(belly.call(z1, y1), y1, z1), Vector3(belly.call(z0, y1), y1, z0)]
-			# Cloths sewn in vertical panels, weathered unevenly.
-			var col := SAILCLOTH.darkened(0.05 * (i % 2) + 0.03 * j / rows)
+			var u0 := float(i) / cols
+			var u1 := float(i + 1) / cols
+			var v0 := float(j) / rows
+			var v1 := float(j + 1) / rows
+			var corner := func(u: float, v: float) -> Vector3:
+				var along := yard * Vector3(lerpf(-beam * 0.95, beam * 0.95, u), 0, 0)
+				var belly := sin(u * PI) * sin(v * PI) * 0.9 + v * v * 0.6
+				return Vector3(0, sail_top - v * sail_drop, len * 0.02 + 0.3) + along + yard * Vector3(0, 0, belly)
+			var p := [corner.call(u0, v0), corner.call(u1, v0), corner.call(u1, v1), corner.call(u0, v1)]
+			var col := SAILCLOTH.darkened(0.05 * (i % 2) + 0.06 * v0)
+			if j == 1 or (i == 2 and j == 4):
+				col = Color(0.62, 0.22, 0.16).lerp(SAILCLOTH, 0.25) # her red band, and a patch
 			for side: float in [1.0, -1.0]:
-				var c := Vector3(-side * 3.0, (y0 + y1) * 0.5, (z0 + z1) * 0.5)
+				var c: Vector3 = (p[0] + p[2]) * 0.5 + yard * Vector3(0, 0, -side * 3.0)
 				sail._tri(p[0], p[1], p[2], c, col)
 				sail._tri(p[0], p[2], p[3], c, col)
 	var sm := sail.commit()
@@ -595,16 +681,17 @@ static func sailboat(b: MapBuilder, size: float) -> void:
 		mi.mesh = sm
 		b.w.add_child(mi)
 	# Bodies stop at the hull; it can be climbed by its low side.
-	for k in 4:
-		var t := (k + 0.5) / 4.0
-		b.solid(Vector3(0, depth * 0.7, lerpf(-len * 0.45, len * 0.45, t)), Vector3(beam * (0.85 if k in [1, 2] else 0.6), depth * 1.5, len * 0.24))
-	b.solid(Vector3(0, depth * 1.2 + size * 0.38, len * 0.08), Vector3(0.4, size * 0.75, 0.4))
-	# A lantern hung on the cabin, still burning: the one warm light on the beach.
+	for k in 5:
+		var t := (k + 0.5) / 5.0
+		var wide := beam * 0.9 * pow(sin(t * PI), 0.6)
+		b.solid(Vector3(0, depth * 0.55, lerpf(-len * 0.46, len * 0.46, t)), Vector3(wide, depth * 1.3, len * 0.19))
+	b.solid(Vector3(0, deck_y + size * 0.3, len * 0.02), Vector3(0.4, size * 0.6, 0.4))
+	# A lantern hung at the deckhouse door, still burning: the one warm light on the beach.
 	var lamp := b.mesh()
 	lamp.base = base
-	lamp.box(Vector3(beam * 0.32, depth * 1.2 + 1.2, -len * 0.1), Vector3(0.18, 0.26, 0.18), Color(1.0, 0.75, 0.35))
+	lamp.box(Vector3(beam * 0.3, deck_y + 1.3, -len * 0.25), Vector3(0.2, 0.3, 0.2), Color(1.0, 0.75, 0.35))
 	MesenllaBuilder._shine(b, lamp)
-	b.w.add_glow(base * Vector3(beam * 0.32, depth * 1.2 + 1.3, -len * 0.1), Color(1.0, 0.7, 0.35), 4.0)
+	b.w.add_glow(base * Vector3(beam * 0.3, deck_y + 1.4, -len * 0.25), Color(1.0, 0.7, 0.35), 5.0)
 
 
 ## What was carried ashore from the boat: crates, barrels, a coil of rope, sacks and an oar.
@@ -696,55 +783,140 @@ static func rope_bridge(b: MapBuilder, _piece: Node3D) -> void:
 	b.add(l)
 
 
-## A cave passage through the rock, size metres long along +Z and wide across: rough walls and a roof
-## of rock with stalactites, its floor the land cut level (MapFonta.land), lit inside by a glowing
-## pool and the god's crystals. In the middle it opens into a chamber where the cult kept an oracle.
+## The Oracle's Grotto, size metres deep along the piece's +Z and wide across at its mouth (the -Z end,
+## at the foot of a cliff): a passage of dark rock widening into the oracle's chamber, where her spring
+## glows in a basin of stones among offerings and niches, then narrowing to the sealed door of her
+## sanctum, a round room where the veiled oracle sits carved in marble over her altar. Three braziers
+## stand cold along the way (FontaRites lights them and opens the door). Walls, roof and stalactites
+## are rock blocks, never flat panels; nothing leads out but the way in.
+const CAVE_ROCK := Color(0.4, 0.37, 0.36)
+const CAVE_DARK := Color(0.26, 0.24, 0.25)
+const CAVE_FLOOR := Color(0.46, 0.42, 0.37)
 static func grotto(b: MapBuilder, size: float, wide: float) -> void:
 	var rng := b.seeded()
 	var l := b.mesh()
 	var floor_y := 0.0
-	var high := 4.2
-	var step := 2.0
-	var count := int(size / step)
-	for k in count + 1:
-		var z := -size * 0.5 + k * step
-		var chamber := 1.0 + 0.9 * exp(-pow(z / (size * 0.18), 2.0))
-		var half := wide * 0.5 * chamber
-		var top := high * (1.0 + (chamber - 1.0) * 0.6)
-		# Walls, of piled rough blocks leaning inward.
+	var half_len := size * 0.5
+	var door_z := size * 0.32
+	# How wide and high the cave is along its length: the mouth, the chamber, the neck before the door,
+	# the round sanctum.
+	var width := func(z: float) -> float:
+		var chamber := exp(-pow((z + 1.0) / (size * 0.17), 2.0)) * wide * 0.9
+		var sanctum := exp(-pow((z - size * 0.42) / (size * 0.09), 2.0)) * wide * 0.5
+		var neck := -exp(-pow((z - door_z) / 1.6, 2.0)) * wide * 0.15
+		return wide + chamber + sanctum + neck
+	var height := func(z: float) -> float:
+		return 4.4 + exp(-pow((z + 1.0) / (size * 0.2), 2.0)) * 2.2 + exp(-pow((z - size * 0.42) / (size * 0.1), 2.0)) * 1.2
+	var step := 1.1
+	var z := -half_len
+	while z <= half_len + 0.6:
+		var w: float = width.call(z)
+		var h: float = height.call(z)
 		for g: float in [-1.0, 1.0]:
-			for q in 3:
-				var y := floor_y + q * top / 3.0
-				l.box(Vector3(g * (half + 0.6 - q * 0.35), y + top / 6.0, z), Vector3(1.6 + rng.randf() * 0.8, top / 3.0 + 0.4, step + 0.5), LIMESTONE_DARK.darkened(rng.randf_range(0.05, 0.3)), Vector3(rng.randf_range(-6, 6), rng.randf_range(-8, 8), g * (8 + q * 6)))
-			b.solid(Vector3(g * (half + 0.9), floor_y + top * 0.5, z), Vector3(1.4, top + 1.0, step + 0.2))
-		# The roof: slabs over the passage, stalactites hanging from it.
-		l.box(Vector3(0, floor_y + top + 0.6, z), Vector3(half * 2.0 + 2.4, 1.4 + rng.randf() * 0.6, step + 0.6), LIMESTONE_DARK.darkened(rng.randf_range(0.1, 0.35)), Vector3(rng.randf_range(-4, 4), 0, rng.randf_range(-5, 5)))
-		b.solid(Vector3(0, floor_y + top + 0.9, z), Vector3(half * 2.0 + 2.0, 1.4, step + 0.2))
-		for q in 2:
-			var x := rng.randf_range(-half * 0.8, half * 0.8)
-			l.prism(Vector3(x, floor_y + top, z + rng.randf_range(-0.8, 0.8)), Vector3(x, floor_y + top - rng.randf_range(0.4, 1.3), z), 0.2, 0.0, 5, LIMESTONE.darkened(0.25))
-		# Limestone spires on top, so that no one stands on the roof over the passage.
-		var spire := Vector3(rng.randf_range(-half, half), floor_y + top + 1.3, z)
-		l.prism(spire, spire + Vector3(rng.randf_range(-0.3, 0.3), rng.randf_range(1.6, 3.0), 0), 0.9, 0.05, 5, LIMESTONE)
+			# The wall: courses of rough dark rock, leaning in as they rise.
+			var y := floor_y - 0.3
+			var course := 0
+			while y < h:
+				var bh := rng.randf_range(0.8, 1.7)
+				var lean := course * 0.22
+				var x := g * (w * 0.5 + 0.7 - lean)
+				var col := CAVE_ROCK.lerp(CAVE_DARK, rng.randf()).darkened(rng.randf_range(0.0, 0.15))
+				# Boulders, not slabs: rounded and uneven, each turned its own way.
+				var turn := Basis.from_euler(Vector3(deg_to_rad(rng.randf_range(-15, 15)), deg_to_rad(rng.randf_range(0, 180)), deg_to_rad(rng.randf_range(-15, 15))))
+				l.ovoid(Vector3(x, y + bh * 0.5, z), Vector3(rng.randf_range(0.8, 1.2), bh * 0.62, (step + rng.randf_range(0.4, 1.0)) * 0.62), col.lightened(0.06), col.darkened(0.2), 3, 6, turn)
+				y += bh * 0.85
+				course += 1
+			b.solid(Vector3(g * (w * 0.5 + 0.9), floor_y + h * 0.5, z), Vector3(1.4, h + 1.0, step + 0.15))
+		# The roof: heavy slabs, overlapping so no sky shows, and stalactites hanging from it.
+		l.box(Vector3(0, floor_y + h + 0.5, z), Vector3(w + 3.0, 1.6, step + 0.9), CAVE_DARK.darkened(rng.randf_range(0.0, 0.25)), Vector3(rng.randf_range(-5, 5), rng.randf_range(-6, 6), rng.randf_range(-6, 6)))
+		b.solid(Vector3(0, floor_y + h + 0.9, z), Vector3(w + 2.0, 1.4, step + 0.15))
+		for q in 3:
+			var x := rng.randf_range(-w * 0.42, w * 0.42)
+			var drop := rng.randf_range(0.3, 1.4)
+			l.prism(Vector3(x, floor_y + h - 0.1, z + rng.randf_range(-0.4, 0.4)), Vector3(x + rng.randf_range(-0.05, 0.05), floor_y + h - 0.1 - drop, z), rng.randf_range(0.12, 0.26), 0.0, 5, CAVE_ROCK.lightened(0.1))
+		# The floor: bare stone under everything, worn flags down the middle, loose stones to either side.
+		l.box(Vector3(0, floor_y + 0.01, z), Vector3(w + 1.6, 0.04, step + 0.12), CAVE_FLOOR.darkened(0.3 + rng.randf() * 0.1))
+		if absf(z) < half_len:
+			for k in 2:
+				var fx := rng.randf_range(-w * 0.25, w * 0.25)
+				l.box(Vector3(fx, floor_y + 0.03, z + rng.randf_range(-0.3, 0.3)), Vector3(rng.randf_range(0.8, 1.4), 0.08, rng.randf_range(0.6, 1.0)), CAVE_FLOOR.darkened(rng.randf_range(0.0, 0.2)), Vector3(0, rng.randf() * 40, 0))
+			for k in 3:
+				var fx := rng.randf_range(-w * 0.48, w * 0.48)
+				l.ovoid(Vector3(fx, floor_y + 0.06, z + rng.randf_range(-0.5, 0.5)), Vector3(rng.randf_range(0.1, 0.3), 0.1, rng.randf_range(0.1, 0.3)), CAVE_ROCK, CAVE_DARK, 2, 5)
+		# Spires on top, so that no one stands on the roof.
+		var spire := Vector3(rng.randf_range(-w * 0.4, w * 0.4), floor_y + h + 1.3, z)
+		l.prism(spire, spire + Vector3(rng.randf_range(-0.3, 0.3), rng.randf_range(1.6, 3.0), 0), 0.9, 0.05, 5, LIMESTONE.darkened(0.2))
 		b.solid(spire + Vector3.UP * 1.0, Vector3(1.0, 2.0, 1.0))
-	# The entrances: an arch of bigger stones at each end.
+		z += step
+	# The mouth: an arch of great stones, ivy hanging over it, the god's sign cut above.
+	var mouth := -half_len - 0.6
+	l.box(Vector3(0, floor_y + 5.2, mouth), Vector3(wide + 4.5, 2.4, 1.8), LIMESTONE.darkened(0.15), Vector3(0, 0, rng.randf_range(-4, 4)))
 	for g: float in [-1.0, 1.0]:
-		var z := g * (size * 0.5 + 0.6)
-		l.box(Vector3(0, floor_y + high + 1.2, z), Vector3(wide + 3.5, 2.2, 1.6), LIMESTONE.darkened(0.1), Vector3(0, 0, rng.randf_range(-6, 6)))
-		for s: float in [-1.0, 1.0]:
-			l.box(Vector3(s * (wide * 0.5 + 1.2), floor_y + high * 0.5 + 0.4, z), Vector3(2.0, high + 1.6, 1.8), LIMESTONE, Vector3(0, 0, s * 6))
+		l.box(Vector3(g * (wide * 0.5 + 1.4), floor_y + 2.4, mouth), Vector3(2.2, 5.2, 2.0), LIMESTONE.darkened(0.1), Vector3(0, 0, g * 5))
+	for k in 8:
+		var x := rng.randf_range(-wide * 0.5, wide * 0.5)
+		l.box(Vector3(x, floor_y + 4.1 - rng.randf() * 0.8, mouth + 0.95), Vector3(0.25, rng.randf_range(0.8, 1.8), 0.08), Color(0.18, 0.3, 0.14))
+	# The back of the sanctum: the living rock.
+	for k in 5:
+		var x := -wide * 0.9 + k * wide * 0.45
+		l.box(Vector3(x, floor_y + 2.6, half_len + 1.4), Vector3(wide * 0.6, 5.8, 2.4), CAVE_DARK.darkened(rng.randf_range(0.0, 0.2)), Vector3(rng.randf_range(-5, 5), rng.randf_range(-10, 10), rng.randf_range(-5, 5)))
+	b.solid(Vector3(0, floor_y + 2.8, half_len + 1.6), Vector3(wide * 3.0, 6.5, 1.6))
+	# The chamber: the oracle's spring in a ring of stones, niches cut in the walls with lamps and little
+	# votive figures, offerings left by the spring.
+	var pool := Vector3(-wide * 0.55, floor_y, -1.0)
+	for k in 12:
+		var a := TAU * k / 12.0
+		l.ovoid(pool + Vector3(cos(a) * 1.9, 0.18, sin(a) * 1.9), Vector3(0.42, 0.25, 0.32), CAVE_FLOOR.lightened(0.05), CAVE_DARK, 2, 6)
+	for k in 4:
+		var g := -1.0 if k % 2 == 0 else 1.0
+		var nz := -5.0 + k * 2.6
+		var nw: float = width.call(nz)
+		var niche := Vector3(g * (nw * 0.5 - 0.15), floor_y + 1.6, nz)
+		l.box(niche, Vector3(0.2, 1.1, 0.9), Color(0.08, 0.07, 0.08))
+		l.prism(niche + Vector3(-g * 0.15, -0.45, 0), niche + Vector3(-g * 0.15, 0.15, 0), 0.12, 0.08, 6, MARBLE.darkened(0.2))
+		l.ovoid(niche + Vector3(-g * 0.15, 0.25, 0), Vector3(0.08, 0.1, 0.08), MARBLE.darkened(0.15), MARBLE.darkened(0.3), 2, 5)
+	for k in 6:
+		var at := pool + Vector3(rng.randf_range(-2.8, 2.8), 0, rng.randf_range(2.2, 3.4)) * Vector3(1, 0, 1 if k % 2 else -1)
+		l.prism(at, at + Vector3(0, 0.45, 0), 0.14, 0.18, 7, Color(0.62, 0.36, 0.22).darkened(0.1 * (k % 3)))
+	# The sanctum: the veiled oracle carved sitting on her throne against the back wall, her altar
+	# before her (where the relic lies, FontaRites).
+	var seat := Vector3(0, floor_y, half_len - 0.6)
+	l.box(seat + Vector3(0, 0.6, 0.3), Vector3(2.2, 1.2, 1.4), MARBLE_SHADE)
+	l.box(seat + Vector3(0, 2.2, 0.85), Vector3(2.2, 2.6, 0.3), MARBLE_SHADE.darkened(0.05))
+	l.prism(seat + Vector3(0, 1.2, 0.1), seat + Vector3(0, 2.7, 0.2), 0.62, 0.42, 8, MARBLE)
+	l.prism(seat + Vector3(0, 2.7, 0.2), seat + Vector3(0, 3.5, 0.25), 0.42, 0.05, 8, MARBLE.darkened(0.05)) # the veil over her head
+	for g: float in [-1.0, 1.0]:
+		l.prism(seat + Vector3(g * 0.5, 1.25, -0.35), seat + Vector3(g * 0.45, 0.1, -0.5), 0.2, 0.17, 6, MARBLE.darkened(0.08)) # her knees, her robe falling
+		l.prism(seat + Vector3(g * 0.55, 2.4, 0.1), seat + Vector3(g * 0.35, 1.5, -0.45), 0.12, 0.1, 6, MARBLE) # her arms
+	var altar := Vector3(0, floor_y, size * 0.44 - 0.4)
+	l.box(altar + Vector3(0, 0.5, 0), Vector3(2.4, 1.0, 1.0), MARBLE_SHADE.darkened(0.1))
+	l.box(altar + Vector3(0, 1.05, 0), Vector3(2.6, 0.1, 1.2), MARBLE)
 	b.add(l)
-	# Inside: the oracle's pool in the chamber, glowing sea-green, and crystals of the god's colour.
+	if not b.is_preview:
+		# Three braziers along the way in (the mouth's hall, the chamber, before the door), the sealed
+		# door, and the sanctum's altar behind it with its relic.
+		b.w.grotto_rites = {
+			"braziers": [b.xf * Vector3(wide * 0.3, floor_y, -size * 0.34), b.xf * Vector3(wide * 0.6, floor_y, -0.5), b.xf * Vector3(-wide * 0.3, floor_y, door_z - 2.2)],
+			"door": b.xf * Transform3D(Basis.IDENTITY, Vector3(0, floor_y, door_z)),
+			"relic": b.xf * Vector3(0, floor_y + 1.1, size * 0.44 - 0.4),
+			"wide": wide,
+		}
+	# What glows: the spring, crystals of the god's colours on the walls, the sigil on the sanctum floor.
 	var glow := b.mesh()
-	glow.prism(Vector3(wide * 0.45, floor_y + 0.03, 0), Vector3(wide * 0.45, floor_y + 0.06, 0), 1.6, 1.6, 10, SEA_GLOW)
-	for k in 7:
-		var at := Vector3(rng.randf_range(-wide * 0.6, wide * 0.6), floor_y, rng.randf_range(-size * 0.4, size * 0.4))
-		at.x = signf(at.x) * maxf(absf(at.x), wide * 0.4)
-		glow.prism(at, at + Vector3(rng.randf_range(-0.2, 0.2), rng.randf_range(0.5, 1.2), rng.randf_range(-0.2, 0.2)), 0.18, 0.0, 5, CHANGE_GLOW if k % 2 else CHANGE_GREEN)
+	glow.prism(pool + Vector3(0, 0.05, 0), pool + Vector3(0, 0.12, 0), 1.7, 1.7, 12, SEA_GLOW)
+	for k in 14:
+		var cz := rng.randf_range(-half_len + 2.0, door_z - 1.0)
+		var cw: float = width.call(cz)
+		var g := -1.0 if k % 2 else 1.0
+		var at := Vector3(g * (cw * 0.5 - 0.1), floor_y + rng.randf_range(0.2, 3.0), cz)
+		for c in 3:
+			glow.prism(at, at + Vector3(-g * rng.randf_range(0.1, 0.4), rng.randf_range(0.25, 0.7), rng.randf_range(-0.2, 0.2)), 0.1, 0.0, 5, CHANGE_GLOW if (k + c) % 2 else CHANGE_GREEN)
+	glow.prism(Vector3(0, floor_y + 0.02, size * 0.4), Vector3(0, floor_y + 0.05, size * 0.4), 1.6, 1.6, 6, CHANGE_GLOW.darkened(0.2))
 	MesenllaBuilder._shine(b, glow)
-	b.w.add_glow(b.xf * Vector3(wide * 0.45, floor_y + 1.0, 0), SEA_GLOW, 5.0)
-	b.w.add_glow(b.xf * Vector3(-wide * 0.3, floor_y + 1.4, -size * 0.3), CHANGE_GLOW, 3.5)
-	b.w.add_glow(b.xf * Vector3(wide * 0.3, floor_y + 1.4, size * 0.3), CHANGE_GREEN, 3.5)
+	b.w.add_glow(b.xf * (pool + Vector3(0, 1.0, 0)), SEA_GLOW, 6.0)
+	b.w.add_glow(b.xf * Vector3(wide * 0.4, floor_y + 2.0, -size * 0.2), CHANGE_GLOW, 4.0)
+	b.w.add_glow(b.xf * Vector3(-wide * 0.4, floor_y + 2.0, size * 0.1), CHANGE_GREEN, 4.0)
+	b.w.add_glow(b.xf * Vector3(0, floor_y + 2.5, size * 0.42), CHANGE_GLOW, 5.0)
 
 
 # --- The sea and the rock ------------------------------------------------------------------------
@@ -788,6 +960,114 @@ static func sea_stack(b: MapBuilder, size: float) -> void:
 
 
 ## An outcrop of limestone, size metres across: grey-white blocks, cracked and leaning.
+## The Sacred Way's stair: marble treads up the slope the land has here, size metres long towards the
+## piece's -Z and wide across, some cracked, some missing their edge. They follow the ground (walked as
+## the ramp it is), each tread's top at the ground's height at its upper edge.
+static func sacred_stair(b: MapBuilder, size: float, wide: float) -> void:
+	var t := b.terrain
+	var rng := b.seeded()
+	var l := b.mesh()
+	l.base = Transform3D.IDENTITY
+	var run := 0.55
+	var count := int(size / run)
+	var back := -b.xf.basis.z.normalized()
+	var side := b.xf.basis.x.normalized()
+	for i in count:
+		var p0 := b.xf.origin + back * (i * run)
+		var p1 := b.xf.origin + back * ((i + 1) * run)
+		var h0 := t.height(p0.x, p0.z)
+		var h1 := t.height(p1.x, p1.z)
+		if h1 - h0 < 0.05:
+			# The landing: one long worn slab.
+			l.box((p0 + p1) * 0.5 + Vector3(0, h1 - 0.12, 0), Vector3(wide, 0.26, run), MARBLE_SHADE.darkened(0.05), Vector3(0, rad_to_deg(atan2(back.x, back.z)), 0))
+			continue
+		var centre := (p0 + p1) * 0.5
+		var tall := h1 - h0 + 0.35
+		var col := MARBLE.darkened(rng.randf_range(0.04, 0.2))
+		var yaw := rad_to_deg(atan2(back.x, back.z))
+		# A tread in two or three slabs across, not one bar.
+		var pieces := rng.randi_range(2, 3)
+		for k in pieces:
+			var w := wide / pieces
+			var off := side * (-wide * 0.5 + w * (k + 0.5))
+			if rng.randf() < 0.05:
+				continue # a slab gone
+			l.box(centre + off + Vector3(0, h1 - tall * 0.5, 0), Vector3(w - 0.05, tall, run + 0.02), col.darkened(0.06 * (k % 2)), Vector3(rng.randf_range(-1.5, 1.5), yaw, rng.randf_range(-1.5, 1.5)))
+	b.add(l)
+
+
+## Every cliff on the island dressed in rock: where the land drops sheer, limestone blocks are stacked
+## up its face from foot to rim in strata, set into it and turned to face out, so a cliff reads as
+## broken rock and not a stretched sheet. Merged per 40 m square.
+static func cliff_faces(b: MapBuilder, radius: float) -> void:
+	var t := b.terrain
+	var keep := b.xf
+	b.stand_at(Transform3D.IDENTITY)
+	var chunks := {}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 8080
+	var step := 1.7
+	var x := -radius
+	while x < radius:
+		var z := -radius
+		while z < radius:
+			z += step
+			var gx := (t.ground_height(x + 1.0, z) - t.ground_height(x - 1.0, z)) * 0.5
+			var gz := (t.ground_height(x, z + 1.0) - t.ground_height(x, z - 1.0)) * 0.5
+			if Vector2(gx, gz).length() < 1.05 or not b._plant_allowed(Vector3(x, 0, z), -0.5):
+				continue # not steep, or inside the grotto or another cleared place (the walls beside them keep their rock)
+			var out := Vector3(-gx, 0, -gz).normalized()
+			var hi := maxf(t.ground_height(x - out.x * 2.5, z - out.z * 2.5), t.ground_height(x, z))
+			var lo := maxf(t.ground_height(x + out.x * 2.5, z + out.z * 2.5), Terrain.ISLE_SEA_Y - 1.2)
+			if hi - lo < 1.6:
+				continue
+			var key := Vector2i(int(floor(x / 40.0)), int(floor(z / 40.0)))
+			if not chunks.has(key):
+				chunks[key] = b.mesh()
+			var l: LowPoly = chunks[key]
+			var yaw := rad_to_deg(atan2(out.x, out.z))
+			# Level courses of limestone, each at its own height everywhere on the island, so the
+			# strata run unbroken along a face. A course is laid in this cell only where it meets the
+			# face here, so neighbouring cells never stack the same course twice.
+			for k in range(ceili((lo - 0.4) / COURSE), floori((hi - 0.3) / COURSE) + 1):
+				var yc := (k + 0.5) * COURSE
+				if yc > hi - 0.3:
+					break
+				var s_rim := -2.5
+				var s_foot := 2.5
+				for _i in 10:
+					var mid_s := (s_rim + s_foot) * 0.5
+					if t.ground_height(x + out.x * mid_s, z + out.z * mid_s) > yc:
+						s_rim = mid_s
+					else:
+						s_foot = mid_s
+				var face := Vector3(x, 0, z) + out * ((s_rim + s_foot) * 0.5)
+				if absf(face.x - x) > step * 0.5 or absf(face.z - z) > step * 0.5:
+					continue
+				var deep := 2.0
+				var proud := (0.18 if k % 2 == 0 else 0.0) + rng.randf_range(0.0, 0.14)
+				var at := face - out * (deep * 0.5 - proud)
+				at.y = yc - 0.02
+				var col := _course_colour(k).darkened(rng.randf_range(0.0, 0.07))
+				l.box(at, Vector3(rng.randf_range(2.3, 2.9), COURSE * rng.randf_range(0.9, 0.98), deep), col, Vector3(0, yaw, 0))
+				# Now and then a cushion of something green clinging on a ledge.
+				if rng.randf() < 0.025:
+					l.ovoid(at + out * (deep * 0.5 + 0.1) + Vector3.UP * COURSE * 0.5, Vector3(0.6, 0.22, 0.5), Color(0.36, 0.42, 0.22), Color(0.24, 0.3, 0.16), 3, 6)
+		x += step
+	for key: Vector2i in chunks:
+		b.add(chunks[key])
+	b.stand_at(keep)
+
+
+## The colour of a course of the island's limestone: pale and grey in turns, and now and then a
+## band of ochre where iron ran through the rock.
+static func _course_colour(k: int) -> Color:
+	var h := absi(k * 7919 + 13) % 11
+	if h == 3 or h == 8:
+		return CLIFF_OCHRE
+	return CLIFF_GREY.lightened(0.08) if k % 2 == 0 else CLIFF_GREY.darkened(0.05)
+
+
 static func limestone(b: MapBuilder, size: float) -> void:
 	var rng := b.seeded()
 	var l := b.cell()
