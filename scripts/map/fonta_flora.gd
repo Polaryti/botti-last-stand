@@ -8,6 +8,9 @@ class_name FontaFlora
 ## merged per 24 m square, like the map's other small things.
 
 const NOMINAL := {"olive": 4.5, "holm_oak": 7.0, "madrono": 5.0, "carob": 6.0, "cypress": 10.0}
+## Where a Mutant Spider can cling, at a tree's own size: the trunk's girth (its radius, bark and all)
+## and how high it runs clear of leaves. A cypress is leaves to the ground: nothing clings to it.
+const TRUNKS := {"olive": Vector2(0.42, 1.5), "holm_oak": Vector2(0.38, 2.4), "madrono": Vector2(0.5, 1.4), "carob": Vector2(0.45, 1.9)}
 
 const OLIVE_BARK := Color(0.33, 0.29, 0.24)
 const OLIVE_LEAF := Color(0.42, 0.48, 0.36)
@@ -65,7 +68,11 @@ static func tree(b: MapBuilder, kind: String, size: float) -> void:
 	var nominal: float = NOMINAL.get(kind, 5.0)
 	var s := size / nominal
 	# Cypresses are narrow: a blow cannot pass through one, but there is room either side.
+	var planted: int = b.w.tree_spots.size()
 	b.tree("flora:" + kind, s, 1.0, true)
+	if TRUNKS.has(kind) and b.w.tree_spots.size() > planted:
+		var trunk: Vector2 = TRUNKS[kind]
+		b.w.spider_trunks.append({"at": b.xf.origin, "girth": trunk.x * s, "high": trunk.y * s})
 
 
 static func tree_mesh(kind: String) -> Mesh:

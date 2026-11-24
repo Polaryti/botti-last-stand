@@ -40,7 +40,12 @@ const FOODS := {
 	"bread": {"name": "Bread", "heal": 20.0, "weight": 3.0},
 	"cheese": {"name": "Cheese", "heal": 25.0, "weight": 2.0},
 	"meat": {"name": "Roast Meat", "heal": 40.0, "weight": 1.0},
+	# Fontanova: never random food, only from its bees and its hives (FontaMind).
+	"honey": {"name": "Honey", "heal": 25.0, "weight": 0.0, "maps": ["fontanova"], "haste": true},
 }
+## Honey runs through you: this much faster for this many seconds.
+const HONEY_SPEED := 0.3
+const HONEY_HASTE := 6.0
 
 const ARCHER_INTERVAL := 1.0
 const ARCHER_RANGE := 22.0
@@ -149,6 +154,14 @@ static func mesh(id: String) -> Mesh:
 		"meat":
 			l.prism(Vector3(-0.3, 0, 0), Vector3(0.1, 0, 0), 0.05, 0.05, 5, Color(0.9, 0.88, 0.78))
 			l.prism(Vector3(-0.08, 0, 0), Vector3(0.28, 0, 0), 0.13, 0.2, 7, Color(0.5, 0.22, 0.12))
+		"honey":
+			# A clay pot of honey, a waxed cloth tied over it, honey run down its side.
+			l.prism(Vector3(0, -0.16, 0), Vector3(0, 0.08, 0), 0.13, 0.17, 8, Color(0.66, 0.36, 0.2))
+			l.prism(Vector3(0, 0.08, 0), Vector3(0, 0.16, 0), 0.17, 0.1, 8, Color(0.6, 0.32, 0.18))
+			l.prism(Vector3(0, 0.15, 0), Vector3(0, 0.2, 0), 0.13, 0.14, 8, Color(0.9, 0.84, 0.66))
+			l.prism(Vector3(0, 0.2, 0), Vector3(0, 0.24, 0), 0.08, 0.02, 6, Color(0.9, 0.84, 0.66))
+			l.prism(Vector3(0.16, 0.08, 0.02), Vector3(0.15, -0.06, 0.03), 0.03, 0.015, 5, Color(1.0, 0.72, 0.12))
+			l.prism(Vector3(0.0, 0.17, 0.0), Vector3(0.0, 0.175, 0.0), 0.12, 0.12, 8, Color(1.0, 0.75, 0.16))
 		"arrows":
 			for i in 5:
 				var x := -0.1 + i * 0.05

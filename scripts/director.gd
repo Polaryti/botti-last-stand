@@ -544,6 +544,25 @@ func _tick_mesenlla() -> void:
 
 ## Port Vael: Brine Hounds come up out of the sea in packs; the high tide carries Lantern Jellies in
 ## over the flats; and Anglers lie buried on the shore with their lures showing.
+## Fontanova: its hives grow at the start of the night, and from SPIDERS_FROM its spiders wait in the
+## trees, a new one every SPIDER_EVERY seconds while fewer than MAX_SPIDERS are about.
+const SPIDERS_FROM := 200.0
+const SPIDER_EVERY := 50.0
+const MAX_SPIDERS := 3
+var _hives_grown := false
+var _next_spider := SPIDERS_FROM
+func _tick_fontanova() -> void:
+	if _follows_host:
+		return
+	if not _hives_grown:
+		_hives_grown = true
+		world.grow_hives()
+	if elapsed >= _next_spider:
+		_next_spider = elapsed + SPIDER_EVERY
+		if world.count_type("mutant_spider") < MAX_SPIDERS:
+			world.spawn_spider()
+
+
 func _tick_vael() -> void:
 	if elapsed >= _next_rider and elapsed >= ZombieDefs.ALL["brine_hound"]["from"]:
 		_next_rider = elapsed + HOUND_PACK_EVERY
@@ -672,6 +691,9 @@ func _tick_specials() -> void:
 		return
 	if world.map_id in SpawnRules.VAEL:
 		_tick_vael()
+		return
+	if world.map_id in SpawnRules.ARCHIPELAGO:
+		_tick_fontanova()
 		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
 		_next_rider = elapsed + RIDER_EVERY

@@ -115,6 +115,7 @@ var lighthouse_top := Vector3.INF
 var last_light: LastLight
 var tide: MistTide # Port Vael's Mist Tide, or null
 var isle_sea: IsleSea # the sea round an island of the archipelago, or null
+var fonta_trails: FontaTrails # the trails Fontanova's snails leave, made when the first one crawls
 var _tide_fog := 1.0 # how much thicker the tide makes the fog
 var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
 var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
@@ -128,6 +129,8 @@ const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itsel
 ## Where new Fort wood lies: by the walls (6 to 15 m out), in the field (15 to 30 m) or in the woods.
 const WOOD_BANDS := {"near": 0.45, "field": 0.3, "forest": 0.25}
 var tree_spots: Array[Vector3] = []
+var hive_spots: Array[Vector3] = [] # Fontanova: where its beehives grow (MapSpot "hive")
+var spider_trunks: Array[Dictionary] = [] # Fontanova: tree trunks a spider can cling to, {at, girth, high}
 var forest_wood_spots: Array[Vector3] = []
 var near_wood_spots: Array[Vector3] = []
 var field_wood_spots: Array[Vector3] = []
@@ -1555,10 +1558,12 @@ func has_line_of_sight(a: Vector3, b: Vector3) -> bool:
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
+## The living that count toward the night's numbers: a fixture (a Beehive, grown where the map says)
+## is part of the place, not one of the hunters.
 func count_living() -> int:
 	var n := 0
 	for z in zombies:
-		if z.is_alive():
+		if z.is_alive() and not z.def.get("fixture", false):
 			n += 1
 	return n
 
@@ -2887,6 +2892,39 @@ func spawn_angler() -> bool:
 	return at != Vector3.INF and spawn_zombie("angler", at)
 
 
+## Fontanova: a Mutant Spider clinging head down to a tree trunk, a way off from someone, to drop on
+## whoever comes near (FontaMind). Returns whether one found a tree.
+func spawn_spider() -> bool:
+	var near := random_player_position()
+	var trees := spider_trunks.filter(func(p: Dictionary) -> bool:
+		var t: Vector3 = p["at"]
+		var d := Vector2(t.x - near.x, t.z - near.z).length()
+		return d > 16.0 and d < 42.0)
+	if trees.is_empty():
+		return false
+	var perch: Dictionary = trees.pick_random()
+	var tree: Vector3 = perch["at"]
+	var out := Vector3(near.x - tree.x, 0, near.z - tree.z).normalized()
+	var at := Vector3(tree.x, ground_at(tree), tree.z) + out * (float(perch["girth"]) + FontaMind.CLING)
+	if not spawn_zombie("mutant_spider", at):
+		return false
+	var spider: Zombie = zombies.back()
+	spider.position = FontaMind.perch_at(perch, out, ground_at(tree))
+	spider.rotation.y = atan2(out.x, out.z) # facing out from the trunk; perched, it tips head down
+	spider.reset_physics_interpolation()
+	(spider.mesenlla_mind as FontaMind).perched = true
+	return true
+
+
+## Fontanova: the beehives grow where the map says, once each night.
+func grow_hives() -> int:
+	var grown := 0
+	for at: Vector3 in hive_spots:
+		if spawn_zombie("beehive", Vector3(at.x, ground_at(at), at.z)):
+			grown += 1
+	return grown
+
+
 ## Port Vael: a Siren at the water's edge, down on the flats a way off from someone.
 func spawn_siren() -> bool:
 	if vael_sites:
@@ -3256,9 +3294,16 @@ func _scan_pickups_for(who: Player) -> void:
 					near = p
 					near_distance_squared = distance_squared
 			Pickup.Kind.FOOD:
-				if distance_squared < 1.6 * 1.6 and who.hp < who.max_hp():
-					who.heal(float(PowerDefs.FOODS[p.item_id]["heal"]))
-					who.say("+%d %s" % [int(PowerDefs.FOODS[p.item_id]["heal"]), p.display_name()])
+				var food: Dictionary = PowerDefs.FOODS[p.item_id]
+				# Honey is worth taking even unhurt, for its speed, while you are not already running on it.
+				var wanted: bool = who.hp < who.max_hp() or (food.get("haste", false) and not who._buffs.has("honey"))
+				if distance_squared < 1.6 * 1.6 and wanted:
+					who.heal(float(food["heal"]))
+					if food.get("haste", false):
+						who._buffs["honey"] = {"stat": "speed", "val": PowerDefs.HONEY_SPEED, "left": PowerDefs.HONEY_HASTE, "stacks": 1}
+						who.say("+%d %s, and quicker for %d s" % [int(food["heal"]), p.display_name(), int(PowerDefs.HONEY_HASTE)])
+					else:
+						who.say("+%d %s" % [int(food["heal"]), p.display_name()])
 					who.sfx("eat", -2.0)
 					remove_pickup(p)
 			Pickup.Kind.ARROWS:

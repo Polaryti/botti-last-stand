@@ -409,6 +409,11 @@ const VAEL_POOLS := {"drowned": 18, "barnacle_brute": 3, "brine_hound": 6, "lant
 	"wreck_gull": 3, "storm_ray": 2, "bell_wraith": 2, "siren": 2, "press_gang": 9, "tide_witch": 2, "harbourmaster": 1, "lighthouse_keeper": 1, "kraken_arm": 4, "hollow_sovereign": 1, "leviathan": 1, "kraken": 1}
 
 
+## Fontanova: the mutants of the island, its hives and its ambushers.
+const FONTA_POOLS := {"mutant_bee": 14, "beehive": 6, "mutant_wasp": 9, "mutant_snail": 4, "wasp_hive_snail": 2, "mutant_spider": 4,
+	"battle_ostrich": 4, "ember_moth": 3, "thornback": 3}
+
+
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
 const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6, "mist_eagle": 3, "shapeshifter": 3,
 	"earth_elemental": 4, "mist_elemental": 3, "storm_elemental": 3, "wyvern": 2, "war_wyvern": 1}
@@ -432,6 +437,8 @@ func zombie_pool_plan() -> Dictionary:
 		return road
 	if mode == Mode.NIGHT and current_map() in SpawnRules.VAEL:
 		return VAEL_POOLS.duplicate()
+	if mode == Mode.NIGHT and current_map() in SpawnRules.ARCHIPELAGO:
+		return FONTA_POOLS.duplicate()
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:
 		plan["dummy"] = 6
@@ -439,6 +446,8 @@ func zombie_pool_plan() -> Dictionary:
 			plan[model] = mini(int(MESENLLA_POOLS[model]), 4)
 		for model: String in VAEL_POOLS:
 			plan[model] = mini(int(VAEL_POOLS[model]), 4)
+		for model: String in FONTA_POOLS:
+			plan[model] = mini(int(FONTA_POOLS[model]), 4)
 		plan["leviathan"] = 1
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS

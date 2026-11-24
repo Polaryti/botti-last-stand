@@ -32,6 +32,34 @@ const ALL := {
 	"lantern_jelly": {"name": "Lantern Jelly", "icon": "lantern_jelly", "desc": "Drifts in on the high tide with a ship's lantern still burning inside it. Its threads flare, then it stings everything within 2.4 m, stunning for 0.8 s. When it dies it stings once more. Back away when the threads flare.", "hp": 60.0, "roam_speed": 1.0, "speed": 1.8, "damage": 14.0, "scale": 1.0, "xp": 18,
 		"sight": 26.0, "models": ["lantern_jelly"], "from": 60.0, "weight": 0.0, "custom": true, "maps": ["vael", "lantern_road"], "sting_reach": 2.4, "sting_stun": 0.8, "radius": 0.6, "tall": 2.4,
 		"lore": "Jellies drifted into the drowned harbour and grew round its lanterns, which never went out. Sailors once steered home by those lights. Now the lights come looking for them."},
+	# Fontanova: the mutants Al'quimelea made (FontaMind, FontaModels).
+	"mutant_bee": {"name": "Mutant Bee", "icon": "mutant_bee", "desc": "A bee the size of a dog, changed by the island's god. Circles low, then curls its stinger forward and dives at where you stood: step aside. Its sting poisons you for 4 s. Half the time it leaves Honey when it dies.", "hp": 40.0, "roam_speed": 3.0, "speed": 6.0, "damage": 9.0, "scale": 1.0, "xp": 10,
+		"sight": 30.0, "models": ["mutant_bee"], "from": 0.0, "weight": 2.4, "custom": true, "flies": true, "fly_height": 1.8, "radius": 0.5, "tall": 0.9, "maps": ["fontanova"], "tint": Color(0.85, 0.6, 0.15),
+		"lore": "The worshippers kept bees on the terraces and offered the god their honey. The god kept the bees."},
+	"beehive": {"name": "Beehive", "icon": "beehive", "desc": "A great comb grown over an old olive stump, its cells glowing where the god touched it. It neither moves nor strikes, but every blow sends 2 bees out of it, no more than 6 at once. Broken, it spills 4 Honey.", "hp": 260.0, "roam_speed": 0.0, "speed": 0.0, "damage": 0.0, "scale": 1.0, "xp": 30,
+		"sight": 18.0, "models": ["beehive"], "from": 9999.0, "weight": 0.0, "custom": true, "rooted": true, "fixture": true, "radius": 1.0, "tall": 2.4, "maps": ["fontanova"], "tint": Color(0.85, 0.62, 0.2),
+		"lore": "Old hives, older than the ruins round them. The comb never stops growing, and nobody has ever seen a queen."},
+	"mutant_wasp": {"name": "Mutant Wasp", "icon": "mutant_wasp", "desc": "A red-and-black wasp as long as your arm. Keeps its distance and shoots its stinger, which poisons you for 3 s; up close it dives to bite. It arches its abdomen under itself before it shoots.", "hp": 50.0, "roam_speed": 3.0, "speed": 6.5, "damage": 11.0, "scale": 1.0, "xp": 14,
+		"sight": 34.0, "models": ["mutant_wasp"], "from": 120.0, "weight": 1.6, "custom": true, "flies": true, "fly_height": 3.0, "radius": 0.5, "tall": 0.9, "maps": ["fontanova"], "tint": Color(0.62, 0.13, 0.08),
+		"lore": "Paper wasps used to nest under the temple's eaves. What hatches there now has learned to throw its sting."},
+	"mutant_snail": {"name": "Mutant Snail", "icon": "mutant_snail", "desc": "A snail as big as a boar, its shell grown into glowing seams. Slow, but it leaves a trail behind it that lasts 8 s: green poison or burning embers, whichever its seams glow with. Don't walk in its track.", "hp": 220.0, "roam_speed": 0.8, "speed": 1.3, "damage": 14.0, "scale": 1.0, "xp": 24,
+		"sight": 20.0, "models": ["mutant_snail"], "from": 60.0, "weight": 1.4, "custom": true, "radius": 0.9, "tall": 1.4, "maps": ["fontanova"], "tint": Color(0.52, 0.47, 0.38),
+		"lore": "After rain the olive groves used to be full of snails. Some of them grew, and kept growing, and the grass where they crawl never grows back."},
+	"wasp_hive_snail": {"name": "Wasp-Hive Snail", "icon": "wasp_hive_snail", "desc": "A snail carrying a paper wasps' nest for a shell. Every 12 s its nest shudders and a Mutant Wasp crawls out, no more than 3 of its own at once. Kill the snail and no more come.", "hp": 320.0, "roam_speed": 0.7, "speed": 1.1, "damage": 16.0, "scale": 1.0, "xp": 40,
+		"sight": 22.0, "models": ["wasp_hive_snail"], "from": 300.0, "weight": 0.6, "custom": true, "radius": 1.0, "tall": 2.4, "maps": ["fontanova"], "tint": Color(0.6, 0.58, 0.54),
+		"lore": "Nobody can say whether the wasps built their nest on the snail, or the snail grew it."},
+	"mutant_spider": {"name": "Mutant Spider", "icon": "mutant_spider", "desc": "A long-legged spider that clings head down to tree trunks. Come within 14 m and it drops on you: its web where it lands holds you for 1.2 s and poisons you for 3 s. On the ground it crouches before each pounce. Watch the trees.", "hp": 110.0, "roam_speed": 3.0, "speed": 5.0, "damage": 16.0, "scale": 1.0, "xp": 26,
+		"sight": 26.0, "models": ["mutant_spider"], "from": 200.0, "weight": 0.0, "custom": true, "radius": 0.7, "tall": 0.9, "maps": ["fontanova"], "tint": Color(0.3, 0.24, 0.2),
+		"lore": "The holm oaks are full of webs as wide as a doorway. The birds that lived in them are gone."},
+	"battle_ostrich": {"name": "Battle Ostrich", "icon": "battle_ostrich", "desc": "An ostrich in a war-harness of bronze, as tall as a rider. Paws the ground with its head low, then charges straight at you: whoever it reaches is kicked away. Step out of its line.", "hp": 160.0, "roam_speed": 3.0, "speed": 7.0, "damage": 18.0, "scale": 1.0, "xp": 30,
+		"sight": 32.0, "models": ["battle_ostrich"], "from": 180.0, "weight": 1.1, "custom": true, "radius": 0.7, "tall": 2.6, "maps": ["fontanova"], "tint": Color(0.12, 0.1, 0.1),
+		"lore": "The cult's guardians rode them to war. The harnesses outlasted the riders."},
+	"ember_moth": {"name": "Ember Moth", "icon": "ember_moth", "desc": "A moth wider than a man, with eye-spots on its wings. It spreads its wings and holds them for 1 s, eye-spots blazing, then claps them: the dust where it was looking dazzles you for 2.5 s and sets you alight. Leave the circle.", "hp": 70.0, "roam_speed": 2.0, "speed": 3.5, "damage": 10.0, "scale": 1.0, "xp": 18,
+		"sight": 30.0, "models": ["ember_moth"], "from": 240.0, "weight": 0.8, "custom": true, "flies": true, "fly_height": 3.4, "radius": 0.6, "tall": 1.0, "maps": ["fontanova"], "tint": Color(0.95, 0.55, 0.2),
+		"lore": "Drawn to the cult's braziers for so long that they became something like them."},
+	"thornback": {"name": "Thornback", "icon": "thornback", "desc": "A tortoise as big as a cart, its shell grown into limestone thorns. Slow, but blows from the front glance off its shell for half. Get round it.", "hp": 380.0, "roam_speed": 0.8, "speed": 1.4, "damage": 22.0, "scale": 1.0, "xp": 36,
+		"sight": 20.0, "models": ["thornback"], "from": 150.0, "weight": 0.9, "custom": true, "shielded": true, "radius": 1.1, "tall": 1.6, "maps": ["fontanova"], "tint": Color(0.4, 0.36, 0.26),
+		"lore": "Tortoises live long. This one has lived long enough to have known the island's people, and to have changed with it."},
 	"wreck_gull": {"name": "Wreck Gull", "icon": "wreck_gull", "desc": "A salt-crusted gull from the wrecks. Circles above the quay, swells its glowing throat and spits a salt glob from up to 24 m away. The marked splash slows for 1.5 s. Step out of the circle; after spitting it drops low for 1.8 s, within sword reach.", "hp": 65.0, "roam_speed": 2.0, "speed": 5.2, "damage": 12.0, "scale": 1.0, "xp": 22,
 		"sight": 36.0, "models": ["wreck_gull"], "from": 75.0, "weight": 1.5, "custom": true, "flies": true, "fly_height": 3.0, "radius": 0.55, "tall": 1.0, "maps": ["vael"],
 		"lore": "Gulls nested in the ribs of Vael's wrecks until salt grew through their feathers. They no longer wait for the tide to uncover a meal."},
@@ -198,4 +226,4 @@ static func pick_roamer(elapsed: float, map_id := "village") -> String:
 			r -= w
 			if r <= 0.0:
 				return id
-	return "child_of_woods" if map_id in SpawnRules.MESENLLA else "drowned_sailor" if map_id in SpawnRules.VAEL else "normal"
+	return "child_of_woods" if map_id in SpawnRules.MESENLLA else "drowned_sailor" if map_id in SpawnRules.VAEL else "mutant_bee" if map_id in SpawnRules.ARCHIPELAGO else "normal"

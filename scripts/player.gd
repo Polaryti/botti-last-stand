@@ -1262,6 +1262,16 @@ func root_by_creature(seconds: float) -> void:
 
 
 ## Slowed by a creature (a wave knocking you off your feet): for just as long as it says.
+## Poisoned by a creature (a mutant's sting, a spider's web, a snail's trail): the poison runs its
+## course as yours would on them, unless you carry an antidote.
+func poison_by_creature(seconds: float) -> void:
+	if dead or guard_left > 0.0 or has_flag("antidote"):
+		return
+	if poison_left <= 0.0:
+		say("Poisoned")
+	poison_left = maxf(poison_left, seconds)
+
+
 func slow_by_creature(seconds: float) -> void:
 	if dead or guard_left > 0.0:
 		return
@@ -2522,7 +2532,7 @@ func _pack_call() -> bool:
 			var spot := here - global_basis.z * 1.5
 			var wants_food: bool = hp < max_hp() * 0.7 or not (class_def().get("ranged", false) or WeaponDefs.uses_arrows(weapon_def()))
 			if wants_food:
-				world.spawn_pickup_at(spot, Pickup.Kind.FOOD, PowerDefs.FOODS.keys().pick_random())
+				world.spawn_pickup_at(spot, Pickup.Kind.FOOD, PowerDefs.pick_weighted(PowerDefs.FOODS))
 			else:
 				world.spawn_pickup_at(spot, Pickup.Kind.ARROWS, "arrows")
 			sfx("wolf", -6.0, 1.3)

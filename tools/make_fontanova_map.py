@@ -259,6 +259,11 @@ far = group("Archipelago")
 for (x, z, s) in [(-232, -70, 70.0), (205, -150, 80.0), (150, 205, 55.0), (-190, 175, 50.0), (30, -240, 90.0)]:
     fonta("HorizonIsle", far, "horizon_isle", (x, 0, z, x % 360), size=s, on_ground=False)
 
+# --- The hives: where the night's beehives grow ----------------------------------------------------
+hives = group("Hives")
+for (x, z) in [(-14, 44), (22, 52), (-38, -10), (40, -28), (60, 2), (-24, -58)]:
+    spot(hives, "hive", (x, 0, z))
+
 # --- Versus: where rivals begin ------------------------------------------------------------------
 rivals = group("Rivals")
 for (x, z) in [(0, 70), (-30, 30), (30, 30), (-60, -10), (60, -10), (0, -40), (-40, -60), (40, -60)]:

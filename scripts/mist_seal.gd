@@ -8,11 +8,14 @@ extends Node3D
 ## stand), a wave that throws you back and slows you, the Harbourmaster's hook (it drags you to him), a
 ## burning oil lamp, a Kraken's Arm slamming down, the Lighthouse Keeper's great lamp (it dazzles whoever
 ## is looking at him as it blazes) and the Sunken Crown's judgement.
+## The mutants of Fontanova (FontaMind) add: a bee's sting and a wasp's bite where they dive, a spider's
+## web where it lands (it holds you and poisons you), an ostrich's kick (it throws you back) and a
+## moth's burning dust (it dazzles you and sets you alight).
 const LIMIT := 16
 const STING_STUN := 0.8 # how long a Lantern Jelly's sting stuns you (ZombieDefs "sting_stun")
 ## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
 const PORTAL_SHARE := 1.5
-enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL, INK } # new ones go at the end
+enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL, INK, STINGER, BITE, WEB, KICK, DUST } # new ones go at the end
 const FROST_FREEZE := 0.6
 const FROST_SLOW := 2.0
 const LOOKS := {
@@ -34,14 +37,21 @@ const LOOKS := {
 	Style.FLASH: [Color(1.0, 0.95, 0.7), Color(1.0, 1.0, 0.92)],
 	Style.CROWN: [Color(0.95, 0.78, 0.3), Color(0.45, 1.0, 0.82)],
 	Style.INK: [Color(0.42, 0.16, 0.5), Color(0.12, 0.04, 0.16)],
+	Style.STINGER: [Color(0.95, 0.8, 0.2), Color(0.55, 1.0, 0.35)],
+	Style.BITE: [Color(0.95, 0.35, 0.2), Color(1.0, 0.75, 0.3)],
+	Style.WEB: [Color(0.8, 0.78, 0.9), Color(0.72, 0.4, 1.0)],
+	Style.KICK: [Color(0.95, 0.6, 0.3), Color(0.85, 0.2, 0.15)],
+	Style.DUST: [Color(1.0, 0.6, 0.25), Color(0.72, 0.4, 1.0)],
 }
 ## What each sounds like as its circle appears, and as it closes.
 const WARN_SOUNDS := {Style.MIST: "mist_warning", Style.QUAKE: "quake_warning", Style.STORM: "storm_call", Style.FIRE: "fire_warning",
 	Style.BOULDER: "boulder_throw", Style.FROST: "frost_warning", Style.STING: "jelly_hum", Style.NET: "", Style.WAVE: "wave_rise",
-	Style.HOOK: "", Style.LAMP: "", Style.SLAM: "", Style.FLASH: "lamp_flare", Style.CROWN: "crown_toll", Style.SALT: "", Style.BRINE_BOLT: "", Style.KNELL: "", Style.INK: ""}
+	Style.HOOK: "", Style.LAMP: "", Style.SLAM: "", Style.FLASH: "lamp_flare", Style.CROWN: "crown_toll", Style.SALT: "", Style.BRINE_BOLT: "", Style.KNELL: "", Style.INK: "",
+	Style.STINGER: "", Style.BITE: "", Style.WEB: "", Style.KICK: "", Style.DUST: "moth_flutter"}
 const STRIKE_SOUNDS := {Style.MIST: "mist_burst", Style.QUAKE: "earth_slam", Style.STORM: "thunder", Style.FIRE: "fire_breath",
 	Style.BOULDER: "boulder_impact", Style.FROST: "frost_burst", Style.STING: "jelly_sting", Style.NET: "net_land", Style.WAVE: "wave_crash",
-	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall", Style.SALT: "salt_splash", Style.BRINE_BOLT: "brine_crack", Style.KNELL: "knell_strike", Style.INK: "kraken_ink"}
+	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall", Style.SALT: "salt_splash", Style.BRINE_BOLT: "brine_crack", Style.KNELL: "knell_strike", Style.INK: "kraken_ink",
+	Style.STINGER: "bee_sting", Style.BITE: "wasp_bite", Style.WEB: "spider_bite", Style.KICK: "ostrich_kick", Style.DUST: "moth_dust"}
 ## Thrown things (a net, a hook, a lamp) leave the thrower's hand for the last part of the tell.
 const THROWN := [Style.NET, Style.HOOK, Style.LAMP, Style.SALT, Style.INK]
 const THROW_FLIGHT := 0.55
@@ -57,6 +67,12 @@ const FLASH_STUN := VaelMind.FLASH_STUN
 const JUDGEMENT_STUN := VaelMind.JUDGEMENT_STUN
 const INK_BLIND := VaelMind.KRAKEN_INK_BLIND
 const INK_SLOW := VaelMind.KRAKEN_INK_SLOW
+const STING_POISON := FontaMind.STING_POISON
+const WEB_ROOT := FontaMind.WEB_ROOT
+const WEB_POISON := FontaMind.WEB_POISON
+const KICK_KNOCK := FontaMind.KICK_KNOCK
+const DUST_BLIND := FontaMind.DUST_BLIND
+const DUST_BURN := FontaMind.DUST_BURN
 var style := 0
 var _boulder: MeshInstance3D
 var _chain: MeshInstance3D
@@ -315,6 +331,16 @@ func strike() -> void:
 		Style.CROWN:
 			world.fx_water(position, radius * 0.6, Color(0.95, 0.82, 0.4))
 			world.flash_bolt(position)
+		Style.STINGER, Style.BITE:
+			world.fx_gore(position + Vector3.UP * 0.8, col)
+		Style.WEB:
+			world.fx_mist(position + Vector3.UP * 0.4, radius * 0.35)
+			world.show_ring(position + Vector3.UP * 0.05, radius * 0.6, Color(0.9, 0.88, 1.0))
+		Style.KICK:
+			world.fx_gore(position + Vector3.UP * 0.5, Color(0.5, 0.42, 0.32))
+		Style.DUST:
+			world.fx_fire_patch(position, radius * 0.6)
+			world.fx_mist(position + Vector3.UP * 1.0, radius * 0.5)
 		Style.INK:
 			world.fx_gore(position + Vector3.UP * 0.6, Color(0.1, 0.03, 0.12))
 			world.fx_gore(position + Vector3(radius * 0.4, 0.4, 0), Color(0.16, 0.05, 0.18))
@@ -365,6 +391,20 @@ func strike() -> void:
 					p.night_blind_left = maxf(p.night_blind_left, INK_BLIND)
 					p.slow_by_creature(INK_SLOW)
 					p.say("Ink in your eyes!")
+				Style.STINGER: p.poison_by_creature(STING_POISON)
+				Style.WEB:
+					p.root_by_creature(WEB_ROOT)
+					p.poison_by_creature(WEB_POISON)
+					p.say("Caught in a web!")
+				Style.KICK:
+					var away := Vector3(p.global_position.x - position.x, 0, p.global_position.z - position.z)
+					if source:
+						away = Vector3(p.global_position.x - source.position.x, 0, p.global_position.z - source.position.z)
+					p.velocity += away.normalized() * KICK_KNOCK + Vector3.UP * 3.5
+				Style.DUST:
+					p.night_blind_left = maxf(p.night_blind_left, DUST_BLIND)
+					p.ignite(DUST_BURN)
+					p.say("Burning dust in your eyes!")
 				Style.MIST: p.apply_status(Net.Status.SLOW, 2.0)
 				Style.QUAKE, Style.BOULDER:
 					p.apply_status(Net.Status.STUN, 0.8)

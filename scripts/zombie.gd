@@ -547,7 +547,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 			_visual.set_meta("risen", 0.0)
 			VaelModels.bury(_visual) # it lies in wait in the sand
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
-	mesenlla_mind = VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
+	mesenlla_mind = FontaMind.new(id) if FontaMind.handles(id) else VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
@@ -1227,6 +1227,8 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 	hp -= amount
 	if _is_dummy:
 		hp = maxf(hp, 1.0)
+	if mesenlla_mind and is_alive():
+		mesenlla_mind.on_hurt(self)
 	bar_time = 2.5
 	_flash_on()
 	if not control_immune() and flies and (_dive > 0.0 or _windup > 0.0):
@@ -1262,7 +1264,9 @@ const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", 
 	"wreck_gull": "wreck_gull_call", "storm_ray": "storm_ray_call", "bell_wraith": "bell_wraith_call",
 	"drowned_sailor": "drowned_moan", "barnacle_brute": "drowned_moan", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum",
 	"siren": "siren_hum", "press_gang": "press_shout", "tide_witch": "witch_call", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_laugh",
-	"kraken_arm": "kraken_rise", "hollow_sovereign": "sovereign_voice", "leviathan": "leviathan_roar", "kraken": "kraken_roar"}
+	"kraken_arm": "kraken_rise", "hollow_sovereign": "sovereign_voice", "leviathan": "leviathan_roar", "kraken": "kraken_roar",
+	"mutant_bee": "bee_buzz", "beehive": "hive_hum", "mutant_wasp": "wasp_buzz", "mutant_snail": "snail_squelch", "wasp_hive_snail": "snail_squelch",
+	"mutant_spider": "spider_hiss", "battle_ostrich": "ostrich_hiss", "ember_moth": "moth_flutter", "thornback": "thornback_grunt"}
 
 
 ## How each of them sounds when struck, and when it dies.
@@ -1272,7 +1276,9 @@ const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist
 	"wreck_gull": "wreck_gull_hurt", "storm_ray": "storm_ray_hurt", "bell_wraith": "bell_wraith_hurt",
 	"drowned_sailor": "drowned_hurt", "barnacle_brute": "brute_hurt", "brine_hound": "hound_snarl", "lantern_jelly": "jelly_hum", "angler": "angler_bite",
 	"siren": "siren_shriek", "press_gang": "drowned_hurt", "tide_witch": "drowned_hurt", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_hurt",
-	"kraken_arm": "kraken_hurt", "hollow_sovereign": "sovereign_hurt", "leviathan": "leviathan_hurt", "kraken": "kraken_hurt"}
+	"kraken_arm": "kraken_hurt", "hollow_sovereign": "sovereign_hurt", "leviathan": "leviathan_hurt", "kraken": "kraken_hurt",
+	"mutant_bee": "insect_hurt", "beehive": "hive_hurt", "mutant_wasp": "insect_hurt", "mutant_snail": "snail_hurt", "wasp_hive_snail": "snail_hurt",
+	"mutant_spider": "spider_hurt", "battle_ostrich": "ostrich_hurt", "ember_moth": "insect_hurt", "thornback": "thornback_grunt"}
 const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
@@ -1280,7 +1286,9 @@ const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "
 	"wreck_gull": "wreck_gull_death", "storm_ray": "storm_ray_death", "bell_wraith": "bell_wraith_death",
 	"drowned_sailor": "drowned_death", "barnacle_brute": "brute_death", "brine_hound": "hound_death", "lantern_jelly": "jelly_burst", "angler": "angler_death",
 	"siren": "siren_death", "press_gang": "drowned_death", "tide_witch": "witch_death", "harbourmaster": "brute_death", "lighthouse_keeper": "keeper_hurt",
-	"kraken_arm": "kraken_death", "hollow_sovereign": "sovereign_death", "leviathan": "leviathan_death", "kraken": "kraken_end"}
+	"kraken_arm": "kraken_death", "hollow_sovereign": "sovereign_death", "leviathan": "leviathan_death", "kraken": "kraken_end",
+	"mutant_bee": "insect_death", "beehive": "hive_break", "mutant_wasp": "insect_death", "mutant_snail": "snail_death", "wasp_hive_snail": "snail_death",
+	"mutant_spider": "spider_death", "battle_ostrich": "ostrich_death", "ember_moth": "insect_death", "thornback": "thornback_death"}
 
 
 ## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.

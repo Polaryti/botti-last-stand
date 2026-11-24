@@ -1831,6 +1831,7 @@ func _fontanova() -> void:
 	# The Oracle's Grotto: a way through the east hill.
 	var through := isle.grid.route(Vector3(82, 0, -48), Vector3(82, 0, -10))
 	check(through.size() > 1 and Array(through).all(func(p: Vector3) -> bool: return absf(p.x - 82.0) < 12.0) and t.is_walkable(82, -29), "the Oracle's Grotto runs through the east hill")
+	await _fonta_mutants(isle)
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode
@@ -2167,7 +2168,7 @@ func _drowned_court() -> void:
 	for id: String in court:
 		var d: Dictionary = ZombieDefs.ALL[id]
 		check(SpawnRules.is_vael(d) and VaelMind.handles(id) and str(d.get("lore", "")).length() > 60 and Icons.exists(str(d["icon"]).get_slice("+", 0)), "%s: of Vael, with its own mind, lore and icon" % id)
-		check(CodexPanel.enemy_group(id) == (6 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
+		check(CodexPanel.enemy_group(id) == (7 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
 		var voices: Array = [Zombie.MESENLLA_VOICES.get(id, ""), Zombie.MESENLLA_HURT.get(id, ""), Zombie.MESENLLA_DEATHS.get(id, "")]
 		check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "%s has a voice, a hurt and a death of its own" % id)
 	var wanders := func(id: String) -> bool: return ZombieDefs.roams(id, 999.0, "vael") and float(ZombieDefs.ALL[id]["weight"]) > 0.0
@@ -2175,7 +2176,7 @@ func _drowned_court() -> void:
 	check(["harbourmaster", "lighthouse_keeper", "kraken_arm"].all(func(id: String) -> bool: return ZombieDefs.ALL[id].get("miniboss", false)) and ZombieDefs.ALL["hollow_sovereign"].get("vael_boss", false), "three of the court are minibosses, and the Hollow Sovereign the boss")
 	check(Director.BOSS_CARDS.has("hollow_sovereign") and Sfx.NAMES.has("boss_bells_sovereign") and ResourceLoader.exists("res://assets/sounds/boss_bells_sovereign.ogg"), "he enters with his own card and bells")
 	check(Net.ANIMS.size() <= 64 and ["m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"].all(func(a: String) -> bool: return Net.ANIMS.has(a)), "every phone is sent what they are doing (%d states)" % Net.ANIMS.size())
-	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.Style.INK == 17 and MistSeal.LOOKS.size() == 18, "the new rings come after the old on the wire")
+	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.Style.INK == 17 and MistSeal.LOOKS.size() == MistSeal.Style.size(), "the new rings come after the old on the wire, each with its look")
 	var space := SubViewport.new()
 	space.own_world_3d = true
 	add_child(space)
@@ -2429,7 +2430,7 @@ func _last_light() -> void:
 	check(Game.MAPS.has("lantern_road") and Places.ALL.has("lantern_road") and Places.ORDER.has("lantern_road") and WorldAtlas.SPOTS.has("lantern_road") and Icons.exists("map_lantern_road"), "the Lantern Road is a map of its own, in the Places, on the atlas, with its icon")
 	check(ResourceLoader.exists("res://maps/lantern_road.tscn") and Sfx.MUSIC_SETS.has("lantern") and (Sfx.MUSIC_SETS["lantern"] as Array).all(func(m: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % m)), "with its own music")
 	var levi: Dictionary = ZombieDefs.ALL["leviathan"]
-	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 6, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
+	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 7, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
 	var voices: Array = [Zombie.MESENLLA_VOICES.get("leviathan", ""), Zombie.MESENLLA_HURT.get("leviathan", ""), Zombie.MESENLLA_DEATHS.get("leviathan", ""), "leviathan_bite", "leviathan_rise", "waystation", "lighthouse_lit", "boss_bells_leviathan"]
 	check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "it and the road have sounds of their own")
 	check(Director.BOSS_CARDS.has("leviathan"), "it enters with its own card")
@@ -2830,6 +2831,316 @@ func _vael_weapons() -> void:
 	p.setup_class("infantry")
 	p.slots = ["sword", null]
 	p._equip()
+
+
+## The mutants of Fontanova: each one's tell, what lands and how to step out of it, what it leaves
+## behind, and where the night puts them.
+func _fonta_mutants(isle: World) -> void:
+	var you := isle.player
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var ready_you := func() -> void:
+		you.position = at
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+		you.poison_left = 0.0
+		you.rooted_left = 0.0
+		you.burn_time = 0.0
+		you.night_blind_left = 0.0
+		you.velocity = Vector3.ZERO
+		you._status_immune = 0.0
+	var drop_seals := func() -> void:
+		for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	var honey := func() -> Array:
+		return isle.pickups.filter(func(p: Pickup) -> bool: return p.item_id == "honey")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	# Who they are.
+	for id: String in FontaModels.KINDS:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(d["maps"] == ["fontanova"] and SpawnRules.is_archipelago(d) and CodexPanel.enemy_group(id) == 6 and Icons.exists(id) and str(d.get("lore", "")).length() > 60, id + ": of Fontanova, in the Codex with its icon and lore")
+		check(not ZombieDefs.roams(id, 600, "vael") and not ZombieDefs.roams(id, 600, "village") and not ZombieDefs.roams(id, 600, "mists"), id + " lives only on Fontanova")
+		var model := MesenllaModels.build(id)
+		check(MesenllaModels.KINDS.has(id) and model.has_node("Rig") and FontaMind.handles(id), id + " has its own model and mind")
+		model.free()
+		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
+			var sound: String = table.get(id, "")
+			check(sound != "" and Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s has its own voice (%s)" % [id, sound])
+	check(CodexPanel.enemy_group("kraken") == 7, "the bosses still come last in the Codex")
+	for i in 300:
+		var pick := ZombieDefs.pick_roamer(900.0, "fontanova")
+		if pick in ["beehive", "mutant_spider"] or not FontaModels.KINDS.has(pick):
+			check(false, "hives and spiders come only where the night puts them, never as roamers (%s)" % pick)
+			break
+	check(MistSeal.Style.INK == 17 and MistSeal.Style.DUST == 22 and Net.ANIMS.size() <= 63, "their strikes append wire styles and reuse animation slots")
+	# Mutant Bee: a tell, a dive at where you stood, a poisoned sting; a step aside is enough.
+	ready_you.call()
+	check(isle.spawn_zombie("mutant_bee", at + Vector3(0, 0, -8)), "a Mutant Bee spawns")
+	var bee: Zombie = isle.zombies.back()
+	bee.set_physics_process(false)
+	bee._sees = true
+	var mind := bee.mesenlla_mind as FontaMind
+	check(bee.flies and mind != null, "it flies, with its own mind")
+	mind.cooldown = 0.0
+	mind.tick(bee, you, Vector3.ZERO, 8.0, 0.01)
+	check(mind.phase == "tell" and bee.is_warning() and bee._current_anim == "m_cast" and isle.mist_seals.is_empty(), "it curls its stinger forward before it dives, and nothing lands yet")
+	var aim := mind.aim
+	mind.tick(bee, you, Vector3.ZERO, 8.0, FontaMind.BEE_TELL + 0.01)
+	check(mind.phase == "dive" and bee._current_anim == "m_dive", "then it dives")
+	for i in 120:
+		if mind.phase != "dive":
+			break
+		mind.tick(bee, you, Vector3.ZERO, 8.0, 1.0 / 30.0)
+	check(mind.phase == "recover" and isle.mist_seals.size() == 1, "and stings where you stood")
+	var sting: MistSeal = isle.mist_seals[0]
+	sting.set_physics_process(false)
+	you.position = aim + Vector3(4, 0, 0)
+	var hp := you.hp
+	sting.strike()
+	check(you.hp == hp and you.poison_left <= 0.0, "a step aside and it misses")
+	you.position = aim
+	sting.strike()
+	check(you.hp < hp and is_equal_approx(you.poison_left, FontaMind.STING_POISON), "where it lands it stings, and poisons you for %d s" % int(FontaMind.STING_POISON))
+	drop_seals.call()
+	await frames(1)
+	bee.stun(0.5)
+	check(mind.phase == "" and not bee.is_warning(), "a stun breaks off its attack")
+	bee.release()
+	# Honey: half the bees leave some.
+	seed(11)
+	var before := (honey.call() as Array).size()
+	for i in 40:
+		mind.on_death(bee)
+	var dropped := (honey.call() as Array).size() - before
+	check(dropped > 10 and dropped < 30, "about half the bees leave Honey (%d of 40)" % dropped)
+	for p: Pickup in honey.call(): isle.remove_pickup(p)
+	# Beehive: it grows where the map says, sends bees out when struck, spills Honey when broken.
+	check(isle.hive_spots.size() == 6, "the map has six places where hives grow")
+	var living := isle.count_living()
+	check(isle.spawn_zombie("beehive", at + Vector3(8, 0, -8)), "a Beehive grows")
+	var hive: Zombie = isle.zombies.back()
+	hive.set_physics_process(false)
+	check(isle.count_living() == living, "a hive is part of the island, not one of the night's hunters")
+	var bees := isle.count_type("mutant_bee")
+	hive.take_damage(10.0, Vector3.FORWARD, 0.0, hive.centre())
+	check(isle.count_type("mutant_bee") == bees + FontaMind.HIVE_RELEASE, "struck, it sends out %d bees" % FontaMind.HIVE_RELEASE)
+	hive.take_damage(10.0, Vector3.FORWARD, 0.0, hive.centre())
+	check(isle.count_type("mutant_bee") == bees + FontaMind.HIVE_RELEASE, "not again at once")
+	var hive_mind := hive.mesenlla_mind as FontaMind
+	for i in 6:
+		hive_mind._released = 0.0
+		hive_mind.on_hurt(hive)
+	var from_hive := isle.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and int(z.get_meta("from", -1)) == hive.net_id).size()
+	check(from_hive == FontaMind.HIVE_BEES, "never more than %d of its bees at once" % FontaMind.HIVE_BEES)
+	hive_mind.on_death(hive)
+	check((honey.call() as Array).size() == FontaMind.HIVE_HONEY, "broken, it spills %d Honey" % FontaMind.HIVE_HONEY)
+	for p: Pickup in honey.call(): isle.remove_pickup(p)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	# Honey: worth eating unhurt, for its speed, but not twice over.
+	ready_you.call()
+	you._buffs.erase("honey")
+	var pot := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
+	isle._scan_pickups_for(you)
+	check(not isle.pickups.has(pot) and you._buffs.has("honey") and is_equal_approx(float(you._buffs["honey"]["val"]), PowerDefs.HONEY_SPEED) and is_equal_approx(float(you._buffs["honey"]["left"]), PowerDefs.HONEY_HASTE), "Honey quickens you even unhurt")
+	var pot2 := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
+	isle._scan_pickups_for(you)
+	check(isle.pickups.has(pot2), "but you leave a second pot while it lasts and you are unhurt")
+	you.hp = you.max_hp() - 40.0
+	isle._scan_pickups_for(you)
+	check(not isle.pickups.has(pot2) and is_equal_approx(you.hp, you.max_hp() - 40.0 + float(PowerDefs.FOODS["honey"]["heal"])), "hurt, you eat it for its healing")
+	you._buffs.erase("honey")
+	check(PowerDefs.FOODS["honey"]["weight"] == 0.0 and PowerDefs.mesh("honey") != null, "Honey is never found lying about, only dropped, and has its own pot")
+	# Mutant Wasp: the stinger from afar, which poisons; close in, a dive to bite.
+	ready_you.call()
+	check(isle.spawn_zombie("mutant_wasp", at + Vector3(0, 0, -10)), "a Mutant Wasp spawns")
+	var wasp: Zombie = isle.zombies.back()
+	wasp.set_physics_process(false)
+	wasp._sees = true
+	mind = wasp.mesenlla_mind as FontaMind
+	mind.cooldown = 0.0
+	mind.tick(wasp, you, Vector3.ZERO, 10.0, 0.01)
+	check(mind.phase == "tell" and wasp.is_warning(), "at range it arches its abdomen under itself first")
+	mind.tick(wasp, you, Vector3.ZERO, 10.0, FontaMind.WASP_TELL + 0.01)
+	var stingers := isle._projectiles.filter(func(p: Projectile) -> bool: return p.active and p.source == "mutant_wasp")
+	check(stingers.size() == 1 and wasp._current_anim == "m_throw", "then shoots its stinger")
+	if stingers.size() == 1:
+		var stinger: Projectile = stingers[0]
+		ready_you.call()
+		await get_tree().physics_frame
+		for i in 60:
+			if not stinger.active:
+				break
+			stinger._fly(1.0 / 30.0)
+		check(you.hp < you.max_hp() and is_equal_approx(you.poison_left, FontaMind.WASP_POISON), "which poisons you for %d s" % int(FontaMind.WASP_POISON))
+	for p: Projectile in isle._projectiles:
+		if p.active: p.stop()
+	mind.phase = ""
+	mind.cooldown = 0.0
+	mind.tick(wasp, you, Vector3.ZERO, 2.0, 0.01)
+	mind.tick(wasp, you, Vector3.ZERO, 2.0, FontaMind.WASP_TELL + 0.01)
+	check(mind.phase == "dive", "close in, it dives to bite")
+	wasp.release()
+	# Wasp-Hive Snail: its nest shudders, then a wasp crawls out; no more than three of its own.
+	check(isle.spawn_zombie("wasp_hive_snail", at + Vector3(0, 0, -12)), "a Wasp-Hive Snail spawns")
+	var nest: Zombie = isle.zombies.back()
+	nest.set_physics_process(false)
+	nest._sees = true
+	mind = nest.mesenlla_mind as FontaMind
+	for i in 5:
+		mind.cooldown = 0.0
+		mind.tick(nest, you, Vector3.ZERO, 12.0, 0.01)
+		check(i > 0 or (mind.phase == "tell" and nest.is_warning()), "its nest shudders first")
+		mind.tick(nest, you, Vector3.ZERO, 12.0, FontaMind.NEST_TELL + 0.01)
+	var wasps := isle.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and int(z.get_meta("from", -1)) == nest.net_id).size()
+	check(wasps == FontaMind.NEST_WASPS, "then wasps crawl out of it, %d of its own at most" % FontaMind.NEST_WASPS)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	# Mutant Snail: a trail behind it, poison or fire, that lasts.
+	ready_you.call()
+	check(isle.spawn_zombie("mutant_snail", at + Vector3(0, 0, -6)), "a Mutant Snail spawns")
+	var snail: Zombie = isle.zombies.back()
+	snail.set_physics_process(false)
+	var trails := FontaTrails.of(isle)
+	for step in 6:
+		snail.position = at + Vector3(0, 0, -6 + step * 1.4)
+		trails.track(snail)
+	var laid := trails._life.filter(func(life: float) -> bool: return life > 0.0).size()
+	check(laid >= 4, "a snail leaves a trail as it crawls (%d)" % laid)
+	you.position = at + Vector3(0, 0, -2)
+	trails._check = 0.0
+	trails._process(0.01)
+	var poisoned := FontaMind.trail_of(snail) == "poison"
+	check(you.poison_left > 0.0 if poisoned else you.burn_time > 0.0, "stepping in it %s" % ("poisons you" if poisoned else "sets you alight"))
+	trails._process(FontaTrails.TRAIL_LIFE)
+	check(trails._life.all(func(life: float) -> bool: return life <= 0.0), "and it is gone after %d s" % int(FontaTrails.TRAIL_LIFE))
+	snail.release()
+	# Mutant Spider: perched head down on a trunk, on the bark, until you come near; its web roots and poisons.
+	ready_you.call()
+	check(isle.spider_trunks.size() >= 10, "the island's trees have trunks to cling to (%d)" % isle.spider_trunks.size())
+	var trunk: Dictionary = isle.spider_trunks[0]
+	var tree: Vector3 = trunk["at"]
+	you.position = tree + Vector3(25, 0, 0)
+	you.position.y = isle.ground_at(you.position)
+	var spider: Zombie = null
+	var placed := false
+	for i in 30:
+		if isle.spawn_spider():
+			placed = true
+			break
+	check(placed, "a spider takes to a tree a way off from you")
+	spider = isle.zombies.back()
+	spider.set_physics_process(false)
+	mind = spider.mesenlla_mind as FontaMind
+	var home: Dictionary = {}
+	for p: Dictionary in isle.spider_trunks:
+		if home.is_empty() or Vector2((p["at"] as Vector3).x - spider.position.x, (p["at"] as Vector3).z - spider.position.z).length() < Vector2((home["at"] as Vector3).x - spider.position.x, (home["at"] as Vector3).z - spider.position.z).length():
+			home = p
+	var off := Vector2((home["at"] as Vector3).x - spider.position.x, (home["at"] as Vector3).z - spider.position.z).length()
+	var up := spider.position.y + FontaMind.SPIDER_RIG - isle.ground_at(home["at"])
+	check(mind.perched and is_equal_approx(off, float(home["girth"]) + FontaMind.CLING), "it clings on the bark of its trunk, not inside it (%.2f m out)" % off)
+	check(up >= FontaMind.PERCH_LOW - 0.01 and up <= FontaMind.PERCH_HIGH + 0.01 and up <= maxf(float(home["high"]), FontaMind.PERCH_LOW) + 0.01, "below the leaves (%.1f m up)" % up)
+	spider._sees = true
+	mind.tick(spider, you, Vector3.ZERO, 30.0, 0.1)
+	check(mind.perched and spider._current_anim == "m_sink" and mind.phase == "", "far off, it waits head down")
+	# On the side it faces, out from its trunk.
+	you.position = spider.position + Vector3(sin(spider.rotation.y), 0, cos(spider.rotation.y)) * 6.0
+	you.position.y = isle.ground_at(you.position)
+	mind.tick(spider, you, Vector3.ZERO, 6.0, 0.1)
+	check(mind.phase == "pounce" and isle.mist_seals.size() == 1, "come near and it drops on you, its landing marked")
+	var web: MistSeal = isle.mist_seals[0]
+	web.set_physics_process(false)
+	for i in 40:
+		mind.tick(spider, you, Vector3.ZERO, 3.0, 1.0 / 30.0)
+	check(not mind.perched and mind.phase == "" and absf(spider.position.y - isle.ground_at(spider.position)) < 0.3, "and lands on the ground")
+	you.position = web.position
+	web.strike()
+	check(you.rooted_left >= FontaMind.WEB_ROOT - 0.01 and you.poison_left >= FontaMind.WEB_POISON - 0.01, "its web holds you and poisons you")
+	drop_seals.call()
+	await frames(1)
+	spider.release()
+	isle.spawn_spider()
+	spider = isle.zombies.back()
+	spider.set_physics_process(false)
+	spider.stun(0.5)
+	check(not (spider.mesenlla_mind as FontaMind).perched, "a stun knocks a spider off its tree")
+	spider.release()
+	# Battle Ostrich: paws the ground, charges, and kicks away whoever it reaches.
+	ready_you.call()
+	check(isle.spawn_zombie("battle_ostrich", at + Vector3(0, 0, -12)), "a Battle Ostrich spawns")
+	var ostrich: Zombie = isle.zombies.back()
+	ostrich.set_physics_process(false)
+	ostrich._sees = true
+	mind = ostrich.mesenlla_mind as FontaMind
+	mind.cooldown = 0.0
+	mind.tick(ostrich, you, Vector3.ZERO, 12.0, 0.01)
+	check(mind.phase == "tell" and ostrich.is_warning(), "it paws the ground before it charges")
+	mind.tick(ostrich, you, Vector3.ZERO, 12.0, FontaMind.CHARGE_TELL_OSTRICH + 0.01)
+	check(mind.phase == "charge" and ostrich._current_anim == "m_charge", "then charges")
+	for i in 90:
+		if mind.phase != "charge":
+			break
+		mind.tick(ostrich, you, Vector3.ZERO, ostrich.position.distance_to(you.position), 1.0 / 30.0)
+	check(isle.mist_seals.size() == 1, "and kicks you when it reaches you")
+	var kick: MistSeal = isle.mist_seals[0]
+	kick.set_physics_process(false)
+	hp = you.hp
+	kick.strike()
+	check(you.hp < hp and Vector2(you.velocity.x, you.velocity.z).length() > 5.0, "the kick throws you away")
+	drop_seals.call()
+	await frames(1)
+	ostrich.release()
+	# Ember Moth: wings spread a second, then the burning dust dazzles and sets alight.
+	ready_you.call()
+	check(isle.spawn_zombie("ember_moth", at + Vector3(0, 0, -10)), "an Ember Moth spawns")
+	var moth: Zombie = isle.zombies.back()
+	moth.set_physics_process(false)
+	moth._sees = true
+	mind = moth.mesenlla_mind as FontaMind
+	mind.cooldown = 0.0
+	mind.tick(moth, you, Vector3.ZERO, 10.0, 0.01)
+	check(mind.phase == "tell" and moth.is_warning() and isle.mist_seals.is_empty(), "it spreads its wings, eye-spots blazing")
+	mind.tick(moth, you, Vector3.ZERO, 10.0, FontaMind.MOTH_TELL * 0.5)
+	check(isle.mist_seals.is_empty(), "and holds them")
+	mind.tick(moth, you, Vector3.ZERO, 10.0, FontaMind.MOTH_TELL * 0.5 + 0.01)
+	check(isle.mist_seals.size() == 1 and moth._current_anim == "m_throw", "then claps them")
+	var dust: MistSeal = isle.mist_seals[0]
+	dust.set_physics_process(false)
+	you.position = dust.position
+	dust.strike()
+	check(you.night_blind_left >= FontaMind.DUST_BLIND - 0.01 and you.burn_time >= FontaMind.DUST_BURN - 0.01, "the dust dazzles you and sets you alight")
+	drop_seals.call()
+	await frames(1)
+	moth.release()
+	# Thornback: blows from the front glance off its shell.
+	check(isle.spawn_zombie("thornback", at + Vector3(0, 0, -6)), "a Thornback spawns")
+	var tortoise: Zombie = isle.zombies.back()
+	tortoise.set_physics_process(false)
+	tortoise.rotation.y = 0.0
+	var full := tortoise.hp
+	tortoise.take_damage(40.0, Vector3(0, 0, -1), 0.0, tortoise.centre())
+	var front := full - tortoise.hp
+	tortoise.hp = full
+	tortoise.take_damage(40.0, Vector3(0, 0, 1), 0.0, tortoise.centre())
+	var back := full - tortoise.hp
+	check(front > 0.0 and is_equal_approx(front * 2.0, back), "struck from the front it takes half (%.0f of %.0f)" % [front, back])
+	tortoise.release()
+	# The night: hives grow at its start, spiders take to the trees from 3:20.
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	ready_you.call()
+	isle.director.elapsed = 10.0
+	isle.director._tick_fontanova()
+	check(isle.count_type("beehive") == isle.hive_spots.size(), "the hives grow where the map says, at the start of the night")
+	isle.director._tick_fontanova()
+	check(isle.count_type("beehive") == isle.hive_spots.size(), "once a night")
+	check(isle.count_type("mutant_spider") == 0, "no spiders yet")
+	isle.director.elapsed = Director.SPIDERS_FROM + 1.0
+	you.position = tree + Vector3(25, 0, 0)
+	you.position.y = isle.ground_at(you.position)
+	for i in 10:
+		isle.director._next_spider = 0.0
+		isle.director._tick_fontanova()
+	check(isle.count_type("mutant_spider") == Director.MAX_SPIDERS, "from %d:%02d spiders wait in the trees, %d at most" % [int(Director.SPIDERS_FROM) / 60, int(Director.SPIDERS_FROM) % 60, Director.MAX_SPIDERS])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	ready_you.call()
 
 
 ## Coastal flyers exercise real wind-ups, dodges, interruption, damage and pool reuse.

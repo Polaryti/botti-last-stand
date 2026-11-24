@@ -1901,6 +1901,38 @@ kind = "horizon_isle"
 size = 90.0
 on_ground = false
 
+[node name="Hives" type="Node3D" parent="."]
+
+[node name="Hive" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 44)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive2" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0, 52)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive3" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -38, 0, -10)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive4" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, -28)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive5" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 2)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive6" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, -58)
+script = ExtResource("spot")
+kind = "hive"
+
 [node name="Rivals" type="Node3D" parent="."]
 
 [node name="Rival" type="Node3D" parent="Rivals"]

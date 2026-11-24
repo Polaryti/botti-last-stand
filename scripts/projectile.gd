@@ -321,6 +321,8 @@ func _fly(delta: float) -> void:
 		t.hurt(damage, position)
 		if kind == Kind.FIREBALL or fire:
 			t.ignite(ZombieDefs.BURN_SECONDS)
+		if source == "mutant_wasp" and t is Player:
+			(t as Player).poison_by_creature(FontaMind.WASP_POISON)
 		stop()
 		return
 	world.fx_impact(at)

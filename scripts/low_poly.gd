@@ -125,6 +125,30 @@ func leaf(a: Vector3, b: Vector3, c: Vector3, col: Color) -> LowPoly:
 	return self
 
 
+## An egg or a plump body: an ellipsoid with radii on its own axes (turned by `turn`), faceted into
+## `lat` bands and `lon` sides, shading from `col` on top to `under` beneath.
+func ovoid(centre: Vector3, radii: Vector3, col: Color, under: Color, lat := 5, lon := 10, turn := Basis.IDENTITY) -> LowPoly:
+	var rows: Array[Array] = []
+	for i in lat + 1:
+		var th := PI * i / lat
+		var row: Array[Vector3] = []
+		for j in lon:
+			var ph := TAU * j / lon + (PI / lon if i % 2 == 1 else 0.0)
+			row.append(centre + turn * Vector3(sin(th) * cos(ph) * radii.x, cos(th) * radii.y, sin(th) * sin(ph) * radii.z))
+		rows.append(row)
+	for i in lat:
+		var c0 := col.lerp(under, float(i) / lat)
+		var c1 := col.lerp(under, float(i + 1) / lat)
+		for j in lon:
+			var a: Vector3 = rows[i][j]
+			var b: Vector3 = rows[i][(j + 1) % lon]
+			var c: Vector3 = rows[i + 1][j]
+			var d: Vector3 = rows[i + 1][(j + 1) % lon]
+			_tri_shaded(a, b, c, centre, c0, c0, c1)
+			_tri_shaded(b, d, c, centre, c0, c1, c1)
+	return self
+
+
 ## A tube or cone from a to b. Set rb to 0 for a point.
 func prism(a: Vector3, b: Vector3, ra: float, rb: float, sides: int, col: Color) -> LowPoly:
 	var axis := (b - a).normalized()

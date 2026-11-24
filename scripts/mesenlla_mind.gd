@@ -109,6 +109,11 @@ func tick(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> 
 	return false
 
 
+## Struck, and still standing (the host's or a lone phone's blow). Nothing, unless a mind says otherwise.
+func on_hurt(_z: Zombie) -> void:
+	pass
+
+
 ## After an ordinary step: show a plain blow as a swipe, and settle back to walking.
 func after(z: Zombie) -> void:
 	if phase != "":

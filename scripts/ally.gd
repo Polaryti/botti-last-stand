@@ -828,7 +828,7 @@ func _forage() -> void:
 	_found_at = world.now
 	var spot := position + Vector3(0.6, 0, 0.6)
 	if randf() < FOX_FINDS_FOOD:
-		world.spawn_pickup_at(spot, Pickup.Kind.FOOD, PowerDefs.FOODS.keys().pick_random())
+		world.spawn_pickup_at(spot, Pickup.Kind.FOOD, PowerDefs.pick_weighted(PowerDefs.FOODS))
 	else:
 		world.spawn_pickup_at(spot, Pickup.Kind.ARROWS, "arrows")
 

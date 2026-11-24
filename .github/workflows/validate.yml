@@ -50,6 +50,8 @@ jobs:
           - suite: network
             mode: vael
           - suite: network
+            mode: fontanova
+          - suite: network
             mode: coop
           - suite: network
             mode: ffa

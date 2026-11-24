@@ -16,6 +16,19 @@
 - **The sea:** wading slows you, and out of your depth it drowns you after 2.5 s.
 - Fireflies, petals on the wind and a violet haze; its own night, hunted and dawn music.
 
+### Creatures of Fontanova
+- **Mutant Bee:** curls its stinger forward, then dives where you stood. Its sting poisons for 4 s.
+- **Beehive:** six grow each night. Every blow sends out 2 bees; broken, it spills 4 Honey.
+- **Mutant Wasp:** shoots its stinger from afar (poisons for 3 s), or dives to bite up close.
+- **Mutant Snail:** leaves a trail of poison or embers that lasts 8 s.
+- **Wasp-Hive Snail:** its nest shudders, and a wasp crawls out, up to 3 at once.
+- **Mutant Spider:** from 3:20, waits head down on tree trunks, then drops within 14 m. Its web holds and poisons.
+- **Battle Ostrich:** paws the ground, then charges and kicks you away.
+- **Ember Moth:** spreads its wings for 1 s, then claps; the dust dazzles and burns.
+- **Thornback:** a great tortoise; blows from the front glance off for half.
+- **Honey:** heals 25 and quickens you for 6 s, so it is worth eating unhurt.
+- Every creature has its own model, sounds, icon and Codex page.
+
 ### Title screen
 - New app icon and splash. The menu tours Fontanova to the Archipelagos' own theme.
 
