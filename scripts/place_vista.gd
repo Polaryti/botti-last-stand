@@ -20,6 +20,7 @@ const LOOKS := {
 	"mesenlla": {"top": Color(0.11, 0.07, 0.22), "low": Color(0.96, 0.56, 0.34), "far": Color(0.33, 0.22, 0.37), "near": Color(0.12, 0.09, 0.17), "glow": Color(1.0, 0.75, 0.5), "accent": Color(0.45, 0.75, 1.0)},
 	"bastion": {"top": Color(0.07, 0.07, 0.19), "low": Color(0.78, 0.52, 0.58), "far": Color(0.27, 0.24, 0.38), "near": Color(0.1, 0.1, 0.17), "glow": Color(0.9, 0.78, 0.86), "accent": Color(0.45, 0.95, 0.92)},
 	"lantern_road": {"top": Color(0.02, 0.05, 0.09), "low": Color(0.2, 0.32, 0.36), "far": Color(0.1, 0.16, 0.2), "near": Color(0.04, 0.07, 0.09), "glow": Color(1.0, 0.82, 0.45), "accent": Color(0.5, 0.84, 0.76)},
+	"fontanova": {"top": Color(0.02, 0.03, 0.1), "low": Color(0.42, 0.26, 0.32), "far": Color(0.1, 0.08, 0.18), "near": Color(0.05, 0.04, 0.1), "glow": Color(0.98, 0.84, 0.55), "accent": Color(0.72, 0.45, 1.0)},
 	"vael": {"top": Color(0.03, 0.07, 0.11), "low": Color(0.3, 0.42, 0.44), "far": Color(0.14, 0.2, 0.24), "near": Color(0.05, 0.08, 0.1), "glow": Color(0.96, 0.87, 0.65), "accent": Color(0.5, 0.84, 0.76)},
 }
 
@@ -47,7 +48,7 @@ func _plan() -> void:
 	_stars = PackedVector2Array()
 	for i in 90:
 		_stars.append(Vector2(r.randf() * size.x, r.randf() * size.y * 0.55))
-	var layers := 0 if place in ["mists", "lantern_road"] else 1 if place == "vael" else 3
+	var layers := 0 if place in ["mists", "lantern_road"] else 1 if place in ["vael", "fontanova"] else 3
 	for k in layers:
 		var line := PackedVector2Array()
 		var base := size.y * (0.56 + 0.1 * k)
@@ -93,6 +94,10 @@ func _draw() -> void:
 			_glow(Vector2(w * 0.5, h * 0.62), h * 0.35, _look("glow"), 0.22)
 		"mesenlla", "bastion":
 			_glow(Vector2(w * 0.3, h * 0.66), h * 0.5, _look("glow"), 0.18)
+		"fontanova":
+			# A great golden moon low over the sea.
+			_glow(Vector2(w * 0.62, h * 0.34), h * 0.34, _look("glow"), 0.34)
+			draw_circle(Vector2(w * 0.62, h * 0.34), h * 0.11, _look("glow"))
 		"vael":
 			_glow(Vector2(w * 0.24, h * 0.18), h * 0.2, _look("glow"), 0.3)
 			draw_circle(Vector2(w * 0.24, h * 0.18), h * 0.04, _look("glow"))
@@ -110,9 +115,10 @@ func _draw() -> void:
 		"mesenlla": _mesenlla(w, h)
 		"bastion": _bastion(w, h)
 		"vael": _vael(w, h)
+		"fontanova": _fontanova(w, h)
 		"lantern_road": _lantern_road(w, h)
 	# Mist drifting across the bottom of the view.
-	var mist := _look("accent") if place in ["mists", "mesenlla", "bastion", "vael", "lantern_road"] else Color(0.7, 0.75, 0.85)
+	var mist := _look("accent") if place in ["mists", "mesenlla", "bastion", "vael", "lantern_road", "fontanova"] else Color(0.7, 0.75, 0.85)
 	for i in 6:
 		var x := fmod(i * w / 5.0 + _t * (12.0 + i * 3.0), w * 1.3) - w * 0.15
 		var y := h * (0.8 + 0.03 * sin(_t * 0.4 + i))
@@ -315,6 +321,52 @@ func _bastion(w: float, h: float) -> void:
 ## Port Vael at night: the sea to the horizon under the moon, its waves catching the light; the town
 ## up on the left with a few windows lit; the harbour wall and a breakwater running out to the dark
 ## lighthouse; a wreck and the drowned bell tower out on the flats, the Mist Tide moving round them.
+## Fontanova from the sea: the island's hill under the moon, the temple's broken colonnade on top
+## with the god's violet light in it, olives on the slope, the moon's road gold on the water, and the
+## other islands of the archipelago dark along the horizon.
+func _fontanova(w: float, h: float) -> void:
+	var sea_top := h * 0.6
+	draw_rect(Rect2(0, sea_top, w, h - sea_top), Color(0.03, 0.05, 0.12))
+	for i in 16:
+		var y := sea_top + (h - sea_top) * (i + 0.5) / 16.0
+		var spread := w * (0.015 + 0.012 * i)
+		var flick := 0.5 + 0.5 * sin(_t * 2.2 + i * 1.7)
+		draw_line(Vector2(w * 0.62 - spread, y), Vector2(w * 0.62 + spread * (0.5 + 0.3 * flick), y), Color(_look("glow"), 0.12 + 0.14 * flick), 2.0)
+	# The archipelago on the horizon.
+	var far := _look("far")
+	for isle: Array in [[0.0, 0.2, 0.06], [0.16, 0.3, 0.035], [0.82, 1.02, 0.08]]:
+		var pts := PackedVector2Array([Vector2(w * isle[0], sea_top)])
+		for k in 13:
+			var f := k / 12.0
+			pts.append(Vector2(w * lerpf(isle[0], isle[1], f), sea_top - h * isle[2] * pow(sin(f * PI), 0.8)))
+		pts.append(Vector2(w * isle[1], sea_top))
+		draw_colored_polygon(pts, far)
+	draw_circle(Vector2(w * 0.08, sea_top - h * 0.055), h * 0.006, Color(0.45, 0.95, 0.9))
+	# The island itself, its hill rising to the left of the moon.
+	var hill := _look("near")
+	var pts := PackedVector2Array([Vector2(w * 0.24, h)])
+	for k in 25:
+		var f := k / 24.0
+		pts.append(Vector2(w * lerpf(0.24, 0.92, f), sea_top + h * 0.03 - h * 0.24 * pow(sin(f * PI), 1.2)))
+	pts.append(Vector2(w * 0.92, h))
+	draw_colored_polygon(pts, hill)
+	var crest := sea_top + h * 0.03 - h * 0.24
+	for k in 7:
+		var x := w * (0.5 + k * 0.026)
+		var tall := h * (0.075 if k != 2 and k != 5 else 0.035)
+		draw_rect(Rect2(x - w * 0.005, crest - tall, w * 0.01, tall + 2.0), hill)
+	draw_rect(Rect2(w * 0.49, crest - h * 0.085, w * 0.11, h * 0.012), hill)
+	var pulse := 0.6 + 0.4 * sin(_t * 1.3)
+	_glow(Vector2(w * 0.565, crest - h * 0.03), h * 0.06, _look("accent"), 0.4 * pulse)
+	# Olives down the slope, round and grey against the moonlit sea.
+	for k in 9:
+		var x := w * (0.3 + k * 0.06)
+		var f := (x / w - 0.24) / 0.68
+		var y := sea_top + h * 0.03 - h * 0.24 * pow(sin(f * PI), 1.2) + h * (0.05 + 0.03 * (k % 3))
+		draw_circle(Vector2(x, y - h * 0.02), h * 0.018, hill.lightened(0.08))
+		draw_line(Vector2(x, y - h * 0.01), Vector2(x, y + h * 0.01), hill, 2.0)
+
+
 func _vael(w: float, h: float) -> void:
 	var sea_top := h * 0.56
 	draw_rect(Rect2(0, sea_top, w, h - sea_top), Color(0.05, 0.11, 0.13))

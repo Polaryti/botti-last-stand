@@ -70,6 +70,11 @@ static func _bake(w: World) -> ImageTexture:
 			elif not t.coast.is_empty() and h < MistTide.HIGH_Y:
 				# The coast: the open sea, and the flats the Mist Tide covers and uncovers, in sand.
 				col = pal["water"] if t.open_sea(wx, wz) else Color(0.42, 0.4, 0.33).lerp(Color(0.26, 0.31, 0.3), clampf((MistTide.HIGH_Y - h) / 2.0, 0.0, 1.0))
+			elif not t.isle.is_empty() and h < Terrain.ISLE_SEA_Y:
+				# The sea round the island, darker as it deepens; the beach in sand.
+				col = (pal["water"] as Color).darkened(clampf((Terrain.ISLE_SEA_Y - h) / 8.0, 0.0, 0.5))
+			elif not t.isle.is_empty() and h < Terrain.ISLE_SEA_Y + 0.9:
+				col = Color(0.62, 0.56, 0.42)
 			elif t.slope(wx, wz) > Terrain.STEEP or not t.is_walkable(wx, wz):
 				col = col.darkened(0.3)
 			img.set_pixel(x, y, col)

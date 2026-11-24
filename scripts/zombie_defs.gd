@@ -177,7 +177,7 @@ static func roams(id: String, elapsed: float, map_id: String) -> bool:
 	var d: Dictionary = ALL[id]
 	if elapsed < float(d.get("from", 9999.0)):
 		return false
-	if map_id in SpawnRules.MESENLLA or map_id in SpawnRules.VAEL:
+	if map_id in SpawnRules.MESENLLA or map_id in SpawnRules.VAEL or map_id in SpawnRules.ARCHIPELAGO:
 		return d.get("maps", []).has(map_id)
 	if d.get("only_islands", false) and map_id != "mists":
 		return false

@@ -4,7 +4,8 @@ extends Node3D
 ## through the trees on the wind, motes of mist light hanging and wandering in the twilight, and in the
 ## Valleys of Mesenlla leaves coming down from the forest; at Mist Bastion fine mist sifting down and
 ## sparks of the Great Portal carried up on the wind; over the sea of Vael, low sea-mist and the deep's
-## green light rising off the water. It follows the camera, so it costs the same
+## green light rising off the water; on Fontanova, fireflies in the dark, petals and olive leaves
+## blown off the trees, and a thin violet haze that is the god's. It follows the camera, so it costs the same
 ## wherever you are, and it is only drawn on this phone.
 
 const WISPS := 9
@@ -16,6 +17,7 @@ var _wisps: Array[MeshInstance3D] = []
 var _motes: CPUParticles3D
 var _falling: CPUParticles3D
 var _sea := false
+var _isle := false
 static var _wisp_material: ShaderMaterial
 
 
@@ -23,7 +25,7 @@ static var _wisp_material: ShaderMaterial
 ## kingdom of Vael, where it is the sea's: low banks of sea-mist on the water and the green light of
 ## the deep rising off it.
 static func wanted(w: World) -> bool:
-	return w.map_id in SpawnRules.VAEL
+	return w.map_id in SpawnRules.VAEL or w.map_id == "fontanova"
 
 
 func _init(w: World) -> void:
@@ -36,6 +38,7 @@ func _ready() -> void:
 	r.seed = 9157
 	var quiet := Game.quality == 0
 	_sea = world.map_id in SpawnRules.VAEL
+	_isle = world.map_id == "fontanova"
 	for i in (WISPS / 2 if quiet else WISPS):
 		var wisp := MeshInstance3D.new()
 		wisp.mesh = _wisp_mesh(r.randf_range(7.0, 13.0), r.randf_range(0.8, 1.6), r)
@@ -46,6 +49,8 @@ func _ready() -> void:
 		wisp.set_meta("height", r.randf_range(0.5, 2.6) if _sea else r.randf_range(1.2, 6.0))
 		if _sea:
 			(wisp.material_override as ShaderMaterial).set_shader_parameter("mist", Vector3(0.66, 0.84, 0.84))
+		elif _isle:
+			(wisp.material_override as ShaderMaterial).set_shader_parameter("mist", Vector3(0.7, 0.6, 0.86))
 		wisp.set_meta("phase", r.randf() * TAU)
 		wisp.position = Vector3(r.randf_range(-WISP_REACH, WISP_REACH), 0, r.randf_range(-WISP_REACH, WISP_REACH))
 		wisp.rotation.y = atan2(WIND.x, WIND.z) + r.randf_range(-0.4, 0.4)
@@ -67,6 +72,23 @@ func _ready() -> void:
 		_motes.emitting = true
 		_motes.emission_box_extents = Vector3(24, 2.5, 24)
 		_falling = _particles(0, Vector3.ONE, 0.1, 1.0)
+	elif _isle:
+		# Fireflies wandering low over the grass, blinking.
+		_motes.color = Color(0.85, 1.0, 0.35, 0.95)
+		_motes.gravity = Vector3(0, 0.02, 0)
+		_motes.amount = 25 if quiet else 70
+		_motes.emitting = true
+		_motes.emission_box_extents = Vector3(22, 1.6, 22)
+		_motes.initial_velocity_max = 0.45
+		_motes.lifetime = 4.0
+		# Petals and olive leaves, blown off the trees along the wind.
+		_falling = _particles(20 if quiet else 55, Vector3(20, 2, 20), 0.12, 9.0)
+		_falling.color_ramp = null
+		_falling.color_initial_ramp = _petal_colours()
+		_falling.gravity = Vector3(0.6, -0.45, 0.2)
+		_falling.angular_velocity_min = -200.0
+		_falling.angular_velocity_max = 200.0
+		_falling.angle_max = 360.0
 	elif bastion:
 		# Fine mist sifting down on the mountaintop.
 		_falling = _particles(40 if quiet else 110, Vector3(18, 2, 18), 0.09, 9.0)
@@ -118,6 +140,15 @@ func _particles(amount: int, extents: Vector3, size: float, life: float) -> CPUP
 	p.color_ramp = ramp
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return p
+
+
+func _petal_colours() -> Gradient:
+	var g := Gradient.new()
+	g.set_color(0, Color(0.95, 0.92, 0.85))
+	g.add_point(0.35, Color(0.92, 0.3, 0.25))
+	g.add_point(0.6, Color(0.6, 0.64, 0.52))
+	g.set_color(g.get_point_count() - 1, Color(0.95, 0.82, 0.3))
+	return g
 
 
 func _leaf_colours() -> Gradient:

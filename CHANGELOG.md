@@ -2,6 +2,23 @@
 
 ## Development — Archipelagos of the Forgotten Gods
 
+*After Port Vael, a ship sails on to Fontanova, the first island of an archipelago whose people worshipped gods now forgotten. One of them never left.*
+
+### Fontanova, a new map
+- **An island in the open sea**, for Survive the Night, Co-op, All vs All and Teams. The night lasts 15 minutes.
+- You land in a cove beside the sailboat that brought you, run up on the beach.
+- Olive terraces and dry-stone walls, the ruined village of the god's worshippers, and the Fallen Colossus.
+- The West Ridge's limestone cliffs, split by the Ravine and crossed by two rope bridges.
+- The Holm Wood, and the Oracle's Grotto running through the east hill, lit by a glowing pool.
+- The Temple of Al'quimelea on the Acropolis, with the shattered statues of five gods round it.
+- The other islands of the archipelago stand on the horizon.
+- **Mediterranean flora:** olives, holm oaks, strawberry trees, carobs, cypresses, maquis and wildflower meadows, all moving in the wind, harder on windy nights.
+- **The sea:** wading slows you, and out of your depth it drowns you after 2.5 s.
+- Fireflies, petals on the wind and a violet haze; its own night, hunted and dawn music.
+
+### Title screen
+- New app icon and splash. The menu tours Fontanova to the Archipelagos' own theme.
+
 ### Fixes
 - **Codex:** when an enemy first appears is only shown once you have killed one.
 - **Codex:** the Kraken and the Leviathan wear the boss crown, and bosses and minibosses no longer read "Appears from 166:39".

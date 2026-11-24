@@ -367,7 +367,7 @@ func _init(owner_world: World, as_bot := 0) -> void:
 	camera.fov = BASE_FOV
 	camera.near = 0.06
 	# The Mists and Mesenlla have islands far off in the sky; elsewhere the fog ends the view.
-	camera.far = 460.0 if owner_world.terrain.has_islands() else 240.0 if owner_world.map_id in SpawnRules.MESENLLA else 300.0 if owner_world.map_id in SpawnRules.VAEL else 100.0
+	camera.far = 460.0 if owner_world.terrain.has_islands() else 240.0 if owner_world.map_id in SpawnRules.MESENLLA else 300.0 if owner_world.map_id in SpawnRules.VAEL or owner_world.map_id == "fontanova" else 100.0
 	head.add_child(camera)
 	_vm_root = Node3D.new()
 	camera.add_child(_vm_root)
@@ -1225,16 +1225,32 @@ func stun_by_creature(seconds: float) -> void:
 var boons: Array[String] = []
 
 
-## Last Light: the Mist Tide drowning you, outside the Lantern Barge's light.
-func drown(amount: float) -> void:
+## Drowning: in the Mist Tide outside the Lantern Barge's light, or out of your depth off an island.
+func drown(amount: float, by := "the Mist Tide") -> void:
 	if dead or guard_left > 0.0:
 		return
 	hp -= amount
-	damaged.emit(amount, "the tide")
+	damaged.emit(amount, "the tide" if by == "the Mist Tide" else "the sea")
 	hurt_flash = maxf(hurt_flash, 0.25)
 	if hp <= 0.0:
-		hit_by = "the Mist Tide"
+		hit_by = by
 		_on_fatal()
+
+
+var _under_sea := 0.0 # seconds out of your depth in an island's sea
+
+
+## Out of your depth in the sea round an island: a few seconds to turn back, then you drown until you
+## reach water you can stand in. Riding does not save you.
+func _tick_sea(delta: float) -> void:
+	if dead or not world.isle_sea.too_deep(global_position):
+		_under_sea = 0.0
+		return
+	if _under_sea == 0.0:
+		say("Too deep! Swim back to the shore.")
+	_under_sea += delta
+	if _under_sea > IsleSea.GRACE:
+		drown(IsleSea.DROWN * delta, "the sea")
 
 
 ## Caught in a Press Gang's net: you can fight and turn, but not move, for as long as it says.
@@ -3936,6 +3952,8 @@ func _physics_step(delta: float) -> void:
 		speed *= WADE_SPEED
 	if world.tide and not has_flag("sea_legs"):
 		speed *= world.tide.slow_at(global_position) # wading in the Mist Tide, on foot or mounted
+	if world.isle_sea and not has_flag("sea_legs"):
+		speed *= world.isle_sea.slow_at(global_position) # wading out from an island's shore
 	var accel := 14.0 if is_on_floor() else 5.0
 	velocity.x = move_toward(velocity.x, dir.x * speed, accel * speed * delta)
 	velocity.z = move_toward(velocity.z, dir.z * speed, accel * speed * delta)
@@ -4182,6 +4200,8 @@ func _process_step(delta: float) -> void:
 			_fervour = 0
 	if harpoon_out:
 		_tick_harpoon(delta)
+	if world.isle_sea:
+		_tick_sea(delta)
 	if _flail_idle > 1.4:
 		_flail_stacks = 0
 	_handle_fire()

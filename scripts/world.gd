@@ -114,6 +114,7 @@ var waystations: Array[Transform3D] = []
 var lighthouse_top := Vector3.INF
 var last_light: LastLight
 var tide: MistTide # Port Vael's Mist Tide, or null
+var isle_sea: IsleSea # the sea round an island of the archipelago, or null
 var _tide_fog := 1.0 # how much thicker the tide makes the fog
 var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
 var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
@@ -270,7 +271,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "lantern" if file.contains("lantern") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "fontanova" if file.contains("fontanova") else "lantern" if file.contains("lantern") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
@@ -327,7 +328,7 @@ func setup(game_mode: int) -> void:
 			elif mark["kind"] == "lane_way":
 				fort.add_lane_way(int(mark["gate"]), mark["at"])
 		fort.lay_ways()
-	if not terrain.coast.is_empty() or not terrain.sea.is_empty():
+	if terrain.seaside():
 		grid.block_steep(terrain, STEEP_RISE)
 		grid.fine_only = true
 	grid.astar.update()
@@ -337,6 +338,8 @@ func setup(game_mode: int) -> void:
 		_mists_look()
 	elif map_id in SpawnRules.MESENLLA:
 		_mesenlla_look()
+	elif map_id == "fontanova":
+		_fonta_look()
 	elif map_id in SpawnRules.VAEL:
 		_vael_look()
 		if map_id == "vael" and mode != Game.Mode.MENU:
@@ -606,6 +609,18 @@ const MENU_TOUR_VAEL := [
 	[Vector3(-58, 10, 66), Vector3(14, 10, 170)],
 	[Vector3(-24, 9, 98), Vector3(4, 6, -10)],
 ]
+## Fontanova by night, for the Archipelagos of the Forgotten Gods: in from the sea over the beached
+## sailboat, up the olive terraces, along the Ravine and its bridges, round the Temple of Al'quimelea,
+## and out over the Holm Wood to the other islands on the horizon.
+const MENU_TOUR_FONTANOVA := [
+	[Vector3(14, 9, 118), Vector3(6, 6, 40)],
+	[Vector3(44, 20, 62), Vector3(-6, 8, 4)],
+	[Vector3(-30, 26, 26), Vector3(-68, 6, -22)],
+	[Vector3(-48, 32, -48), Vector3(0, 22, -86)],
+	[Vector3(22, 34, -110), Vector3(0, 20, -82)],
+	[Vector3(92, 28, -40), Vector3(150, 14, 200)],
+	[Vector3(70, 18, 70), Vector3(10, 6, 80)],
+]
 const MENU_LEG := 22.0 # seconds from one point of the tour to the next
 
 
@@ -630,6 +645,7 @@ func _menu_tour() -> Array:
 	match map_id:
 		"mesenlla": return MENU_TOUR
 		"vael": return MENU_TOUR_VAEL
+		"fontanova": return MENU_TOUR_FONTANOVA
 	return []
 
 
@@ -649,7 +665,7 @@ func _map_file() -> String:
 	if Game.test_map != "":
 		return Game.test_map
 	match mode:
-		Game.Mode.MENU: return "res://maps/vael.tscn" # the title screen of The Sunken Crown
+		Game.Mode.MENU: return "res://maps/fontanova.tscn" # the title screen of the Archipelagos of the Forgotten Gods
 		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
@@ -661,6 +677,8 @@ func _map_file() -> String:
 				return "res://maps/vael.tscn"
 			if Game.current_map() == "lantern_road":
 				return "res://maps/lantern_road.tscn"
+			if Game.current_map() == "fontanova":
+				return "res://maps/fontanova.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -1166,6 +1184,35 @@ func _vael_look() -> void:
 	_apply_sky(_last_dawn)
 
 
+## Fontanova: a warm, still Mediterranean night under a great golden moon, the sea all round, and
+## something wrong with it: a violet haze in the air and the god's lights in its ruins.
+func _fonta_look() -> void:
+	night_bg = Color(0.025, 0.04, 0.11)
+	night_fog_colour = Color(0.15, 0.14, 0.24)
+	night_fog = 0.0085 if Game.quality > 0 else 0.012
+	day_fog = 0.0035 if Game.quality > 0 else 0.007
+	night_ambient = Color(0.5, 0.48, 0.64)
+	night_sky_shows = true
+	night_moon_colour = Color(1.0, 0.88, 0.66)
+	night_moon = 0.75
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.name = "FontaAura"
+	atmosphere.world = self
+	atmosphere.place = MistAtmosphere.Place.FONTANOVA
+	add_child(atmosphere)
+	_sky_material.set_shader_parameter("sea", 1.0)
+	_sky_material.set_shader_parameter("aurora", 0.0)
+	_sky_material.set_shader_parameter("sea_dir", Vector3(0, 0, 1))
+	# The other islands of the archipelago stand far out at sea: the sky has to be further off.
+	_sky_root.scale = Vector3.ONE * 2.85
+	if Ambience.wanted(self):
+		add_child(Ambience.new(self))
+	isle_sea = IsleSea.new(self)
+	add_child(isle_sea)
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
+
+
 ## A violet night with nothing under it.
 func _mists_look() -> void:
 	night_bg = Color(0.012, 0.025, 0.055)
@@ -1245,6 +1292,8 @@ func _apply_sky(dawn: float) -> void:
 		_water_material.set_shader_parameter("dawn", bright)
 	if tide:
 		tide.set_dawn(bright)
+	if isle_sea:
+		isle_sea.set_dawn(bright)
 	_sky_material.set_shader_parameter("sun_dir", _sun_direction(dawn))
 	_star_material.albedo_color = Color(1, 1, 1, clampf(1.0 - dawn * 1.8, 0.0, 1.0))
 	_night_dome.visible = dawn < 0.56 and not wet and night_sky_shows

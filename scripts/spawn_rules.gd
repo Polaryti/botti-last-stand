@@ -18,11 +18,20 @@ static func is_vael(data: Dictionary) -> bool:
 	var maps: Array = data.get("maps", [])
 	return not maps.is_empty() and maps.all(func(m: String) -> bool: return m in VAEL)
 
+## The islands of the Archipelagos of the Forgotten Gods.
+const ARCHIPELAGO := ["fontanova"]
+
+static func is_archipelago(data: Dictionary) -> bool:
+	var maps: Array = data.get("maps", [])
+	return not maps.is_empty() and maps.all(func(m: String) -> bool: return m in ARCHIPELAGO)
+
 static func names(data: Dictionary) -> String:
 	if is_mesenlla(data):
 		return "Mesenlla"
 	if is_vael(data):
 		return "Vael"
+	if is_archipelago(data):
+		return "Fontanova"
 	var names := PackedStringArray()
 	for id: String in data.get("maps", []):
 		names.append({"village": "The Village", "fort": "The Fort", "mists": "The Mists"}.get(id, id.capitalize()))

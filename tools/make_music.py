@@ -29,7 +29,8 @@ TARGET_RMS = {"night": -15.5, "hunted": -13.5, "dawn": -14.5,
     "mesenlla_night": -15.5, "mesenlla_hunted": -13.5, "mesenlla_dawn": -14.5, "menu_mesenlla": -16.0, "menu_vael": -16.0,
     "bastion_night": -15.5, "bastion_hunted": -13.5, "bastion_dawn": -14.5,
     "vael_night": -15.5, "vael_hunted": -13.5, "vael_dawn": -14.5,
-    "lantern_night": -15.5, "lantern_hunted": -13.5, "lantern_dawn": -14.5}
+    "lantern_night": -15.5, "lantern_hunted": -13.5, "lantern_dawn": -14.5,
+    "fonta_night": -15.5, "fonta_hunted": -13.5, "fonta_dawn": -14.5, "menu_fontanova": -16.0}
 
 NAMES = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6, "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
 SAMPLES = ""
@@ -1724,6 +1725,220 @@ def compose_lantern_dawn(o):
     return s
 
 
+# --- Fontanova, the Archipelagos of the Forgotten Gods -------------------------------------------
+# E Phrygian dominant, the old Mediterranean mode (E F G# A B C D): warm, and wrong at the edges. The
+# harp is a lyre picking its 3+3+2 rhythm, plucked strings answer it like guitars, the oboe is the
+# shepherd's pipe the worshippers played, and a frame drum keeps its old pattern. Under it all a low
+# chant of the cult hangs on one note, and the bowed cymbal and the gong are the god, Al'quimelea,
+# stirring. Hunted: the dance driven hard. Dawn: A major, the sun coming up out of the sea over the olives.
+
+FONTA_CHORDS = ["E", "F", "E", "Dm", "E", "F", "G", "E",
+    "Am", "G", "F", "E", "Dm", "F", "Esus", "E",
+    "E", "F", "E", "Dm", "E", "F", "G", "E",
+    "F", "G", "Am", "G", "F", "Dm", "F", "E"]
+FONTA_DAWN_CHORDS = ["A", "D", "A", "E", "F#m", "D", "Bm", "E",
+    "A", "D", "F#m", "C#m", "D", "A", "Esus", "E",
+    "A", "D", "A", "E", "F#m", "D", "Bm", "E",
+    "D", "E", "F#m", "D", "Bm", "D", "Esus", "A"]
+FONTA_A = "E4:1.5 F4:.5 G#4:1 A4:1 | B4:2 A4:1 G#4:1 | F4:1 G#4:1 A4:1 C5:1 | B4:4 | A4:1.5 G#4:.5 F4:1 E4:1 | F4:2 D4:1 F4:1 | E4:1 F4:1 G4:1 F4:1 | E4:4"
+FONTA_B = "B4:2 C5:1 D5:1 | E5:2 D5:1 C5:1 | B4:1 C5:1 A4:1 B4:1 | G#4:4 | A4:2 C5:1 E5:1 | D5:1.5 C5:.5 B4:1 A4:1 | G#4:1 A4:1 B4:1 G#4:1 | E4:4"
+FONTA_C = "E5:2 F5:1 E5:1 | D5:2 C5:2 | B4:1 C5:1 D5:1 F5:1 | E5:4 | C5:2 B4:1 A4:1 | G#4:2 F4:2 | E4:1 F4:1 G#4:1 F4:1 | E4:4"
+FONTA_DAWN_A = "A4:2 C#5:1 D5:1 | E5:2 D5:1 C#5:1 | B4:1 C#5:1 E5:1 A5:1 | G#5:4 | F#5:2 E5:1 D5:1 | C#5:2 B4:1 A4:1 | B4:1 C#5:1 D5:1 B4:1 | E5:4"
+FONTA_DAWN_C = "C#5:2 E5:1 F#5:1 | A5:2 E5:2 | F#5:1 E5:1 C#5:1 F#5:1 | E5:4 | D5:2 F#5:1 B5:1 | A5:2 F#5:1 E5:1 | D5:1 B4:1 C#5:1 B4:1 | A4:4"
+E_PHRYGIAN_DOM = (4, 5, 8, 9, 11, 0, 2)
+A_MAJOR = (9, 11, 1, 2, 4, 6, 8)
+
+
+def lyre(s, inst, chords, first_bar, vel, rng_seed=0):
+    """The harp as a lyre: each bar picked 3+3+2, low-high-middle, the last pluck of the bar lighter."""
+    for i, c in enumerate(chords):
+        notes = tones(c, 52, 76)
+        beat = (first_bar + i - 1) * 4.0
+        for k, at in enumerate((0.0, 1.5, 3.0)):
+            pick = notes[(k * 2 + i) % len(notes)]
+            s.note(inst, pick, beat + at, 1.2, vel * (1.0 if k == 0 else 0.8))
+            s.note(inst, notes[(k * 2 + i + 2) % len(notes)], beat + at + 0.75, 0.6, vel * 0.55)
+
+
+def guitars(s, inst, chords, first_bar, vel):
+    """Plucked strings strummed in the same 3+3+2, the whole chord low, like a guitar under a song."""
+    for i, c in enumerate(chords):
+        beat = (first_bar + i - 1) * 4.0
+        notes = tones(c, 40, 59)
+        for k, at in enumerate((0.0, 1.5, 3.0)):
+            for n, m in enumerate(notes[:4]):
+                s.note(inst, m, beat + at + n * 0.04, 0.5, vel * (0.95 if k == 0 else 0.72))
+
+
+def frame_drum(s, d, bar, vel, busy=False):
+    """The frame drum's old pattern: a deep stroke on one and on the and of two, taps between."""
+    beat = (bar - 1) * 4.0
+    d.boom(s, beat, vel)
+    d.boom(s, beat + 1.5, vel * 0.75)
+    d.snare(s, beat + 3.0, vel * 0.5)
+    if busy:
+        d.snare(s, beat + 2.5, vel * 0.35)
+        d.snare(s, beat + 3.5, vel * 0.42)
+        d.boom(s, beat + 3.0, vel * 0.6)
+
+
+def cult_chant(s, choir, chords, first_bar, vel):
+    """The worshippers' chant: the choir low on the root, held, swelling over each four bars."""
+    for i in range(0, len(chords), 4):
+        root = root_in(chords[i], 45)
+        sing(s, choir, root, (first_bar + i - 1) * 4.0, 15.5, vel)
+        sing(s, choir, root + 7, (first_bar + i - 1) * 4.0 + 4.0, 11.5, vel * 0.7)
+
+
+def compose_fonta_night(o):
+    s = Score("fonta_night", 251)
+    d = o.drums
+    s.dynamics = [(1, 0.5), (8, 0.56), (9, 0.62), (16, 0.72), (17, 0.86), (24, 0.9), (25, 0.66), (32, 0.5), (33, 0.5)]
+    ch = FONTA_CHORDS
+    lyre(s, o.harp, ch, 1, 0.62)
+    cult_chant(s, o.choir, ch, 1, 0.32)
+    play_pad(s, o.cellos, ch, 1, 2, 40, 55, 0.3)
+    # I. The shepherd's pipe alone over the lyre, in the dark.
+    s.play_line(o.oboe, FONTA_A, 1, vel=0.86)
+    d.bowed(s, 0.0, 0.32)
+    # II. Plucked strings come in under the second tune; the flute answers the oboe.
+    guitars(s, o.vln_pizz, ch[8:16], 9, 0.5)
+    s.play_line(o.flute, FONTA_B, 9, vel=0.6)
+    s.play_line(o.oboe, FONTA_B, 9, shift=-12, vel=0.4)
+    for bar in range(9, 17):
+        frame_drum(s, d, bar, 0.42)
+    harp_run(s, o.harp, 62.0, 2.0, 52, 88, 0.5, E_PHRYGIAN_DOM)
+    d.swell(s, 64.0, 0.42, "Median")
+    # III. The whole island sings it: violins high, the solo violin, horns far below.
+    s.play_line(o.violins, FONTA_A, 17, shift=12, vel=0.78, players=3)
+    s.play_line(o.solo_violin, FONTA_A, 17, vel=0.6)
+    s.play_line(o.horns, FONTA_A, 17, shift=-12, vel=0.38, players=2)
+    guitars(s, o.cel_pizz, ch[16:24], 17, 0.55)
+    for bar in range(17, 25):
+        frame_drum(s, d, bar, 0.5, busy=bar % 2 == 0)
+    # IV. The god stirs: the chant louder, the gong, and the pipe going down into it.
+    s.play_line(o.oboe, FONTA_C, 25, vel=0.86)
+    s.play_line(o.bassoon, FONTA_C, 25, shift=-24, vel=0.42)
+    cult_chant(s, o.choir, ch[24:32], 25, 0.42)
+    d.gong(s, 96.0, 0.42)
+    d.bowed(s, 112.0, 0.42)
+    return s
+
+
+def compose_fonta_hunted(o):
+    s = Score("fonta_hunted", 252)
+    d = o.drums
+    s.dynamics = [(1, 0.82), (8, 0.86), (9, 0.88), (16, 0.94), (17, 1.0), (24, 1.0), (25, 0.9), (32, 0.96), (33, 0.82)]
+    ch = FONTA_CHORDS
+    drive_strings(s, o, ch[:8], 1, 0.74)
+    drive_strings(s, o, ch[8:], 9, 0.84, violins=True)
+    lyre(s, o.harp, ch, 1, 0.55)
+    guitars(s, o.cel_pizz, ch, 1, 0.66)
+    for i, c in enumerate(ch):
+        frame_drum(s, d, i + 1, 0.82, busy=True)
+        d.timp(s, root_in(c, 38), i * 4.0, 0.6)
+    for bar in (8, 16, 24, 32):
+        drum_fill(s, d, ch[bar - 1], bar, 0.8)
+    for bar in (9, 17, 25):
+        d.crash(s, (bar - 1) * 4.0, 0.6)
+    s.play_line(o.horns, FONTA_A, 1, vel=0.82, players=3)
+    s.play_line(o.oboe, FONTA_A, 1, shift=12, vel=0.56)
+    s.play_line(o.violins, FONTA_B, 9, vel=0.9, players=3)
+    s.play_line(o.trumpets, FONTA_B, 9, shift=-12, vel=0.76, players=2)
+    s.play_line(o.violins, FONTA_A, 17, shift=12, vel=1.0, players=3)
+    s.play_line(o.trombones, FONTA_A, 17, shift=-12, vel=0.86, players=2)
+    s.play_line(o.piccolo, FONTA_A, 17, shift=12, vel=0.48)
+    for i in range(24, 32):
+        brass_stabs(s, o, ch[i], i + 1, 0.86)
+    s.play_line(o.violins, FONTA_C, 25, vel=0.92, players=3)
+    s.play_line(o.horns, FONTA_C, 25, shift=-12, vel=0.8, players=3)
+    cult_chant(s, o.choir, ch[24:32], 25, 0.56)
+    d.gong(s, 96.0, 0.6)
+    return s
+
+
+def compose_fonta_dawn(o):
+    s = Score("fonta_dawn", 253)
+    d = o.drums
+    s.dynamics = [(1, 0.86), (16, 0.92), (17, 0.72), (24, 0.8), (25, 1.0), (33, 0.88)]
+    ch = FONTA_DAWN_CHORDS
+    low_strings(s, o, ch, 1, 0.7)
+    lyre(s, o.harp, ch, 1, 0.7)
+    sparkle(s, o.glock, ch, 1, 2, 0.58, lo=81, hi=93)
+    for bar in (1, 9, 17, 25):
+        harp_run(s, o.harp, (bar - 1) * 4.0 - 2.0, 2.0, 57, 93, 0.58, A_MAJOR)
+        d.belltree(s, (bar - 1) * 4.0, 0.7)
+    s.play_line(o.violins, FONTA_DAWN_A, 1, vel=0.88, players=3)
+    s.play_line(o.flute, FONTA_DAWN_A, 1, vel=0.54)
+    s.play_line(o.horns, FONTA_DAWN_A, 1, shift=-12, vel=0.6, players=2)
+    guitars(s, o.vln_pizz, ch[:16], 1, 0.46)
+    s.play_line(o.violins, FONTA_DAWN_C, 9, vel=0.88, players=3)
+    s.play_line(o.oboe, FONTA_DAWN_C, 9, vel=0.52)
+    play_pad(s, o.trombones, ch[:16], 1, 2, 45, 57, 0.48)
+    for bar in list(range(1, 17)) + list(range(25, 33)):
+        frame_drum(s, d, bar, 0.5)
+    # The pipe alone again, now in the light, over the sea.
+    s.play_line(o.oboe, FONTA_DAWN_A, 17, vel=0.74)
+    play_pad(s, o.vln_trem, ch[16:24], 17, 3, 69, 85, 0.28)
+    d.swell(s, 96.0, 0.6, "Median")
+    # And the sun on the olive terraces.
+    s.play_line(o.violins, FONTA_DAWN_A, 25, shift=12, vel=0.95, players=3)
+    s.play_line(o.trumpets, FONTA_DAWN_A, 25, shift=-12, vel=0.8, players=2)
+    s.play_line(o.piccolo, FONTA_DAWN_A, 25, shift=12, vel=0.42)
+    play_pad(s, o.trombones, ch[24:32], 25, 2, 45, 57, 0.62)
+    pulse_low(s, o, ch[24:32], 25, 0.66)
+    return s
+
+
+# The main menu of the Archipelagos of the Forgotten Gods: a new tune in A Phrygian dominant,
+# "The Forgotten Gods", that starts on the lyre and the pipe like a song from the island, is taken up
+# by the strings as the ship comes in, rings out with the horns and the cult's choir, and goes back
+# to the lyre and the sea.
+MENU_GODS_CHORDS = ["Am", "Bb", "Am", "Gm", "A", "Bb", "C", "A",
+    "Dm", "C", "Bb", "A", "Gm", "Bb", "Asus", "A",
+    "Am", "Bb", "Am", "Gm", "A", "Bb", "C", "A",
+    "Bb", "C", "Dm", "C", "Bb", "Gm", "Bb", "A"]
+MENU_GODS_A = "A4:3 Bb4:1 | C#5:2 D5:2 | E5:1.5 F5:.5 E5:1 D5:1 | C#5:4 | D5:2 Bb4:1 G4:1 | A4:2 F4:1 E4:1 | F4:1 G4:1 A4:1 Bb4:1 | A4:4"
+MENU_GODS_B = "E5:2 F5:1 G5:1 | A5:2 G5:1 F5:1 | E5:1 F5:1 D5:1 E5:1 | C#5:4 | D5:2 F5:1 A5:1 | G5:1.5 F5:.5 E5:1 D5:1 | C#5:1 D5:1 E5:1 C#5:1 | A4:4"
+A_PHRYGIAN_DOM = (9, 10, 1, 2, 4, 5, 7)
+
+
+def compose_menu_fontanova(o):
+    """The main menu of the Archipelagos of the Forgotten Gods, over Fontanova at night."""
+    s = Score("menu_fontanova", 261)
+    d = o.drums
+    s.dynamics = [(1, 0.46), (8, 0.56), (9, 0.62), (16, 0.72), (17, 0.9), (24, 0.94), (25, 0.64), (32, 0.48), (33, 0.46)]
+    ch = MENU_GODS_CHORDS
+    lyre(s, o.harp, ch, 1, 0.6)
+    # I. A song from the island: the pipe over the lyre.
+    s.play_line(o.oboe, MENU_GODS_A, 1, vel=0.82)
+    play_pad(s, o.cellos, ch[:8], 1, 2, 40, 55, 0.28)
+    d.bowed(s, 0.0, 0.3)
+    # II. The ship comes in: the strings take the second tune, plucked strings under them.
+    s.play_line(o.violins, MENU_GODS_B, 9, vel=0.74, players=3)
+    s.play_line(o.flute, MENU_GODS_B, 9, vel=0.46)
+    guitars(s, o.cel_pizz, ch[8:16], 9, 0.5)
+    for bar in range(9, 17):
+        frame_drum(s, d, bar, 0.4)
+    harp_run(s, o.harp, 62.0, 2.0, 57, 88, 0.52, A_PHRYGIAN_DOM)
+    d.swell(s, 64.0, 0.46, "Median")
+    # III. The forgotten gods: the tune in the violins and horns, the cult's choir high, the gong.
+    s.play_line(o.violins, MENU_GODS_A, 17, shift=12, vel=0.88, players=3)
+    s.play_line(o.horns, MENU_GODS_A, 17, vel=0.62, players=3)
+    s.play_line(o.trombones, MENU_GODS_A, 17, shift=-12, vel=0.4, players=2)
+    choir_chords(s, o.choir, ch[16:24], 17, 0.44, lo=57, hi=76, count=4)
+    pulse_low(s, o, ch[16:24], 17, 0.52)
+    for bar in range(17, 25):
+        frame_drum(s, d, bar, 0.56, busy=bar % 2 == 0)
+    d.gong(s, 64.0, 0.4)
+    # IV. Back to the lyre and the sea, round to the start.
+    s.play_line(o.oboe, MENU_GODS_A, 25, vel=0.74)
+    cult_chant(s, o.choir, ch[24:32], 25, 0.28)
+    play_pad(s, o.cellos, ch[24:32], 25, 2, 40, 55, 0.3)
+    d.bowed(s, 112.0, 0.36)
+    return s
+
+
 def hall(seconds=2.9, seed=5):
     """The room everything is played in: a big stone hall, bright for a moment, then dark."""
     rng = np.random.default_rng(seed)
@@ -1835,7 +2050,9 @@ COMPOSERS = {"night": compose_night, "hunted": compose_hunted, "dawn": compose_d
     "bastion_night": compose_bastion_night, "bastion_hunted": compose_bastion_hunted, "bastion_dawn": compose_bastion_dawn,
     "vael_night": compose_vael_night, "vael_hunted": compose_vael_hunted, "vael_dawn": compose_vael_dawn,
     "lantern_night": compose_lantern_night, "lantern_hunted": compose_lantern_hunted, "lantern_dawn": compose_lantern_dawn,
-    "menu_vael": compose_menu_vael}
+    "menu_vael": compose_menu_vael,
+    "fonta_night": compose_fonta_night, "fonta_hunted": compose_fonta_hunted, "fonta_dawn": compose_fonta_dawn,
+    "menu_fontanova": compose_menu_fontanova}
 
 
 def main():

@@ -13,6 +13,8 @@ with a DEV band across it, so it is never mistaken for the real game on a phone 
                     light of the Mists, over the peaks beyond them and their low mist.
   sunken_crown      0.23: the bell in sea-green bronze wearing the Sunken Crown, under the aurora of
                     Vael, over the night sea and the drowned city's spires with their green windows.
+  forgotten_gods    Archipelagos of the Forgotten Gods: the bell in old gold with a violet rim before a
+                    great golden moon, over the archipelago and the ruined temple of Al'quimelea.
 
 The splash is the edition's backdrop, wide, under the wordmark and the update's name, so run
 tools/make_ui.py first if that changed."""
@@ -388,14 +390,93 @@ def crowned_bell(size, metal):
     return im
 
 
+def gods_backdrop(w, h, adaptive, seed=29):
+    """Archipelagos of the Forgotten Gods: a warm Mediterranean night. A great golden moon low over a
+    calm sea, the other islands of the archipelago dark along the horizon, the nearest with its ruined
+    temple's columns against the moon, and over everything the faint violet haze of Al'quimelea."""
+    rng = np.random.default_rng(seed)
+    yy, xx = np.mgrid[0:h, 0:w]
+    u, v = xx / w, yy / h
+    sea_y = 0.69 if adaptive else 0.71
+    top = np.array([0.02, 0.03, 0.10])
+    mid = np.array([0.12, 0.08, 0.24])
+    low = np.array([0.42, 0.24, 0.30])
+    t = np.clip(v / sea_y, 0, 1)
+    rgb = top[None, None] * (1 - t[..., None]) ** 1.4 + mid[None, None] * (np.sin(t * np.pi)[..., None] * 0.9) + low[None, None] * t[..., None] ** 3.5
+    # The moon, huge and golden, low over the islands, with its halo.
+    mx, my, mr = 0.5, sea_y - 0.2, 0.15 if adaptive else 0.13
+    if w == h:
+        # On the icon the moon is the bell's light: a great gold disc behind it, as the portal's ring was.
+        my, mr = 0.44, 0.3
+    d = np.sqrt(((u - mx) * w / h) ** 2 + (v - my) ** 2)
+    rgb = rgb + np.exp(-(d / (mr * 2.6)) ** 2)[..., None] * np.array([0.38, 0.27, 0.14])
+    disc = d < mr
+    moon = np.array([0.98, 0.84, 0.55])[None, None] * (0.92 + 0.08 * np.sin(u * 40) * np.sin(v * 33))[..., None]
+    rgb = np.where(disc[..., None], moon, rgb)
+    # Al'quimelea's violet haze, in slow folds across the sky.
+    haze = np.exp(-((v - 0.35 - 0.05 * np.sin(u * 6.0)) / 0.12) ** 2) * (0.5 + 0.5 * np.sin(u * 11.0 + 1.2) ** 2)
+    rgb = rgb + haze[..., None] * np.array([0.22, 0.1, 0.34])
+    # The sea, the moon's road gold on it.
+    sea = v > sea_y
+    depth = np.clip((v - sea_y) / (1 - sea_y), 0, 1)
+    water = np.array([0.04, 0.06, 0.14])[None, None] * (1 - depth[..., None]) + np.array([0.01, 0.02, 0.06])[None, None] * depth[..., None]
+    road = np.exp(-((u - mx) / (0.03 + depth * 0.12)) ** 2) * (0.5 + 0.5 * np.sin(v * 220.0 + np.sin(u * 40.0) * 3.0) ** 6)
+    water = water + road[..., None] * np.array([0.7, 0.52, 0.26]) * (1 - depth[..., None] * 0.4)
+    rgb = np.where(sea[..., None], water, rgb)
+    im = Image.fromarray(np.uint8(np.clip(rgb, 0, 1) * 255 + 0.5)).convert("RGBA")
+    draw = ImageDraw.Draw(im)
+    for _ in range(int(w * h / 3000)):
+        x, y = rng.uniform(0, w), rng.uniform(0, h * sea_y * 0.7)
+        if np.hypot((x / w - mx) * w / h, y / h - my) < mr * 1.6:
+            continue
+        r = rng.uniform(0.3, 0.9) * h / 700
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(250, 235, 215, int(rng.uniform(70, 200))))
+    # The archipelago along the horizon: dark islands, one with a god's light burning on it.
+    isles = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    idr = ImageDraw.Draw(isles)
+    base = sea_y * h + 1
+    for x0, x1, tall in ((-0.05, 0.22, 0.1), (0.14, 0.34, 0.06), (0.62, 0.86, 0.08), (0.78, 1.06, 0.12)):
+        pts = [(x0 * w, base)]
+        for k in range(13):
+            f = k / 12
+            pts.append(((x0 + (x1 - x0) * f) * w, base - tall * h * np.sin(f * np.pi) ** 0.8 * (0.8 + 0.2 * np.sin(f * 9 + x0 * 7))))
+        pts.append((x1 * w, base))
+        idr.polygon(pts, fill=(14, 12, 28, 255))
+    # The near island under the moon: a hill and the temple's broken colonnade on top.
+    hill = [(0.3 * w, base)]
+    for k in range(21):
+        f = k / 20
+        hill.append(((0.3 + 0.4 * f) * w, base - 0.13 * h * np.sin(f * np.pi) ** 1.3))
+    hill.append((0.7 * w, base))
+    idr.polygon(hill, fill=(10, 8, 20, 255))
+    crest = base - 0.13 * h
+    cw = 0.014 * w
+    for k, hgt in enumerate((0.07, 0.07, 0.04, 0.07, 0.07, 0.025, 0.07)):
+        x = (0.42 + k * 0.026) * w
+        idr.rectangle((x - cw * 0.35, crest - hgt * h, x + cw * 0.35, crest + 2), fill=(10, 8, 20, 255))
+    idr.rectangle((0.405 * w, crest - 0.082 * h, 0.535 * w, crest - 0.07 * h), fill=(10, 8, 20, 255))
+    idr.polygon([(0.405 * w, crest - 0.082 * h), (0.47 * w, crest - 0.11 * h), (0.5 * w, crest - 0.095 * h), (0.5 * w, crest - 0.082 * h)], fill=(10, 8, 20, 255))
+    im.alpha_composite(isles)
+    lights = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ld = ImageDraw.Draw(lights)
+    for x, y, col in ((0.08, base - 0.09 * h, (110, 240, 220)), (0.93, base - 0.11 * h, (255, 220, 120)), (0.47, crest - 0.02 * h, (190, 120, 255))):
+        r = 0.008 * h
+        ld.ellipse((x * w - r, y - r, x * w + r, y + r), fill=col + (230,))
+    im.alpha_composite(lights.filter(ImageFilter.GaussianBlur(h * 0.012)))
+    im.alpha_composite(lights)
+    return im
+
+
 THEMES = {
     "valleys": {"backdrop": valleys_backdrop, "metal": BELL_FIRE},
     "beyond_the_mists": {"backdrop": mists_backdrop,
         "metal": {"dark": (0.065, 0.055, 0.12), "warm": (0.22, 0.62, 0.68), "hot": (0.62, 0.98, 0.94), "rim": (0.80, 0.70, 1.0)}},
     "sunken_crown": {"backdrop": crown_backdrop, "crowned": True, "title": "The Sunken Crown", "title_ink": (150, 240, 205),
         "metal": {"dark": (0.07, 0.15, 0.15), "warm": (0.20, 0.58, 0.48), "hot": (0.62, 1.0, 0.84), "rim": (0.74, 0.96, 0.88)}},
+    "forgotten_gods": {"backdrop": gods_backdrop, "title": "Archipelagos of the Forgotten Gods", "title_ink": (240, 214, 160),
+        "metal": {"dark": (0.11, 0.07, 0.16), "warm": (0.72, 0.5, 0.24), "hot": (1.0, 0.88, 0.6), "rim": (0.82, 0.62, 1.0)}},
 }
-EDITION = "beyond_the_mists"
+EDITION = "forgotten_gods"
 
 DEV_BAND = (242, 168, 58)    # amber: the Dev build's band
 DEV_INK = (30, 18, 10)

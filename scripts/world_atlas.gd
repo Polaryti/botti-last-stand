@@ -3,16 +3,17 @@ extends Control
 ## The known world, drawn as a map to choose where to play: the Village in its lowland by the river,
 ## the road to the Fort, the Fort's portal to the Mists, the portal from the heart of the Mists to Mist
 ## Bastion on its peak in the twilight lands beyond, the road down from the Bastion to the Valleys
-## of Mesenlla, and the road from the Valleys of Mesenlla down to the coast of Port Vael.
+## of Mesenlla, the road from the Valleys of Mesenlla down to the coast of Port Vael, and the sea
+## crossing from Port Vael to Fontanova, the first island of the archipelago.
 ## Each place is a medal you can tap. Places that cannot be played in the mode being chosen for are
 ## drawn dimmed and cannot be picked.
 
 signal picked(id: String)
 
 ## Where each place lies on the atlas, as a share of its width and height.
-const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.85, 0.78), "bastion": Vector2(0.8, 0.36), "vael": Vector2(0.66, 0.81), "lantern_road": Vector2(0.51, 0.76)}
+const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.85, 0.78), "bastion": Vector2(0.8, 0.36), "vael": Vector2(0.66, 0.81), "lantern_road": Vector2(0.51, 0.76), "fontanova": Vector2(0.38, 0.62)}
 ## Roads walk; portals open. Each link is [from, to, through a portal].
-const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mesenlla", "vael", false]]
+const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mesenlla", "vael", false], ["vael", "fontanova", false]]
 const MEDAL := 92.0
 
 var allowed: Array = []

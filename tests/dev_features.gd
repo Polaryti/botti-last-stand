@@ -41,6 +41,7 @@ func _ready() -> void:
 	await _requests_1116()
 	await _vael_weapons()
 	await _port_vael()
+	await _fontanova()
 	await _drowned_court()
 	await _coastal_campaign()
 	await _feedback_and_numbers()
@@ -1754,6 +1755,87 @@ func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
 
 ## The Sunken Crown: the six weapons of the coast of Vael.
 ## The Sunken Crown, stage 2: Port Vael, its Mist Tide, its salvage and its creatures.
+## Fontanova, the first island of the Archipelagos of the Forgotten Gods: listed everywhere a place is,
+## an island ringed by sea that drowns you out of your depth, its rope bridges and its grotto, its
+## flora moving in the wind, and the title screen it now is.
+func _fontanova() -> void:
+	check(Game.MAPS.has("fontanova") and "fontanova" in Game.VERSUS_MAPS and "fontanova" in Board.MAPS and "fontanova" in Game.ARCHIPELAGO_MAPS, "Fontanova can be chosen for the night and for versus, and has its boards")
+	check(Places.ORDER.has("fontanova") and Places.ALL["fontanova"]["tips"].size() == 3 and str(Places.ALL["fontanova"]["lore"]).length() > 80, "it has its page, its lore and its tips")
+	check(WorldAtlas.SPOTS.has("fontanova") and WorldAtlas.LINKS.has(["vael", "fontanova", false]), "the atlas crossing from Port Vael leads to it")
+	check(PlaceVista.LOOKS.has("fontanova") and Icons.exists("map_fontanova"), "its loading view and its icon")
+	check(Sfx.MUSIC_SETS.has("fontanova") and (Sfx.MUSIC_SETS["fontanova"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
+	check(Director.DAWN_SOUNDS.get("fontanova", "") == "dawn_fontanova" and Sfx.NAMES.has("dawn_fontanova") and Net.SOUNDS.has("dawn_fontanova"), "and its own sound at dawn")
+	check(Sfx.MUSIC_SETS["menu"][0] == "menu_fontanova" and ResourceLoader.exists("res://assets/music/menu_fontanova.ogg"), "the main menu has the Archipelagos' own theme")
+	check(World.MENU_TOUR_FONTANOVA.size() >= 6 and World.MENU_TOUR_FONTANOVA.all(func(p: Array) -> bool: return absf(p[0].x) < 166.0 and absf(p[0].z) < 166.0), "and its camera tours Fontanova, inside the map")
+	check("fontanova" in Weather.WINDY_MAPS, "the wind blows there some nights")
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "fontanova"
+	Game.mode = Game.Mode.NIGHT
+	check(is_equal_approx(Game.night_length(), 900.0), "a night there lasts fifteen minutes")
+	# What the map holds.
+	var scene: Node = (load("res://maps/fontanova.tscn") as PackedScene).instantiate()
+	var pieces := scene.find_children("*", "Node3D", true, false).filter(func(p: Node) -> bool: return p is MapFonta)
+	var kinds := {}
+	var gods := {}
+	for p: MapFonta in pieces:
+		kinds[p.kind] = int(kinds.get(p.kind, 0)) + 1
+		if p.kind in ["god_statue", "fallen_god", "god_head", "stele"]:
+			gods[p.variant] = true
+	check(kinds.get("sailboat", 0) == 1 and kinds.get("rope_bridge", 0) == 2 and kinds.get("grotto", 0) == 1 and kinds.get("temple", 0) == 1, "a beached sailboat, two rope bridges, a grotto and the god's temple")
+	check(gods.size() == FontaBuilder.GODS.size() and kinds.get("horizon_isle", 0) >= 4, "every god of the archipelago is shown somewhere, and the other islands stand on the horizon")
+	for tree: String in ["olive", "holm_oak", "madrono", "carob"]:
+		check(kinds.get(tree, 0) >= 5, "%s trees grow there (%d)" % [tree, kinds.get(tree, 0)])
+	check(kinds.get("wildflowers", 0) >= 8 and kinds.get("maquis", 0) >= 8, "wildflower meadows and maquis")
+	scene.free()
+	# The flora moves in the wind, harder on a windy night.
+	check((FontaFlora.tree_mesh("olive") as ArrayMesh).surface_get_material(0) == FontaFlora.tree_material(), "its trees are drawn to sway")
+	FontaFlora.set_wind(1.0, Vector3(0, 0, 1))
+	check(is_equal_approx(float(FontaFlora.tree_material().get_shader_parameter("gust")), 1.0) and is_equal_approx(float(FontaFlora.herb_material().get_shader_parameter("gust")), 1.0), "the wind bends trees and flowers alike")
+	FontaFlora.set_wind(0.0, Vector3(1, 0, 0.3))
+	# The island itself.
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var isle := World.new()
+	space.add_child(isle)
+	isle.setup(Game.Mode.NIGHT)
+	isle.director.set_process(false)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	var you := isle.player
+	you.set_physics_process(false)
+	var t := isle.terrain
+	check(isle.map_id == "fontanova" and isle.isle_sea != null and not t.isle.is_empty() and Ambience.wanted(isle), "Fontanova loads, an island in its sea, with its night air")
+	check(t.isle_depth(0, 160) > Terrain.ISLE_DROWN and t.isle_depth(160, 0) > Terrain.ISLE_DROWN and t.isle_depth(-160, -100) > Terrain.ISLE_DROWN, "deep sea all round it")
+	check(t.isle_depth(0, 0) == 0.0 and t.isle_depth(0, -84) == 0.0 and t.height(0, -84) > 15.0, "dry land in the middle, the Acropolis high in the north")
+	check(t.deep_water(0, 160) and not t.deep_water(0, 0), "nothing walks into the deep")
+	check(t.isle_depth(2, 64) == 0.0 and t.is_walkable(2, 64), "you land on the beach, by the sailboat")
+	check(is_equal_approx(isle.isle_sea.slow_at(Vector3(0, 0, 0)), 1.0) and isle.isle_sea.slow_at(Vector3(0, 0, 160)) <= IsleSea.SLOW + 0.001, "wading slows you, to %d%% out of your depth" % int(IsleSea.SLOW * 100))
+	# Out of your depth: a moment to turn back, then the sea drowns you.
+	you.global_position = Vector3(0, t.ground_height(0, 160), 160)
+	var hp0 := you.hp
+	you._tick_sea(IsleSea.GRACE * 0.5)
+	check(is_equal_approx(you.hp, hp0), "a few seconds' grace out of your depth")
+	you._tick_sea(IsleSea.GRACE)
+	check(you.hp < hp0, "then the sea drowns you (%.0f)" % (hp0 - you.hp))
+	you.global_position = Vector3(2, t.height(2, 64), 64)
+	you._tick_sea(0.1)
+	check(you._under_sea == 0.0, "back where you can stand, the count starts again")
+	you.hp = you.max_hp()
+	# The rope bridges over the Ravine: decks across it, high over its floor.
+	check(t.bridges().size() == 2, "two rope bridges")
+	for d: Dictionary in t.bridges():
+		var mid := (Vector2(d["a"]) + Vector2(d["b"])) * 0.5
+		check(t.deck_y(d, 0.5) > t.ground_height(mid.x, mid.y) + 3.0 and Vector2(d["a"]).distance_to(d["b"]) > 8.0, "a bridge spans the Ravine, high over its floor (%.1f m)" % (t.deck_y(d, 0.5) - t.ground_height(mid.x, mid.y)))
+		check(t.on_deck(mid.x, mid.y), "and can be walked")
+	# The Oracle's Grotto: a way through the east hill.
+	var through := isle.grid.route(Vector3(82, 0, -48), Vector3(82, 0, -10))
+	check(through.size() > 1 and Array(through).all(func(p: Vector3) -> bool: return absf(p.x - 82.0) < 12.0) and t.is_walkable(82, -29), "the Oracle's Grotto runs through the east hill")
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+
+
 func _port_vael() -> void:
 	# Everywhere a place is listed, Port Vael is.
 	check(Game.MAPS.has("vael") and "vael" in Game.VERSUS_MAPS and "vael" in Board.MAPS, "Port Vael can be chosen for the night and for versus, and has its boards")
@@ -1762,9 +1844,8 @@ func _port_vael() -> void:
 	check(PlaceVista.LOOKS.has("vael") and Icons.exists("map_vael"), "its loading view and its icon")
 	check(Sfx.MUSIC_SETS.has("vael") and (Sfx.MUSIC_SETS["vael"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
 	check(Director.DAWN_SOUNDS.get("vael", "") == "dawn_vael" and Sfx.NAMES.has("dawn_vael"), "and its own sound at dawn")
-	# The Sunken Crown's title screen: Port Vael under its aurora, and a theme of its own.
-	check(Sfx.MUSIC_SETS["menu"][0] == "menu_vael" and ResourceLoader.exists("res://assets/music/menu_vael.ogg"), "the main menu has The Sunken Crown's own theme")
-	check(World.MENU_TOUR_VAEL.size() >= 6 and World.MENU_TOUR_VAEL.all(func(p: Array) -> bool: return absf(p[0].x) < 110.0 and absf(p[0].z) < 110.0), "and its camera tours Port Vael, inside the map")
+	# The Sunken Crown's own title tour is kept, and its menu theme stays in the game.
+	check(ResourceLoader.exists("res://assets/music/menu_vael.ogg") and World.MENU_TOUR_VAEL.size() >= 6 and World.MENU_TOUR_VAEL.all(func(p: Array) -> bool: return absf(p[0].x) < 110.0 and absf(p[0].z) < 110.0), "The Sunken Crown's tour of Port Vael and its theme are kept")
 	# The tide's clock.
 	check(is_equal_approx(MistTide.level_at(0.0), MistTide.LOW_Y) and not MistTide.is_high_at(10.0), "the night begins at low tide")
 	check(MistTide.is_high_at(MistTide.TURN + 1.0) and is_equal_approx(MistTide.level_at(MistTide.TURN + MistTide.RISE), MistTide.HIGH_Y), "after %d s it comes in, taking %d s" % [int(MistTide.TURN), int(MistTide.RISE)])

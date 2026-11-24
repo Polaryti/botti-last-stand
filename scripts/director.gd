@@ -23,7 +23,7 @@ const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
 ## What each land sounds like when the dead sense the dawn. The Village and the Fort keep the wolf.
-const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael"}
+const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael", "fontanova": "dawn_fontanova"}
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0

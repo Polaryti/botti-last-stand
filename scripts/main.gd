@@ -189,7 +189,7 @@ func show_menu(rebuild := false) -> void:
 	mark.custom_minimum_size = Vector2(590, 80)
 	mark.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	top.add_child(mark)
-	var update_title := _label("Beyond the Mists", UiTheme.FS_LEAD, UiTheme.TWILIGHT.lightened(0.15))
+	var update_title := _label("Archipelagos of the Forgotten Gods", UiTheme.FS_LEAD, Color("f0d6a0"))
 	update_title.name = "UpdateTitle"
 	update_title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	top.add_child(update_title)
@@ -3171,7 +3171,7 @@ func _note_pending(mine: Label) -> void:
 
 
 static func _map_word(map: String) -> String:
-	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael", "lantern_road": "Port Vael"}.get(map, map.capitalize())
+	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael", "lantern_road": "Port Vael", "fontanova": "Fontanova"}.get(map, map.capitalize())
 
 
 ## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort",

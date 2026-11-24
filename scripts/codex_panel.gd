@@ -143,7 +143,7 @@ func _enemies() -> void:
 		var locations := PackedStringArray()
 		for map_id: String in d.get("maps", []):
 			if map_id == "lantern_road": continue
-			locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "vael": "Port Vael", "lantern_road": "The Lantern Road", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
+			locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "vael": "Port Vael", "fontanova": "Fontanova", "lantern_road": "The Lantern Road", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
 		var note := enemy_note(id)
 		var words: String = d["desc"]
 		if d.has("lore"):

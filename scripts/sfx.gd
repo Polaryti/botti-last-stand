@@ -43,7 +43,7 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"crossing", "toll_bell", "obol", "souls_go",
 	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
 	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop",
-	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike"]
+	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike", "dawn_fontanova"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],
@@ -58,8 +58,9 @@ const MUSIC_SETS := {
 	"mesenlla": ["mesenlla_night", "mesenlla_hunted", "mesenlla_dawn"],
 	"bastion": ["bastion_night", "bastion_hunted", "bastion_dawn"],
 	"vael": ["vael_night", "vael_hunted", "vael_dawn"],
+	"fontanova": ["fonta_night", "fonta_hunted", "fonta_dawn"],
 	"lantern": ["lantern_night", "lantern_hunted", "lantern_dawn"],
-	"menu": ["menu_vael", "", ""],
+	"menu": ["menu_fontanova", "", ""],
 }
 const MUSIC_BUS := "Music"
 const SOUND_BUS := "Sounds"

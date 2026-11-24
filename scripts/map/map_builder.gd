@@ -163,6 +163,7 @@ func shine(l: LowPoly) -> void:
 
 
 func flush() -> void:
+	FontaFlora.flush(self)
 	for key: Vector2i in _glow_cells:
 		var mi := MeshInstance3D.new()
 		mi.mesh = (_glow_cells[key] as SurfaceTool).commit()
@@ -181,7 +182,8 @@ func flush() -> void:
 		list.assign(_trees[key])
 		var source := key.get_slice("|", 0)
 		# "proc:<kind>" are trees drawn by code (MesenllaBuilder.tree_mesh), the rest come from files.
-		var tree_mesh: Mesh = MesenllaBuilder.tree_mesh(source.substr(5)) if source.begins_with("proc:") else Models.merged(source)
+		# "flora:<kind>" are Fontanova's, drawn by code and moving in the wind (FontaFlora).
+		var tree_mesh: Mesh = MesenllaBuilder.tree_mesh(source.substr(5)) if source.begins_with("proc:") else FontaFlora.tree_mesh(source.substr(6)) if source.begins_with("flora:") else Models.merged(source)
 		w.add_child(Models.scatter(tree_mesh, list))
 	_trees.clear()
 	for key: Vector2i in _cells:
@@ -210,8 +212,8 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" else 0.0)
-	mat.set_shader_parameter("shore", SHORE_Y if not terrain.coast.is_empty() or not terrain.sea.is_empty() else -1000.0)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" or look == "fontanova" else 0.0)
+	mat.set_shader_parameter("shore", SHORE_Y if terrain.seaside() else -1000.0)
 	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
 		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
@@ -222,6 +224,10 @@ func ground() -> void:
 		mat.set_shader_parameter("tint", Vector3(1.12, 0.86, 0.7))
 		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
 		mat.set_shader_parameter("highland", 1.0 if look == "vael" else 0.0)
+	elif look == "fontanova":
+		# Dry Mediterranean ground: golden-green grass burnt by the summer, and red-ochre earth.
+		mat.set_shader_parameter("tint", Vector3(1.08, 1.0, 0.86))
+		mat.set_shader_parameter("dirt", Vector3(0.46, 0.33, 0.24))
 	_ground_material = mat
 	var j := 0
 	while j < terrain.vertices_per_side - 1:
@@ -1690,7 +1696,7 @@ func forest_wall(h: float) -> void:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1))
 				p.y = terrain.height(p.x, p.z)
-				if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4:
+				if terrain.seaside() and p.y < SHORE_Y + 0.4:
 					continue # no trees in the sea: the coast's edge is open water
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 				var file := "res://assets/nature/tree_single_A.gltf" if rng.randf() < 0.72 else "res://assets/nature/tree_single_B.gltf"
@@ -1763,7 +1769,7 @@ func grass(h: float) -> void:
 			if MapIslands.on_masonry(Vector2(p.x, p.z)): continue
 			if not is_preview and MapIslands._near_gate(w, p, 4.0): continue
 		p.y = terrain.height(p.x, p.z)
-		if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
+		if terrain.seaside() and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.z / 24.0)))
 		if not patches.has(key):
 			patches[key] = [[], PackedColorArray()]

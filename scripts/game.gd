@@ -54,12 +54,15 @@ var fort_map := "fort"
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
 	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."},
-	"vael": {"name": "Port Vael", "desc": "A drowned harbour. Survive fifteen minutes of Mist Tide."}}
+	"vael": {"name": "Port Vael", "desc": "A drowned harbour. Survive fifteen minutes of Mist Tide."},
+	"fontanova": {"name": "Fontanova", "desc": "An island of forgotten gods. Survive fifteen minutes."}}
+## The maps of the Archipelagos of the Forgotten Gods: playing on any of them earns the Ascendant.
+const ARCHIPELAGO_MAPS := ["fontanova"]
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
 const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
 	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
-const VERSUS_MAPS := ["village", "mesenlla", "vael"]
+const VERSUS_MAPS := ["village", "mesenlla", "vael", "fontanova"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
@@ -148,7 +151,7 @@ func owns_class(id: String) -> bool:
 
 ## Which map a night is played on: the host decides in a game together.
 func night_length() -> float:
-	return 900.0 if current_map() == "vael" else NIGHT_LENGTH
+	return 900.0 if current_map() in ["vael", "fontanova"] else NIGHT_LENGTH
 
 
 func current_map() -> String:
