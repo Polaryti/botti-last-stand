@@ -53,7 +53,8 @@ func _ready() -> void:
 		p.input_fire = false
 		p._swing = 0.3
 		p._reload = 0.05
-		p.pose_weapon(p.weapon_def(), p._swing)
+		# A thrown harpoon leaves the hand empty: pose the throw itself.
+		p.pose_weapon(WeaponDefs.ALL[weapon], p._swing)
 		await get_tree().create_timer(0.15).timeout
 		await snap(weapon + "_strike")
 	p._vm_root.visible = false

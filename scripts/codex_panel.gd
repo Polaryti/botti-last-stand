@@ -104,6 +104,25 @@ static func enemy_group(id: String) -> int:
 	return 1
 
 const HIDDEN_ENEMY := "Kill one to learn about it."
+## A "from" this late means the night's clock never brings it: something else calls it up.
+const UNTIMED := 9000.0
+
+## The line under an enemy's name: health and XP, then how it comes. Bosses and minibosses are called
+## up by the night itself; anyone else's first hour is learned by killing one, like what it is.
+static func enemy_note(id: String) -> String:
+	var d: Dictionary = ZombieDefs.ALL[id]
+	var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
+	var from: float = d.get("from", -1.0)
+	if d.get("mist_boss", false) or d.get("mesenlla_boss", false) or d.get("vael_boss", false):
+		note += ". Boss encounter"
+	elif d.get("miniboss", false):
+		note += ". Miniboss encounter"
+	elif d.get("carried", false):
+		note += ". Rides the War Wyvern"
+	elif from > 0.0 and from < UNTIMED and Game.has_killed(id):
+		note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
+	return note
+
 
 func _enemies() -> void:
 	# A War Wyvern's rider is part of the War Wyvern's entry, not one of its own.
@@ -125,14 +144,7 @@ func _enemies() -> void:
 		for map_id: String in d.get("maps", []):
 			if map_id == "lantern_road": continue
 			locations.append({"mists": "The Mists", "village": "The Village", "fort": "The Fort", "mesenlla": "Valleys of Mesenlla", "vael": "Port Vael", "lantern_road": "The Lantern Road", "bastion": "Mist Bastion"}.get(map_id, map_id.capitalize()))
-		var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
-		var from: float = d.get("from", -1.0)
-		if d.get("mist_boss", false) or d.get("mesenlla_boss", false):
-			note += ". Boss encounter"
-		elif d.get("carried", false):
-			note += ". Rides the War Wyvern"
-		elif from > 0.0:
-			note += ". Appears from %d:%02d" % [int(from) / 60, int(from) % 60]
+		var note := enemy_note(id)
 		var words: String = d["desc"]
 		if d.has("lore"):
 			words += "\n" + str(d["lore"])

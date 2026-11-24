@@ -232,6 +232,7 @@ var _cleave_idle := 0.0
 var _axe_out := false
 var harpoon_out := false # your Whaler's Harpoon lies somewhere: walk over it to take it back
 var _harpoon_back := 0.0 # seconds until it comes back to your hand by itself
+var _harpoon_slot := -1 # the slot it was thrown from, left empty until it comes back
 var _fervour := 0 # Cutlass kills in a row
 var _fervour_left := 0.0
 var _trampled := {}
@@ -655,7 +656,7 @@ func readiness() -> Array[Dictionary]:
 	if d.has("fervour") and _fervour > 0:
 		out.append({"key": "fervour", "name": "Fervour", "icon": "cutlass+up", "color": Color(0.95, 0.75, 0.5), "button": "",
 			"need": int(d["fervour"]), "have": _fervour, "primed": false, "active": true})
-	if d.has("tethered") and harpoon_out:
+	if harpoon_out:
 		armed.call("harpoon", {"name": "Harpoon thrown: walk over it", "icon": "harpoon", "color": Color(0.85, 0.72, 0.45)}, "fire", false, true)
 	if d.get("momentum", false) and _flail_stacks > 0:
 		out.append({"key": "momentum", "name": "Momentum", "icon": "flail+up", "color": Color(0.95, 0.75, 0.5), "button": "",
@@ -4265,11 +4266,11 @@ func _handle_fire() -> void:
 				elif WeaponDefs.own_ammo(weapon_id()) > 0:
 					own_ammo[weapon_id()] = ammo_of(weapon_id()) - 1
 				_fire_arrow(d)
+				_spent_weapon()
 				if d.has("tethered"):
 					harpoon_out = true
 					_harpoon_back = HarpoonerKit.harpoon_return(self, float(d["tethered"]))
-					_vm_mesh.visible = false
-				_spent_weapon()
+					_let_go_of_harpoon()
 		WeaponDefs.Kind.SPELL:
 			mana -= float(d["cost"]) * m("spell_cost")
 			_cast_bolt(d)
@@ -4517,11 +4518,21 @@ func _anchor_quake(d: Dictionary, stats: Dictionary) -> int:
 	return caught
 
 
-## Your Whaler's Harpoon, out in the world: taken back when you walk over it, or back in your hand
-## by itself once its time is up. If you no longer carry the harpoon, it is simply gone.
+## Thrown, the harpoon is no longer in your hands: its slot stays empty until it comes back, and you
+## turn to your other weapon if you carry one.
+func _let_go_of_harpoon() -> void:
+	_harpoon_slot = current
+	slots[current] = "fists" if class_id == "monk" else null
+	if not class_def().get("one_weapon", false) and not _slot_free(1 - current):
+		current = 1 - current
+	_equip()
+
+
+## Your Whaler's Harpoon, out in the world: taken back when you walk over it, or back by itself once
+## its time is up. If you picked up another meanwhile, the thrown one is simply gone.
 func _tick_harpoon(delta: float) -> void:
 	var lying: Node3D = world.harpoons.get(net_id(), null)
-	if not slots.has("harpoon"):
+	if slots.has("harpoon"):
 		_harpoon_home(false)
 		return
 	_harpoon_back -= delta
@@ -4541,9 +4552,29 @@ func _harpoon_home(in_hand: bool) -> void:
 		Net.world_fx(Net.Fx.HARPOON_GONE, Vector3.ZERO, Vector3.ZERO, net_id())
 	if in_hand:
 		sfx("harpoon_reel", -4.0)
-		if weapon_id() == "harpoon":
-			_vm_mesh.visible = true
-			_switch_anim = 0.18
+		_harpoon_to_hand()
+	_harpoon_slot = -1
+
+
+## Back from the throw: into empty hands if you have them, else the slot it left, else the other.
+## With both hands full it drops at your feet, to be picked up like any weapon.
+func _harpoon_to_hand() -> void:
+	var one: bool = class_def().get("one_weapon", false)
+	var slot := -1
+	if _slot_free(current):
+		slot = current
+	elif _harpoon_slot >= 0 and _harpoon_slot < slots.size() and _slot_free(_harpoon_slot) and not (one and _harpoon_slot != 0):
+		slot = _harpoon_slot
+	elif not one and _slot_free(1 - current):
+		slot = 1 - current
+	if slot < 0:
+		world.drop_weapon(global_position, "harpoon")
+		say("Both hands full: your harpoon lies at your feet")
+		return
+	slots[slot] = "harpoon"
+	if slot == current:
+		_equip()
+		_switch_anim = 0.18
 
 
 ## Rules applied to every zombie a melee swing connects with.

@@ -1,5 +1,12 @@
 # Changelog
 
+## Development — Archipelagos of the Forgotten Gods
+
+### Fixes
+- **Codex:** when an enemy first appears is only shown once you have killed one.
+- **Codex:** the Kraken and the Leviathan wear the boss crown, and bosses and minibosses no longer read "Appears from 166:39".
+- **Whaler's Harpoon:** throwing it leaves its slot empty until it comes back. With both hands full by then, it lands at your feet.
+
 ## 0.22.1 — The Sunken Crown (24 November 2026)
 
 *Down the road from the Valleys lies Vael, a harbour kingdom drowned when the Mists rose like a sea. Its Hollow Sovereign still holds court.* A new map with its own tide, creatures, court and bosses, a new class, coast weapons, nine Class Upgrades and the Trappers' Guild.

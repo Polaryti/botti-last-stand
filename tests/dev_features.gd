@@ -1416,7 +1416,7 @@ func _wilds_of_mesenlla() -> void:
 func _changelog_and_atlas() -> void:
 	var vs := ChangelogPanel.versions(ChangelogPanel.notes())
 	var current := str(ProjectSettings.get_setting("application/config/version")).get_slice("-dev.", 0)
-	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > 5, "the Changelog reads every version, newest first")
+	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > (0 if str(vs[0]["number"]).begins_with("Development") else 5), "the Changelog reads every version, newest first")
 	var released: Dictionary = vs.filter(func(v: Dictionary) -> bool: return str(v["number"]) == "0.21.4")[0]
 	check(released["name"] == "A Portal Worth Defending" and released["date"] == "11 November 2026", "with each version's name and date")
 	check(ChangelogPanel.category("Fixes")[1] == "Fixes" and ChangelogPanel.category("The wilds of Mesenlla")[1] == "Enemies" and ChangelogPanel.category("Spectator Mode")[1] == "Playing together", "each part is marked by what it is about")
@@ -2610,7 +2610,7 @@ func _vael_weapons() -> void:
 	p.input_fire = true
 	p._handle_fire()
 	p.input_fire = false
-	check(p.harpoon_out and p.arrows == arrows_before and not p._vm_mesh.visible, "thrown: it is out of your hand, and spent no arrows")
+	check(p.harpoon_out and p.arrows == arrows_before and p.slots[0] == null and p.weapon_id() == "sword", "thrown: its slot is left empty, you turn to your sword, and no arrows are spent")
 	for i in 60:
 		await get_tree().physics_frame
 	check(whale.root_left > 1.5 and whale.hp < 5000.0, "it struck and pinned what it hit (%.1f s)" % whale.root_left)
@@ -2624,9 +2624,11 @@ func _vael_weapons() -> void:
 	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() == flying, "with it out, there is nothing to throw")
 	p.global_position = lying.global_position + Vector3(0.5, 0, 0)
 	p._tick_harpoon(0.02)
-	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p._vm_mesh.visible, "walking over it takes it back")
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p.slots[0] == "harpoon" and p.weapon_id() == "sword", "walking over it takes it back into the slot it left")
 	p.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
 	whale.release()
+	p.current = 0
+	p._equip()
 	p._cooldown = 0.0
 	p.input_fire = true
 	p._handle_fire()
@@ -2635,7 +2637,38 @@ func _vael_weapons() -> void:
 		await get_tree().physics_frame
 	check(p.harpoon_out and w.harpoons.has(p.net_id()), "thrown at nothing, it lies on the ground")
 	p._tick_harpoon(16.0)
-	check(not p.harpoon_out and not w.harpoons.has(p.net_id()), "and after 15 s it is back in your hand by itself")
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p.slots[0] == "harpoon" and p.weapon_id() == "sword", "and after 15 s it is back in its slot by itself")
+	# Thrown with nothing else to hold, it comes back into your empty hands.
+	p.slots[1] = null
+	p.current = 0
+	p._equip()
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(p.harpoon_out and p.current == 0 and p.slots == [null, null], "with no other weapon you are left empty-handed")
+	p._tick_harpoon(16.0)
+	check(p.weapon_id() == "harpoon", "and it comes back into your empty hands")
+	for i in 30:
+		await get_tree().physics_frame
+	# Both hands full when it comes back: it drops at your feet instead of vanishing.
+	p.slots[1] = "sword"
+	p.current = 0
+	p._equip()
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	for i in 90:
+		await get_tree().physics_frame
+	p.slots[0] = "mace"
+	p.current = 0
+	p._equip()
+	var lying_round := w.pickups.size()
+	p._tick_harpoon(16.0)
+	var dropped := w.pickups.filter(func(q: Pickup) -> bool: return q.weapon_id == "harpoon" and q.global_position.distance_to(p.global_position) < 3.0)
+	check(not p.harpoon_out and not p.slots.has("harpoon") and w.pickups.size() == lying_round + 1 and dropped.size() == 1, "with both hands full it lies at your feet")
+	for item: Pickup in dropped: w.remove_pickup(item)
 	# Flare Pistol: 6 flares a pistol; a flare burns all within 3 m and shows all within 7 m for 8 s.
 	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
 	p.slots = ["sword", null]
