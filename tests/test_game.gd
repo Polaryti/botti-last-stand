@@ -4118,8 +4118,13 @@ func test_powers() -> void:
 		else:
 			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
 			await seconds(0.25)
+		if id == "mystery_flask" and not pl.has_power(id):
+			# One flask in eight has turned: it poisons instead, and leaves nothing to wear.
+			ok(pl.poison_left > 0.0, "%s activates, or has turned and poisons" % id)
+			pl.poison_left = 0.0
+			continue
 		ok(pl.has_power(id), "%s activates" % id)
-		var want := PowerDefs.CROWN_TIME if PowerDefs.ALL[id].get("relic", false) else 20.0 # a relic is worn until you fall
+		var want := PowerDefs.CROWN_TIME if PowerDefs.ALL[id].get("relic", false) else float(PowerDefs.ALL[id]["time"]) # a relic is worn until you fall
 		ok(absf(float(pl.powers[id]) - want) < 1.0, "%s lasts %d s" % [id, want])
 		pl.powers.erase(id)
 		if pl._familiars.has(id):
@@ -4436,7 +4441,9 @@ func test_trees() -> void:
 	for id: String in ClassDefs.ALL:
 		var tree := AbilityData.tree(id)
 		ok((tree["core"] as Array).size() == Player.CORE_STEPS, "%s has its shared tiers" % id)
-		ok((tree["specs"] as Array).size() == 3, "%s has 3 specializations" % id)
+		# Three professions each; the Ascendant's grow with the gods of the Archipelagos (two so far).
+		var professions := 2 if id == "ascendant" else 3
+		ok((tree["specs"] as Array).size() == professions, "%s has %d specializations" % [id, professions])
 		var ids := {}
 		var icons := {}
 		var bad_icons := 0
@@ -4526,10 +4533,13 @@ func test_trees() -> void:
 	pl.add_xp(5000)
 	ok(pl.level == ClassDefs.MAX_LEVEL, "levels stop at the top")
 
-	# Every ability of every branch can be taken and fired without errors.
+	# Every ability of every branch can be taken and fired without errors (the professions that are
+	# earned, earned for this).
 	await start_clean()
+	var had_specs: Dictionary = Game.earned_specs.duplicate()
+	Game.earned_specs["adorer"] = true
 	for id: String in ClassDefs.ALL:
-		for spec_i in 3:
+		for spec_i in (AbilityData.tree(id)["specs"] as Array).size():
 			for pick in 2:
 				Game.player_class = id
 				await fresh_pawn(id)
@@ -4559,6 +4569,7 @@ func test_trees() -> void:
 				ok(ok_all and pl.spec_id != "" and not pl.dead, "%s %s build %d works" % [id, pl.spec_def()["name"], pick])
 				d.set_physics_process(true)
 				await kill_all()
+	Game.earned_specs = had_specs
 	Game.player_class = "infantry"
 
 

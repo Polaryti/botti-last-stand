@@ -40,6 +40,8 @@ const ALL := {
 	# A relic: never random loot, never in the Sandbox's rows.
 	"sunken_crown": {"maps": ["vael"], "relic": true, "named": true, "name": "Sunken Crown", "desc": "The Hollow Sovereign's crown, dropped where he falls (in All vs All at Port Vael, washed up at the Drowned Bell at 2:00). While you wear it everything you do hits 25% harder and you heal 2 health a second, but everyone can see where you are. Fall, and it falls with you.", "time": CROWN_TIME, "color": Color(0.98, 0.78, 0.3), "familiar": false, "weight": 0.0},
 	"oracle_eye": {"maps": ["fontanova"], "relic": true, "named": true, "name": "Oracle's Eye", "desc": "The oracle's sight, from her sanctum deep in the Oracle's Grotto: every enemy within 36 metres is marked, even through rock, and your blows land 20% harder.", "time": CROWN_TIME, "color": Color(0.72, 0.5, 1.0), "familiar": false, "weight": 0.0},
+	"honeycomb": {"maps": ["fontanova"], "name": "Honeycomb", "desc": "A living piece of the wild hives, humming at your shoulder. Every 2 seconds its bees sting the last enemy you struck, or else the nearest within 10 metres, for 10, and poison it for 4 a second over 3 seconds. Every 15 seconds it forages a Honey and drops it at your feet.", "time": FAMILIAR_TIME, "color": Color(1.0, 0.74, 0.22), "familiar": true, "weight": 1.0},
+	"mystery_flask": {"maps": ["fontanova"], "named": true, "name": "Mysterious Flask", "desc": "A flask from the cult's stores, never the same colour twice. Drink it for one of these, for 10 seconds: 40% faster, 30% more damage, 30% less harm, or 4 health a second. One flask in 8 has turned, and poisons you for 5 seconds instead.", "time": 10.0, "color": Color(0.7, 0.5, 1.0), "familiar": false, "weight": 2.0},
 	"antler_charm": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Antler Charm", "desc": "Vines from the valley: your hits root enemies to the ground for 1.5 seconds. The same enemy cannot be rooted again for 4 seconds after it is caught, and fliers are out of the vines' reach.", "time": POTION_TIME, "color": Color(0.55, 0.78, 0.32), "familiar": false, "weight": 2.0},
 }
 
@@ -78,6 +80,21 @@ const BOUNCES := 2
 const LANTERN_RANGE := 30.0
 const STONE_INTERVAL := 5.0 # the Stone Sprite raises a ward this long after the last one was spent
 const STONE_KNOCK := 9.0
+## The Honeycomb (Fontanova): its bees, and the Honey it brings.
+const COMB_INTERVAL := 2.0
+const COMB_REACH := 10.0
+const COMB_STING := 10.0
+const COMB_POISON := Vector2(4.0, 3.0) # a second, for this long
+const COMB_FORAGE := 15.0
+## The Mysterious Flask (Fontanova): what it might be.
+const FLASK_BAD := 0.125 # one in 8
+const FLASK_POISON := 5.0
+const FLASK_GIFTS := [
+	{"name": "Swiftness", "buffs": {"speed": 0.4}},
+	{"name": "Fury", "buffs": {"melee_damage": 0.3, "ranged_damage": 0.3, "spell_damage": 0.3}},
+	{"name": "Iron Skin", "buffs": {"damage_taken": -0.3}},
+	{"name": "Vigour", "buffs": {"regen": 4.0}},
+]
 const STONE_STAGGER := 0.5
 const MIST_TRAIL_EVERY := 0.35 # the Mistberry Draught leaves a patch of mist this often
 const MIST_TRAIL_LIFE := 5.0
@@ -295,6 +312,32 @@ static func mesh(id: String) -> Mesh:
 			l.box(Vector3(0.07, 0.14, 0.04), Vector3(0.1, 0.02, 0.05), Color(0.25, 0.42, 0.2), Vector3(0, 0, 30))
 			for i in 3:
 				l.box(Vector3(0.1 + i * 0.03, 0.1 - i * 0.03, 0.06), Vector3(0.045, 0.045, 0.045), Color(0.3, 0.14, 0.42))
+		"honeycomb":
+			# A broken piece of wild comb: hexagonal wax cells, some capped, honey dripping from its foot,
+			# and three of its bees clinging to it.
+			var wax := Color(0.95, 0.72, 0.24)
+			for i in 7:
+				var c := Vector3.ZERO if i == 0 else Vector3(cos(TAU * i / 6.0) * 0.13, sin(TAU * i / 6.0) * 0.13, 0)
+				l.prism(c + Vector3(0, 0, -0.06), c + Vector3(0, 0, 0.06), 0.072, 0.072, 6, wax.darkened(0.06 * (i % 3)))
+				l.prism(c + Vector3(0, 0, 0.06), c + Vector3(0, 0, 0.065), 0.055, 0.055, 6, Color(1.0, 0.86, 0.4) if i % 2 == 0 else Color(0.7, 0.42, 0.12))
+			l.prism(Vector3(0.0, -0.2, 0.0), Vector3(0.0, -0.3, 0.02), 0.03, 0.012, 5, Color(1.0, 0.7, 0.15)) # a drip
+			l.prism(Vector3(0.1, -0.18, 0.0), Vector3(0.1, -0.24, 0.02), 0.022, 0.008, 5, Color(1.0, 0.7, 0.15))
+			for k in 3:
+				var at := Vector3([-0.16, 0.18, 0.04][k], [0.12, -0.04, 0.2][k], 0.1)
+				l.prism(at + Vector3(-0.035, 0, 0), at + Vector3(0.035, 0, 0), 0.025, 0.02, 5, Color(0.95, 0.78, 0.2))
+				l.box(at, Vector3(0.012, 0.05, 0.05), Color(0.12, 0.08, 0.05))
+				l.box(at + Vector3(0, 0.03, 0), Vector3(0.05, 0.012, 0.04), Color(0.85, 0.95, 1.0))
+		"mystery_flask":
+			# A pear-shaped flask of shifting colours, violet below and green above, a gold-wired cork and
+			# a cult seal of wax on a cord.
+			l.prism(Vector3(0, -0.24, 0), Vector3(0, -0.04, 0), 0.1, 0.17, 9, Color(0.6, 0.38, 0.95))
+			l.prism(Vector3(0, -0.04, 0), Vector3(0, 0.1, 0), 0.17, 0.07, 9, Color(0.48, 0.9, 0.5))
+			l.prism(Vector3(0, 0.1, 0), Vector3(0, 0.2, 0), 0.05, 0.05, 7, Color(0.85, 0.95, 0.9))
+			l.prism(Vector3(0, 0.2, 0), Vector3(0, 0.27, 0), 0.06, 0.055, 7, Color(0.5, 0.34, 0.2))
+			l.prism(Vector3(0, 0.25, 0), Vector3(0, 0.26, 0), 0.065, 0.065, 7, Color(0.95, 0.78, 0.3))
+			l.prism(Vector3(0.05, 0.12, 0.03), Vector3(0.12, -0.02, 0.1), 0.008, 0.008, 3, Color(0.3, 0.2, 0.14))
+			l.prism(Vector3(0.12, -0.02, 0.1), Vector3(0.12, -0.02, 0.13), 0.045, 0.045, 8, Color(0.75, 0.15, 0.2))
+			l.box(Vector3(-0.08, -0.1, 0.12), Vector3(0.03, 0.05, 0.02), Color(1.0, 1.0, 1.0)) # a glint
 		"antler_charm":
 			# A small antler bound with green twine on a cord, a leaf tied to it.
 			var antler := Color(0.88, 0.84, 0.72)

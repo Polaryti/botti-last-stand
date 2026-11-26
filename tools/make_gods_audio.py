@@ -470,6 +470,317 @@ SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
     ("insect_hurt", 0.65), ("insect_death", 0.65), ("thornback_grunt", 0.7), ("thornback_death", 0.8))})
 
 
+
+# --- The cult's minibosses ------------------------------------------------------------------------
+
+def hierophant_voice():
+    """The Hierophant preaching: a deep voice, doubled an octave down as if two spoke, a bell behind."""
+    m = n(2.0)
+    line = curve(m, (0, 110), (0.25, 123), (0.5, 98), (0.8, 116), (1, 92))
+    words = 0.5 + 0.5 * np.abs(np.sin(np.pi * t_(m) / 0.33))
+    x = voice(m, line, VOWEL_A, breath=0.15, rough=0.2) + voice(m, line * 0.5, VOWEL_O, breath=0.1) * 0.7
+    ring = metal(660, 3.0, 2.0) * bell_env(m, 1.6) * 0.08
+    return reverb(lowp(x * words, 2400) * env(m, 0.1, 0.8) + ring, 1.4, 0.4)
+
+
+def hierophant_hurt():
+    m = n(0.6)
+    return lowp(voice(m, curve(m, (0, 150), (1, 95)), VOWEL_A, breath=0.35, rough=0.5) + voice(m, curve(m, (0, 75), (1, 48)), VOWEL_O) * 0.6, 2000) * env(m, 0.01, 5)
+
+
+def hierophant_death():
+    """The Hierophant falling: both voices sinking apart, glass breaking, a bell going on alone."""
+    m = n(2.6)
+    a_ = voice(m, curve(m, (0, 120), (1, 55)), VOWEL_O, breath=0.4, rough=0.3) * env(m, 0.02, 1.2)
+    b_ = voice(m, curve(m, (0, 60), (1, 40)), VOWEL_U, breath=0.2) * env(m, 0.02, 1.0) * 0.7
+    glass_ = sum(at(glass(r, 0.4, 10.0) * 0.14, 0.9 + k * 0.06, 2.6) for k, r in enumerate((1900, 2600, 3300, 4100)))
+    ring = at(metal(440, 2.6, 1.6) * bell_env(n(1.6), 1.2) * 0.12, 1.0, 2.6)
+    return reverb(a_ + b_ + glass_ + ring + thud(m, 1.0, 0.9, 100), 1.6, 0.35)
+
+
+def transmute_rite():
+    """The elixir of change poured out: a seething boil, and a chord climbing out of it, not quite in tune."""
+    m = n(2.4)
+    tt = t_(m)
+    boil = band(noise(m), 200, 1400) * (0.5 + 0.5 * np.abs(np.sin(2 * np.pi * 9 * tt + np.sin(2 * np.pi * 1.3 * tt) * 3))) * env(m, 0.3, 1.0) * 0.4
+    chord = sum(np.sin(2 * np.pi * np.cumsum(curve(m, (0, f), (1, f * 1.5))) / SR) * 0.08 for f in (130, 164, 196, 233))
+    return reverb(boil + chord * env(m, 0.6, 1.2), 1.4, 0.35)
+
+
+def polemarch_voice():
+    """The Polemarch's war-cry, booming in its helmet."""
+    m = n(1.0)
+    bark = voice(m, curve(m, (0, 120), (0.3, 165), (1, 110)), VOWEL_A, breath=0.25, rough=0.7) * env(m, 0.02, 2.2)
+    return reverb(lowp(bark, 2200) + band(noise(m), 1200, 3500) * env(m, 0.005, 12) * 0.12, 0.7, 0.3)
+
+
+def polemarch_hurt():
+    m = n(0.5)
+    return lowp(voice(m, curve(m, (0, 130), (1, 95)), VOWEL_A, breath=0.4, rough=0.7), 2000) * env(m, 0.01, 6) + band(noise(m), 2000, 6000) * env(m, 0.002, 30) * 0.25
+
+
+def polemarch_death():
+    """The Polemarch falling: a roar breaking off, the great shield ringing down on the stones."""
+    m = n(2.2)
+    roar = voice(m, curve(m, (0, 140), (1, 60)), VOWEL_O, breath=0.4, rough=0.6) * env(m, 0.02, 1.6)
+    ring = at(metal(310, 3.5, 1.4) * bell_env(n(1.4), 1.6) * 0.25, 0.9, 2.2)
+    return roar + ring + thud(m, 0.9, 1.0, 90) + thud(m, 1.1, 0.6, 120)
+
+
+def spear_sweep():
+    """A long spear swept low: a deep swish and the bronze head ringing at the end of it."""
+    m = n(0.8)
+    swish = sweep_filter(noise(m), 300, 1800, 0.35) * env(m, 0.08, 4) * 0.55
+    return swish + at(metal(1250, 3.0, 0.6) * bell_env(n(0.6), 4) * 0.12, 0.35, 0.8)
+
+
+def phalanx_call():
+    """The Polemarch calls its Guardians: a bronze horn, two long falling notes, spears struck on shields."""
+    m = n(2.2)
+    horn = sum(at(lowp(sum(np.sin(2 * np.pi * np.cumsum(curve(n(0.9), (0, f), (1, f * 0.94))) / SR * h) * a for h, a in ((1, 1.0), (2, 0.5), (3, 0.3))), 1800) * env(n(0.9), 0.08, 1.6) * 0.3, s_, 2.2)
+        for s_, f in ((0.0, 196), (0.9, 147)))
+    clash = sum(at(band(noise(n(0.06)), 1500, 6000) * env(n(0.06), 0.001, 25) * 0.4, 1.6 + k * 0.14, 2.2) for k in range(3))
+    return reverb(horn + clash, 1.2, 0.3)
+
+
+SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
+    ("hierophant_voice", 0.75), ("hierophant_hurt", 0.7), ("hierophant_death", 0.8), ("transmute_rite", 0.75),
+    ("polemarch_voice", 0.8), ("polemarch_hurt", 0.7), ("polemarch_death", 0.8), ("spear_sweep", 0.7), ("phalanx_call", 0.75))})
+
+
+
+# --- Al'quimelea --------------------------------------------------------------------------------------
+
+def _choir(m, line, spread=(1.0, 1.26, 1.5, 0.5)):
+    """Many voices on one line, each a little out of tune with the others: the god speaking."""
+    return sum(voice(m, line * r * (1 + 0.006 * k), (VOWEL_O, VOWEL_A, VOWEL_U, VOWEL_O)[k % 4], breath=0.12) * (0.9 if r != 0.5 else 0.7)
+        for k, r in enumerate(spread))
+
+
+def alq_voice():
+    """Al'quimelea speaking: a choir of voices on one falling line, glass ringing in it."""
+    m = n(3.0)
+    line = curve(m, (0, 98), (0.3, 104), (0.55, 92), (0.8, 87), (1, 82))
+    words = 0.55 + 0.45 * np.abs(np.sin(np.pi * t_(m) / 0.45))
+    ring = sum(at(glass(f, 1.6, 2.5) * 0.06, k * 0.4, 3.0) for k, f in enumerate((1318, 1397, 1661)))
+    return reverb(lowp(_choir(m, line) * words, 2600) * env(m, 0.2, 0.7) + ring, 2.0, 0.45)
+
+
+def alq_roar():
+    """It tears itself open: every voice rising into a scream, a boiling under it."""
+    m = n(2.4)
+    line = curve(m, (0, 82), (0.5, 140), (1, 120))
+    scream = _choir(m, line, (1.0, 1.06, 1.5, 2.0)) * env(m, 0.1, 1.2)
+    boil = band(noise(m), 150, 900) * (0.5 + 0.5 * np.abs(np.sin(2 * np.pi * 7 * t_(m)))) * env(m, 0.2, 1.0) * 0.4
+    return reverb(lowp(scream, 3000) * 0.8 + boil + thud(m, 0.0, 0.8, 70), 1.8, 0.4)
+
+
+def alq_hurt():
+    m = n(0.8)
+    return reverb(lowp(_choir(m, curve(m, (0, 130), (1, 95))), 2400) * env(m, 0.01, 4.0) + glass(2200, 0.8, 12.0) * 0.08, 0.8, 0.3)
+
+
+def alq_death():
+    """Its end: the voices sinking and falling apart one by one, glass breaking, a long boil going quiet."""
+    m = n(5.5)
+    sink = sum(voice(m, curve(m, (0, f), (0.5 + k * 0.1, f * 0.7), (1, f * 0.4)), VOWEL_O, breath=0.3) * env(m, 0.05, 0.6 + k * 0.25) * 0.6 for k, f in enumerate((120, 150, 180, 98)))
+    shards = sum(at(glass(r, 0.5, 8.0) * 0.12, 0.8 + k * 0.23, 5.5) for k, r in enumerate((1800, 2300, 2900, 3600, 4400, 5100)))
+    boil = band(noise(m), 200, 1200) * np.exp(-t_(m) * 0.6) * 0.25
+    return reverb(sink + shards + boil + thud(m, 2.6, 1.0, 60), 2.4, 0.4)
+
+
+def alq_shatter():
+    """Its halo breaks: many flasks at once, falling and smashing."""
+    m = n(1.6)
+    return sum(at(glass(r, 0.35, 14.0) * 0.12, k * 0.07, 1.6) for k, r in enumerate((1900, 2600, 3100, 3900, 4400, 5200, 2800, 3500))) + band(noise(m), 2000, 7000) * env(m, 0.01, 4) * 0.15
+
+
+def alq_gather():
+    """The crucible gathering its light: a rising hum and a hiss."""
+    m = n(1.4)
+    hum = sum(np.sin(2 * np.pi * np.cumsum(curve(m, (0, f), (1, f * 2.0))) / SR) * 0.1 for f in (110, 165))
+    return (hum + band(noise(m), 3000, 8000) * 0.05) * env(m, 0.8, 0.4)
+
+
+def alq_nova():
+    """The nova: a white boom, a ring of light rolling out."""
+    m = n(1.6)
+    boom = thud(m, 0.0, 1.2, 55) + band(noise(m), 300, 4000) * env(m, 0.002, 4) * 0.6
+    ring = glide(1400, 700, m) * np.exp(-t_(m) * 2.5) * 0.15
+    return reverb(boom + ring, 1.4, 0.35)
+
+
+def alq_change():
+    """The ground changing under you: a crack, and a bright chord coming up out of it."""
+    m = n(1.3)
+    crack = band(noise(n(0.1)), 800, 5000) * env(n(0.1), 0.002, 20) * 0.6
+    chord = sum(glass(f, 1.3, 3.5) * 0.08 for f in (659, 698, 831, 988))
+    return at(crack, 0.0, 1.3) + chord + thud(m, 0.0, 0.5, 90)
+
+
+def alq_shard():
+    """A crystal shard driven into the ground."""
+    m = n(0.6)
+    return glass(2600, 0.6, 9.0) * 0.18 + glass(1950, 0.6, 9.0) * 0.12 + band(noise(m), 1500, 6000) * env(m, 0.002, 18) * 0.3
+
+
+def alq_lance():
+    """The lance cast: shards drawn together with a rising chime."""
+    m = n(1.0)
+    return sum(at(glass(f, 0.5, 6.0) * 0.1, k * 0.06, 1.0) for k, f in enumerate((880, 988, 1175, 1318, 1568, 1760, 2093)))
+
+
+SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
+    ("alq_voice", 0.8), ("alq_roar", 0.85), ("alq_hurt", 0.7), ("alq_death", 0.85), ("alq_shatter", 0.75), ("alq_gather", 0.7),
+    ("alq_nova", 0.85), ("alq_change", 0.75), ("alq_shard", 0.7), ("alq_lance", 0.7))})
+
+
+
+# --- Fontanova's weapons ----------------------------------------------------------------------
+
+def censer_swing():
+    """A censer swung on its chain: links chinking, the bronze bowl whooshing through the air, the embers
+    breathing as it goes."""
+    m = n(0.55)
+    whoosh = sweep_filter(noise(m), 300, 1800, 0.35) * env(m, 0.08, 5) * 0.45
+    chink = sum(at(metal(rng.uniform(2600, 3600), 30, 0.08) * bell_env(n(0.08), 30) * 0.08, k * 0.05, 0.55) for k in range(4))
+    breath = band(noise(m), 800, 2400) * env(m, 0.1, 4) * 0.12
+    return whoosh + chink + breath
+
+
+def censer_ready():
+    """The censer full: the resin catching, a low hum, and one small temple bell."""
+    m = n(0.9)
+    catch = band(noise(m), 1500, 5000) * env(m, 0.005, 9) * 0.2
+    bell = metal(1320, 6, 0.9) * bell_env(m, 4.0) * 0.14
+    hum = np.sin(2 * np.pi * 165 * t_(m)) * env(m, 0.1, 3) * 0.08
+    return catch + bell + hum
+
+
+def censer_release():
+    """The release: a heavy whoosh all the way round, bronze ringing, and the smoke bursting out with a
+    roar of embers."""
+    m = n(1.3)
+    whoosh = sweep_filter(noise(m), 200, 2600, 0.5) * env(m, 0.12, 2.6) * 0.6
+    ring = metal(740, 5, 1.3) * bell_env(m, 3.0) * 0.18 + metal(1110, 6, 1.3) * bell_env(m, 3.5) * 0.1
+    roar = band(noise(m), 400, 3000) * np.exp(-((t_(m) - 0.3) ** 2) / 0.08) * 0.35
+    return reverb(whoosh + ring + roar + thud(m, 0.25, 0.5, 100), 0.8, 0.2)
+
+
+def repeater_shot():
+    """The Resin Repeater: a tight crack of the prod, the lever clacking the next bolt down."""
+    m = n(0.4)
+    snap = band(noise(n(0.03)), 1200, 6000) * env(n(0.03), 0.001, 60) * 0.8
+    thrum = glide(240, 160, m) * np.exp(-t_(m) * 22) * 0.35
+    clack = band(noise(n(0.03)), 2000, 7000) * env(n(0.03), 0.001, 50) * 0.35
+    return at(snap, 0.0, 0.4) + thrum + at(clack, 0.16, 0.4) + at(clack * 0.7, 0.21, 0.4)
+
+
+def greataxe_swing():
+    """The Ruin-Breaker's chop: a long heavy whoosh, deep, the haft creaking."""
+    m = n(0.7)
+    whoosh = sweep_filter(noise(m), 160, 1300, 0.5) * env(m, 0.15, 4) * 0.7
+    creak = band(noise(m), 300, 700) * (0.5 + 0.5 * np.sin(2 * np.pi * 30 * t_(m))) * env(m, 0.05, 6) * 0.12
+    return whoosh + creak
+
+
+SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
+    ("censer_swing", 0.6), ("censer_ready", 0.6), ("censer_release", 0.85), ("repeater_shot", 0.7), ("greataxe_swing", 0.75))})
+
+
+# --- The Ascendant ----------------------------------------------------------------------------
+
+def ascend_leap():
+    """Rising: a rush of air upward and a breath of choir."""
+    m = n(0.7)
+    rush = sweep_filter(noise(m), 300, 3200, 0.45) * env(m, 0.05, 3) * 0.5
+    choir = _choir(m, curve(m, (0, 330), (1, 440)), spread=(1.0, 1.5, 2.0)) * env(m, 0.15, 3) * 0.25
+    return rush + choir
+
+
+def ascend_crash():
+    """Coming down: a stone-breaking crash, dust, and a ringing chord."""
+    m = n(1.4)
+    crash = thud(m, 0.0, 1.4, 70) + band(noise(m), 200, 3000) * env(m, 0.002, 6) * 0.7
+    grit = band(noise(m), 2500, 7000) * env(m, 0.02, 4) * 0.15
+    chord = sum(glass(f, 1.4, 3.0) * 0.05 for f in (440, 554, 659))
+    return reverb(crash + grit + chord, 1.0, 0.25)
+
+
+def deicide_strike():
+    """Deicide: the axe coming down out of the leap, a heavy bite, and a choir cut off."""
+    m = n(1.5)
+    bite = thud(m, 0.0, 1.5, 60) + at(band(noise(n(0.08)), 600, 5000) * env(n(0.08), 0.001, 25) * 0.9, 0.0, 1.5)
+    choir = _choir(m, curve(m, (0, 392), (0.2, 392), (1, 196)), spread=(1.0, 1.26, 1.5, 0.5)) * np.exp(-t_(m) * 6) * 0.35
+    return reverb(bite + choir, 1.2, 0.3)
+
+
+def rite_break():
+    """An attack broken: a holy chord shattering like glass and falling away."""
+    m = n(1.3)
+    chord = sum(glass(f, 1.3, 2.0) * 0.07 for f in (523, 659, 784, 1047))
+    shatter = sum(at(glass(r, 0.3, 14.0) * 0.14, 0.05 + k * 0.025, 1.3) for k, r in enumerate((2200, 2900, 3700, 4600, 5400)))
+    fall = glide(900, 220, m) * np.exp(-t_(m) * 3) * 0.12
+    return reverb(chord * np.exp(-t_(m) * 8) + shatter + fall, 1.0, 0.3)
+
+
+def elixir_drink():
+    """The Elixir of Change drunk: a gulp, bubbling, and a bright chord swelling up."""
+    m = n(1.4)
+    gulp = sum(at(lowp(noise(n(0.09)), 500) * env(n(0.09), 0.01, 18) * 0.5, k * 0.16, 1.4) for k in range(3))
+    bubbles = sum(at(glide(rng.uniform(500, 900), rng.uniform(900, 1500), n(0.06)) * env(n(0.06), 0.005, 30) * 0.08, rng.uniform(0.3, 1.0), 1.4) for _ in range(10))
+    swell = sum(glass(f, 1.4, 1.5) * 0.06 for f in (587, 740, 880)) * np.clip(t_(m) / 0.9, 0, 1)
+    return gulp + bubbles + swell
+
+
+def change_end():
+    """The change ebbing away: a falling sigh of chord."""
+    m = n(0.9)
+    return reverb(sum(glide(f, f * 0.75, m) * 0.05 for f in (587, 740, 880)) * env(m, 0.03, 3), 0.8, 0.3)
+
+
+SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
+    ("ascend_leap", 0.7), ("ascend_crash", 0.85), ("deicide_strike", 0.9), ("rite_break", 0.8), ("elixir_drink", 0.7), ("change_end", 0.6))})
+
+
+# --- The Honeycomb and the Mysterious Flask -----------------------------------------------------
+
+def honeycomb_hum():
+    """The Honeycomb's bees going out to sting: a swelling buzz of many small wings."""
+    m = n(0.9)
+    tt = t_(m)
+    buzz = sum(np.sin(2 * np.pi * np.cumsum(np.full(m, f) * (1 + 0.02 * np.sin(2 * np.pi * rng.uniform(5, 9) * tt))) / SR) for f in (220, 233, 247, 262))
+    buzz = band(np.sign(buzz) * np.abs(buzz) ** 0.6, 200, 3000) * env(m, 0.15, 3) * 0.25
+    return buzz
+
+
+def honey_forage():
+    """Honey brought back: a sticky plop and a small bright chime."""
+    m = n(0.8)
+    plop = glide(500, 180, n(0.12)) * env(n(0.12), 0.003, 20) * 0.5
+    return at(plop, 0.0, 0.8) + glass(1760, 0.8, 5.0) * 0.12 + glass(2217, 0.8, 6.0) * 0.06
+
+
+def flask_drink():
+    """The Mysterious Flask: a cork drawn, a swallow, and something unexpected fizzing up."""
+    m = n(1.1)
+    cork = band(noise(n(0.04)), 800, 4000) * env(n(0.04), 0.001, 40) * 0.6 + glide(900, 600, n(0.04)) * 0.2
+    gulp = sum(at(lowp(noise(n(0.08)), 450) * env(n(0.08), 0.01, 18) * 0.45, 0.25 + k * 0.15, 1.1) for k in range(2))
+    fizz = band(noise(m), 4000, 9000) * np.clip((t_(m) - 0.55) / 0.2, 0, 1) * np.exp(-np.clip(t_(m) - 0.75, 0, None) * 4) * 0.15
+    return at(cork, 0.0, 1.1) + gulp + fizz
+
+
+def flask_sour():
+    """The flask was bad: a sour gurgle and a cough."""
+    m = n(0.9)
+    gurgle = band(noise(m), 200, 700) * (0.5 + 0.5 * np.sin(2 * np.pi * 18 * t_(m))) * env(m, 0.05, 4) * 0.4
+    cough = voice(n(0.25), curve(n(0.25), (0, 220), (1, 160)), VOWEL_A, breath=0.8, rough=0.5) * env(n(0.25), 0.005, 12)
+    return gurgle + at(cough, 0.5, 0.9) * 0.6
+
+
+SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
+    ("honeycomb_hum", 0.55), ("honey_forage", 0.65), ("flask_drink", 0.7), ("flask_sour", 0.7))})
+
 if __name__ == "__main__":
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
     for name, (make, gain) in SOUNDS.items():

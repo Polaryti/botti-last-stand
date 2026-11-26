@@ -128,11 +128,24 @@ def kraken():
     return mix(7.4, parts)
 
 
+def alquimelea():
+    # Al'quimelea comes down from its temple: Fontanova's E Phrygian dominant, never settling. A low E
+    # knocked three times, each nearer; then F, G-sharp, B and E climbing; the low E struck with the F a
+    # half-step over it, a chord that will not resolve, under the loudest gong; the bell tree run upward.
+    toll = [(0.0, "E3", 0.6), (0.4, "E3", 0.7), (0.8, "E3", 0.8), (1.4, "F4", 0.84), (1.62, "G#4", 0.86), (1.84, "B4", 0.9), (2.06, "E5", 0.94),
+        (2.6, "E3", 1.0), (2.6, "F3", 0.8), (2.6, "B3", 0.7), (3.5, "F4", 0.7), (3.5, "E4", 0.7)]
+    parts = [(at, tube(note, 5.0), gain) for at, note, gain in toll]
+    parts.append((0.8, one("Percussion/gongHit_mf.wav"), 0.3))
+    parts.append((2.6, one("Percussion/gongHit_f.wav"), 0.55))
+    parts.append((2.62, one("Percussion/BellTree_Stroke3_*.wav"), 0.34))
+    return mix(7.2, parts)
+
+
 if __name__ == "__main__":
     if not SAMPLES or not glob.glob(os.path.join(SAMPLES, "Percussion/TB_hit_*.wav")):
         raise SystemExit("Give the VSCO-2 CE folder (the soundtrack's samples) as the first argument.")
     only = [s for s in os.environ.get("ONLY", "").split(",") if s]
-    for name, make in (("revenant", revenant), ("wyvern", wyvern), ("regent", regent), ("sovereign", sovereign), ("leviathan", leviathan), ("kraken", kraken)):
+    for name, make in (("revenant", revenant), ("wyvern", wyvern), ("regent", regent), ("sovereign", sovereign), ("leviathan", leviathan), ("kraken", kraken), ("alquimelea", alquimelea)):
         if not only or name in only:
             write("assets/sounds/boss_bells_%s.ogg" % name, make(), 0.8, q=4)
     print("boss bells done")

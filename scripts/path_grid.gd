@@ -67,6 +67,21 @@ func block_turned(t: Transform3D, box: Vector3, solid := true) -> void:
 ## the land): closed, so nothing plans a way up a sea wall's slope or a breakwater's tumbled side it
 ## could never climb, and goes round by the stairs instead. On the coastal maps (Port Vael, the
 ## Lantern Road), where the sea meets stone.
+## The Ravine's floor, far below the rims: no one should be led down into it (only bridges cross it).
+func block_chasms(t: Terrain) -> int:
+	if t.chasms.is_empty():
+		return 0
+	var closed := 0
+	for y in size:
+		for x in size:
+			var middle := to_world(Vector2i(x, y))
+			if t.in_chasm(middle.x, middle.z) and not t.on_deck(middle.x, middle.z) and t.ground_height(middle.x, middle.z) < Terrain.CHASM_DEATH:
+				if not astar.is_point_solid(Vector2i(x, y)):
+					astar.set_point_solid(Vector2i(x, y), true)
+					closed += 1
+	return closed
+
+
 func block_steep(t: Terrain, rise: float) -> int:
 	var n := t.vertices_per_side
 	var limit := rise * Terrain.CELL

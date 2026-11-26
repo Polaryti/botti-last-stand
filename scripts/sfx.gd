@@ -46,7 +46,10 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike", "dawn_fontanova",
 	"bee_buzz", "bee_sting", "wasp_buzz", "wasp_shot", "wasp_bite", "hive_hum", "hive_hurt", "hive_swarm", "hive_break", "nest_shudder", "snail_squelch", "snail_hurt", "snail_death", "spider_hiss", "spider_pounce", "spider_bite", "spider_hurt", "spider_death", "ostrich_screech", "ostrich_hiss", "ostrich_kick", "ostrich_hurt", "ostrich_death", "moth_flutter", "moth_dust", "insect_hurt", "insect_death", "thornback_grunt", "thornback_death",
 	"brazier_lit", "sanctum_open", "altar_wake", "altar_bless", "tide_rising",
-	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash"]
+	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash",
+	"hierophant_voice", "hierophant_hurt", "hierophant_death", "transmute_rite", "polemarch_voice", "polemarch_hurt", "polemarch_death", "spear_sweep", "phalanx_call",
+	"alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea",
+	"censer_swing", "censer_ready", "censer_release", "repeater_shot", "greataxe_swing", "ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end", "honeycomb_hum", "honey_forage", "flask_drink", "flask_sour"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
 	"zombie_hurt": ["zombie_hurt_a", "zombie_hurt_b"], "zombie_death": ["zombie_death_a", "zombie_death_b"],
 	"hurt": ["hurt_a", "hurt_b"], "swing": ["swing_a", "swing_b", "swing_c"], "hit": ["hit_a", "hit_b"],

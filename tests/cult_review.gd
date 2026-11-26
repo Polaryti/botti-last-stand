@@ -6,7 +6,8 @@ extends Node
 var w: World
 var cam: Camera3D
 const POSES := {"cult_worshipper": ["Idle", "Walking_A", "1H_Melee_Attack_Chop"], "cult_priest": ["Idle", "Throw", "Raise"],
-	"cult_guardian": ["Idle", "WindUp", "Running_A"], "ostrich_rider": ["Ride", "RideCharge", "RideThrust"]}
+	"cult_guardian": ["Idle", "WindUp", "Running_A"], "ostrich_rider": ["Ride", "RideCharge", "RideThrust"],
+	"hierophant": ["Idle", "Throw", "Raise"], "polemarch": ["Idle", "WindUp", "1H_Melee_Attack_Chop"]}
 
 
 func _ready() -> void:

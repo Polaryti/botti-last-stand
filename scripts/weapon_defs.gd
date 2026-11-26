@@ -4,7 +4,7 @@ class_name WeaponDefs
 enum Kind { MELEE, RANGED, SPELL }
 
 const DAMAGE := 25.0
-const ALIGNED_HELD := ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword", "oar", "anchor"]
+const ALIGNED_HELD := ["lance", "scythe", "flail", "censer_flail", "resin_repeater", "bell_hammer", "bow", "longbow", "crossbow", "greatsword", "oar", "anchor"]
 const HAND_TURN := PI * 0.5
 const TORCH_FIRE := 0.575 # how high up a torch the fire starts
 
@@ -72,6 +72,12 @@ const ALL := {
 		"knock": 1.0, "weight": 0.8, "pos": Vector3(0.15, -0.16, -0.27), "scale": 0.85},
 	"anchor": {"maps": ["vael", "lantern_road"], "swing_sound": "anchor_heave", "two_handed": true, "power": 2.3, "name": "Ship's Anchor", "quake": 4.5, "quake_share": 0.5, "quake_stagger": 0.6, "burden": 0.9, "desc": "A ship's anchor on a short chain, swung with both hands. Very slow, but each slam shakes the ground: everything within 4.5 m takes half the blow and staggers for 0.6 s. You move at 90% speed while you carry it.", "lore": "Torn from a wreck in the harbour mud. Whoever first swung it at the Drowned found that they, too, remember what an anchor means.", "kind": Kind.MELEE, "rate": 1.5, "range": 2.7, "cone": 120.0, "max_hits": 6,
 		"knock": 3.0, "swing": "slam", "weight": 0.8, "pos": Vector3(0.26, -0.44, -0.52), "scale": 0.5},
+	"censer_flail": {"maps": ["fontanova"], "swing_sound": "censer_swing", "power": 0.95, "name": "Censer Flail", "censer": 5, "censer_power": 2.0, "censer_reach": 3.6, "censer_smoke": Vector2(6.0, 3.0), "desc": "A bronze temple censer on a chain, swung like a flail. Each blow that lands packs it with burning resin. After 5, the next swing is a release that sweeps all round you, out to 3.6 m, for double damage, and its smoke poisons what it strikes for 6 a second over 3 s.", "lore": "The priests of Fontanova swung these down the Sacred Way at every rite. The smoke was said to carry prayers up to the gods. Lately it has carried other things down.", "kind": Kind.MELEE, "rate": 0.7, "range": 2.6, "cone": 110.0, "max_hits": 3,
+		"knock": 2.0, "swing": "flail", "weight": 1.0, "pos": Vector3(0.28, -0.1, -0.7), "scale": 0.72},
+	"resin_repeater": {"maps": ["fontanova"], "swing_sound": "repeater_shot", "power": 0.75, "nock": Vector3(0.0, 0.03, -0.16), "name": "Resin Repeater", "flyers": 1.75, "desc": "A repeating crossbow from the temple armoury, its stinger bolts tipped with hardened resin. Quick, flat shots that fly true out to 34 m, and strike flying enemies 75% harder. Uses arrows.", "lore": "The temple guard kept these for the swarms. A bolt that could find a wasp in the air could find anything else, too.", "kind": Kind.RANGED, "rate": 0.36, "range": 34.0, "speed": 52.0, "gravity": 0.6,
+		"knock": 1.0, "weight": 1.0, "pos": Vector3(0.17, -0.2, -0.3), "scale": 0.2},
+	"ruin_greataxe": {"maps": ["fontanova"], "swing_sound": "greataxe_swing", "two_handed": true, "power": 1.6, "name": "Ruin-Breaker Greataxe", "breaker": 1.5, "desc": "A great double-bitted axe, made to bring down temple doors. Slow, wide chops through up to four. Shields do not stop it, and it strikes stone things 50% harder.", "lore": "When the people of Fontanova turned from their god, they took axes like this to its doors. The doors were stone, and so were the things behind them.", "kind": Kind.MELEE, "rate": 1.05, "range": 3.0, "cone": 130.0, "max_hits": 4,
+		"knock": 3.5, "swing": "overhead", "weight": 0.9, "pos": Vector3(0.32, -0.46, -0.52), "scale": 0.5},
 	"trident": {"only": "tidecaller", "power": 1.2, "name": "Tidecaller's Trident", "tide": 6.0, "desc": "Tidecaller only. Long thrusts that strike up to two in a line; each blow that lands draws 6 tide. The Tidecaller's tree makes it reach further, skewer and soak.",
 		"lore": "Coral has grown over the haft where the sea held it. The tines still taste of salt.", "kind": Kind.MELEE, "rate": 0.55, "range": 3.9, "cone": 22.0, "max_hits": 2,
 		"knock": 2.0, "swing": "thrust", "weight": 0.0, "pos": Vector3(0.22, -0.24, 0.05), "scale": 1.0},
@@ -135,7 +141,7 @@ static func pick_rare(map_id := "") -> String:
 ## How a weapon sits in a character's hand. Poles and bows are drawn along their length, so they need
 ## a quarter turn to point where the character is looking.
 static func hand_rotation(id: String) -> Vector3:
-	if id in ["spear", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow", "musket", "harpoon", "flare_pistol"]:
+	if id in ["spear", "pitchfork", "javelins", "blowgun", "bow", "longbow", "crossbow", "resin_repeater", "musket", "harpoon", "flare_pistol"]:
 		return Vector3(HAND_TURN, 0.0, 0.0)
 	return Vector3.ZERO
 
@@ -145,7 +151,7 @@ static func held_size(id: String) -> float:
 	match id:
 		"lance": return 1.0
 		"bow", "longbow": return 1.1
-		"crossbow": return 0.5
+		"crossbow", "resin_repeater": return 0.5
 	return float(ALL[id]["scale"]) * 1.6
 
 
@@ -222,6 +228,9 @@ static func mesh(id: String) -> Mesh:
 		"anchor": m = _anchor()
 		"oar": m = _oar()
 		"trident": m = _trident()
+		"censer_flail": m = _censer_handle()
+		"resin_repeater": m = _resin_repeater()
+		"ruin_greataxe": m = _ruin_greataxe()
 	_meshes[id] = m
 	return m
 
@@ -665,6 +674,139 @@ static func flail_chain() -> Mesh:
 		l.prism(c + d * 0.08, c + d * 0.23, 0.045, 0.0, 4, STEEL)
 	_meshes["chain"] = l.commit()
 	return _meshes["chain"]
+
+
+## What swings at the end of a chained weapon's handle (WeaponVisual): the Flail's spiked ball, the
+## Censer Flail's censer.
+static func chain_mesh(id: String) -> Mesh:
+	match id:
+		"flail": return flail_chain()
+		"censer_flail": return censer_chain()
+	return null
+
+
+# --- Fontanova --------------------------------------------------------------------------------
+const BRONZE := Color(0.7, 0.48, 0.24)
+const TEMPLE_GOLD := Color(0.9, 0.72, 0.32)
+const RESIN := Color(0.95, 0.62, 0.16)
+const MARBLE := Color(0.88, 0.86, 0.8)
+
+
+## The Censer Flail's handle: a short turned haft of olive wood with a bronze pommel, a gilded collar and
+## a ring at its head, where the chain hangs.
+static func _censer_handle() -> Mesh:
+	var l := LowPoly.new()
+	l.prism(Vector3(0, -0.22, 0), Vector3(0, 0.3, 0), 0.03, 0.026, 8, LIGHT_WOOD.darkened(0.18))
+	for y: float in [-0.12, 0.0, 0.12]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.025, 0), 0.034, 0.034, 8, Color(0.36, 0.22, 0.4)) # violet cord binding
+	l.prism(Vector3(0, -0.28, 0), Vector3(0, -0.21, 0), 0.05, 0.035, 8, BRONZE)
+	l.prism(Vector3(0, -0.32, 0), Vector3(0, -0.28, 0), 0.02, 0.05, 8, TEMPLE_GOLD)
+	l.prism(Vector3(0, 0.28, 0), Vector3(0, 0.34, 0), 0.04, 0.045, 8, TEMPLE_GOLD)
+	l.prism(Vector3(0, 0.36, -0.03), Vector3(0, 0.36, 0.03), 0.035, 0.035, 8, BRONZE.darkened(0.1)) # the ring
+	return l.commit()
+
+
+## Its chain and the censer itself: a pierced bronze bowl with a domed, pierced lid, a little temple-roof
+## finial, and the glow of burning resin showing through the holes. Hangs from the handle's ring.
+static func censer_chain() -> Mesh:
+	if _meshes.has("_censer_chain"):
+		return _meshes["_censer_chain"]
+	var l := LowPoly.new()
+	for i in 6:
+		var y := -0.035 - i * 0.055
+		for offset: float in [-0.016, 0.016]:
+			var centre := Vector3(offset, y, 0) if i % 2 == 0 else Vector3(0, y, offset)
+			l.box(centre, Vector3(0.008, 0.05, 0.008), BRONZE.lightened(0.1))
+	# Three short chains down to the rim, from a little crown above the lid.
+	var top := Vector3(0, -0.36, 0)
+	l.prism(top + Vector3.UP * 0.02, top - Vector3.UP * 0.02, 0.03, 0.03, 6, TEMPLE_GOLD)
+	var c := Vector3(0, -0.56, 0)
+	for k in 3:
+		var a := TAU * k / 3.0
+		l.prism(top, c + Vector3(cos(a) * 0.1, 0.02, sin(a) * 0.1), 0.006, 0.006, 3, BRONZE.lightened(0.1))
+	# The lid: a dome, pierced, with a finial.
+	l.prism(c + Vector3(0, 0.0, 0), c + Vector3(0, 0.08, 0), 0.12, 0.06, 10, BRONZE)
+	l.prism(c + Vector3(0, 0.08, 0), c + Vector3(0, 0.12, 0), 0.06, 0.02, 10, TEMPLE_GOLD)
+	l.prism(c + Vector3(0, 0.12, 0), c + Vector3(0, 0.17, 0), 0.015, 0.0, 6, TEMPLE_GOLD)
+	# The bowl, wider at the rim, and its foot.
+	l.prism(c + Vector3(0, -0.12, 0), c, 0.07, 0.125, 10, BRONZE.darkened(0.12))
+	l.prism(c + Vector3(0, -0.16, 0), c + Vector3(0, -0.12, 0), 0.05, 0.06, 8, BRONZE.darkened(0.25))
+	l.prism(c + Vector3(0, -0.005, 0), c + Vector3(0, 0.005, 0), 0.13, 0.13, 10, TEMPLE_GOLD)
+	# The holes, glowing with the resin inside.
+	for k in 8:
+		var a := TAU * k / 8.0 + 0.2
+		l.box(c + Vector3(cos(a) * 0.1, -0.05, sin(a) * 0.1), Vector3(0.022, 0.03, 0.022), RESIN.lightened(0.2), Vector3(0, -rad_to_deg(a), 0))
+		l.box(c + Vector3(cos(a) * 0.085, 0.045, sin(a) * 0.085), Vector3(0.018, 0.018, 0.018), RESIN, Vector3(0, -rad_to_deg(a), 0))
+	_meshes["_censer_chain"] = l.commit()
+	return _meshes["_censer_chain"]
+
+
+## The Resin Repeater: a crossbow with a box magazine of stinger bolts on top and a lever to work it,
+## its stock carved from olive wood, its prod of horn and bronze, amber resin sealing every joint.
+## Stock points down -Z, like the Crossbow's.
+static func _resin_repeater() -> Mesh:
+	var l := LowPoly.new()
+	var olive := LIGHT_WOOD.darkened(0.12)
+	l.box(Vector3(0, 0, 0.1), Vector3(0.18, 0.22, 1.8), olive)
+	l.box(Vector3(0, -0.06, 0.75), Vector3(0.16, 0.34, 0.5), olive.darkened(0.12)) # the butt
+	l.box(Vector3(0, -0.24, 0.3), Vector3(0.12, 0.36, 0.2), olive.darkened(0.2)) # the grip
+	l.box(Vector3(0, 0.12, -0.2), Vector3(0.08, 0.04, 1.4), BRONZE.darkened(0.2)) # the rail
+	# The magazine: a slim box of bolts on the rail, bound in bronze, and its lever arched over it.
+	l.box(Vector3(0, 0.3, -0.2), Vector3(0.13, 0.3, 0.5), olive.darkened(0.25))
+	l.box(Vector3(0, 0.46, -0.2), Vector3(0.15, 0.04, 0.54), BRONZE)
+	for z: float in [-0.38, -0.2, -0.02]:
+		l.box(Vector3(0, 0.3, z), Vector3(0.15, 0.31, 0.035), BRONZE.darkened(0.15))
+	for i in 3:
+		l.prism(Vector3(0.035 * (i - 1), 0.48, -0.36), Vector3(0.035 * (i - 1), 0.52, -0.43), 0.016, 0.0, 4, RESIN) # bolt tips peeping out
+	l.prism(Vector3(0.09, 0.1, 0.3), Vector3(0.1, 0.5, 0.02), 0.02, 0.02, 4, BRONZE)
+	l.prism(Vector3(-0.09, 0.1, 0.3), Vector3(-0.1, 0.5, 0.02), 0.02, 0.02, 4, BRONZE)
+	l.prism(Vector3(0.1, 0.5, 0.02), Vector3(-0.1, 0.5, 0.02), 0.02, 0.02, 4, BRONZE)
+	# The prod, horn and bronze, swept forward, and its string.
+	for side: float in [-1.0, 1.0]:
+		l.prism(Vector3(0, 0.02, -0.75), Vector3(side * 0.45, 0.02, -0.62), 0.07, 0.055, 6, Color(0.86, 0.8, 0.66))
+		l.prism(Vector3(side * 0.45, 0.02, -0.62), Vector3(side * 0.82, 0.02, -0.38), 0.055, 0.03, 6, Color(0.82, 0.74, 0.58))
+		l.prism(Vector3(side * 0.82, 0.02, -0.38), Vector3(side * 0.9, 0.02, -0.3), 0.035, 0.035, 5, BRONZE)
+		l.prism(Vector3(side * 0.88, 0.02, -0.32), Vector3(0, 0.12, 0.2), 0.01, 0.01, 3, LIGHT_WOOD.lightened(0.3))
+	l.box(Vector3(0, 0.02, -0.78), Vector3(0.24, 0.16, 0.12), BRONZE)
+	l.box(Vector3(0, 0.0, -0.84), Vector3(0.14, 0.1, 0.04), RESIN) # an amber seal on its nose
+	return l.commit()
+
+
+## The Ruin-Breaker Greataxe: a long haft of dark holm oak, iron-shod, bound in bronze; a double-bitted head
+## with two broad crescent blades, a marble-white edge on each, and a spike between them to break stone.
+## The heads lie along Z, so their faces show in the hand, like the Battleaxe's.
+static func _ruin_greataxe() -> Mesh:
+	var l := LowPoly.new()
+	var oak := WOOD.darkened(0.25)
+	l.prism(Vector3(0, -0.85, 0), Vector3(0, 0.78, 0), 0.034, 0.03, 8, oak)
+	l.prism(Vector3(0, -0.93, 0), Vector3(0, -0.85, 0), 0.03, 0.04, 8, DARK) # the iron shoe
+	for y: float in [-0.72, -0.55, -0.1, 0.36]:
+		l.prism(Vector3(0, y, 0), Vector3(0, y + 0.05, 0), 0.04, 0.04, 8, BRONZE)
+	l.prism(Vector3(0, -0.66, 0), Vector3(0, -0.6, 0), 0.042, 0.042, 8, Color(0.42, 0.14, 0.12)) # a red grip wrap
+	# The socket.
+	l.box(Vector3(0, 0.6, 0), Vector3(0.09, 0.3, 0.09), DARK.lightened(0.1))
+	l.box(Vector3(0, 0.6, 0), Vector3(0.1, 0.06, 0.1), BRONZE)
+	var iron := STEEL.darkened(0.15)
+	for side: float in [-1.0, 1.0]:
+		# Cheek, then the crescent: thin plates fanned from the cheek out to a curved edge, the edge itself
+		# a run of short white bars from horn to horn.
+		l.box(Vector3(0, 0.6, side * 0.085), Vector3(0.04, 0.17, 0.09), iron)
+		var prev := Vector3.INF
+		for k in 11:
+			var t := (k - 5) / 5.0
+			var y := 0.6 + t * 0.22
+			var reach := 0.13 + 0.06 * (1.0 - t * t)
+			l.box(Vector3(0, y, side * (0.1 + reach * 0.5)), Vector3(0.026, 0.05, reach), iron.lightened(0.03 * (k % 2)))
+			var edge := Vector3(0, y, side * (0.1 + reach))
+			if prev != Vector3.INF:
+				l.prism(prev, edge, 0.016, 0.016, 4, MARBLE)
+			prev = edge
+		l.prism(Vector3(0, 0.82, side * 0.23), Vector3(0, 0.88, side * 0.19), 0.02, 0.0, 4, iron) # the horns of the crescent
+		l.prism(Vector3(0, 0.38, side * 0.23), Vector3(0, 0.32, side * 0.19), 0.02, 0.0, 4, iron)
+	# A spike on top, to break stone.
+	l.prism(Vector3(0, 0.74, 0), Vector3(0, 0.96, 0), 0.045, 0.0, 4, iron.lightened(0.1))
+	l.box(Vector3(0.05, 0.6, 0), Vector3(0.01, 0.12, 0.08), TEMPLE_GOLD) # a gilded mark on the cheek
+	return l.commit()
 
 
 ## Armoured war hammer with a solid striking face and rear pick.

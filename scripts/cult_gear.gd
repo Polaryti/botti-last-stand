@@ -30,12 +30,23 @@ const GLOW_VIOLET := Color(0.82, 0.55, 1.0)
 const GLOW_GREEN := Color(0.55, 1.0, 0.5)
 const PLUME_BLACK := Color(0.1, 0.09, 0.09)
 const PLUME_WHITE := Color(0.92, 0.9, 0.85)
+const GOLD := Color(0.92, 0.72, 0.28)
+const GOLD_DARK := Color(0.58, 0.4, 0.12)
 
-const GEARED := ["cult_worshipper", "cult_priest", "cult_guardian"]
+const GEARED := ["cult_worshipper", "cult_priest", "cult_guardian", "hierophant", "polemarch"]
 ## How each held piece is turned in its hand (built upright, +Y along the haft).
 const TURNS := {"handslot.r": Vector3(0, 0, 1.5), "handslot.l": Vector3(0, 0, 0)}
 
+## A model's own turns where they differ: the Polemarch's tower shield is built tall along +Y, and
+## stood upright in the hand.
+const MODEL_TURNS := {"polemarch": {"handslot.l": Vector3(0, 0, PI * 0.5)}}
+
 static var _meshes := {}
+
+
+static func turn(model: String, bone: String) -> Vector3:
+	var own: Dictionary = MODEL_TURNS.get(model, {})
+	return own.get(bone, TURNS.get(bone, Vector3.ZERO))
 
 
 static func _mesh(key: String, build: Callable) -> ArrayMesh:
@@ -51,6 +62,8 @@ static func gear_for(model: String) -> Dictionary:
 		"cult_worshipper": return worshipper()
 		"cult_priest": return priest()
 		"cult_guardian": return guardian()
+		"hierophant": return hierophant()
+		"polemarch": return polemarch()
 	return {}
 
 
@@ -311,6 +324,161 @@ static func guardian() -> Dictionary:
 				var a := TAU * k / 6.0 + PI / 6.0
 				l.prism(Vector3(cos(a) * 0.36, sin(a) * 0.36, 0.06), Vector3(cos(a) * 0.36, sin(a) * 0.36, 0.1), 0.035, 0.02, 5, BRONZE_DARK)),
 	}
+
+
+static func hierophant() -> Dictionary:
+	return {
+		"head": _mesh("hierophant_head", func(l: LowPoly) -> void:
+			# A tall skep-mitre of straw rings bound in gold, a crown of bronze cells round its brow.
+			for k in 8:
+				var y := k * 0.16
+				var r0 := 0.6 - k * k * 0.006 - k * 0.012
+				var r1 := 0.6 - (k + 1) * (k + 1) * 0.006 - (k + 1) * 0.012
+				l.prism(Vector3(0, y, -0.03), Vector3(0, y + 0.16, -0.03), r0, r1, 14, STRAW.darkened(0.1 * (k % 2)))
+				l.prism(Vector3(0, y + 0.14, -0.03), Vector3(0, y + 0.18, -0.03), r1 + 0.02, r1 + 0.02, 14, GOLD if k % 2 == 0 else STRAW.darkened(0.22))
+			l.prism(Vector3(0, 1.28, -0.03), Vector3(0, 1.5, -0.03), 0.2, 0.0, 10, GOLD)
+			for k in 9:
+				var a := -1.2 + k * 0.3
+				var at := Vector3(sin(a) * 0.6, 0.78, cos(a) * 0.6 - 0.03)
+				l.prism(at, at + Vector3(sin(a), 0.0, cos(a)) * 0.04 + Vector3(0, 0.22 + 0.06 * float(k == 4), 0), 0.06, 0.02, 6, GOLD.darkened(0.05 * (k % 2)))
+			# A golden mask over the face, calm and wide-eyed, a third eye open in its brow.
+			l.ovoid(Vector3(0, 0.34, 0.46), Vector3(0.38, 0.4, 0.11), GOLD, GOLD_DARK, 4, 12)
+			l.box(Vector3(0, 0.27, 0.57), Vector3(0.06, 0.16, 0.04), GOLD.lightened(0.15))
+			l.box(Vector3(0, 0.06, 0.55), Vector3(0.16, 0.035, 0.03), GOLD_DARK)
+			for side: float in [-1.0, 1.0]:
+				l.box(Vector3(side * 0.14, 0.36, 0.565), Vector3(0.17, 0.06, 0.02), Color(0.06, 0.04, 0.06))
+			l.prism(Vector3(0, 0.56, 0.54), Vector3(0, 0.56, 0.6), 0.09, 0.09, 8, BRONZE_DARK)),
+		"head:glow": _mesh("hierophant_eyes", func(l: LowPoly) -> void:
+			for side: float in [-1.0, 1.0]:
+				l.box(Vector3(side * 0.14, 0.36, 0.575), Vector3(0.12, 0.035, 0.02), GLOW_VIOLET)
+			l.prism(Vector3(0, 0.56, 0.58), Vector3(0, 0.56, 0.64), 0.065, 0.05, 8, GLOW_VIOLET)),
+		"chest": _mesh("hierophant_chest", func(l: LowPoly) -> void:
+			_band(l, 0.27, -0.52, Vector2(0.36, 0.3), Vector2(0.46, 0.38), VIOLET, VIOLET_DARK)
+			# Two mantles, ochre over gold, cells worked in both; a pectoral of bronze cells.
+			_band(l, 0.3, -0.06, Vector2(0.42, 0.36), Vector2(0.56, 0.48), GOLD.darkened(0.15), GOLD_DARK)
+			_band(l, 0.32, 0.08, Vector2(0.43, 0.37), Vector2(0.52, 0.45), OCHRE.darkened(0.05), OCHRE.darkened(0.3))
+			for k in 11:
+				var a := -1.4 + k * 0.28
+				_cell(l, Vector3(sin(a) * 0.53, -0.02, cos(a) * 0.46), Vector3(sin(a), 0, cos(a)), 0.04, GOLD.lightened(0.2))
+			for row in 2:
+				for col in 3:
+					_cell(l, Vector3(-0.1 + col * 0.1 + row * 0.05, -0.16 - row * 0.09, 0.38), Vector3(0, 0, 1), 0.05, BRONZE.lightened(0.1))
+			# A great bandolier of vials, both sides.
+			for side: float in [-1.0, 1.0]:
+				l.turned_box(Vector3(side * 0.04, -0.24, 0.39), Vector3(0.09, 0.8, 0.03), LEATHER, Basis(Vector3.FORWARD, side * 0.55))
+			l.turned_box(Vector3(0, -0.3, -0.42), Vector3(0.7, 1.0, 0.035), VIOLET.darkened(0.15), Basis(Vector3.RIGHT, -0.1))),
+		"chest:glow": _mesh("hierophant_vials", func(l: LowPoly) -> void:
+			for side: float in [-1.0, 1.0]:
+				for k in 3:
+					var at := Vector3(side * (0.22 - k * 0.07), -0.08 - k * 0.12, 0.42)
+					l.prism(at + Vector3(0, -0.06, 0), at + Vector3(0, 0.07, 0), 0.04, 0.03, 6, GLOW_GREEN if (k + int(side > 0)) % 2 == 0 else GLOW_VIOLET)),
+		"upperarm.l": _mesh("hierophant_sleeve_up", func(l: LowPoly) -> void: _sleeve(l, 0.25, 0.13, 0.15, VIOLET)),
+		"upperarm.r": _mesh("hierophant_sleeve_up", func(l: LowPoly) -> void: _sleeve(l, 0.25, 0.13, 0.15, VIOLET)),
+		"lowerarm.l": _mesh("hierophant_sleeve_low", func(l: LowPoly) -> void: _sleeve(l, 0.24, 0.15, 0.27, VIOLET, GOLD)),
+		"lowerarm.r": _mesh("hierophant_sleeve_low", func(l: LowPoly) -> void: _sleeve(l, 0.24, 0.15, 0.27, VIOLET, GOLD)),
+		"hips": _mesh("hierophant_hips", func(l: LowPoly) -> void:
+			_band(l, 0.08, -0.16, Vector2(0.46, 0.4), Vector2(0.54, 0.47), VIOLET, VIOLET_DARK)
+			_band(l, 0.08, -0.0, Vector2(0.47, 0.41), Vector2(0.47, 0.41), GOLD, GOLD_DARK)
+			# A long stole hanging down the front to the hem.
+			for side: float in [-1.0, 1.0]:
+				l.box(Vector3(side * 0.1, -0.24, 0.46), Vector3(0.12, 0.5, 0.025), OCHRE)
+				l.box(Vector3(side * 0.1, -0.5, 0.47), Vector3(0.13, 0.05, 0.03), GOLD)),
+		"upperleg.l": _mesh("hierophant_robe_l", func(l: LowPoly) -> void: _leg_panels(l, 1.0, VIOLET, GOLD, 0.44, 0.32)),
+		"upperleg.r": _mesh("hierophant_robe_r", func(l: LowPoly) -> void: _leg_panels(l, -1.0, VIOLET, GOLD, 0.44, 0.32)),
+		"handslot.r": _mesh("hierophant_staff", func(l: LowPoly) -> void:
+			# A staff of black wood bound in gold, a gold cage of six ribs round a great alembic.
+			l.prism(Vector3(0, -0.85, 0), Vector3(0, 1.4, 0), 0.04, 0.035, 6, Color(0.18, 0.12, 0.08))
+			for k in 4:
+				l.prism(Vector3(0, -0.4 + k * 0.45, 0), Vector3(0, -0.34 + k * 0.45, 0), 0.05, 0.05, 6, GOLD)
+			l.prism(Vector3(0, -0.85, 0), Vector3(0, -0.97, 0), 0.04, 0.0, 5, GOLD_DARK)
+			for k in 6:
+				var a := TAU * k / 6.0
+				l.prism(Vector3(0, 1.38, 0), Vector3(cos(a) * 0.2, 1.62, sin(a) * 0.2), 0.016, 0.016, 4, GOLD)
+				l.prism(Vector3(cos(a) * 0.2, 1.62, sin(a) * 0.2), Vector3(0, 1.94, 0), 0.016, 0.016, 4, GOLD)
+			l.prism(Vector3(0, 1.94, 0), Vector3(0, 2.1, 0), 0.04, 0.0, 6, GOLD)),
+		"handslot.r:glow": _mesh("hierophant_alembic", func(l: LowPoly) -> void:
+			l.ovoid(Vector3(0, 1.62, 0), Vector3(0.15, 0.16, 0.15), GLOW_GREEN, GLOW_GREEN.darkened(0.2), 4, 10)
+			l.prism(Vector3(0, 1.76, 0), Vector3(0, 1.9, 0), 0.035, 0.03, 6, GLOW_VIOLET)),
+		"handslot.l": _mesh("hierophant_censer", func(l: LowPoly) -> void:
+			# A censer on its chain, swinging from the hand: a pierced bronze bowl with a domed lid.
+			for k in 5:
+				l.prism(Vector3(0, -k * 0.06, 0), Vector3(0, -k * 0.06 - 0.05, 0), 0.012, 0.012, 4, GOLD_DARK)
+			l.prism(Vector3(0, -0.34, 0), Vector3(0, -0.44, 0), 0.08, 0.13, 8, GOLD)
+			l.prism(Vector3(0, -0.44, 0), Vector3(0, -0.56, 0), 0.13, 0.06, 8, BRONZE)
+			l.prism(Vector3(0, -0.29, 0), Vector3(0, -0.34, 0), 0.03, 0.08, 8, GOLD.lightened(0.1))),
+		"handslot.l:glow": _mesh("hierophant_censer_coals", func(l: LowPoly) -> void:
+			for k in 6:
+				var a := TAU * k / 6.0
+				l.box(Vector3(cos(a) * 0.11, -0.45, sin(a) * 0.11), Vector3(0.03, 0.04, 0.03), GLOW_GREEN)),
+	}
+
+
+static func polemarch() -> Dictionary:
+	var gear := guardian()
+	gear["head"] = _mesh("polemarch_head", func(l: LowPoly) -> void:
+		# The commander's helmet: closed, gilded at the brow, its crimson crest set crosswise, ear to ear.
+		l.ovoid(Vector3(0, 0.46, -0.02), Vector3(0.55, 0.55, 0.54), BRONZE, BRONZE_DARK, 6, 16)
+		l.box(Vector3(0, 0.03, 0.42), Vector3(0.36, 0.1, 0.12), BRONZE.darkened(0.05))
+		_band(l, 0.64, 0.56, Vector2(0.57, 0.56), Vector2(0.57, 0.56), GOLD, GOLD_DARK, 0.02)
+		l.box(Vector3(0, 0.3, 0.535), Vector3(0.07, 0.36, 0.04), GOLD)
+		for side: float in [-1.0, 1.0]:
+			l.turned_box(Vector3(side * 0.25, 0.14, 0.45), Vector3(0.24, 0.48, 0.06), BRONZE.lightened(0.05), Basis(Vector3.UP, side * 0.45))
+			l.turned_box(Vector3(side * 0.44, 0.16, 0.18), Vector3(0.08, 0.5, 0.42), BRONZE.darkened(0.05), Basis.IDENTITY)
+			l.box(Vector3(side * 0.17, 0.38, 0.52), Vector3(0.2, 0.06, 0.02), Color(0.05, 0.04, 0.04))
+			# A gilded ram's-horn curl at each temple.
+			l.ovoid(Vector3(side * 0.5, 0.58, 0.12), Vector3(0.08, 0.12, 0.12), GOLD, GOLD_DARK, 3, 8)
+		l.prism(Vector3(0, 0.08, -0.32), Vector3(0, -0.08, -0.44), 0.32, 0.4, 10, BRONZE_DARK)
+		l.box(Vector3(0, 1.0, -0.02), Vector3(0.86, 0.08, 0.08), GOLD_DARK)
+		for k in 15:
+			var x := -0.42 + k * 0.06
+			var tip := Vector3(x * 1.08, 1.42 - absf(x) * 0.35, -0.02)
+			l.leaf(Vector3(x, 1.02, -0.05), tip, Vector3(x, 1.02, 0.01), CRIMSON.lightened(0.05 * (k % 2)))
+			l.leaf(Vector3(x, 1.02, 0.01), tip, Vector3(x, 1.02, -0.05), CRIMSON.darkened(0.1)))
+	gear["chest"] = _mesh("polemarch_chest", func(l: LowPoly) -> void:
+		_band(l, 0.27, -0.5, Vector2(0.38, 0.32), Vector2(0.42, 0.36), BRONZE, BRONZE_DARK)
+		_band(l, -0.08, -0.5, Vector2(0.44, 0.38), Vector2(0.42, 0.36), BRONZE, BRONZE_DARK)
+		for side: float in [-1.0, 1.0]:
+			l.turned_box(Vector3(side * 0.14, 0.08, 0.33), Vector3(0.24, 0.18, 0.05), GOLD.darkened(0.1), Basis(Vector3.UP, side * 0.35))
+			for k in 3:
+				l.box(Vector3(side * 0.09, -0.16 - k * 0.1, 0.38), Vector3(0.14, 0.07, 0.04), BRONZE.lightened(0.06))
+		_cell(l, Vector3(0, 0.15, 0.34), Vector3(0, 0, 1), 0.08, VIOLET)
+		_cell(l, Vector3(0, 0.15, 0.36), Vector3(0, 0, 1), 0.045, GOLD)
+		# A long crimson cloak, gold-edged, down to the heels.
+		l.turned_box(Vector3(0, -0.46, -0.38), Vector3(0.8, 1.3, 0.04), CRIMSON, Basis(Vector3.RIGHT, -0.1))
+		l.turned_box(Vector3(0, -1.08, -0.45), Vector3(0.82, 0.06, 0.05), GOLD_DARK, Basis(Vector3.RIGHT, -0.1))
+		_band(l, 0.31, 0.2, Vector2(0.4, 0.35), Vector2(0.42, 0.37), GOLD_DARK, GOLD_DARK.darkened(0.2)))
+	gear["handslot.r"] = _mesh("polemarch_spear", func(l: LowPoly) -> void:
+		l.prism(Vector3(0, -1.0, 0), Vector3(0, 1.75, 0), 0.04, 0.035, 6, Color(0.32, 0.22, 0.13))
+		l.prism(Vector3(0, -1.0, 0), Vector3(0, -1.2, 0), 0.045, 0.0, 5, GOLD_DARK)
+		l.prism(Vector3(0, 1.73, 0), Vector3(0, 1.84, 0), 0.05, 0.045, 6, GOLD)
+		l.turned_box(Vector3(0, 2.06, 0), Vector3(0.15, 0.38, 0.03), BRONZE.lightened(0.2), Basis.IDENTITY)
+		l.prism(Vector3(0, 2.25, 0), Vector3(0, 2.42, 0), 0.055, 0.0, 4, BRONZE.lightened(0.3))
+		l.prism(Vector3(0, 1.84, 0), Vector3(0, 1.66, 0.05), 0.06, 0.02, 6, CRIMSON))
+	gear["handslot.l"] = _mesh("polemarch_shield", func(l: LowPoly) -> void:
+		# A tall tower shield, curved round its bearer: bronze plates on a crimson field, the god's cell
+		# in gold at its middle, a gold rim.
+		const COLS := 7
+		for c in COLS:
+			var a0 := -0.5 + c / float(COLS)
+			var a1 := -0.5 + (c + 1) / float(COLS)
+			var x0 := sin(a0) * 0.55
+			var x1 := sin(a1) * 0.55
+			var z0 := cos(a0) * 0.55 - 0.45
+			var z1 := cos(a1) * 0.55 - 0.45
+			var mid := Vector3((x0 + x1) * 0.5, 0, (z0 + z1) * 0.5)
+			var wide := Vector2(x1 - x0, z1 - z0).length()
+			l.turned_box(mid, Vector3(wide + 0.01, 1.12, 0.05), CRIMSON if c % 2 else CRIMSON.darkened(0.12), Basis(Vector3.UP, -(a0 + a1) * 0.5))
+			l.turned_box(mid + Vector3(0, 0.58, 0), Vector3(wide + 0.02, 0.06, 0.07), GOLD, Basis(Vector3.UP, -(a0 + a1) * 0.5))
+			l.turned_box(mid + Vector3(0, -0.58, 0), Vector3(wide + 0.02, 0.06, 0.07), GOLD, Basis(Vector3.UP, -(a0 + a1) * 0.5))
+		for side: float in [-1.0, 1.0]:
+			l.turned_box(Vector3(sin(side * 0.5) * 0.55, 0, cos(0.5) * 0.55 - 0.45), Vector3(0.06, 1.18, 0.07), GOLD, Basis(Vector3.UP, -side * 0.5))
+		l.prism(Vector3(0, 0, 0.11), Vector3(0, 0, 0.15), 0.24, 0.2, 6, GOLD)
+		l.prism(Vector3(0, 0, 0.15), Vector3(0, 0, 0.19), 0.13, 0.1, 6, VIOLET.lightened(0.2))
+		for k in 4:
+			var y := -0.4 + k * 0.27
+			if absf(y) > 0.2:
+				l.prism(Vector3(0, y, 0.1), Vector3(0, y, 0.14), 0.05, 0.03, 6, BRONZE.lightened(0.15)))
+	return gear
 
 
 static func eyes(_model: String) -> Mesh:

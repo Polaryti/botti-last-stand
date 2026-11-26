@@ -62,6 +62,10 @@ const COPY := {
 		"Every soul pays for its passage.",
 		"Cross the dark in a ghostly skiff, through them, and specialize in tolls, the ferry itself, or the souls of the dead."
 	],
+	"ascendant": [
+		"What was worshipped can bleed.",
+		"Leap and crash down with Ascend, strike the divine and the changed harder, and take up a profession: hunt the gods as a Godslayer, or earn the elixir of the Adorer of Al'quimelea."
+	],
 	"commander": [
 		"A single voice can turn the battle.",
 		"Use Command and unlock a profession-specific Last Command at level ten."

@@ -115,7 +115,7 @@ static func enemy_note(id: String) -> String:
 	var d: Dictionary = ZombieDefs.ALL[id]
 	var note := "Health %d, %d XP" % [int(d["hp"]), int(d["xp"])]
 	var from: float = d.get("from", -1.0)
-	if d.get("mist_boss", false) or d.get("mesenlla_boss", false) or d.get("vael_boss", false):
+	if d.get("mist_boss", false) or d.get("mesenlla_boss", false) or d.get("vael_boss", false) or d.get("god_boss", false):
 		note += ". Boss encounter"
 	elif d.get("miniboss", false):
 		note += ". Miniboss encounter"

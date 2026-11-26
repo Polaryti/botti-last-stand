@@ -962,7 +962,7 @@ func _fill_class_detail(detail: VBoxContainer, id: String, mode: int, in_store :
 		spec_name.custom_minimum_size.x = 190
 		spec_name.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		line.add_child(spec_name)
-		var spec_desc := _soft(ClassPresentation.profession(spec), UiTheme.FS_BODY)
+		var spec_desc := _soft(ClassPresentation.profession(spec) + ("" if Game.owns_spec(spec) else "\n" + Game.spec_earn_text(spec)), UiTheme.FS_BODY)
 		spec_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		spec_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		line.add_child(spec_desc)
@@ -1464,6 +1464,8 @@ func _fill_armory(detail: VBoxContainer, id: String) -> void:
 		content.add_child(block)
 		block.add_child(_body(spec["name"], UiTheme.FS_HEAD))
 		block.add_child(_body(ClassPresentation.profession(spec), UiTheme.FS_BODY))
+		if not Game.owns_spec(spec):
+			block.add_child(_soft(Game.spec_earn_text(spec), UiTheme.FS_SMALL))
 		var upgrades := items.filter(func(item: String) -> bool: return ShopDefs.ITEMS[item]["spec"] == spec["id"])
 		if not upgrades.is_empty():
 			block.add_child(_armory_spec_row(id, spec["id"], upgrades))
@@ -2159,6 +2161,12 @@ func _earned_line(earned: int) -> String:
 	for id: String in Game.fresh_unlocks:
 		_rewards.append({"class": id, "text": "%s unlocked!" % ClassDefs.ALL[id]["name"]})
 	Game.fresh_unlocks.clear()
+	for id: String in Game.fresh_specs:
+		for cls: String in ClassDefs.ALL:
+			for spec: Dictionary in AbilityData.tree(cls)["specs"]:
+				if spec.get("earned", "") == id:
+					_rewards.append({"spec": spec["id"], "color": spec["color"], "text": "%s unlocked!" % spec["name"]})
+	Game.fresh_specs.clear()
 	return ""
 
 
@@ -2176,6 +2184,10 @@ func _reward_rows(box: VBoxContainer) -> void:
 			var id: String = reward["class"]
 			var emblem := IconView.new(ClassDefs.icon(id), ClassDefs.color(id), 44.0)
 			emblem.name = "ClassIcon"
+			row.add_child(emblem)
+		elif reward.has("spec"):
+			var emblem := IconView.new("spec_%s" % reward["spec"], reward["color"], 44.0)
+			emblem.name = "SpecIcon"
 			row.add_child(emblem)
 		else:
 			var star := IconView.new("star", UiTheme.STEEL, 40.0)

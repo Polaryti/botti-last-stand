@@ -123,7 +123,8 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"haul_range": 0.0, "haul_cd": 1.0, "haul_stun": 0.0, "path_cd": 1.0, "blood_time": 0.0, "line_time": 0.0, "lines": 0.0, "line_reach": 0.0,
 	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0,
 	"trident_reach": 0.0, "trident_hits": 0.0, "trident_tide": 0.0, "shell_hp": 0.0, "spear_range": 0.0, "chains": 0.0, "serpent_time": 0.0,
-	"cross_reach": 0.0, "ferry_cast_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0}
+	"cross_reach": 0.0, "ferry_cast_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0,
+	"divine_bane": 0.0, "deicide_reach": 0.0, "changed_time": 0.0, "field_reach": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
@@ -176,6 +177,10 @@ var _spirit_taken := 0.0
 var _bo_hits := 0
 var _sweep_now := false
 var _vaulting := false
+var ascending := "" # the Ascendant in the air: "ascend" or "deicide" (AscendantKit.land)
+var deicide_on: Zombie # what Deicide leapt on
+var changed_left := 0.0 # an Adorer of Al'quimelea, Changed by its elixir
+var changed_glow := 0.0
 var _next_hit_mult := 1.0
 var stone_skin := 0.0
 var _still_for := 0.0
@@ -233,6 +238,11 @@ var _axe_out := false
 var harpoon_out := false # your Whaler's Harpoon lies somewhere: walk over it to take it back
 var _harpoon_back := 0.0 # seconds until it comes back to your hand by itself
 var _harpoon_slot := -1 # the slot it was thrown from, left empty until it comes back
+var _comb_timer := 0.0 # the Honeycomb's next sting
+var _forage_timer := 0.0 # and the next Honey it brings
+var _comb_mark: Zombie # the last enemy you struck, for its bees
+var censer := 0 # Censer Flail: blows packed into the censer since its last release
+var _censer_release := false # this swing is the release
 var _fervour := 0 # Cutlass kills in a row
 var _fervour_left := 0.0
 var _trampled := {}
@@ -553,7 +563,7 @@ func status_effects() -> Array[Dictionary]:
 			continue
 		var b: Dictionary = _buffs[key]
 		var from_command := key.begins_with("command_")
-		var buff_icon: String = {"blood_water": "drop+up", "lifeline": "boot+rope"}.get(key, _BUFF_ICONS.get(b["stat"], "star+up"))
+		var buff_icon: String = {"blood_water": "drop+up", "lifeline": "boot+rope", "changed": "elixir"}.get(key, _BUFF_ICONS.get(b["stat"], "star+up"))
 		if b["stat"] == "horse_speed":
 			buff_icon = mount_kind() + "+up"
 		out.append({"icon": buff_icon, "color": ClassDefs.color("commander") if from_command else ClassDefs.color(class_id),
@@ -656,6 +666,9 @@ func readiness() -> Array[Dictionary]:
 	if d.has("fervour") and _fervour > 0:
 		out.append({"key": "fervour", "name": "Fervour", "icon": "cutlass+up", "color": Color(0.95, 0.75, 0.5), "button": "",
 			"need": int(d["fervour"]), "have": _fervour, "primed": false, "active": true})
+	if d.has("censer"):
+		out.append({"key": "censer", "name": "Censer: release!" if censer >= int(d["censer"]) else "Censer", "icon": "censer_flail", "color": Color(0.95, 0.62, 0.16), "button": "fire",
+			"need": int(d["censer"]), "have": censer, "primed": censer >= int(d["censer"]), "active": true})
 	if harpoon_out:
 		armed.call("harpoon", {"name": "Harpoon thrown: walk over it", "icon": "harpoon", "color": Color(0.85, 0.72, 0.45)}, "fire", false, true)
 	if d.get("momentum", false) and _flail_stacks > 0:
@@ -1116,7 +1129,7 @@ func _take_hurt(amount: float, from: Vector3, attacker: Zombie = null) -> void:
 	if stone_ward:
 		_ward_breaks(attacker)
 		return
-	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0) * FerrymanKit.ward(self)
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (0.3 if mirror_guard_left > 0.0 else 1.0) * (POISON_HURT if poison_left > 0.0 else 1.0) * FerrymanKit.ward(self) * AscendantKit.hurt_scale(self)
 	if Net.active():
 		# A Guardian nearby takes part of it.
 		var cover: Target = world.best_cover(global_position)
@@ -1637,6 +1650,10 @@ func respawn(at: Vector3) -> void:
 	input_fire = false
 	input_jump = false
 	_leap_t = -1.0
+	ascending = ""
+	deicide_on = null
+	changed_left = 0.0
+	_buffs.erase("changed")
 	_rift_targets.clear()
 	_cast_kind = ""
 	ride_behind = 0
@@ -1756,6 +1773,12 @@ func steps() -> Array:
 	return out
 
 
+## Whether this character can take a profession: one that has to be earned is open only to a person
+## whose phone has earned it, never to a bot.
+func spec_open(spec: Dictionary) -> bool:
+	return not spec.has("earned") or (bot_peer == 0 and Game.owns_spec(spec))
+
+
 func spec_def() -> Dictionary:
 	for spec: Dictionary in tree_data()["specs"]:
 		if spec["id"] == spec_id:
@@ -1771,6 +1794,8 @@ func choose_ability(step: int, index: int) -> bool:
 		return false
 	var options: Array = all[step]
 	if index < 0 or index >= options.size():
+		return false
+	if step == CORE_STEPS and not spec_open((tree_data()["specs"] as Array)[index]):
 		return false
 	var a: Dictionary = options[index]
 	chosen[step] = a["id"]
@@ -2100,6 +2125,8 @@ func _on_kill(z: Zombie) -> void:
 		HarpoonerKit.on_kill(self, z)
 	if class_id == "ferryman":
 		FerrymanKit.on_kill(self, z)
+	if class_id == "ascendant":
+		AscendantKit.on_kill(self, z)
 	fire("kill", {"z": z})
 	if _assassin_kill:
 		_assassin_kill = false
@@ -2142,6 +2169,8 @@ func modify_damage(z: Zombie, base: float) -> float:
 		dmg *= HarpoonerKit.damage_scale(self, z)
 	if class_id == "ferryman":
 		dmg *= FerrymanKit.blow_scale(self)
+	if class_id == "ascendant":
+		dmg *= AscendantKit.damage_scale(self, z)
 	return dmg
 
 
@@ -2360,6 +2389,9 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 			"bell_spirit": _bell_timer = 1.0
 			"rat": _rat_timer = 0.0
 			"stone_sprite": _raise_ward()
+			"honeycomb":
+				_comb_timer = 0.5
+				_forage_timer = PowerDefs.COMB_FORAGE
 			"ghost":
 				var previous := world.begin_act(self)
 				world.spawn_ally("ghost", global_position - global_basis.z * 1.5, time)
@@ -2389,6 +2421,9 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 		sfx("potion", -2.0)
 		if id == "mistberry_draught":
 			_mist_timer = 0.0
+		if id == "mystery_flask":
+			_open_flask(time)
+			return
 	say(str(d["name"]) + "!")
 
 
@@ -2457,8 +2492,74 @@ func _tick_powers(delta: float) -> void:
 			_rat_timer = PowerDefs.RAT_INTERVAL
 			world.drop_poison(global_position)
 	_tick_stone_sprite(delta)
+	_tick_honeycomb(delta)
 	_tick_mistberry(delta)
 	_tick_ability_timers(delta)
+
+
+## The Honeycomb: its bees go out to sting what you fight, and now and then it brings Honey.
+func _tick_honeycomb(delta: float) -> void:
+	if not has_power("honeycomb"):
+		return
+	_comb_timer -= delta
+	if _comb_timer <= 0.0:
+		_comb_timer = PowerDefs.COMB_INTERVAL
+		var prey := comb_prey()
+		if prey:
+			var from := global_position + Vector3.UP * 1.6
+			world.bee_swarm_fx(from, prey.centre())
+			if Net.active():
+				Net.world_fx(Net.Fx.BEES, from, prey.centre())
+			var was := world.begin_act(self)
+			# A familiar's sting: yours, but not a blow of your own (nothing that feeds on your hits).
+			prey.take_damage(PowerDefs.COMB_STING * damage_multiplier(), (prey.position - global_position).normalized(), 0.5, prey.centre())
+			prey.add_dot(PowerDefs.COMB_POISON.x, PowerDefs.COMB_POISON.y)
+			world.end_act(was)
+	_forage_timer -= delta
+	if _forage_timer <= 0.0:
+		_forage_timer = PowerDefs.COMB_FORAGE
+		var at := global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * 1.2
+		at.y = world.ground_at(at)
+		world.spawn_pickup_at(at, Pickup.Kind.FOOD, "honey")
+		sfx("honey_forage", -3.0)
+		if bot_peer == 0:
+			say("Honey!")
+
+
+## What the Honeycomb's bees go for: the last enemy you struck, if it is still near, or else the nearest.
+func comb_prey() -> Zombie:
+	if is_instance_valid(_comb_mark) and _comb_mark.is_alive() and _comb_mark.position.distance_to(global_position) <= PowerDefs.COMB_REACH:
+		return _comb_mark
+	var best: Zombie = null
+	var near := PowerDefs.COMB_REACH
+	for z: Zombie in world.zombies_near(global_position, PowerDefs.COMB_REACH, 16):
+		var d := z.position.distance_to(global_position)
+		if z.is_alive() and d <= near:
+			near = d
+			best = z
+	return best
+
+
+## The Mysterious Flask: one gift for its time, or one in 8 has turned.
+func _open_flask(time: float) -> void:
+	if randf() < PowerDefs.FLASK_BAD:
+		powers.erase("mystery_flask")
+		poison_by_creature(PowerDefs.FLASK_POISON)
+		sfx("flask_sour", -1.0)
+		say("The flask has turned!")
+		return
+	var gift: Dictionary = PowerDefs.FLASK_GIFTS.pick_random()
+	take_flask_gift(gift, time)
+
+
+func take_flask_gift(gift: Dictionary, time: float) -> void:
+	for key: String in _buffs.keys():
+		if key.begins_with("flask_"):
+			_buffs.erase(key)
+	for stat: String in gift["buffs"]:
+		_buffs["flask_" + stat] = {"stat": stat, "val": float(gift["buffs"][stat]), "left": time, "stacks": 1}
+	sfx("flask_drink", -1.0)
+	say("Flask of %s!" % gift["name"])
 
 
 ## The Stone Sprite: a ward of stones circles you until something hits you; then it rises again
@@ -2723,6 +2824,8 @@ func art_def() -> Dictionary:
 		return TidecallerKit.art(self)
 	if class_id == "ferryman":
 		return FerrymanKit.art(self)
+	if class_id == "ascendant":
+		return AscendantKit.art(self)
 	if class_id == "adept":
 		return WorldLight.ARTS["stance"]
 	if class_id == "monk" and spec_id == "":
@@ -2907,7 +3010,7 @@ func use_art() -> void:
 	mana -= art_cost()
 	# The Bandit's paths sharpen their own ability (on the second button), not Into the Shadows.
 	art_cd_left = maxf(3.5 if class_id == "adept" else 0.5, float(d["cd"]) * art_cd_scale())
-	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "tidecaller" if class_id == "tidecaller" else "ferryman" if class_id == "ferryman" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
+	_cast_kind = "command" if class_id == "commander" else "bandit" if class_id == "bandit" else "cartographer" if class_id == "cartographer" else "harpooner" if class_id == "harpooner" else "tidecaller" if class_id == "tidecaller" else "ferryman" if class_id == "ferryman" else "ascendant" if class_id == "ascendant" else "stance" if class_id == "adept" else "ki_blast" if d == WorldLight.ARTS["ki_blast"] else spec_id
 	_cast_left = float(d["cast"])
 	_cast_anim(str(d.get("anim", "")))
 	sfx("spell", -5.0, 1.3)
@@ -3296,6 +3399,7 @@ func _tick_mist(delta: float) -> void:
 	PathUpgrades.tick(self, delta)
 	CrownUpgrades.tick(self, delta)
 	TidecallerKit.tick(self, delta)
+	AscendantKit.tick(self, delta)
 	if _cast_kind == "":
 		return
 	if _cast_kind == "sharpshooter":
@@ -3331,6 +3435,7 @@ func _tick_mist(delta: float) -> void:
 		"harpooner_path": HarpoonerKit.cast_path(self)
 		"tidecaller": TidecallerKit.cast(self)
 		"ferryman": FerrymanKit.cast(self)
+		"ascendant": AscendantKit.cast(self)
 		"apothecary": _healing_tonic()
 		"trapper":
 			trap_charges -= 1
@@ -3731,7 +3836,7 @@ func decoy_burst(at: Vector3) -> void:
 func take_shared(amount: float) -> void:
 	if dead or guard_left > 0.0:
 		return
-	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (1.0 - minf(0.6, m("shield"))) * FerrymanKit.ward(self)
+	var dmg := amount * (1.0 - WorldLight.DOME_REDUCTION if dome_left > 0.0 else 1.0) * m("damage_taken") * (1.0 - minf(0.6, m("shield"))) * FerrymanKit.ward(self) * AscendantKit.hurt_scale(self)
 	hp -= dmg
 	hurt_flash = maxf(hurt_flash, 0.4)
 	sfx("block", -8.0, 1.0, 0.15)
@@ -3752,7 +3857,7 @@ func _start_leap(reach := -1.0) -> void:
 	guard_left = maxf(guard_left, 0.55)
 	sfx("jump_a", -2.0, 0.8)
 	_mist_trail = 0.0
-	if _vaulting:
+	if _vaulting or ascending != "":
 		return
 	sfx("wraith", -9.0, 1.4, 0.3)
 	fog_flash = 1.0
@@ -3788,7 +3893,7 @@ func _fog_at(at: Vector3, size: float) -> void:
 func _tick_leap(delta: float) -> void:
 	_leap_t += delta / 0.42
 	_mist_trail -= delta
-	if _mist_trail <= 0.0 and not _vaulting:
+	if _mist_trail <= 0.0 and not _vaulting and ascending == "":
 		_mist_trail = 0.07
 		_fog_at(global_position + Vector3.UP * 0.7, 0.8)
 	var f := minf(_leap_t, 1.0)
@@ -3805,6 +3910,9 @@ func _tick_leap(delta: float) -> void:
 		_noise(8.0)
 		if _vaulting:
 			_vault_landing()
+			return
+		if ascending != "":
+			AscendantKit.land(self)
 			return
 		_fog_at(global_position + Vector3.UP * 0.4, 1.9)
 		fog_flash = 1.0
@@ -4457,6 +4565,8 @@ func _fire_arrow(d: Dictionary) -> void:
 			sfx("bolas_throw", -3.0, randf_range(0.95, 1.05))
 		else:
 			sfx("swing", -3.0, 0.75)
+	elif d.has("swing_sound"):
+		sfx(str(d["swing_sound"]), -3.0, randf_range(0.95, 1.05))
 	else:
 		sfx("crossbow" if weapon_id() == "crossbow" else "bow", -2.0, 0.85 if weapon_id() == "longbow" else 1.0)
 	_noise(4.0)
@@ -4538,7 +4648,24 @@ func _do_melee_hit() -> void:
 			stats["knock"] *= 1.8
 			world.fx_blast(global_position + Vector3.UP * 0.3 - global_basis.z * 1.6, 1.4, Color(0.95, 0.75, 0.5, 0.45))
 			sfx("cleave", -1.0, randf_range(0.95, 1.05))
+	if d.has("censer") and censer >= int(d["censer"]):
+		# The Censer Flail's release: one sweep all round, further and harder, trailing smoke.
+		_censer_release = true
+		stats["damage"] *= float(d["censer_power"])
+		stats["range"] = float(d["censer_reach"])
+		stats["cone"] = 360.0
+		stats["hits"] = int(stats["hits"]) * 3
+		censer = 0
 	var hits := world.melee_hit(self, d, stats)
+	if _censer_release:
+		_censer_release = false
+		world.censer_fx(global_position, float(d["censer_reach"]))
+		if Net.active():
+			Net.world_fx(Net.Fx.CENSER, global_position, Vector3(float(d["censer_reach"]), 0, 0))
+	elif d.has("censer") and hits > 0:
+		censer = mini(int(d["censer"]), censer + 1)
+		if censer == int(d["censer"]):
+			sfx("censer_ready", -4.0)
 	if d.has("quake") and d != BASH:
 		hits += _anchor_quake(d, stats)
 	if hits > 0 and d != BASH:
@@ -4667,10 +4794,13 @@ func _harpoon_to_hand() -> void:
 ## Rules applied to every zombie a melee swing connects with.
 func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 	_ki_from_blow()
+	_comb_mark = z
 	if d.has("tide") and class_id == "tidecaller":
 		TidecallerKit.on_trident_hit(self, z)
 	if class_id == "ferryman":
 		FerrymanKit.on_blow(self, z)
+	if class_id == "ascendant":
+		AscendantKit.on_blow(self, z)
 	if stance == "flame":
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if has_flag("void_walker") and STANCES.has(stance):
@@ -4694,6 +4824,9 @@ func on_melee_connect(z: Zombie, d: Dictionary) -> void:
 		world.sfx_at("hook_catch", z.centre(), -3.0)
 	if d.has("slows"):
 		z.slow(float(d["slows"]))
+	if _censer_release:
+		var smoke: Vector2 = d["censer_smoke"]
+		z.add_dot(smoke.x, smoke.y)
 	if rage_left > 0.0:
 		z.ignite(ZombieDefs.BURN_SECONDS)
 	if d.get("backstab", false) and z.is_alive():
@@ -4746,6 +4879,7 @@ func on_shot_rival(peer: int, fire_shot: bool, frost_shot: bool) -> void:
 ## Rules for arrows and bolts that reach a zombie.
 func on_shot_connect(z: Zombie) -> void:
 	gain_ki(KI_PER_SHOT)
+	_comb_mark = z
 	if class_id == "harpooner":
 		HarpoonerKit.on_blow(self)
 	_antler_root(z)

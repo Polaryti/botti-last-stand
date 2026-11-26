@@ -43,6 +43,29 @@
 - **Temple Guardians** brace behind their bronze shields, then rush you and bash you down. From the front, blows glance off the shield.
 - **Ostrich Guardians** ride out on their war-birds from 7:00. Bring the bird down and the Guardian fights on foot.
 - Each has its own gear, voice, icon and Codex page; the cult has its own Codex section.
+- **The Hierophant** comes down the Sacred Way once, around 3:30. It throws three flasks at once; hurt, it turns nearby Worshippers into mutants.
+- **The Polemarch** marches out of the village once, around 6:30. Its tower shield takes three quarters of a blow from the front. It sweeps its spear to stun, charges, and calls Guardians to its side.
+
+### Al'quimelea
+- **The fallen god of change** comes down from its temple at 11:00. Dawn waits until it falls.
+- It floats over cliffs and chasms, rains elixir, opens fields of change that poison and root, blasts close attackers with its crucible, and lances distant ones with crystal shards.
+- At two thirds and one third of its health, mutants are born of it, and it grows quicker.
+- Its own boss card, bells, voice and a six-second death.
+
+### The Ascendant, a new class
+- **Earned by playing a match on Fontanova** to its end, won or lost.
+- Starts with the Ruin-Breaker Greataxe, and strikes bosses, minibosses and mutants 15% harder.
+- **Ascend** leaps up to 8 m and crashes down on everything near where it lands.
+- **Godslayer:** Deicide leaps on the enemy you face. It ends lesser foes when they are low, and breaks an attack being readied, even a god's.
+- **Adorer of Al'quimelea:** earned by winning on Fontanova as the Ascendant. The Elixir of Change makes you quicker and your blows poisonous, and opens a field of change that poisons and holds.
+- A profession you have not earned yet shows how to earn it.
+
+### Fontanova's weapons and finds
+- **Censer Flail:** each blow packs it with resin. After five, the next swing sweeps all round you in poison smoke.
+- **Resin Repeater:** a quick, flat-shooting crossbow that strikes flying enemies much harder.
+- **Ruin-Breaker Greataxe:** chops through shields, and strikes stone things harder.
+- **Honeycomb**, a familiar: its bees sting what you fight, and it brings you Honey.
+- **Mysterious Flask:** a random gift for 10 seconds. Now and then it has turned, and poisons you.
 
 ### Title screen
 - New app icon and splash. The menu tours Fontanova to the Archipelagos' own theme.

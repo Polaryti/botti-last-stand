@@ -2040,9 +2040,10 @@ func _fontanova() -> void:
 	if host:
 		for z: Zombie in w.zombies.duplicate():
 			z.release()
-	await sync(707)
-	# The Oracle's braziers and the altars: the host decides, every phone follows.
+	# The Oracle's braziers and the altars: the host decides, every phone follows. Cold first, looked at
+	# before both phones go on: the host lights them the moment they do.
 	ok(w.fonta_rites != null and w.fonta_rites.lit == 0 and not w.fonta_rites.door_open, "the Oracle's braziers are cold on both phones")
+	await sync(707)
 	if host:
 		var rites := w.fonta_rites
 		var keep := pl.global_position
@@ -2057,6 +2058,93 @@ func _fontanova() -> void:
 	ok(w.fonta_rites.claims == 1, "and the held altars counted alike")
 	ok(w.pickups.any(func(p: Pickup) -> bool: return p.kind == Pickup.Kind.POWER and p.item_id == PowerDefs.EYE), "the Oracle's Eye lies in the sanctum on both phones")
 	await sync(709)
+	# The joined phone plays an Ascendant. As a Godslayer it breaks the Hierophant's attack on the host:
+	# its flasks' rings fade on both phones without landing.
+	if not host:
+		pl.setup_class("ascendant")
+		pl.points = 4
+		for step in Player.CORE_STEPS:
+			pl.choose_ability(step, 0)
+		pl.choose_ability(Player.CORE_STEPS, 0)
+	var hiero_id := -1
+	if host:
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+		w.spawn_zombie("hierophant", _avatar().position + Vector3(0, 0, -7))
+		var hiero: Zombie = w.zombies.back()
+		hiero.set_physics_process(false)
+		hiero._sees = true
+		var hm := hiero.mesenlla_mind as CultMind
+		hm.cooldown = 0.0
+		hm.cooldown_b = 99.0
+		hm.tick(hiero, _avatar(), Vector3.ZERO, 7.0, 0.01)
+		hiero_id = hiero.net_id
+		told.rpc(str(hiero_id))
+	await wait(0.3)
+	# Each phone counts the rings before the joined phone breaks them: the host before both go on (the
+	# break can reach it the moment they do), the joined phone before it strikes.
+	var rings := func(source: int) -> int: return w.mist_seals.filter(func(m: MistSeal) -> bool: return m.source_id == source and not m.struck).size()
+	if host:
+		ok(rings.call(hiero_id) == 3, "the Hierophant's three flasks are marked on this phone (%d)" % rings.call(hiero_id))
+	await sync(710)
+	if not host:
+		hiero_id = int(_told)
+		ok(rings.call(hiero_id) == 3, "the Hierophant's three flasks are marked on this phone (%d)" % rings.call(hiero_id))
+	if not host:
+		ok(pl.spec_id == "godslayer", "this phone plays a Godslayer")
+		var there := w.zombie_by_id(hiero_id)
+		ok(there != null and there.is_warning(), "and sees the Hierophant readying them")
+		if there:
+			AscendantKit.break_rite(pl, there)
+	await wait(0.4)
+	await sync(711)
+	ok(rings.call(hiero_id) == 0, "the Godslayer broke it: the rings are gone on this phone too, none of them landed")
+	if host:
+		var hiero := w.zombie_by_id(hiero_id)
+		ok(hiero != null and not hiero.is_warning() and (hiero.mesenlla_mind as CultMind).phase == "", "and the Hierophant has to start again")
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	await sync(712)
+	# An Adorer's field of change, opened on the joined phone, poisons and holds the host's creature.
+	var held_id := -1
+	if host:
+		w.spawn_zombie("cult_worshipper", _avatar().position + Vector3(1.5, 0, -1.5))
+		var held: Zombie = w.zombies.back()
+		held.set_physics_process(false)
+		held.hp = 5000.0
+		held.max_hp = 5000.0
+		held_id = held.net_id
+		told.rpc(str(held_id))
+	await wait(0.4)
+	await sync(713)
+	if not host:
+		held_id = int(_told)
+		AscendantKit.open_field(pl, pl.global_position)
+	await wait(AscendantKit.FIELD_TELL + 0.6)
+	await sync(714)
+	if host:
+		var held := w.zombie_by_id(held_id)
+		ok(held != null and held.poison_left > 0.0 and held.root_left > 0.0, "the other phone's field of change poisoned and held this phone's creature")
+	# The joined phone's Honeycomb stings the host's creature. Its health is read before both phones go
+	# on, so a sting that arrives first is still counted. The field's poison is spent first.
+	var hp_was := 0.0
+	if host:
+		var held := w.zombie_by_id(held_id)
+		held.poison_left = 0.0
+		hp_was = held.hp
+	await sync(715)
+	if not host:
+		pl.activate_power("honeycomb")
+		pl._comb_mark = w.zombie_by_id(held_id)
+		pl._tick_honeycomb(PowerDefs.COMB_INTERVAL)
+	await wait(0.6)
+	await sync(716)
+	if host:
+		var held := w.zombie_by_id(held_id)
+		ok(held != null and held.hp < hp_was, "the other phone's Honeycomb stung this phone's creature (%.0f)" % (hp_was - held.hp if held else 0.0))
+		for z: Zombie in w.zombies.duplicate():
+			z.release()
+	await sync(717)
 
 
 func _vael() -> void:

@@ -30,6 +30,7 @@ static var _shadow_mesh: QuadMesh
 static var _arrow_mesh: Mesh
 static var _stone_mesh: Mesh
 static var _pellet_mesh: Mesh
+var _bee_mesh: Mesh # the Honeycomb's bees (bee_swarm_fx)
 static var _keg_mesh: Mesh
 static var _shard_mesh: Mesh
 var _ember_spark_mat: StandardMaterial3D
@@ -336,6 +337,7 @@ func setup(game_mode: int) -> void:
 		fort.lay_ways()
 	if terrain.seaside():
 		grid.block_steep(terrain, STEEP_RISE)
+		grid.block_chasms(terrain)
 		grid.fine_only = true
 	grid.astar.update()
 	grid.build_far_grid()
@@ -1775,6 +1777,12 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 			push = Vector3(origin.x - centre.x, 0, origin.z - centre.z).normalized()
 			knock = float(d["drags"]) * 8.0 * z._scale if z.draggable() else 0.0
 		var blow := attacker.modify_damage(z, float(stats["damage"]))
+		if d.has("breaker"):
+			# The Ruin-Breaker: through a shield, and harder into stone.
+			if z.def.get("shielded", false):
+				z.unguard()
+			if z.def.get("stone", false):
+				blow *= float(d["breaker"])
 		if d.has("tide") and attacker.class_id == "tidecaller":
 			blow *= TidecallerKit.trident_scale(attacker, z) # the Trident's own tree: Skewer, Brine, Charged Tines
 		damage_zombie(z, blow, push, knock, centre, false)
@@ -1891,6 +1899,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 			var by := p
 			shot.on_burst = func(at: Vector3) -> void: flare(at, by)
 		shot.slow_secs = float(d.get("slows", 0.0))
+		shot.vs_flyers = float(d.get("flyers", 1.0))
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
@@ -3625,6 +3634,89 @@ func take_harpoon(peer: int) -> void:
 
 
 ## A Ship's Anchor's slam, seen: a ring of dust running out over the ground, cracks under it, a blast.
+## The Honeycomb's bees going out to sting: a little swarm flying in arcs from `from` to `to`, gone as it lands.
+func bee_swarm_fx(from: Vector3, to: Vector3) -> void:
+	if _bee_mesh == null:
+		var l := LowPoly.new()
+		l.prism(Vector3(-0.045, 0, 0), Vector3(0.045, 0, 0), 0.03, 0.022, 5, Color(0.98, 0.78, 0.18))
+		l.box(Vector3(0.0, 0, 0), Vector3(0.014, 0.06, 0.062), Color(0.1, 0.07, 0.04))
+		l.box(Vector3(0.01, 0.04, 0), Vector3(0.06, 0.012, 0.05), Color(0.88, 0.95, 1.0))
+		_bee_mesh = l.commit()
+	sfx_at("honeycomb_hum", from, -6.0)
+	for i in 6:
+		var bee := MeshInstance3D.new()
+		bee.mesh = _bee_mesh
+		bee.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(bee)
+		bee.global_position = from + Vector3(randf_range(-0.2, 0.2), randf_range(-0.1, 0.2), randf_range(-0.2, 0.2))
+		var side := Vector3(randf_range(-1, 1), randf_range(0.3, 1.0), randf_range(-1, 1)).normalized() * randf_range(0.6, 1.4)
+		var mid := (from + to) * 0.5 + side
+		var end := to + Vector3(randf_range(-0.25, 0.25), randf_range(-0.2, 0.3), randf_range(-0.25, 0.25))
+		var start := bee.global_position
+		var flight := randf_range(0.32, 0.45)
+		var tw := create_tween()
+		tw.tween_method(func(t: float) -> void:
+			if not is_instance_valid(bee):
+				return
+			var a := start.lerp(mid, t)
+			var b := mid.lerp(end, t)
+			var at := a.lerp(b, t)
+			if (b - a).length() > 0.01 and absf((b - a).normalized().y) < 0.98:
+				bee.look_at_from_position(at, at + (b - a), Vector3.UP)
+			else:
+				bee.global_position = at, 0.0, 1.0, flight).set_delay(i * 0.04)
+		tw.tween_callback(bee.queue_free)
+
+
+## A field of change opening (an Adorer's Elixir of Change): a violet ring told first, then green light
+## welling up as it opens.
+func change_field_fx(at: Vector3, radius: float, tell: float) -> void:
+	show_ring(at + Vector3.UP * 0.05, radius, Color(0.82, 0.5, 1.0))
+	fx_mist(at + Vector3.UP * 0.3, radius * 0.3)
+	get_tree().create_timer(tell).timeout.connect(func() -> void:
+		if not is_inside_tree():
+			return
+		show_ring(at + Vector3.UP * 0.05, radius, Color(0.55, 1.0, 0.45))
+		fx_blast(at + Vector3.UP * 0.4, radius * 0.7, Color(0.55, 1.0, 0.45, 0.45))
+		sfx_at("alq_change", at, -3.0))
+
+
+## The Censer Flail's release: a ring of embers round the swinger and a cloud of resin smoke rolling out.
+func censer_fx(at: Vector3, reach: float) -> void:
+	fx_ring(at + Vector3.UP * 0.15, reach, Color(1.0, 0.62, 0.18))
+	fx_blast(at + Vector3.UP * 0.8, reach * 0.55, Color(0.95, 0.7, 0.3, 0.35))
+	sfx_at("censer_release", at, -1.0)
+	var smoke := CPUParticles3D.new()
+	smoke.mesh = WyvernRig.puff_mesh()
+	smoke.one_shot = true
+	smoke.explosiveness = 0.85
+	smoke.amount = 22
+	smoke.lifetime = 1.6
+	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	smoke.emission_ring_axis = Vector3.UP
+	smoke.emission_ring_radius = 0.5
+	smoke.emission_ring_inner_radius = 0.2
+	smoke.emission_ring_height = 0.4
+	smoke.direction = Vector3(1, 0.4, 0)
+	smoke.spread = 180.0
+	smoke.flatness = 0.7
+	smoke.gravity = Vector3(0, 0.5, 0)
+	smoke.initial_velocity_min = reach * 0.8
+	smoke.initial_velocity_max = reach * 1.2
+	smoke.damping_min = reach * 1.1
+	smoke.damping_max = reach * 1.5
+	smoke.scale_amount_min = 1.3
+	smoke.scale_amount_max = 2.4
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.3, 1.0])
+	ramp.colors = PackedColorArray([Color(1.0, 0.7, 0.3, 0.75), Color(0.72, 0.64, 0.52, 0.5), Color(0.6, 0.58, 0.55, 0.0)])
+	smoke.color_ramp = ramp
+	smoke.position = at + Vector3.UP * 0.7
+	add_child(smoke)
+	smoke.emitting = true
+	get_tree().create_timer(smoke.lifetime + 0.3).timeout.connect(smoke.queue_free)
+
+
 func anchor_quake_fx(at: Vector3, reach: float) -> void:
 	fx_blast(at + Vector3.UP * 0.3, reach * 0.6, Color(0.7, 0.62, 0.5, 0.4))
 	sfx_at("anchor_slam", at, 0.0)

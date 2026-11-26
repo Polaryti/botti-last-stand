@@ -37,6 +37,8 @@ const ALL := {
 		"desc": "Speaks for the sea, through its Trident: every blow it lands draws 6 tide, and the tide also rises slowly by itself. Call the Tide spends it on a wave that throws enemies back and slows them. A Tidewarden turns it into a shell of seawater, a Stormcaller into lightning, a Deepcaller into a sea serpent. Uses melee and ranged weapons."},
 	"ferryman": {"disabled": true, "two_handed": true, "name": "Ferryman", "weapon": "oar", "arrows": 0, "hp": 120.0, "speed": 0.95, "ranged": false, "hidden": true, "earned": "vael_nights",
 		"desc": "Rows the dead across the Sound. Starts with a Ferryman's Oar. Crossing glides you 9 m ahead in a ghostly skiff, through enemies: they are shoved aside, struck and slowed, and friends it passes are healed 15. Uses melee and two-handed weapons."},
+	"ascendant": {"two_handed": true, "name": "Ascendant", "weapon": "ruin_greataxe", "arrows": 0, "hp": 110.0, "speed": 1.0, "ranged": true, "hidden": true, "earned": "archipelago",
+		"desc": "Climbs toward what the gods were, to bring them down. Starts with a Ruin-Breaker Greataxe, and strikes bosses, minibosses and mutants 15% harder. Ascend leaps up to 8 m and comes down on everything within 3 m for 35, stunning it for 0.6 s. A Godslayer leaps on what it hunts; an Adorer of Al'quimelea drinks its god's elixir. Uses melee, two-handed and ranged weapons."},
 	"commander": {"two_handed": true, "name": "Commander", "weapon": "sword", "arrows": 0, "hp": 110.0, "speed": 1.05, "ranged": true, "hidden": true, "unavailable": true, "unique": true, "no_bots": true,
 		"desc": "First prize in VRAIN tournaments. Only one Commander per match; never a bot. Command rallies allies, then becomes Last Command at level 10."},
 }
@@ -48,7 +50,8 @@ static func icon(id: String) -> String:
 static func color(id: String) -> Color:
 	return {"commander": Color(0.78, 0.59, 0.2), "infantry": Color(0.62, 0.2, 0.14), "ranger": Color(0.22, 0.46, 0.26), "heavy": Color(0.36, 0.4, 0.48),
 		"adept": Color(0.3, 0.36, 0.72), "chivalry": Color(0.68, 0.48, 0.16), "magician": Color(0.36, 0.26, 0.66), "revenant": Color(0.16, 0.48, 0.5), "artificer": Color(0.52, 0.37, 0.22), "monk": Color(0.76, 0.46, 0.14), "plague_doctor": Color(0.26, 0.32, 0.24),
-		"bandit": Color(0.48, 0.23, 0.36), "cartographer": Color(0.25, 0.56, 0.82), "harpooner": Color(0.14, 0.3, 0.46), "tidecaller": Color(0.18, 0.66, 0.62), "ferryman": Color(0.72, 0.68, 0.56)}[id]
+		"bandit": Color(0.48, 0.23, 0.36), "cartographer": Color(0.25, 0.56, 0.82), "harpooner": Color(0.14, 0.3, 0.46), "tidecaller": Color(0.18, 0.66, 0.62), "ferryman": Color(0.72, 0.68, 0.56),
+		"ascendant": Color(0.62, 0.66, 0.24)}[id]
 
 
 ## Some classes share a body with another, but not its clothes or its gear.

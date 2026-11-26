@@ -18,6 +18,7 @@ const CODES := {"c734137a1f7468ebdb5cf20deae67c89b15dc5de26ff06b497548a4a62a3370
 	"8134ddbc51238f953f50369be83a1f67d15ff1a9bf15af44fc9da01b9b8f9c19": "harpooner",
 	"b467740d07272196d7ca893ee099a0f27cf2b91ea0c6f5826b3cc12862cba55c": "tidecaller",
 	"198dc481de37e02396478059dbf04e3edbb784f5b86f4e8cbc75989ae71b5c3f": "ferryman",
+	"d9bca845c05c9fef2cc0fddcccfece5da2c8fe91b53ba194bc7675aac36886a9": "ascendant",
 	"0737b22b9c93c1bbf0a043d938dfb28e119d6c542908f2003d191607b5f03275": "revenant",
 	"7d81bbae5f2dc15cbe7ef6021dad08e08235c315458fde23654b3a3fc88e2031": "artificer",
 	"851722ee3f2991091bcf1a11d634ff05ea3ea54ed49811ef83a8b7b4d2026312": "chivalry",
@@ -64,6 +65,8 @@ const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a kee
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
 const VERSUS_MAPS := ["village", "mesenlla", "vael", "fontanova"]
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
+var earned_specs := {} # professions that have to be earned (AbilityData._spec), once they are
+var fresh_specs: Array[String] = [] # earned just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
 const WINS_FOR_CARTOGRAPHER := 3 # in each of the Valleys of Mesenlla and Mist Bastion
@@ -224,6 +227,8 @@ func earn_text(id: String) -> String:
 			return "Win a match in Port Vael to unlock this class: reach the dawn there, alone or with friends, or win a versus match there."
 		"harbourmaster":
 			return "Defeat the Harbourmaster of Port Vael to unlock this class: be in the match when he falls."
+		"archipelago":
+			return "Play a match on Fontanova to its end to unlock this class, win or lose."
 		"beyond":
 			return "Win %d matches in the Valleys of Mesenlla and %d in Mist Bastion to unlock this class. So far: %d and %d." % [WINS_FOR_CARTOGRAPHER, WINS_FOR_CARTOGRAPHER, mini(mesenlla_wins, WINS_FOR_CARTOGRAPHER), mini(bastion_wins, WINS_FOR_CARTOGRAPHER)]
 	return ""
@@ -289,6 +294,10 @@ func note_beyond_win() -> void:
 			if not unlocked.has("tidecaller"):
 				_earn("tidecaller")
 			return
+		"fontanova":
+			if player_class == "ascendant" and not earned_specs.has("adorer"):
+				earn_spec("adorer")
+			return
 		"mesenlla":
 			mesenlla_wins += 1
 		"bastion":
@@ -324,7 +333,29 @@ func note_game_finished() -> void:
 	finished_games += 1
 	if finished_games >= GAMES_FOR_MAGICIAN and not unlocked.has("magician"):
 		_earn("magician")
+	if current_map() in ARCHIPELAGO_MAPS and not unlocked.has("ascendant"):
+		# Any match played to its end on an island of the Archipelagos, won or lost.
+		_earn("ascendant")
 	save_settings()
+
+
+## A profession that has to be earned: can this phone take it?
+func owns_spec(spec: Dictionary) -> bool:
+	return not spec.has("earned") or earned_specs.has(spec["earned"])
+
+
+func earn_spec(id: String) -> void:
+	earned_specs[id] = true
+	fresh_specs.append(id)
+	save_settings()
+
+
+## How to earn a profession that cannot be taken yet.
+static func spec_earn_text(spec: Dictionary) -> String:
+	match str(spec.get("earned", "")):
+		"adorer":
+			return "Win a match on Fontanova as the Ascendant to unlock this profession: reach the dawn there, alone or with friends, or win a versus match there."
+	return ""
 
 
 func _earn(id: String) -> void:
@@ -411,7 +442,7 @@ const VAEL_POOLS := {"drowned": 18, "barnacle_brute": 3, "brine_hound": 6, "lant
 
 ## Fontanova: the mutants of the island, its hives and its ambushers.
 const FONTA_POOLS := {"mutant_bee": 14, "beehive": 6, "mutant_wasp": 9, "mutant_snail": 4, "wasp_hive_snail": 2, "mutant_spider": 4,
-	"battle_ostrich": 4, "ember_moth": 3, "thornback": 3, "cult_worshipper": 9, "cult_priest": 3, "cult_guardian": 5} # (Ostrich Guardians ride on Guardians' bodies)
+	"battle_ostrich": 4, "ember_moth": 3, "thornback": 3, "cult_worshipper": 9, "cult_priest": 3, "cult_guardian": 5, "hierophant": 1, "polemarch": 1, "alquimelea": 1} # (Ostrich Guardians ride on Guardians' bodies)
 
 
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
@@ -507,6 +538,7 @@ func load_settings() -> void:
 	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
 	player_name = str(_saved(c, "progress", "player_name", ""))
 	unlocked = _saved(c, "progress", "unlocked", {})
+	earned_specs = _saved(c, "progress", "earned_specs", {})
 	redeemed = _saved(c, "progress", "redeemed", {})
 	doubloons = maxi(0, _saved(c, "progress", "doubloons", 0))
 	board_prizes = _saved(c, "progress", "board_prizes", {})
@@ -562,6 +594,7 @@ func save_settings() -> void:
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
 	c.set_value("progress", "unlocked", unlocked)
+	c.set_value("progress", "earned_specs", earned_specs)
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
 	c.set_value("progress", "board_prizes", board_prizes)

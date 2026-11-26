@@ -4,7 +4,7 @@ extends CharacterBody3D
 ## searches where the player was last seen. Animation is throttled with distance.
 
 enum State { ROAM, INVESTIGATE, CHASE, SEARCH }
-enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL, HAUL, DRIFT, BLIND } # new ones go at the end: the number travels
+enum Effect { STUN, SLOW, IGNITE, MARK, DOT, FORGET, FREEZE, TAUNT, PULL, BLEED, DISARM, FLINCH, ROOT, PIN, REVEAL, HAUL, DRIFT, BLIND, UNGUARD, BREAK } # new ones go at the end: the number travels
 
 const DIVE_WARNING := 0.6
 
@@ -21,7 +21,7 @@ const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its 
 const BODY_FILES := {"woods_child": "normal_b", "fallen_revenant": "clever", # a Fallen Revenant is a Revenant's own body
 	"drowned": "normal_a", "barnacle_brute": "normal_a", # the drowned of Vael, dressed by VaelModels
 	"press_gang": "normal_b", "tide_witch": "magic", "harbourmaster": "normal_a", "lighthouse_keeper": "clever", "hollow_sovereign": "normal_a",
-	"cult_worshipper": "normal_b", "cult_priest": "normal_a", "cult_guardian": "normal_a"} # the cult of Fontanova, dressed by CultGear
+	"cult_worshipper": "normal_b", "cult_priest": "normal_a", "cult_guardian": "normal_a", "hierophant": "normal_a", "polemarch": "normal_a"} # the cult of Fontanova, dressed by CultGear
 const FAR := 34.0
 const DUMMY_WINDOW := 5.0
 
@@ -150,6 +150,7 @@ var _poison_dps := 0.0
 var dot_kind := "" # set just before a damage-over-time tick's take_damage: "poison", "bleed", "fire"
 var _bleed_dps := 0.0
 var poison_left := 0.0
+var _unguarded := false # the next blow ignores its shield
 var bleed_left := 0.0
 var _debuff_fx: CPUParticles3D
 var _gate_wait := 0.0
@@ -474,8 +475,7 @@ func _build_visual() -> void:
 			for key: String in gear:
 				var bone := key.get_slice(":", 0)
 				var piece := _attach(bone, gear[key], Vector3.ZERO)
-				if CultGear.TURNS.has(bone):
-					piece.rotation = CultGear.TURNS[bone]
+				piece.rotation = CultGear.turn(model_id, bone)
 				if key.ends_with(":glow"):
 					piece.material_override = MesenllaModels.glow_material()
 					if bone == "head":
@@ -566,7 +566,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 			_visual.set_meta("risen", 0.0)
 			VaelModels.bury(_visual) # it lies in wait in the sand
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
-	mesenlla_mind = CultMind.new(id) if CultMind.handles(id) else FontaMind.new(id) if FontaMind.handles(id) else VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
+	mesenlla_mind = GodMind.new(id) if GodMind.handles(id) else CultMind.new(id) if CultMind.handles(id) else FontaMind.new(id) if FontaMind.handles(id) else VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
@@ -1059,7 +1059,7 @@ func _play(anim_name: String, speed := 1.0, blend := 0.2) -> void:
 
 ## A boss of the Mists or of Mesenlla: shrugs off long stuns, and grows with the number of players.
 func is_boss() -> bool:
-	return def.get("mist_boss", false) or def.get("mesenlla_boss", false) or def.get("vael_boss", false)
+	return def.get("mist_boss", false) or def.get("mesenlla_boss", false) or def.get("vael_boss", false) or def.get("god_boss", false)
 
 
 ## The Harbourmaster, the Mad Lighthouse Keeper and the Kraken's Arms: not bosses (the night does not
@@ -1083,7 +1083,7 @@ func is_hunting() -> bool:
 ## The Fallen (the Fallen Heroes, and the Fallen Revenant of the Mists): a long bar with a name over
 ## them while they hunt.
 func named_bar() -> bool:
-	return hero or bool(def.get("fallen", false)) or is_miniboss() or def.get("vael_boss", false)
+	return hero or bool(def.get("fallen", false)) or is_miniboss() or def.get("vael_boss", false) or def.get("god_boss", false)
 
 
 func headshot_at(y: float) -> bool:
@@ -1254,12 +1254,14 @@ func take_damage(amount: float, from_dir: Vector3, knock: float, hit_pos: Vector
 		_wake()
 	if _mark_time > 0.0:
 		amount *= _mark_mult
-	if def.get("shielded", false) and amount < 5000.0:
+	var unguarded := _unguarded
+	_unguarded = false
+	if def.get("shielded", false) and amount < 5000.0 and not unguarded:
 		var away := -from_dir
 		away.y = 0.0
 		var look := Vector3(sin(rotation.y), 0, cos(rotation.y))
 		if away.length_squared() > 0.001 and look.dot(away.normalized()) > 0.3:
-			amount *= 0.5
+			amount *= float(def.get("shield_cut", 0.5))
 			world.sfx_at("block", position, -6.0)
 	if dot != "":
 		_show_dot(amount, dot)
@@ -1308,7 +1310,7 @@ const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", 
 	"kraken_arm": "kraken_rise", "hollow_sovereign": "sovereign_voice", "leviathan": "leviathan_roar", "kraken": "kraken_roar",
 	"mutant_bee": "bee_buzz", "beehive": "hive_hum", "mutant_wasp": "wasp_buzz", "mutant_snail": "snail_squelch", "wasp_hive_snail": "snail_squelch",
 	"mutant_spider": "spider_hiss", "battle_ostrich": "ostrich_hiss", "ember_moth": "moth_flutter", "thornback": "thornback_grunt",
-	"cult_worshipper": "cult_chant", "cult_priest": "priest_intone", "cult_guardian": "guardian_shout", "ostrich_rider": "guardian_shout"}
+	"cult_worshipper": "cult_chant", "cult_priest": "priest_intone", "cult_guardian": "guardian_shout", "ostrich_rider": "guardian_shout", "hierophant": "hierophant_voice", "polemarch": "polemarch_voice", "alquimelea": "alq_voice"}
 
 
 ## How each of them sounds when struck, and when it dies.
@@ -1321,7 +1323,7 @@ const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist
 	"kraken_arm": "kraken_hurt", "hollow_sovereign": "sovereign_hurt", "leviathan": "leviathan_hurt", "kraken": "kraken_hurt",
 	"mutant_bee": "insect_hurt", "beehive": "hive_hurt", "mutant_wasp": "insect_hurt", "mutant_snail": "snail_hurt", "wasp_hive_snail": "snail_hurt",
 	"mutant_spider": "spider_hurt", "battle_ostrich": "ostrich_hurt", "ember_moth": "insect_hurt", "thornback": "thornback_grunt",
-	"cult_worshipper": "worshipper_hurt", "cult_priest": "priest_hurt", "cult_guardian": "guardian_hurt", "ostrich_rider": "guardian_hurt"}
+	"cult_worshipper": "worshipper_hurt", "cult_priest": "priest_hurt", "cult_guardian": "guardian_hurt", "ostrich_rider": "guardian_hurt", "hierophant": "hierophant_hurt", "polemarch": "polemarch_hurt", "alquimelea": "alq_hurt"}
 const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
@@ -1332,7 +1334,7 @@ const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "
 	"kraken_arm": "kraken_death", "hollow_sovereign": "sovereign_death", "leviathan": "leviathan_death", "kraken": "kraken_end",
 	"mutant_bee": "insect_death", "beehive": "hive_break", "mutant_wasp": "insect_death", "mutant_snail": "snail_death", "wasp_hive_snail": "snail_death",
 	"mutant_spider": "spider_death", "battle_ostrich": "ostrich_death", "ember_moth": "insect_death", "thornback": "thornback_death",
-	"cult_worshipper": "worshipper_death", "cult_priest": "priest_death", "cult_guardian": "guardian_death", "ostrich_rider": "guardian_death"}
+	"cult_worshipper": "worshipper_death", "cult_priest": "priest_death", "cult_guardian": "guardian_death", "ostrich_rider": "guardian_death", "hierophant": "hierophant_death", "polemarch": "polemarch_death", "alquimelea": "alq_death"}
 
 
 ## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.
@@ -1421,6 +1423,34 @@ func flinch(seconds: float) -> void:
 	_attack_left = 0.0
 	_attack_hit_pending = false
 	_attack_cd = maxf(_attack_cd, seconds)
+
+
+## An attack it is readying, broken (an Ascendant's Deicide): its pose drops, its rings fade where they
+## are, and it has to start again. Bosses and minibosses too: this is not a stun.
+func break_rite() -> void:
+	if not is_alive():
+		return
+	if puppet:
+		Net.effect_zombie(self, Effect.BREAK)
+		return
+	if not is_warning():
+		return
+	if mesenlla_mind:
+		mesenlla_mind.interrupt(self)
+	mesenlla_warning = false
+	_dive = 0.0
+	_windup = 0.0
+	_recover = maxf(_recover, 0.8)
+	MistSeal.break_from(world, net_id)
+
+
+## The next blow goes through its shield (the Ruin-Breaker Greataxe). Sent ahead of the blow itself,
+## which follows it to the host in order.
+func unguard() -> void:
+	if puppet:
+		Net.effect_zombie(self, Effect.UNGUARD)
+		return
+	_unguarded = true
 
 
 func stun(seconds: float) -> void:

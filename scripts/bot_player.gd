@@ -220,7 +220,11 @@ func _spend_points() -> void:
 		if step >= all.size():
 			return
 		var options: Array = all[step]
-		if options.is_empty() or not pawn.choose_ability(step, randi() % options.size()):
+		var open: Array[int] = []
+		for i in options.size():
+			if step != Player.CORE_STEPS or pawn.spec_open((pawn.tree_data()["specs"] as Array)[i]):
+				open.append(i)
+		if open.is_empty() or not pawn.choose_ability(step, open.pick_random()):
 			return
 
 
@@ -679,6 +683,27 @@ func _bandit_skills(p: Player, has_target: bool, dist: float) -> void:
 		p.use_art()
 
 
+## An Ascendant bot: Ascend into a crowd a few steps off; as a Godslayer, Deicide on what it fights,
+## soonest when that is readying an attack or is a boss; as an Adorer, the Elixir when the fight is on it.
+func _ascendant_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "" or p.art_cd_left > 0.0 or p._leap_t >= 0.0 or not has_target:
+		return
+	match p.spec_id:
+		"godslayer":
+			if dist < AscendantKit.deicide_reach(p) - 1.0:
+				_face(_target_point(), false)
+				var z := AscendantKit.quarry(p)
+				if z != null and (z.is_warning() or AscendantKit.divine(z) or dist > 3.0):
+					p.use_art()
+		"adorer":
+			if _enemies_within(AscendantKit.field_radius(p)) >= 2 or (p.hp < p.max_hp() * 0.5 and dist < 3.0):
+				p.use_art()
+		_:
+			if dist > 3.0 and dist < AscendantKit.ASCEND_REACH and _enemies_within(AscendantKit.ASCEND_REACH + 2.0) >= 2:
+				_face(_target_point(), false)
+				p.use_art()
+
+
 ## A Harpooner bot: Haul what it is fighting when it is out of reach (or itself to something big), and
 ## its path's ability on the second button.
 func _harpooner_skills(p: Player, has_target: bool, dist: float) -> void:
@@ -778,6 +803,9 @@ func _use_skills() -> void:
 		return
 	if p.class_id == "ferryman":
 		_ferryman_skills(p, has_target, dist)
+		return
+	if p.class_id == "ascendant":
+		_ascendant_skills(p, has_target, dist)
 		return
 	if not p.has_art() or p.art_cd_left > 0.0 or p._cast_kind != "" or p.aiming_art:
 		return

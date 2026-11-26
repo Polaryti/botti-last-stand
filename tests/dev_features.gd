@@ -1831,6 +1831,8 @@ func _fontanova() -> void:
 	await _fonta_rites(isle)
 	await _fonta_mutants(isle)
 	await _fonta_cult(isle)
+	await _fonta_god(isle)
+	await _fonta_ascendant(isle)
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode
@@ -3096,6 +3098,99 @@ func _fonta_cult(isle: World) -> void:
 	check((mount.get_node("Rig") as Node3D).position.is_equal_approx(Vector3(0, 1.25, 0)) or not mount.has_meta("did_thud"), "and stands ready again for the next rider")
 	for z: Zombie in isle.zombies.duplicate(): z.release()
 	await frames(1)
+	# The cult's great ones.
+	for id: String in CultMind.GREAT:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(d.get("miniboss", false) and CodexPanel.enemy_group(id) == 7 and Icons.exists(id) and CultMind.handles(id) and str(d.get("first_words", "")) != "" and str(d.get("last_words", "")) != "", id + ": a miniboss of the cult, with its icon, words and mind")
+		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
+			check(Sfx.NAMES.has(table.get(id, "")) and Net.SOUNDS.has(table.get(id, "")), "%s has its own voice (%s)" % [id, table.get(id, "")])
+	ready_you.call()
+	isle.spawn_zombie("hierophant", at + Vector3(0, 0, -11))
+	var hiero: Zombie = isle.zombies.back()
+	hiero.set_physics_process(false)
+	hiero._sees = true
+	var hm := hiero.mesenlla_mind as CultMind
+	hm.cooldown = 0.0
+	hm.cooldown_b = 99.0
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, 0.01)
+	check(hm.phase == "fan" and hiero.is_warning() and isle.mist_seals.size() == 3 and isle.mist_seals.all(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.ELIXIR), "the Hierophant throws three flasks at once")
+	var spread := (isle.mist_seals[0] as MistSeal).position.distance_to((isle.mist_seals[2] as MistSeal).position)
+	check(absf(spread - CultMind.FAN_SPREAD * 2.0) < 0.6, "one where you are going and one %.1f m to either side" % CultMind.FAN_SPREAD)
+	drop_seals.call()
+	hm.phase = ""
+	hiero._current_anim = ""
+	hiero.mesenlla_warning = false
+	# Below half health, the elixir of change.
+	for i in 2:
+		isle.spawn_zombie("cult_worshipper", hiero.position + Vector3(3.0 + i * 1.5, 0, 0))
+	hiero.hp = hiero.max_hp * 0.4
+	hm.cooldown_b = 0.0
+	hm.cooldown = 99.0
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, 0.01)
+	check(hm.phase == "rite" and hiero.is_warning(), "below half health it raises its staff to pour the elixir of change")
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, CultMind.RITE_TELL + 0.01)
+	check(isle.count_type("cult_worshipper") == 0 and isle.count_type("battle_ostrich") + isle.count_type("thornback") == CultMind.RITE_COUNT, "and the Worshippers near it become mutants")
+	hm.cooldown_b = 0.0
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, 0.01)
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, CultMind.RITE_TELL + 0.01)
+	check(isle.count_type("cult_worshipper") == CultMind.RITE_COUNT, "with none near, it calls %d down to it" % CultMind.RITE_COUNT)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The Polemarch: behind its tower shield, a sweep close in, a charge further off, its Guardians called.
+	ready_you.call()
+	isle.spawn_zombie("polemarch", at + Vector3(0, 0, -3))
+	var pole: Zombie = isle.zombies.back()
+	pole.set_physics_process(false)
+	pole._sees = true
+	pole.rotation.y = 0.0 # facing +Z, toward you
+	var full := pole.hp
+	pole.take_damage(100.0, Vector3(0, 0, -1), 0.0, pole.centre())
+	check(is_equal_approx(full - pole.hp, 100.0 * float(ZombieDefs.ALL["polemarch"]["shield_cut"])), "a blow from the front: only a quarter gets past the tower shield")
+	full = pole.hp
+	pole.take_damage(100.0, Vector3(0, 0, 1), 0.0, pole.centre())
+	check(is_equal_approx(full - pole.hp, 100.0), "from behind, all of it")
+	var pm := pole.mesenlla_mind as CultMind
+	pm.cooldown = 99.0
+	pm.cooldown_b = 0.0
+	pm.tick(pole, you, Vector3.ZERO, 3.0, 0.01)
+	check(pm.phase == "sweep" and pole.is_warning() and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.SWEEP, "close in, it draws back its spear to sweep")
+	var sweep: MistSeal = isle.mist_seals[0]
+	sweep.set_physics_process(false)
+	you.position = sweep.position
+	hp = you.hp
+	sweep.strike()
+	check(you.hp < hp and you.frozen_left >= CultMind.SPEAR_STUN - 0.01, "caught by the sweep: thrown back and stunned %d s" % int(CultMind.SPEAR_STUN))
+	drop_seals.call()
+	pm.phase = ""
+	ready_you.call()
+	pole.hp = pole.max_hp * 0.55
+	pm.tick(pole, you, Vector3.ZERO, 3.0, 0.01)
+	check(pm.phase == "call", "at %d%% it calls its Guardians" % int(CultMind.PHALANX[0] * 100.0))
+	pm.tick(pole, you, Vector3.ZERO, 3.0, 1.3)
+	check(isle.count_type("cult_guardian") == CultMind.PHALANX_COUNT, "and %d come to its sides" % CultMind.PHALANX_COUNT)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	# Each comes once in the night, at its hour, at its place.
+	isle.director._court_came.clear()
+	isle.director.elapsed = Director.HIEROPHANT_AT + 0.1
+	isle.director._next_procession = INF
+	isle.director._next_ostrich_rider = INF
+	isle.director._tick_cult()
+	check(isle.count_type("hierophant") == 1, "at %d:%02d the Hierophant comes" % [int(Director.HIEROPHANT_AT) / 60, int(Director.HIEROPHANT_AT) % 60])
+	isle.director.elapsed = Director.POLEMARCH_AT + 0.1
+	isle.director._tick_cult()
+	isle.director._tick_cult()
+	check(isle.count_type("polemarch") == 1 and isle.count_type("hierophant") == 1, "at %d:%02d the Polemarch; each of them once" % [int(Director.POLEMARCH_AT) / 60, int(Director.POLEMARCH_AT) % 60])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	isle.director._court_came.clear()
+	# The Ravine's floor is shut to paths: nothing is led down into it.
+	var floor_cell := Vector3.INF
+	for zz in range(-40, 30, 2):
+		if isle.terrain.in_chasm(-64, zz) and not isle.terrain.on_deck(-64, zz) and isle.terrain.ground_height(-64, zz) < Terrain.CHASM_DEATH:
+			floor_cell = Vector3(-64, 0, zz)
+			break
+	check(floor_cell != Vector3.INF and isle.grid.astar.is_point_solid(isle.grid.to_cell(floor_cell)), "the Ravine's floor is shut to paths")
 	# The night: processions from 2:00, riders from 7:00, out of sight of everyone.
 	var director := isle.director
 	you.position = at
@@ -3118,6 +3213,269 @@ func _fonta_cult(isle: World) -> void:
 	director._next_procession = Director.PROCESSION_FROM
 	director._next_ostrich_rider = Director.RIDERS_FROM
 	ready_you.call()
+
+
+## Al'quimelea, the end of Fontanova's night: it comes down from its temple at 11:00, keeps its distance
+## floating over everything, tells each of its four arts before it lands, broods twice, and dawn waits for it.
+func _fonta_god(isle: World) -> void:
+	var you := isle.player
+	var d := isle.director
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var ready_you := func() -> void:
+		you.position = at
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+		you.poison_left = 0.0
+		you.slowed_left = 0.0
+		you.frozen_left = 0.0
+		you.rooted_left = 0.0
+		you.burn_time = 0.0
+		you.velocity = Vector3.ZERO
+		you._status_immune = 0.0
+	var drop_seals := func() -> void:
+		for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	var id := Director.ALQUIMELEA
+	var def: Dictionary = ZombieDefs.ALL[id]
+	check(def.get("god_boss", false) and def["maps"] == ["fontanova"] and GodMind.handles(id) and Icons.exists(id) and Director.BOSS_CARDS.has(id)
+		and Game.zombie_pool_plan().has(id) and str(def.get("lore", "")).length() > 80 and str(def.get("first_words", "")) != "" and str(def.get("last_words", "")) != "",
+		"Al'quimelea is Fontanova's god, with its card, icon, lore, words and mind")
+	for sound: String in ["alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# Dawn waits for it, and it comes at 11:00 from the temple's court.
+	check(d.requires_regent(), "on Fontanova, dawn waits for the god")
+	d._mist_boss_spawned = false
+	d._mist_boss_defeated = false
+	d.elapsed = Director.ALQ_AT - 1.0
+	d._tick_mist_boss()
+	check(isle.count_type(id) == 0, "not before %d:%02d" % [int(Director.ALQ_AT) / 60, int(Director.ALQ_AT) % 60])
+	d.elapsed = Director.ALQ_AT + 0.1
+	d._tick_mist_boss()
+	d._tick_mist_boss()
+	check(isle.count_type(id) == 1 and d._mist_boss_spawned, "at %d:%02d it comes down, once" % [int(Director.ALQ_AT) / 60, int(Director.ALQ_AT) % 60])
+	var god: Zombie = isle.zombies.filter(func(z: Zombie) -> bool: return z.type_id == id).front()
+	check(Vector2(god.position.x - Director.ALQ_FROM.x, god.position.z - Director.ALQ_FROM.z).length() < 6.0, "from the temple's court on the Acropolis")
+	check(god.is_boss() and god._visual.get_node_or_null("Rig/Body/Crucible") != null and god._visual.get_node_or_null("Rig/Head/Halo") != null and god._visual.get_node_or_null("Pour") != null,
+		"a boss with its crucible, its halo of flasks and the elixir it floats on")
+	d.elapsed = d.match_length() + 5.0
+	check(d.dawn_amount() < 0.5, "past the night's end, while it lives: no dawn")
+	god.set_physics_process(false)
+	god._sees = true
+	var mind := god.mesenlla_mind as GodMind
+	# It rises first; nothing lands while it does.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -14)), at.z - 14.0)
+	mind.tick(god, you, Vector3.ZERO, 14.0, 0.01)
+	check(mind.phase == "rise" and isle.mist_seals.is_empty(), "it rises before it does anything")
+	mind.tick(god, you, Vector3.ZERO, 14.0, GodModels.RISE_TIME + 0.01)
+	check(mind.phase == "", "and is ready after %.0f s" % GodModels.RISE_TIME)
+	# It floats to keep its distance, over everything.
+	god.position = Vector3(at.x, 0, at.z - 4.0)
+	var was := Vector2(god.position.x - you.position.x, god.position.z - you.position.z).length()
+	mind.cooldown = 99.0
+	mind._cool_field = 99.0
+	mind._cool_nova = 99.0
+	mind._cool_lance = 99.0
+	for i in 30:
+		mind.tick(god, you, Vector3.ZERO, Vector2(god.position.x - you.position.x, god.position.z - you.position.z).length(), 0.1)
+	var now := Vector2(god.position.x - you.position.x, god.position.z - you.position.z).length()
+	check(now > was + 2.0, "too close, it floats back from you (%.1f m to %.1f m)" % [was, now])
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -13)), at.z - 13.0)
+	# Elixir rain: several flasks round you.
+	mind.cooldown = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	var rain := isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.ELIXIR)
+	check(mind.phase == "rain" and god.is_warning() and rain.size() == GodMind.RAIN_PER[0], "elixir rain: %d flasks fall round you, each told" % GodMind.RAIN_PER[0])
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind.cooldown = 99.0
+	# Fields of change: poisoned and held fast.
+	mind._cool_field = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	check(mind.phase == "field" and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.CHANGE, "a field of change opens under you")
+	var field: MistSeal = isle.mist_seals[0]
+	field.set_physics_process(false)
+	you.position = field.position
+	var hp := you.hp
+	field.strike()
+	check(you.hp < hp and you.poison_left >= GodMind.CHANGE_POISON - 0.01 and you.rooted_left >= GodMind.CHANGE_ROOT - 0.01, "caught in it: poisoned %.0f s and held fast %.1f s" % [GodMind.CHANGE_POISON, GodMind.CHANGE_ROOT])
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_field = 99.0
+	# Crucible nova: close in, thrown back and set burning.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -5)), at.z - 5.0)
+	mind._cool_nova = 0.0
+	mind.tick(god, you, Vector3.ZERO, 5.0, 0.01)
+	check(mind.phase == "nova" and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.NOVA and is_equal_approx(isle.mist_seals[0].radius, GodMind.NOVA_REACH), "within %.0f m, its crucible gathers light" % GodMind.NOVA_REACH)
+	var nova: MistSeal = isle.mist_seals[0]
+	nova.set_physics_process(false)
+	hp = you.hp
+	nova.strike()
+	check(you.hp < hp and you.velocity.length() > 6.0 and you.burn_time > 0.0, "and the nova throws you back burning")
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_nova = 99.0
+	# Crystal lance: a line of shards toward whoever stands furthest off.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -16)), at.z - 16.0)
+	mind._cool_lance = 0.0
+	mind.tick(god, you, Vector3.ZERO, 16.0, 0.01)
+	var shards := isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.SHARD)
+	check(mind.phase == "lance" and shards.size() == GodMind.LANCE_SHARDS, "further off, a lance of %d shards strikes out toward you" % GodMind.LANCE_SHARDS)
+	var toward := ((shards.back() as MistSeal).position - (shards.front() as MistSeal).position) * Vector3(1, 0, 1)
+	check(toward.normalized().dot(Vector3(0, 0, 1)) > 0.95, "in a line, from it toward you")
+	var shard: MistSeal = shards[2]
+	shard.set_physics_process(false)
+	you.position = shard.position
+	shard.strike()
+	check(you.slowed_left >= GodMind.SHARD_SLOW - 0.01, "a shard slows you %.1f s" % GodMind.SHARD_SLOW)
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_lance = 99.0
+	# Below two thirds and one third: it broods, and grows quicker.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -13)), at.z - 13.0)
+	for stage in [1, 2]:
+		god.hp = god.max_hp * (float(GodMind.STAGES[stage - 1]) - 0.01)
+		var before := isle.zombies.size()
+		mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+		check(mind.phase == "brood" and GodMind.stage_of(god) == stage, "below %d%% of its health it changes" % int(float(GodMind.STAGES[stage - 1]) * 100.0))
+		mind.tick(god, you, Vector3.ZERO, 13.0, GodMind.BROOD_TIME + 0.01)
+		check(isle.zombies.size() > before, "and mutants are born of it (%d)" % (isle.zombies.size() - before))
+		mind.cooldown = 0.0
+		mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+		check(is_equal_approx(mind.cooldown, GodMind.RAIN_EVERY * float(GodMind.QUICKER[stage])), "its arts come quicker (%.1f s)" % mind.cooldown)
+		drop_seals.call()
+		await frames(1)
+		mind.phase = ""
+		for z: Zombie in isle.zombies.duplicate():
+			if z != god: z.release()
+	# It falls: its long death, and then the dawn.
+	check(is_equal_approx(MesenllaModels.death_time(id), GodModels.DEATH_TIME), "its death takes %.0f s" % GodModels.DEATH_TIME)
+	d.boss_fallen(god)
+	check(d._mist_boss_defeated and d.dawn_amount() >= 1.0, "when it falls, the dawn comes")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	d.elapsed = 0.0
+	d._mist_boss_spawned = false
+	d._mist_boss_defeated = false
+	ready_you.call()
+	await frames(1)
+
+
+## The Ascendant against Fontanova's own: it strikes the divine and the changed harder, its Deicide breaks
+## a miniboss's attack, and the Ruin-Breaker goes through a Guardian's shield and into stone.
+func _fonta_ascendant(isle: World) -> void:
+	var you := isle.player
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var was_class := you.class_id
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	var place := func(kind: String, ahead: float, side := 0.0) -> Zombie:
+		var spot := at + Vector3(side, 0, -ahead)
+		spot.y = isle.ground_at(spot)
+		if not isle.spawn_zombie(kind, spot):
+			return null
+		var z: Zombie = isle.zombies.back()
+		z.position = spot
+		z.set_physics_process(false)
+		z.hp = 10000.0
+		z.max_hp = 10000.0
+		return z
+	you.setup_class("ascendant")
+	you.chosen.clear()
+	you.flags.clear()
+	you.mods = Player.BASE_MODS.duplicate()
+	you.spec_id = ""
+	you.position = at
+	you.rotation = Vector3.ZERO
+	you.yaw = 0.0
+	you.pitch = 0.0
+	you.camera.rotation = Vector3.ZERO
+	var snail: Zombie = place.call("mutant_snail", 3.0)
+	var pole: Zombie = place.call("polemarch", 3.0, 3.0)
+	var worshipper: Zombie = place.call("cult_worshipper", 3.0, -3.0)
+	check(snail != null and pole != null and worshipper != null, "a mutant, a miniboss and a Worshipper to try it on")
+	if snail == null or pole == null or worshipper == null:
+		return
+	check(is_equal_approx(AscendantKit.damage_scale(you, snail), 1.0 + AscendantKit.BANE) and is_equal_approx(AscendantKit.damage_scale(you, pole), 1.0 + AscendantKit.BANE)
+		and is_equal_approx(AscendantKit.damage_scale(you, worshipper), 1.0), "the Ascendant strikes mutants and minibosses %d%% harder, and a mere Worshipper no harder" % roundi(AscendantKit.BANE * 100.0))
+	you.flags["unbowed"] = true
+	check(is_equal_approx(AscendantKit.hurt_scale(you), 1.0 - AscendantKit.UNBOWED), "Unbowed: with a miniboss near, less harm")
+	you.flags.erase("unbowed")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# A Godslayer's Deicide on the Hierophant as it readies its flasks: the attack is broken.
+	you.points = 4
+	for step in Player.CORE_STEPS:
+		you.choose_ability(step, 0)
+	you.choose_ability(Player.CORE_STEPS, 0)
+	check(you.spec_id == "godslayer", "a Godslayer")
+	var hiero: Zombie = place.call("hierophant", 7.0)
+	hiero._sees = true
+	var hm := hiero.mesenlla_mind as CultMind
+	hm.cooldown = 0.0
+	hm.cooldown_b = 99.0
+	hm.tick(hiero, you, Vector3.ZERO, 7.0, 0.01)
+	await frames(1)
+	var own := func() -> int: return isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.source_id == hiero.net_id and not m.struck).size()
+	check(hiero.is_warning() and own.call() == 3, "the Hierophant readies three flasks")
+	var h0 := hiero.hp
+	AscendantKit.deicide(you)
+	check(you.deicide_on == hiero, "Deicide leaps on it")
+	you.set_physics_process(true)
+	for i in 120:
+		if you._leap_t < 0.0:
+			break
+		await get_tree().physics_frame
+	you.set_physics_process(false)
+	await frames(1)
+	check(hiero.hp < h0 and not hiero.is_warning() and hm.phase == "" and own.call() == 0, "and breaks its attack, though stuns do not touch it: its rings fade without landing")
+	for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The Ruin-Breaker Greataxe: through a Guardian's shield, and into stone.
+	you.setup_class("infantry")
+	you.position = at
+	you.rotation = Vector3.ZERO
+	you.yaw = 0.0
+	you.camera.rotation = Vector3.ZERO
+	var guard: Zombie = place.call("cult_guardian", 2.0)
+	guard.look_at(Vector3(you.position.x, guard.position.y, you.position.z), Vector3.UP, true)
+	var sword: Dictionary = WeaponDefs.ALL["sword"]
+	var axe: Dictionary = WeaponDefs.ALL["ruin_greataxe"]
+	var g0 := guard.hp
+	isle.melee_hit(you, sword, you.melee_stats(sword))
+	var by_sword := g0 - guard.hp
+	g0 = guard.hp
+	isle.melee_hit(you, axe, you.melee_stats(axe))
+	var by_axe := g0 - guard.hp
+	var plain := float(you.melee_stats(axe)["damage"]) / float(you.melee_stats(sword)["damage"])
+	check(by_sword > 0.0 and absf(by_axe / by_sword - plain / float(ZombieDefs.ALL["cult_guardian"].get("shield_cut", 0.5))) < 0.05, "a sword glances off a Guardian's shield; the Greataxe goes through it")
+	guard.release()
+	await frames(1)
+	var stony: Zombie = place.call("cult_worshipper", 2.0)
+	stony.def = stony.def.duplicate()
+	stony.def["stone"] = true # this one only: what counts is that it is stone
+	var s0 := stony.hp
+	isle.melee_hit(you, axe, you.melee_stats(axe))
+	check(absf((s0 - stony.hp) - float(you.melee_stats(axe)["damage"]) * float(axe["breaker"])) < 1.0, "it strikes stone things %d%% harder" % roundi((float(axe["breaker"]) - 1.0) * 100.0))
+	check(["earth_elemental", "great_revenant_elemental", "gargoyle"].all(func(k: String) -> bool: return ZombieDefs.ALL[k].get("stone", false)), "the elementals of stone and the gargoyles are stone")
+	stony.release()
+	# The Resin Repeater against a mutant bee.
+	var bee: Zombie = place.call("mutant_bee", 6.0)
+	check(bee != null and bee.flies, "a mutant bee flies, and the Repeater's bolts are made for it")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	you.setup_class(was_class)
+	you.position = at
 
 
 func _fonta_mutants(isle: World) -> void:

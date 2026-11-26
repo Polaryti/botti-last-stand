@@ -234,7 +234,11 @@ func _show_cards(step: int, options: Array) -> void:
 			col = specs[i]["color"]
 		elif player.spec_id != "":
 			col = player.spec_def()["color"]
-		row.add_child(_card(step, i, a, col, count, text_w, text_h))
+		var card := _card(step, i, a, col, count, text_w, text_h)
+		if picking_spec and not player.spec_open(specs[i]):
+			# Not earned yet: the card says how, and cannot be taken.
+			_lock_card(card, Game.spec_earn_text(specs[i]))
+		row.add_child(card)
 
 
 ## One choice, large enough to read in a hurry. One tap takes it.
@@ -283,6 +287,23 @@ func _card(step: int, index: int, a: Dictionary, col: Color, count: int, text_w 
 		var small := 25 if count < 3 else 22
 		_fit_pair(name_label, desc, text_w, text_h, [big, big - 3, big - 6, 20], range(small, 14, -1))
 	return b
+
+
+## A profession not yet earned, among the choices: greyed, padlocked, its words saying how to earn it.
+func _lock_card(card: Button, how: String) -> void:
+	card.disabled = true
+	card.modulate = Color(1, 1, 1, 0.62)
+	card.name = "LockedCard"
+	var labels := card.find_children("*", "Label", true, false)
+	if labels.size() >= 2:
+		(labels[1] as Label).text = how
+		(labels[1] as Label).add_theme_color_override("font_color", UiTheme.ASH)
+	card.add_theme_stylebox_override("disabled", UiTheme.flat(UiTheme.DUSK, UiTheme.STEEL, 10, 0.0))
+	var lock := IconView.new("lock", UiTheme.STEEL, 40.0)
+	lock.name = "Padlock"
+	lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(lock)
+	lock.position = Vector2(10, 10)
 
 
 func _show_waiting(step: int, total: int) -> void:
@@ -355,6 +376,8 @@ func _show_reading() -> void:
 
 
 func _state_words(n: TreeNodeButton) -> String:
+	if n.spec >= 0 and not player.spec_open((player.tree_data()["specs"] as Array)[n.spec]):
+		return Game.spec_earn_text((player.tree_data()["specs"] as Array)[n.spec])
 	match state_of(n):
 		"taken": return "You have this."
 		"ready": return "You can take this now."
@@ -383,6 +406,8 @@ func state_of(n: TreeNodeButton) -> String:
 	if taken == n.ability["id"]:
 		return "taken"
 	if n.spec >= 0 and player.spec_id != "" and (player.tree_data()["specs"] as Array)[n.spec]["id"] != player.spec_id:
+		return "locked"
+	if n.spec >= 0 and not player.spec_open((player.tree_data()["specs"] as Array)[n.spec]):
 		return "locked"
 	if taken != null:
 		return "locked"

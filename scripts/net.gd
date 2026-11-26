@@ -22,12 +22,12 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 71
+const PROTOCOL := 72
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
-enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH, FLARE, HARPOON_LIE, HARPOON_GONE, QUAKE }
+enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH, FLARE, HARPOON_LIE, HARPOON_GONE, QUAKE, CENSER, CHANGE_FIELD, BEES }
 enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT, REVEAL, BLIND } # new ones go at the end: the number travels
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
@@ -72,7 +72,10 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike", "dawn_fontanova",
 	"bee_buzz", "bee_sting", "wasp_buzz", "wasp_shot", "wasp_bite", "hive_hum", "hive_hurt", "hive_swarm", "hive_break", "nest_shudder", "snail_squelch", "snail_hurt", "snail_death", "spider_hiss", "spider_pounce", "spider_bite", "spider_hurt", "spider_death", "ostrich_screech", "ostrich_hiss", "ostrich_kick", "ostrich_hurt", "ostrich_death", "moth_flutter", "moth_dust", "insect_hurt", "insect_death", "thornback_grunt", "thornback_death",
 	"brazier_lit", "sanctum_open", "altar_wake", "altar_bless", "tide_rising",
-	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash"]
+	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash",
+	"hierophant_voice", "hierophant_hurt", "hierophant_death", "transmute_rite", "polemarch_voice", "polemarch_hurt", "polemarch_death", "spear_sweep", "phalanx_call",
+	"alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea",
+	"censer_swing", "censer_ready", "censer_release", "repeater_shot", "greataxe_swing", "ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end", "honeycomb_hum", "honey_forage", "flask_drink", "flask_sour"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -1146,6 +1149,11 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 		Fx.HARPOON_LIE: world.lay_harpoon(by, a, b, true)
 		Fx.HARPOON_GONE: world.take_harpoon(by)
 		Fx.QUAKE: world.anchor_quake_fx(a, b.x)
+		Fx.CENSER: world.censer_fx(a, clampf(b.x, 0.5, 8.0))
+		Fx.CHANGE_FIELD: world.change_field_fx(a, clampf(b.x, 0.5, 10.0), clampf(b.y, 0.1, 3.0))
+		Fx.BEES:
+			if a.distance_to(b) < 40.0:
+				world.bee_swarm_fx(a, b)
 
 
 func set_night_map(id: String) -> void:
@@ -1465,6 +1473,8 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.HAUL: z.haul_to(Vector3(a, 0.0, b))
 		Zombie.Effect.DRIFT: z.drift_to(Vector3(a, 0.0, b), CrownUpgrades.HORIZON_PULL) # only Event Horizon draws them now
 		Zombie.Effect.BLIND: z.blind_for(clampf(a, 0.0, 20.0))
+		Zombie.Effect.UNGUARD: z.unguard()
+		Zombie.Effect.BREAK: z.break_rite()
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -2952,6 +2962,18 @@ func _command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
 func mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int, style := 0) -> void:
 	if is_host():
 		_spawn_mist_seal.rpc(at, radius, eye, delay, damage, source, style)
+
+
+## Every ring of one caster that has not landed yet, gone: its attack was broken (Zombie.break_rite).
+func seals_broken(source: int) -> void:
+	if is_host():
+		_seals_broken.rpc(source)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _seals_broken(source: int) -> void:
+	if world and is_instance_valid(world):
+		MistSeal.break_from(world, source, true)
 
 
 @rpc("authority", "call_local", "reliable")
