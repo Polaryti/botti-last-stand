@@ -2506,7 +2506,8 @@ func _tick_honeycomb(delta: float) -> void:
 		_comb_timer = PowerDefs.COMB_INTERVAL
 		var prey := comb_prey()
 		if prey:
-			var from := global_position + Vector3.UP * 1.6
+			# Out from where the comb hangs, ahead of the face: not from inside your own head.
+			var from := global_position + Vector3.UP * 1.5 - global_basis.z * 1.4 - global_basis.x * 0.5
 			world.bee_swarm_fx(from, prey.centre())
 			if Net.active():
 				Net.world_fx(Net.Fx.BEES, from, prey.centre())
