@@ -15,7 +15,7 @@ const LIMIT := 16
 const STING_STUN := 0.8 # how long a Lantern Jelly's sting stuns you (ZombieDefs "sting_stun")
 ## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
 const PORTAL_SHARE := 1.5
-enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL, INK, STINGER, BITE, WEB, KICK, DUST } # new ones go at the end
+enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL, INK, STINGER, BITE, WEB, KICK, DUST, ELIXIR, BASH } # new ones go at the end
 const FROST_FREEZE := 0.6
 const FROST_SLOW := 2.0
 const LOOKS := {
@@ -42,18 +42,20 @@ const LOOKS := {
 	Style.WEB: [Color(0.8, 0.78, 0.9), Color(0.72, 0.4, 1.0)],
 	Style.KICK: [Color(0.95, 0.6, 0.3), Color(0.85, 0.2, 0.15)],
 	Style.DUST: [Color(1.0, 0.6, 0.25), Color(0.72, 0.4, 1.0)],
+	Style.ELIXIR: [Color(0.55, 1.0, 0.45), Color(0.72, 0.4, 1.0)],
+	Style.BASH: [Color(0.9, 0.7, 0.32), Color(0.85, 0.3, 0.18)],
 }
 ## What each sounds like as its circle appears, and as it closes.
 const WARN_SOUNDS := {Style.MIST: "mist_warning", Style.QUAKE: "quake_warning", Style.STORM: "storm_call", Style.FIRE: "fire_warning",
 	Style.BOULDER: "boulder_throw", Style.FROST: "frost_warning", Style.STING: "jelly_hum", Style.NET: "", Style.WAVE: "wave_rise",
 	Style.HOOK: "", Style.LAMP: "", Style.SLAM: "", Style.FLASH: "lamp_flare", Style.CROWN: "crown_toll", Style.SALT: "", Style.BRINE_BOLT: "", Style.KNELL: "", Style.INK: "",
-	Style.STINGER: "", Style.BITE: "", Style.WEB: "", Style.KICK: "", Style.DUST: "moth_flutter"}
+	Style.STINGER: "", Style.BITE: "", Style.WEB: "", Style.KICK: "", Style.DUST: "moth_flutter", Style.ELIXIR: "", Style.BASH: ""}
 const STRIKE_SOUNDS := {Style.MIST: "mist_burst", Style.QUAKE: "earth_slam", Style.STORM: "thunder", Style.FIRE: "fire_breath",
 	Style.BOULDER: "boulder_impact", Style.FROST: "frost_burst", Style.STING: "jelly_sting", Style.NET: "net_land", Style.WAVE: "wave_crash",
 	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall", Style.SALT: "salt_splash", Style.BRINE_BOLT: "brine_crack", Style.KNELL: "knell_strike", Style.INK: "kraken_ink",
-	Style.STINGER: "bee_sting", Style.BITE: "wasp_bite", Style.WEB: "spider_bite", Style.KICK: "ostrich_kick", Style.DUST: "moth_dust"}
+	Style.STINGER: "bee_sting", Style.BITE: "wasp_bite", Style.WEB: "spider_bite", Style.KICK: "ostrich_kick", Style.DUST: "moth_dust", Style.ELIXIR: "elixir_shatter", Style.BASH: "shield_bash"}
 ## Thrown things (a net, a hook, a lamp) leave the thrower's hand for the last part of the tell.
-const THROWN := [Style.NET, Style.HOOK, Style.LAMP, Style.SALT, Style.INK]
+const THROWN := [Style.NET, Style.HOOK, Style.LAMP, Style.SALT, Style.INK, Style.ELIXIR]
 const THROW_FLIGHT := 0.55
 ## What each of the drowned court's circles does to you (VaelMind has the numbers).
 const NET_HOLD := VaelMind.NET_HOLD
@@ -73,6 +75,10 @@ const WEB_POISON := FontaMind.WEB_POISON
 const KICK_KNOCK := FontaMind.KICK_KNOCK
 const DUST_BLIND := FontaMind.DUST_BLIND
 const DUST_BURN := FontaMind.DUST_BURN
+const ELIXIR_POISON := CultMind.ELIXIR_POISON
+const ELIXIR_SLOW := CultMind.ELIXIR_SLOW
+const BASH_STUN := CultMind.BASH_STUN
+const BASH_KNOCK := CultMind.BASH_KNOCK
 var style := 0
 var _boulder: MeshInstance3D
 var _chain: MeshInstance3D
@@ -203,6 +209,13 @@ static func thrown_mesh(kind: int) -> Mesh:
 		return _thrown_meshes[kind]
 	var l := LowPoly.new()
 	match kind:
+		Style.ELIXIR:
+			# A priest's flask: a round glass belly of green elixir, a long neck, a wax seal, a violet glint.
+			l.prism(Vector3(0, -0.16, 0), Vector3(0, 0.1, 0), 0.15, 0.16, 8, Color(0.45, 0.95, 0.4))
+			l.prism(Vector3(0, 0.1, 0), Vector3(0, 0.18, 0), 0.16, 0.05, 8, Color(0.4, 0.85, 0.36))
+			l.prism(Vector3(0, 0.18, 0), Vector3(0, 0.34, 0), 0.045, 0.04, 6, Color(0.82, 0.9, 0.86))
+			l.prism(Vector3(0, 0.34, 0), Vector3(0, 0.4, 0), 0.06, 0.05, 6, Color(0.62, 0.2, 0.16))
+			l.box(Vector3(0.1, 0.0, 0.1), Vector3(0.05, 0.12, 0.02), Color(0.85, 0.6, 1.0))
 		Style.INK:
 			# A gout of ink, ragged at the edges, trailing a tail.
 			var ink := Color(0.08, 0.03, 0.1)
@@ -341,6 +354,14 @@ func strike() -> void:
 		Style.DUST:
 			world.fx_fire_patch(position, radius * 0.6)
 			world.fx_mist(position + Vector3.UP * 1.0, radius * 0.5)
+		Style.ELIXIR:
+			world.fx_water(position, radius * 0.5, Color(0.5, 1.0, 0.42))
+			world.fx_mist(position + Vector3.UP * 0.5, radius * 0.45)
+			if _boulder:
+				_boulder.visible = false
+		Style.BASH:
+			world.fx_gore(position + Vector3.UP * 0.6, Color(0.62, 0.5, 0.3))
+			world.show_ring(position + Vector3.UP * 0.05, radius, Color(0.95, 0.75, 0.35))
 		Style.INK:
 			world.fx_gore(position + Vector3.UP * 0.6, Color(0.1, 0.03, 0.12))
 			world.fx_gore(position + Vector3(radius * 0.4, 0.4, 0), Color(0.16, 0.05, 0.18))
@@ -405,6 +426,15 @@ func strike() -> void:
 					p.night_blind_left = maxf(p.night_blind_left, DUST_BLIND)
 					p.ignite(DUST_BURN)
 					p.say("Burning dust in your eyes!")
+				Style.ELIXIR:
+					p.poison_by_creature(ELIXIR_POISON)
+					p.slow_by_creature(ELIXIR_SLOW)
+				Style.BASH:
+					var shoved := Vector3(p.global_position.x - position.x, 0, p.global_position.z - position.z)
+					if source:
+						shoved = Vector3(p.global_position.x - source.position.x, 0, p.global_position.z - source.position.z)
+					p.velocity += shoved.normalized() * BASH_KNOCK + Vector3.UP * 2.5
+					p.stun_by_creature(BASH_STUN)
 				Style.MIST: p.apply_status(Net.Status.SLOW, 2.0)
 				Style.QUAKE, Style.BOULDER:
 					p.apply_status(Net.Status.STUN, 0.8)

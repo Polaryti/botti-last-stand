@@ -36,6 +36,14 @@
 - Every creature has its own model, sounds, icon, Codex page and death.
 - The wasp's stinger is a venomous dart of its own, not an arrow.
 
+
+### The cult of Al'quimelea
+- **Worshippers** come down from their village or the Sacred Way in processions of three, from 2:00. When one falls, the others nearby rush you.
+- **Priests of Change** keep their distance, throw flasks of elixir that poison and slow, and anoint hurt creatures back to health.
+- **Temple Guardians** brace behind their bronze shields, then rush you and bash you down. From the front, blows glance off the shield.
+- **Ostrich Guardians** ride out on their war-birds from 7:00. Bring the bird down and the Guardian fights on foot.
+- Each has its own gear, voice, icon and Codex page; the cult has its own Codex section.
+
 ### Title screen
 - New app icon and splash. The menu tours Fontanova to the Archipelagos' own theme.
 

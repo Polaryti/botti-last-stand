@@ -561,6 +561,75 @@ func _tick_fontanova() -> void:
 		_next_spider = elapsed + SPIDER_EVERY
 		if world.count_type("mutant_spider") < MAX_SPIDERS:
 			world.spawn_spider()
+	_tick_cult()
+
+
+## The cult of Fontanova by place and time: processions of three Worshippers down from their village
+## or the Sacred Way from PROCESSION_FROM, every PROCESSION_EVERY seconds while there are not too many
+## about; Guardians on their ostriches along the Sacred Way or the Ravine from RIDERS_FROM.
+const PROCESSION_FROM := 120.0
+const PROCESSION_EVERY := 80.0
+const MAX_WORSHIPPERS := 9
+const RIDERS_FROM := 420.0
+const RIDER_EVERY_ISLAND := 100.0
+const MAX_OSTRICH_RIDERS := 2
+const PROCESSION_SITES := ["Worshippers' Village", "Sacred Way"]
+const RIDER_SITES := ["Sacred Way", "The Ravine"]
+var _next_procession := PROCESSION_FROM
+var _next_ostrich_rider := RIDERS_FROM
+func _tick_cult() -> void:
+	if Net.fog_rules():
+		return
+	if elapsed >= _next_procession:
+		_next_procession = elapsed + PROCESSION_EVERY
+		var pack := int(ZombieDefs.ALL["cult_worshipper"]["pack"])
+		var site := cult_site(PROCESSION_SITES)
+		if site != Vector3.INF and world.count_type("cult_worshipper") <= MAX_WORSHIPPERS - pack:
+			var came := 0
+			for i in pack:
+				var at := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(site + Vector3(i * 1.6 - 1.6, 0, i % 2 * 1.2))))
+				at.y = world.ground_at(at)
+				if world.spawn_zombie("cult_worshipper", at):
+					came += 1
+			if came > 0:
+				_sound("cult_chant", 2.0)
+				show_banner("A procession of worshippers comes chanting from %s..." % _site_name(site), 3.5)
+	if elapsed >= _next_ostrich_rider:
+		_next_ostrich_rider = elapsed + RIDER_EVERY_ISLAND
+		var site := cult_site(RIDER_SITES)
+		if site != Vector3.INF and world.count_type("ostrich_rider") < MAX_OSTRICH_RIDERS:
+			var at := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(site)))
+			at.y = world.ground_at(at)
+			if world.spawn_zombie("ostrich_rider", at):
+				_sound("ostrich_screech", 2.0)
+				show_banner("Claws on the stones: a Guardian rides out on its war-bird...", 3.5)
+
+
+## Of these named places, the one farthest from anyone still standing, if it is out of their sight
+## (more than CULT_HIDDEN metres off); INF if none is.
+const CULT_HIDDEN := 22.0
+func cult_site(names: Array) -> Vector3:
+	var best := Vector3.INF
+	var best_d := CULT_HIDDEN
+	for mark: Dictionary in world.map_marks:
+		if not names.has(mark["name"]):
+			continue
+		var at := Vector3(mark["at"].x, 0, mark["at"].y)
+		var near := INF
+		for p: Target in world.players:
+			if not p.dead:
+				near = minf(near, Vector2(p.global_position.x - at.x, p.global_position.z - at.z).length())
+		if near > best_d:
+			best = at
+			best_d = near
+	return best
+
+
+func _site_name(at: Vector3) -> String:
+	for mark: Dictionary in world.map_marks:
+		if Vector2(mark["at"]).distance_to(Vector2(at.x, at.z)) < 0.5:
+			return "the " + str(mark["name"]) if str(mark["name"]) == "Sacred Way" else str(mark["name"])
+	return "the hills"
 
 
 func _tick_vael() -> void:

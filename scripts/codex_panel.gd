@@ -95,7 +95,8 @@ func _classes() -> void:
 ## Families are kept together; alphabetical order is only used within a family.
 static func enemy_group(id: String) -> int:
 	var d: Dictionary = ZombieDefs.ALL[id]
-	if d.get("mist_boss", false) or d.get("mesenlla_boss", false) or d.get("vael_boss", false): return 7
+	if d.get("mist_boss", false) or d.get("mesenlla_boss", false) or d.get("vael_boss", false) or d.get("god_boss", false): return 8
+	if d.get("cult", false): return 7
 	if SpawnRules.is_archipelago(d): return 6
 	if SpawnRules.is_vael(d): return 5
 	if SpawnRules.is_mesenlla(d): return 4
@@ -138,7 +139,7 @@ func _enemies() -> void:
 	for id: String in order:
 		var group := enemy_group(id)
 		if group != previous:
-			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Creatures of Mesenlla", "The drowned of Vael", "Creatures of Fontanova", "Bosses"][group])
+			_section(["The undead", "Hunters and horrors", "Fallen heroes", "Creatures of The Mists", "Creatures of Mesenlla", "The drowned of Vael", "Creatures of Fontanova", "The cult of Al'quimelea", "Bosses"][group])
 			previous = group
 		var d: Dictionary = ZombieDefs.ALL[id]
 		var locations := PackedStringArray()

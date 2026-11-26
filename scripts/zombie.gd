@@ -20,7 +20,8 @@ const BODY_TOP := {"magic": 2.2027} # the mage's hat does not count towards its 
 ## Bodies that share another's animated model, dressed differently.
 const BODY_FILES := {"woods_child": "normal_b", "fallen_revenant": "clever", # a Fallen Revenant is a Revenant's own body
 	"drowned": "normal_a", "barnacle_brute": "normal_a", # the drowned of Vael, dressed by VaelModels
-	"press_gang": "normal_b", "tide_witch": "magic", "harbourmaster": "normal_a", "lighthouse_keeper": "clever", "hollow_sovereign": "normal_a"}
+	"press_gang": "normal_b", "tide_witch": "magic", "harbourmaster": "normal_a", "lighthouse_keeper": "clever", "hollow_sovereign": "normal_a",
+	"cult_worshipper": "normal_b", "cult_priest": "normal_a", "cult_guardian": "normal_a"} # the cult of Fontanova, dressed by CultGear
 const FAR := 34.0
 const DUMMY_WINDOW := 5.0
 
@@ -465,6 +466,24 @@ func _build_visual() -> void:
 			for piece in worn:
 				piece.set_meta("own_material", piece.material_override)
 				_parts.append(piece)
+		elif model_id in CultGear.GEARED:
+			# The cult of Al'quimelea: robes, masks and bronze (CultGear), eyes lit in the masks.
+			_eyes.visible = false
+			var gear := CultGear.gear_for(model_id)
+			var worn: Array[MeshInstance3D] = []
+			for key: String in gear:
+				var bone := key.get_slice(":", 0)
+				var piece := _attach(bone, gear[key], Vector3.ZERO)
+				if CultGear.TURNS.has(bone):
+					piece.rotation = CultGear.TURNS[bone]
+				if key.ends_with(":glow"):
+					piece.material_override = MesenllaModels.glow_material()
+					if bone == "head":
+						_eyes = piece
+				worn.append(piece)
+			for piece in worn:
+				piece.set_meta("own_material", piece.material_override)
+				_parts.append(piece)
 	if model_id == "hollow_sovereign": SovereignRegalia.install(self)
 	_shadow = World.make_blob_shadow(1.0)
 	add_child(_shadow)
@@ -547,7 +566,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 			_visual.set_meta("risen", 0.0)
 			VaelModels.bury(_visual) # it lies in wait in the sand
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
-	mesenlla_mind = FontaMind.new(id) if FontaMind.handles(id) else VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
+	mesenlla_mind = CultMind.new(id) if CultMind.handles(id) else FontaMind.new(id) if FontaMind.handles(id) else VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
@@ -730,7 +749,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 func _show_mount(on: bool, falls := false) -> void:
 	var was := _mounted
 	_mounted = on
-	if on and _horse_node == null and model_id == "woods_child":
+	if on and _horse_node == null and def.get("mount", "") in RIGGED_MOUNTS:
 		_make_bear_mount()
 	var bear := _horse_node != null and not (_horse_node is MeshInstance3D)
 	if _horse_node:
@@ -742,14 +761,14 @@ func _show_mount(on: bool, falls := false) -> void:
 		_horse_node.rotation = Vector3(0, 0 if bear else PI, 0)
 		_horse_node.position = Vector3.ZERO
 		_visual.position.x = 0.0
-		_horse_node.scale = Vector3.ONE * _scale * (MesenllaModels.CAVALRY_SIZE if bear else HorseModel.RIDDEN_SIZE)
+		_horse_node.scale = Vector3.ONE * _scale * (_mount_size() if bear else HorseModel.RIDDEN_SIZE)
 		if bear:
 			if not on and was and falls:
 				# Brought down: the bear stays where it fell and rolls over, and its rider jumps clear.
 				_horse_node.visible = true
 				_horse_node.top_level = true
-				_horse_node.global_transform = global_transform.scaled_local(Vector3.ONE * _scale * MesenllaModels.CAVALRY_SIZE)
-				_mount_fall = MOUNT_FALL_TIME
+				_horse_node.global_transform = global_transform.scaled_local(Vector3.ONE * _scale * _mount_size())
+				_mount_fall = _mount_fall_time()
 	_visual.rotation = Vector3.ZERO
 	_visual.position.z = 0.0
 	if bear and on:
@@ -818,7 +837,7 @@ func _tick_dummy(delta: float) -> void:
 ## Cavalry) it sits astride: the spear couched as the bear gallops in, driven home as they pass while
 ## the bear rakes with a paw, then brandished overhead as the bear half rears and roars, wheeling.
 func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void:
-	var on_bear: bool = def.get("mount", "") == "bear"
+	var on_bear: bool = def.get("mount", "") in RIGGED_MOUNTS # sat astride: couched, thrust, brandished
 	if _attack_left > 0.0:
 		_attack_left -= delta
 	if _ride_pass > 0.0:
@@ -865,8 +884,16 @@ func _tick_rider(target: Target, to: Vector3, dist: float, delta: float) -> void
 
 
 ## The Woodland Cavalry's bear, the first time this body rides one.
+## Mounts with joints of their own, that a rider sits astride (def "mount"), and how big each is beside
+## its rider, and where its saddle is.
+const RIGGED_MOUNTS := ["bear", "ostrich"]
+const MOUNT_SADDLES := {"bear": "Rig/Hind/Torso/Saddle", "ostrich": "Rig/Saddle"}
+func _mount_size() -> float:
+	return FontaModels.MOUNT_SIZE if def.get("mount", "") == "ostrich" else MesenllaModels.CAVALRY_SIZE
+
+
 func _make_bear_mount() -> void:
-	_horse_node = MesenllaModels.cavalry_bear()
+	_horse_node = FontaModels.mount_ostrich() if def.get("mount", "") == "ostrich" else MesenllaModels.cavalry_bear()
 	_horse_node.visible = false
 	add_child(_horse_node)
 	MesenllaModels.remember_pose(_horse_node)
@@ -879,12 +906,14 @@ func _make_bear_mount() -> void:
 
 
 const MOUNT_FALL_TIME := 1.8 # seconds the cavalry's bear takes to roll over and sink away, brought down
+func _mount_fall_time() -> float:
+	return FontaModels.MOUNT_FALL_TIME if def.get("mount", "") == "ostrich" else MOUNT_FALL_TIME
 
 
 ## The rider sits in the bear's saddle and moves with its back: up and down with its gallop, tipped
 ## back as it half rears.
 func _seat_rider() -> void:
-	var seat := _horse_node.get_node_or_null("Rig/Hind/Torso/Saddle") as Node3D
+	var seat := _horse_node.get_node_or_null(MOUNT_SADDLES.get(def.get("mount", "bear"), "Rig/Hind/Torso/Saddle")) as Node3D
 	if seat == null or not seat.is_inside_tree():
 		return
 	var to := global_transform.affine_inverse() * seat.global_transform
@@ -896,15 +925,16 @@ func _seat_rider() -> void:
 
 ## How high the rider's hips are above its feet, in its body's own measure, sitting astride.
 func _rider_hip() -> float:
-	if not _fit.has("woods_child_hip"):
+	var key := model_id + "_hip"
+	if not _fit.has(key):
 		var hip := 0.42
 		if _skeleton:
 			var i := _skeleton.find_bone("hips")
 			if i >= 0:
 				var rest := _skeleton.get_bone_global_rest(i)
 				hip = ((_visual.global_transform.affine_inverse() * _skeleton.global_transform) * rest.origin).y
-		_fit["woods_child_hip"] = hip
-	return float(_fit["woods_child_hip"])
+		_fit[key] = hip
+	return float(_fit[key])
 
 
 ## A mount under its rider: the horse's legs swinging with its pace, or the bear moving with what
@@ -913,7 +943,10 @@ func _tick_mount(delta: float, pace: float) -> void:
 	if _horse_node is MeshInstance3D:
 		HorseModel.set_gait(_horse_node as MeshInstance3D, clampf(pace / 7.0, 0.0, 1.0))
 		return
-	MesenllaModels.ride_bear(self, _horse_node, delta, pace, _current_anim)
+	if def.get("mount", "") == "ostrich":
+		FontaModels.ride_ostrich(self, _horse_node, delta, pace, _current_anim)
+	else:
+		MesenllaModels.ride_bear(self, _horse_node, delta, pace, _current_anim)
 	_seat_rider()
 
 
@@ -922,13 +955,21 @@ func _tick_mount_fall(delta: float) -> void:
 	if _mount_fall <= 0.0 or _horse_node == null:
 		return
 	_mount_fall -= delta
-	var t := MOUNT_FALL_TIME - _mount_fall
+	var t := _mount_fall_time() - _mount_fall
+	if def.get("mount", "") == "ostrich":
+		FontaModels.fall_mount(self, _horse_node, t, delta)
+		if _mount_fall <= 0.0:
+			_horse_node.visible = false
+			_horse_node.top_level = false
+			MesenllaModels.reset_pose(_horse_node)
+		return
 	var over := smoothstep(0.0, 0.7, t)
 	var rig := _horse_node.get_node("Rig") as Node3D
 	rig.rotation.z = 1.5 * over
 	rig.position.y = 0.42 * over
-	var head := rig.get_node("Hind/Torso/Head") as Node3D
-	head.rotation.x = lerpf(head.rotation.x, 0.5 * over, minf(1.0, delta * 6.0))
+	var head := rig.get_node_or_null("Hind/Torso/Head" if def.get("mount", "") != "ostrich" else "Neck") as Node3D
+	if head:
+		head.rotation.x = lerpf(head.rotation.x, 0.5 * over, minf(1.0, delta * 6.0))
 	rig.position.y -= 1.2 * smoothstep(1.1, MOUNT_FALL_TIME, t)
 	if _mount_fall <= 0.0:
 		_horse_node.visible = false
@@ -1266,7 +1307,8 @@ const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", 
 	"siren": "siren_hum", "press_gang": "press_shout", "tide_witch": "witch_call", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_laugh",
 	"kraken_arm": "kraken_rise", "hollow_sovereign": "sovereign_voice", "leviathan": "leviathan_roar", "kraken": "kraken_roar",
 	"mutant_bee": "bee_buzz", "beehive": "hive_hum", "mutant_wasp": "wasp_buzz", "mutant_snail": "snail_squelch", "wasp_hive_snail": "snail_squelch",
-	"mutant_spider": "spider_hiss", "battle_ostrich": "ostrich_hiss", "ember_moth": "moth_flutter", "thornback": "thornback_grunt"}
+	"mutant_spider": "spider_hiss", "battle_ostrich": "ostrich_hiss", "ember_moth": "moth_flutter", "thornback": "thornback_grunt",
+	"cult_worshipper": "cult_chant", "cult_priest": "priest_intone", "cult_guardian": "guardian_shout", "ostrich_rider": "guardian_shout"}
 
 
 ## How each of them sounds when struck, and when it dies.
@@ -1278,7 +1320,8 @@ const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist
 	"siren": "siren_shriek", "press_gang": "drowned_hurt", "tide_witch": "drowned_hurt", "harbourmaster": "harbour_growl", "lighthouse_keeper": "keeper_hurt",
 	"kraken_arm": "kraken_hurt", "hollow_sovereign": "sovereign_hurt", "leviathan": "leviathan_hurt", "kraken": "kraken_hurt",
 	"mutant_bee": "insect_hurt", "beehive": "hive_hurt", "mutant_wasp": "insect_hurt", "mutant_snail": "snail_hurt", "wasp_hive_snail": "snail_hurt",
-	"mutant_spider": "spider_hurt", "battle_ostrich": "ostrich_hurt", "ember_moth": "insect_hurt", "thornback": "thornback_grunt"}
+	"mutant_spider": "spider_hurt", "battle_ostrich": "ostrich_hurt", "ember_moth": "insect_hurt", "thornback": "thornback_grunt",
+	"cult_worshipper": "worshipper_hurt", "cult_priest": "priest_hurt", "cult_guardian": "guardian_hurt", "ostrich_rider": "guardian_hurt"}
 const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
@@ -1288,7 +1331,8 @@ const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "
 	"siren": "siren_death", "press_gang": "drowned_death", "tide_witch": "witch_death", "harbourmaster": "brute_death", "lighthouse_keeper": "keeper_hurt",
 	"kraken_arm": "kraken_death", "hollow_sovereign": "sovereign_death", "leviathan": "leviathan_death", "kraken": "kraken_end",
 	"mutant_bee": "insect_death", "beehive": "hive_break", "mutant_wasp": "insect_death", "mutant_snail": "snail_death", "wasp_hive_snail": "snail_death",
-	"mutant_spider": "spider_death", "battle_ostrich": "ostrich_death", "ember_moth": "insect_death", "thornback": "thornback_death"}
+	"mutant_spider": "spider_death", "battle_ostrich": "ostrich_death", "ember_moth": "insect_death", "thornback": "thornback_death",
+	"cult_worshipper": "worshipper_death", "cult_priest": "priest_death", "cult_guardian": "guardian_death", "ostrich_rider": "guardian_death"}
 
 
 ## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.
@@ -2355,8 +2399,11 @@ func _physics_process(delta: float) -> void:
 			# rider falls from the saddle to the ground beside it.
 			var k := clampf((2.2 - _dying) / 0.6, 0.0, 1.0)
 			var over := k * k * (3.0 - 2.0 * k)
-			_horse_node.rotation.z = 1.45 * over
-			_horse_node.position.y = 0.45 * over * _scale
+			if def.get("mount", "") == "ostrich":
+				FontaModels.fall_mount(self, _horse_node, 2.2 - _dying, delta) # the bird dies its own death
+			else:
+				_horse_node.rotation.z = 1.45 * over
+				_horse_node.position.y = 0.45 * over * _scale
 			var bear := not (_horse_node is MeshInstance3D)
 			_visual.rotation = Vector3.ZERO
 			_visual.position.y = (_seat_y if bear else HorseModel.SADDLE * _scale) * (1.0 - over)

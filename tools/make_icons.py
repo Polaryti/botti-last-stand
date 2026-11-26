@@ -973,6 +973,51 @@ def thornback():
         + line("#5a4a30", 4, (8, 77), (86, 77)))
 PLAIN.append(thornback)
 
+# The cult of Al'quimelea: heads, each told by what it wears.
+LINEN_C = ("#efe6d2", "#9c8f74"); WAX_C = ("#f6d77a", "#b9862a"); VIOLET_C = ("#a26bd8", "#3e1a6a"); BRONZE_C = ("#f0b45a", "#7a4818")
+
+def _violet_eyes(y, xs=(38, 62), w_=12):
+    return "".join(rect("#e8c8ff", x - w_ / 2, y - 1.6, w_, 3.2, 1.2, 0) for x in xs)
+
+def cult_worshipper():
+    # A linen hood over a wax mask pressed with honeycomb, its slit eyes lit violet, a violet stole.
+    cells = "".join(poly(("#e8c060", "#a87a20"), *[(x + 4.2 * math.cos(a * math.pi / 3), y + 4.2 * math.sin(a * math.pi / 3)) for a in range(6)], w=1)
+        for x, y in ((40, 40), (50, 36), (60, 40), (45, 62), (55, 62)))
+    return (path(LINEN_C, "M14 96 C14 70 22 58 30 54 L70 54 C78 58 86 70 86 96Z")
+        + rect(VIOLET_C, 34, 60, 9, 38, 2, 2) + rect(VIOLET_C, 57, 60, 9, 38, 2, 2)
+        + path(LINEN_C, "M18 62 C10 30 30 4 54 6 C70 8 76 2 84 0 C80 12 86 22 84 40 C82 54 78 62 72 66 L28 66Z")
+        + ell(WAX_C, 50, 46, 20, 22, 0, 2.4) + cells
+        + rect(BRONZE_C, 30, 30, 40, 4, 1.5, 1.6)
+        + _violet_eyes(48) + poly(WAX_C, (44, 66), (50, 76), (56, 66), w=1.6))
+PLAIN.append(cult_worshipper)
+
+def cult_priest():
+    # A hood woven like a bee-skep, a violet veil in strips, one violet eye at the brow; a green vial.
+    rings = "".join(path(("#e8c068", "#8a6020"), f"M{50 - r} {y} C{50 - r} {y - 8} {50 + r} {y - 8} {50 + r} {y} L{50 + r - 2} {y + 9} C{50 + r - 2} {y + 2} {50 - r + 2} {y + 2} {50 - r + 2} {y + 9}Z", 1.6)
+        for r, y in ((34, 64), (32, 54), (29, 44), (25, 34), (19, 24), (12, 15)))
+    veil = "".join(rect(VIOLET_C, 30 + k * 7, 50, 6, 22 + (k % 2) * 5, 1, 1.2) for k in range(6))
+    return (path(VIOLET_C, "M12 98 C14 80 24 72 36 70 L64 70 C76 72 86 80 88 98Z")
+        + rings + veil + rect(BRONZE_C, 28, 48, 44, 4, 1, 1.4)
+        + circ(BRONZE_C, 50, 38, 7, 1.6) + circ(("#f0d8ff", "#9a4af0"), 50, 38, 4.4, 0)
+        + rect(("#d8ffb0", "#3c9a2a"), 74, 74, 9, 16, 3, 1.8) + rect(LEATHER, 75, 70, 7, 5, 1, 1.2))
+PLAIN.append(cult_priest)
+
+def cult_guardian():
+    # A closed bronze helmet, a ridge of black plumes, violet eyes in the T of its face.
+    plumes = "".join(poly(("#3a3440", "#0e0c12"), (x - 4, 26), (x + 2, 2 + abs(x - 50) * 0.15), (x + 4, 26), w=1.4) for x in range(28, 76, 6))
+    return (plumes + rect(BRONZE_C, 26, 24, 48, 6, 2, 1.6)
+        + path(BRONZE_C, "M20 58 C18 30 32 24 50 24 C68 24 82 30 80 58 L78 90 L60 92 L56 66 L44 66 L40 92 L22 90Z")
+        + path(("#1a1418", "#000000"), "M30 46 L70 46 L70 52 L54 52 L54 72 L46 72 L46 52 L30 52Z", 1)
+        + _violet_eyes(49, (38, 62), 11)
+        + curve("#7a4818", 2.2, "M24 40 C40 34 60 34 76 40", ink=False)
+        + poly(VIOLET_C, (50, 30), (55, 33), (55, 38), (50, 41), (45, 38), (45, 33), w=1.4))
+PLAIN.append(cult_guardian)
+
+def ostrich_rider():
+    # The Guardian's helmet behind the war-bird's head, the bird's neck reaching forward.
+    return (at(36, 50, 0.72, cult_guardian()) + at(66, 54, 0.7, battle_ostrich()))
+PLAIN.append(ostrich_rider)
+
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),

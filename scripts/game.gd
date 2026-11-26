@@ -411,7 +411,7 @@ const VAEL_POOLS := {"drowned": 18, "barnacle_brute": 3, "brine_hound": 6, "lant
 
 ## Fontanova: the mutants of the island, its hives and its ambushers.
 const FONTA_POOLS := {"mutant_bee": 14, "beehive": 6, "mutant_wasp": 9, "mutant_snail": 4, "wasp_hive_snail": 2, "mutant_spider": 4,
-	"battle_ostrich": 4, "ember_moth": 3, "thornback": 3}
+	"battle_ostrich": 4, "ember_moth": 3, "thornback": 3, "cult_worshipper": 9, "cult_priest": 3, "cult_guardian": 5} # (Ostrich Guardians ride on Guardians' bodies)
 
 
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.

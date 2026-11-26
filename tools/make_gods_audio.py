@@ -342,6 +342,125 @@ SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
     ("brazier_lit", 0.75), ("sanctum_open", 0.8), ("altar_wake", 0.7), ("altar_bless", 0.6), ("tide_rising", 0.75))})
 
 
+# --- The cult of Al'quimelea -----------------------------------------------------------------------
+
+VOWEL_O = ((420, 0.35, 1.0), (800, 0.3, 0.55), (2500, 0.15, 0.12))
+VOWEL_A = ((720, 0.3, 1.0), (1150, 0.25, 0.6), (2600, 0.15, 0.15))
+VOWEL_U = ((320, 0.35, 1.0), (750, 0.3, 0.35), (2300, 0.15, 0.08))
+
+
+def voice(m, f_curve, vowel, breath=0.15, rough=0.12):
+    """A human voice, plainly sung or spoken."""
+    return throat(m, f_curve, vowel, breath=breath, rough=rough, sub=0.05)
+
+
+def cult_chant():
+    """Worshippers chanting behind their wax masks: three voices on one slow line, muffled, a drone under."""
+    m = n(2.4)
+    tt = t_(m)
+    line = curve(m, (0, 146), (0.3, 146), (0.35, 164), (0.6, 164), (0.65, 146), (1, 130))
+    syll = 0.55 + 0.45 * np.abs(np.sin(np.pi * tt / 0.4))
+    x = sum(voice(m, line * r, VOWEL_O if i != 1 else VOWEL_U) for i, r in enumerate((1.0, 1.004, 1.5)))
+    drone = voice(m, np.full(m, 73.0), VOWEL_U) * 0.6
+    return lowp((x * syll + drone) * env(m, 0.3, 0.9), 1800) * 0.5
+
+
+def worshipper_hurt():
+    m = n(0.4)
+    return lowp(voice(m, curve(m, (0, 220), (1, 160)), VOWEL_A, breath=0.4, rough=0.5), 2000) * env(m, 0.01, 7)
+
+
+def worshipper_death():
+    m = n(1.1)
+    return lowp(voice(m, curve(m, (0, 200), (1, 90)), VOWEL_O, breath=0.4, rough=0.4), 1800) * env(m, 0.02, 2.2) + thud(m, 0.75, 0.5, 120)
+
+
+def priest_intone():
+    """A priest's rite: a deep intoned line climbing, and a small bronze bell under it."""
+    m = n(1.6)
+    line = curve(m, (0, 98), (0.4, 110), (0.7, 131), (1, 123))
+    sung = voice(m, line, VOWEL_A, breath=0.1) * env(m, 0.15, 1.2)
+    ring = metal(1320, 3.0, 1.6) * bell_env(m, 1.5) * 0.12
+    return reverb(sung + ring, 1.2, 0.35)
+
+
+def priest_hurt():
+    m = n(0.45)
+    return voice(m, curve(m, (0, 180), (1, 120)), VOWEL_O, breath=0.4, rough=0.5) * env(m, 0.01, 6)
+
+
+def priest_death():
+    """A priest falling: a long sigh, and its vials breaking."""
+    m = n(1.4)
+    sigh = voice(m, curve(m, (0, 160), (1, 70)), VOWEL_O, breath=0.5, rough=0.3) * env(m, 0.02, 1.8)
+    glass_ = sum(at(glass(r, 0.3, 14.0) * 0.12, 0.6 + k * 0.07, 1.4) for k, r in enumerate((2200, 2900, 3500)))
+    return sigh + glass_ + thud(m, 0.6, 0.4, 130)
+
+
+def elixir_throw():
+    """A flask flung: a swish and liquid sloshing in glass."""
+    m = n(0.5)
+    swish = sweep_filter(noise(m), 500, 2500, 0.3) * env(m, 0.05, 6) * 0.4
+    slosh = band(noise(m), 300, 900) * (0.5 + 0.5 * np.sin(2 * np.pi * 14 * t_(m))) * env(m, 0.02, 5) * 0.3
+    return swish + slosh
+
+
+def elixir_shatter():
+    """The flask breaking: glass, a splash, and the elixir hissing."""
+    m = n(1.0)
+    shards = sum(at(glass(r, 0.25, 18.0) * 0.18, k * 0.02, 1.0) for k, r in enumerate((2400, 3100, 3900, 4700)))
+    splash = band(noise(m), 600, 3000) * env(m, 0.003, 9) * 0.6
+    hiss = band(noise(m), 3000, 8000) * np.exp(-t_(m) * 2.5) * 0.18
+    return shards + splash + hiss
+
+
+def anoint_chime():
+    """A hurt creature anointed: a bright chime rising."""
+    m = n(1.2)
+    return reverb(sum(at(glass(f, 0.9, 4.0) * 0.25, k * 0.08, 1.2) for k, f in enumerate((880, 1109, 1319, 1760))), 1.0, 0.3)
+
+
+def guardian_shout():
+    """A Guardian's battle-cry, inside its helmet."""
+    m = n(0.7)
+    bark = voice(m, curve(m, (0, 150), (0.3, 190), (1, 140)), VOWEL_A, breath=0.3, rough=0.6) * env(m, 0.02, 3)
+    return lowp(bark, 2500) + band(noise(m), 1500, 4000) * env(m, 0.005, 20) * 0.1
+
+
+def guardian_hurt():
+    m = n(0.4)
+    return lowp(voice(m, curve(m, (0, 160), (1, 120)), VOWEL_A, breath=0.4, rough=0.6), 2200) * env(m, 0.01, 7) + band(noise(m), 2000, 6000) * env(m, 0.002, 30) * 0.2
+
+
+def guardian_death():
+    """A Guardian falling: a groan, and bronze crashing on stone."""
+    m = n(1.5)
+    groan = voice(m, curve(m, (0, 150), (1, 70)), VOWEL_O, breath=0.4, rough=0.5) * env(m, 0.02, 2.0)
+    crash = sum(at(band(noise(n(0.2)), 1500, 6000) * env(n(0.2), 0.002, 14) * 0.4, 0.8 + k * 0.12, 1.5) for k in range(3))
+    return groan + crash + thud(m, 0.8, 0.8, 110)
+
+
+def shield_rush():
+    """Running in behind the shield: heavy steps and bronze rattling."""
+    m = n(0.9)
+    steps = sum(at(lowp(noise(n(0.08)), 300) * env(n(0.08), 0.002, 30) * 0.8, k * 0.18, 0.9) for k in range(5))
+    rattle = band(noise(m), 2500, 7000) * (0.5 + 0.5 * np.sin(2 * np.pi * 11 * t_(m))) * env(m, 0.05, 2) * 0.15
+    return steps + rattle
+
+
+def shield_bash():
+    """The shield striking: a bronze boom and a body thrown back."""
+    m = n(0.8)
+    clang = band(noise(n(0.05)), 800, 4000) * env(n(0.05), 0.001, 30) * 0.8
+    return at(clang, 0.0, 0.8) + thud(m, 0.0, 1.0, 140) + glide(420, 300, m) * np.exp(-t_(m) * 7) * 0.25
+
+
+SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
+    ("cult_chant", 0.6), ("worshipper_hurt", 0.65), ("worshipper_death", 0.7), ("priest_intone", 0.7), ("priest_hurt", 0.65),
+    ("priest_death", 0.7), ("elixir_throw", 0.6), ("elixir_shatter", 0.75), ("anoint_chime", 0.6), ("guardian_shout", 0.75),
+    ("guardian_hurt", 0.7), ("guardian_death", 0.75), ("shield_rush", 0.7), ("shield_bash", 0.8))})
+
+
 SOUNDS.update({n_: (globals()[n_], g) for n_, g in (
     ("bee_buzz", 0.6), ("bee_sting", 0.75), ("wasp_buzz", 0.6), ("wasp_shot", 0.7), ("wasp_bite", 0.75),
     ("hive_hum", 0.5), ("hive_hurt", 0.7), ("hive_swarm", 0.7), ("hive_break", 0.8), ("nest_shudder", 0.65),

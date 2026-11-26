@@ -592,6 +592,36 @@ static func _ostrich(root: Node3D) -> void:
 			l.prism(Vector3(side * 0.04, -0.6, 0.14), Vector3(side * 0.04, -0.62, 0.22), 0.03, 0.0, 4, BLACK))
 
 
+## A battle ostrich under a Temple Guardian (ZombieDefs "mount": "ostrich"): the same bird, with a
+## saddle for the rider to sit in (Zombie._seat_rider).
+const MOUNT_SIZE := 0.95 # (times its rider's own scale: a Guardian's head rides level with the bird's)
+static func mount_ostrich() -> Node3D:
+	var root := Node3D.new()
+	root.name = "OstrichMount"
+	_ostrich(root)
+	_pivot(root.get_node("Rig") as Node3D, Vector3(0, 0.34, -0.3), "Saddle")
+	return root
+
+
+## The mount runs as the ostrich does on its own: legs scissoring with its rider's pace, stretched out
+## in the charge, a kick as its rider strikes.
+static func ride_ostrich(z: Zombie, mount: Node3D, delta: float, pace: float, rider_anim: String) -> void:
+	var rig := mount.get_node("Rig") as Node3D
+	var state := "m_charge" if rider_anim == "RideCharge" else ""
+	_run_ostrich(z, rig, delta, minf(1.0, delta * 8.0), pace, state, false, 0.0, z.world.now, true)
+
+
+## A Guardian's ostrich brought down under it: it dies as a battle ostrich does, `age` seconds in,
+## and sinks away at the end of MOUNT_FALL_TIME.
+const MOUNT_FALL_TIME := 3.0
+static func fall_mount(z: Zombie, mount: Node3D, age: float, delta: float) -> void:
+	if not mount.has_meta("side"):
+		mount.set_meta("side", -1.0 if randf() < 0.5 else 1.0)
+	var rig := mount.get_node("Rig") as Node3D
+	_die_ostrich(z, mount, rig, age, delta, float(mount.get_meta("side")), mount.global_position)
+	rig.position.y -= 1.4 * smoothstep(MOUNT_FALL_TIME - 0.6, MOUNT_FALL_TIME, age)
+
+
 # --- The thornback -------------------------------------------------------------------------------
 
 static func _thornback(root: Node3D) -> void:
@@ -801,7 +831,7 @@ static func _scuttle_spider(z: Zombie, rig: Node3D, delta: float, k: float, movi
 ## scraping the ground back. The charge (m_charge) is flat out, neck level, wings wide. The kick
 ## (m_bite): a wind-up, knee drawn high and the body leaning back, wings flaring, then the leg slashes
 ## forward and down, and is set back.
-static func _run_ostrich(z: Zombie, rig: Node3D, delta: float, k: float, moving: float, state: String, tell: bool, age: float, t: float) -> void:
+static func _run_ostrich(z: Zombie, rig: Node3D, delta: float, k: float, moving: float, state: String, tell: bool, age: float, t: float, ridden := false) -> void:
 	var charging := state == "m_charge"
 	var running := moving > 0.2 or charging
 	var pace := (2.6 if charging else clampf(moving * 0.55, 0.9, 2.4))
@@ -849,6 +879,8 @@ static func _run_ostrich(z: Zombie, rig: Node3D, delta: float, k: float, moving:
 	var head := upper.get_node("Head") as Node3D
 	var pump := sin(stride * 2.0) * 0.14 * float(running)
 	var bend := (1.15 if charging else 0.85 if tell else 0.2 * float(running)) - 0.45 * wind * (1.0 - slash)
+	if ridden:
+		bend = maxf(bend, 0.75) # under a rider the neck is carried well forward, clear of the rider
 	neck.rotation.x = lerpf(neck.rotation.x, bend + pump, k)
 	upper.rotation.x = lerpf(upper.rotation.x, (0.35 if charging else -0.2 if tell else 0.0) - pump * 0.6, k)
 	head.rotation.x = lerpf(head.rotation.x, -(neck.rotation.x + upper.rotation.x) * 0.85, k)
@@ -1093,7 +1125,8 @@ static func _die_spider(z: Zombie, root: Node3D, rig: Node3D, age: float, delta:
 	_fade_glow(rig, 1.0 - _ease(1.6, 2.4, age))
 
 
-static func _die_ostrich(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float) -> void:
+static func _die_ostrich(z: Zombie, root: Node3D, rig: Node3D, age: float, delta: float, side: float, at := Vector3.INF) -> void:
+	var where := z.position if at == Vector3.INF else at # (a fallen mount lies where it fell, not under its rider)
 	var neck := rig.get_node("Neck") as Node3D
 	var upper := neck.get_node("NeckUp") as Node3D
 	var head := upper.get_node("Head") as Node3D
@@ -1104,8 +1137,8 @@ static func _die_ostrich(z: Zombie, root: Node3D, rig: Node3D, age: float, delta
 	var drop := _ease(0.3, 0.75, age)
 	var over := _ease(0.6, 1.05, age)
 	if _once(root, "thud", age, 0.95):
-		z.world.fx_gore(z.position + Vector3.UP * 0.4, Color(0.45, 0.4, 0.34))
-		z.world.show_ring(z.position + Vector3.UP * 0.05, 1.4, Color(0.55, 0.5, 0.42))
+		z.world.fx_gore(where + Vector3.UP * 0.4, Color(0.45, 0.4, 0.34))
+		z.world.show_ring(where + Vector3.UP * 0.05, 1.4, Color(0.55, 0.5, 0.42))
 	var lurch := sin(stagger * PI) * (1.0 - drop)
 	rig.position.y = lerpf(1.25, 0.5, drop) - lurch * 0.15 + absf(sin(_ease(0.95, 1.3, age) * PI)) * 0.08
 	rig.position.x = side * lurch * 0.3

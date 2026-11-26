@@ -1830,6 +1830,7 @@ func _fontanova() -> void:
 	await _fonta_land(isle)
 	await _fonta_rites(isle)
 	await _fonta_mutants(isle)
+	await _fonta_cult(isle)
 	space.queue_free()
 	Game.night_map = was_map
 	Game.mode = was_mode
@@ -2166,7 +2167,7 @@ func _drowned_court() -> void:
 	for id: String in court:
 		var d: Dictionary = ZombieDefs.ALL[id]
 		check(SpawnRules.is_vael(d) and VaelMind.handles(id) and str(d.get("lore", "")).length() > 60 and Icons.exists(str(d["icon"]).get_slice("+", 0)), "%s: of Vael, with its own mind, lore and icon" % id)
-		check(CodexPanel.enemy_group(id) == (7 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
+		check(CodexPanel.enemy_group(id) == (8 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
 		var voices: Array = [Zombie.MESENLLA_VOICES.get(id, ""), Zombie.MESENLLA_HURT.get(id, ""), Zombie.MESENLLA_DEATHS.get(id, "")]
 		check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "%s has a voice, a hurt and a death of its own" % id)
 	var wanders := func(id: String) -> bool: return ZombieDefs.roams(id, 999.0, "vael") and float(ZombieDefs.ALL[id]["weight"]) > 0.0
@@ -2428,7 +2429,7 @@ func _last_light() -> void:
 	check(Game.MAPS.has("lantern_road") and Places.ALL.has("lantern_road") and Places.ORDER.has("lantern_road") and WorldAtlas.SPOTS.has("lantern_road") and Icons.exists("map_lantern_road"), "the Lantern Road is a map of its own, in the Places, on the atlas, with its icon")
 	check(ResourceLoader.exists("res://maps/lantern_road.tscn") and Sfx.MUSIC_SETS.has("lantern") and (Sfx.MUSIC_SETS["lantern"] as Array).all(func(m: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % m)), "with its own music")
 	var levi: Dictionary = ZombieDefs.ALL["leviathan"]
-	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 7, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
+	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 8, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
 	var voices: Array = [Zombie.MESENLLA_VOICES.get("leviathan", ""), Zombie.MESENLLA_HURT.get("leviathan", ""), Zombie.MESENLLA_DEATHS.get("leviathan", ""), "leviathan_bite", "leviathan_rise", "waystation", "lighthouse_lit", "boss_bells_leviathan"]
 	check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "it and the road have sounds of their own")
 	check(Director.BOSS_CARDS.has("leviathan"), "it enters with its own card")
@@ -2976,6 +2977,149 @@ func _fonta_rites(isle: World) -> void:
 	you._buffs.erase("royal_jelly_spell_rate")
 
 
+## The cult of Al'quimelea: who they are, how they are dressed, what each of them does, the night's
+## processions and riders.
+func _fonta_cult(isle: World) -> void:
+	var you := isle.player
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var ready_you := func() -> void:
+		you.position = at
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+		you.poison_left = 0.0
+		you.slowed_left = 0.0
+		you.frozen_left = 0.0
+		you.velocity = Vector3.ZERO
+		you._status_immune = 0.0
+	var drop_seals := func() -> void:
+		for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	for id: String in CultMind.CULT:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(d["maps"] == ["fontanova"] and CodexPanel.enemy_group(id) == 7 and Icons.exists(id) and str(d.get("lore", "")).length() > 60 and CultMind.handles(id), id + ": of Fontanova's cult, in the Codex with its icon, lore and mind")
+		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
+			var sound: String = table.get(id, "")
+			check(sound != "" and Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s has its own voice (%s)" % [id, sound])
+		# Dressed piece by piece on the body's bones: robes and sleeves move with the limbs.
+		ready_you.call()
+		check(isle.spawn_zombie(id, at + Vector3(0, 0, -10)), id + " spawns")
+		var z: Zombie = isle.zombies.back()
+		var bones := {}
+		for n in z._visual.find_children("*", "BoneAttachment3D", true, false):
+			bones[(n as BoneAttachment3D).bone_name] = true
+		var limbs := bones.keys().filter(func(b: String) -> bool: return b.begins_with("upper") or b.begins_with("lower"))
+		check(bones.has("head") and bones.has("chest") and bones.has("hips") and limbs.size() >= 4, "%s wears its gear on its head, chest, hips and %d limbs" % [id, limbs.size()])
+		z.release()
+	# The worshippers: when one falls the others near it take up the cry.
+	for i in 2:
+		isle.spawn_zombie("cult_worshipper", at + Vector3(i * 2.0, 0, -12))
+	var first: Zombie = isle.zombies[-2]
+	var second: Zombie = isle.zombies[-1]
+	first.take_damage(first.hp + 100.0, Vector3.ZERO, 0.0, first.centre())
+	check(second.haste_left >= CultMind.FERVOUR_TIME - 0.01, "a Worshipper falls: those within %d m hurry on for %d s" % [int(CultMind.FERVOUR_REACH), int(CultMind.FERVOUR_TIME)])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The priest: a tell, a flask thrown where you will be, poison and a slow where it bursts.
+	ready_you.call()
+	isle.spawn_zombie("cult_priest", at + Vector3(0, 0, -12))
+	var priest: Zombie = isle.zombies.back()
+	priest.set_physics_process(false)
+	priest._sees = true
+	var mind := priest.mesenlla_mind as CultMind
+	mind.cooldown = 0.0
+	mind.cooldown_b = 99.0
+	mind.tick(priest, you, Vector3.ZERO, 12.0, 0.01)
+	check(mind.phase == "throw" and priest.is_warning() and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.ELIXIR, "a Priest draws back and throws a flask of elixir")
+	var flask: MistSeal = isle.mist_seals[0]
+	flask.set_physics_process(false)
+	you.position = flask.position
+	var hp := you.hp
+	flask.strike()
+	check(you.hp < hp and is_equal_approx(you.poison_left, CultMind.ELIXIR_POISON) and you.slowed_left >= CultMind.ELIXIR_SLOW - 0.01, "where it bursts: poisoned %d s and slowed %d s" % [int(CultMind.ELIXIR_POISON), int(CultMind.ELIXIR_SLOW)])
+	drop_seals.call()
+	# And it anoints the hurt: a third of their health back, and haste.
+	mind.phase = ""
+	priest._current_anim = ""
+	isle.spawn_zombie("thornback", at + Vector3(3, 0, -12))
+	var hurt: Zombie = isle.zombies.back()
+	hurt.hp = hurt.max_hp * 0.3
+	mind.cooldown_b = 0.0
+	mind.cooldown = 99.0
+	mind.tick(priest, you, Vector3.ZERO, 12.0, 0.01)
+	check(mind.phase == "anoint" and priest.is_warning(), "a Priest raises its staff over a hurt creature")
+	mind.tick(priest, you, Vector3.ZERO, 12.0, CultMind.ANOINT_TELL + 0.01)
+	check(is_equal_approx(hurt.hp, hurt.max_hp * (0.3 + CultMind.ANOINT_HEAL)) and hurt.haste_left >= CultMind.ANOINT_HASTE - 0.01, "and anoints it: a third of its health back, and %d s of haste" % int(CultMind.ANOINT_HASTE))
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The guardian: braces behind its shield, then rushes and bashes you down.
+	ready_you.call()
+	isle.spawn_zombie("cult_guardian", at + Vector3(0, 0, -6))
+	var guard: Zombie = isle.zombies.back()
+	guard.set_physics_process(false)
+	guard._sees = true
+	var gm := guard.mesenlla_mind as CultMind
+	gm.cooldown = 0.0
+	gm.tick(guard, you, Vector3.ZERO, 6.0, 0.01)
+	check(gm.phase == "brace" and guard.is_warning(), "a Guardian braces behind its shield before it rushes")
+	gm.tick(guard, you, Vector3.ZERO, 6.0, CultMind.RUSH_TELL + 0.01)
+	for i in 60:
+		if gm.phase != "rush" or isle.mist_seals.size() > 0:
+			break
+		gm.tick(guard, you, Vector3.ZERO, guard.position.distance_to(you.position), 1.0 / 30.0)
+	check(isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.BASH, "then rushes, and its shield meets you")
+	if isle.mist_seals.size() == 1:
+		hp = you.hp
+		(isle.mist_seals[0] as MistSeal).strike()
+		check(you.hp < hp and you.frozen_left >= CultMind.BASH_STUN - 0.01, "stunned %.1f s by the bash" % CultMind.BASH_STUN)
+	drop_seals.call()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The Ostrich Guardian: on its bird until the bird is brought down, then on foot behind its shield.
+	ready_you.call()
+	isle.spawn_zombie("ostrich_rider", at + Vector3(0, 0, -14))
+	var rider: Zombie = isle.zombies.back()
+	rider.set_physics_process(false)
+	check(rider._mounted and rider._horse_node != null and rider._horse_node.visible, "an Ostrich Guardian rides its war-bird")
+	check(rider._horse_node.scale.x < rider._scale * 1.0 and rider._horse_node.scale.x > rider._scale * 0.9, "a bird of a rider's own size, not a giant")
+	rider.take_damage(rider.max_hp * 0.65, Vector3.ZERO, 0.0, rider.centre())
+	check(not rider._mounted and rider.is_alive(), "below 40%: the bird goes down, the Guardian fights on")
+	var mount := rider._horse_node
+	var t := 0.0
+	var saw_down := false
+	while rider._mount_fall > 0.0 and t < 5.0:
+		rider._tick_mount_fall(1.0 / 30.0)
+		t += 1.0 / 30.0
+		saw_down = saw_down or mount.has_meta("did_thud")
+	check(saw_down and absf(t - FontaModels.MOUNT_FALL_TIME) < 0.1 and not mount.visible, "the bird dies as a battle ostrich does, over %.1f s, and is gone" % FontaModels.MOUNT_FALL_TIME)
+	check((mount.get_node("Rig") as Node3D).position.is_equal_approx(Vector3(0, 1.25, 0)) or not mount.has_meta("did_thud"), "and stands ready again for the next rider")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The night: processions from 2:00, riders from 7:00, out of sight of everyone.
+	var director := isle.director
+	you.position = at
+	director.elapsed = Director.PROCESSION_FROM + 0.1
+	director._next_procession = Director.PROCESSION_FROM
+	director._next_ostrich_rider = INF
+	director._tick_cult()
+	check(isle.count_type("cult_worshipper") == int(ZombieDefs.ALL["cult_worshipper"]["pack"]), "from %d:%02d a procession of %d Worshippers comes" % [int(Director.PROCESSION_FROM) / 60, int(Director.PROCESSION_FROM) % 60, int(ZombieDefs.ALL["cult_worshipper"]["pack"])])
+	var near := INF
+	for z: Zombie in isle.zombies:
+		near = minf(near, z.position.distance_to(you.position))
+	check(near > Director.CULT_HIDDEN, "out of your sight (%.0f m away)" % near)
+	director.elapsed = Director.RIDERS_FROM + 0.1
+	director._next_ostrich_rider = Director.RIDERS_FROM
+	director._next_procession = INF
+	director._tick_cult()
+	check(isle.count_type("ostrich_rider") == 1, "from %d:%02d Guardians ride out on their birds" % [int(Director.RIDERS_FROM) / 60, int(Director.RIDERS_FROM) % 60])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	director.elapsed = 0.0
+	director._next_procession = Director.PROCESSION_FROM
+	director._next_ostrich_rider = Director.RIDERS_FROM
+	ready_you.call()
+
+
 func _fonta_mutants(isle: World) -> void:
 	var you := isle.player
 	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
@@ -3007,11 +3151,11 @@ func _fonta_mutants(isle: World) -> void:
 		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
 			var sound: String = table.get(id, "")
 			check(sound != "" and Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s has its own voice (%s)" % [id, sound])
-	check(CodexPanel.enemy_group("kraken") == 7, "the bosses still come last in the Codex")
+	check(CodexPanel.enemy_group("kraken") == 8 and CodexPanel.enemy_group("cult_priest") == 7, "the cult has its own place in the Codex, and the bosses still come last")
 	for i in 300:
 		var pick := ZombieDefs.pick_roamer(900.0, "fontanova")
-		if pick in ["beehive", "mutant_spider"] or not FontaModels.KINDS.has(pick):
-			check(false, "hives and spiders come only where the night puts them, never as roamers (%s)" % pick)
+		if pick in ["beehive", "mutant_spider", "ostrich_rider"] or not (FontaModels.KINDS.has(pick) or CultMind.CULT.has(pick)):
+			check(false, "hives, spiders and riders come only where the night puts them, never as roamers (%s)" % pick)
 			break
 	check(MistSeal.Style.INK == 17 and MistSeal.Style.DUST == 22 and Net.ANIMS.size() <= 63, "their strikes append wire styles and reuse animation slots")
 	# Mutant Bee: a tell, a dive at where you stood, a poisoned sting; a step aside is enough.
