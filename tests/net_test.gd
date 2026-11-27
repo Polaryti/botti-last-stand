@@ -133,6 +133,9 @@ func _as_host() -> void:
 	if rules == "bastion":
 		Net.set_fort_map("bastion")
 		ok(Net.fort_map == "bastion", "the host picks Mist Bastion")
+	if rules == "thalys":
+		Net.set_fort_map("thalys")
+		ok(Net.fort_map == "thalys", "the host picks Thalys")
 	if rules == "vael":
 		Net.set_night_map("vael")
 		ok(Net.night_map == "vael", "the host picks Port Vael")
@@ -142,7 +145,7 @@ func _as_host() -> void:
 	if rules == "lantern":
 		Net.set_night_map("lantern_road")
 		ok(Net.night_map == "lantern_road", "the host picks the Lantern Road")
-	Net.set_rules({"fontanova": Net.Rules.COOP, "ferryman": Net.Rules.COOP, "tidecaller": Net.Rules.COOP, "harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
+	Net.set_rules({"thalys": Net.Rules.FORT, "fontanova": Net.Rules.COOP, "ferryman": Net.Rules.COOP, "tidecaller": Net.Rules.COOP, "harpooner": Net.Rules.COOP, "lantern": Net.Rules.COOP, "vael": Net.Rules.COOP, "bastion": Net.Rules.FORT, "mesenlla": Net.Rules.COOP, "cartographer": Net.Rules.COOP, "bandit": Net.Rules.TEAMS, "commander": Net.Rules.COOP, "mists": Net.Rules.COOP, "coop": Net.Rules.COOP, "ride": Net.Rules.COOP, "chariot": Net.Rules.COOP, "bots": Net.Rules.COOP, "room": Net.Rules.COOP, "botsffa": Net.Rules.FFA, "ffa": Net.Rules.FFA, "teams": Net.Rules.TEAMS, "fort": Net.Rules.FORT}[rules])
 	_press("Hard")
 	await wait(0.1)
 	ok(Net.difficulty == 2 and Game.difficulty == 2, "the host can pick the difficulty")
@@ -306,6 +309,8 @@ func _play() -> void:
 		await _mesenlla()
 	elif rules == "bastion":
 		await _bastion()
+	elif rules == "thalys":
+		await _thalys()
 	elif rules == "vael":
 		await _vael()
 	elif rules == "fontanova":
@@ -1970,6 +1975,40 @@ func _mesenlla() -> void:
 ## Fontanova on two phones: the island in its sea, and its mutants: a snail's trail laid on both, in
 ## the same colour; a spider clinging head down to its trunk; a bee's sting marked on both and landing
 ## on the joined player's own body.
+func _thalys() -> void:
+	ok(Game.mode == Game.Mode.FORT and w.map_id == "thalys" and w.fort.heart_name == "Cornucopia", "both phones enter the Cornucopia siege")
+	ok(not Game.owns_spec({"earned": "adorer_pelagros"}), "Adorer of Pelagros begins locked on this phone")
+	await _clear_zombies_on_host()
+	w.director.set_process(false)
+	var boss: Zombie
+	var mind: FeastMind
+	if host:
+		w.director.elapsed = FeastMind.ARRIVAL
+		w.director._tick_thalys()
+		boss = w.zombies.back()
+		ok(boss.type_id == FeastMind.ID, "the host calls Pelagros")
+		boss.set_physics_process(false)
+		mind = boss.mesenlla_mind as FeastMind
+		mind.tick(boss, pl, Vector3.ZERO, 15.0, 1.9)
+		mind._offering = 0.01
+		mind.tick(boss, pl, Vector3.ZERO, 15.0, 0.04)
+	await wait(0.35)
+	await sync(777)
+	ok(w.count_type(FeastMind.ID) == 1, "Pelagros is present on both phones")
+	ok(w.mist_seals.any(func(seal: MistSeal) -> bool: return seal.style == MistSeal.Style.FEAST and not seal.struck), "the offering's tell reaches both phones")
+	if host:
+		mind.tick(boss, pl, Vector3.ZERO, 15.0, FeastMind.CHEST_TELL + 0.05)
+	await until(func() -> bool: return w.fort.heart_hp < Fort.HEART_HP, 4.0)
+	await sync(778)
+	ok(w.fort.heart_hp == Fort.HEART_HP - FeastMind.TRIBUTE_DAMAGE, "the offering drains the Cornucopia exactly once on both phones")
+	if host:
+		boss.next_hitter = pl.net_id()
+		boss.take_damage(boss.hp + 10.0, Vector3.BACK, 0.0, boss.centre())
+	await until(func() -> bool: return Game.owns_spec({"earned": "adorer_pelagros"}), 3.0)
+	await sync(779)
+	ok(Game.owns_spec({"earned": "adorer_pelagros"}), "the boss defeat earns Adorer of Pelagros for both players")
+
+
 func _fontanova() -> void:
 	ok(w.map_id == "fontanova" and w.isle_sea != null and Game.zombie_pool_plan().has("mutant_bee") and not w.spider_trunks.is_empty() and w.hive_spots.size() == 6, "both phones are on Fontanova, in its sea, with its trees and hives")
 	w.director.set_process(false)

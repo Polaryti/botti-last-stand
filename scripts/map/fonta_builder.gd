@@ -522,13 +522,13 @@ static func terrace_wall(b: MapBuilder, size: float, wide: float) -> void:
 ## single mast with its yard and square sail, torn, the cloth hanging and moving in the wind. On deck: a
 ## little deckhouse aft, a rack of amphorae, coiled ropes, a stone anchor, the hatch open. A hole stove
 ## in her low side, ribs showing. Everything is drawn on every side, stern and keel included.
-static func sailboat(b: MapBuilder, size: float) -> void:
+static func sailboat(b: MapBuilder, size: float, docked := false) -> void:
 	var rng := b.seeded()
 	var len := size
 	var beam := size * 0.3
 	var depth := size * 0.15
 	var heel := Basis(Vector3.FORWARD, deg_to_rad(-22.0)) * Basis(Vector3.RIGHT, deg_to_rad(-3.0))
-	var base := b.xf * Transform3D(heel, Vector3(0, -depth * 0.35, 0))
+	var base := b.xf if docked else b.xf * Transform3D(heel, Vector3(0, -depth * 0.35, 0))
 	var hull := LowPoly.new()
 	hull.base = base
 	const STATIONS := 18
@@ -610,19 +610,23 @@ static func sailboat(b: MapBuilder, size: float) -> void:
 	# A hole stove in her low side, ribs showing through.
 	var holed: Array[Vector3] = rings[7]
 	var hole_at: Vector3 = holed[ROUND * 2 - 3]
-	hull.box(hole_at + Vector3(0.2, 0, 0.6), Vector3(0.16, 1.3, 2.4), Color(0.05, 0.04, 0.04))
-	for k in 4:
-		hull.prism(hole_at + Vector3(0.3, -0.7, -0.3 + k * 0.65), hole_at + Vector3(0.3, 0.7, -0.3 + k * 0.65), 0.07, 0.07, 4, WOOD)
-	for k in 5:
-		hull.box(hole_at + Vector3(0.35, rng.randf_range(-0.8, 0.8), rng.randf_range(-0.6, 1.6)), Vector3(0.05, 0.12, rng.randf_range(0.5, 1.1)), WOOD_DARK, Vector3(rng.randf_range(-30, 30), 0, rng.randf_range(-40, 40)))
+	if docked:
+		for k in 5:
+			hull.box(hole_at + Vector3(0.13, -0.5 + k * 0.21, 0.5), Vector3(0.13, 0.17, 2.2), WOOD.lightened(0.08 * (k % 3)), Vector3(0, 7, 0))
+	else:
+		hull.box(hole_at + Vector3(0.2, 0, 0.6), Vector3(0.16, 1.3, 2.4), Color(0.05, 0.04, 0.04))
+		for k in 4:
+			hull.prism(hole_at + Vector3(0.3, -0.7, -0.3 + k * 0.65), hole_at + Vector3(0.3, 0.7, -0.3 + k * 0.65), 0.07, 0.07, 4, WOOD)
+		for k in 5:
+			hull.box(hole_at + Vector3(0.35, rng.randf_range(-0.8, 0.8), rng.randf_range(-0.6, 1.6)), Vector3(0.05, 0.12, rng.randf_range(0.5, 1.1)), WOOD_DARK, Vector3(rng.randf_range(-30, 30), 0, rng.randf_range(-40, 40)))
 	# Steering oars at her quarters: the port one still shipped, the starboard snapped.
 	for side: float in [-1.0, 1.0]:
 		var at: Vector3 = rings[2][0 if side < 0 else ROUND * 2]
 		var blade_end := at + Vector3(side * 1.0, -depth * 1.4, -1.6)
-		if side > 0:
+		if side > 0 and not docked:
 			blade_end = at.lerp(blade_end, 0.45)
 		hull.prism(at + Vector3(0, 0.9, 0.4), blade_end, 0.12, 0.1, 6, WOOD)
-		if side < 0:
+		if side < 0 or docked:
 			hull.box(blade_end + Vector3(0, 0.6, -0.1), Vector3(0.12, 1.6, 0.7), WOOD.darkened(0.1), Vector3(-20, 0, side * 10))
 	# The deckhouse aft, its roof tiled.
 	var deck_y := depth * 1.02
@@ -667,7 +671,7 @@ static func sailboat(b: MapBuilder, size: float) -> void:
 	var sail_drop := size * 0.42
 	for i in cols:
 		for j in rows:
-			if (i >= 4 and j > 3) or (i == 3 and j > 5) or (i == 0 and j == 6):
+			if not docked and ((i >= 4 and j > 3) or (i == 3 and j > 5) or (i == 0 and j == 6)):
 				continue # torn away
 			var u0 := float(i) / cols
 			var u1 := float(i + 1) / cols
@@ -695,8 +699,12 @@ static func sailboat(b: MapBuilder, size: float) -> void:
 	for k in 5:
 		var t := (k + 0.5) / 5.0
 		var wide := beam * 0.9 * pow(sin(t * PI), 0.6)
-		b.solid(Vector3(0, depth * 0.55, lerpf(-len * 0.46, len * 0.46, t)), Vector3(wide, depth * 1.3, len * 0.19))
+		var high := depth * (1.0 + 0.45 * pow(absf(t - 0.45) * 2.0, 2.2)) if docked else depth * 1.3
+		var bottom := 0.0 if docked else -depth * 0.1
+		b.solid(Vector3(0, bottom + high * 0.5, (t - 0.5) * len if docked else lerpf(-len * 0.46, len * 0.46, t)), Vector3(wide, high, len * 0.19))
 	b.solid(Vector3(0, deck_y + size * 0.3, len * 0.02), Vector3(0.4, size * 0.6, 0.4))
+	if docked:
+		b.collider(Vector3(0, deck_y + 0.75, -len * 0.3), Vector3(beam * 0.5, 1.5, len * 0.14))
 	# A lantern hung at the deckhouse door, still burning: the one warm light on the beach.
 	var lamp := b.mesh()
 	lamp.base = base

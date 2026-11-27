@@ -48,6 +48,7 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"brazier_lit", "sanctum_open", "altar_wake", "altar_bless", "tide_rising",
 	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash",
 	"hierophant_voice", "hierophant_hurt", "hierophant_death", "transmute_rite", "polemarch_voice", "polemarch_hurt", "polemarch_death", "spear_sweep", "phalanx_call",
+	"pelagros_arrive", "pelagros_charge", "pelagros_crash", "pelagros_fall", "feast_bless",
 	"alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea",
 	"censer_swing", "censer_ready", "censer_release", "repeater_shot", "greataxe_swing", "ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end", "honeycomb_hum", "honey_forage", "flask_drink", "flask_sour"]
 const VARIANTS := {"groan": ["groan_a", "groan_b", "groan_c", "groan_d"], "attack": ["attack_a", "attack_b"],
@@ -65,6 +66,7 @@ const MUSIC_SETS := {
 	"bastion": ["bastion_night", "bastion_hunted", "bastion_dawn"],
 	"vael": ["vael_night", "vael_hunted", "vael_dawn"],
 	"fontanova": ["fonta_night", "fonta_hunted", "fonta_dawn"],
+	"thalys": ["fonta_night", "fort_hunted", "fonta_dawn"],
 	"lantern": ["lantern_night", "lantern_hunted", "lantern_dawn"],
 	"menu": ["menu_fontanova", "", ""],
 }

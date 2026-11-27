@@ -278,7 +278,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "fontanova" if file.contains("fontanova") else "lantern" if file.contains("lantern") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "thalys" if file.contains("thalys") else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "fontanova" if file.contains("fontanova") else "lantern" if file.contains("lantern") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
@@ -349,8 +349,8 @@ func setup(game_mode: int) -> void:
 		_mists_look()
 	elif map_id in SpawnRules.MESENLLA:
 		_mesenlla_look()
-	elif map_id == "fontanova":
-		_fonta_look()
+	elif map_id in SpawnRules.ARCHIPELAGO:
+		_archipelago_look()
 	elif map_id in SpawnRules.VAEL:
 		_vael_look()
 		if map_id == "vael" and mode != Game.Mode.MENU:
@@ -680,7 +680,7 @@ func _map_file() -> String:
 		return Game.test_map
 	match mode:
 		Game.Mode.MENU: return "res://maps/fontanova.tscn" # the title screen of the Archipelagos of the Forgotten Gods
-		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
+		Game.Mode.FORT: return "res://maps/%s.tscn" % Game.current_map()
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
 			if Game.current_map() == "mists":
@@ -914,8 +914,9 @@ func add_convex_solid(xf: Transform3D, points: PackedVector3Array, footprint: Ve
 
 
 func _on_fort_fallen() -> void:
+	director.running = false
 	if Net.is_host():
-		Net.finish("The heart has fallen", "The fort lasted until %s.\n%s" % [Game.clock(director.night_left()), Net.score_lines()])
+		Net.finish("The %s has fallen" % fort.heart_name.to_lower(), "The fort lasted until %s.\n%s" % [Game.clock(director.night_left()), Net.score_lines()])
 	elif not Net.active():
 		fort_lost.emit()
 
@@ -1200,7 +1201,7 @@ func _vael_look() -> void:
 
 ## Fontanova: a warm, still Mediterranean night under a great golden moon, the sea all round, and
 ## something wrong with it: a violet haze in the air and the god's lights in its ruins.
-func _fonta_look() -> void:
+func _archipelago_look() -> void:
 	night_bg = Color(0.025, 0.04, 0.11)
 	night_fog_colour = Color(0.15, 0.14, 0.24)
 	night_fog = 0.0085 if Game.quality > 0 else 0.012
@@ -1209,11 +1210,20 @@ func _fonta_look() -> void:
 	night_sky_shows = true
 	night_moon_colour = Color(1.0, 0.88, 0.66)
 	night_moon = 0.75
-	var atmosphere := MistAtmosphere.new()
-	atmosphere.name = "FontaAura"
-	atmosphere.world = self
-	atmosphere.place = MistAtmosphere.Place.FONTANOVA
-	add_child(atmosphere)
+	if map_id == "thalys":
+		# Luminous turquoise water and peach light over the Feast Court.
+		night_bg = Color("233b46")
+		night_fog_colour = Color("63747a")
+		night_fog = 0.0055 if Game.quality > 0 else 0.008
+		night_ambient = Color("a6adb9")
+		night_moon_colour = Color("ffe6bf")
+		night_moon = 1.0
+	if map_id == "fontanova":
+		var atmosphere := MistAtmosphere.new()
+		atmosphere.name = "FontaAura"
+		atmosphere.world = self
+		atmosphere.place = MistAtmosphere.Place.FONTANOVA
+		add_child(atmosphere)
 	_sky_material.set_shader_parameter("sea", 1.0)
 	_sky_material.set_shader_parameter("aurora", 0.0)
 	_sky_material.set_shader_parameter("sea_dir", Vector3(0, 0, 1))
@@ -3109,8 +3119,12 @@ func note_defeated(z: Zombie) -> void:
 	for p: Player in local_players():
 		if p.class_id == "ferryman":
 			FerrymanKit.gather(p, z.position, z.last_hitter == p.net_id())
-	if z.type_id == "harbourmaster" and player and not Net.spectating and not director.sandbox:
+	if player == null or Net.spectating or director.sandbox:
+		return
+	if z.type_id == "harbourmaster":
 		Game.note_harbourmaster()
+	if z.type_id == FeastMind.ID and map_id == "thalys" and not _dawn_done and fort and fort.heart_hp > 0.0:
+		Game.earn_spec("adorer_pelagros")
 
 
 func on_player_died(p: Player) -> void:

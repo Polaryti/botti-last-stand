@@ -2,6 +2,13 @@
 
 ## 0.23.0 — Archipelagos of the Forgotten Gods (27 November 2026)
 
+### Thalys, the island of feasts
+- New **Defend the Fort** map on the sea chart, playable solo or with a party. Three harvest roads lead through Pomegranate Rise, Purple Vines and the Hearth Kilns to the Golden Cornucopia. Follow the market road to Lantern Quay and board Fontanova's repaired merchant ship.
+- Repair the Orchard, Vine and Hearth gates with wood as Temple Guardians and Fontanova's mutants advance. Keep the cornucopia standing for ten minutes and defeat **Pelagros**, god of food and feasts.
+- Pelagros enters at 7:30 with a bronze ladle, a burning hearth and a wheel of gold. Evade the fire he sends down the court. When he marks the cornucopia, strike him repeatedly to break his offering. At half health he calls reinforcements.
+- Defeat Pelagros to unlock **Adorer of Pelagros**, a profession for the Ascendant. Its **Feast of Embers** heals nearby allies and strikes enemies in the same area. Its final ability serves a stronger feast.
+
+
 *After Port Vael, a ship sails on to Fontanova, the first island of an archipelago whose people worshipped gods now forgotten. One of them never left.* A new island with its own rites, creatures, cult and god, a new class, new weapons, a sea chart of the Archipelago and a random place to play.
 
 ### Fontanova, a new map

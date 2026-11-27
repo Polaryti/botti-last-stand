@@ -448,7 +448,7 @@ func _draw_fort(s: Vector2, centre: Vector2) -> void:
 	draw_style_box(_backing, Rect2(x0, top, w, h))
 	var x := x0 + 10.0
 	var heart := fort.heart_hp / Fort.HEART_HP
-	_text("Portal", Vector2(x, top + 17), FS, UiTheme.BONE)
+	_text(fort.heart_name, Vector2(x, top + 17), FS, UiTheme.BONE)
 	var pct := "%d%%" % ceili(heart * 100.0)
 	_text(pct, Vector2(x + BAR_W - font.get_string_size(pct, HORIZONTAL_ALIGNMENT_LEFT, -1, FS).x, top + 17), FS, UiTheme.BONE if heart > 0.35 else UiTheme.BLOOD.lightened(0.3))
 	_bar(Rect2(x, top + 22, BAR_W, 8), heart, Color(0.9, 0.3, 0.24))

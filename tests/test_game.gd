@@ -4490,8 +4490,8 @@ func test_trees() -> void:
 	for id: String in ClassDefs.ALL:
 		var tree := AbilityData.tree(id)
 		ok((tree["core"] as Array).size() == Player.CORE_STEPS, "%s has its shared tiers" % id)
-		# Three professions each; the Ascendant's grow with the gods of the Archipelagos (two so far).
-		var professions := 2 if id == "ascendant" else 3
+		# Three professions each; the Ascendant’s grow with the gods of the Archipelagos.
+		var professions := 3
 		ok((tree["specs"] as Array).size() == professions, "%s has %d specializations" % [id, professions])
 		var ids := {}
 		var icons := {}
@@ -4587,6 +4587,7 @@ func test_trees() -> void:
 	await start_clean()
 	var had_specs: Dictionary = Game.earned_specs.duplicate()
 	Game.earned_specs["adorer"] = true
+	Game.earned_specs["adorer_pelagros"] = true
 	for id: String in ClassDefs.ALL:
 		for spec_i in (AbilityData.tree(id)["specs"] as Array).size():
 			for pick in 2:

@@ -111,6 +111,10 @@ func _build_water() -> void:
 	_mat.set_shader_parameter("shallow", Vector3(0.1, 0.33, 0.36))
 	_mat.set_shader_parameter("mist", Vector3(0.3, 0.42, 0.55))
 	_mat.set_shader_parameter("foam", Vector3(0.85, 0.92, 0.95))
+	if world.map_id == "thalys":
+		_mat.set_shader_parameter("deep", Vector3(0.028, 0.15, 0.20))
+		_mat.set_shader_parameter("shallow", Vector3(0.13, 0.48, 0.43))
+		_mat.set_shader_parameter("mist", Vector3(0.5, 0.59, 0.57))
 	_mat.set_shader_parameter("coastal", 1.0)
 	_water.material_override = _mat
 	add_child(_water)

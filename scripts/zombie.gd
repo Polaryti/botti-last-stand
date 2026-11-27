@@ -568,7 +568,7 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 			_visual.set_meta("risen", 0.0)
 			VaelModels.bury(_visual) # it lies in wait in the sand
 	mist_mind = MistMind.new() if id in MistModels.BORN else null
-	mesenlla_mind = GodMind.new(id) if GodMind.handles(id) else CultMind.new(id) if CultMind.handles(id) else FontaMind.new(id) if FontaMind.handles(id) else VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
+	mesenlla_mind = FeastMind.new(id) if id == FeastMind.ID else GodMind.new(id) if GodMind.handles(id) else CultMind.new(id) if CultMind.handles(id) else FontaMind.new(id) if FontaMind.handles(id) else VaelSkyMind.new(id) if id in VaelSkyMind.KINDS else VaelMind.new(id) if VaelMind.handles(id) else MesenllaMind.new(id) if MesenllaMind.wants(id) else null
 	mesenlla_warning = false
 	def = ZombieDefs.def_of(id)
 	_is_dummy = def.get("dummy", false)
@@ -1314,7 +1314,7 @@ const MESENLLA_VOICES := {"wyvern_rider": "woods_chatter", "bear": "bear_roar", 
 	"kraken_arm": "kraken_rise", "hollow_sovereign": "sovereign_voice", "leviathan": "leviathan_roar", "kraken": "kraken_roar",
 	"mutant_bee": "bee_buzz", "beehive": "hive_hum", "mutant_wasp": "wasp_buzz", "mutant_snail": "snail_squelch", "wasp_hive_snail": "snail_squelch",
 	"mutant_spider": "spider_hiss", "battle_ostrich": "ostrich_hiss", "ember_moth": "moth_flutter", "thornback": "thornback_grunt",
-	"cult_worshipper": "cult_chant", "cult_priest": "priest_intone", "cult_guardian": "guardian_shout", "ostrich_rider": "guardian_shout", "hierophant": "hierophant_voice", "polemarch": "polemarch_voice", "alquimelea": "alq_voice"}
+	"cult_worshipper": "cult_chant", "cult_priest": "priest_intone", "cult_guardian": "guardian_shout", "ostrich_rider": "guardian_shout", "hierophant": "hierophant_voice", "polemarch": "polemarch_voice", "alquimelea": "alq_voice", "pelagros": "pelagros_charge"}
 
 
 ## How each of them sounds when struck, and when it dies.
@@ -1327,7 +1327,7 @@ const MESENLLA_HURT := {"wyvern_rider": "woods_hurt", "bear": "bear_hurt", "mist
 	"kraken_arm": "kraken_hurt", "hollow_sovereign": "sovereign_hurt", "leviathan": "leviathan_hurt", "kraken": "kraken_hurt",
 	"mutant_bee": "insect_hurt", "beehive": "hive_hurt", "mutant_wasp": "insect_hurt", "mutant_snail": "snail_hurt", "wasp_hive_snail": "snail_hurt",
 	"mutant_spider": "spider_hurt", "battle_ostrich": "ostrich_hurt", "ember_moth": "insect_hurt", "thornback": "thornback_grunt",
-	"cult_worshipper": "worshipper_hurt", "cult_priest": "priest_hurt", "cult_guardian": "guardian_hurt", "ostrich_rider": "guardian_hurt", "hierophant": "hierophant_hurt", "polemarch": "polemarch_hurt", "alquimelea": "alq_hurt"}
+	"cult_worshipper": "worshipper_hurt", "cult_priest": "priest_hurt", "cult_guardian": "guardian_hurt", "ostrich_rider": "guardian_hurt", "hierophant": "hierophant_hurt", "polemarch": "polemarch_hurt", "alquimelea": "alq_hurt", "pelagros": "pelagros_crash"}
 const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "mist_bear": "bear_death", "eagle": "eagle_death", "mist_eagle": "eagle_death",
 	"shapeshifter": "shapeshifter_death", "child_of_woods": "woods_death", "woodland_cavalry": "woods_death", "earth_elemental": "stone_crumble",
 	"great_revenant_elemental": "revenant_death", "mist_elemental": "mist_dissipate", "storm_elemental": "storm_burst", "wyvern": "wyvern_death",
@@ -1338,7 +1338,7 @@ const MESENLLA_DEATHS := {"wyvern_rider": "woods_death", "bear": "bear_death", "
 	"kraken_arm": "kraken_death", "hollow_sovereign": "sovereign_death", "leviathan": "leviathan_death", "kraken": "kraken_end",
 	"mutant_bee": "insect_death", "beehive": "hive_break", "mutant_wasp": "insect_death", "mutant_snail": "snail_death", "wasp_hive_snail": "snail_death",
 	"mutant_spider": "spider_death", "battle_ostrich": "ostrich_death", "ember_moth": "insect_death", "thornback": "thornback_death",
-	"cult_worshipper": "worshipper_death", "cult_priest": "priest_death", "cult_guardian": "guardian_death", "ostrich_rider": "guardian_death", "hierophant": "hierophant_death", "polemarch": "polemarch_death", "alquimelea": "alq_death"}
+	"cult_worshipper": "worshipper_death", "cult_priest": "priest_death", "cult_guardian": "guardian_death", "ostrich_rider": "guardian_death", "hierophant": "hierophant_death", "polemarch": "polemarch_death", "alquimelea": "alq_death", "pelagros": "pelagros_fall"}
 
 
 ## The Shapeshifter speaks with whichever body it has: the stag's call, or the beast's growl.

@@ -124,7 +124,7 @@ const BASE_MODS := {"melee_damage": 1.0, "melee_rate": 1.0, "melee_reach": 0.0, 
 	"harpoon_back": 0.0, "mark_time": 0.0, "great_damage": 0.0,
 	"trident_reach": 0.0, "trident_hits": 0.0, "trident_tide": 0.0, "shell_hp": 0.0, "spear_range": 0.0, "chains": 0.0, "serpent_time": 0.0,
 	"cross_reach": 0.0, "ferry_cast_reach": 0.0, "cross_width": 0.0, "cross_damage": 0.0, "debt_time": 0.0, "obols": 0.0, "obol_heal": 0.0, "souls": 0.0, "soul_damage": 0.0,
-	"divine_bane": 0.0, "deicide_reach": 0.0, "changed_time": 0.0, "field_reach": 0.0}
+	"divine_bane": 0.0, "deicide_reach": 0.0, "changed_time": 0.0, "field_reach": 0.0, "feast_radius": 0.0, "feast_heal": 0.0, "feast_damage": 0.0}
 var mods := BASE_MODS.duplicate()
 var flags := {}
 var spec_id := ""
@@ -377,7 +377,7 @@ func _init(owner_world: World, as_bot := 0) -> void:
 	camera.fov = BASE_FOV
 	camera.near = 0.06
 	# The Mists and Mesenlla have islands far off in the sky; elsewhere the fog ends the view.
-	camera.far = 460.0 if owner_world.terrain.has_islands() else 240.0 if owner_world.map_id in SpawnRules.MESENLLA else 300.0 if owner_world.map_id in SpawnRules.VAEL or owner_world.map_id == "fontanova" else 100.0
+	camera.far = 460.0 if owner_world.terrain.has_islands() else 240.0 if owner_world.map_id in SpawnRules.MESENLLA else 300.0 if owner_world.map_id in SpawnRules.VAEL or owner_world.map_id in SpawnRules.ARCHIPELAGO else 100.0
 	head.add_child(camera)
 	_vm_root = Node3D.new()
 	camera.add_child(_vm_root)

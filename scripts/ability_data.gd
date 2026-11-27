@@ -776,6 +776,18 @@ static func _ascendant() -> Dictionary:
 			a("spreading_change", "Spreading Change", "Changed, a poisoned enemy you kill opens a field of change where it falls", "elixir+skull", {}, [], "spreading")]],
 			a("crucible_heart", "Crucible Heart", "When the change ends, light bursts from you: 60 damage within 6 m, throwing enemies back and setting them burning for 2 s", "", {}, [], "crucible"),
 			"adorer"),
+		_spec("adorer_pelagros", "Adorer of Pelagros", "Pelagros's heir turns his hearthfire against the hungry and shares the feast with allies.", Color("f5b960"),
+			a("adorer_pelagros_entry", "Adorer of Pelagros", "Ascend becomes Feast of Embers. Within 7 m, heal yourself and allies for 18 and strike enemies for 38.", "spec_adorer_pelagros", {}, [], "art_feast"),
+			[[a("open_table", "Open Table", "Feast of Embers reaches 2 m further.", "spec_adorer_pelagros+up", {"feast_radius": 2.0}),
+			a("second_helping", "Second Helping", "Feast of Embers heals 10 more.", "heart+up", {"feast_heal": 10.0})],
+			[a("hearth_guard", "Hearth Guard", "Feast gives everyone it heals 1.1 s of protection from damage.", "shield+flame", {}, [], "feast_ward"),
+			a("kindle", "Kindle", "Feast of Embers deals 16 more damage.", "flame+up", {"feast_damage": 16.0})],
+			[a("turn_tables", "Turn the Tables", "Feast of Embers comes back 25% sooner.", "clock+wind", {"art_cd": -0.25}),
+			a("clean_plate", "Clean Plate", "Feast of Embers clears your poison and bleeding.", "heart+star", {}, [], "feast_cleanse")],
+			[a("host_reward", "The Host's Reward", "Hitting an enemy with Feast takes 2 s off its cooldown.", "clock+flame", {}, [], "feast_refund"),
+			a("stout_guest", "Stout Guest", "+25 max health.", "heart+shield", {"max_hp": 25.0})]],
+			a("last_course", "The Last Course", "Feast of Embers heals 12 more and deals 26 more damage.", "", {}, [], "last_course"),
+			"adorer_pelagros"),
 	]}
 
 

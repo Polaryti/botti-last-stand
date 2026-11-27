@@ -61,10 +61,11 @@ const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a cas
 	"vael": {"name": "Port Vael", "desc": "A drowned harbour. Survive fifteen minutes of Mist Tide."},
 	"fontanova": {"name": "Fontanova", "desc": "An island of forgotten gods. Survive twelve minutes."}}
 ## The maps of the Archipelagos of the Forgotten Gods: playing on any of them earns the Ascendant.
-const ARCHIPELAGO_MAPS := ["fontanova"]
+const ARCHIPELAGO_MAPS := ["fontanova", "thalys"]
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
 const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
-	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
+	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."},
+	"thalys": {"name": "Thalys", "desc": "Hold three harvest roads and defend the Golden Cornucopia from Pelagros."}}
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
 const VERSUS_MAPS := ["village", "mesenlla", "vael", "fontanova"]
 
@@ -177,6 +178,7 @@ func night_length() -> float:
 	match current_map():
 		"vael": return 900.0
 		"fontanova": return 720.0
+		"thalys": return 600.0
 	return NIGHT_LENGTH
 
 
@@ -368,6 +370,8 @@ func owns_spec(spec: Dictionary) -> bool:
 
 
 func earn_spec(id: String) -> void:
+	if earned_specs.has(id):
+		return
 	earned_specs[id] = true
 	fresh_specs.append(id)
 	save_settings()
@@ -376,6 +380,8 @@ func earn_spec(id: String) -> void:
 ## How to earn a profession that cannot be taken yet.
 static func spec_earn_text(spec: Dictionary) -> String:
 	match str(spec.get("earned", "")):
+		"adorer_pelagros":
+			return "Defeat Pelagros in Defend the Fort on Thalys."
 		"adorer":
 			return "Win a match on Fontanova as the Ascendant to unlock this profession."
 	return ""
@@ -473,7 +479,14 @@ const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6
 	"earth_elemental": 4, "mist_elemental": 3, "storm_elemental": 3, "wyvern": 2, "war_wyvern": 1}
 
 
+const THALYS_POOLS := {"cult_worshipper": 17, "cult_guardian": 10, "cult_priest": 5, "battle_ostrich": 5,
+	"mutant_snail": 6, "thornback": 5, "ember_moth": 4,
+	"polemarch": 1, "pelagros": 1}
+
+
 func zombie_pool_plan() -> Dictionary:
+	if mode == Mode.FORT and current_map() == "thalys":
+		return THALYS_POOLS.duplicate()
 	if mode == Mode.FORT and current_map() == "bastion":
 		return BASTION_POOLS.duplicate()
 	if mode == Mode.NIGHT and current_map() in SpawnRules.MESENLLA:
@@ -503,6 +516,7 @@ func zombie_pool_plan() -> Dictionary:
 		for model: String in FONTA_POOLS:
 			plan[model] = mini(int(FONTA_POOLS[model]), 4)
 		plan["leviathan"] = 1
+		plan["pelagros"] = 1
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent

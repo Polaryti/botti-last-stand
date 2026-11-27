@@ -61,9 +61,18 @@ const CRUCIBLE_DAMAGE := 60.0
 const CRUCIBLE_KNOCK := 9.0
 const CRUCIBLE_BURN := 2.0
 
+# Adorer of Pelagros: Feast of Embers
+const FEAST_RADIUS := 7.0
+const FEAST_HEAL := 18.0
+const FEAST_DAMAGE := 38.0
+const FEAST_COURSE := 12.0
+const FEAST_WARD := 1.1
+const FEAST_LAST := 26.0
+
 const ARTS := {
 	"": {"name": "Ascend", "cost": 0.0, "cast": 0.1, "cd": 10.0, "icon": "ascend"},
 	"godslayer": {"name": "Deicide", "cost": 0.0, "cast": 0.1, "cd": 12.0, "icon": "deicide"},
+	"adorer_pelagros": {"name": "Feast of Embers", "cost": 0.0, "cast": 0.32, "cd": 16.0, "icon": "spec_adorer_pelagros", "anim": "Spellcast_Raise"},
 	"adorer": {"name": "Elixir of Change", "cost": 0.0, "cast": 0.35, "cd": 15.0, "icon": "elixir", "anim": "Spellcast_Raise"},
 }
 const ICHOR := Color(0.62, 0.66, 0.24) # the class's colour: the olive-gold of ichor
@@ -79,7 +88,34 @@ static func cast(p: Player) -> void:
 	match p.spec_id:
 		"godslayer": deicide(p)
 		"adorer": drink(p)
+		"adorer_pelagros": feast(p)
 		_: ascend(p)
+
+
+## Feast shares a meal with allies and brings the god's hearthfire down on nearby enemies.
+static func feast(p: Player) -> void:
+	var at := p.global_position
+	var radius := FEAST_RADIUS + p.m("feast_radius")
+	var healing := FEAST_HEAL + p.m("feast_heal")
+	var protection := FEAST_WARD if p.has_flag("feast_ward") else 0.0
+	var damage := FEAST_DAMAGE + p.m("feast_damage")
+	if p.has_flag("last_course"):
+		healing += FEAST_COURSE
+		damage += FEAST_LAST
+	if p.has_flag("feast_cleanse"):
+		p.poison_left = 0.0
+		p.bleed_left = 0.0
+	var was := p.world.begin_act(p)
+	p.heal(healing)
+	p.guard_left = maxf(p.guard_left, protection)
+	for ally: Target in p.world.friends_near(at, radius):
+		Net.guard_peer(p.world.peer_of(ally), protection, healing)
+	var hits := _crash(p, radius, damage, 0.0, null)
+	if hits > 0 and p.has_flag("feast_refund"):
+		p.art_cd_left = maxf(0.0, p.art_cd_left - 2.0)
+	p.world.end_act(was)
+	p.world.fx_ring(at + Vector3.UP * 0.18, radius * 0.64, Color("f89959"))
+	p.world.sfx_at("feast_bless", at, -1.0)
 
 
 ## The gods, their servants and what they made: bosses, minibosses and Fontanova's mutants.

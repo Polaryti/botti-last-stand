@@ -36,6 +36,7 @@ var heart_hp := HEART_HP
 const SIGN_GONE := 9.0 # metres from a gate at which its name is gone
 const SIGN_FULL := 15.0 # and at which it is all there
 var heart_at := Vector3.ZERO
+var heart_name := "Portal"
 var _heart_mesh: Node3D
 var _repair_timer := 0.0
 var _sync_timer := 0.0
@@ -259,8 +260,9 @@ func wood_needed(g: Dictionary) -> int:
 	return ceili(maxf(0.0, GATE_HP - float(g["hp"])) / REPAIR_PER_WOOD)
 
 
-func set_heart(at: Vector3, mesh: Node3D) -> void:
+func set_heart(at: Vector3, mesh: Node3D, title := "Portal") -> void:
 	heart_at = at
+	heart_name = title
 	_heart_mesh = mesh
 
 
@@ -375,6 +377,9 @@ func hit_heart(damage: float) -> void:
 			world.sfx_at("portal_wound", heart_at, -2.0)
 			if Net.is_host():
 				Net.sound_at("portal_wound", heart_at, -2.0)
+		elif heart_name == "Cornucopia":
+			world.banner("The Golden Cornucopia is under attack!", 3.0)
+			world.sfx_at("pelagros_crash", heart_at, -7.0)
 		else:
 			world.banner("They are at the portal!", 3.0)
 			world.sfx_at("banshee", heart_at, -6.0)
@@ -532,3 +537,5 @@ func apply_state(b: PackedByteArray) -> void:
 		at += 3
 	if at + 2 <= b.size():
 		heart_hp = float(b.decode_u16(at))
+		if _heart_mesh:
+			_heart_mesh.visible = heart_hp > 0.0

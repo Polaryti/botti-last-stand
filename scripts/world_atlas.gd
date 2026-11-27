@@ -18,13 +18,13 @@ signal viewed(view: String)
 const SPOTS := {"village": Vector2(0.16, 0.7), "fort": Vector2(0.37, 0.82), "mists": Vector2(0.5, 0.42), "mesenlla": Vector2(0.85, 0.78), "bastion": Vector2(0.8, 0.36), "vael": Vector2(0.66, 0.81), "lantern_road": Vector2(0.51, 0.76)}
 ## And on the sea chart of the Archipelago: Port Vael on the coast in the north-west corner, Fontanova
 ## the first island out, its beach (where the crossing lands) on its south side.
-const SEA_SPOTS := {"vael": Vector2(0.14, 0.2), "fontanova": Vector2(0.44, 0.56)}
+const SEA_SPOTS := {"vael": Vector2(0.14, 0.2), "fontanova": Vector2(0.42, 0.55), "thalys": Vector2(0.72, 0.64)}
 const WORLD := "world"
 const ARCHIPELAGO := "archipelago"
 ## The gods' other islands, not yet charted: where they lie, and how big.
-const UNCHARTED := [Vector3(0.78, 0.3, 0.07), Vector3(0.9, 0.62, 0.055), Vector3(0.7, 0.84, 0.05), Vector3(0.62, 0.14, 0.035)]
+const UNCHARTED := [Vector3(0.78, 0.3, 0.07), Vector3(0.91, 0.82, 0.042), Vector3(0.62, 0.14, 0.035)]
 ## Roads walk; portals open. Each link is [from, to, through a portal].
-const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mesenlla", "vael", false], ["vael", "fontanova", false]]
+const LINKS := [["village", "fort", false], ["fort", "mists", true], ["mists", "bastion", true], ["bastion", "mesenlla", false], ["mesenlla", "vael", false], ["vael", "fontanova", false], ["fontanova", "thalys", false]]
 const MEDAL := 92.0
 
 var allowed: Array = []
@@ -400,6 +400,22 @@ func _archipelago(w: float, h: float) -> void:
 		draw_rect(Rect2(top + Vector2(-11 + k * 5, -13), Vector2(2, 10)), Color(0.9, 0.86, 0.76))
 	draw_colored_polygon(PackedVector2Array([top + Vector2(-14, -13), top + Vector2(0, -20), top + Vector2(14, -13)]), Color(0.9, 0.86, 0.76))
 	_glow(top + Vector2(0, -9), 16.0, Color(0.7, 0.45, 1.0), 0.35 + 0.15 * sin(_t * 1.6))
+	# Thalys, with the three harvest roads visible through the orchards.
+	var harvest := spot("thalys")
+	var shore := PackedVector2Array()
+	for i in 32:
+		var a := TAU * i / 32.0
+		shore.append(harvest + Vector2(cos(a) * r * 1.20, sin(a) * r * 0.80) * (1.0 + 0.13 * cos(a * 3.0) + 0.11 * sin(a * 5.0)))
+	draw_colored_polygon(shore, Color("d2a872"))
+	var farmland := PackedVector2Array()
+	for p in shore:
+		farmland.append(harvest.lerp(p, 0.88))
+	draw_colored_polygon(farmland, Color("647444"))
+	for k in 6:
+		var stripe := Vector2(-72.0 + k * 28.0, -26.0 + 5.0 * (k % 2))
+		draw_line(harvest + stripe, harvest + stripe + Vector2(13, 37), Color("a87353"), 3.0, true)
+	draw_polyline(shore + PackedVector2Array([shore[0]]), Color(0.8, 0.91, 0.83, 0.4), 2.0, true)
+	_glow(harvest, r * 0.72, Color("f9a555"), 0.23 + 0.12 * sin(_t * 1.5))
 	# The gods' other islands, uncharted: dark shapes in the mist, each with a faint light on it.
 	for u: Vector3 in UNCHARTED:
 		var at := Vector2(u.x * w, u.y * h)

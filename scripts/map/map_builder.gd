@@ -233,7 +233,7 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" or look == "fontanova" else 0.0)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" or look in SpawnRules.ARCHIPELAGO else 0.0)
 	mat.set_shader_parameter("shore", SHORE_Y if terrain.seaside() else -1000.0)
 	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
@@ -245,6 +245,9 @@ func ground() -> void:
 		mat.set_shader_parameter("tint", Vector3(1.12, 0.86, 0.7))
 		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
 		mat.set_shader_parameter("highland", 1.0 if look == "vael" else 0.0)
+	elif look == "thalys":
+		mat.set_shader_parameter("tint", Vector3(1.13, 1.13, 0.87))
+		mat.set_shader_parameter("dirt", Vector3(0.61, 0.44, 0.29))
 	elif look == "fontanova":
 		# Dry Mediterranean ground: golden-green grass burnt by the summer, and red-ochre earth.
 		mat.set_shader_parameter("tint", Vector3(1.08, 1.0, 0.86))

@@ -83,7 +83,9 @@ func _ready() -> void:
 	if Game.test_map != "":
 		# Someone pressed F6 on a map in the editor, so go straight to it.
 		var map := Game.test_map
-		start_game(Game.Mode.SANDBOX if map.contains("sandbox") else (Game.Mode.FORT if map.contains("fort") or map.contains("bastion") else Game.Mode.NIGHT))
+		if map.get_file() == "thalys.tscn":
+			Game.fort_map = "thalys"
+		start_game(Game.Mode.SANDBOX if map.contains("sandbox") else (Game.Mode.FORT if map.contains("fort") or map.contains("bastion") or map.contains("thalys") else Game.Mode.NIGHT))
 		return
 	show_menu()
 
@@ -199,7 +201,7 @@ func show_menu(rebuild := false) -> void:
 	gap.custom_minimum_size.y = 14
 	box.add_child(gap)
 	box.add_child(_menu_row("Survive the Night", "Ten minutes until dawn.", func() -> void: show_map_picker(), true))
-	box.add_child(_menu_row("Defend the Fort", "Hold the gates. Protect the portal.", func() -> void: show_fort_picker()))
+	box.add_child(_menu_row("Defend the Fort", "Hold the gates and protect the stronghold.", func() -> void: show_fort_picker()))
 	var together := _menu_row("Play Together", "Up to four phones, nearby or online.", show_together)
 	together.name = "PlayTogether"
 	box.add_child(together)
@@ -2208,7 +2210,7 @@ func _on_fort_lost() -> void:
 	var seconds := world.director.elapsed
 	var kills := world.player.kills
 	var earned := Game.award_doubloons(seconds, kills, false, false)
-	_end_screen("The portal has fallen", "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
+	_end_screen("The %s has fallen" % world.fort.heart_name.to_lower(), "The fort held for %s, and you took %d with you.%s" % [Game.clock(seconds), kills, _earned_line(earned) + _board_line(seconds, kills, false)])
 
 
 ## What the match earned is listed under the end screen's words, each with its picture: doubloons
@@ -3204,7 +3206,7 @@ func _fill_leaderboard(list: VBoxContainer, note: Label, mine: Label, fresh: boo
 	if not is_instance_valid(list) or _board_period != period or _board_kind != kind:
 		return
 	asking.queue_free()
-	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village and the Valleys of Mesenlla", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort and Mist Bastion", "coop": "Co-op nights in the Village and the Valleys of Mesenlla", "versus": "All vs All and Teams"}[kind]
+	var what: String = "every match" if kind == "all" else {"night": "Survive the Night in the Village and the Valleys of Mesenlla", "mists": "nights in the Mists, alone or together", "fort": "Defend the Fort, Mist Bastion and Thalys", "coop": "Co-op nights in the Village and the Valleys of Mesenlla", "versus": "All vs All and Teams"}[kind]
 	note.text = ("Points from %s, since the leaderboard began." if period == "all" else "Points from %s since Monday 00:00 UTC.") % what
 	if not result["ok"]:
 		list.add_child(_board_problem(result["error"]))
@@ -3246,7 +3248,7 @@ func _note_pending(mine: Label) -> void:
 
 
 static func _map_word(map: String) -> String:
-	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael", "lantern_road": "Port Vael", "fontanova": "Fontanova"}.get(map, map.capitalize())
+	return {"village": "Village", "mists": "Mists", "fort": "Fort", "mesenlla": "Mesenlla", "bastion": "Mist Bastion", "vael": "Port Vael", "lantern_road": "Port Vael", "fontanova": "Fontanova", "thalys": "Thalys"}.get(map, map.capitalize())
 
 
 ## "Night · Mists", "Co-op · Village", "All vs All · Village"; the Fort is its own map, so just "Fort",

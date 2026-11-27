@@ -23,7 +23,7 @@ const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
 ## What each land sounds like when the dead sense the dawn. The Village and the Fort keep the wolf.
-const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael", "fontanova": "dawn_fontanova"}
+const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael", "fontanova": "dawn_fontanova", "thalys": "dawn_fontanova"}
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0
@@ -171,6 +171,8 @@ func opening_line() -> String:
 	var opening := "Survive until the dawn"
 	if world.last_light:
 		opening = "Walk with the Lantern Barge to the Isle of Lamps"
+	elif world.map_id == "thalys":
+		opening = "Defend the Golden Cornucopia. Defeat Pelagros at the feast."
 	elif world.map_id == "bastion":
 		opening = "Defend the Great Portal until the dawn"
 	elif world.fort:
@@ -190,6 +192,7 @@ const BOSS_CARDS := {
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
 	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "the drowned harbour belongs to the deep", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
 	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
+	FeastMind.ID: {"name": "Pelagros", "line": "the god of food and feasts has come to collect", "color": Color("ffd075"), "glow": Color("b4482e"), "bells": "pelagros_arrive", "strikes": [0.0, 0.38, 0.9, 1.55]},
 	ALQUIMELEA: {"name": "Al'quimelea", "line": "the god of change comes down from its temple", "color": Color(0.86, 0.6, 1.0), "glow": Color(0.2, 0.5, 0.18), "bells": "boss_bells_alquimelea", "strikes": [0.0, 0.4, 0.8, 1.4, 2.06, 2.6]},
 	KRAKEN: {"name": "The Kraken", "line": "the last of Vael rises from the deep", "color": Color(0.45, 1.0, 0.8), "glow": Color(0.32, 0.06, 0.2), "bells": "boss_bells_kraken", "strikes": [0.0, 0.32, 1.2, 1.86, 2.3, 3.3]},
 }
@@ -373,7 +376,7 @@ func _process(delta: float) -> void:
 		var living := world.count_living()
 		if living < target_population():
 			_spawn_roamer()
-	if elapsed >= _next_beast:
+	if world.map_id != "thalys" and elapsed >= _next_beast:
 		_next_beast = elapsed + (LAST_STAND_BEAST_EVERY if _last_stand else BEAST_EVERY)
 		if world.count_type("beast") < (LAST_STAND_BEASTS if _last_stand else MAX_BEASTS) and world.spawn_zombie("beast"):
 			_sound("howl", 0.0)
@@ -452,6 +455,8 @@ func minute() -> int:
 
 
 func _pick_roamer() -> String:
+	if world.map_id == "thalys":
+		return _thalys_roamer()
 	var kind := ZombieDefs.pick_roamer(elapsed, world.spawn_map())
 	# Coastal flyers share three ranged slots, leaving room for the drowned on phones.
 	if kind in VaelSkyMind.KINDS:
@@ -460,6 +465,35 @@ func _pick_roamer() -> String:
 		if flyers >= 3: return "drowned_sailor"
 	# Leave two pooled bodies available for the Regent's second phase.
 	return "rift_stalker" if kind == "lantern_wisp" and world.count_type(kind) >= 3 else kind
+
+
+## Three ways in: a ground siege first, long-range priests and flyers as the feast draws near.
+func _thalys_roamer() -> String:
+	var roll := randf()
+	if elapsed >= 280.0 and roll < 0.08 and world.count_type("ember_moth") < 3:
+		return "ember_moth"
+	if elapsed >= 160.0 and roll < 0.19 and world.count_type("cult_priest") < 4:
+		return "cult_priest"
+	if elapsed >= 105.0 and roll < 0.34 and world.count_type("cult_guardian") < 9:
+		return "cult_guardian"
+	if elapsed >= 72.0 and roll < 0.46 and world.count_type("battle_ostrich") < 5:
+		return "battle_ostrich"
+	if elapsed >= 42.0 and roll < 0.60 and world.count_type("mutant_snail") < 6:
+		return "mutant_snail"
+	if world.count_type("cult_worshipper") < 16:
+		return "cult_worshipper"
+	return "thornback"
+
+
+func _tick_thalys() -> void:
+	if elapsed >= 240.0 and not _court_came.has("polemarch"):
+		if world.spawn_zombie("polemarch"):
+			_court_came["polemarch"] = true
+			show_banner("The Polemarch leads the attack on the feast.", 4.0)
+			_sound("polemarch_voice", 1.0)
+	if elapsed >= FeastMind.ARRIVAL and not _mist_boss_spawned:
+		if world.spawn_zombie(FeastMind.ID, MapFeast.BOSS_FROM):
+			_mist_boss_spawned = true
 
 
 func _tick_mist_boss() -> void:
@@ -534,6 +568,9 @@ func boss_fallen(_z: Zombie) -> void:
 	if _z.type_id == KRAKEN:
 		_kraken_fallen = true
 		show_banner("The Kraken sinks. The deep is still, and Vael is free.", 6.0)
+	elif _z.type_id == FeastMind.ID:
+		_mist_boss_defeated = true
+		MistSeal.break_from(world, _z.net_id)
 	elif _z.type_id == ALQUIMELEA:
 		_mist_boss_defeated = true
 		show_banner("Al'quimelea is gone. Nothing on Fontanova will change again.", 6.0)
@@ -799,7 +836,10 @@ func _tick_specials() -> void:
 	if world.map_id in SpawnRules.VAEL:
 		_tick_vael()
 		return
-	if world.map_id in SpawnRules.ARCHIPELAGO:
+	if world.map_id == "thalys":
+		_tick_thalys()
+		return
+	if world.map_id == "fontanova":
 		_tick_fontanova()
 		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
@@ -883,4 +923,4 @@ func _spawn_roamer() -> void:
 
 ## The Mists end only when the Veil Regent falls, and Mesenlla only when the Great Revenant Elemental does.
 func requires_regent() -> bool:
-	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA or world.map_id == "vael" or world.map_id == "fontanova") and not sandbox and not Net.fog_rules()
+	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA or world.map_id == "vael" or world.map_id in SpawnRules.ARCHIPELAGO) and not sandbox and not Net.fog_rules()

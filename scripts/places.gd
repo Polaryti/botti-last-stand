@@ -3,7 +3,7 @@ class_name Places
 ## screen and the world atlas. Each has a name, an icon, a colour, its lore, what is played there and
 ## a few hints about it for the loading screen.
 
-const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael", "fontanova"]
+const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael", "fontanova", "thalys"]
 
 const ALL := {
 	"village": {"name": "The Village", "icon": "map_village", "color": Color("efe8d8"), "plays": "Survive the Night, Co-op, All vs All and Teams",
@@ -41,6 +41,11 @@ const ALL := {
 		"tips": ["Don't swim too far out, and get off the beaches when the sea rises: out of your depth it drowns you.",
 			"Mind the Ravine: the fall is deadly, for you and for anything you knock into it.",
 			"Light the three braziers in the Oracle's Grotto. When an altar wakes, hold it for its god's blessing."]},
+	"thalys": {"name": "Thalys", "icon": "map_thalys", "color": Color("f5bf69"), "plays": "Defend the Fort, alone or with a party",
+		"lore": "Fontanova's merchant ship makes its next berth at Lantern Quay. Above it, the three harvest roads meet at a walled feast court. Pelagros once fed every visitor from its golden horn. Now the god of feasts demands the whole harvest back.",
+		"tips": ["Guard Orchard, Vine and Hearth gates. Stand near a damaged gate with wood to repair it.",
+			"Pelagros arrives inside the Feast Court at 7:30. When he marks the horn, concentrate your attacks on him to break his offering.",
+			"Defeat Pelagros here to unlock Adorer of Pelagros for the Ascendant. Hold the cornucopia until 10:00 to win the siege."]},
 	"lantern_road": {"name": "The Lantern Road", "icon": "map_lantern_road", "color": Color("ffd36e"), "plays": "Last Light, alone or in Co-op",
 		"lore": "Beyond Port Vael an old causeway runs out across the drowned Sound to the Isle of Lamps, where the ferrymen once rowed the dead. Its lanterns went out when the Mists rose. Only the Lantern Barge still carries a light along it, and the Mist Tide never goes out.",
 		"tips": ["Keep inside the barge's light. Outside it, the tide starts to drown you after a few seconds.",

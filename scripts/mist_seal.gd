@@ -15,7 +15,7 @@ const LIMIT := 40 # at once on the field: a god's rain round four of you and its
 const STING_STUN := 0.8 # how long a Lantern Jelly's sting stuns you (ZombieDefs "sting_stun")
 ## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
 const PORTAL_SHARE := 1.5
-enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL, INK, STINGER, BITE, WEB, KICK, DUST, ELIXIR, BASH, SWEEP, CHANGE, NOVA, SHARD } # new ones go at the end
+enum Style { MIST, QUAKE, STORM, FIRE, BOULDER, FROST, STING, NET, WAVE, HOOK, LAMP, SLAM, FLASH, CROWN, SALT, BRINE_BOLT, KNELL, INK, STINGER, BITE, WEB, KICK, DUST, ELIXIR, BASH, SWEEP, CHANGE, NOVA, SHARD, FEAST } # new ones go at the end
 const FROST_FREEZE := 0.6
 const FROST_SLOW := 2.0
 const LOOKS := {
@@ -47,6 +47,7 @@ const LOOKS := {
 	Style.SWEEP: [Color(1.0, 0.82, 0.4), Color(0.75, 0.14, 0.1)],
 	Style.CHANGE: [Color(0.82, 0.5, 1.0), Color(0.45, 1.0, 0.5)],
 	Style.NOVA: [Color(0.7, 1.0, 0.55), Color(1.0, 0.95, 0.7)],
+	Style.FEAST: [Color("ffb64f"), Color("ba3054")],
 	Style.SHARD: [Color(0.75, 0.55, 1.0), Color(0.95, 0.85, 1.0)],
 }
 ## What each sounds like as its circle appears, and as it closes.
@@ -57,7 +58,7 @@ const WARN_SOUNDS := {Style.MIST: "mist_warning", Style.QUAKE: "quake_warning", 
 const STRIKE_SOUNDS := {Style.MIST: "mist_burst", Style.QUAKE: "earth_slam", Style.STORM: "thunder", Style.FIRE: "fire_breath",
 	Style.BOULDER: "boulder_impact", Style.FROST: "frost_burst", Style.STING: "jelly_sting", Style.NET: "net_land", Style.WAVE: "wave_crash",
 	Style.HOOK: "hook_catch", Style.LAMP: "lamp_smash", Style.SLAM: "kraken_slam", Style.FLASH: "lamp_blaze", Style.CROWN: "crown_fall", Style.SALT: "salt_splash", Style.BRINE_BOLT: "brine_crack", Style.KNELL: "knell_strike", Style.INK: "kraken_ink",
-	Style.STINGER: "bee_sting", Style.BITE: "wasp_bite", Style.WEB: "spider_bite", Style.KICK: "ostrich_kick", Style.DUST: "moth_dust", Style.ELIXIR: "elixir_shatter", Style.BASH: "shield_bash", Style.SWEEP: "spear_sweep", Style.CHANGE: "alq_change", Style.NOVA: "alq_nova", Style.SHARD: "alq_shard"}
+	Style.STINGER: "bee_sting", Style.BITE: "wasp_bite", Style.WEB: "spider_bite", Style.KICK: "ostrich_kick", Style.DUST: "moth_dust", Style.ELIXIR: "elixir_shatter", Style.BASH: "shield_bash", Style.SWEEP: "spear_sweep", Style.CHANGE: "alq_change", Style.NOVA: "alq_nova", Style.SHARD: "alq_shard", Style.FEAST: "pelagros_crash"}
 ## Thrown things (a net, a hook, a lamp) leave the thrower's hand for the last part of the tell.
 const THROWN := [Style.NET, Style.HOOK, Style.LAMP, Style.SALT, Style.INK, Style.ELIXIR]
 const THROW_FLIGHT := 0.55
@@ -403,6 +404,10 @@ func strike() -> void:
 			world.fx_ring(position + Vector3.UP * 0.2, radius, Color(0.75, 1.0, 0.6))
 			world.show_ring(position + Vector3.UP * 0.1, radius * 0.6, Color(1.0, 0.95, 0.7))
 			world.fx_fire_patch(position, radius * 0.25)
+		Style.FEAST:
+			world.fx_ring(position + Vector3.UP * 0.12, radius, Color("fbd375"))
+			world.show_ring(position + Vector3.UP * 0.08, radius * 0.65, Color("e25d52"))
+			world.fx_fire_patch(position, radius * 0.46)
 		Style.SHARD:
 			world.fx_gore(position + Vector3.UP * 0.8, Color(0.8, 0.6, 1.0))
 			world.show_ring(position + Vector3.UP * 0.05, radius, Color(0.85, 0.7, 1.0))
@@ -508,13 +513,14 @@ func strike() -> void:
 				Style.STORM: p.apply_status(Net.Status.STUN, 0.5)
 				Style.STING: p.stun_by_creature(STING_STUN)
 				Style.FIRE: p.ignite(3.0)
+				Style.FEAST: p.ignite(2.0)
 				Style.FROST:
 					p.apply_status(Net.Status.FREEZE, FROST_FREEZE)
 					p.apply_status(Net.Status.SLOW, FROST_SLOW)
 		elif style == Style.FIRE or style == Style.LAMP:
 			target.ignite(3.0)
 	# What falls on a stronghold's portal hurts it, as surely as claws do. The host decides.
-	if world.fort and (not Net.active() or Net.is_host()) and Vector2(world.fort.heart_at.x - position.x, world.fort.heart_at.z - position.z).length() <= radius + 1.0:
+	if style != Style.FEAST and world.fort and (not Net.active() or Net.is_host()) and Vector2(world.fort.heart_at.x - position.x, world.fort.heart_at.z - position.z).length() <= radius + 1.0:
 		world.fort.hit_heart(damage * PORTAL_SHARE)
 
 ## Whether someone is facing a point: within VaelMind.FLASH_CONE degrees of looking straight at it.
