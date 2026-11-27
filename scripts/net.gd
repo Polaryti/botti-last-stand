@@ -22,7 +22,7 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 73
+const PROTOCOL := 74
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
@@ -74,6 +74,7 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"brazier_lit", "sanctum_open", "altar_wake", "altar_bless", "tide_rising",
 	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash",
 	"hierophant_voice", "hierophant_hurt", "hierophant_death", "transmute_rite", "polemarch_voice", "polemarch_hurt", "polemarch_death", "spear_sweep", "phalanx_call",
+	"pipburst_tell", "pipburst_pop", "pipburst_hurt", "ovenback_tell", "ovenback_crash", "ovenback_hurt", "pepperwing_tell", "pepperwing_blast", "pepperwing_hurt",
 	"pelagros_arrive", "pelagros_charge", "pelagros_crash", "pelagros_fall", "feast_bless",
 	"alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea",
 	"censer_swing", "censer_ready", "censer_release", "repeater_shot", "greataxe_swing", "ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end", "honeycomb_hum", "honey_forage", "flask_drink", "flask_sour"]

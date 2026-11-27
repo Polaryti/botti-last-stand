@@ -37,6 +37,7 @@ const SIGN_GONE := 9.0 # metres from a gate at which its name is gone
 const SIGN_FULL := 15.0 # and at which it is all there
 var heart_at := Vector3.ZERO
 var heart_name := "Portal"
+var heart_reach := 3.8
 var _heart_mesh: Node3D
 var _repair_timer := 0.0
 var _sync_timer := 0.0
@@ -88,11 +89,13 @@ func add_gate(i: int, node: Node3D, rows: Array[Node3D]) -> void:
 
 
 ## A gate anywhere: at is the middle of the gateway on the ground, dir the way out. Gates on a
-## stronghold that is not the square face along the X or Z axis too.
+## stronghold can face along a diagonal; use the same basis for collision and the grid.
 func add_gate_at(gate_name: String, at: Vector3, dir: Vector3, node: Node3D, rows: Array[Node3D]) -> void:
 	var i := gates.size()
+	var diagonal := absf(dir.x) > 0.01 and absf(dir.z) > 0.01
 	var along_x := absf(dir.z) > 0.5
-	var size := Vector3(GATE_W, GATE_H, WALL_T) if along_x else Vector3(WALL_T, GATE_H, GATE_W)
+	var size := Vector3(GATE_W, GATE_H, WALL_T) if along_x or diagonal else Vector3(WALL_T, GATE_H, GATE_W)
+	var xf := Transform3D(Basis.looking_at(-dir, Vector3.UP) if diagonal else Basis.IDENTITY, at)
 	var body := StaticBody3D.new()
 	body.collision_layer = 1
 	body.collision_mask = 0
@@ -100,12 +103,12 @@ func add_gate_at(gate_name: String, at: Vector3, dir: Vector3, node: Node3D, row
 	var box := BoxShape3D.new()
 	box.size = size
 	cs.shape = box
-	cs.position = at + Vector3.UP * GATE_H * 0.5
+	cs.transform = xf.translated(Vector3.UP * GATE_H * 0.5)
 	body.add_child(cs)
 	world.add_child(body)
-	gates.append({"i": i, "name": gate_name, "short": gate_name.left(1).to_upper(), "at": at, "dir": dir, "size": size, "hp": GATE_HP, "closed": true,
+	gates.append({"i": i, "name": gate_name, "short": gate_name.left(1).to_upper(), "at": at, "dir": dir, "size": size, "xf": xf, "diagonal": diagonal, "hp": GATE_HP, "closed": true,
 		"node": node, "rows": rows, "shape": cs, "lane": [] as Array[Vector3], "way": [] as Array[Vector3]})
-	world.grid.set_box(at, size, true)
+	_gate_grid(gates.back(), true)
 	var sign_board := Label3D.new()
 	sign_board.text = gate_name.to_upper()
 	sign_board.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
@@ -260,9 +263,10 @@ func wood_needed(g: Dictionary) -> int:
 	return ceili(maxf(0.0, GATE_HP - float(g["hp"])) / REPAIR_PER_WOOD)
 
 
-func set_heart(at: Vector3, mesh: Node3D, title := "Portal") -> void:
+func set_heart(at: Vector3, mesh: Node3D, title := "Portal", reach := 3.8) -> void:
 	heart_at = at
 	heart_name = title
+	heart_reach = reach
 	_heart_mesh = mesh
 
 
@@ -423,8 +427,15 @@ func _set_closed(g: Dictionary, closed: bool) -> void:
 	_dirty = true
 	g["closed"] = closed
 	(g["shape"] as CollisionShape3D).set_deferred("disabled", not closed)
-	world.grid.set_box(g["at"], g["size"], closed)
+	_gate_grid(g, closed)
 	_show_gate(g)
+
+
+func _gate_grid(gate: Dictionary, closed: bool) -> void:
+	if gate["diagonal"]:
+		world.grid.block_turned(gate["xf"], gate["size"], closed)
+	else:
+		world.grid.set_box(gate["at"], gate["size"], closed)
 
 
 ## A gate loses its planks from the top down as it takes damage.

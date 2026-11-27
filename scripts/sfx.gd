@@ -48,6 +48,7 @@ const NAMES := ["bell", "blast", "block", "bow", "burn", "chime", "creak", "cros
 	"brazier_lit", "sanctum_open", "altar_wake", "altar_bless", "tide_rising",
 	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash",
 	"hierophant_voice", "hierophant_hurt", "hierophant_death", "transmute_rite", "polemarch_voice", "polemarch_hurt", "polemarch_death", "spear_sweep", "phalanx_call",
+	"boss_bells_pelagros", "pipburst_tell", "pipburst_pop", "pipburst_hurt", "ovenback_tell", "ovenback_crash", "ovenback_hurt", "pepperwing_tell", "pepperwing_blast", "pepperwing_hurt",
 	"pelagros_arrive", "pelagros_charge", "pelagros_crash", "pelagros_fall", "feast_bless",
 	"alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea",
 	"censer_swing", "censer_ready", "censer_release", "repeater_shot", "greataxe_swing", "ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end", "honeycomb_hum", "honey_forage", "flask_drink", "flask_sour"]
@@ -78,6 +79,8 @@ var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 var _last := {}
 var _ambient: AudioStreamPlayer
+var _entrance: AudioStreamPlayer
+var _entrance_duck := 0.0
 var _music: Array[AudioStreamPlayer] = []
 var _targets := [-2.0, -60.0, -60.0] # calm, hunted, dawn
 var _music_on := false
@@ -110,6 +113,9 @@ func _ready() -> void:
 		_players.append(p)
 	var loop: AudioStreamOggVorbis = load("res://assets/sounds/night.ogg")
 	loop.loop = true
+	_entrance = AudioStreamPlayer.new()
+	_entrance.bus = SOUND_BUS
+	add_child(_entrance)
 	_ambient = AudioStreamPlayer.new()
 	_ambient.stream = loop
 	_ambient.volume_db = -14.0
@@ -255,8 +261,10 @@ func set_mood(hunted: float, dawn: float) -> void:
 
 
 func _process(delta: float) -> void:
+	var duck := 14.0 if _entrance.playing else 0.0
+	_entrance_duck = move_toward(_entrance_duck, duck, delta * (85.0 if duck > 0.0 else 12.0))
 	for i in _music.size():
-		_music[i].volume_db = move_toward(_music[i].volume_db, _targets[i], delta * 14.0)
+		_music[i].volume_db = move_toward(_music[i].volume_db, _targets[i] - _entrance_duck, delta * (65.0 if _entrance.playing else 14.0))
 	if _rain and _rain.playing:
 		_rain.volume_db = move_toward(_rain.volume_db, _rain_target, delta * 24.0)
 		if _rain.volume_db <= -59.0 and _rain_target <= -59.0:
@@ -265,6 +273,12 @@ func _process(delta: float) -> void:
 		_wind.volume_db = move_toward(_wind.volume_db, _wind_target, delta * 12.0)
 		if _wind.volume_db <= -59.0 and _wind_target <= -59.0:
 			_wind.stop()
+
+
+## A musical cue uses its own voice so the siege noise cannot cut it off.
+func play_entrance(sound: String) -> void:
+	_entrance.stream = _streams[sound]
+	_entrance.play()
 
 
 ## min_gap keeps a horde from machine-gunning the same sample.

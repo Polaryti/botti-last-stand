@@ -1980,6 +1980,21 @@ func _thalys() -> void:
 	ok(not Game.owns_spec({"earned": "adorer_pelagros"}), "Adorer of Pelagros begins locked on this phone")
 	await _clear_zombies_on_host()
 	w.director.set_process(false)
+	var pepper: Zombie
+	if host:
+		ok(w.spawn_zombie("pepperwing", Vector3(5, 7.3, 9)), "the host can spawn Pepperwing")
+		pepper = w.zombies.back()
+		pepper.set_physics_process(false)
+		pepper._sees = true
+		(pepper.mesenlla_mind as HarvestMind).tick(pepper, pl, Vector3.BACK, 10.0, 1.01)
+	await wait(0.23)
+	await sync(774)
+	ok(w.count_type("pepperwing") == 1 and w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.PEPPER and s._boulder != null), "Pepperwing and its hot seed appear on both phones")
+	if host:
+		pepper.take_damage(pepper.hp + 1.0, Vector3.ZERO, 0.0, pepper.centre())
+	await wait(0.24)
+	await sync(775)
+	ok(w.mist_seals.all(func(s: MistSeal) -> bool: return s.style != MistSeal.Style.PEPPER), "a destroyed Pepperwing cancels its hot seed on both phones")
 	var boss: Zombie
 	var mind: FeastMind
 	if host:

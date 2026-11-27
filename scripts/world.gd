@@ -893,6 +893,16 @@ func add_enemy_block(at: Vector3, size: Vector3) -> void:
 	grid.block_box(at, size)
 
 
+func add_enemy_block_xf(xf: Transform3D, size: Vector3) -> void:
+	var box := BoxShape3D.new()
+	box.size = size
+	var shape := CollisionShape3D.new()
+	shape.shape = box
+	shape.transform = xf
+	_enemy_blocks.add_child(shape)
+	grid.block_turned(xf, size)
+
+
 func add_rotated_collider(xf: Transform3D, size: Vector3) -> void:
 	var shape := BoxShape3D.new()
 	shape.size = size

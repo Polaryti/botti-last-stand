@@ -2,6 +2,12 @@
 
 ## 0.23.0 — Archipelagos of the Forgotten Gods (27 November 2026)
 
+### Thalys: Pyramid of the Feast
+- The three siege roads now climb to a stepped triangular pyramid, with one gate and a firing gallery on each face. The Golden Cornucopia and its spilled fruit block movement, and attackers can still reach the objective when a gate breaks.
+- Added flower gardens, lily basins, terraced hills and limestone ridges. The market road still leads to the merchant ship at Lantern Quay.
+- **Pipburst** swells and bursts into sticky pips. **Ovenback** spits three bursts of kiln fire. **Pepperwing** drops hot seeds from the air and dips after attacking. All three have their own models, animations, sounds and siege waves.
+- Pelagros enters to a dedicated bell melody. Background music fades down while it plays.
+
 ### Thalys, the island of feasts
 - New **Defend the Fort** map on the sea chart, playable solo or with a party. Three harvest roads lead through Pomegranate Rise, Purple Vines and the Hearth Kilns to the Golden Cornucopia. Follow the market road to Lantern Quay and board Fontanova's repaired merchant ship.
 - Repair the Orchard, Vine and Hearth gates with wood as Temple Guardians and Fontanova's mutants advance. Keep the cornucopia standing for ten minutes and defeat **Pelagros**, god of food and feasts.

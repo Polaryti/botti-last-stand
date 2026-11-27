@@ -192,7 +192,7 @@ const BOSS_CARDS := {
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
 	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "the drowned harbour belongs to the deep", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
 	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
-	FeastMind.ID: {"name": "Pelagros", "line": "the god of food and feasts has come to collect", "color": Color("ffd075"), "glow": Color("b4482e"), "bells": "pelagros_arrive", "strikes": [0.0, 0.38, 0.9, 1.55]},
+	FeastMind.ID: {"name": "Pelagros", "line": "the god of food and feasts has come to collect", "color": Color("ffd075"), "glow": Color("b4482e"), "bells": "boss_bells_pelagros", "strikes": [0.0, 0.42, 0.75, 1.18, 1.75, 2.20, 2.85, 3.69]},
 	ALQUIMELEA: {"name": "Al'quimelea", "line": "the god of change comes down from its temple", "color": Color(0.86, 0.6, 1.0), "glow": Color(0.2, 0.5, 0.18), "bells": "boss_bells_alquimelea", "strikes": [0.0, 0.4, 0.8, 1.4, 2.06, 2.6]},
 	KRAKEN: {"name": "The Kraken", "line": "the last of Vael rises from the deep", "color": Color(0.45, 1.0, 0.8), "glow": Color(0.32, 0.06, 0.2), "bells": "boss_bells_kraken", "strikes": [0.0, 0.32, 1.2, 1.86, 2.3, 3.3]},
 }
@@ -212,7 +212,10 @@ func show_boss_card(kind: String) -> void:
 	boss_card = kind
 	boss_card_time = BOSS_CARD_TIME
 	banner_time = 0.0
-	Sfx.play(str(BOSS_CARDS[kind]["bells"]), 0.0, 1.0, 1.0)
+	if kind == FeastMind.ID:
+		Sfx.play_entrance(BOSS_CARDS[kind]["bells"])
+	else:
+		Sfx.play(str(BOSS_CARDS[kind]["bells"]), 0.0, 1.0, 1.0)
 
 
 func show_banner(text: String, seconds: float) -> void:
@@ -470,15 +473,21 @@ func _pick_roamer() -> String:
 ## Three ways in: a ground siege first, long-range priests and flyers as the feast draws near.
 func _thalys_roamer() -> String:
 	var roll := randf()
-	if elapsed >= 280.0 and roll < 0.08 and world.count_type("ember_moth") < 3:
+	if elapsed >= float(ZombieDefs.ALL["pepperwing"]["from"]) and roll < 0.13 and world.count_type("pepperwing") < 3:
+		return "pepperwing"
+	if elapsed >= float(ZombieDefs.ALL["ovenback"]["from"]) and roll < 0.27 and world.count_type("ovenback") < 5:
+		return "ovenback"
+	if elapsed >= float(ZombieDefs.ALL["pipburst"]["from"]) and roll < 0.48 and world.count_type("pipburst") < 8:
+		return "pipburst"
+	if elapsed >= 280.0 and roll < 0.56 and world.count_type("ember_moth") < 3:
 		return "ember_moth"
-	if elapsed >= 160.0 and roll < 0.19 and world.count_type("cult_priest") < 4:
+	if elapsed >= 160.0 and roll < 0.64 and world.count_type("cult_priest") < 4:
 		return "cult_priest"
-	if elapsed >= 105.0 and roll < 0.34 and world.count_type("cult_guardian") < 9:
+	if elapsed >= 105.0 and roll < 0.72 and world.count_type("cult_guardian") < 9:
 		return "cult_guardian"
-	if elapsed >= 72.0 and roll < 0.46 and world.count_type("battle_ostrich") < 5:
+	if elapsed >= 72.0 and roll < 0.78 and world.count_type("battle_ostrich") < 5:
 		return "battle_ostrich"
-	if elapsed >= 42.0 and roll < 0.60 and world.count_type("mutant_snail") < 6:
+	if elapsed >= 42.0 and roll < 0.85 and world.count_type("mutant_snail") < 6:
 		return "mutant_snail"
 	if world.count_type("cult_worshipper") < 16:
 		return "cult_worshipper"
@@ -486,6 +495,13 @@ func _thalys_roamer() -> String:
 
 
 func _tick_thalys() -> void:
+	# Send each monster's first wave at its hour, even if the opening siege already filled the cap.
+	for id: String in HarvestMind.KINDS:
+		if elapsed >= float(ZombieDefs.ALL[id]["from"]) and not _court_came.has(id):
+			if world.spawn_zombie(id):
+				_court_came[id] = true
+				if id == "pipburst":
+					world.spawn_zombie(id)
 	if elapsed >= 240.0 and not _court_came.has("polemarch"):
 		if world.spawn_zombie("polemarch"):
 			_court_came["polemarch"] = true

@@ -9,40 +9,40 @@
 
 [sub_resource type="Curve3D" id="OrchardRoad"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 4, -18, 0, 0, 0, 0, 0, 0, 0, 4, -32, 0, 0, 0, 0, 0, 0, 0, 3.8, -49, 0, 0, 0, 0, 0, 0, 0, 2.7, -67),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 4, -24, 0, 0, 0, 0, 0, 0, 0, 4, -37, 0, 0, 0, 0, 0, 0, 0, 3.8, -51, 0, 0, 0, 0, 0, 0, 0, 3.3, -68),
 "tilts": PackedFloat32Array(0, 0, 0, 0)
 }
 point_count = 4
 
 [sub_resource type="Curve3D" id="VineRoad"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 21, 4, 0, 0, 0, 0, 0, 0, 0, 33, 4, 0, 0, 0, 0, 0, 0, 0, 50, 3.6, 0, 0, 0, 0, 0, 0, 0, 67, 2.6, 0),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 16, 4, 5, 0, 0, 0, 0, 0, 0, 31, 4, 13.6, 0, 0, 0, 0, 0, 0, 48, 3.8, 17.5, 0, 0, 0, 0, 0, 0, 66, 3.4, 16),
 "tilts": PackedFloat32Array(0, 0, 0, 0)
 }
 point_count = 4
 
 [sub_resource type="Curve3D" id="HearthRoad"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -21, 4, 0, 0, 0, 0, 0, 0, 0, -34, 4, 0, 0, 0, 0, 0, 0, 0, -48, 3.5, 0, 0, 0, 0, 0, 0, 0, -65, 2.6, 0),
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -16, 4, 5, 0, 0, 0, 0, 0, 0, -31, 4, 13.6, 0, 0, 0, 0, 0, 0, -48, 3.55, 17.5, 0, 0, 0, 0, 0, 0, -64, 3.15, 13),
 "tilts": PackedFloat32Array(0, 0, 0, 0)
 }
 point_count = 4
 
 [sub_resource type="Curve3D" id="QuayRoad"]
 _data = {
-"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -9, 4, 16, 0, 0, 0, 0, 0, 0, -9, 4, 26, 0, 0, 0, 0, 0, 0, -9, 3.0, 41, 0, 0, 0, 0, 0, 0, 0, 1.95, 55),
-"tilts": PackedFloat32Array(0, 0, 0, 0)
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 9, 4, 13, 0, 0, 0, 0, 0, 0, 14.3, 4, 16.1, 0, 0, 0, 0, 0, 0, 20.0, 4, 23, 0, 0, 0, 0, 0, 0, 13, 3.0, 40, 0, 0, 0, 0, 0, 0, 0, 1.95, 55),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0)
 }
-point_count = 4
+point_count = 5
 
 [node name="Thalys" type="Node3D"]
 script = ExtResource("root")
 play_half = 142.0
 land_half = 142
 forest_wall = false
-roughness = 3.2
-calm_radius = 37.0
-grass = 0.75
+roughness = 5.1
+calm_radius = 31.0
+grass = 1.16
 look = "thalys"
 
 [node name="Island" type="Node3D" parent="."]
@@ -52,40 +52,118 @@ kind = "island"
 on_ground = false
 
 [node name="PomegranateRise" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -41, 0, -44)
-script = ExtResource("hill")
-height = 8.0
-radius = 17
-
-[node name="VineRidge" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, -28)
-script = ExtResource("hill")
-height = 8.5
-radius = 18
-
-[node name="BeaconHead" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 0, 37)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -41, 0, -52)
 script = ExtResource("hill")
 height = 11
 radius = 15
 
-[node name="StoneHead" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49, 0, 42)
+[node name="VineRidge" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 57, 0, -28)
 script = ExtResource("hill")
-height = 8
-radius = 16
+height = 14
+radius = 14
+
+[node name="BeaconHead" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 44, 0, 44)
+script = ExtResource("hill")
+height = 13
+radius = 13
+
+[node name="StoneHead" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -49, 0, 45)
+script = ExtResource("hill")
+height = 11
+radius = 12
 
 [node name="OrchardBluffs" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0, -61)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28, 0, -68)
 script = ExtResource("hill")
-height = 9
-radius = 16
+height = 12
+radius = 14
 
 [node name="KilnCliffs" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -65, 0, -20)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -65, 0, -21)
 script = ExtResource("hill")
-height = 7.5
-radius = 12
+height = 13.5
+radius = 14
+
+[node name="StoneShoulder" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -64, 0, 30)
+script = ExtResource("hill")
+height = 8.3
+radius = 8.0
+
+[node name="PurpleHollow" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 69, 0, 11)
+script = ExtResource("hill")
+height = -5.0
+radius = 8.0
+
+[node name="LimestoneCrown0" type="Node3D" parent="."]
+transform = Transform3D(0.9563, 0, 0.29237, 0, 1, 0, -0.29237, 0, 0.9563, -54, 10.2, -52)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 12
+wide = 4.2
+stretch = 1.38
+on_ground = false
+
+[node name="LimestoneCrown1" type="Node3D" parent="."]
+transform = Transform3D(0.9563, 0, -0.29237, 0, 1, 0, 0.29237, 0, 0.9563, 60, 12.5, -36)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 13
+wide = 4.2
+stretch = 1.38
+on_ground = false
+
+[node name="LimestoneCrown2" type="Node3D" parent="."]
+transform = Transform3D(0.84805, 0, 0.52992, 0, 1, 0, -0.52992, 0, 0.84805, -62, 13.5, -22)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 11
+wide = 4.2
+stretch = 1.38
+on_ground = false
+
+[node name="LimestoneCrown3" type="Node3D" parent="."]
+transform = Transform3D(0.91355, 0, -0.40674, 0, 1, 0, 0.40674, 0, 0.91355, 45, 10.7, 48)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 11
+wide = 4.2
+stretch = 1.38
+on_ground = false
+
+[node name="LimestoneCrown4" type="Node3D" parent="."]
+transform = Transform3D(0.98163, 0, -0.19081, 0, 1, 0, 0.19081, 0, 0.98163, 26, 11.3, -71)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 9
+wide = 4.2
+stretch = 1.38
+on_ground = false
+
+[node name="TerracedHill0" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, -20)
+script = ExtResource("fonta")
+kind = "terraces"
+size = 15
+wide = 1.25
+
+[node name="TerracedHill1" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 0, -43)
+script = ExtResource("fonta")
+kind = "terraces"
+size = 14
+wide = 1.25
+
+[node name="TerracedHill2" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -56, 0, 44)
+script = ExtResource("fonta")
+kind = "terraces"
+size = 15
+wide = 1.25
 
 [node name="OrchardRoad" type="Path3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
@@ -136,6 +214,282 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0, -11)
 script = ExtResource("feast")
 kind = "shrine"
 on_ground = true
+
+[node name="WestWaterGarden" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, -9)
+script = ExtResource("feast")
+kind = "basin"
+on_ground = true
+
+[node name="SouthWaterGarden" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 20)
+script = ExtResource("feast")
+kind = "basin"
+on_ground = true
+
+[node name="FlowerBed0" type="Node3D" parent="."]
+transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, -21, 0, -15)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.91,0.29,0.38,1)
+
+[node name="FlowerBed1" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 0, -18)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.62,0.33,0.83,1)
+
+[node name="FlowerBed2" type="Node3D" parent="."]
+transform = Transform3D(0.98481, 0, -0.17365, 0, 1, 0, 0.17365, 0, 0.98481, -14, 0, 9)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.86,0.38,0.56,1)
+
+[node name="FlowerBed3" type="Node3D" parent="."]
+transform = Transform3D(0.86603, 0, 0.5, 0, 1, 0, -0.5, 0, 0.86603, 13, 0, 6)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.91,0.72,0.26,1)
+
+[node name="FlowerBed4" type="Node3D" parent="."]
+transform = Transform3D(-0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, -0.5, -8, 0, 20)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.72,0.31,0.59,1)
+
+[node name="FlowerBed5" type="Node3D" parent="."]
+transform = Transform3D(0.61566, 0, 0.78801, 0, 1, 0, -0.78801, 0, 0.61566, 7, 0, 22)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.90,0.42,0.33,1)
+
+[node name="FlowerBed6" type="Node3D" parent="."]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 9, 0, -18)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.78,0.33,0.65,1)
+
+[node name="FlowerBed7" type="Node3D" parent="."]
+transform = Transform3D(0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.93969, -22, 0, 2)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.88,0.32,0.34,1)
+
+[node name="FlowerBed8" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 0, -40)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.88,0.27,0.28,1)
+
+[node name="FlowerBed9" type="Node3D" parent="."]
+transform = Transform3D(0.81915, 0, 0.57358, 0, 1, 0, -0.57358, 0, 0.81915, 12, 0, -43)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.87,0.43,0.62,1)
+
+[node name="FlowerBed10" type="Node3D" parent="."]
+transform = Transform3D(0.96593, 0, -0.25882, 0, 1, 0, 0.25882, 0, 0.96593, 23, 0, -48)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.66,0.35,0.89,1)
+
+[node name="FlowerBed11" type="Node3D" parent="."]
+transform = Transform3D(0.78801, 0, -0.61566, 0, 1, 0, 0.61566, 0, 0.78801, -11, 0, -60)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.95,0.49,0.29,1)
+
+[node name="FlowerBed12" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -27, 0, 25)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.72,0.29,0.52,1)
+
+[node name="FlowerBed13" type="Node3D" parent="."]
+transform = Transform3D(0.9703, 0, -0.24192, 0, 1, 0, 0.24192, 0, 0.9703, -40, 0, 28)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.91,0.37,0.39,1)
+
+[node name="FlowerBed14" type="Node3D" parent="."]
+transform = Transform3D(0.77715, 0, -0.62932, 0, 1, 0, 0.62932, 0, 0.77715, 33, 0, 30)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.65,0.41,0.91,1)
+
+[node name="FlowerBed15" type="Node3D" parent="."]
+transform = Transform3D(0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.93969, 36, 0, 3)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.80,0.32,0.60,1)
+
+[node name="FlowerBed16" type="Node3D" parent="."]
+transform = Transform3D(0.98481, 0, -0.17365, 0, 1, 0, 0.17365, 0, 0.98481, 52, 0, 2)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.83,0.36,0.69,1)
+
+[node name="FlowerBed17" type="Node3D" parent="."]
+transform = Transform3D(0.64279, 0, -0.76604, 0, 1, 0, 0.76604, 0, 0.64279, 58, 0, 30)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.86,0.46,0.31,1)
+
+[node name="FlowerBed18" type="Node3D" parent="."]
+transform = Transform3D(0.52992, 0, -0.84805, 0, 1, 0, 0.84805, 0, 0.52992, 7, 0, 46)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.81,0.25,0.46,1)
+
+[node name="FlowerBed19" type="Node3D" parent="."]
+transform = Transform3D(0.79864, 0, -0.60182, 0, 1, 0, 0.60182, 0, 0.79864, 16, 0, 48)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.66,0.35,0.78,1)
+
+[node name="FlowerBed20" type="Node3D" parent="."]
+transform = Transform3D(0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, 0.93969, -10, 0, 53)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.88,0.40,0.30,1)
+
+[node name="FlowerBed21" type="Node3D" parent="."]
+transform = Transform3D(0.86603, 0, -0.5, 0, 1, 0, 0.5, 0, 0.86603, -28, 0, 50)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.93,0.58,0.40,1)
+
+[node name="FlowerBed22" type="Node3D" parent="."]
+transform = Transform3D(0.90631, 0, 0.42262, 0, 1, 0, -0.42262, 0, 0.90631, 30, 0, 62)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.95,0.59,0.34,1)
+
+[node name="FlowerBed23" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 19, 0, 65)
+script = ExtResource("feast")
+kind = "bloom"
+on_ground = true
+cloth = Color(0.75,0.38,0.81,1)
+
+[node name="TerraceRetaining0" type="Node3D" parent="."]
+transform = Transform3D(0.97815, 0, 0.20791, 0, 1, 0, -0.20791, 0, 0.97815, -42, 0, -44)
+script = ExtResource("fonta")
+kind = "terrace_wall"
+size = 9.0
+wide = 1.2
+
+[node name="TerraceRetaining1" type="Node3D" parent="."]
+transform = Transform3D(0.99756, 0, 0.06976, 0, 1, 0, -0.06976, 0, 0.99756, -51, 0, -43)
+script = ExtResource("fonta")
+kind = "terrace_wall"
+size = 9.0
+wide = 1.2
+
+[node name="TerraceRetaining2" type="Node3D" parent="."]
+transform = Transform3D(0.92718, 0, -0.37461, 0, 1, 0, 0.37461, 0, 0.92718, 53, 0, -23)
+script = ExtResource("fonta")
+kind = "terrace_wall"
+size = 9.0
+wide = 1.2
+
+[node name="TerraceRetaining3" type="Node3D" parent="."]
+transform = Transform3D(0.95106, 0, -0.30902, 0, 1, 0, 0.30902, 0, 0.95106, 55, 0, -16)
+script = ExtResource("fonta")
+kind = "terrace_wall"
+size = 9.0
+wide = 1.2
+
+[node name="TerraceRetaining4" type="Node3D" parent="."]
+transform = Transform3D(0.87462, 0, -0.48481, 0, 1, 0, 0.48481, 0, 0.87462, -47, 0, 33)
+script = ExtResource("fonta")
+kind = "terrace_wall"
+size = 9.0
+wide = 1.2
+
+[node name="TerraceRetaining5" type="Node3D" parent="."]
+transform = Transform3D(0.682, 0, -0.73135, 0, 1, 0, 0.73135, 0, 0.682, 38, 0, 45)
+script = ExtResource("fonta")
+kind = "terrace_wall"
+size = 9.0
+wide = 1.2
+
+[node name="StoneOutcrop0" type="Node3D" parent="."]
+transform = Transform3D(0.92718, 0, -0.37461, 0, 1, 0, 0.37461, 0, 0.92718, -54, 0, -15)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 6.5
+
+[node name="StoneOutcrop1" type="Node3D" parent="."]
+transform = Transform3D(0.76604, 0, -0.64279, 0, 1, 0, 0.64279, 0, 0.76604, -61, 0, -32)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
+
+[node name="StoneOutcrop2" type="Node3D" parent="."]
+transform = Transform3D(0.90631, 0, 0.42262, 0, 1, 0, -0.42262, 0, 0.90631, 52, 0, -41)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
+
+[node name="StoneOutcrop3" type="Node3D" parent="."]
+transform = Transform3D(0.89101, 0, -0.45399, 0, 1, 0, 0.45399, 0, 0.89101, 36, 0, -54)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 6.5
+
+[node name="StoneOutcrop4" type="Node3D" parent="."]
+transform = Transform3D(0.9563, 0, -0.29237, 0, 1, 0, 0.29237, 0, 0.9563, 54, 0, 41)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
+
+[node name="StoneOutcrop5" type="Node3D" parent="."]
+transform = Transform3D(0.92718, 0, 0.37461, 0, 1, 0, -0.37461, 0, 0.92718, -45, 0, 45)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
+
+[node name="StoneOutcrop6" type="Node3D" parent="."]
+transform = Transform3D(0.81915, 0, -0.57358, 0, 1, 0, 0.57358, 0, 0.81915, 42, 0, 58)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 6.5
+
+[node name="StoneOutcrop7" type="Node3D" parent="."]
+transform = Transform3D(0.83867, 0, -0.54464, 0, 1, 0, 0.54464, 0, 0.83867, 69, 0, -4)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
+
+[node name="StoneOutcrop8" type="Node3D" parent="."]
+transform = Transform3D(0.43837, 0, -0.89879, 0, 1, 0, 0.89879, 0, 0.43837, -65, 0, 26)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
 
 [node name="Grain0" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 0, -34)
@@ -264,19 +618,19 @@ on_ground = true
 cloth = Color(0.72, 0.31, 0.19, 1)
 
 [node name="HearthKilns" type="Node3D" parent="."]
-transform = Transform3D(0.99452, 0, 0.10453, 0, 1, 0, -0.10453, 0, 0.99452, -43, 0, 10)
+transform = Transform3D(0.99452, 0, 0.10453, 0, 1, 0, -0.10453, 0, 0.99452, -43, 0, 25)
 script = ExtResource("feast")
 kind = "kilns"
 on_ground = true
 
 [node name="CliffKilns" type="Node3D" parent="."]
-transform = Transform3D(0.93358, 0, 0.35837, 0, 1, 0, -0.35837, 0, 0.93358, -57, 0, 21)
+transform = Transform3D(0.93358, 0, 0.35837, 0, 1, 0, -0.35837, 0, 0.93358, -57, 0, 29)
 script = ExtResource("feast")
 kind = "kilns"
 on_ground = true
 
 [node name="VineTerraces" type="Node3D" parent="."]
-transform = Transform3D(0.97815, 0, -0.20791, 0, 1, 0, 0.20791, 0, 0.97815, 47, 0, 12)
+transform = Transform3D(0.97815, 0, -0.20791, 0, 1, 0, 0.20791, 0, 0.97815, 49, 0, 26)
 script = ExtResource("feast")
 kind = "vineyard"
 on_ground = true
@@ -851,55 +1205,55 @@ kind = "beacon"
 on_ground = true
 
 [node name="Approach0_0" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -66)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -67)
 script = ExtResource("spot")
 kind = "lane"
 gate = 0
 
 [node name="Approach0_1" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -49)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -50)
 script = ExtResource("spot")
 kind = "lane_way"
 gate = 0
 
 [node name="Approach0_2" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -37)
 script = ExtResource("spot")
 kind = "lane_way"
 gate = 0
 
 [node name="Approach1_0" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 65, 0, 16)
 script = ExtResource("spot")
 kind = "lane"
 gate = 1
 
 [node name="Approach1_1" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 48, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 47, 0, 17.5)
 script = ExtResource("spot")
 kind = "lane_way"
 gate = 1
 
 [node name="Approach1_2" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 34, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31, 0, 13.6)
 script = ExtResource("spot")
 kind = "lane_way"
 gate = 1
 
 [node name="Approach2_0" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -64, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -63, 0, 13)
 script = ExtResource("spot")
 kind = "lane"
 gate = 2
 
 [node name="Approach2_1" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -47, 0, 17.5)
 script = ExtResource("spot")
 kind = "lane_way"
 gate = 2
 
 [node name="Approach2_2" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31, 0, 13.6)
 script = ExtResource("spot")
 kind = "lane_way"
 gate = 2
@@ -1108,7 +1462,7 @@ kind = "wood"
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2)
 script = ExtResource("spot")
 kind = "place"
-text = "Feast Court"
+text = "Pyramid of the Feast"
 
 [node name="Place1" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -53)
@@ -1129,7 +1483,7 @@ kind = "place"
 text = "Hearth Kilns"
 
 [node name="Place4" type="Node3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 38)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 48)
 script = ExtResource("spot")
 kind = "place"
 text = "Silk Market"

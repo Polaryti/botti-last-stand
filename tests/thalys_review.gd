@@ -56,6 +56,7 @@ func _run() -> void:
 	director.set_process(false)
 	var player := _world.player
 	player.set_physics_process(false)
+	check(fort.region.size() == 3 and fort.doors.size() == 3, "the pyramid has three faces and three gate complexes")
 	check(fort.has_lanes() and fort.heart_name == "Cornucopia" and fort.heart_hp == Fort.HEART_HP, "lanes lead to a healthy Cornucopia")
 	check(_world.count_type("cult_worshipper") >= 3, "opening attackers spawn without an exposed player")
 	for i in fort.gates.size():
@@ -64,16 +65,17 @@ func _run() -> void:
 		var front := fort.gate_front(g, way[0])
 		check(not _world.grid.route(way[0], front).is_empty(), "%s attackers can reach the gate" % g["name"])
 		fort.hit_gate(g, Fort.GATE_HP, way[0])
-		check(not g["closed"] and not _world.grid.route(front, Vector3(0, 4, 3.5)).is_empty(), "%s breach gives access to the heart" % g["name"])
+		check(not g["closed"] and not _world.grid.route(front, Vector3(5.5, 4, 0)).is_empty(), "%s breach gives access to the heart" % g["name"])
 		fort.repair(i, Fort.GATE_HP)
 		check(g["closed"], "%s gate can be repaired" % g["name"])
 	for z: Zombie in _world.zombies.duplicate():
 		z.release()
 	var vine := fort.gates[1]
-	var vine_front := fort.gate_front(vine, Vector3(40, 4, 0))
-	check(_world.spawn_zombie("cult_worshipper", vine_front + Vector3.RIGHT * 2.2), "a Worshipper joins the Vine lane")
+	var vine_out: Vector3 = vine["dir"]
+	var vine_front := fort.gate_front(vine, (vine["at"] as Vector3) + vine_out * 12.0)
+	check(_world.spawn_zombie("cult_worshipper", vine_front + vine_out * 2.2), "a Worshipper joins the Vine lane")
 	var marcher: Zombie = _world.zombies.back()
-	marcher._set_goal(vine_front + Vector3.RIGHT * 1.4)
+	marcher._set_goal(vine_front + vine_out * 1.4)
 	await get_tree().create_timer(2.4).timeout
 	check(float(vine["hp"]) < Fort.GATE_HP, "an attacker replaces the old lane waypoint and hits the Vine gate")
 	marcher.release()
@@ -86,14 +88,34 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var space := _world.get_world_3d().direct_space_state
+	for sample: Array in [[Vector3(-5, 6, -1.8), Vector3(5, 6, -1.8)], [Vector3(0, 5.55, 7), Vector3(0, 5.55, -5)], [Vector3(-5, 8.4, -3.6), Vector3(5, 8.4, -3.6)]]:
+		var ray := PhysicsRayQueryParameters3D.create(sample[0], sample[1], 1)
+		var hit := space.intersect_ray(ray)
+		check(not hit.is_empty(), "the cornucopia blocks bodies above the pedestal at %s" % str(sample))
+	# The two diagonal gates close real collision, and opening one removes it while the lintel stays.
+	var passage := (vine["at"] as Vector3) + Vector3.UP * 1.6
+	var across := PhysicsRayQueryParameters3D.create(passage + vine_out * 2.5, passage - vine_out * 7.0, 1)
+	check(not space.intersect_ray(across).is_empty(), "closed diagonal gate is solid")
+	fort.hit_gate(vine, Fort.GATE_HP, passage)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	check(space.intersect_ray(across).is_empty(), "diagonal gateway is physically open after breaking")
+	fort.repair(1, Fort.GATE_HP)
 	for dock_point: Vector3 in [Vector3(0, 0, 70), Vector3(0, 0, 80), Vector3(0, 0, 84), Vector3(0, 0, 89), Vector3(3, 0, 90)]:
 		var ray := PhysicsRayQueryParameters3D.create(dock_point + Vector3.UP * 5.0, dock_point - Vector3.UP * 2.0, 1)
 		var hit := space.intersect_ray(ray)
 		check(not hit.is_empty() and (hit.get("position", Vector3.ZERO) as Vector3).y > 1.8, "walkable dock or ship at %s" % dock_point)
 	await shot("island", Vector3(121, 112, 145), Vector3(-3, -7, 0), 51.0)
 	await shot("quay", Vector3(15, 11, 64), Vector3(1, 6, 90), 65.0)
-	await shot("court", Vector3(11, 7.6, 15), Vector3(0, 8.3, -1), 64.0)
+	await shot("court", Vector3(3.5, 7.6, 13.5), Vector3(0, 8.3, -1), 65.0)
 	await shot("orchard", Vector3(-19, 9.5, -57), Vector3(-3, 9, -23), 65.0)
+	await shot("pyramid", Vector3(58, 37, 59), Vector3(0, 9, 0), 66.0)
+	await _harvest_review(player)
+	for z: Zombie in _world.zombies.duplicate():
+		z.release()
+	for seal: MistSeal in _world.mist_seals.duplicate():
+		seal.queue_free()
+	await get_tree().process_frame
 	director.elapsed = FeastMind.ARRIVAL - 0.1
 	director._tick_thalys()
 	check(_world.count_type(FeastMind.ID) == 0, "Pelagros does not arrive early")
@@ -106,7 +128,8 @@ func _run() -> void:
 	var boss: Zombie = _world.zombies.back()
 	boss.set_physics_process(false)
 	var mind := boss.mesenlla_mind as FeastMind
-	player.position = Vector3(0, 4.05, 2.5)
+	check(Director.BOSS_CARDS[FeastMind.ID]["bells"] == "boss_bells_pelagros" and Sfx._entrance.stream.get_length() > 5.0, "Pelagros plays his dedicated entrance melody")
+	player.position = Vector3(0, 4.05, 6.45)
 	mind.tick(boss, player, Vector3.ZERO, 15.0, 1.9)
 	mind._offering = 0.01
 	mind.tick(boss, player, Vector3.ZERO, 15.0, 0.03)
@@ -144,6 +167,57 @@ func _run() -> void:
 	_finish()
 
 
+func _harvest_review(player: Player) -> void:
+	var director := _world.director
+	for id: String in HarvestMind.KINDS:
+		director.elapsed = float(ZombieDefs.ALL[id]["from"])
+		director._tick_thalys()
+		check(_world.count_type(id) > 0 and Icons.exists(id), "%s arrives in its own siege wave with a Codex icon" % id)
+	for enemy: Zombie in _world.zombies.duplicate():
+		enemy.release()
+	var spots := [Vector3(-4, 4, 12), Vector3(0, 4, 12), Vector3(4, 7.2, 12)]
+	var mobs: Array[Zombie] = []
+	for i in HarvestMind.KINDS.size():
+		check(_world.spawn_zombie(HarvestMind.KINDS[i], spots[i]), "pools supply a living food monster")
+		var z: Zombie = _world.zombies.back()
+		mobs.append(z)
+		z.set_physics_process(false)
+		z.rotation.y = 0.0
+		z._sees = true
+	player.position = Vector3(0, 4.05, 14.45)
+	var pip := mobs[0]
+	var oven := mobs[1]
+	var pepper := mobs[2]
+	var pip_mind := pip.mesenlla_mind as HarvestMind
+	var oven_mind := oven.mesenlla_mind as HarvestMind
+	var pepper_mind := pepper.mesenlla_mind as HarvestMind
+	pip_mind.tick(pip, player, Vector3.BACK, 2.65, 1.04)
+	oven_mind.tick(oven, player, Vector3.BACK, 8.0, 1.04)
+	pepper_mind.tick(pepper, player, Vector3.BACK, 8.0, 1.04)
+	for k in 9:
+		for z: Zombie in mobs:
+			z._animate_custom(0.08, 0.0)
+	check(pip.is_warning() and oven.is_warning() and pepper.is_warning(), "each enemy uses an individual attack windup")
+	check(_world.mist_seals.filter(func(seal: MistSeal) -> bool: return seal.style == MistSeal.Style.OVEN).size() == 3, "Ovenback lays three bursts in a line")
+	check(_world.mist_seals.any(func(seal: MistSeal) -> bool: return seal.style == MistSeal.Style.PEPPER and seal._boulder != null), "Pepperwing drops a modeled hot seed")
+	var pips: MistSeal
+	for seal: MistSeal in _world.mist_seals:
+		seal.set_physics_process(false)
+		if seal.style == MistSeal.Style.PIPS:
+			pips = seal
+	await shot("harvest_monsters", Vector3(1.0, 7.1, 23), Vector3(0, 6.4, 12), 66.0)
+	pip.take_damage(pip.hp + 2.0, Vector3.ZERO, 0.0, pip.centre())
+	check(is_instance_valid(pips) and pips.struck and not _world.mist_seals.has(pips), "killing Pipburst interrupts its pips")
+	pepper_mind.tick(pepper, player, Vector3.BACK, 6.0, HarvestMind.PEPPER_TELL + 0.2)
+	check(pepper_mind.phase == "recoil" and not pepper.is_warning(), "Pepperwing releases the seed and enters recovery")
+
+
 func _finish() -> void:
+	if is_instance_valid(_world):
+		_world.queue_free()
+	await get_tree().process_frame
+	await get_tree().process_frame
+	Sfx.stop_all()
+	await get_tree().create_timer(0.12).timeout
 	print("RESULT: %d checks, %d failures" % [_checks, _failures])
 	get_tree().quit(0 if _failures == 0 else 1)

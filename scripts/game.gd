@@ -481,6 +481,7 @@ const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6
 
 const THALYS_POOLS := {"cult_worshipper": 17, "cult_guardian": 10, "cult_priest": 5, "battle_ostrich": 5,
 	"mutant_snail": 6, "thornback": 5, "ember_moth": 4,
+	"pipburst": 9, "ovenback": 6, "pepperwing": 4,
 	"polemarch": 1, "pelagros": 1}
 
 
@@ -517,6 +518,8 @@ func zombie_pool_plan() -> Dictionary:
 			plan[model] = mini(int(FONTA_POOLS[model]), 4)
 		plan["leviathan"] = 1
 		plan["pelagros"] = 1
+		for model: String in HarvestMind.KINDS:
+			plan[model] = 3
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
 		plan["lantern_wisp"] = 5 # three roamers and two reserved for the Regent

@@ -13,7 +13,7 @@ const KINDS := ["bear", "mist_bear", "eagle", "mist_eagle", "shapeshifter", "ear
 	# The mutants of Fontanova (FontaModels).
 	"mutant_bee", "beehive", "mutant_wasp", "mutant_snail", "wasp_hive_snail", "mutant_spider", "battle_ostrich", "ember_moth", "thornback",
 	# Fontanova's god (GodModels).
-	"alquimelea", "pelagros"]
+	"alquimelea", "pelagros", "pipburst", "ovenback", "pepperwing"]
 const FLYERS := ["eagle", "mist_eagle", "wyvern", "war_wyvern"]
 const BOSS_NAMES := {"great_revenant_elemental": "GREAT REVENANT ELEMENTAL", "war_wyvern": "WAR WYVERN"}
 
@@ -672,6 +672,8 @@ static func steed_gait(root: Node3D, gait: float) -> void:
 
 ## Returns the model. Named nodes and meta are what animate() moves.
 static func build(id: String) -> Node3D:
+	if id in HarvestMind.KINDS:
+		return HarvestModels.build(id)
 	if id == FeastMind.ID:
 		return FeastModels.build()
 	if id in VaelSkyModels.KINDS:
@@ -831,6 +833,9 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 	else:
 		root.set_meta("act_t", float(root.get_meta("act_t", 0.0)) + delta)
 	var speed := clampf(moving / maxf(z._speed, 0.1), 0.0, 1.0) if moving > 0.0 else 0.0
+	if z.model_id in HarvestMind.KINDS:
+		HarvestModels.animate(z, root, delta, moving, t, float(root.get_meta("act_t", 0.0)))
+		return
 	match z.model_id:
 		"bear", "mist_bear":
 			_animate_bear(z, root, delta, speed, state)
@@ -1472,6 +1477,8 @@ static func reset_pose(root: Node3D) -> void:
 
 ## How long each kind takes to die before the body is gone.
 static func death_time(id: String) -> float:
+	if id in HarvestMind.KINDS:
+		return 1.3
 	if id == FeastMind.ID:
 		return 3.6
 	if id in FontaModels.KINDS:
@@ -1537,6 +1544,9 @@ static func begin_death(z: Zombie, root: Node3D) -> void:
 
 ## Each frame of a death, k seconds after it began.
 static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> void:
+	if z.model_id in HarvestMind.KINDS:
+		HarvestModels.fall(z, root, k)
+		return
 	if z.model_id == FeastMind.ID:
 		FeastModels.fall(root, k / death_time(z.model_id))
 		return
