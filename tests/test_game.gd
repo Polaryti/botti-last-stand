@@ -2115,16 +2115,23 @@ func test_version_15() -> void:
 	ok(Net.listed_map() == "random", "a room waiting on a random place is listed as one")
 	Net.map_random = false
 	Net.rules = was_rules
-	# Choosing where to hold the fort: the Fort, or Mist Bastion.
+	# Choosing a stronghold from either chart.
 	var saved_fort := Game.fort_map
 	var mode_before := Game.mode
 	m.show_fort_picker()
 	await frames(2)
 	var atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
-	ok(atlas != null and atlas.allowed == ["fort", "bastion"], "Defend the Fort asks where, on the world atlas: the Fort or Mist Bastion")
+	ok(atlas != null and atlas.allowed == ["fort", "bastion", "thalys"], "Defend the Fort offers the Fort, Mist Bastion and Thalys")
 	if atlas:
-		var places := ["village", "fort", "mists", "mesenlla", "bastion"]
-		ok(places.all(func(id: String) -> bool: return (atlas.find_child("Place_" + id, true, false) as Button).disabled == (id not in ["fort", "bastion"])), "the atlas shows all five places, and only the strongholds can be picked")
+		ok(Places.ORDER.all(func(id: String) -> bool: return (atlas.find_child("Place_" + id, true, false) as Button).disabled == (not Game.FORT_MAPS.has(id))), "only strongholds can be picked")
+		atlas.show_view(WorldAtlas.ARCHIPELAGO)
+		await frames(1)
+		var thalys := atlas.find_child("Place_thalys", true, false) as Button
+		ok(thalys.visible and not thalys.disabled, "Thalys can be selected from the archipelago chart")
+		thalys.pressed.emit()
+		await frames(1)
+		ok(atlas.selected == "thalys" and Game.fort_map == saved_fort, "tapping Thalys previews the island before starting")
+		atlas.show_view(WorldAtlas.WORLD)
 		(atlas.find_child("Place_bastion", true, false) as Button).pressed.emit()
 		await frames(2)
 		ok(atlas.selected == "bastion" and Game.fort_map == saved_fort and m.panel.find_child("WorldAtlas", true, false) == atlas, "tapping Mist Bastion shows it without starting anything")
