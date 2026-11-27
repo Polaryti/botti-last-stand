@@ -1813,9 +1813,10 @@ func _ascendant() -> void:
 	check(d["weapon"] == "ruin_greataxe" and d.get("earned", "") == "archipelago" and not ClassDefs.for_sale().has("ascendant") and ClassDefs.available().has("ascendant") == Game.owns_class("ascendant"), "the Ascendant starts with the Ruin-Breaker Greataxe and is earned in the Archipelagos")
 	check(ClassDefs.weapon_categories("ascendant") == Array(["melee", "two_handed", "ranged"], TYPE_STRING, "", null), "it wields Melee, Two-Handed and Ranged weapons")
 	var specs: Array = AbilityData.tree("ascendant")["specs"]
-	check(specs.map(func(x: Dictionary) -> String: return x["id"]) == ["godslayer", "adorer"] and not specs[0].has("earned") and specs[1].get("earned", "") == "adorer", "two professions: the Godslayer, always open, and the Adorer of Al'quimelea, to be earned")
-	for id: String in ["crest_ascendant", "spec_godslayer", "spec_adorer", "ascend", "deicide", "elixir", "rite_break", "ruin_greataxe"]:
-		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	check(specs.map(func(x: Dictionary) -> String: return x["id"]) == ["godslayer", "adorer", "adorer_pelagros"], "the Ascendant has the Godslayer and both god professions")
+	check(not specs[0].has("earned") and specs[1].get("earned", "") == "adorer" and specs[2].get("earned", "") == "adorer_pelagros", "the Godslayer is open and the two god professions must be earned")
+	for id: String in ["crest_ascendant", "spec_godslayer", "spec_adorer", "spec_adorer_pelagros", "ascend", "deicide", "elixir", "rite_break", "ruin_greataxe"]:
+		check(Icons.exists(id), "%s icon" % id)
 	for sound: String in ["ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end"]:
 		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
 	check(ClassGear._pieces("ascendant").has("hips:glow") and Avatar.MODELS.has("ascendant") and ClassPresentation.COPY.has("ascendant"), "dressed, seen by others, and described")

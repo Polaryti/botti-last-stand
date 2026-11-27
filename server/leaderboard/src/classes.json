@@ -1,7 +1,7 @@
 {
   "adept": ["blade_dancer", "mirror_step", "void_walker"],
   "artificer": ["pyromaniac", "mechanic", "inventor"],
-  "ascendant": ["godslayer", "adorer"],
+  "ascendant": ["godslayer", "adorer", "adorer_pelagros"],
   "bandit": ["thief", "mercenary", "highwayman"],
   "cartographer": ["star_reader", "worlds_traveler", "pathfinder"],
   "chivalry": ["lancer", "paladin", "horse_archer"],

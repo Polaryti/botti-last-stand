@@ -253,7 +253,7 @@ func earn_text(id: String) -> String:
 		"harbourmaster":
 			return "Defeat the Harbourmaster of Port Vael to unlock this class: be in the match when he falls."
 		"archipelago":
-			return "Play a match on Fontanova to its end to unlock this class, win or lose."
+			return "Finish a match on Fontanova or Thalys to unlock this class, win or lose."
 		"beyond":
 			return "Win %d matches in the Valleys of Mesenlla and %d in Mist Bastion to unlock this class. So far: %d and %d." % [WINS_FOR_CARTOGRAPHER, WINS_FOR_CARTOGRAPHER, mini(mesenlla_wins, WINS_FOR_CARTOGRAPHER), mini(bastion_wins, WINS_FOR_CARTOGRAPHER)]
 	return ""
