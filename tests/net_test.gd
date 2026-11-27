@@ -1970,16 +1970,13 @@ func _mesenlla() -> void:
 	await sync(703)
 
 
-## Two phones in Port Vael: the Mist Tide stands the same on both, a Drowned Sailor carries the same
-## weapon on both, and a Lantern Jelly's sting reaches the other phone and stuns its player there.
-## Fontanova on two phones: the island in its sea, and its mutants: a snail's trail laid on both, in
-## the same colour; a spider clinging head down to its trunk; a bee's sting marked on both and landing
-## on the joined player's own body.
+## Both phones see the island encounters, resolve the same siege and earn the boss reward.
 func _thalys() -> void:
 	ok(Game.mode == Game.Mode.FORT and w.map_id == "thalys" and w.fort.heart_name == "Cornucopia", "both phones enter the Cornucopia siege")
 	ok(not Game.owns_spec({"earned": "adorer_pelagros"}), "Adorer of Pelagros begins locked on this phone")
 	await _clear_zombies_on_host()
 	w.director.set_process(false)
+	await sync(773)
 	var pepper: Zombie
 	if host:
 		ok(w.spawn_zombie("pepperwing", Vector3(5, 7.3, 9)), "the host can spawn Pepperwing")
@@ -1987,14 +1984,23 @@ func _thalys() -> void:
 		pepper.set_physics_process(false)
 		pepper._sees = true
 		(pepper.mesenlla_mind as HarvestMind).tick(pepper, pl, Vector3.BACK, 10.0, 1.01)
-	await wait(0.23)
+	var find_seed := func() -> bool:
+		for seal: MistSeal in w.mist_seals:
+			if seal.style == MistSeal.Style.PEPPER and seal._boulder != null:
+				seal.set_physics_process(false)
+				return w.count_type("pepperwing") == 1
+		return false
+	await until(find_seed, 4.0)
+	ok(find_seed.call(), "Pepperwing and its hot seed appear on both phones")
+	# Neither peer advances the attack while the other catches up to the assertion.
 	await sync(774)
-	ok(w.count_type("pepperwing") == 1 and w.mist_seals.any(func(s: MistSeal) -> bool: return s.style == MistSeal.Style.PEPPER and s._boulder != null), "Pepperwing and its hot seed appear on both phones")
 	if host:
 		pepper.take_damage(pepper.hp + 1.0, Vector3.ZERO, 0.0, pepper.centre())
-	await wait(0.24)
+	var seed_gone := func() -> bool:
+		return w.mist_seals.all(func(s: MistSeal) -> bool: return s.style != MistSeal.Style.PEPPER)
+	await until(seed_gone, 4.0)
+	ok(seed_gone.call(), "a destroyed Pepperwing cancels its hot seed on both phones")
 	await sync(775)
-	ok(w.mist_seals.all(func(s: MistSeal) -> bool: return s.style != MistSeal.Style.PEPPER), "a destroyed Pepperwing cancels its hot seed on both phones")
 	var boss: Zombie
 	var mind: FeastMind
 	if host:
