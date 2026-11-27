@@ -20,7 +20,7 @@
 - The braziers burn with real, flickering fire.
 - **Waking altars:** from 2:00, one god's altar wakes every 2 minutes. Hold it for 10 s, and all who stand there are blessed at once, for a minute. The altar says what each blessing gives.
 - **The rising sea:** at 3:20, 6:40 and 10:00 the sea floods the beaches for a minute.
-- **Transmutation blooms:** from 3:20, violet blooms break through somewhere on the island. Once open, they poison and hurt whoever stands among them.
+- **Transmutation blooms:** from 2:40, violet blooms break through somewhere on the island. Once open, they poison and hurt whoever stands among them.
 - **Royal Jelly:** a broken Beehive also leaves Royal Jelly. It restores your health, mana and every ability, and quickens you for 45 s.
 
 ### Creatures of Fontanova
@@ -29,7 +29,7 @@
 - **Mutant Wasp:** shoots its stinger from afar (poisons for 3 s), or dives to bite up close.
 - **Mutant Snail:** leaves a trail of poison or embers that lasts 8 s.
 - **Wasp-Hive Snail:** its nest shudders, and a wasp crawls out, up to 3 at once.
-- **Mutant Spider:** from 3:20, waits head down on tree trunks, then drops within 14 m. Its web holds and poisons.
+- **Mutant Spider:** from 2:40, waits head down on tree trunks, then drops within 14 m. Its web holds and poisons.
 - **Battle Ostrich:** paws the ground, then charges and kicks you away.
 - **Ember Moth:** spreads its wings for 1 s, then claps; the dust dazzles and burns.
 - **Thornback:** a great tortoise; blows from the front glance off for half.
