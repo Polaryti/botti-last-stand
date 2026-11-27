@@ -647,9 +647,9 @@ func _flyers() -> void:
 	var fell_from := first.position.y
 	await seconds(0.4)
 	check(first.position.y < fell_from - 1.0, "and falls")
-	war.hp = war.max_hp * 0.45
-	await seconds(0.3)
-	check(w.count_type("eagle") >= 2, "and below half health it calls eagles")
+	war.take_damage(war.hp - war.max_hp * 0.45, Vector3.ZERO, 0.0, war.centre())
+	await frames(1)
+	check(w.count_type("eagle") >= 2, "and the blow that takes it below half health calls eagles, at once")
 	war.take_damage(war.hp + 1.0, Vector3.ZERO, 0.0, war.centre())
 	check(not second.is_alive(), "when the War Wyvern falls, its rider falls with it")
 

@@ -110,8 +110,21 @@ func tick(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> 
 
 
 ## Struck, and still standing (the host's or a lone phone's blow). Nothing, unless a mind says otherwise.
-func on_hurt(_z: Zombie) -> void:
-	pass
+func on_hurt(z: Zombie) -> void:
+	if kind == "war_wyvern":
+		_call_eagles(z) # the blow that takes it below half calls them at once, whatever it is doing
+
+
+## The War Wyvern below half health calls the eagles of the peaks, once: from the blow that takes it
+## there (on_hurt), or from its next turn if its health fell some other way.
+func _call_eagles(z: Zombie) -> void:
+	if called or z.hp >= z.max_hp * 0.5:
+		return
+	called = true
+	z.world.director.show_banner("The War Wyvern calls the eagles of the peaks", 3.0)
+	for i in 3:
+		var a := TAU * i / 3.0
+		z.world.spawn_zombie("eagle", z.position + Vector3(cos(a) * 6.0, 0, sin(a) * 6.0))
 
 
 ## After an ordinary step: show a plain blow as a swipe, and settle back to walking.
@@ -639,12 +652,8 @@ const DIVE_BURST_POWER := 0.5 # of its blow
 func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 	var war := kind == "war_wyvern"
 	var style := element_style(z.element)
-	if war and not called and z.hp < z.max_hp * 0.5:
-		called = true
-		z.world.director.show_banner("The War Wyvern calls the eagles of the peaks", 3.0)
-		for i in 3:
-			var a := TAU * i / 3.0
-			z.world.spawn_zombie("eagle", z.position + Vector3(cos(a) * 6.0, 0, sin(a) * 6.0))
+	if war:
+		_call_eagles(z)
 	# Over a stronghold, the War Wyvern breaks off every so often to make a burning pass at its portal.
 	var fort := z.world.fort
 	if war and fort and phase == "":
