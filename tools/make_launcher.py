@@ -442,24 +442,38 @@ def gods_backdrop(w, h, adaptive, seed=29):
             pts.append(((x0 + (x1 - x0) * f) * w, base - tall * h * np.sin(f * np.pi) ** 0.8 * (0.8 + 0.2 * np.sin(f * 9 + x0 * 7))))
         pts.append((x1 * w, base))
         idr.polygon(pts, fill=(14, 12, 28, 255))
-    # The near island under the moon: a hill and the temple's broken colonnade on top.
-    hill = [(0.3 * w, base)]
-    for k in range(21):
-        f = k / 20
-        hill.append(((0.3 + 0.4 * f) * w, base - 0.13 * h * np.sin(f * np.pi) ** 1.3))
-    hill.append((0.7 * w, base))
-    idr.polygon(hill, fill=(10, 8, 20, 255))
-    crest = base - 0.13 * h
+    # The near island under the moon, as Fontanova is: olive terraces climbing from the shore to the
+    # Acropolis, a crag with sheer sides and a flat top, and the temple standing on that top, on its
+    # stepped floor, its colonnade broken and its roof fallen at one end. Everything stands on the rock.
+    dark = (10, 8, 20, 255)
+    crest = base - 0.115 * h
+    island = [(0.27 * w, base)]
+    for k in range(5):  # terraces up the west side: a rise, then a step
+        x = 0.29 + k * 0.022
+        y = base - (0.014 + k * 0.014) * h
+        island += [(x * w, y + 0.006 * h), ((x + 0.006) * w, y), ((x + 0.022) * w, y)]
+    island += [(0.392 * w, base - 0.075 * h), (0.398 * w, crest + 0.02 * h), (0.402 * w, crest)]  # the crag's west face
+    island += [(0.598 * w, crest), (0.604 * w, crest + 0.025 * h), (0.612 * w, base - 0.07 * h)]  # its east face
+    for k in range(7):  # and the long east slope to the sea
+        f = (k + 1) / 7
+        island.append(((0.612 + 0.12 * f) * w, base - 0.07 * h * (1 - f) ** 1.2 + 0.003 * h * np.sin(k * 2.1)))
+    island.append((0.74 * w, base))
+    idr.polygon(island, fill=dark)
+    # The temple's stepped floor, on the crag's top (two steps, wider below).
+    idr.rectangle((0.408 * w, crest - 0.007 * h, 0.592 * w, crest + 2), fill=dark)
+    idr.rectangle((0.414 * w, crest - 0.014 * h, 0.586 * w, crest - 0.006 * h), fill=dark)
+    floor = crest - 0.014 * h
     cw = 0.014 * w
-    for k, hgt in enumerate((0.07, 0.07, 0.04, 0.07, 0.07, 0.025, 0.07)):
-        x = (0.42 + k * 0.026) * w
-        idr.rectangle((x - cw * 0.35, crest - hgt * h, x + cw * 0.35, crest + 2), fill=(10, 8, 20, 255))
-    idr.rectangle((0.405 * w, crest - 0.082 * h, 0.535 * w, crest - 0.07 * h), fill=(10, 8, 20, 255))
-    idr.polygon([(0.405 * w, crest - 0.082 * h), (0.47 * w, crest - 0.11 * h), (0.5 * w, crest - 0.095 * h), (0.5 * w, crest - 0.082 * h)], fill=(10, 8, 20, 255))
+    for k, hgt in enumerate((0.062, 0.062, 0.036, 0.062, 0.062, 0.022, 0.062)):
+        x = (0.425 + k * 0.025) * w
+        idr.rectangle((x - cw * 0.35, floor - hgt * h, x + cw * 0.35, floor + 2), fill=dark)
+    # The entablature and pediment still over the west end; the east end's roof has fallen.
+    idr.rectangle((0.414 * w, floor - 0.074 * h, 0.536 * w, floor - 0.061 * h), fill=dark)
+    idr.polygon([(0.414 * w, floor - 0.074 * h), (0.475 * w, floor - 0.1 * h), (0.505 * w, floor - 0.087 * h), (0.505 * w, floor - 0.074 * h)], fill=dark)
     im.alpha_composite(isles)
     lights = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     ld = ImageDraw.Draw(lights)
-    for x, y, col in ((0.08, base - 0.09 * h, (110, 240, 220)), (0.93, base - 0.11 * h, (255, 220, 120)), (0.47, crest - 0.02 * h, (190, 120, 255))):
+    for x, y, col in ((0.08, base - 0.09 * h, (110, 240, 220)), (0.93, base - 0.11 * h, (255, 220, 120)), (0.4625, crest - 0.036 * h, (190, 120, 255))):
         r = 0.008 * h
         ld.ellipse((x * w - r, y - r, x * w + r, y + r), fill=col + (230,))
     im.alpha_composite(lights.filter(ImageFilter.GaussianBlur(h * 0.012)))

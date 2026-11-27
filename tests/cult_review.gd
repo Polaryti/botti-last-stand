@@ -5,9 +5,9 @@ extends Node
 ## godot --path . res://tests/cult_review.tscn -- OUT [one_id]
 var w: World
 var cam: Camera3D
-const POSES := {"cult_worshipper": ["Idle", "Walking_A", "1H_Melee_Attack_Chop"], "cult_priest": ["Idle", "Throw", "Raise"],
-	"cult_guardian": ["Idle", "WindUp", "Running_A"], "ostrich_rider": ["Ride", "RideCharge", "RideThrust"],
-	"hierophant": ["Idle", "Throw", "Raise"], "polemarch": ["Idle", "WindUp", "1H_Melee_Attack_Chop"]}
+const POSES := {"cult_worshipper": ["Idle", "Walking_A", "1H_Melee_Attack_Chop"], "cult_priest": ["Idle", "Raise", "Thrust"],
+	"cult_guardian": ["Idle", "WindUp", "Thrust"], "ostrich_rider": ["Ride", "RideCharge", "RideThrust"],
+	"hierophant": ["Idle", "Throw", "Thrust"], "polemarch": ["Idle", "WindUp", "Sweep"]}
 
 
 func _ready() -> void:

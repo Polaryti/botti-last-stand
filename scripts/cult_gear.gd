@@ -34,8 +34,10 @@ const GOLD := Color(0.92, 0.72, 0.28)
 const GOLD_DARK := Color(0.58, 0.4, 0.12)
 
 const GEARED := ["cult_worshipper", "cult_priest", "cult_guardian", "hierophant", "polemarch"]
-## How each held piece is turned in its hand (built upright, +Y along the haft).
-const TURNS := {"handslot.r": Vector3(0, 0, 1.5), "handslot.l": Vector3(0, 0, 0)}
+## How each held piece is turned in its hand. Built upright, +Y along the haft, a piece already lies as
+## the hand holds a spear or a sword (WeaponDefs.hand_rotation turns the player's -Z spear onto the same
+## +Y), head out past the thumb: no turn. (A turn about Z laid them across the fist, head behind.)
+const TURNS := {"handslot.r": Vector3.ZERO, "handslot.l": Vector3.ZERO}
 
 ## A model's own turns where they differ: the Polemarch's tower shield is built tall along +Y, and
 ## stood upright in the hand.

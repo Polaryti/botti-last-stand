@@ -1907,8 +1907,8 @@ func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_nam
 		position = at
 
 
-## Its blow up close. What a body was made holding (a cult staff or spear, ZombieDefs "blow") is swung
-## with its own move: a punch's closed fist would turn a staff's head behind it.
+## Its blow up close. What a body was made holding (a cult staff or spear, ZombieDefs "blow") is driven
+## with a spearman's thrust, never a bare punch.
 func _blow_anim() -> String:
 	if def.has("blow") and weapon_id == "":
 		return str(def["blow"])
@@ -2310,7 +2310,7 @@ func _fort_strike(gate: int, at: Vector3) -> void:
 	_attack_cd = _attack_interval()
 	_attack_left = ATTACK_TIME
 	_current_anim = ""
-	_play(BodyAnim.mob_attack(weapon_id, def.get("claws", false)), 1.2, 0.1)
+	_play(_blow_anim(), 1.2, 0.1)
 	var dmg := maxf(_melee_damage(), 8.0)
 	if gate >= 0:
 		world.fort.hit_gate(world.fort.gates[gate], dmg * Fort.WOOD_TOUGHNESS, position)

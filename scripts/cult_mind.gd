@@ -367,7 +367,7 @@ func _polemarch(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 		cooldown_b = SPEAR_EVERY
 		z.mesenlla_warning = true
 		_face(z, target.global_position, 1.0, 100.0)
-		_pose(z, "1H_Melee_Attack_Chop", 0.9 / (SPEAR_TELL + 0.35))
+		_pose(z, "Sweep", 0.9 / (SPEAR_TELL + 0.35)) # the spear swept round, as a spearman does
 		var ahead := Vector3(sin(z.rotation.y), 0, cos(z.rotation.y))
 		MistSeal.cast(z, _ground(z, z.position + ahead * SPEAR_AHEAD), SPEAR_RADIUS, SPEAR_TELL, z._damage * SPEAR_POWER, 0.0, MistSeal.Style.SWEEP)
 		z.world.sfx_at("polemarch_voice", z.position, 0.0)

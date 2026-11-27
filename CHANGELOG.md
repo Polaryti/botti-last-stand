@@ -84,8 +84,8 @@
 - Returning to the title screen after a match is much quicker again.
 - Fixed a rare case where nothing nearby could be picked up.
 - Creatures backing away from you no longer get stuck against walls. Cornered, they stand and fight.
-- The Priest of Change and the temple's spearmen strike with the head of the staff or spear, not the butt.
-- Fontanova's temple steps no longer have an invisible wall, and its loading view no longer floats.
+- The Priest of Change, the Hierophant and the temple's spearmen hold their staffs and spears the right way round, and thrust and sweep with them instead of punching.
+- Fontanova's temple steps no longer have an invisible wall, and the temple no longer floats on the loading view or the splash screen.
 
 ## 0.22.1 — The Sunken Crown (24 November 2026)
 
