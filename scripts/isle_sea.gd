@@ -28,8 +28,10 @@ func _ready() -> void:
 
 
 ## How deep the sea is here (0 on dry land).
+## Measured from whichever is higher, the ground or `at` itself: someone up on a bridge over the
+## Ravine, or on a jetty, stands above the water, however deep it is below (like MistTide.depth_at).
 func depth_at(at: Vector3) -> float:
-	return maxf(0.0, level - world.terrain.ground_height(at.x, at.z))
+	return maxf(0.0, level - maxf(world.terrain.ground_height(at.x, at.z), at.y - 0.1))
 
 
 ## Over your head: you cannot stand here, and the sea will drown you.

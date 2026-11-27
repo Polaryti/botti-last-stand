@@ -1055,7 +1055,7 @@ static func cliff_faces(b: MapBuilder, radius: float) -> void:
 					l.ovoid(at + out * (deep * 0.5 + 0.1) + Vector3.UP * COURSE * 0.5, Vector3(0.6, 0.22, 0.5), Color(0.36, 0.42, 0.22), Color(0.24, 0.3, 0.16), 3, 6)
 		x += step
 	for key: Vector2i in chunks:
-		b.add(chunks[key])
+		FontaFlora.keep_mesh("cliffs", b.add(chunks[key]))
 	b.stand_at(keep)
 
 

@@ -32,7 +32,7 @@
 - **Battle Ostrich:** paws the ground, then charges and kicks you away.
 - **Ember Moth:** spreads its wings for 1 s, then claps; the dust dazzles and burns.
 - **Thornback:** a great tortoise; blows from the front glance off for half.
-- **Honey:** heals 25 and quickens you for 6 s, so it is worth eating unhurt.
+- **Honey:** heals 25 and quickens you for 6 s, so it is worth eating unhurt. Another pot starts the 6 s over.
 - Every creature has its own model, sounds, icon, Codex page and death.
 - The wasp's stinger is a venomous dart of its own, not an arrow.
 
@@ -74,6 +74,8 @@
 - **Codex:** when an enemy first appears is only shown once you have killed one.
 - **Codex:** the Kraken and the Leviathan wear the boss crown, and bosses and minibosses no longer read "Appears from 166:39".
 - **Whaler's Harpoon:** throwing it leaves its slot empty until it comes back. With both hands full by then, it lands at your feet.
+- Returning to the title screen after a match is much quicker again.
+- Fixed a rare case where nothing nearby could be picked up.
 
 ## 0.22.1 — The Sunken Crown (24 November 2026)
 

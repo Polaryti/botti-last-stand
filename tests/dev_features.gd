@@ -1809,7 +1809,7 @@ func _fontanova() -> void:
 	check(t.isle_depth(0, 0) == 0.0 and t.isle_depth(0, -84) == 0.0 and t.height(0, -84) > 15.0, "dry land in the middle, the Acropolis high in the north")
 	check(t.deep_water(0, 160) and not t.deep_water(0, 0), "nothing walks into the deep")
 	check(t.isle_depth(2, 64) == 0.0 and t.is_walkable(2, 64), "you land on the beach, by the sailboat")
-	check(is_equal_approx(isle.isle_sea.slow_at(Vector3(0, 0, 0)), 1.0) and isle.isle_sea.slow_at(Vector3(0, 0, 160)) <= IsleSea.SLOW + 0.001, "wading slows you, to %d%% out of your depth" % int(IsleSea.SLOW * 100))
+	check(is_equal_approx(isle.isle_sea.slow_at(Vector3(0, t.ground_height(0, 0), 0)), 1.0) and isle.isle_sea.slow_at(Vector3(0, t.ground_height(0, 160), 160)) <= IsleSea.SLOW + 0.001, "wading slows you, to %d%% out of your depth" % int(IsleSea.SLOW * 100))
 	# Out of your depth: a moment to turn back, then the sea drowns you.
 	you.global_position = Vector3(0, t.ground_height(0, 160), 160)
 	var hp0 := you.hp
@@ -1821,12 +1821,42 @@ func _fontanova() -> void:
 	you._tick_sea(0.1)
 	check(you._under_sea == 0.0, "back where you can stand, the count starts again")
 	you.hp = you.max_hp()
+	# Its planting is kept: the next world on this land (the title screen after a match, the next night)
+	# reuses the same meshes rather than working the island out again.
+	var herbs := isle.find_children("*", "MeshInstance3D", false, false).map(func(n: Node) -> Mesh: return (n as MeshInstance3D).mesh)
+	var kept := FontaFlora._memo.values().any(func(k: Dictionary) -> bool: return (k["herbs"] as Array).size() > 20 and (k["herbs"] as Array).all(func(m: Mesh) -> bool: return herbs.has(m)) and (k["cliffs"] as Array).size() > 5 and (k["carpet"] as Array).size() > 20)
+	check(kept, "the island's herbs, cliff faces and grass are kept for the next world, and this one shows them")
 	# The rope bridges over the Ravine: decks across it, high over its floor.
 	check(t.bridges().size() == 2, "two rope bridges")
 	for d: Dictionary in t.bridges():
 		var mid := (Vector2(d["a"]) + Vector2(d["b"])) * 0.5
 		check(t.deck_y(d, 0.5) > t.ground_height(mid.x, mid.y) + 3.0 and Vector2(d["a"]).distance_to(d["b"]) > 8.0, "a bridge spans the Ravine, high over its floor (%.1f m)" % (t.deck_y(d, 0.5) - t.ground_height(mid.x, mid.y)))
 		check(t.on_deck(mid.x, mid.y), "and can be walked")
+		var on_it := Vector3(mid.x, t.deck_y(d, 0.5), mid.y)
+		check(isle.isle_sea.slow_at(on_it) == 1.0 and not isle.isle_sea.too_deep(on_it), "up on it you are not in the sea, however far below the water is (%.1f m of it under the deck)" % maxf(0.0, isle.isle_sea.level - t.ground_height(mid.x, mid.y)))
+	# Walking: as quick across a bridge as on dry ground.
+	var walk := func(at: Vector3, toward: Vector3) -> float:
+		you.global_position = at + Vector3.UP * 0.05
+		you.velocity = Vector3.ZERO
+		you.look_at(Vector3(toward.x, you.global_position.y, toward.z), Vector3.UP)
+		you.yaw = you.rotation.y
+		you.input_move = Vector2(0, -1)
+		you.set_physics_process(true)
+		for i in 40:
+			await get_tree().physics_frame
+		var quick := Vector2(you.velocity.x, you.velocity.z).length()
+		you.set_physics_process(false)
+		you.input_move = Vector2.ZERO
+		return quick
+	var dry := Vector3(0, t.ground_height(0, 20), 20)
+	var on_land: float = await walk.call(dry, dry + Vector3(0, 0, -10))
+	for d: Dictionary in t.bridges():
+		var a3 := Vector3(Vector2(d["a"]).x, 0, Vector2(d["a"]).y)
+		var b3 := Vector3(Vector2(d["b"]).x, 0, Vector2(d["b"]).y)
+		var start := a3.lerp(b3, 0.35)
+		start.y = t.deck_y(d, 0.35)
+		var across: float = await walk.call(start, b3)
+		check(on_land > 1.0 and across > on_land * 0.95, "crossing a bridge you walk as quick as on the land (%.1f m/s against %.1f), not wading" % [across, on_land])
 	await _fonta_land(isle)
 	await _fonta_rites(isle)
 	await _fonta_mutants(isle)
@@ -3585,12 +3615,22 @@ func _fonta_mutants(isle: World) -> void:
 	var pot := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
 	isle._scan_pickups_for(you)
 	check(not isle.pickups.has(pot) and you._buffs.has("honey") and is_equal_approx(float(you._buffs["honey"]["val"]), PowerDefs.HONEY_SPEED) and is_equal_approx(float(you._buffs["honey"]["left"]), PowerDefs.HONEY_HASTE), "Honey quickens you even unhurt")
+	you._buffs["honey"]["left"] = 1.0
 	var pot2 := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
 	isle._scan_pickups_for(you)
-	check(isle.pickups.has(pot2), "but you leave a second pot while it lasts and you are unhurt")
+	check(not isle.pickups.has(pot2) and is_equal_approx(float(you._buffs["honey"]["left"]), PowerDefs.HONEY_HASTE), "a second pot, unhurt and still quick: you take it, and the speed starts over")
 	you.hp = you.max_hp() - 40.0
+	var pot3 := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
 	isle._scan_pickups_for(you)
-	check(not isle.pickups.has(pot2) and is_equal_approx(you.hp, you.max_hp() - 40.0 + float(PowerDefs.FOODS["honey"]["heal"])), "hurt, you eat it for its healing")
+	check(not isle.pickups.has(pot3) and is_equal_approx(you.hp, you.max_hp() - 40.0 + float(PowerDefs.FOODS["honey"]["heal"])), "hurt, you eat it for its healing")
+	# Something freed out from under the list of pickups does not stop you taking what is there.
+	var gone := isle.spawn_pickup_at(you.position + Vector3(30, 0, 0), Pickup.Kind.FOOD, "apple")
+	gone.free()
+	you.hp = you.max_hp() - 40.0
+	var pot4 := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
+	isle._scan_pickups_for(you)
+	check(not isle.pickups.has(pot4) and isle.pickups.all(func(k: Variant) -> bool: return is_instance_valid(k)), "a freed pickup in the list is let go of, and Honey is still taken")
+	you.hp = you.max_hp()
 	you._buffs.erase("honey")
 	check(PowerDefs.FOODS["honey"]["weight"] == 0.0 and PowerDefs.mesh("honey") != null, "Honey is never found lying about, only dropped, and has its own pot")
 	# Mutant Wasp: the stinger from afar, which poisons; close in, a dive to bite.

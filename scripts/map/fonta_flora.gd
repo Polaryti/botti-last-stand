@@ -443,17 +443,92 @@ static func _herb_cell(b: MapBuilder) -> LowPoly:
 
 ## The flowers and shrubs, one mesh per square, all moving in the wind.
 static func flush(b: MapBuilder) -> void:
-	for key: Vector2i in _herbs:
-		var m := (_herbs[key] as LowPoly).commit()
-		if m.get_surface_count() == 0:
-			continue
-		m.surface_set_material(0, herb_material())
+	var meshes: Array[Mesh] = []
+	if _replay_herbs.is_empty():
+		for key: Vector2i in _herbs:
+			var m := (_herbs[key] as LowPoly).commit()
+			if m.get_surface_count() == 0:
+				continue
+			m.surface_set_material(0, herb_material())
+			meshes.append(m)
+		if _recording != null:
+			_recording["herbs"] = meshes
+			_recording = null
+	else:
+		meshes = _replay_herbs
+	for m: Mesh in meshes:
 		var mi := MeshInstance3D.new()
 		mi.mesh = m
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		mi.visibility_range_end = [70.0, 95.0, 130.0][b.quality]
 		b.w.add_child(mi)
 	_herbs.clear()
+	_replay_herbs = []
+
+
+# --- Kept between worlds -------------------------------------------------------------------------
+# Planting the island takes the most time of anything in building a world (its herbs, cliff faces,
+# terrace faces and grass carpet: about a second and a half of a desktop's time, several on a phone),
+# and every bit of it comes out the same for the same land, quality, roads and clearings. So the first
+# world that plants it keeps what it made, and every later one (the title screen after each match,
+# the next match on Fontanova) reuses those meshes instead of working them out again. The trees are
+# still placed each time: they are quick, and the builder gathers them with the rest.
+static var _memo := {} # key -> {"cliffs": Array[Mesh], "terraces": Array[Mesh], "carpet": Array, "herbs": Array[Mesh]}
+static var _recording = null # what this build is keeping, while it plants for the first time
+static var _replay_herbs: Array[Mesh] = []
+
+
+## What decides how the island is planted: its land, the quality, its roads and every place kept clear.
+static func memo_key(b: MapBuilder, radius: float) -> String:
+	var parts := PackedStringArray([str(b.terrain.get_instance_id()), str(b.quality), "%.1f" % radius])
+	for c: Vector3 in b._plant_clearings:
+		parts.append("c%.2f,%.2f,%.2f" % [c.x, c.y, c.z])
+	for c: Vector3 in b.tree_clearings:
+		parts.append("t%.2f,%.2f,%.2f" % [c.x, c.y, c.z])
+	for room: Dictionary in b._plant_rooms:
+		var inv: Transform3D = room["inverse"]
+		parts.append("r%s|%s" % [inv, room["half"]])
+	for line: Array[Vector2] in b.w.map_roads:
+		parts.append("w%s" % [line])
+	return "/".join(parts).sha256_text()
+
+
+## Fontanova planted (MapFonta "flora"): its cliff faces, then its field (FontaFlora.field), made
+## once and then reused.
+static func plant_island(b: MapBuilder, radius: float) -> void:
+	var key := memo_key(b, radius)
+	if _memo.has(key):
+		var kept: Dictionary = _memo[key]
+		for m: Mesh in kept["cliffs"]:
+			_place_mesh(b, m)
+		field(b, radius, kept)
+		return
+	_recording = {"cliffs": [], "terraces": [], "carpet": [], "herbs": []}
+	FontaBuilder.cliff_faces(b, radius)
+	var made: Dictionary = _recording
+	field(b, radius)
+	_memo[key] = made
+
+
+## Kept meshes, back in a world: drawn from the origin, as they were made.
+static func _place_mesh(b: MapBuilder, m: Mesh) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = m
+	b.w.add_child(mi)
+	return mi
+
+
+## A mesh the island has just made, kept for the next world (while it is being planted the first time).
+static func keep_mesh(part: String, mi: MeshInstance3D) -> void:
+	if _recording != null:
+		(_recording[part] as Array).append(mi.mesh)
+
+
+## Forgets what was kept: a test that changes the land, or the editor.
+static func forget_planting() -> void:
+	_memo.clear()
+	_recording = null
+	_replay_herbs = []
 
 
 # --- The field: the whole island planted ---------------------------------------------------------
@@ -532,7 +607,7 @@ static func _on_road(b: MapBuilder, p: Vector2, margin: float) -> bool:
 	return false
 
 
-static func field(b: MapBuilder, radius: float) -> void:
+static func field(b: MapBuilder, radius: float, kept := {}) -> void:
 	var t := b.terrain
 	var grove_noise := FastNoiseLite.new()
 	grove_noise.seed = 1717
@@ -570,6 +645,15 @@ static func field(b: MapBuilder, radius: float) -> void:
 			if not b._plant_allowed(b.xf.origin, 1.5) or b.tree_clearings.any(func(c: Vector3) -> bool: return Vector2(x - c.x, z - c.y).length() < c.z):
 				continue
 			tree(b, kind, nominal * lerpf(0.75, 1.25, size_roll))
+	if not kept.is_empty():
+		# Planted before with this land: its herbs, faces and grass, as they were.
+		_replay_herbs.assign(kept["herbs"])
+		for m: Mesh in kept["terraces"]:
+			_place_mesh(b, m)
+		for patch: Array in kept["carpet"]:
+			_carpet_patch(b, patch[0], patch[1])
+		b.stand_at(keep)
+		return
 	# Flowers, grasses and shrubs, in drifts.
 	steps = int(radius * 2.0 / HERB_CELL)
 	for j in steps:
@@ -606,6 +690,19 @@ static func field(b: MapBuilder, radius: float) -> void:
 const CARPET_CELL := 12.0
 const CARPET_DENSITY := [1.0, 2.0, 3.2] # tufts per square metre, by quality
 const CARPET_SIGHT := [26.0, 34.0, 44.0]
+
+
+## One square of the grass carpet, in a world.
+static func _carpet_patch(b: MapBuilder, mm: MultiMesh, centre: Vector3) -> void:
+	var node := MultiMeshInstance3D.new()
+	node.multimesh = mm
+	node.material_override = grass_material()
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.visibility_range_end = float(CARPET_SIGHT[b.quality])
+	node.visibility_range_end_margin = 6.0
+	node.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+	b.w.add_child(node)
+	node.position = centre
 
 
 static func carpet(b: MapBuilder, radius: float) -> void:
@@ -692,15 +789,9 @@ static func carpet(b: MapBuilder, radius: float) -> void:
 				for n in list.size():
 					mm.set_instance_transform(n, list[n][0])
 					mm.set_instance_color(n, list[n][1])
-				var node := MultiMeshInstance3D.new()
-				node.multimesh = mm
-				node.material_override = grass_material()
-				node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				node.visibility_range_end = float(CARPET_SIGHT[b.quality])
-				node.visibility_range_end_margin = 6.0
-				node.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
-				b.w.add_child(node)
-				node.position = centre
+				_carpet_patch(b, mm, centre)
+				if _recording != null:
+					(_recording["carpet"] as Array).append([mm, centre])
 
 
 ## Three tufts of grass blades, white so each instance can be tinted: a low dense one, a taller
@@ -889,5 +980,5 @@ static func _terrace_faces(b: MapBuilder) -> void:
 				var stone := Color(0.6, 0.54, 0.45).darkened(rng.randf_range(0.0, 0.25))
 				l.box(Vector3(x, h - 0.1, z), Vector3(rng.randf_range(0.55, 0.8), rng.randf_range(0.35, 0.55), rng.randf_range(0.4, 0.55)), stone, Vector3(rng.randf_range(-8, 8), yaw + rng.randf_range(-10, 10), rng.randf_range(-6, 6)))
 			x += GAP
-	b.add(l)
+	keep_mesh("terraces", b.add(l))
 	b.stand_at(keep)

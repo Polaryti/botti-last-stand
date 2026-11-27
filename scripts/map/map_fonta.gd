@@ -98,8 +98,7 @@ func build(b: MapBuilder) -> void:
 		"flora":
 			# The whole island planted from its land (FontaFlora.field), size metres round the middle.
 			if not b.is_preview:
-				FontaBuilder.cliff_faces(b, size)
-				FontaFlora.field(b, size)
+				FontaFlora.plant_island(b, size)
 		"mesa", "terraces":
 			if b.is_preview:
 				b.w.show_spot("hill", kind, b.xf.origin)

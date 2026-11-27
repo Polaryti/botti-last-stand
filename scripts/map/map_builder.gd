@@ -36,6 +36,7 @@ var _ground_material: ShaderMaterial
 var _road_lines: Array[Dictionary] = []
 var _dirt_patches: Array[Dictionary] = []
 var skip_beyond := false # the menu only needs the village
+var walkless := false # the title screen: nothing walks there, so nothing needs blocking for walkers
 var _glow_cells := {} # 24 m square -> SurfaceTool of everything that glows there
 var sight := 1.0 # how far grass and other small things are drawn, as a share of the usual
 var xf := Transform3D.IDENTITY # where the piece being built stands
@@ -277,6 +278,8 @@ func boundary(h: float) -> void:
 	w.add_collider(Vector3(0, 15, h + t * 0.5), Vector3(h * 2 + 4, 70, t))
 	w.add_collider(Vector3(-h - t * 0.5, 15, 0), Vector3(t, 70, h * 2 + 4))
 	w.add_collider(Vector3(h + t * 0.5, 15, 0), Vector3(t, 70, h * 2 + 4))
+	if walkless:
+		return
 	# Cliffs and deep water.
 	for r in terrain.blocked_rects():
 		var c := Vector2(r.position) + Vector2(r.size) * 0.5 - Vector2.ONE * terrain.half_extent

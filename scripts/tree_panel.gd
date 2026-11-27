@@ -347,12 +347,16 @@ func _show_reading() -> void:
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(desc)
 	# Room for the words: the width left beside the picture and the buttons, and the height left
-	# under the name, above the line that says where it stands.
-	_fit_pair(name_label, desc, _zone_width() - 120.0 - 18.0 * 2.0 - 190.0, ZONE_HIGH - 34.0, [34, 30, 26], range(27, 15, -1))
+	# under the name, above the line that says where it stands. That line wraps too (a profession still
+	# to be earned says how, in a sentence), and its height comes off what the rest may use.
+	var width := _zone_width() - 120.0 - 18.0 * 2.0 - 190.0
 	var state := Label.new()
 	state.text = _state_words(_reading)
 	state.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	state.add_theme_color_override("font_color", UiTheme.EMBER)
+	state.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var state_h := text_height(get_theme_font("font", "Label"), state.text, width, UiTheme.FS_BODY, get_theme_constant("line_spacing", "Label"))
+	_fit_pair(name_label, desc, width, ZONE_HIGH - maxf(34.0, state_h + 6.0), [34, 30, 26], range(27, 15, -1))
 	text.add_child(state)
 	var buttons := VBoxContainer.new()
 	buttons.size_flags_vertical = Control.SIZE_SHRINK_CENTER

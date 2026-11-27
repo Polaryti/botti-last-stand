@@ -318,6 +318,7 @@ func setup(game_mode: int) -> void:
 	builder.quality = Game.quality
 	builder.grass_tufts = int(Game.grass_count() * map.grass)
 	builder.skip_beyond = mode == Game.Mode.MENU
+	builder.walkless = mode == Game.Mode.MENU
 	# The title screen's camera flies high over the valley, so its grass and flowers are drawn much
 	# further off than a player on foot would need.
 	builder.sight = 3.0 if mode == Game.Mode.MENU else 1.0
@@ -335,12 +336,14 @@ func setup(game_mode: int) -> void:
 			elif mark["kind"] == "lane_way":
 				fort.add_lane_way(int(mark["gate"]), mark["at"])
 		fort.lay_ways()
-	if terrain.seaside():
-		grid.block_steep(terrain, STEEP_RISE)
-		grid.block_chasms(terrain)
-		grid.fine_only = true
-	grid.astar.update()
-	grid.build_far_grid()
+	# The title screen's paths are never walked: no need to work them out each time it comes back.
+	if mode != Game.Mode.MENU:
+		if terrain.seaside():
+			grid.block_steep(terrain, STEEP_RISE)
+			grid.block_chasms(terrain)
+			grid.fine_only = true
+		grid.astar.update()
+		grid.build_far_grid()
 	prepare_forest_wood()
 	if terrain.has_islands():
 		_mists_look()
@@ -3302,9 +3305,12 @@ func _scan_pickups_for(who: Player) -> void:
 	# A weapon just put down stays down until you have walked away from where it fell.
 	if who.shun_weapon != "" and Vector2(here.x - who.shun_at.x, here.z - who.shun_at.z).length_squared() > Pickup.SHUN_REACH * Pickup.SHUN_REACH:
 		who.shun_weapon = ""
+	# One freed out from under the list (its tween, an expiry) is let go of here first: a typed loop
+	# over it would stop the whole scan, and nothing nearby could be taken.
+	for i in range(pickups.size() - 1, -1, -1):
+		if not is_instance_valid(pickups[i]):
+			pickups.remove_at(i)
 	for p: Pickup in pickups.duplicate():
-		if not is_instance_valid(p):
-			continue
 		var distance_squared := p.global_position.distance_squared_to(here)
 		if distance_squared >= 12.25: continue
 		if p.kind == Pickup.Kind.WEAPON and p.weapon_id == who.shun_weapon and p.global_position.distance_squared_to(who.shun_at) < 6.25:
@@ -3337,8 +3343,8 @@ func _scan_pickups_for(who: Player) -> void:
 					near_distance_squared = distance_squared
 			Pickup.Kind.FOOD:
 				var food: Dictionary = PowerDefs.FOODS[p.item_id]
-				# Honey is worth taking even unhurt, for its speed, while you are not already running on it.
-				var wanted: bool = who.hp < who.max_hp() or (food.get("haste", false) and not who._buffs.has("honey")) or food.get("jelly", false)
+				# Honey is worth taking even unhurt, for its speed: taken again, it starts the speed over.
+				var wanted: bool = who.hp < who.max_hp() or food.get("haste", false) or food.get("jelly", false)
 				if distance_squared < 1.6 * 1.6 and wanted:
 					who.heal(float(food["heal"]))
 					if food.get("jelly", false):
@@ -3503,9 +3509,9 @@ func imp_steal(p: Player) -> void:
 	var best: Pickup = null
 	var best_d := PowerDefs.IMP_RANGE * PowerDefs.IMP_RANGE
 	for it in pickups:
-		if it.kind == Pickup.Kind.WEAPON:
+		if not is_instance_valid(it) or it.kind == Pickup.Kind.WEAPON:
 			continue
-		if it.kind == Pickup.Kind.FOOD and p.hp >= p.max_hp():
+		if it.kind == Pickup.Kind.FOOD and p.hp >= p.max_hp() and not PowerDefs.FOODS[it.item_id].get("haste", false) and not PowerDefs.FOODS[it.item_id].get("jelly", false):
 			continue
 		if it.kind == Pickup.Kind.POWER and str(PowerDefs.ALL[it.item_id].get("spec", p.spec_id)) != p.spec_id:
 			continue

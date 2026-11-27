@@ -1859,10 +1859,22 @@ func _ascendant() -> void:
 	panel.theme = UiTheme.make()
 	panel.player = p
 	add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	panel.build()
 	await frames(1)
 	var locked := panel.find_children("LockedCard", "Button", true, false)
 	check(locked.size() == 1 and (locked[0] as Button).disabled and (locked[0] as Button).find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == Game.spec_earn_text(specs[1])), "the profession card is locked, and says how to earn it")
+	# Tapped on the map, the locked profession reads in full, its words inside the panel.
+	var entry_node: Variant = null
+	for n: Node in panel.find_children("*", "", true, false):
+		if n.get("ability") is Dictionary and str(n.get("ability").get("id", "")) == "adorer_entry":
+			entry_node = n
+	panel.read(entry_node)
+	await frames(2)
+	var words := panel._zone.find_children("*", "Label", true, false)
+	var how := words.filter(func(l: Label) -> bool: return l.text == Game.spec_earn_text(specs[1]))
+	var inside := words.all(func(l: Label) -> bool: return l.get_global_rect().end.x <= panel.get_global_rect().end.x + 1.0)
+	check(how.size() == 1 and (how[0] as Label).autowrap_mode != TextServer.AUTOWRAP_OFF and inside, "read on the map, the locked profession says how to earn it, and every line stays inside the panel")
 	panel.queue_free()
 	Game.earned_specs["adorer"] = true
 	check(p.spec_open(specs[1]) and p.choose_ability(Player.CORE_STEPS, 1) and p.spec_id == "adorer", "earned, it can be taken")
@@ -1905,6 +1917,8 @@ func _ascendant() -> void:
 	check(p.art_def()["name"] == "Elixir of Change", "an Adorer's Ascend is the Elixir of Change")
 	var in_field := foe("normal", 2.0)
 	var outside := foe("normal", 9.0)
+	for z: Zombie in [in_field, outside]:
+		z.set_physics_process(false) # where they are put: one in the field, one well out of it
 	var speed := p.m("speed")
 	AscendantKit.drink(p)
 	check(is_equal_approx(p.changed_left, AscendantKit.changed_time(p)) and is_equal_approx(p.m("speed"), speed + AscendantKit.CHANGED_SPEED), "it drinks and is Changed, quicker")

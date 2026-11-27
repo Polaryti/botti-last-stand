@@ -4123,7 +4123,8 @@ func _physics_step(delta: float) -> void:
 		speed = 0.0
 	if bleed_left > 0.0:
 		speed *= BLEED_SPEED
-	var wading := world.terrain.in_water(global_position.x, global_position.z)
+	# In the river, not over it on a bridge.
+	var wading := world.terrain.in_water(global_position.x, global_position.z) and global_position.y < Terrain.WATER_Y + 0.6
 	if wading and not has_flag("sea_legs"):
 		speed *= WADE_SPEED
 	if world.tide and not has_flag("sea_legs"):

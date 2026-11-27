@@ -354,7 +354,7 @@ func earn_spec(id: String) -> void:
 static func spec_earn_text(spec: Dictionary) -> String:
 	match str(spec.get("earned", "")):
 		"adorer":
-			return "Win a match on Fontanova as the Ascendant to unlock this profession: reach the dawn there, alone or with friends, or win a versus match there."
+			return "Win a match on Fontanova as the Ascendant to unlock this profession."
 	return ""
 
 
