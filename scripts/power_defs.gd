@@ -8,6 +8,13 @@ const SENSOR_RANGE := 20.0
 ## until you fall (CROWN_TIME is "for good"), then it falls where you do.
 const CROWN := "sunken_crown"
 const CROWN_TIME := 99999.0
+
+
+## What a relic tells you as you take it up.
+static func relic_banner(id: String) -> String:
+	match id:
+		EYE: return "The Oracle's Eye: enemies within %d m are marked and your blows land %d%% harder, until you fall" % [int(EYE_RANGE), roundi((EYE_DAMAGE - 1.0) * 100.0)]
+	return "You wear the Sunken Crown. Everyone can see where you are"
 const CROWN_DAMAGE := 1.25
 ## Fontanova's relic, from the oracle's sanctum (FontaRites): it marks and it sharpens.
 const EYE := "oracle_eye"
@@ -39,7 +46,7 @@ const ALL := {
 	"mistberry_draught": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Mistberry Draught", "desc": "You leave a trail of mist behind you. While you stand in it, enemies cannot see you and you heal 3 health a second.", "time": POTION_TIME, "color": Color(0.62, 0.78, 0.95), "familiar": false, "weight": 2.0},
 	# A relic: never random loot, never in the Sandbox's rows.
 	"sunken_crown": {"maps": ["vael"], "relic": true, "named": true, "name": "Sunken Crown", "desc": "The Hollow Sovereign's crown, dropped where he falls (in All vs All at Port Vael, washed up at the Drowned Bell at 2:00). While you wear it everything you do hits 25% harder and you heal 2 health a second, but everyone can see where you are. Fall, and it falls with you.", "time": CROWN_TIME, "color": Color(0.98, 0.78, 0.3), "familiar": false, "weight": 0.0},
-	"oracle_eye": {"maps": ["fontanova"], "relic": true, "named": true, "name": "Oracle's Eye", "desc": "The oracle's sight, from her sanctum deep in the Oracle's Grotto: every enemy within 36 metres is marked, even through rock, and your blows land 20% harder.", "time": CROWN_TIME, "color": Color(0.72, 0.5, 1.0), "familiar": false, "weight": 0.0},
+	"oracle_eye": {"maps": ["fontanova"], "relic": true, "named": true, "name": "Oracle's Eye", "desc": "The oracle's sight, from her sanctum deep in the Oracle's Grotto. While you carry it, every enemy within 36 metres is marked, even through rock, and your blows land 20% harder. Fall, and it is lost for good.", "time": CROWN_TIME, "color": Color(0.72, 0.5, 1.0), "familiar": false, "weight": 0.0},
 	"honeycomb": {"maps": ["fontanova"], "name": "Honeycomb", "desc": "A living piece of the wild hives, humming at your shoulder. Every 2 seconds its bees sting the last enemy you struck, or else the nearest within 10 metres, for 10, and poison it for 4 a second over 3 seconds. Every 15 seconds it forages a Honey and drops it at your feet.", "time": FAMILIAR_TIME, "color": Color(1.0, 0.74, 0.22), "familiar": true, "weight": 1.0},
 	"mystery_flask": {"maps": ["fontanova"], "named": true, "name": "Mysterious Flask", "desc": "A flask from the cult's stores, never the same colour twice. Drink it for one of these, for 10 seconds: 40% faster, 30% more damage, 30% less harm, or 4 health a second. One flask in 8 has turned, and poisons you for 5 seconds instead.", "time": 10.0, "color": Color(0.7, 0.5, 1.0), "familiar": false, "weight": 2.0},
 	"antler_charm": {"maps": SpawnRules.MESENLLA, "named": true, "name": "Antler Charm", "desc": "Vines from the valley: your hits root enemies to the ground for 1.5 seconds. The same enemy cannot be rooted again for 4 seconds after it is caught, and fliers are out of the vines' reach.", "time": POTION_TIME, "color": Color(0.55, 0.78, 0.32), "familiar": false, "weight": 2.0},

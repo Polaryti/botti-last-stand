@@ -11,7 +11,7 @@ extends Node3D
 ## The mutants of Fontanova (FontaMind) add: a bee's sting and a wasp's bite where they dive, a spider's
 ## web where it lands (it holds you and poisons you), an ostrich's kick (it throws you back) and a
 ## moth's burning dust (it dazzles you and sets you alight).
-const LIMIT := 16
+const LIMIT := 40 # at once on the field: a god's rain round four of you and its lances need room
 const STING_STUN := 0.8 # how long a Lantern Jelly's sting stuns you (ZombieDefs "sting_stun")
 ## How hard a closing circle hits a stronghold's portal it lands on, for each point it does to a player.
 const PORTAL_SHARE := 1.5

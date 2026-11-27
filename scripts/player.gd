@@ -1595,6 +1595,19 @@ const GOD_DAMAGE := 0.3
 const GOD_SPEED := 0.25
 const GOD_GUARD := -0.2
 const GOD_AIM := 0.4
+const GOD_HEAL := 30.0 # Thaleon's, at once
+
+
+## What a lesser god of Fontanova gives, in so many words: the waking altar's banner says it, and so
+## does the blessing when it comes.
+static func god_gift(god: int) -> String:
+	var secs := int(BLESSING_TIME["god_%d" % god])
+	match god:
+		1: return "heals %d at once, then %d health a second for %d s" % [int(GOD_HEAL), int(GOD_REGEN), secs]
+		2: return "%d%% harder blows and shots for %d s" % [roundi(GOD_DAMAGE * 100.0), secs]
+		3: return "%d%% faster and %d%% less harm taken for %d s" % [roundi(GOD_SPEED * 100.0), roundi(-GOD_GUARD * 100.0), secs]
+		4: return "%d%% harder shots for %d s" % [roundi(GOD_AIM * 100.0), secs]
+	return ""
 func bless(blessing: String) -> void:
 	var secs: float = BLESSING_TIME.get(blessing, 20.0)
 	match blessing:
@@ -1605,7 +1618,7 @@ func bless(blessing: String) -> void:
 				_buffs["shrine_bear_" + stat] = {"stat": stat, "val": 0.25, "left": secs, "stacks": 1}
 		"god_1":
 			_buffs["god_thaleon"] = {"stat": "regen", "val": GOD_REGEN, "left": secs, "stacks": 1}
-			heal(30.0)
+			heal(GOD_HEAL)
 		"god_2":
 			for stat: String in ["melee_damage", "ranged_damage", "spell_damage"]:
 				_buffs["god_ilyria_" + stat] = {"stat": stat, "val": GOD_DAMAGE, "left": secs, "stacks": 1}
@@ -1618,7 +1631,11 @@ func bless(blessing: String) -> void:
 			_buffs["shrine_spring"] = {"stat": "regen", "val": 4.0, "left": secs, "stacks": 1}
 			heal(20.0)
 	if blessing.begins_with("god_"):
+		# Given the moment the altar is held: said in full, so you know what you have and for how long.
+		var god := int(blessing.substr(4))
 		say(BLESSING_WORDS[blessing])
+		if bot_peer == 0 and world and world.director:
+			world.director.local_banner("%s's blessing is yours now: %s" % [FontaRites.GOD_NAMES[god], god_gift(god)], 4.0)
 	sfx("level", -4.0)
 
 
@@ -1712,6 +1729,11 @@ func _kill() -> void:
 		world.spawn_pickup_at(global_position, Pickup.Kind.POWER, PowerDefs.CROWN)
 		if bot_peer == 0 and world.director:
 			world.director.local_banner("The Sunken Crown falls from your head", 3.0)
+	if has_power(PowerDefs.EYE):
+		# The oracle's sight does not outlive you: it is gone for good, not left for anyone.
+		powers.erase(PowerDefs.EYE)
+		if bot_peer == 0 and world.director:
+			world.director.local_banner("The Oracle's Eye goes dark. Its sight is lost", 3.0)
 	world.on_player_died(self)
 
 
@@ -2370,7 +2392,7 @@ func activate_power(id: String, forced_time := 0.0) -> void:
 	if d.get("relic", false):
 		time = d["time"] # worn until you fall
 		if bot_peer == 0 and world.director:
-			world.director.local_banner("You wear the Sunken Crown. Everyone can see where you are", 3.5)
+			world.director.local_banner(PowerDefs.relic_banner(id), 3.5)
 		sfx("crown_take", 0.0)
 	if id == "lantern":
 		time += m("lantern_time")

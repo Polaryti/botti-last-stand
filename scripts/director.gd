@@ -64,7 +64,7 @@ const SOVEREIGN_FROM := Vector3(0, 0, 44) # the middle of the flats
 # Dawn will not come until it sinks.
 const KRAKEN := "kraken"
 const ALQUIMELEA := "alquimelea"
-const ALQ_AT := 660.0 # 11:00: the god comes down from its temple
+const ALQ_AT := 540.0 # 9:00: the god comes down from its temple (the night there is 12 minutes)
 const ALQ_FROM := Vector3(0, 0, -86) # the temple's court on the Acropolis
 const KRAKEN_AFTER := 14.0 # seconds of stillness before it rises
 const KRAKEN_FROM := Vector3(0, 0, 24)
@@ -567,7 +567,7 @@ func _tick_mesenlla() -> void:
 ## over the flats; and Anglers lie buried on the shore with their lures showing.
 ## Fontanova: its hives grow at the start of the night, and from SPIDERS_FROM its spiders wait in the
 ## trees, a new one every SPIDER_EVERY seconds while fewer than MAX_SPIDERS are about.
-const SPIDERS_FROM := 200.0
+const SPIDERS_FROM := 160.0
 const SPIDER_EVERY := 50.0
 const MAX_SPIDERS := 3
 var _hives_grown := false
@@ -588,16 +588,16 @@ func _tick_fontanova() -> void:
 ## The cult of Fontanova by place and time: processions of three Worshippers down from their village
 ## or the Sacred Way from PROCESSION_FROM, every PROCESSION_EVERY seconds while there are not too many
 ## about; Guardians on their ostriches along the Sacred Way or the Ravine from RIDERS_FROM.
-const PROCESSION_FROM := 120.0
-const PROCESSION_EVERY := 80.0
+const PROCESSION_FROM := 100.0
+const PROCESSION_EVERY := 65.0
 const MAX_WORSHIPPERS := 9
-const RIDERS_FROM := 420.0
+const RIDERS_FROM := 360.0
 const RIDER_EVERY_ISLAND := 100.0
 const MAX_OSTRICH_RIDERS := 2
 const PROCESSION_SITES := ["Worshippers' Village", "Sacred Way"]
 const RIDER_SITES := ["Sacred Way", "Worshippers' Village"] # (never the Ravine: its floor is a fall)
-const HIEROPHANT_AT := 210.0
-const POLEMARCH_AT := 390.0
+const HIEROPHANT_AT := 180.0
+const POLEMARCH_AT := 330.0
 var _next_procession := PROCESSION_FROM
 var _next_ostrich_rider := RIDERS_FROM
 func _tick_cult() -> void:

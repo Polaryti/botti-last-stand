@@ -758,6 +758,10 @@ func _show_atlas(mode: int) -> void:
 	var root := _screen("Defend the Fort" if fort else "Survive the Night", func() -> void: _back.call(), "Where will you hold the line?" if fort else "Where will you spend the night?")
 	root.name = "Atlas"
 	var box: VBoxContainer = root.get_meta("box")
+	# Which chart is shown (the Known World or the Archipelago), and a random place instead of one.
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 10)
+	box.add_child(tabs)
 	var panes := HBoxContainer.new()
 	panes.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panes.add_theme_constant_override("separation", 16)
@@ -803,14 +807,68 @@ func _show_atlas(mode: int) -> void:
 		var go := _button("Play here", func() -> void:
 			if fort:
 				Game.fort_map = chosen
+				Game.fort_random = false
 			else:
 				Game.night_map = chosen
+				Game.night_random = false
 			Game.save_settings()
 			show_class_picker(mode), Vector2(0, UiTheme.BTN_TALL), true)
 		go.name = "PlayHere"
 		detail.add_child(go)
-	atlas.picked.connect(show_place)
-	show_place.call(atlas.selected)
+	# A random place: its own page, and the night rolls where it is each time it begins.
+	var chips := {} # the view tabs by view, and "random": shared by the lambdas below
+	var mark := func(random_on: bool) -> void:
+		for v: String in [WorldAtlas.WORLD, WorldAtlas.ARCHIPELAGO]:
+			if atlas.view == v: UiTheme.selected(chips[v])
+			else: UiTheme.plain(chips[v])
+		if random_on: UiTheme.selected(chips["random"])
+		else: UiTheme.plain(chips["random"])
+	var show_random := func() -> void:
+		for c in detail.get_children():
+			detail.remove_child(c)
+			c.queue_free()
+		atlas.selected = ""
+		var title := _label("A random place", UiTheme.FS_HEAD, UiTheme.BONE)
+		title.add_theme_font_override("font", UiTheme.title_font())
+		detail.add_child(title)
+		var names := allowed.map(func(id: String) -> String: return str(Places.ALL[id]["name"]))
+		var says := _label("Each time %s begins, it is somewhere you have not just been, chosen for you: %s." % ["a siege" if fort else "a night", ", ".join(names)], UiTheme.FS_BODY, UiTheme.ASH)
+		says.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		says.custom_minimum_size.x = 300
+		detail.add_child(says)
+		detail.add_child(_expand(true))
+		var go := _button("Play here", func() -> void:
+			if fort:
+				Game.fort_random = true
+			else:
+				Game.night_random = true
+			Game.save_settings()
+			show_class_picker(mode), Vector2(0, UiTheme.BTN_TALL), true)
+		go.name = "PlayHere"
+		detail.add_child(go)
+	for v: String in [WorldAtlas.WORLD, WorldAtlas.ARCHIPELAGO]:
+		var which := v
+		var tab := _button("The Known World" if v == WorldAtlas.WORLD else "The Archipelago", func() -> void: atlas.show_view(which), Vector2(0, UiTheme.BTN_SHORT))
+		tab.name = "View_" + v
+		chips[v] = tab
+		tabs.add_child(tab)
+	tabs.add_child(_expand(false))
+	var dice := _button("Random place", func() -> void:
+		show_random.call()
+		mark.call(true), Vector2(0, UiTheme.BTN_SHORT))
+	dice.name = "RandomPlace"
+	chips["random"] = dice
+	tabs.add_child(dice)
+	atlas.viewed.connect(func(_v: String) -> void: mark.call(atlas.selected == ""))
+	atlas.picked.connect(func(id: String) -> void:
+		show_place.call(id)
+		mark.call(false))
+	var random_now: bool = Game.fort_random if fort else Game.night_random
+	if random_now:
+		show_random.call()
+	else:
+		show_place.call(atlas.selected)
+	mark.call(random_now)
 	panel = root
 
 
@@ -1806,6 +1864,8 @@ func close_tree() -> void:
 func start_game(mode: int) -> void:
 	Game.begin_run()
 	Game.mode = mode
+	if not Net.active():
+		Game.roll_random_map()
 	get_tree().paused = false
 	_run_over = false
 	_rewards.clear()
@@ -2563,7 +2623,7 @@ func _public_games(box: VBoxContainer) -> void:
 
 
 func _public_room_row(room: Dictionary) -> Button:
-	var map_name: String = Game.MAPS.get(str(room["map"]), {}).get("name", "")
+	var map_name: String = "a random place" if str(room["map"]) == "random" else Game.MAPS.get(str(room["map"]), {}).get("name", "")
 	var rules: String = Net.RULE_NAMES[clampi(int(room["rules"]), 0, Net.RULE_NAMES.size() - 1)]
 	var what := rules if int(room["rules"]) != Net.Rules.COOP or map_name == "" else "%s, %s" % [rules, map_name]
 	var b := _button("%s's game: %s. %d of %d players" % [room["name"], what, int(room["players"]), Net.MAX_PLAYERS], func() -> void: _join_online(str(room["host"])), Vector2(0, UiTheme.BTN))
@@ -2735,13 +2795,16 @@ func _fill_lobby(body: VBoxContainer) -> void:
 		if Net.rules == Net.Rules.FORT:
 			for id: String in Game.FORT_MAPS:
 				var chosen_fort := id
-				maps.add_child(_choice(Game.FORT_MAPS[id]["name"], func() -> void: Net.set_fort_map(chosen_fort), Vector2(210, UiTheme.BTN_SHORT), Net.fort_map == id))
+				maps.add_child(_choice(Game.FORT_MAPS[id]["name"], func() -> void: Net.set_fort_map(chosen_fort), Vector2(210, UiTheme.BTN_SHORT), Net.fort_map == id and not Net.map_random))
 		else:
 			for id: String in Game.MAPS:
 				if Net.pvp() and id not in Game.VERSUS_MAPS:
 					continue
 				var chosen_map := id
-				maps.add_child(_choice(Game.MAPS[id]["name"], func() -> void: Net.set_night_map(chosen_map), Vector2(210, UiTheme.BTN_SHORT), Net.night_map == id))
+				maps.add_child(_choice(Game.MAPS[id]["name"], func() -> void: Net.set_night_map(chosen_map), Vector2(210, UiTheme.BTN_SHORT), Net.night_map == id and not Net.map_random))
+		var dice := _choice("Random", func() -> void: Net.set_map_random(), Vector2(150, UiTheme.BTN_SHORT), Net.map_random)
+		dice.name = "RandomMap"
+		maps.add_child(dice)
 		var levels := _setting_row(body, "Difficulty")
 		for d in 3:
 			var level := d

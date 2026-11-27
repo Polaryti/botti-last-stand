@@ -269,7 +269,7 @@ static func room_card(listed: bool, waiting: bool) -> Dictionary:
 		VERSION: str(Net.protocol_version()),
 		HOST_NAME: Game.player_name,
 		RULES: str(Net.rules),
-		MAP: Net.night_map,
+		MAP: Net.listed_map(),
 		PLAYERS: str(maxi(1, Net.roster.size())),
 		LIVE: "1" if not waiting and Net.allow_spectators else "0",
 		WATCHERS: str(Net.spectators.size()),

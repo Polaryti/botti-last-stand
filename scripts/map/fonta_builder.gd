@@ -319,11 +319,22 @@ static func temple(b: MapBuilder, size: float, wide: float) -> void:
 		l.box(Vector3(0, k * 0.35 + 0.17, 0), Vector3(w - k * 1.0, 0.35, d - k * 1.0), MARBLE_SHADE.darkened(0.04 * (2 - k)))
 	var floor_y := 1.05
 	b.solid(Vector3(0, 0.5, 0), Vector3(w - 2.0, 1.0, d - 2.0))
-	# The steps are walked as slopes across the whole front and both sides, so no step is a wall.
-	b.w.add_ledge(b.xf * Transform3D(Basis(Vector3.RIGHT, deg_to_rad(-16)), Vector3(0, 0.45, d * 0.5 - 0.4)), Vector3(w - 0.4, 0.4, 3.6))
+	# The steps are walked as slopes across the whole front and both sides, so no step is a wall: each
+	# ramp runs from the floor's edge, flush with it, down and out past the bottom step to end under the
+	# ground, so there is no edge to walk into at either end.
+	var ramp := func(across: float, deep: float) -> Array:
+		# In the frame of the front (+Z out): from (0, floor, deep - 2) down to (0, -0.5, deep + 1.6).
+		var inner := Vector3(0, floor_y + 0.01, deep - 2.0)
+		var outer := Vector3(0, -0.5, deep + 1.6)
+		var run := outer - inner
+		var tilt := atan2(-run.y, run.z)
+		var basis := Basis(Vector3.RIGHT, tilt)
+		return [Transform3D(basis, (inner + outer) * 0.5 - basis.y * 0.2), Vector3(across, 0.4, run.length())]
+	var front: Array = ramp.call(w - 0.4, d * 0.5)
+	b.w.add_ledge(b.xf * (front[0] as Transform3D), front[1])
 	for side: float in [-1.0, 1.0]:
-		var turn := Basis(Vector3.UP, side * PI * 0.5) * Basis(Vector3.RIGHT, deg_to_rad(-16))
-		b.w.add_ledge(b.xf * Transform3D(turn, Vector3(side * (w * 0.5 - 0.4), 0.45, 0)), Vector3(d - 0.4, 0.4, 3.6))
+		var flank: Array = ramp.call(d - 0.4, w * 0.5)
+		b.w.add_ledge(b.xf * Transform3D(Basis(Vector3.UP, side * PI * 0.5), Vector3.ZERO) * (flank[0] as Transform3D), flank[1])
 	# The peristyle: columns all round, some gone, some broken.
 	var col_h := 7.5
 	var cols := 0

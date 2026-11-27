@@ -2066,6 +2066,55 @@ func test_version_15() -> void:
 	var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 	var night_atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
 	ok(night_atlas != null and night_atlas.allowed == Game.MAPS.keys(), "you can choose where to spend the night on the world atlas: %s" % (str(night_atlas.allowed) if night_atlas else "none"))
+	# Two charts: the Known World, and the Archipelago of the Forgotten Gods out at sea beyond Port Vael.
+	if night_atlas:
+		var medal := func(id: String) -> Button: return night_atlas.find_child("Place_" + id, true, false) as Button
+		ok(night_atlas.view == WorldAtlas.view_of(Game.night_map), "the atlas opens on the chart where your place is")
+		night_atlas.show_view(WorldAtlas.WORLD)
+		ok(not medal.call("fontanova").visible and medal.call("vael").visible and medal.call("village").visible, "the Known World: Fontanova is not on it, inland or anywhere")
+		(m.panel.find_child("View_" + WorldAtlas.ARCHIPELAGO, true, false) as Button).pressed.emit()
+		await frames(1)
+		ok(night_atlas.view == WorldAtlas.ARCHIPELAGO and medal.call("fontanova").visible and medal.call("vael").visible and not medal.call("village").visible, "the Archipelago: Fontanova out at sea, Port Vael on the coast")
+		var sea: Dictionary = WorldAtlas.SEA_SPOTS
+		ok((sea["fontanova"] as Vector2).x > (sea["vael"] as Vector2).x and (sea["fontanova"] as Vector2).y > (sea["vael"] as Vector2).y, "Fontanova lies out to sea from Port Vael, the first island")
+		(night_atlas.find_child("SeaRoad", true, false) as Button).pressed.emit()
+		await frames(1)
+		ok(night_atlas.view == WorldAtlas.WORLD, "the sea road on the chart leads back to the Known World")
+		# A random place: its own page; Play here keeps it, and each night rolls where.
+		var was_random := Game.night_random
+		(m.panel.find_child("RandomPlace", true, false) as Button).pressed.emit()
+		await frames(1)
+		var says := (m.panel.find_child("PlaceDetail", true, false) as Node).find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		ok(says.has("A random place") and night_atlas.selected == "", "Random place shows what it does, with no place picked")
+		(m.panel.find_child("PlayHere", true, false) as Button).pressed.emit()
+		await frames(2)
+		ok(Game.night_random, "Play here on it keeps a random place for your nights")
+		var rolled := {}
+		Game.mode = Game.Mode.NIGHT
+		for i in 40:
+			var last := Game.night_map
+			Game.roll_random_map()
+			rolled[Game.night_map] = true
+			if Game.night_map == last or not Game.MAPS.has(Game.night_map):
+				rolled["bad"] = true
+		ok(not rolled.has("bad") and rolled.size() == Game.MAPS.size(), "each night it is somewhere else, and every place comes up (%s)" % str(rolled.keys()))
+		Game.night_random = false
+		var stays := Game.night_map
+		Game.roll_random_map()
+		ok(Game.night_map == stays, "a chosen place stays chosen")
+		Game.night_random = was_random
+		Game.night_map = saved_map
+	# Together, the host can choose a random place too: rolled as the match starts, from the maps the game allows.
+	var was_rules := Net.rules
+	Net.rules = Net.Rules.FFA
+	ok(Net.playable_maps() == Game.VERSUS_MAPS, "a random versus place comes from the versus maps")
+	Net.rules = Net.Rules.FORT
+	ok(Net.playable_maps() == Game.FORT_MAPS.keys(), "a random siege from the strongholds")
+	Net.rules = Net.Rules.COOP
+	Net.map_random = true
+	ok(Net.listed_map() == "random", "a room waiting on a random place is listed as one")
+	Net.map_random = false
+	Net.rules = was_rules
 	# Choosing where to hold the fort: the Fort, or Mist Bastion.
 	var saved_fort := Game.fort_map
 	var mode_before := Game.mode

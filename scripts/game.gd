@@ -52,11 +52,14 @@ var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
 var night_map := "village"
 var fort_map := "fort"
+## A random place instead of a chosen one: rolled afresh each time a night or a siege begins.
+var night_random := false
+var fort_random := false
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
 	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."},
 	"vael": {"name": "Port Vael", "desc": "A drowned harbour. Survive fifteen minutes of Mist Tide."},
-	"fontanova": {"name": "Fontanova", "desc": "An island of forgotten gods. Survive fifteen minutes."}}
+	"fontanova": {"name": "Fontanova", "desc": "An island of forgotten gods. Survive twelve minutes."}}
 ## The maps of the Archipelagos of the Forgotten Gods: playing on any of them earns the Ascendant.
 const ARCHIPELAGO_MAPS := ["fontanova"]
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
@@ -64,6 +67,23 @@ const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a kee
 	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
 const VERSUS_MAPS := ["village", "mesenlla", "vael", "fontanova"]
+
+
+## Somewhere to play out of `choices`, at random, never `last` (the place just played) when there is
+## anywhere else.
+static func roll_map(choices: Array, last := "") -> String:
+	var fresh := choices.filter(func(id: String) -> bool: return id != last)
+	if fresh.is_empty():
+		fresh = choices
+	return str(fresh.pick_random()) if not fresh.is_empty() else last
+
+
+## A night or a siege about to begin on a random place: where it is, this time.
+func roll_random_map() -> void:
+	if mode == Mode.FORT and fort_random:
+		fort_map = roll_map(FORT_MAPS.keys(), fort_map)
+	elif mode == Mode.NIGHT and night_random:
+		night_map = roll_map(MAPS.keys(), night_map)
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
 var earned_specs := {} # professions that have to be earned (AbilityData._spec), once they are
 var fresh_specs: Array[String] = [] # earned just now, for the end screen to announce
@@ -154,7 +174,10 @@ func owns_class(id: String) -> bool:
 
 ## Which map a night is played on: the host decides in a game together.
 func night_length() -> float:
-	return 900.0 if current_map() in ["vael", "fontanova"] else NIGHT_LENGTH
+	match current_map():
+		"vael": return 900.0
+		"fontanova": return 720.0
+	return NIGHT_LENGTH
 
 
 func current_map() -> String:
@@ -568,6 +591,8 @@ func load_settings() -> void:
 	fort_map = _saved(c, "progress", "fort_map", "fort")
 	if not FORT_MAPS.has(fort_map):
 		fort_map = "fort"
+	night_random = bool(_saved(c, "progress", "night_random", false))
+	fort_random = bool(_saved(c, "progress", "fort_random", false))
 	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
 		pet = "wolf"
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class) or ClassDefs.disabled(player_class):
@@ -613,6 +638,8 @@ func save_settings() -> void:
 	c.set_value("progress", "pet", pet)
 	c.set_value("progress", "night_map", night_map)
 	c.set_value("progress", "fort_map", fort_map)
+	c.set_value("progress", "night_random", night_random)
+	c.set_value("progress", "fort_random", fort_random)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)

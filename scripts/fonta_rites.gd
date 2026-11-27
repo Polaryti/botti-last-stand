@@ -21,7 +21,7 @@ extends Node3D
 const BRAZIER_REACH := 2.4
 const BRAZIER_HOLD := 3.0
 const DOOR_SINK := 2.5 # seconds for the sanctum's door to sink away
-const ALTAR_FIRST := 150.0
+const ALTAR_FIRST := 120.0
 const ALTAR_EVERY := 120.0
 const ALTAR_AWAKE := 60.0
 const ALTAR_REACH := 4.5
@@ -31,13 +31,13 @@ const ALTAR_GUARDS := 3 # mutants drawn to an altar when it wakes
 const ALTAR_ORDER := [2, 3, 1, 4] # Ilyria, Orvane, Thaleon, Kerys, round and round
 const GOD_NAMES := {1: "Thaleon", 2: "Ilyria", 3: "Orvane", 4: "Kerys"}
 const GOD_COLOURS := {1: Color(0.35, 0.85, 0.95), 2: Color(1.0, 0.82, 0.35), 3: Color(0.75, 0.6, 1.0), 4: Color(0.55, 1.0, 0.5)}
-const TIDES := [240.0, 480.0, 720.0]
+const TIDES := [200.0, 400.0, 600.0]
 const TIDE_WARN := 15.0
 const TIDE_RAMP := 8.0
 const TIDE_HIGH := 60.0
 const TIDE_RISE := 2.4
-const BLOOM_FIRST := 200.0
-const BLOOM_EVERY := 150.0
+const BLOOM_FIRST := 160.0
+const BLOOM_EVERY := 120.0
 const BLOOM_WARN := 12.0
 const BLOOM_TIME := 40.0
 const BLOOM_RADIUS := 11.0
@@ -136,12 +136,28 @@ func _build_grotto() -> void:
 		var stand := MeshInstance3D.new()
 		stand.mesh = brazier_mesh()
 		node.add_child(stand)
+		# A living fire, as Port Vael's braziers burn: curved tongues the shader bends and flickers
+		# (WorldLight.brazier_mesh), a warm halo round them and sparks going up; all shown when it is lit.
 		var fire := MeshInstance3D.new()
-		fire.mesh = _flame_mesh()
-		fire.material_override = MesenllaModels.glow_material()
-		fire.position = Vector3(0, 1.05, 0)
+		fire.name = "AnimatedFlame"
+		fire.mesh = WorldLight.brazier_mesh()
+		fire.scale = Vector3.ONE * 0.5
+		fire.position = Vector3(0, 1.02, 0)
+		fire.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		fire.visible = false
 		node.add_child(fire)
+		var halo := world.add_glow(Vector3.ZERO, Color(1.0, 0.6, 0.24), 1.9, 0.0, true)
+		halo.position = Vector3(0, 1.45, 0)
+		halo.reparent(node, false)
+		halo.visible = false
+		fire.set_meta("halo", halo)
+		if Game.quality > 0:
+			var sparks := VaelDressing.spark_emitter(0.18)
+			sparks.position = Vector3(0, 1.4, 0)
+			sparks.emitting = false
+			sparks.visible = false
+			node.add_child(sparks)
+			fire.set_meta("sparks", sparks)
 		var light := OmniLight3D.new()
 		light.light_color = Color(1.0, 0.62, 0.3)
 		light.omni_range = 7.0
@@ -188,15 +204,6 @@ static func brazier_mesh() -> Mesh:
 	return _brazier
 
 
-static func _flame_mesh() -> Mesh:
-	var l := LowPoly.new()
-	for k in 5:
-		var a := TAU * k / 5.0
-		l.prism(Vector3(cos(a) * 0.22, 0.0, sin(a) * 0.22), Vector3(cos(a) * 0.08, 0.7 + 0.2 * (k % 2), sin(a) * 0.08), 0.16, 0.0, 5, Color(1.0, 0.55 + 0.1 * (k % 2), 0.2))
-	l.prism(Vector3(0, 0, 0), Vector3(0, 1.0, 0), 0.26, 0.0, 6, Color(1.0, 0.85, 0.45))
-	return l.commit()
-
-
 static func door_mesh(wide: float) -> Mesh:
 	var l := LowPoly.new()
 	var marble := Color(0.8, 0.77, 0.72)
@@ -229,10 +236,19 @@ func _tick_braziers(delta: float) -> void:
 
 
 func _light(i: int) -> void:
-	if i >= _braziers.size():
+	if i >= _braziers.size() or (_braziers[i]["fire"] as MeshInstance3D).visible:
 		return
-	(_braziers[i]["fire"] as MeshInstance3D).visible = true
-	(_braziers[i]["light"] as OmniLight3D).light_energy = 1.6
+	var fire := _braziers[i]["fire"] as MeshInstance3D
+	fire.visible = true
+	(fire.get_meta("halo") as Node3D).visible = true
+	if fire.has_meta("sparks"):
+		var sparks := fire.get_meta("sparks") as CPUParticles3D
+		sparks.visible = true
+		sparks.emitting = true
+	var light := _braziers[i]["light"] as OmniLight3D
+	light.light_energy = 1.6
+	# Firelight, as a torch's: its light flickers with the world's fires.
+	world.add_fire(_braziers[i]["at"], WorldLight.TORCH_REACH, light)
 	world.sfx_at("brazier_lit", _braziers[i]["at"], 0.0)
 	var count := 0
 	for k in 3:
@@ -301,7 +317,7 @@ func _tick_altars(delta: float) -> void:
 		altar_hold = 0.0
 		var at := _altar_at(altar_god)
 		if at != Vector3.INF:
-			world.director.show_banner("%s's altar wakes %s: hold it for the god's blessing!" % [GOD_NAMES[altar_god], _bearing(at)], 4.0)
+			world.director.show_banner("%s's altar wakes %s. Hold it, and all who stand there are blessed at once: %s" % [GOD_NAMES[altar_god], _bearing(at), Player.god_gift(altar_god)], 5.0)
 			world.sfx_at("altar_wake", at, 4.0)
 			for k in ALTAR_GUARDS:
 				var a := TAU * k / ALTAR_GUARDS + randf() * 0.5

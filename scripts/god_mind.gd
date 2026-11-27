@@ -17,28 +17,30 @@ extends VaelMind
 const GODS := ["alquimelea"]
 const RANGE := Vector2(9.0, 18.0)
 const STAGES := [0.66, 0.33] # of its health, where it broods and grows quicker
-const QUICKER := [1.0, 0.85, 0.7] # its cooldowns at each stage
-const RAIN_EVERY := 8.0
-const RAIN_TELL := 1.4
-const RAIN_PER := [3, 4, 5] # flasks round each of you, by stage
-const RAIN_RADIUS := 2.4
-const RAIN_SCATTER := 4.0
+const QUICKER := [1.0, 0.8, 0.62] # its cooldowns at each stage
+const RAIN_EVERY := 6.5
+const RAIN_TELL := 1.05
+const RAIN_PER := [4, 5, 6] # flasks round each of you, by stage
+const RAIN_RADIUS := 2.8
+const RAIN_SCATTER := 3.5
 const RAIN_POWER := 0.7
 const RAIN_REACH := 30.0
-const FIELD_EVERY := 12.0
-const FIELD_TELL := 1.6
-const FIELD_RADIUS := 4.0
+const FIELD_EVERY := 10.0
+const FIELD_TELL := 1.25
+const FIELD_RADIUS := 5.0
 const FIELD_POWER := 1.0
 const CHANGE_POISON := 3.0
 const CHANGE_ROOT := 1.2
-const NOVA_EVERY := 9.0
-const NOVA_TELL := 1.4
+const NOVA_EVERY := 7.5
+const NOVA_TELL := 1.1
 const NOVA_REACH := 8.0
 const NOVA_POWER := 1.4
 const NOVA_KNOCK := 11.0
 const NOVA_BURN := 2.0
-const LANCE_EVERY := 10.0
-const LANCE_TELL := 1.2
+const LANCE_EVERY := 8.0
+const LANCE_TELL := 0.95
+const LANCE_FAN := 3 # lances at once, from its first change
+const LANCE_SPREAD := 0.32 # radians between them
 const LANCE_SHARDS := 7
 const LANCE_STEP := 0.12 # each shard a little after the one before it
 const LANCE_GAP := 3.0 # metres between shards
@@ -123,10 +125,14 @@ func tick(z: Zombie, target: Target, _to: Vector3, _dist: float, delta: float) -
 			phase = "lance"
 			left = LANCE_TELL + LANCE_SHARDS * LANCE_STEP + 0.2
 			_show(z, "m_ink", true)
-			var along := (far.global_position - z.position) * Vector3(1, 0, 1)
+			# At where they are going, not where they are; once it has changed, a fan of them.
+			var along := (_lead(z, far, LANCE_TELL * 0.6) - z.position) * Vector3(1, 0, 1)
 			along = along.normalized() if along.length() > 0.1 else Vector3.FORWARD
-			for i in LANCE_SHARDS:
-				MistSeal.cast(z, _ground(z, z.position + along * (3.0 + i * LANCE_GAP)), SHARD_RADIUS, LANCE_TELL + i * LANCE_STEP, z._damage * SHARD_POWER, 0.0, MistSeal.Style.SHARD)
+			var lances := LANCE_FAN if stage > 0 else 1
+			for l in lances:
+				var way := along.rotated(Vector3.UP, (l - (lances - 1) * 0.5) * LANCE_SPREAD)
+				for i in LANCE_SHARDS:
+					MistSeal.cast(z, _ground(z, z.position + way * (3.0 + i * LANCE_GAP)), SHARD_RADIUS, LANCE_TELL + i * LANCE_STEP, z._damage * SHARD_POWER, 0.0, MistSeal.Style.SHARD)
 			z.world.sfx_at("alq_lance", z.position, 4.0)
 			return true
 	if _cool_field <= 0.0:
@@ -136,7 +142,7 @@ func tick(z: Zombie, target: Target, _to: Vector3, _dist: float, delta: float) -
 		_show(z, "m_slam", true)
 		for t: Target in z.world.players:
 			if not t.dead and not t.is_unseen() and t.global_position.distance_to(z.position) < RAIN_REACH:
-				MistSeal.cast(z, _ground(z, t.global_position), FIELD_RADIUS, FIELD_TELL, z._damage * FIELD_POWER, 0.0, MistSeal.Style.CHANGE)
+				MistSeal.cast(z, _lead(z, t, FIELD_TELL * 0.6), FIELD_RADIUS, FIELD_TELL, z._damage * FIELD_POWER, 0.0, MistSeal.Style.CHANGE)
 		z.world.sfx_at("alq_voice", z.position, 4.0)
 		return true
 	if cooldown <= 0.0:
@@ -148,8 +154,10 @@ func tick(z: Zombie, target: Target, _to: Vector3, _dist: float, delta: float) -
 		for t: Target in z.world.players:
 			if t.dead or t.is_unseen() or t.global_position.distance_to(z.position) > RAIN_REACH:
 				continue
+			# Round where they are heading: the first on it, the rest closing the ways out.
+			var heading := _lead(z, t, RAIN_TELL * 0.7)
 			for i in per:
-				var spot := _lead(z, t, RAIN_TELL * 0.5) if i == 0 else t.global_position + Vector3(randf_range(-1, 1), 0, randf_range(-1, 1)).normalized() * randf_range(1.5, RAIN_SCATTER)
+				var spot := heading if i == 0 else heading + Vector3(cos(TAU * i / float(per - 1)), 0, sin(TAU * i / float(per - 1))) * randf_range(RAIN_RADIUS * 0.9, RAIN_SCATTER)
 				MistSeal.cast(z, _ground(z, spot), RAIN_RADIUS, RAIN_TELL + i * 0.18, z._damage * RAIN_POWER, 0.0, MistSeal.Style.ELIXIR)
 		z.world.sfx_at("elixir_throw", z.position, 6.0)
 		return true

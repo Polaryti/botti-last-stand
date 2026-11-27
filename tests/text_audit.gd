@@ -297,7 +297,7 @@ static func facts() -> Dictionary:
 		"enemy:cult_guardian": [CultMind.BASH_STUN],
 		"enemy:hierophant": [CultMind.HIERO_RANGE.x, CultMind.HIERO_RANGE.y, 3, CultMind.ELIXIR_POISON, CultMind.ELIXIR_SLOW, CultMind.RITE_EVERY, CultMind.RITE_REACH, CultMind.RITE_COUNT, CultMind.RITE_COUNT, int(Director.HIEROPHANT_AT) / 60, int(Director.HIEROPHANT_AT) % 60],
 		"enemy:polemarch": [CultMind.SPEAR_STUN, roundf(CultMind.PHALANX[0] * 100.0), roundf(CultMind.PHALANX[1] * 100.0), CultMind.PHALANX_COUNT, int(Director.POLEMARCH_AT) / 60, int(Director.POLEMARCH_AT) % 60],
-		"enemy:alquimelea": [int(Director.ALQ_AT) / 60, int(Director.ALQ_AT) % 60, GodMind.RANGE.x, GodMind.RANGE.y, MistSeal.ELIXIR_POISON, MistSeal.ELIXIR_SLOW, GodMind.CHANGE_POISON, GodMind.CHANGE_ROOT, GodMind.NOVA_REACH, GodMind.NOVA_BURN, GodMind.LANCE_SHARDS, GodMind.SHARD_SLOW],
+		"enemy:alquimelea": [int(Director.ALQ_AT) / 60, int(Director.ALQ_AT) % 60, GodMind.RANGE.x, GodMind.RANGE.y, MistSeal.ELIXIR_POISON, MistSeal.ELIXIR_SLOW, GodMind.CHANGE_POISON, GodMind.CHANGE_ROOT, GodMind.NOVA_REACH, GodMind.NOVA_BURN, GodMind.LANCE_SHARDS, GodMind.SHARD_SLOW, GodMind.LANCE_FAN],
 		"enemy:tide_witch": [float(VaelMind.WAVES), VaelMind.WAVE_SLOW, float(VaelMind.RAISE_COUNT)],
 		"enemy:harbourmaster": _clock(Director.HARBOURMASTER_AT),
 		"enemy:lighthouse_keeper": [VaelMind.FLASH_REACH, VaelMind.FLASH_STUN, 2.0] + _clock(Director.KEEPER_AT),

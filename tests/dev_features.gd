@@ -1761,7 +1761,7 @@ func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
 func _fontanova() -> void:
 	check(Game.MAPS.has("fontanova") and "fontanova" in Game.VERSUS_MAPS and "fontanova" in Board.MAPS and "fontanova" in Game.ARCHIPELAGO_MAPS, "Fontanova can be chosen for the night and for versus, and has its boards")
 	check(Places.ORDER.has("fontanova") and Places.ALL["fontanova"]["tips"].size() == 3 and str(Places.ALL["fontanova"]["lore"]).length() > 80, "it has its page, its lore and its tips")
-	check(WorldAtlas.SPOTS.has("fontanova") and WorldAtlas.LINKS.has(["vael", "fontanova", false]), "the atlas crossing from Port Vael leads to it")
+	check(WorldAtlas.SEA_SPOTS.has("fontanova") and not WorldAtlas.SPOTS.has("fontanova") and WorldAtlas.view_of("fontanova") == WorldAtlas.ARCHIPELAGO and WorldAtlas.LINKS.has(["vael", "fontanova", false]), "on the Archipelago's chart, the crossing from Port Vael leads to it")
 	check(PlaceVista.LOOKS.has("fontanova") and Icons.exists("map_fontanova"), "its loading view and its icon")
 	check(Sfx.MUSIC_SETS.has("fontanova") and (Sfx.MUSIC_SETS["fontanova"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
 	check(Director.DAWN_SOUNDS.get("fontanova", "") == "dawn_fontanova" and Sfx.NAMES.has("dawn_fontanova") and Net.SOUNDS.has("dawn_fontanova"), "and its own sound at dawn")
@@ -1772,7 +1772,7 @@ func _fontanova() -> void:
 	var was_mode := Game.mode
 	Game.night_map = "fontanova"
 	Game.mode = Game.Mode.NIGHT
-	check(is_equal_approx(Game.night_length(), 900.0), "a night there lasts fifteen minutes")
+	check(is_equal_approx(Game.night_length(), 720.0), "a night there lasts twelve minutes")
 	# What the map holds.
 	var scene: Node = (load("res://maps/fontanova.tscn") as PackedScene).instantiate()
 	var pieces := scene.find_children("*", "Node3D", true, false).filter(func(p: Node) -> bool: return p is MapFonta)
@@ -1857,6 +1857,28 @@ func _fontanova() -> void:
 		start.y = t.deck_y(d, 0.35)
 		var across: float = await walk.call(start, b3)
 		check(on_land > 1.0 and across > on_land * 0.95, "crossing a bridge you walk as quick as on the land (%.1f m/s against %.1f), not wading" % [across, on_land])
+	# The temple's steps: walked straight up, at the front and at either side, onto its floor.
+	var court := t.ground_height(10, -78)
+	for line: Array in [[Vector3(10, 0, -78), Vector3(0, 0, -1)], [Vector3(-10, 0, -78), Vector3(0, 0, -1)], [Vector3(-22, 0, -94), Vector3(1, 0, 0)], [Vector3(22, 0, -94), Vector3(-1, 0, 0)]]:
+		var from: Vector3 = line[0]
+		from.y = t.ground_height(from.x, from.z) + 0.05
+		var heading: Vector3 = line[1]
+		you.global_position = from
+		you.velocity = Vector3.ZERO
+		you.look_at(from + heading, Vector3.UP)
+		you.yaw = you.rotation.y
+		you.input_move = Vector2(0, -1)
+		you.set_physics_process(true)
+		var highest := from.y
+		for i in 900:
+			await get_tree().physics_frame
+			if Vector2(you.global_position.x, you.global_position.z).distance_to(Vector2(0, -94)) < 16.0: # on the temple's footprint
+				highest = maxf(highest, you.global_position.y)
+			if highest > court + 0.9:
+				break
+		you.set_physics_process(false)
+		you.input_move = Vector2.ZERO
+		check(highest > court + 0.9, "the temple's steps walk straight up from %s onto its floor (%.1f m up), no wall in the way" % [from, highest - court])
 	await _fonta_land(isle)
 	await _fonta_rites(isle)
 	await _fonta_mutants(isle)
@@ -2948,13 +2970,26 @@ func _fonta_rites(isle: World) -> void:
 			check(not rites.lit & 1, "a brazier takes a moment to light")
 		rites._tick_braziers(FontaRites.BRAZIER_HOLD * 0.6)
 	check(rites.lit == 7 and rites.door_open, "light all three braziers and the sanctum's door opens")
+	var flames: Array = rites._braziers.map(func(b: Dictionary) -> MeshInstance3D: return b["fire"])
+	check(flames.all(func(f: MeshInstance3D) -> bool: return f.visible and f.mesh == WorldLight.brazier_mesh() and (f.get_meta("halo") as Node3D).visible and (not f.has_meta("sparks") or (f.get_meta("sparks") as CPUParticles3D).emitting)),
+		"each burns with living tongues of fire, a halo and sparks, as Port Vael's braziers do")
 	var pickups_after := isle.pickups.size()
 	check(pickups_after >= pickups_before + 2, "inside: a rare weapon and the Oracle's Eye")
 	# The Oracle's Eye: harder blows, and the enemies near you shown.
 	var dmg := you.damage_multiplier()
-	you.powers[PowerDefs.EYE] = 30.0
+	you.activate_power(PowerDefs.EYE)
 	check(is_equal_approx(you.damage_multiplier(), dmg * PowerDefs.EYE_DAMAGE), "the Oracle's Eye: blows %d%% harder" % int(round((PowerDefs.EYE_DAMAGE - 1.0) * 100.0)))
-	you.powers.erase(PowerDefs.EYE)
+	check(PowerDefs.relic_banner(PowerDefs.EYE).contains("Oracle's Eye") and not PowerDefs.relic_banner(PowerDefs.EYE).contains("Crown") and you.skin_bits() & 2 == 0, "taken up, it says what it is and what it does, not the Sunken Crown's words")
+	you._tick_powers(600.0)
+	check(you.has_power(PowerDefs.EYE), "carried for as long as you stand")
+	var eyes := func() -> int: return isle.pickups.filter(func(k: Pickup) -> bool: return is_instance_valid(k) and k.item_id == PowerDefs.EYE).size()
+	var lying: int = eyes.call()
+	var at_eye := you.global_position
+	you._kill()
+	check(not you.has_power(PowerDefs.EYE) and eyes.call() == lying, "fall, and it is lost for good: not on you, not on the ground")
+	you.respawn(at_eye)
+	check(not you.has_power(PowerDefs.EYE), "and it does not come back with you")
+	you.guard_left = 0.0 # a fresh respawn's moment of safety, run out (physics is off here)
 	# The altars wake one at a time.
 	check(FontaRites.awake_at(FontaRites.ALTAR_FIRST - 1.0).x == 0 and int(FontaRites.awake_at(FontaRites.ALTAR_FIRST + 1.0).x) == FontaRites.ALTAR_ORDER[0], "the first altar wakes after %d s" % int(FontaRites.ALTAR_FIRST))
 	check(FontaRites.awake_at(FontaRites.ALTAR_FIRST + FontaRites.ALTAR_AWAKE + 1.0).x == 0 and int(FontaRites.awake_at(FontaRites.ALTAR_FIRST + FontaRites.ALTAR_EVERY + 1.0).x) == FontaRites.ALTAR_ORDER[1], "sleeps after %d s, and the next wakes %d s after the first" % [int(FontaRites.ALTAR_AWAKE), int(FontaRites.ALTAR_EVERY)])
@@ -2972,6 +3007,9 @@ func _fonta_rites(isle: World) -> void:
 	rites._tick_altars(FontaRites.ALTAR_HOLD * 0.6)
 	rites._bless_claimed()
 	check(rites.claims == 1 and you._buffs.has("god_ilyria_melee_damage"), "held for %d s, Ilyria blesses whoever stands there: blows %d%% harder" % [int(FontaRites.ALTAR_HOLD), int(Player.GOD_DAMAGE * 100.0)])
+	check(isle.director.banner.contains("Ilyria's blessing is yours now") and isle.director.banner.contains(Player.god_gift(2)), "and says so at once, with what it gives and for how long")
+	check(Player.god_gift(1).contains("%d at once" % int(Player.GOD_HEAL)) and Player.god_gift(1).contains("%d health a second" % int(Player.GOD_REGEN)) and Player.god_gift(3).contains("%d%% faster" % roundi(Player.GOD_SPEED * 100.0))
+		and Player.god_gift(4).contains("%d%% harder shots" % roundi(Player.GOD_AIM * 100.0)) and [1, 2, 3, 4].all(func(g: int) -> bool: return Player.god_gift(g).contains("%d s" % int(Player.BLESSING_TIME["god_%d" % g]))), "each god's blessing in its own words, with its numbers")
 	for key: String in you._buffs.keys():
 		if key.begins_with("god_"):
 			you._buffs.erase(key)
@@ -3027,6 +3065,81 @@ func _fonta_cult(isle: World) -> void:
 		for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
 	for z: Zombie in isle.zombies.duplicate(): z.release()
 	drop_seals.call()
+	await frames(1)
+	# Some Worshippers carry a hunting bow, and put the sickle away for it; it shoots from afar.
+	var archers := 0
+	var sicklers := 0
+	for i in 24:
+		isle.spawn_zombie("cult_worshipper", at + Vector3(i % 6 * 2.0 - 5.0, 0, -12.0 - int(i / 6) * 2.0))
+		var w: Zombie = isle.zombies.back()
+		var sickle: MeshInstance3D = w._parts.filter(func(m: MeshInstance3D) -> bool: return m.has_meta("cult_held")).front()
+		if w.weapon_id == "bow":
+			archers += 1
+			check(not sickle.visible and w._hand_mesh != null and w._attack_style() == "ranged" and w._ranged_reach() > 20.0, "a Worshipper with a bow holds it, not its sickle, and shoots from %.0f m" % w._ranged_reach())
+			w.net_weapon("")
+			check(sickle.visible, "told by the host it carries its sickle after all, it shows the sickle again")
+		else:
+			sicklers += 1
+			check(w.weapon_id == "" and sickle.visible and w._attack_style() == "melee", "the rest come at you with the sickle")
+		w.release()
+	check(archers > 0 and sicklers > archers, "about one in four carries a bow (%d of 24)" % archers)
+	await frames(1)
+	# A staff or a spear is swung head first, never jabbed butt first with its head behind.
+	for id: String in ["cult_priest", "cult_guardian", "hierophant", "polemarch"]:
+		isle.spawn_zombie(id, at + Vector3(0, 0, -12))
+		var c: Zombie = isle.zombies.back()
+		c.set_physics_process(false)
+		var held: MeshInstance3D = c._parts.filter(func(m: MeshInstance3D) -> bool: return m.get_parent() is BoneAttachment3D and (m.get_parent() as BoneAttachment3D).bone_name == "handslot.r").front()
+		c._current_anim = ""
+		c._play(c._blow_anim(), 1.0, 0.0)
+		var ahead := -1.0
+		for f: float in [0.3, 0.4, 0.5]:
+			c._anim.seek(c._anim.current_animation_length * f, true)
+			await frames(1)
+			ahead = maxf(ahead, (c.global_transform.basis.inverse() * held.global_transform.basis.y.normalized()).z)
+		check(c._blow_anim() != "Unarmed_Melee_Attack_Punch_A" and ahead > 0.4, "%s swings what it holds head first at you (%.1f ahead)" % [id, ahead])
+		c.release()
+	await frames(1)
+	# Backing off from you with a wall behind it: it goes round, along the wall, and does not walk into
+	# it; boxed in, it stands its ground.
+	ready_you.call()
+	var path_grid := isle.grid
+	var by_wall := at + Vector3(0, 0, -6)
+	isle.spawn_zombie("cult_priest", by_wall)
+	var backer: Zombie = isle.zombies.back()
+	backer.set_physics_process(false)
+	backer.position = by_wall
+	var shut: Array[Vector2i] = []
+	var wall := func(cells: Array) -> void:
+		for c: Vector2i in cells:
+			if path_grid.is_free(c):
+				path_grid.astar.set_point_solid(c, true)
+				shut.append(c)
+	var behind := path_grid.to_cell(by_wall + Vector3(0, 0, -1.2))
+	var row: Array = []
+	for dx in range(-12, 13): row.append(behind + Vector2i(dx, 0))
+	wall.call(row)
+	var backing := backer.mesenlla_mind as VaelMind
+	var start := backer.position
+	for i in 40:
+		var to := you.global_position - backer.position
+		backing._keep(backer, to, Vector2(to.x, to.z).length(), CultMind.PRIEST_RANGE, 1.0 / 30.0, you)
+	var moved := Vector2(backer.position.x - start.x, backer.position.z - start.z)
+	check(absf(moved.x) > 1.0 and path_grid.is_free(path_grid.to_cell(backer.position)), "a backer backing into a wall goes along it instead (%.1f m aside)" % moved.x)
+	backer.position = by_wall
+	var box: Array = []
+	for dx in range(-12, 13):
+		for dz in range(-12, 0): box.append(path_grid.to_cell(by_wall) + Vector2i(dx, dz))
+		for dz in range(1, 13): box.append(path_grid.to_cell(by_wall) + Vector2i(dx, dz) if absi(dx) > 1 else path_grid.to_cell(by_wall) + Vector2i(12, 12))
+	wall.call(box)
+	for c: Vector2i in [path_grid.to_cell(by_wall) + Vector2i(-1, 0), path_grid.to_cell(by_wall) + Vector2i(1, 0)]: wall.call([c])
+	start = backer.position
+	for i in 20:
+		var to := you.global_position - backer.position
+		backing._keep(backer, to, Vector2(to.x, to.z).length(), CultMind.PRIEST_RANGE, 1.0 / 30.0, you)
+	check(Vector2(backer.position.x - start.x, backer.position.z - start.z).length() < 0.2, "and cornered, it stands its ground")
+	for c in shut: path_grid.astar.set_point_solid(c, false)
+	backer.release()
 	await frames(1)
 	for id: String in CultMind.CULT:
 		var d: Dictionary = ZombieDefs.ALL[id]
@@ -3368,7 +3481,64 @@ func _fonta_god(isle: World) -> void:
 	drop_seals.call()
 	await frames(1)
 	mind.phase = ""
+	# Once it has changed, a fan of lances.
+	god.hp = god.max_hp * (float(GodMind.STAGES[0]) - 0.01)
+	mind._brooded = 1
+	mind._cool_lance = 0.0
+	mind.tick(god, you, Vector3.ZERO, 16.0, 0.01)
+	shards = isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.SHARD)
+	check(mind.phase == "lance" and shards.size() == GodMind.LANCE_SHARDS * GodMind.LANCE_FAN, "once it has changed, %d lances at once (%d shards)" % [GodMind.LANCE_FAN, shards.size()])
+	god.hp = god.max_hp
+	mind._brooded = 0
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
 	mind._cool_lance = 99.0
+	# It aims where you are going: a ring of change and the first flask land ahead of you.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -13)), at.z - 13.0)
+	you.velocity = Vector3(5, 0, 0)
+	mind._cool_field = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	var ring: Array = isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.CHANGE)
+	check(ring.size() == 1 and (ring[0] as MistSeal).position.x > you.position.x + 2.0, "its ring of change opens where you are heading (%.1f m ahead)" % ((ring[0] as MistSeal).position.x - you.position.x if ring.size() == 1 else 0.0))
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_field = 99.0
+	mind.cooldown = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	var flasks: Array = isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.ELIXIR)
+	var centre_x := 0.0
+	for f: MistSeal in flasks: centre_x += f.position.x / flasks.size()
+	check(flasks.size() == GodMind.RAIN_PER[0] and centre_x > you.position.x + 2.0, "and its flasks close round where you are going")
+	you.velocity = Vector3.ZERO
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind.cooldown = 99.0
+	# Bots fight it: seen from far off, before the mutants round them, unless one is at their throat.
+	var info := {"name": "Godslayer", "class": "ranger", "team": 0}
+	var body := Avatar.new(isle, Net.BOT_BASE + 91, info)
+	isle.add_child(body)
+	var bot := BotPlayer.new(isle, body, info)
+	isle.add_child(bot)
+	await frames(3)
+	bot.set_physics_process(false)
+	bot.pawn.set_physics_process(false)
+	bot.pawn.global_position = Vector3(at.x + 2.0, isle.ground_at(at + Vector3(2, 0, 16)) + 0.05, at.z + 16.0)
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -14)), at.z - 14.0)
+	check(god.position.distance_to(bot.pawn.global_position) > BotPlayer.SEE_ZOMBIES, "(the god is %.0f m off, past where a bot sees the rest)" % god.position.distance_to(bot.pawn.global_position))
+	isle.spawn_zombie("mutant_wasp", bot.pawn.global_position + Vector3(0, 0, -9))
+	bot._decide()
+	check(bot._target == god, "a bot fights the god, though it is far and a mutant is nearer")
+	var throat: Zombie = isle.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "mutant_wasp").front()
+	throat.position = bot.pawn.global_position + Vector3(0, 0, -2.5)
+	bot._decide()
+	check(bot._target == throat, "but first whatever is at its throat")
+	throat.release()
+	bot.queue_free()
+	await frames(2)
 	# Below two thirds and one third: it broods, and grows quicker.
 	ready_you.call()
 	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -13)), at.z - 13.0)

@@ -5,7 +5,7 @@
 *After Port Vael, a ship sails on to Fontanova, the first island of an archipelago whose people worshipped gods now forgotten. One of them never left.*
 
 ### Fontanova, a new map
-- **An island in the open sea**, for Survive the Night, Co-op, All vs All and Teams. The night lasts 15 minutes.
+- **An island in the open sea**, for Survive the Night, Co-op, All vs All and Teams. The night lasts 12 minutes.
 - You land in a cove beside the old merchant ship that brought you, run aground on the beach.
 - Olive terraces climb from the shore; the Sacred Way's stair climbs on to the temple on the Acropolis crag, 34 m up.
 - The worshippers' village stands on the rim of the Ravine. Two rope bridges cross it to the West Ridge and Kerys' Watch. A fall into the Ravine kills.
@@ -16,9 +16,10 @@
 
 ### Rites of Fontanova
 - **The Oracle's Grotto:** light its three braziers to open the sanctum, which holds a rare weapon and the Oracle's Eye.
-- **Oracle's Eye:** marks every enemy within 36 m, through rock, and your blows land 20% harder.
-- **Waking altars:** from 2:30, one god's altar wakes every 2 minutes. Hold it for 10 s to earn that god's blessing for a minute.
-- **The rising sea:** at 4:00, 8:00 and 12:00 the sea floods the beaches for a minute.
+- **Oracle's Eye:** marks every enemy within 36 m, through rock, and your blows land 20% harder. Fall, and it is lost for good.
+- The braziers burn with real, flickering fire.
+- **Waking altars:** from 2:00, one god's altar wakes every 2 minutes. Hold it for 10 s, and all who stand there are blessed at once, for a minute. The altar says what each blessing gives.
+- **The rising sea:** at 3:20, 6:40 and 10:00 the sea floods the beaches for a minute.
 - **Transmutation blooms:** from 3:20, violet blooms break through somewhere on the island. Once open, they poison and hurt whoever stands among them.
 - **Royal Jelly:** a broken Beehive also leaves Royal Jelly. It restores your health, mana and every ability, and quickens you for 45 s.
 
@@ -38,18 +39,20 @@
 
 
 ### The cult of Al'quimelea
-- **Worshippers** come down from their village or the Sacred Way in processions of three, from 2:00. When one falls, the others nearby rush you.
+- **Worshippers** come down from their village or the Sacred Way in processions of three, from 1:40. When one falls, the others nearby rush you. One in four carries a hunting bow.
 - **Priests of Change** keep their distance, throw flasks of elixir that poison and slow, and anoint hurt creatures back to health.
 - **Temple Guardians** brace behind their bronze shields, then rush you and bash you down. From the front, blows glance off the shield.
-- **Ostrich Guardians** ride out on their war-birds from 7:00. Bring the bird down and the Guardian fights on foot.
+- **Ostrich Guardians** ride out on their war-birds from 6:00. Bring the bird down and the Guardian fights on foot.
 - Each has its own gear, voice, icon and Codex page; the cult has its own Codex section.
-- **The Hierophant** comes down the Sacred Way once, around 3:30. It throws three flasks at once; hurt, it turns nearby Worshippers into mutants.
-- **The Polemarch** marches out of the village once, around 6:30. Its tower shield takes three quarters of a blow from the front. It sweeps its spear to stun, charges, and calls Guardians to its side.
+- **The Hierophant** comes down the Sacred Way once, around 3:00. It throws three flasks at once; hurt, it turns nearby Worshippers into mutants.
+- **The Polemarch** marches out of the village once, around 5:30. Its tower shield takes three quarters of a blow from the front. It sweeps its spear to stun, charges, and calls Guardians to its side.
 
 ### Al'quimelea
-- **The fallen god of change** comes down from its temple at 11:00. Dawn waits until it falls.
+- **The fallen god of change** comes down from its temple at 9:00. Dawn waits until it falls.
 - It floats over cliffs and chasms, rains elixir, opens fields of change that poison and root, blasts close attackers with its crucible, and lances distant ones with crystal shards.
+- Its flasks and fields fall where you are heading. Once changed, it sends three lances at once.
 - At two thirds and one third of its health, mutants are born of it, and it grows quicker.
+- Bots fight it whenever they can see it.
 - Its own boss card, bells, voice and a six-second death.
 
 ### The Ascendant, a new class
@@ -70,12 +73,19 @@
 ### Title screen
 - New app icon and splash. The menu tours Fontanova to the Archipelagos' own theme.
 
+### Choosing where to play
+- **The Archipelago of the Forgotten Gods** has its own sea chart beyond Port Vael's coast, with Fontanova as its first island.
+- **Random place**, alone or together: each match is somewhere you have not just played.
+
 ### Fixes
 - **Codex:** when an enemy first appears is only shown once you have killed one.
 - **Codex:** the Kraken and the Leviathan wear the boss crown, and bosses and minibosses no longer read "Appears from 166:39".
 - **Whaler's Harpoon:** throwing it leaves its slot empty until it comes back. With both hands full by then, it lands at your feet.
 - Returning to the title screen after a match is much quicker again.
 - Fixed a rare case where nothing nearby could be picked up.
+- Creatures backing away from you no longer get stuck against walls. Cornered, they stand and fight.
+- The Priest of Change and the temple's spearmen strike with the head of the staff or spear, not the butt.
+- Fontanova's temple steps no longer have an invisible wall, and its loading view no longer floats.
 
 ## 0.22.1 — The Sunken Crown (24 November 2026)
 

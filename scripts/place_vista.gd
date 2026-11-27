@@ -382,6 +382,17 @@ func _fontanova(w: float, h: float) -> void:
 	island.append(Vector2(w * 0.86, sea_top - h * 0.03))
 	island.append(Vector2(w * 0.92, shore))
 	draw_colored_polygon(island, near)
+	# Where the island's skyline is at any x, from its own outline: everything below stands on it.
+	var skyline := island.duplicate()
+	var ground_at := func(x: float) -> float:
+		for i in skyline.size() - 1:
+			var a: Vector2 = skyline[i]
+			var b: Vector2 = skyline[i + 1]
+			if x >= a.x and x <= b.x:
+				if b.x - a.x < 1.0:
+					return minf(a.y, b.y) # a sheer face: its top
+				return lerpf(a.y, b.y, (x - a.x) / (b.x - a.x))
+		return shore
 	# Its reflection, broken by the swell, and the surf along the beach.
 	for k in 10:
 		var y := shore + h * (0.004 + k * 0.007)
@@ -401,10 +412,11 @@ func _fontanova(w: float, h: float) -> void:
 	# The temple, standing on the crag: a stepped floor, its columns on it, the roof fallen at one end.
 	var temple_l := w * 0.5
 	var temple_r := w * 0.61
-	draw_rect(Rect2(temple_l - w * 0.006, top - h * 0.008, temple_r - temple_l + w * 0.012, h * 0.008 + 1.0), near)
-	draw_rect(Rect2(temple_l - w * 0.002, top - h * 0.014, temple_r - temple_l + w * 0.004, h * 0.006 + 1.0), near)
+	var stand: float = ground_at.call((temple_l + temple_r) * 0.5)
+	draw_rect(Rect2(temple_l - w * 0.006, stand - h * 0.008, temple_r - temple_l + w * 0.012, h * 0.008 + 2.0), near)
+	draw_rect(Rect2(temple_l - w * 0.002, stand - h * 0.014, temple_r - temple_l + w * 0.004, h * 0.006 + 2.0), near)
 	var col_h := h * 0.07
-	var floor_y := top - h * 0.014
+	var floor_y := stand - h * 0.014
 	for k in 7:
 		var x := lerpf(temple_l + w * 0.004, temple_r - w * 0.004, k / 6.0)
 		var tall := col_h if k != 5 else col_h * 0.45 # one broken
@@ -414,18 +426,19 @@ func _fontanova(w: float, h: float) -> void:
 	var pulse := 0.6 + 0.4 * sin(_t * 1.3)
 	_glow(Vector2((temple_l + temple_r) * 0.5, floor_y - col_h * 0.45), h * 0.05, _look("accent"), 0.45 * pulse)
 	# Cypresses like dark flames by the crag, olives round and grey on the terraces.
-	for c: Array in [[0.445, 0.07], [0.455, 0.05], [0.66, 0.06]]:
+	# Each stands on the ground under it, its foot a little sunk into the slope, so none hangs in the air.
+	for c: Array in [[0.43, 0.07], [0.443, 0.05], [0.67, 0.06]]:
 		var x := w * float(c[0])
-		var base := sea_top - h * (0.2 if c[0] < 0.5 else 0.16)
+		var base: float = maxf(ground_at.call(x - w * 0.006), ground_at.call(x + w * 0.006)) + h * 0.004
 		var tall := h * float(c[1])
 		draw_colored_polygon(PackedVector2Array([Vector2(x - w * 0.006, base), Vector2(x, base - tall), Vector2(x + w * 0.006, base)]), near.lightened(0.04))
 	for k in 6:
 		var x := w * (0.235 + k * 0.04)
-		var y := sea_top - h * (0.01 + k * 0.03)
 		for j in 2:
-			var ox := x + w * (0.008 + j * 0.016)
-			draw_circle(Vector2(ox, y - h * 0.014), h * 0.012, near.lightened(0.09))
-			draw_line(Vector2(ox, y - h * 0.006), Vector2(ox, y), near, 2.0)
+			var ox := x + w * (0.004 + j * 0.014)
+			var foot: float = ground_at.call(ox) + 1.0
+			draw_line(Vector2(ox, foot - h * 0.012), Vector2(ox, foot), near, 2.0)
+			draw_circle(Vector2(ox, foot - h * 0.02), h * 0.011, near.lightened(0.09))
 
 
 func _vael(w: float, h: float) -> void:

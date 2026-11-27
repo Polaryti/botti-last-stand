@@ -92,6 +92,7 @@ const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
 var night_map := "village" # which map a co-op night is played on: the host's choice
+var map_random := false # the host chose a random place: rolled each time a match starts
 var fort_map := "fort" # which stronghold Defend the Fort is played on: the host's choice
 var online: EpicNet # stays once made, because its system can only start once
 var room_code := ""
@@ -659,7 +660,7 @@ func _spectator_loaded() -> void:
 		if not z.active or not z.is_alive() or z.net_id < 0:
 			continue
 		_z_spawn.rpc_id(id, z.net_id, z.type_id, z.position, z.hero_minute)
-		if z.weapon_id != "":
+		if z.weapon_id != "" or z.def.has("weapons"):
 			_z_weapon.rpc_id(id, z.net_id, z.weapon_id)
 		if z.element != "":
 			_z_element.rpc_id(id, z.net_id, z.element)
@@ -814,7 +815,7 @@ func _beacon_text() -> PackedByteArray:
 	# "live": a match under way, which can be watched while "a" (spectators allowed) and "w" (how
 	# many watch) leave room.
 	return JSON.stringify({"g": "botti-last-stand", "v": protocol_version(), "n": Game.player_name, "p": roster.size(), "r": rules,
-		"live": 1 if in_game else 0, "a": 1 if allow_spectators else 0, "w": spectators.size(), "m": fort_map if rules == Rules.FORT else night_map}).to_utf8_buffer()
+		"live": 1 if in_game else 0, "a": 1 if allow_spectators else 0, "w": spectators.size(), "m": listed_map()}).to_utf8_buffer()
 
 
 func _answer_questions() -> void:
@@ -960,6 +961,13 @@ func start_match() -> void:
 		if _answer:
 			_answer.close()
 			_answer = null
+	if map_random:
+		# Where tonight is, told to everyone before it begins (the same reliable channel, in order).
+		if rules == Rules.FORT:
+			fort_map = Game.roll_map(playable_maps(), fort_map)
+		else:
+			night_map = Game.roll_map(playable_maps(), night_map)
+		_share_lobby()
 	var tonight := Weather.roll(Game.current_map())
 	var fog_at := Vector2(randf_range(-22.0, 22.0), randf_range(-22.0, 22.0))
 	# Off the list of games waiting for players.
@@ -1159,12 +1167,35 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 func set_night_map(id: String) -> void:
 	if is_host() and not in_game and Game.MAPS.has(id):
 		night_map = id
+		map_random = false
 		_share_lobby()
+
+
+## A random place, for the night or the siege, whatever the game: rolled as the match starts.
+func set_map_random() -> void:
+	if is_host() and not in_game:
+		map_random = true
+		_share_lobby()
+
+
+## The place a room's listing names: "random" while it waits on a random place, else where it plays.
+func listed_map() -> String:
+	if map_random and not in_game:
+		return "random"
+	return fort_map if rules == Rules.FORT else night_map
+
+
+## The places this room's game can be played on.
+func playable_maps() -> Array:
+	if rules == Rules.FORT:
+		return Game.FORT_MAPS.keys()
+	return Game.VERSUS_MAPS.duplicate() if rules == Rules.FFA or rules == Rules.TEAMS else Game.MAPS.keys()
 
 
 func set_fort_map(id: String) -> void:
 	if is_host() and not in_game and Game.FORT_MAPS.has(id):
 		fort_map = id
+		map_random = false
 		_share_lobby()
 
 

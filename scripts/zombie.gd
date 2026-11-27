@@ -476,6 +476,8 @@ func _build_visual() -> void:
 				var bone := key.get_slice(":", 0)
 				var piece := _attach(bone, gear[key], Vector3.ZERO)
 				piece.rotation = CultGear.turn(model_id, bone)
+				if bone == "handslot.r" and model_id == "cult_worshipper":
+					piece.set_meta("cult_held", true)
 				if key.ends_with(":glow"):
 					piece.material_override = MesenllaModels.glow_material()
 					if bone == "head":
@@ -692,7 +694,9 @@ func spawn(id: String, at: Vector3, minute := 0) -> void:
 		var found: Array = def["weapons"]
 		var odds: Array = def.get("weapon_odds", [])
 		weapon_id = str(found[randi() % found.size()] if odds.size() != found.size() else found[pick_weighted(odds)])
-		_show_weapon(weapon_id)
+		if weapon_id != "": # "" keeps what it was made with (a Worshipper's sickle)
+			_show_weapon(weapon_id)
+	_show_cult_held()
 	for c: MeshInstance3D in _claws:
 		c.visible = def.get("claws", false)
 	_visual.position = Vector3.ZERO
@@ -1903,8 +1907,24 @@ func net_apply(at: Vector3, rot: float, flags: int, hp_fraction: float, anim_nam
 		position = at
 
 
+## Its blow up close. What a body was made holding (a cult staff or spear, ZombieDefs "blow") is swung
+## with its own move: a punch's closed fist would turn a staff's head behind it.
+func _blow_anim() -> String:
+	if def.has("blow") and weapon_id == "":
+		return str(def["blow"])
+	return BodyAnim.mob_attack(weapon_id, def.get("claws", false))
+
+
+## What a cultist was made holding (a Worshipper's sickle) is put away while it carries something else.
+func _show_cult_held() -> void:
+	for piece in _parts:
+		if piece.has_meta("cult_held"):
+			piece.visible = weapon_id == ""
+
+
 func net_weapon(id: String) -> void:
 	weapon_id = id
+	_show_cult_held()
 	if id == "" or not WeaponDefs.ALL.has(id):
 		# Disarmed on the host: empty the hand here too.
 		if _hand_mesh:
@@ -3273,7 +3293,7 @@ func _combat(target: Target, dist: float, delta: float) -> void:
 		_attack_left = ATTACK_TIME
 		_attack_hit_pending = true
 		_current_anim = ""
-		_play(BodyAnim.mob_attack(weapon_id, def.get("claws", false)), 1.4, 0.1)
+		_play(_blow_anim(), 1.4, 0.1)
 		world.sfx_at(_attack_sound(), position, -8.0)
 
 

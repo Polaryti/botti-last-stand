@@ -10,6 +10,8 @@ const POSE_EVERY := 0.066
 const REPATH_EVERY := 1.0
 const SEE_ZOMBIES := 20.0
 const SEE_RIVALS := 35.0
+const GOD_SIGHT := 48.0 # a god towers over everything: seen from much further than the rest
+const AT_YOUR_THROAT := 5.0 # nearer than this, whatever it is comes before a god
 const FOLLOW_AT := 5.0
 const SHOT_REACH := 22.0
 const MELEE_SLACK := 0.3
@@ -232,6 +234,10 @@ func _spend_points() -> void:
 func _decide() -> void:
 	var eye := pawn.eye_position()
 	var zombie: Zombie = world.nearest_zombie(eye, SEE_ZOMBIES * float(_smart["see"]), true)
+	# Dawn waits on a god: seen, it is the one to fight, unless something nearer is at its throat.
+	var god := _god_in_sight(eye)
+	if god and (zombie == null or zombie.position.distance_to(pawn.global_position) > AT_YOUR_THROAT):
+		zombie = god
 	var rival := _nearest_rival(SEE_RIVALS * float(_smart["see"]), true)
 	_target = zombie
 	if rival:
@@ -426,7 +432,28 @@ func _target_alive() -> bool:
 
 
 func _target_point() -> Vector3:
+	if _target is Zombie and (_target as Zombie).def.get("god_boss", false):
+		var seen := _sight_point(pawn.eye_position(), _target as Zombie)
+		return seen if seen != Vector3.INF else (_target as Zombie).centre()
 	return (_target as Zombie).centre() if _target is Zombie else _target.global_position + Vector3.UP * 1.1
+
+
+## A god in sight, if there is one.
+func _god_in_sight(eye: Vector3) -> Zombie:
+	for z: Zombie in world.zombies:
+		if z.is_alive() and not z.dormant and z.def.get("god_boss", false) and z.position.distance_to(pawn.global_position) < GOD_SIGHT and _sight_point(eye, z) != Vector3.INF:
+			return z
+	return null
+
+
+## Somewhere on a towering body that can be seen from here: its middle, else lower, else higher.
+## INF when none of it can.
+func _sight_point(eye: Vector3, z: Zombie) -> Vector3:
+	for f: float in [0.55, 0.3, 0.8]:
+		var at := z.position + Vector3.UP * z.height * f
+		if world.has_line_of_sight(eye, at):
+			return at
+	return Vector3.INF
 
 
 # --- Weapons -------------------------------------------------------------------
