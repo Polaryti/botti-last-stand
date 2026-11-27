@@ -221,6 +221,10 @@ static func facts() -> Dictionary:
 		"transmute": [AscendantKit.TRANSMUTE_HEAL],
 		"alembic": [AscendantKit.ALEMBIC],
 		"crucible_heart": [AscendantKit.CRUCIBLE_DAMAGE, AscendantKit.CRUCIBLE_RADIUS, AscendantKit.CRUCIBLE_BURN],
+		"adorer_pelagros_entry": [AscendantKit.FEAST_RADIUS, AscendantKit.FEAST_HEAL, AscendantKit.FEAST_DAMAGE],
+		"hearth_guard": [AscendantKit.FEAST_WARD],
+		"host_reward": [AscendantKit.FEAST_REFUND],
+		"last_course": [AscendantKit.FEAST_COURSE, AscendantKit.FEAST_LAST],
 		# Fontanova's weapons and finds
 		"weapon:censer_flail": [(WeaponDefs.ALL["censer_flail"]["censer_smoke"] as Vector2).x, (WeaponDefs.ALL["censer_flail"]["censer_smoke"] as Vector2).y],
 		"power:honeycomb": [PowerDefs.COMB_INTERVAL, PowerDefs.COMB_REACH, PowerDefs.COMB_STING, PowerDefs.COMB_POISON.x, PowerDefs.COMB_POISON.y, PowerDefs.COMB_FORAGE],

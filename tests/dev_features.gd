@@ -3143,7 +3143,7 @@ func _fonta_cult(isle: World) -> void:
 	await frames(1)
 	for id: String in CultMind.CULT:
 		var d: Dictionary = ZombieDefs.ALL[id]
-		check(d["maps"] == ["fontanova"] and CodexPanel.enemy_group(id) == 7 and Icons.exists(id) and str(d.get("lore", "")).length() > 60 and CultMind.handles(id), id + ": of Fontanova's cult, in the Codex with its icon, lore and mind")
+		check(d["maps"].has("fontanova") and SpawnRules.is_archipelago(d) and CodexPanel.enemy_group(id) == 7 and Icons.exists(id) and str(d.get("lore", "")).length() > 60 and CultMind.handles(id), id + ": of Fontanova's cult, in the Codex with its icon, lore and mind")
 		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
 			var sound: String = table.get(id, "")
 			check(sound != "" and Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s has its own voice (%s)" % [id, sound])
@@ -3701,8 +3701,8 @@ func _fonta_mutants(isle: World) -> void:
 	# Who they are.
 	for id: String in FontaModels.KINDS:
 		var d: Dictionary = ZombieDefs.ALL[id]
-		check(d["maps"] == ["fontanova"] and SpawnRules.is_archipelago(d) and CodexPanel.enemy_group(id) == 6 and Icons.exists(id) and str(d.get("lore", "")).length() > 60, id + ": of Fontanova, in the Codex with its icon and lore")
-		check(not ZombieDefs.roams(id, 600, "vael") and not ZombieDefs.roams(id, 600, "village") and not ZombieDefs.roams(id, 600, "mists"), id + " lives only on Fontanova")
+		check(d["maps"].has("fontanova") and SpawnRules.is_archipelago(d) and CodexPanel.enemy_group(id) == 6 and Icons.exists(id) and str(d.get("lore", "")).length() > 60, id + ": of Fontanova, in the Codex with its icon and lore")
+		check(not ZombieDefs.roams(id, 600, "vael") and not ZombieDefs.roams(id, 600, "village") and not ZombieDefs.roams(id, 600, "mists"), id + " stays in the Archipelagos")
 		var model := MesenllaModels.build(id)
 		check(MesenllaModels.KINDS.has(id) and model.has_node("Rig") and FontaMind.handles(id), id + " has its own model and mind")
 		model.free()

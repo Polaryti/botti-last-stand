@@ -67,6 +67,7 @@ const FEAST_HEAL := 18.0
 const FEAST_DAMAGE := 38.0
 const FEAST_COURSE := 12.0
 const FEAST_WARD := 1.1
+const FEAST_REFUND := 2.0
 const FEAST_LAST := 26.0
 
 const ARTS := {
@@ -112,7 +113,7 @@ static func feast(p: Player) -> void:
 		Net.guard_peer(p.world.peer_of(ally), protection, healing)
 	var hits := _crash(p, radius, damage, 0.0, null)
 	if hits > 0 and p.has_flag("feast_refund"):
-		p.art_cd_left = maxf(0.0, p.art_cd_left - 2.0)
+		p.art_cd_left = maxf(0.0, p.art_cd_left - FEAST_REFUND)
 	p.world.end_act(was)
 	p.world.fx_ring(at + Vector3.UP * 0.18, radius * 0.64, Color("f89959"))
 	p.world.sfx_at("feast_bless", at, -1.0)

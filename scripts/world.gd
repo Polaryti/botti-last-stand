@@ -680,7 +680,9 @@ func _map_file() -> String:
 		return Game.test_map
 	match mode:
 		Game.Mode.MENU: return "res://maps/fontanova.tscn" # the title screen of the Archipelagos of the Forgotten Gods
-		Game.Mode.FORT: return "res://maps/%s.tscn" % Game.current_map()
+		Game.Mode.FORT:
+			var stronghold := Net.fort_map if Net.active() else Game.fort_map
+			return "res://maps/%s.tscn" % (stronghold if Game.FORT_MAPS.has(stronghold) else "fort")
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
 			if Game.current_map() == "mists":
