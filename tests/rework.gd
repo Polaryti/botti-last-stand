@@ -613,6 +613,15 @@ func _mists() -> void:
 				ray.exclude = [walker.get_rid()]
 				var hit := mw.get_world_3d().direct_space_state.intersect_ray(ray)
 				blocker = " blocked by %s at %s" % [str((hit["collider"] as Node).get_path()) if hit.has("collider") and hit["collider"] is Node else "nothing", str(hit.get("position", "-"))]
+				# And what holds the walker itself: its own state, and every body it stands in.
+				var touching := PhysicsShapeQueryParameters3D.new()
+				var probe := SphereShape3D.new()
+				probe.radius = walker.body_radius() + 0.3
+				touching.shape = probe
+				touching.transform = Transform3D(Basis(), walker.centre())
+				touching.exclude = [walker.get_rid()]
+				var near := mw.get_world_3d().direct_space_state.intersect_shape(touching, 8).map(func(h: Dictionary) -> String: return "%s(layer %d)" % [(h["collider"] as Node).name if h["collider"] is Node else "?", (h["collider"] as CollisionObject3D).collision_layer if h["collider"] is CollisionObject3D else -1])
+				blocker += "; speed %.1f hop %s vel %s sep %s tick %d gate %.1f layer %d shape_off %s; touching %s" % [walker._desired_speed(), walker._hop_walk, walker.velocity, walker._separation, walker._tick_every, walker._gate_wait, walker.collision_layer, walker._shape.disabled, near]
 			check(reached, "physical mob (%s) from %s reaches goal %s (ended %s, blocked %.1f s)%s" % [body, outside, goal, walker.position, walker._blocked_timer, blocker])
 		walker.release()
 	mp.position = Vector3(0, 10.06, 16)
