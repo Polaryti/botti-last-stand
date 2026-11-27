@@ -9,7 +9,11 @@ extends RefCounted
 
 ## Also the creatures of Port Vael (VaelModels.KINDS), built and moved through here on the same rigs.
 const KINDS := ["bear", "mist_bear", "eagle", "mist_eagle", "shapeshifter", "earth_elemental", "mist_elemental",
-	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan", "wreck_gull", "storm_ray", "bell_wraith", "kraken"]
+	"storm_elemental", "wyvern", "great_revenant_elemental", "war_wyvern", "brine_hound", "lantern_jelly", "angler", "siren", "kraken_arm", "leviathan", "wreck_gull", "storm_ray", "bell_wraith", "kraken",
+	# The mutants of Fontanova (FontaModels).
+	"mutant_bee", "beehive", "mutant_wasp", "mutant_snail", "wasp_hive_snail", "mutant_spider", "battle_ostrich", "ember_moth", "thornback",
+	# Fontanova's god (GodModels).
+	"alquimelea"]
 const FLYERS := ["eagle", "mist_eagle", "wyvern", "war_wyvern"]
 const BOSS_NAMES := {"great_revenant_elemental": "GREAT REVENANT ELEMENTAL", "war_wyvern": "WAR WYVERN"}
 
@@ -670,6 +674,10 @@ static func steed_gait(root: Node3D, gait: float) -> void:
 static func build(id: String) -> Node3D:
 	if id in VaelSkyModels.KINDS:
 		return VaelSkyModels.build(id)
+	if id in FontaModels.KINDS:
+		return FontaModels.build(id)
+	if id in GodModels.KINDS:
+		return GodModels.build(id)
 	var root := Node3D.new()
 	match id:
 		"bear":
@@ -805,6 +813,9 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 	if z.model_id in VaelSkyModels.KINDS:
 		VaelSkyModels.animate(z, root, delta, moving)
 		return
+	if z.model_id in FontaModels.KINDS:
+		FontaModels.animate(z, root, delta, moving)
+		return
 	var t := z.world.now + float(z.net_id) * 0.37
 	var state := z._current_anim
 	# How long it has been in this state, for moves that play out over time (a maul, a slash).
@@ -877,6 +888,8 @@ static func animate(z: Zombie, root: Node3D, delta: float, moving: float) -> voi
 			KrakenModels.animate_arm(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
 		"kraken":
 			KrakenModels.animate_kraken(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
+		"alquimelea":
+			GodModels.animate(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
 		"leviathan":
 			VaelModels.animate_leviathan(z, root, delta, state, t, float(root.get_meta("act_t", 0.0)))
 	if z.model_id == "war_wyvern":
@@ -1432,6 +1445,10 @@ static func reset_pose(root: Node3D) -> void:
 		if node is MeshInstance3D or node is Label3D:
 			node.visible = true
 	root.remove_meta("side")
+	# A Fontanova mutant's death beats (FontaModels.fall) start over.
+	for key: StringName in root.get_meta_list():
+		if str(key).begins_with("did_") or key == &"landed_at":
+			root.remove_meta(key)
 	# The Shapeshifter stands as a stag again, the Revenant's stones are still.
 	var beast := root.get_node_or_null("Beast") as Node3D
 	if beast:
@@ -1451,6 +1468,10 @@ static func reset_pose(root: Node3D) -> void:
 
 ## How long each kind takes to die before the body is gone.
 static func death_time(id: String) -> float:
+	if id in FontaModels.KINDS:
+		return FontaModels.death_time(id)
+	if id in GodModels.KINDS:
+		return GodModels.DEATH_TIME
 	match id:
 		"great_revenant_elemental", "war_wyvern":
 			return 3.2
@@ -1512,6 +1533,12 @@ static func begin_death(z: Zombie, root: Node3D) -> void:
 static func animate_death(z: Zombie, root: Node3D, k: float, delta: float) -> void:
 	if z.model_id in VaelSkyModels.KINDS:
 		VaelSkyModels.fall(root, k, delta)
+		return
+	if z.model_id in FontaModels.KINDS:
+		FontaModels.fall(z, root, k, delta)
+		return
+	if z.model_id in GodModels.KINDS:
+		GodModels.fall(z, root, k, delta)
 		return
 	var side := float(root.get_meta("side", 1.0))
 	var total := death_time(z.model_id)

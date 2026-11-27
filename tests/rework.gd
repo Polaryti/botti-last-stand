@@ -53,6 +53,10 @@ func _ready() -> void:
 	await _harpooner()
 	print("REWORK tidecaller")
 	await _tidecaller()
+	print("REWORK ascendant")
+	await _ascendant()
+	print("REWORK fontanova finds")
+	await _fonta_finds()
 	print("REWORK ferryman")
 	check(ClassDefs.disabled("ferryman") and not ClassDefs.available().has("ferryman"), "Ferryman is disabled and absent from playable classes")
 	print("REWORK walls")
@@ -1785,6 +1789,245 @@ func _class_codes() -> void:
 		var d: Dictionary = ClassDefs.ALL[id]
 		if d.get("hidden", false) and not ClassDefs.disabled(id):
 			check(coded.has(id), "%s can be opened with a code" % d["name"])
+
+
+## Lets a leap run its course, frame by frame, as it would in play.
+func _leap_through() -> void:
+	for i in 120:
+		if p._leap_t < 0.0:
+			return
+		await get_tree().physics_frame
+
+
+func _ascendant() -> void:
+	var d: Dictionary = ClassDefs.ALL["ascendant"]
+	check(d["weapon"] == "ruin_greataxe" and d.get("earned", "") == "archipelago" and not ClassDefs.for_sale().has("ascendant") and ClassDefs.available().has("ascendant") == Game.owns_class("ascendant"), "the Ascendant starts with the Ruin-Breaker Greataxe and is earned in the Archipelagos")
+	check(ClassDefs.weapon_categories("ascendant") == Array(["melee", "two_handed", "ranged"], TYPE_STRING, "", null), "it wields Melee, Two-Handed and Ranged weapons")
+	var specs: Array = AbilityData.tree("ascendant")["specs"]
+	check(specs.map(func(x: Dictionary) -> String: return x["id"]) == ["godslayer", "adorer"] and not specs[0].has("earned") and specs[1].get("earned", "") == "adorer", "two professions: the Godslayer, always open, and the Adorer of Al'quimelea, to be earned")
+	for id: String in ["crest_ascendant", "spec_godslayer", "spec_adorer", "ascend", "deicide", "elixir", "rite_break", "ruin_greataxe"]:
+		check(ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s icon" % id)
+	for sound: String in ["ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	check(ClassGear._pieces("ascendant").has("hips:glow") and Avatar.MODELS.has("ascendant") and ClassPresentation.COPY.has("ascendant"), "dressed, seen by others, and described")
+	# Earned by playing a match on Fontanova to its end, won or lost; the Adorer by winning there as one.
+	var had: Dictionary = Game.unlocked.duplicate()
+	var had_specs: Dictionary = Game.earned_specs.duplicate()
+	var was_mode := Game.mode
+	var was_map := Game.night_map
+	var was_class := Game.player_class
+	var games := Game.finished_games
+	Game.unlocked.erase("ascendant")
+	Game.mode = Game.Mode.NIGHT
+	Game.night_map = "vael"
+	Game.note_game_finished()
+	check(not Game.owns_class("ascendant") and Game.earn_text("ascendant").contains("Fontanova"), "a match elsewhere does not earn it, and it says to play on Fontanova")
+	Game.night_map = "fontanova"
+	Game.note_game_finished()
+	check(Game.owns_class("ascendant") and Game.fresh_unlocks.has("ascendant"), "a match on Fontanova, played to its end, earns the Ascendant")
+	Game.fresh_unlocks.erase("ascendant")
+	Game.earned_specs.erase("adorer")
+	Game.player_class = "infantry"
+	Game.note_beyond_win()
+	check(not Game.earned_specs.has("adorer"), "a win on Fontanova as another class does not earn the Adorer")
+	Game.player_class = "ascendant"
+	Game.night_map = "vael"
+	Game.note_beyond_win()
+	check(not Game.earned_specs.has("adorer"), "nor a win elsewhere as the Ascendant")
+	Game.night_map = "fontanova"
+	Game.note_beyond_win()
+	check(Game.earned_specs.has("adorer") and Game.fresh_specs.has("adorer") and Game.owns_spec(specs[1]), "a win on Fontanova as the Ascendant earns the Adorer of Al'quimelea")
+	Game.fresh_specs.clear()
+	Game.earned_specs.erase("adorer")
+	Game.mode = Game.Mode.SANDBOX
+	Game.note_beyond_win()
+	check(not Game.earned_specs.has("adorer"), "but not in the Sandbox")
+	Game.unlocked = had
+	Game.mode = was_mode
+	Game.night_map = was_map
+	Game.player_class = was_class
+	Game.finished_games = games
+	# Not yet earned, the Adorer cannot be taken; its card says how to earn it. Earned, it can. A bot never takes it.
+	Game.earned_specs.erase("adorer")
+	pawn("ascendant")
+	p.points = 4
+	for step in Player.CORE_STEPS:
+		p.choose_ability(step, 0)
+	check(not p.spec_open(specs[1]) and not p.choose_ability(Player.CORE_STEPS, 1) and p.spec_id == "", "the Adorer, not yet earned, cannot be taken")
+	check(Game.spec_earn_text(specs[1]).contains("Fontanova") and Game.spec_earn_text(specs[1]).contains("Ascendant"), "and it says how to earn it")
+	var panel := TreePanel.new()
+	panel.theme = UiTheme.make()
+	panel.player = p
+	add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.build()
+	await frames(1)
+	var locked := panel.find_children("LockedCard", "Button", true, false)
+	check(locked.size() == 1 and (locked[0] as Button).disabled and (locked[0] as Button).find_children("*", "Label", true, false).any(func(l: Label) -> bool: return l.text == Game.spec_earn_text(specs[1])), "the profession card is locked, and says how to earn it")
+	# Tapped on the map, the locked profession reads in full, its words inside the panel.
+	var entry_node: Variant = null
+	for n: Node in panel.find_children("*", "", true, false):
+		if n.get("ability") is Dictionary and str(n.get("ability").get("id", "")) == "adorer_entry":
+			entry_node = n
+	panel.read(entry_node)
+	await frames(2)
+	var words := panel._zone.find_children("*", "Label", true, false)
+	var how := words.filter(func(l: Label) -> bool: return l.text == Game.spec_earn_text(specs[1]))
+	var inside := words.all(func(l: Label) -> bool: return l.get_global_rect().end.x <= panel.get_global_rect().end.x + 1.0)
+	check(how.size() == 1 and (how[0] as Label).autowrap_mode != TextServer.AUTOWRAP_OFF and inside, "read on the map, the locked profession says how to earn it, and every line stays inside the panel")
+	panel.queue_free()
+	Game.earned_specs["adorer"] = true
+	check(p.spec_open(specs[1]) and p.choose_ability(Player.CORE_STEPS, 1) and p.spec_id == "adorer", "earned, it can be taken")
+	p.bot_peer = 77
+	check(not p.spec_open(specs[1]) and p.spec_open(specs[0]), "a bot never takes a profession that has to be earned")
+	p.bot_peer = 0
+	# Ascend: up, and down on everything near where it lands.
+	pawn("ascendant")
+	_face_ahead()
+	check(p.weapon_id() == "ruin_greataxe" and p.art_def()["name"] == "Ascend", "it holds the Greataxe and has Ascend")
+	var near_a := foe("normal", AscendantKit.ASCEND_REACH - 1.0, -0.6)
+	var near_b := foe("normal", AscendantKit.ASCEND_REACH - 1.0, 0.6)
+	var far := foe("normal", 2.0, 9.0)
+	for z: Zombie in [near_a, near_b, far]:
+		z.set_physics_process(false) # they stand where they are put, so what is measured is the leap
+	var a0 := near_a.hp
+	var f0 := far.hp
+	var from := p.global_position
+	AscendantKit.ascend(p)
+	check(p._leap_t >= 0.0 and p.ascending == "ascend", "Ascend leaps")
+	await _leap_through()
+	var landed := p.global_position
+	var gap := Vector2(near_a.position.x - landed.x, near_a.position.z - landed.z).length()
+	check(p.ascending == "" and near_a.hp < a0 and near_b._stun > 0.0 and is_equal_approx(far.hp, f0),
+		"and comes down on what is near where it lands, stunning it, and nothing further (leapt %.1f m; %.1f m from the nearest; it took %.0f)" % [Vector2(landed.x - from.x, landed.z - from.z).length(), gap, a0 - near_a.hp])
+	check(is_equal_approx(AscendantKit.damage_scale(p, near_a), 1.0), "a lesser enemy takes no more than anyone's blow (the divine are tried on Fontanova: dev_features)")
+	# Godslayer: Deicide ends what is low, and breaks what is being readied, even a miniboss's.
+	pawn("ascendant", 0, true)
+	_face_ahead()
+	check(p.art_def()["name"] == "Deicide", "a Godslayer's Ascend is Deicide")
+	var low := foe("normal", 6.0, 0.0, 1000.0)
+	low.hp = 200.0
+	AscendantKit.deicide(p)
+	check(p.deicide_on == low, "it leaps on the enemy it faces")
+	await _leap_through()
+	check(not low.is_alive(), "and ends it, below %d%% health" % roundi(AscendantKit.execute_below(p) * 100.0))
+	# Adorer: the Elixir of Change.
+	pawn("ascendant", 1, true)
+	_face_ahead()
+	check(p.art_def()["name"] == "Elixir of Change", "an Adorer's Ascend is the Elixir of Change")
+	var in_field := foe("normal", 2.0)
+	var outside := foe("normal", 9.0)
+	for z: Zombie in [in_field, outside]:
+		z.set_physics_process(false) # where they are put: one in the field, one well out of it
+	var speed := p.m("speed")
+	AscendantKit.drink(p)
+	check(is_equal_approx(p.changed_left, AscendantKit.changed_time(p)) and is_equal_approx(p.m("speed"), speed + AscendantKit.CHANGED_SPEED), "it drinks and is Changed, quicker")
+	await get_tree().create_timer(AscendantKit.FIELD_TELL + 0.15).timeout
+	check(in_field.poison_left > 0.0 and in_field.root_left > 0.0 and outside.poison_left <= 0.0, "the field of change poisons and holds what is still in it")
+	var struck := foe("normal", 1.5, 2.0)
+	p.on_melee_connect(struck, WeaponDefs.ALL["ruin_greataxe"])
+	check(struck.poison_left > 0.0, "Changed, its blows poison")
+	check(is_equal_approx(AscendantKit.hurt_scale(p), 1.0 - AscendantKit.THICK_HIDE) or not p.has_flag("thick_hide"), "Thick Hide: less harm while Changed")
+	var ring := foe("normal", 2.5, 2.5)
+	var r0 := ring.hp
+	p.flags["crucible"] = true
+	p.changed_left = 0.01
+	AscendantKit.tick(p, 0.02)
+	check(p.changed_left == 0.0 and not p._buffs.has("changed") and ring.hp < r0 and ring.burn_time > 0.0, "the change ends, and its Crucible Heart bursts out")
+	Game.earned_specs = had_specs
+	pawn("infantry")
+
+
+## Fontanova's three weapons, the Honeycomb familiar and the Mysterious Flask.
+func _fonta_finds() -> void:
+	for id: String in ["censer_flail", "resin_repeater", "ruin_greataxe"]:
+		var wd: Dictionary = WeaponDefs.ALL[id]
+		check(WeaponDefs.lies_around(id) and SpawnRules.allows(wd, "fontanova") and not SpawnRules.allows(wd, "village") and WeaponDefs.mesh(id) != null and Icons.weapon(id) == id and ResourceLoader.exists("res://assets/icons/%s.png" % id), "%s lies about only on Fontanova, with its own model and icon" % id)
+		check(str(wd.get("lore", "")).length() > 40 and not RegEx.create_from_string("\\d").search(str(wd["lore"])), "%s has a story of its own, with no numbers in it" % id)
+	check(WeaponDefs.category("censer_flail") == "melee" and WeaponDefs.category("resin_repeater") == "ranged" and WeaponDefs.category("ruin_greataxe") == "two_handed", "one melee, one ranged, one two-handed")
+	for sound: String in ["censer_swing", "censer_ready", "censer_release", "repeater_shot", "greataxe_swing", "honeycomb_hum", "honey_forage", "flask_drink", "flask_sour"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# The Censer Flail: packed by each blow that lands, then a release all round.
+	pawn("infantry")
+	_face_ahead()
+	p.slots = ["censer_flail", null]
+	p.current = 0
+	p._equip()
+	var cd: Dictionary = WeaponDefs.ALL["censer_flail"]
+	var front := foe("normal", 1.6)
+	front.stun(60.0)
+	for i in int(cd["censer"]):
+		p._do_melee_hit()
+	check(p.censer == int(cd["censer"]), "%d blows that land fill the censer" % int(cd["censer"]))
+	var behind := foe("normal", -2.4)
+	behind.stun(60.0)
+	var b0 := behind.hp
+	p._do_melee_hit()
+	check(p.censer == 0 and behind.hp < b0 and behind.poison_left > 0.0, "the next swing is its release: it strikes all round, behind too, and its smoke poisons")
+	# The Resin Repeater: harder into what flies.
+	pawn("infantry")
+	_face_ahead()
+	var bee := foe("normal", 6.0)
+	bee.flies = true # what counts is that it flies (Fontanova's bees are tried there)
+	var walker := foe("normal", 6.0, 3.0)
+	bee.set_physics_process(false)
+	walker.set_physics_process(false)
+	p.slots = ["resin_repeater", null]
+	p._equip()
+	var shot := w.spawn_player_arrow(p, p.eye_position(), Vector3(0, 0, -50), 0.6, 34.0, 1.0, 20.0)
+	var e0 := bee.hp
+	shot._hit_zombie(bee, bee.centre())
+	var into_bee := e0 - bee.hp
+	shot = w.spawn_player_arrow(p, p.eye_position(), Vector3(0, 0, -50), 0.6, 34.0, 1.0, 20.0)
+	e0 = walker.hp
+	shot._hit_zombie(walker, walker.centre())
+	var into_walker := e0 - walker.hp
+	check(into_walker > 0.0 and absf(into_bee / into_walker - float(WeaponDefs.ALL["resin_repeater"]["flyers"])) < 0.05, "its bolts strike what flies %d%% harder" % roundi((float(WeaponDefs.ALL["resin_repeater"]["flyers"]) - 1.0) * 100.0))
+	shot.stop()
+	# The Honeycomb: its bees sting what you last struck, and it forages Honey.
+	pawn("infantry")
+	_face_ahead()
+	var comb: Dictionary = PowerDefs.ALL["honeycomb"]
+	check(comb["familiar"] and comb["maps"] == ["fontanova"] and Icons.power("honeycomb") == "honeycomb" and ResourceLoader.exists("res://assets/icons/honeycomb.png") and PowerDefs.mesh("honeycomb") != null, "the Honeycomb is Fontanova's familiar, with its own model and icon")
+	var near_one := foe("normal", 3.0)
+	var struck_one := foe("normal", 7.0, 2.0)
+	p.activate_power("honeycomb")
+	p.on_melee_connect(struck_one, WeaponDefs.ALL["sword"])
+	var n0 := near_one.hp
+	var s1 := struck_one.hp
+	p._tick_honeycomb(1.0)
+	check(near_one.hp == n0 and struck_one.hp < s1 and struck_one.poison_left > 0.0, "its bees sting the last enemy you struck, not the nearest, and poison it")
+	struck_one.release()
+	await frames(1)
+	n0 = near_one.hp
+	p._tick_honeycomb(PowerDefs.COMB_INTERVAL)
+	check(near_one.hp < n0, "with that one gone, the nearest")
+	var honey := w.pickups.filter(func(k: Pickup) -> bool: return k.item_id == "honey").size()
+	p._tick_honeycomb(PowerDefs.COMB_FORAGE)
+	check(w.pickups.filter(func(k: Pickup) -> bool: return k.item_id == "honey").size() == honey + 1, "and every %d s it brings a Honey" % int(PowerDefs.COMB_FORAGE))
+	# The Mysterious Flask: one gift at a time, or now and then poison.
+	var gifts := 0
+	var poisoned := 0
+	for i in 400:
+		p.poison_left = 0.0
+		p.guard_left = 0.0
+		p._buffs.clear()
+		p.activate_power("mystery_flask")
+		var held := p._buffs.keys().filter(func(k: String) -> bool: return k.begins_with("flask_"))
+		if p.poison_left > 0.0:
+			poisoned += 1
+			if poisoned == 1:
+				check(held.is_empty() and not p.has_power("mystery_flask"), "a turned flask gives nothing else")
+		elif not held.is_empty():
+			gifts += 1
+	check(poisoned > 0 and gifts > 0 and gifts + poisoned == 400 and absf(float(poisoned) / 400.0 - PowerDefs.FLASK_BAD) < 0.06, "the flask gives one of its gifts, and one in %d is turned (%d of 400)" % [roundi(1.0 / PowerDefs.FLASK_BAD), poisoned])
+	p._buffs.clear()
+	p.take_flask_gift(PowerDefs.FLASK_GIFTS[1], 10.0)
+	p.take_flask_gift(PowerDefs.FLASK_GIFTS[0], 10.0)
+	check(p._buffs.has("flask_speed") and not p._buffs.has("flask_melee_damage"), "a new flask's gift takes the place of the last")
+	p._buffs.clear()
+	p.poison_left = 0.0
+	pawn("infantry")
 
 
 func _harpooner() -> void:

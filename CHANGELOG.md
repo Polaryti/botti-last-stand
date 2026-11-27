@@ -1,5 +1,85 @@
 # Changelog
 
+## 0.23.0 — Archipelagos of the Forgotten Gods (27 November 2026)
+
+*After Port Vael, a ship sails on to Fontanova, the first island of an archipelago whose people worshipped gods now forgotten. One of them never left.* A new island with its own rites, creatures, cult and god, a new class, new weapons, a sea chart of the Archipelago and a random place to play.
+
+### Fontanova, a new map
+- **An island in the open sea**, for Survive the Night, Co-op, All vs All and Teams. The night lasts 12 minutes.
+- You land in a cove beside the old merchant ship that brought you, run aground on the beach.
+- Olive terraces climb from the shore; the Sacred Way's stair climbs on to the temple on the Acropolis crag, 34 m up.
+- The worshippers' village stands on the rim of the Ravine. Two rope bridges cross it to the West Ridge and Kerys' Watch. A fall into the Ravine kills.
+- The Holm Wood on its height, the Fallen Colossus, and the shattered statues of five gods.
+- **Dense Mediterranean flora:** ten kinds of tree, a carpet of grass, and drifts of flowers and shrubs, all swaying in the wind.
+- Fireflies, falling petals and leaves, shooting stars, and its own music.
+- **The sea:** wading slows you, and out of your depth it drowns you after 2.5 s.
+
+### Rites of Fontanova
+- **The Oracle's Grotto:** light its three braziers to open the sanctum, which holds a rare weapon and the Oracle's Eye.
+- **Oracle's Eye:** marks every enemy within 36 m, through rock, and your blows land 20% harder. Fall, and it is lost for good.
+- **Waking altars:** from 2:00, one god's altar wakes every 2 minutes. Hold it for 10 s, and all who stand there are blessed at once, for a minute. The altar says what each blessing gives.
+- **The rising sea:** at 3:20, 6:40 and 10:00 the sea floods the beaches for a minute.
+- **Transmutation blooms:** from 2:40, violet blooms break through somewhere on the island. Once open, they poison and hurt whoever stands among them.
+- **Royal Jelly:** a broken Beehive also leaves Royal Jelly. It restores your health, mana and every ability, and quickens you for 45 s.
+
+### Creatures of Fontanova
+- **Mutant Bee:** curls its stinger forward, then dives where you stood. Its sting poisons for 4 s.
+- **Beehive:** six grow each night. Every blow sends out 2 bees; broken, it spills 4 Honey.
+- **Mutant Wasp:** shoots a venomous stinger from afar (poisons for 3 s), or dives to bite up close.
+- **Mutant Snail:** leaves a trail of poison or embers that lasts 8 s.
+- **Wasp-Hive Snail:** its nest shudders, and a wasp crawls out, up to 3 at once.
+- **Mutant Spider:** from 2:40, waits head down on tree trunks, then drops within 14 m. Its web holds and poisons.
+- **Battle Ostrich:** paws the ground, then charges and kicks you away.
+- **Ember Moth:** spreads its wings for 1 s, then claps; the dust dazzles and burns.
+- **Thornback:** a great tortoise; blows from the front glance off for half.
+- **Honey:** heals 25 and quickens you for 6 s.
+- Every creature has its own model, sounds, icon, Codex page and death.
+
+### The cult of Al'quimelea
+- **Worshippers** come down from their village or the Sacred Way in processions of three, from 1:40. When one falls, the others nearby rush you. One in four carries a hunting bow.
+- **Priests of Change** keep their distance, throw flasks of elixir that poison and slow, and anoint hurt creatures back to health.
+- **Temple Guardians** brace behind their bronze shields, then rush you and bash you down. From the front, blows glance off the shield.
+- **Ostrich Guardians** ride out on their war-birds from 6:00. Bring the bird down and the Guardian fights on foot.
+- Each has its own gear, voice, icon and Codex page; the cult has its own Codex section.
+- **The Hierophant** comes down the Sacred Way once, around 3:00. It throws three flasks at once; hurt, it turns nearby Worshippers into mutants.
+- **The Polemarch** marches out of the village once, around 5:30. Its tower shield takes three quarters of a blow from the front. It sweeps its spear to stun, charges, and calls Guardians to its side.
+
+### Al'quimelea
+- **The fallen god of change** comes down from its temple at 9:00. Dawn waits until it falls.
+- It floats over cliffs and chasms, rains elixir, opens fields of change that poison and root, blasts close attackers with its crucible, and lances distant ones with crystal shards.
+- Its flasks and fields fall where you are heading. Once changed, it sends three lances at once.
+- At two thirds and one third of its health, mutants are born of it, and it grows quicker.
+- Its own boss card, bells, voice and a six-second death.
+
+### The Ascendant, a new class
+- **Earned by playing a match on Fontanova** to its end, won or lost.
+- Starts with the Ruin-Breaker Greataxe, and strikes bosses, minibosses and mutants 15% harder.
+- **Ascend** leaps up to 8 m and crashes down on everything near where it lands.
+- **Godslayer:** Deicide leaps on the enemy you face. It ends lesser foes when they are low, and breaks an attack being readied, even a god's.
+- **Adorer of Al'quimelea:** earned by winning on Fontanova as the Ascendant. The Elixir of Change makes you quicker and your blows poisonous, and opens a field of change that poisons and holds.
+- A profession you have not earned yet shows how to earn it.
+
+### Fontanova's weapons and finds
+- **Censer Flail:** each blow packs it with resin. After five, the next swing sweeps all round you in poison smoke.
+- **Resin Repeater:** a quick, flat-shooting crossbow that strikes flying enemies much harder.
+- **Ruin-Breaker Greataxe:** chops through shields, and strikes stone things harder.
+- **Honeycomb**, a familiar: its bees sting what you fight, and it brings you Honey.
+- **Mysterious Flask:** a random gift for 10 seconds. Now and then it has turned, and poisons you.
+
+### Choosing where to play
+- **The Archipelago of the Forgotten Gods** has its own sea chart beyond Port Vael's coast, with Fontanova as its first island.
+- **Random place**, alone or together: each match is somewhere you have not just played.
+
+### Screens
+- New app icon and splash. The menu tours Fontanova to the Archipelagos' own theme.
+
+### Fixes
+- **Codex:** when an enemy first appears is only shown once you have killed one.
+- **Codex:** the Kraken and the Leviathan wear the boss crown, and bosses and minibosses no longer read "Appears from 166:39".
+- **Whaler's Harpoon:** throwing it leaves its slot empty until it comes back. With both hands full by then, it lands at your feet.
+- Creatures backing away from you no longer get stuck against walls. Cornered, they stand and fight.
+- Online matches need everyone on 0.23.0.
+
 ## 0.22.1 — The Sunken Crown (24 November 2026)
 
 *Down the road from the Valleys lies Vael, a harbour kingdom drowned when the Mists rose like a sea. Its Hollow Sovereign still holds court.* A new map with its own tide, creatures, court and bosses, a new class, coast weapons, nine Class Upgrades and the Trappers' Guild.

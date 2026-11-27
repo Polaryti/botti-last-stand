@@ -234,7 +234,11 @@ func _show_cards(step: int, options: Array) -> void:
 			col = specs[i]["color"]
 		elif player.spec_id != "":
 			col = player.spec_def()["color"]
-		row.add_child(_card(step, i, a, col, count, text_w, text_h))
+		var card := _card(step, i, a, col, count, text_w, text_h)
+		if picking_spec and not player.spec_open(specs[i]):
+			# Not earned yet: the card says how, and cannot be taken.
+			_lock_card(card, Game.spec_earn_text(specs[i]))
+		row.add_child(card)
 
 
 ## One choice, large enough to read in a hurry. One tap takes it.
@@ -285,6 +289,23 @@ func _card(step: int, index: int, a: Dictionary, col: Color, count: int, text_w 
 	return b
 
 
+## A profession not yet earned, among the choices: greyed, padlocked, its words saying how to earn it.
+func _lock_card(card: Button, how: String) -> void:
+	card.disabled = true
+	card.modulate = Color(1, 1, 1, 0.62)
+	card.name = "LockedCard"
+	var labels := card.find_children("*", "Label", true, false)
+	if labels.size() >= 2:
+		(labels[1] as Label).text = how
+		(labels[1] as Label).add_theme_color_override("font_color", UiTheme.ASH)
+	card.add_theme_stylebox_override("disabled", UiTheme.flat(UiTheme.DUSK, UiTheme.STEEL, 10, 0.0))
+	var lock := IconView.new("lock", UiTheme.STEEL, 40.0)
+	lock.name = "Padlock"
+	lock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(lock)
+	lock.position = Vector2(10, 10)
+
+
 func _show_waiting(step: int, total: int) -> void:
 	var line := "Tap anything on the map below to read it."
 	if player.level >= ClassDefs.MAX_LEVEL and player.points == 0 and step >= total:
@@ -326,12 +347,16 @@ func _show_reading() -> void:
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.add_child(desc)
 	# Room for the words: the width left beside the picture and the buttons, and the height left
-	# under the name, above the line that says where it stands.
-	_fit_pair(name_label, desc, _zone_width() - 120.0 - 18.0 * 2.0 - 190.0, ZONE_HIGH - 34.0, [34, 30, 26], range(27, 15, -1))
+	# under the name, above the line that says where it stands. That line wraps too (a profession still
+	# to be earned says how, in a sentence), and its height comes off what the rest may use.
+	var width := _zone_width() - 120.0 - 18.0 * 2.0 - 190.0
 	var state := Label.new()
 	state.text = _state_words(_reading)
 	state.add_theme_font_size_override("font_size", UiTheme.FS_BODY)
 	state.add_theme_color_override("font_color", UiTheme.EMBER)
+	state.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var state_h := text_height(get_theme_font("font", "Label"), state.text, width, UiTheme.FS_BODY, get_theme_constant("line_spacing", "Label"))
+	_fit_pair(name_label, desc, width, ZONE_HIGH - maxf(34.0, state_h + 6.0), [34, 30, 26], range(27, 15, -1))
 	text.add_child(state)
 	var buttons := VBoxContainer.new()
 	buttons.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -355,6 +380,8 @@ func _show_reading() -> void:
 
 
 func _state_words(n: TreeNodeButton) -> String:
+	if n.spec >= 0 and not player.spec_open((player.tree_data()["specs"] as Array)[n.spec]):
+		return Game.spec_earn_text((player.tree_data()["specs"] as Array)[n.spec])
 	match state_of(n):
 		"taken": return "You have this."
 		"ready": return "You can take this now."
@@ -383,6 +410,8 @@ func state_of(n: TreeNodeButton) -> String:
 	if taken == n.ability["id"]:
 		return "taken"
 	if n.spec >= 0 and player.spec_id != "" and (player.tree_data()["specs"] as Array)[n.spec]["id"] != player.spec_id:
+		return "locked"
+	if n.spec >= 0 and not player.spec_open((player.tree_data()["specs"] as Array)[n.spec]):
 		return "locked"
 	if taken != null:
 		return "locked"

@@ -62,6 +62,10 @@ const COPY := {
 		"Every soul pays for its passage.",
 		"Cross the dark in a ghostly skiff, through them, and specialize in tolls, the ferry itself, or the souls of the dead."
 	],
+	"ascendant": [
+		"What was worshipped can bleed.",
+		"Leap and crash down with Ascend, strike the divine and the changed harder, and take up a profession: hunt the gods as a Godslayer, or earn the elixir of the Adorer of Al'quimelea."
+	],
 	"commander": [
 		"A single voice can turn the battle.",
 		"Use Command and unlock a profession-specific Last Command at level ten."
@@ -88,6 +92,7 @@ const TAG_STYLES := {
 	"map_mists": [Color("193e4b"), Color("6fb6d6"), Color("a5f0ec")],
 	"map_mesenlla": [Color("2a1f4d"), UiTheme.TWILIGHT, Color("e2d8ff")], # the twilight violet of the lands beyond the Mists
 	"map_vael": [Color("102a3c"), Color("d9a24a"), Color("f4dfb0")], # deep harbour water and the brass of Vael's lamps
+	"map_fontanova": [Color("1f1a33"), Color("b98cf0"), Color("f2d79a")], # the island's night and the god's violet
 }
 
 
@@ -119,7 +124,7 @@ static func weapon_tags(id: String) -> HFlowContainer:
 
 ## "Map Exclusive · …" in the colour of the maps it belongs to.
 static func map_tag(data: Dictionary) -> PanelContainer:
-	var style := "map_mesenlla" if SpawnRules.is_mesenlla(data) else "map_vael" if SpawnRules.is_vael(data) else ("map_green" if data.get("maps", []).has("village") or data.get("maps", []).has("fort") else "map_mists")
+	var style := "map_mesenlla" if SpawnRules.is_mesenlla(data) else "map_vael" if SpawnRules.is_vael(data) else "map_fontanova" if SpawnRules.is_archipelago(data) else ("map_green" if data.get("maps", []).has("village") or data.get("maps", []).has("fort") else "map_mists")
 	return tag("Map Exclusive · " + SpawnRules.names(data), style)
 
 static func profession(spec: Dictionary) -> String:

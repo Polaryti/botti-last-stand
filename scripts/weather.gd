@@ -11,7 +11,7 @@ enum Kind { CLEAR, RAIN, STORM, WINDY } # new kinds at the end: the number trave
 const STORM_CHANCE := 0.05 # of nights
 const RAIN_CHANCE := 0.16 # of nights, besides the storms
 const WINDY_CHANCE := 0.1 # of nights, where the wind blows
-const WINDY_MAPS := ["mesenlla", "bastion", "vael", "lantern_road"]
+const WINDY_MAPS := ["mesenlla", "bastion", "vael", "lantern_road", "fontanova"]
 const DRY_MAPS := ["mists"] # no rain and no storms there
 const WIND_SPEED := 13.0
 const WIND_STREAKS := [40, 80, 120]
@@ -87,6 +87,8 @@ func set_kind(new_kind: int) -> void:
 		_rain.visible = wet
 	Sfx.rain(wet, -9.0)
 	var windy := kind == Kind.WINDY
+	# Fontanova's trees and flowers bend with it.
+	FontaFlora.set_wind(1.0 if windy else 0.0, wind_dir)
 	if windy and _wind == null:
 		_build_wind()
 	if _wind:

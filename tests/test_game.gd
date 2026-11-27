@@ -2066,6 +2066,55 @@ func test_version_15() -> void:
 	var names: Array = m.panel.find_children("*", "Button", true, false).map(func(b: Button) -> String: return b.text)
 	var night_atlas := m.panel.find_child("WorldAtlas", true, false) as WorldAtlas
 	ok(night_atlas != null and night_atlas.allowed == Game.MAPS.keys(), "you can choose where to spend the night on the world atlas: %s" % (str(night_atlas.allowed) if night_atlas else "none"))
+	# Two charts: the Known World, and the Archipelago of the Forgotten Gods out at sea beyond Port Vael.
+	if night_atlas:
+		var medal := func(id: String) -> Button: return night_atlas.find_child("Place_" + id, true, false) as Button
+		ok(night_atlas.view == WorldAtlas.view_of(Game.night_map), "the atlas opens on the chart where your place is")
+		night_atlas.show_view(WorldAtlas.WORLD)
+		ok(not medal.call("fontanova").visible and medal.call("vael").visible and medal.call("village").visible, "the Known World: Fontanova is not on it, inland or anywhere")
+		(m.panel.find_child("View_" + WorldAtlas.ARCHIPELAGO, true, false) as Button).pressed.emit()
+		await frames(1)
+		ok(night_atlas.view == WorldAtlas.ARCHIPELAGO and medal.call("fontanova").visible and medal.call("vael").visible and not medal.call("village").visible, "the Archipelago: Fontanova out at sea, Port Vael on the coast")
+		var sea: Dictionary = WorldAtlas.SEA_SPOTS
+		ok((sea["fontanova"] as Vector2).x > (sea["vael"] as Vector2).x and (sea["fontanova"] as Vector2).y > (sea["vael"] as Vector2).y, "Fontanova lies out to sea from Port Vael, the first island")
+		(night_atlas.find_child("SeaRoad", true, false) as Button).pressed.emit()
+		await frames(1)
+		ok(night_atlas.view == WorldAtlas.WORLD, "the sea road on the chart leads back to the Known World")
+		# A random place: its own page; Play here keeps it, and each night rolls where.
+		var was_random := Game.night_random
+		(m.panel.find_child("RandomPlace", true, false) as Button).pressed.emit()
+		await frames(1)
+		var says := (m.panel.find_child("PlaceDetail", true, false) as Node).find_children("*", "Label", true, false).map(func(l: Label) -> String: return l.text)
+		ok(says.has("A random place") and night_atlas.selected == "", "Random place shows what it does, with no place picked")
+		(m.panel.find_child("PlayHere", true, false) as Button).pressed.emit()
+		await frames(2)
+		ok(Game.night_random, "Play here on it keeps a random place for your nights")
+		var rolled := {}
+		Game.mode = Game.Mode.NIGHT
+		for i in 40:
+			var last := Game.night_map
+			Game.roll_random_map()
+			rolled[Game.night_map] = true
+			if Game.night_map == last or not Game.MAPS.has(Game.night_map):
+				rolled["bad"] = true
+		ok(not rolled.has("bad") and rolled.size() == Game.MAPS.size(), "each night it is somewhere else, and every place comes up (%s)" % str(rolled.keys()))
+		Game.night_random = false
+		var stays := Game.night_map
+		Game.roll_random_map()
+		ok(Game.night_map == stays, "a chosen place stays chosen")
+		Game.night_random = was_random
+		Game.night_map = saved_map
+	# Together, the host can choose a random place too: rolled as the match starts, from the maps the game allows.
+	var was_rules := Net.rules
+	Net.rules = Net.Rules.FFA
+	ok(Net.playable_maps() == Game.VERSUS_MAPS, "a random versus place comes from the versus maps")
+	Net.rules = Net.Rules.FORT
+	ok(Net.playable_maps() == Game.FORT_MAPS.keys(), "a random siege from the strongholds")
+	Net.rules = Net.Rules.COOP
+	Net.map_random = true
+	ok(Net.listed_map() == "random", "a room waiting on a random place is listed as one")
+	Net.map_random = false
+	Net.rules = was_rules
 	# Choosing where to hold the fort: the Fort, or Mist Bastion.
 	var saved_fort := Game.fort_map
 	var mode_before := Game.mode
@@ -3431,8 +3480,8 @@ func test_flow() -> void:
 	m = load("res://scripts/main.gd").new()
 	add_child(m)
 	await frames(3)
-	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.map_id == "vael", "the title screen shows Port Vael")
-	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "Beyond the Mists", "main title names the restored Beyond the Mists edition")
+	ok(m.world != null and m.world.mode == Game.Mode.MENU and m.world.map_id == "fontanova", "the title screen shows Fontanova")
+	ok((m.panel.find_child("UpdateTitle", true, false) as Label).text == "Archipelagos of the Forgotten Gods", "the main title names the Archipelagos of the Forgotten Gods")
 	ok(m.world.player == null and m.world.zombies.is_empty() and not m.world.director.running, "the title backdrop has no active match")
 	await m.start_game(Game.Mode.SANDBOX)
 	await seconds(3.0)
@@ -4089,7 +4138,7 @@ func test_items() -> void:
 		var heal: float = PowerDefs.FOODS[food]["heal"]
 		w.spawn_pickup_at(pl.global_position, Pickup.Kind.FOOD, food)
 		await seconds(0.3)
-		ok(is_equal_approx(pl.hp, 50.0 + heal), "%s heals %d" % [food, heal])
+		ok(is_equal_approx(pl.hp, minf(pl.max_hp(), 50.0 + heal)), "%s heals %d" % [food, heal] if heal < 900.0 else "%s heals you fully" % food)
 	pl.hp = pl.max_hp()
 	var apple := w.spawn_pickup_at(pl.global_position, Pickup.Kind.FOOD, "apple")
 	await seconds(0.3)
@@ -4118,8 +4167,13 @@ func test_powers() -> void:
 		else:
 			w.spawn_pickup_at(pl.global_position, Pickup.Kind.POWER, id)
 			await seconds(0.25)
+		if id == "mystery_flask" and not pl.has_power(id):
+			# One flask in eight has turned: it poisons instead, and leaves nothing to wear.
+			ok(pl.poison_left > 0.0, "%s activates, or has turned and poisons" % id)
+			pl.poison_left = 0.0
+			continue
 		ok(pl.has_power(id), "%s activates" % id)
-		var want := PowerDefs.CROWN_TIME if PowerDefs.ALL[id].get("relic", false) else 20.0 # a relic is worn until you fall
+		var want := PowerDefs.CROWN_TIME if PowerDefs.ALL[id].get("relic", false) else float(PowerDefs.ALL[id]["time"]) # a relic is worn until you fall
 		ok(absf(float(pl.powers[id]) - want) < 1.0, "%s lasts %d s" % [id, want])
 		pl.powers.erase(id)
 		if pl._familiars.has(id):
@@ -4436,7 +4490,9 @@ func test_trees() -> void:
 	for id: String in ClassDefs.ALL:
 		var tree := AbilityData.tree(id)
 		ok((tree["core"] as Array).size() == Player.CORE_STEPS, "%s has its shared tiers" % id)
-		ok((tree["specs"] as Array).size() == 3, "%s has 3 specializations" % id)
+		# Three professions each; the Ascendant's grow with the gods of the Archipelagos (two so far).
+		var professions := 2 if id == "ascendant" else 3
+		ok((tree["specs"] as Array).size() == professions, "%s has %d specializations" % [id, professions])
 		var ids := {}
 		var icons := {}
 		var bad_icons := 0
@@ -4526,10 +4582,13 @@ func test_trees() -> void:
 	pl.add_xp(5000)
 	ok(pl.level == ClassDefs.MAX_LEVEL, "levels stop at the top")
 
-	# Every ability of every branch can be taken and fired without errors.
+	# Every ability of every branch can be taken and fired without errors (the professions that are
+	# earned, earned for this).
 	await start_clean()
+	var had_specs: Dictionary = Game.earned_specs.duplicate()
+	Game.earned_specs["adorer"] = true
 	for id: String in ClassDefs.ALL:
-		for spec_i in 3:
+		for spec_i in (AbilityData.tree(id)["specs"] as Array).size():
 			for pick in 2:
 				Game.player_class = id
 				await fresh_pawn(id)
@@ -4559,6 +4618,7 @@ func test_trees() -> void:
 				ok(ok_all and pl.spec_id != "" and not pl.dead, "%s %s build %d works" % [id, pl.spec_def()["name"], pick])
 				d.set_physics_process(true)
 				await kill_all()
+	Game.earned_specs = had_specs
 	Game.player_class = "infantry"
 
 

@@ -18,6 +18,7 @@ const CODES := {"c734137a1f7468ebdb5cf20deae67c89b15dc5de26ff06b497548a4a62a3370
 	"8134ddbc51238f953f50369be83a1f67d15ff1a9bf15af44fc9da01b9b8f9c19": "harpooner",
 	"b467740d07272196d7ca893ee099a0f27cf2b91ea0c6f5826b3cc12862cba55c": "tidecaller",
 	"198dc481de37e02396478059dbf04e3edbb784f5b86f4e8cbc75989ae71b5c3f": "ferryman",
+	"d9bca845c05c9fef2cc0fddcccfece5da2c8fe91b53ba194bc7675aac36886a9": "ascendant",
 	"0737b22b9c93c1bbf0a043d938dfb28e119d6c542908f2003d191607b5f03275": "revenant",
 	"7d81bbae5f2dc15cbe7ef6021dad08e08235c315458fde23654b3a3fc88e2031": "artificer",
 	"851722ee3f2991091bcf1a11d634ff05ea3ea54ed49811ef83a8b7b4d2026312": "chivalry",
@@ -51,16 +52,41 @@ var switched_off := {} # bought, and turned off in the Armory
 var pet := "wolf"
 var night_map := "village"
 var fort_map := "fort"
+## A random place instead of a chosen one: rolled afresh each time a night or a siege begins.
+var night_random := false
+var fort_random := false
 const MAPS := {"village": {"name": "The Village", "desc": "Houses, fields, a castle on a hill, and a river to cross."},
 	"mists": {"name": "The Mists", "desc": "Rock islands high above the mist. Don't fall."},
 	"mesenlla": {"name": "Valleys of Mesenlla", "desc": "Mountain slopes, rifts and islands in the twilight."},
-	"vael": {"name": "Port Vael", "desc": "A drowned harbour. Survive fifteen minutes of Mist Tide."}}
+	"vael": {"name": "Port Vael", "desc": "A drowned harbour. Survive fifteen minutes of Mist Tide."},
+	"fontanova": {"name": "Fontanova", "desc": "An island of forgotten gods. Survive twelve minutes."}}
+## The maps of the Archipelagos of the Forgotten Gods: playing on any of them earns the Ascendant.
+const ARCHIPELAGO_MAPS := ["fontanova"]
 ## Where to defend: the Fort round the portal to the Mists, or Mist Bastion beyond them.
 const FORT_MAPS := {"fort": {"name": "The Fort", "desc": "Four gates round a keep, and the portal inside."},
 	"bastion": {"name": "Mist Bastion", "desc": "A Great Portal on a mountaintop, and three lanes up."}}
 ## The maps All vs All and Teams can be played on: the Mists have no room to run.
-const VERSUS_MAPS := ["village", "mesenlla", "vael"]
+const VERSUS_MAPS := ["village", "mesenlla", "vael", "fontanova"]
+
+
+## Somewhere to play out of `choices`, at random, never `last` (the place just played) when there is
+## anywhere else.
+static func roll_map(choices: Array, last := "") -> String:
+	var fresh := choices.filter(func(id: String) -> bool: return id != last)
+	if fresh.is_empty():
+		fresh = choices
+	return str(fresh.pick_random()) if not fresh.is_empty() else last
+
+
+## A night or a siege about to begin on a random place: where it is, this time.
+func roll_random_map() -> void:
+	if mode == Mode.FORT and fort_random:
+		fort_map = roll_map(FORT_MAPS.keys(), fort_map)
+	elif mode == Mode.NIGHT and night_random:
+		night_map = roll_map(MAPS.keys(), night_map)
 var fresh_unlocks: Array[String] = [] # opened just now, for the end screen to announce
+var earned_specs := {} # professions that have to be earned (AbilityData._spec), once they are
+var fresh_specs: Array[String] = [] # earned just now, for the end screen to announce
 const GAMES_FOR_MAGICIAN := 5
 const WINS_FOR_REVENANT := 5
 const WINS_FOR_CARTOGRAPHER := 3 # in each of the Valleys of Mesenlla and Mist Bastion
@@ -148,7 +174,10 @@ func owns_class(id: String) -> bool:
 
 ## Which map a night is played on: the host decides in a game together.
 func night_length() -> float:
-	return 900.0 if current_map() == "vael" else NIGHT_LENGTH
+	match current_map():
+		"vael": return 900.0
+		"fontanova": return 720.0
+	return NIGHT_LENGTH
 
 
 func current_map() -> String:
@@ -221,6 +250,8 @@ func earn_text(id: String) -> String:
 			return "Win a match in Port Vael to unlock this class: reach the dawn there, alone or with friends, or win a versus match there."
 		"harbourmaster":
 			return "Defeat the Harbourmaster of Port Vael to unlock this class: be in the match when he falls."
+		"archipelago":
+			return "Play a match on Fontanova to its end to unlock this class, win or lose."
 		"beyond":
 			return "Win %d matches in the Valleys of Mesenlla and %d in Mist Bastion to unlock this class. So far: %d and %d." % [WINS_FOR_CARTOGRAPHER, WINS_FOR_CARTOGRAPHER, mini(mesenlla_wins, WINS_FOR_CARTOGRAPHER), mini(bastion_wins, WINS_FOR_CARTOGRAPHER)]
 	return ""
@@ -286,6 +317,10 @@ func note_beyond_win() -> void:
 			if not unlocked.has("tidecaller"):
 				_earn("tidecaller")
 			return
+		"fontanova":
+			if player_class == "ascendant" and not earned_specs.has("adorer"):
+				earn_spec("adorer")
+			return
 		"mesenlla":
 			mesenlla_wins += 1
 		"bastion":
@@ -321,7 +356,29 @@ func note_game_finished() -> void:
 	finished_games += 1
 	if finished_games >= GAMES_FOR_MAGICIAN and not unlocked.has("magician"):
 		_earn("magician")
+	if current_map() in ARCHIPELAGO_MAPS and not unlocked.has("ascendant"):
+		# Any match played to its end on an island of the Archipelagos, won or lost.
+		_earn("ascendant")
 	save_settings()
+
+
+## A profession that has to be earned: can this phone take it?
+func owns_spec(spec: Dictionary) -> bool:
+	return not spec.has("earned") or earned_specs.has(spec["earned"])
+
+
+func earn_spec(id: String) -> void:
+	earned_specs[id] = true
+	fresh_specs.append(id)
+	save_settings()
+
+
+## How to earn a profession that cannot be taken yet.
+static func spec_earn_text(spec: Dictionary) -> String:
+	match str(spec.get("earned", "")):
+		"adorer":
+			return "Win a match on Fontanova as the Ascendant to unlock this profession."
+	return ""
 
 
 func _earn(id: String) -> void:
@@ -406,6 +463,11 @@ const VAEL_POOLS := {"drowned": 18, "barnacle_brute": 3, "brine_hound": 6, "lant
 	"wreck_gull": 3, "storm_ray": 2, "bell_wraith": 2, "siren": 2, "press_gang": 9, "tide_witch": 2, "harbourmaster": 1, "lighthouse_keeper": 1, "kraken_arm": 4, "hollow_sovereign": 1, "leviathan": 1, "kraken": 1}
 
 
+## Fontanova: the mutants of the island, its hives and its ambushers.
+const FONTA_POOLS := {"mutant_bee": 14, "beehive": 6, "mutant_wasp": 9, "mutant_snail": 4, "wasp_hive_snail": 2, "mutant_spider": 4,
+	"battle_ostrich": 4, "ember_moth": 3, "thornback": 3, "cult_worshipper": 9, "cult_priest": 3, "cult_guardian": 5, "hierophant": 1, "polemarch": 1, "alquimelea": 1} # (Ostrich Guardians ride on Guardians' bodies)
+
+
 ## Mist Bastion: more on foot to press the three gates, and the War Wyvern in place of the Revenant.
 const BASTION_POOLS := {"woods_child": 26, "bear": 6, "mist_bear": 3, "eagle": 6, "mist_eagle": 3, "shapeshifter": 3,
 	"earth_elemental": 4, "mist_elemental": 3, "storm_elemental": 3, "wyvern": 2, "war_wyvern": 1}
@@ -429,6 +491,8 @@ func zombie_pool_plan() -> Dictionary:
 		return road
 	if mode == Mode.NIGHT and current_map() in SpawnRules.VAEL:
 		return VAEL_POOLS.duplicate()
+	if mode == Mode.NIGHT and current_map() in SpawnRules.ARCHIPELAGO:
+		return FONTA_POOLS.duplicate()
 	var plan := _zombie_pools()
 	if mode == Mode.SANDBOX:
 		plan["dummy"] = 6
@@ -436,6 +500,8 @@ func zombie_pool_plan() -> Dictionary:
 			plan[model] = mini(int(MESENLLA_POOLS[model]), 4)
 		for model: String in VAEL_POOLS:
 			plan[model] = mini(int(VAEL_POOLS[model]), 4)
+		for model: String in FONTA_POOLS:
+			plan[model] = mini(int(FONTA_POOLS[model]), 4)
 		plan["leviathan"] = 1
 	if mode == Mode.SANDBOX or (mode == Mode.NIGHT and current_map() == "mists"):
 		plan["harrier"] = MIST_HARRIERS
@@ -495,6 +561,7 @@ func load_settings() -> void:
 	difficulty = clampi(_saved(c, "progress", "difficulty", 1), 0, 2)
 	player_name = str(_saved(c, "progress", "player_name", ""))
 	unlocked = _saved(c, "progress", "unlocked", {})
+	earned_specs = _saved(c, "progress", "earned_specs", {})
 	redeemed = _saved(c, "progress", "redeemed", {})
 	doubloons = maxi(0, _saved(c, "progress", "doubloons", 0))
 	board_prizes = _saved(c, "progress", "board_prizes", {})
@@ -524,6 +591,8 @@ func load_settings() -> void:
 	fort_map = _saved(c, "progress", "fort_map", "fort")
 	if not FORT_MAPS.has(fort_map):
 		fort_map = "fort"
+	night_random = bool(_saved(c, "progress", "night_random", false))
+	fort_random = bool(_saved(c, "progress", "fort_random", false))
 	if not ShopDefs.PETS.has(pet) or (pet != "wolf" and not owned_items.has(pet)):
 		pet = "wolf"
 	if ClassDefs.ALL.get(player_class, {}).get("hidden", false) and not unlocked.has(player_class) or ClassDefs.disabled(player_class):
@@ -550,6 +619,7 @@ func save_settings() -> void:
 	c.set_value("progress", "difficulty", difficulty)
 	c.set_value("progress", "player_name", player_name)
 	c.set_value("progress", "unlocked", unlocked)
+	c.set_value("progress", "earned_specs", earned_specs)
 	c.set_value("progress", "redeemed", redeemed)
 	c.set_value("progress", "doubloons", doubloons)
 	c.set_value("progress", "board_prizes", board_prizes)
@@ -568,6 +638,8 @@ func save_settings() -> void:
 	c.set_value("progress", "pet", pet)
 	c.set_value("progress", "night_map", night_map)
 	c.set_value("progress", "fort_map", fort_map)
+	c.set_value("progress", "night_random", night_random)
+	c.set_value("progress", "fort_random", fort_random)
 	c.set_value("progress", "best_time", best_time)
 	c.set_value("progress", "best_kills", best_kills)
 	c.set_value("progress", "nights_survived", nights_survived)

@@ -10,6 +10,8 @@ const POSE_EVERY := 0.066
 const REPATH_EVERY := 1.0
 const SEE_ZOMBIES := 20.0
 const SEE_RIVALS := 35.0
+const GOD_SIGHT := 48.0 # a god towers over everything: seen from much further than the rest
+const AT_YOUR_THROAT := 5.0 # nearer than this, whatever it is comes before a god
 const FOLLOW_AT := 5.0
 const SHOT_REACH := 22.0
 const MELEE_SLACK := 0.3
@@ -220,7 +222,11 @@ func _spend_points() -> void:
 		if step >= all.size():
 			return
 		var options: Array = all[step]
-		if options.is_empty() or not pawn.choose_ability(step, randi() % options.size()):
+		var open: Array[int] = []
+		for i in options.size():
+			if step != Player.CORE_STEPS or pawn.spec_open((pawn.tree_data()["specs"] as Array)[i]):
+				open.append(i)
+		if open.is_empty() or not pawn.choose_ability(step, open.pick_random()):
 			return
 
 
@@ -228,6 +234,10 @@ func _spend_points() -> void:
 func _decide() -> void:
 	var eye := pawn.eye_position()
 	var zombie: Zombie = world.nearest_zombie(eye, SEE_ZOMBIES * float(_smart["see"]), true)
+	# Dawn waits on a god: seen, it is the one to fight, unless something nearer is at its throat.
+	var god := _god_in_sight(eye)
+	if god and (zombie == null or zombie.position.distance_to(pawn.global_position) > AT_YOUR_THROAT):
+		zombie = god
 	var rival := _nearest_rival(SEE_RIVALS * float(_smart["see"]), true)
 	_target = zombie
 	if rival:
@@ -422,7 +432,28 @@ func _target_alive() -> bool:
 
 
 func _target_point() -> Vector3:
+	if _target is Zombie and (_target as Zombie).def.get("god_boss", false):
+		var seen := _sight_point(pawn.eye_position(), _target as Zombie)
+		return seen if seen != Vector3.INF else (_target as Zombie).centre()
 	return (_target as Zombie).centre() if _target is Zombie else _target.global_position + Vector3.UP * 1.1
+
+
+## A god in sight, if there is one.
+func _god_in_sight(eye: Vector3) -> Zombie:
+	for z: Zombie in world.zombies:
+		if z.is_alive() and not z.dormant and z.def.get("god_boss", false) and z.position.distance_to(pawn.global_position) < GOD_SIGHT and _sight_point(eye, z) != Vector3.INF:
+			return z
+	return null
+
+
+## Somewhere on a towering body that can be seen from here: its middle, else lower, else higher.
+## INF when none of it can.
+func _sight_point(eye: Vector3, z: Zombie) -> Vector3:
+	for f: float in [0.55, 0.3, 0.8]:
+		var at := z.position + Vector3.UP * z.height * f
+		if world.has_line_of_sight(eye, at):
+			return at
+	return Vector3.INF
 
 
 # --- Weapons -------------------------------------------------------------------
@@ -679,6 +710,27 @@ func _bandit_skills(p: Player, has_target: bool, dist: float) -> void:
 		p.use_art()
 
 
+## An Ascendant bot: Ascend into a crowd a few steps off; as a Godslayer, Deicide on what it fights,
+## soonest when that is readying an attack or is a boss; as an Adorer, the Elixir when the fight is on it.
+func _ascendant_skills(p: Player, has_target: bool, dist: float) -> void:
+	if p._cast_kind != "" or p.art_cd_left > 0.0 or p._leap_t >= 0.0 or not has_target:
+		return
+	match p.spec_id:
+		"godslayer":
+			if dist < AscendantKit.deicide_reach(p) - 1.0:
+				_face(_target_point(), false)
+				var z := AscendantKit.quarry(p)
+				if z != null and (z.is_warning() or AscendantKit.divine(z) or dist > 3.0):
+					p.use_art()
+		"adorer":
+			if _enemies_within(AscendantKit.field_radius(p)) >= 2 or (p.hp < p.max_hp() * 0.5 and dist < 3.0):
+				p.use_art()
+		_:
+			if dist > 3.0 and dist < AscendantKit.ASCEND_REACH and _enemies_within(AscendantKit.ASCEND_REACH + 2.0) >= 2:
+				_face(_target_point(), false)
+				p.use_art()
+
+
 ## A Harpooner bot: Haul what it is fighting when it is out of reach (or itself to something big), and
 ## its path's ability on the second button.
 func _harpooner_skills(p: Player, has_target: bool, dist: float) -> void:
@@ -778,6 +830,9 @@ func _use_skills() -> void:
 		return
 	if p.class_id == "ferryman":
 		_ferryman_skills(p, has_target, dist)
+		return
+	if p.class_id == "ascendant":
+		_ascendant_skills(p, has_target, dist)
 		return
 	if not p.has_art() or p.art_cd_left > 0.0 or p._cast_kind != "" or p.aiming_art:
 		return

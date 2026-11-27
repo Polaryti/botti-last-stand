@@ -29,21 +29,22 @@ func equip(id: String, view_model := false) -> void:
 	if chain:
 		chain.free()
 		chain = null
-	if id == "flail":
+	if WeaponDefs.chain_mesh(id) != null:
 		chain = MeshInstance3D.new()
-		chain.mesh = WeaponDefs.flail_chain()
+		chain.mesh = WeaponDefs.chain_mesh(id)
 		chain.position.y = 0.36
 		chain.layers = layers
 		chain.cast_shadow = SHADOW_CASTING_SETTING_OFF
 		add_child(chain)
 		_chain_direction = Vector3.DOWN
-	if not view_model and id in ["bow", "longbow", "crossbow"]:
+	if not view_model and id in ["bow", "longbow", "crossbow", "resin_repeater"]:
 		arrow = MeshInstance3D.new()
 		arrow.mesh = WeaponAnim.nocked_arrow()
 		arrow.layers = layers
 		arrow.cast_shadow = SHADOW_CASTING_SETTING_OFF
-		arrow.position = Vector3(0, 0, -0.05) if id != "crossbow" else Vector3(0, 0.2, -0.1)
-		arrow.scale = Vector3.ONE * (1.0 if id != "crossbow" else 2.5)
+		var bolted := id in ["crossbow", "resin_repeater"]
+		arrow.position = Vector3(0, 0, -0.05) if not bolted else Vector3(0, 0.2, -0.1)
+		arrow.scale = Vector3.ONE * (1.0 if not bolted else 2.5)
 		add_child(arrow)
 	set_process(chain != null or arrow != null)
 

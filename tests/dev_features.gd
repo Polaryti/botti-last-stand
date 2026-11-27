@@ -41,6 +41,7 @@ func _ready() -> void:
 	await _requests_1116()
 	await _vael_weapons()
 	await _port_vael()
+	await _fontanova()
 	await _drowned_court()
 	await _coastal_campaign()
 	await _feedback_and_numbers()
@@ -1416,7 +1417,7 @@ func _wilds_of_mesenlla() -> void:
 func _changelog_and_atlas() -> void:
 	var vs := ChangelogPanel.versions(ChangelogPanel.notes())
 	var current := str(ProjectSettings.get_setting("application/config/version")).get_slice("-dev.", 0)
-	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > 5, "the Changelog reads every version, newest first")
+	check(vs.size() > 10 and (str(vs[0]["number"]).begins_with("Development") or str(vs[0]["number"]) == current) and ChangelogPanel.count(vs[0]) > (0 if str(vs[0]["number"]).begins_with("Development") else 5), "the Changelog reads every version, newest first")
 	var released: Dictionary = vs.filter(func(v: Dictionary) -> bool: return str(v["number"]) == "0.21.4")[0]
 	check(released["name"] == "A Portal Worth Defending" and released["date"] == "11 November 2026", "with each version's name and date")
 	check(ChangelogPanel.category("Fixes")[1] == "Fixes" and ChangelogPanel.category("The wilds of Mesenlla")[1] == "Enemies" and ChangelogPanel.category("Spectator Mode")[1] == "Playing together", "each part is marked by what it is about")
@@ -1754,6 +1755,141 @@ func _nearest_zombie(at: Vector3, in_world: World) -> Zombie:
 
 ## The Sunken Crown: the six weapons of the coast of Vael.
 ## The Sunken Crown, stage 2: Port Vael, its Mist Tide, its salvage and its creatures.
+## Fontanova, the first island of the Archipelagos of the Forgotten Gods: listed everywhere a place is,
+## an island ringed by sea that drowns you out of your depth, its rope bridges and its grotto, its
+## flora moving in the wind, and the title screen it now is.
+func _fontanova() -> void:
+	check(Game.MAPS.has("fontanova") and "fontanova" in Game.VERSUS_MAPS and "fontanova" in Board.MAPS and "fontanova" in Game.ARCHIPELAGO_MAPS, "Fontanova can be chosen for the night and for versus, and has its boards")
+	check(Places.ORDER.has("fontanova") and Places.ALL["fontanova"]["tips"].size() == 3 and str(Places.ALL["fontanova"]["lore"]).length() > 80, "it has its page, its lore and its tips")
+	check(WorldAtlas.SEA_SPOTS.has("fontanova") and not WorldAtlas.SPOTS.has("fontanova") and WorldAtlas.view_of("fontanova") == WorldAtlas.ARCHIPELAGO and WorldAtlas.LINKS.has(["vael", "fontanova", false]), "on the Archipelago's chart, the crossing from Port Vael leads to it")
+	check(PlaceVista.LOOKS.has("fontanova") and Icons.exists("map_fontanova"), "its loading view and its icon")
+	check(Sfx.MUSIC_SETS.has("fontanova") and (Sfx.MUSIC_SETS["fontanova"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
+	check(Director.DAWN_SOUNDS.get("fontanova", "") == "dawn_fontanova" and Sfx.NAMES.has("dawn_fontanova") and Net.SOUNDS.has("dawn_fontanova"), "and its own sound at dawn")
+	check(Sfx.MUSIC_SETS["menu"][0] == "menu_fontanova" and ResourceLoader.exists("res://assets/music/menu_fontanova.ogg"), "the main menu has the Archipelagos' own theme")
+	check(World.MENU_TOUR_FONTANOVA.size() >= 6 and World.MENU_TOUR_FONTANOVA.all(func(p: Array) -> bool: return absf(p[0].x) < 166.0 and absf(p[0].z) < 166.0), "and its camera tours Fontanova, inside the map")
+	check("fontanova" in Weather.WINDY_MAPS, "the wind blows there some nights")
+	var was_map := Game.night_map
+	var was_mode := Game.mode
+	Game.night_map = "fontanova"
+	Game.mode = Game.Mode.NIGHT
+	check(is_equal_approx(Game.night_length(), 720.0), "a night there lasts twelve minutes")
+	# What the map holds.
+	var scene: Node = (load("res://maps/fontanova.tscn") as PackedScene).instantiate()
+	var pieces := scene.find_children("*", "Node3D", true, false).filter(func(p: Node) -> bool: return p is MapFonta)
+	var kinds := {}
+	var gods := {}
+	for p: MapFonta in pieces:
+		kinds[p.kind] = int(kinds.get(p.kind, 0)) + 1
+		if p.kind in ["god_statue", "fallen_god", "god_head", "stele"]:
+			gods[p.variant] = true
+	check(kinds.get("sailboat", 0) == 1 and kinds.get("rope_bridge", 0) == 2 and kinds.get("grotto", 0) == 1 and kinds.get("temple", 0) == 1, "a beached sailboat, two rope bridges, a grotto and the god's temple")
+	check(gods.size() == FontaBuilder.GODS.size() and kinds.get("horizon_isle", 0) >= 4, "every god of the archipelago is shown somewhere, and the other islands stand on the horizon")
+	check(kinds.get("flora", 0) == 1 and kinds.get("mesa", 0) >= 8 and kinds.get("terraces", 0) == 2 and kinds.get("sacred_stair", 0) == 1 and kinds.get("god_altar", 0) == 4,
+		"the island is planted from its land, has its crags and terraces, the Sacred Way's stair, and an altar for each god")
+	scene.free()
+	# The flora moves in the wind, harder on a windy night.
+	check((FontaFlora.tree_mesh("olive") as ArrayMesh).surface_get_material(0) == FontaFlora.tree_material(), "its trees are drawn to sway")
+	FontaFlora.set_wind(1.0, Vector3(0, 0, 1))
+	check(is_equal_approx(float(FontaFlora.tree_material().get_shader_parameter("gust")), 1.0) and is_equal_approx(float(FontaFlora.herb_material().get_shader_parameter("gust")), 1.0), "the wind bends trees and flowers alike")
+	FontaFlora.set_wind(0.0, Vector3(1, 0, 0.3))
+	# The island itself.
+	var space := SubViewport.new()
+	space.own_world_3d = true
+	add_child(space)
+	var isle := World.new()
+	space.add_child(isle)
+	isle.setup(Game.Mode.NIGHT)
+	isle.director.set_process(false)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	var you := isle.player
+	you.set_physics_process(false)
+	var t := isle.terrain
+	check(isle.map_id == "fontanova" and isle.isle_sea != null and not t.isle.is_empty() and Ambience.wanted(isle), "Fontanova loads, an island in its sea, with its night air")
+	check(t.isle_depth(0, 160) > Terrain.ISLE_DROWN and t.isle_depth(160, 0) > Terrain.ISLE_DROWN and t.isle_depth(-160, -100) > Terrain.ISLE_DROWN, "deep sea all round it")
+	check(t.isle_depth(0, 0) == 0.0 and t.isle_depth(0, -84) == 0.0 and t.height(0, -84) > 15.0, "dry land in the middle, the Acropolis high in the north")
+	check(t.deep_water(0, 160) and not t.deep_water(0, 0), "nothing walks into the deep")
+	check(t.isle_depth(2, 64) == 0.0 and t.is_walkable(2, 64), "you land on the beach, by the sailboat")
+	check(is_equal_approx(isle.isle_sea.slow_at(Vector3(0, t.ground_height(0, 0), 0)), 1.0) and isle.isle_sea.slow_at(Vector3(0, t.ground_height(0, 160), 160)) <= IsleSea.SLOW + 0.001, "wading slows you, to %d%% out of your depth" % int(IsleSea.SLOW * 100))
+	# Out of your depth: a moment to turn back, then the sea drowns you.
+	you.global_position = Vector3(0, t.ground_height(0, 160), 160)
+	var hp0 := you.hp
+	you._tick_sea(IsleSea.GRACE * 0.5)
+	check(is_equal_approx(you.hp, hp0), "a few seconds' grace out of your depth")
+	you._tick_sea(IsleSea.GRACE)
+	check(you.hp < hp0, "then the sea drowns you (%.0f)" % (hp0 - you.hp))
+	you.global_position = Vector3(2, t.height(2, 64), 64)
+	you._tick_sea(0.1)
+	check(you._under_sea == 0.0, "back where you can stand, the count starts again")
+	you.hp = you.max_hp()
+	# Its planting is kept: the next world on this land (the title screen after a match, the next night)
+	# reuses the same meshes rather than working the island out again.
+	var herbs := isle.find_children("*", "MeshInstance3D", false, false).map(func(n: Node) -> Mesh: return (n as MeshInstance3D).mesh)
+	var kept := FontaFlora._memo.values().any(func(k: Dictionary) -> bool: return (k["herbs"] as Array).size() > 20 and (k["herbs"] as Array).all(func(m: Mesh) -> bool: return herbs.has(m)) and (k["cliffs"] as Array).size() > 5 and (k["carpet"] as Array).size() > 20)
+	check(kept, "the island's herbs, cliff faces and grass are kept for the next world, and this one shows them")
+	# The rope bridges over the Ravine: decks across it, high over its floor.
+	check(t.bridges().size() == 2, "two rope bridges")
+	for d: Dictionary in t.bridges():
+		var mid := (Vector2(d["a"]) + Vector2(d["b"])) * 0.5
+		check(t.deck_y(d, 0.5) > t.ground_height(mid.x, mid.y) + 3.0 and Vector2(d["a"]).distance_to(d["b"]) > 8.0, "a bridge spans the Ravine, high over its floor (%.1f m)" % (t.deck_y(d, 0.5) - t.ground_height(mid.x, mid.y)))
+		check(t.on_deck(mid.x, mid.y), "and can be walked")
+		var on_it := Vector3(mid.x, t.deck_y(d, 0.5), mid.y)
+		check(isle.isle_sea.slow_at(on_it) == 1.0 and not isle.isle_sea.too_deep(on_it), "up on it you are not in the sea, however far below the water is (%.1f m of it under the deck)" % maxf(0.0, isle.isle_sea.level - t.ground_height(mid.x, mid.y)))
+	# Walking: as quick across a bridge as on dry ground.
+	var walk := func(at: Vector3, toward: Vector3) -> float:
+		you.global_position = at + Vector3.UP * 0.05
+		you.velocity = Vector3.ZERO
+		you.look_at(Vector3(toward.x, you.global_position.y, toward.z), Vector3.UP)
+		you.yaw = you.rotation.y
+		you.input_move = Vector2(0, -1)
+		you.set_physics_process(true)
+		for i in 40:
+			await get_tree().physics_frame
+		var quick := Vector2(you.velocity.x, you.velocity.z).length()
+		you.set_physics_process(false)
+		you.input_move = Vector2.ZERO
+		return quick
+	var dry := Vector3(0, t.ground_height(0, 20), 20)
+	var on_land: float = await walk.call(dry, dry + Vector3(0, 0, -10))
+	for d: Dictionary in t.bridges():
+		var a3 := Vector3(Vector2(d["a"]).x, 0, Vector2(d["a"]).y)
+		var b3 := Vector3(Vector2(d["b"]).x, 0, Vector2(d["b"]).y)
+		var start := a3.lerp(b3, 0.35)
+		start.y = t.deck_y(d, 0.35)
+		var across: float = await walk.call(start, b3)
+		check(on_land > 1.0 and across > on_land * 0.95, "crossing a bridge you walk as quick as on the land (%.1f m/s against %.1f), not wading" % [across, on_land])
+	# The temple's steps: walked straight up, at the front and at either side, onto its floor.
+	var court := t.ground_height(10, -78)
+	for line: Array in [[Vector3(10, 0, -78), Vector3(0, 0, -1)], [Vector3(-10, 0, -78), Vector3(0, 0, -1)], [Vector3(-22, 0, -94), Vector3(1, 0, 0)], [Vector3(22, 0, -94), Vector3(-1, 0, 0)]]:
+		var from: Vector3 = line[0]
+		from.y = t.ground_height(from.x, from.z) + 0.05
+		var heading: Vector3 = line[1]
+		you.global_position = from
+		you.velocity = Vector3.ZERO
+		you.look_at(from + heading, Vector3.UP)
+		you.yaw = you.rotation.y
+		you.input_move = Vector2(0, -1)
+		you.set_physics_process(true)
+		var highest := from.y
+		for i in 900:
+			await get_tree().physics_frame
+			if Vector2(you.global_position.x, you.global_position.z).distance_to(Vector2(0, -94)) < 16.0: # on the temple's footprint
+				highest = maxf(highest, you.global_position.y)
+			if highest > court + 0.9:
+				break
+		you.set_physics_process(false)
+		you.input_move = Vector2.ZERO
+		check(highest > court + 0.9, "the temple's steps walk straight up from %s onto its floor (%.1f m up), no wall in the way" % [from, highest - court])
+	await _fonta_land(isle)
+	await _fonta_rites(isle)
+	await _fonta_mutants(isle)
+	await _fonta_cult(isle)
+	await _fonta_god(isle)
+	await _fonta_ascendant(isle)
+	space.queue_free()
+	Game.night_map = was_map
+	Game.mode = was_mode
+
+
 func _port_vael() -> void:
 	# Everywhere a place is listed, Port Vael is.
 	check(Game.MAPS.has("vael") and "vael" in Game.VERSUS_MAPS and "vael" in Board.MAPS, "Port Vael can be chosen for the night and for versus, and has its boards")
@@ -1762,9 +1898,8 @@ func _port_vael() -> void:
 	check(PlaceVista.LOOKS.has("vael") and Icons.exists("map_vael"), "its loading view and its icon")
 	check(Sfx.MUSIC_SETS.has("vael") and (Sfx.MUSIC_SETS["vael"] as Array).all(func(n: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % n)), "its own music, night, hunted and dawn")
 	check(Director.DAWN_SOUNDS.get("vael", "") == "dawn_vael" and Sfx.NAMES.has("dawn_vael"), "and its own sound at dawn")
-	# The Sunken Crown's title screen: Port Vael under its aurora, and a theme of its own.
-	check(Sfx.MUSIC_SETS["menu"][0] == "menu_vael" and ResourceLoader.exists("res://assets/music/menu_vael.ogg"), "the main menu has The Sunken Crown's own theme")
-	check(World.MENU_TOUR_VAEL.size() >= 6 and World.MENU_TOUR_VAEL.all(func(p: Array) -> bool: return absf(p[0].x) < 110.0 and absf(p[0].z) < 110.0), "and its camera tours Port Vael, inside the map")
+	# The Sunken Crown's own title tour is kept, and its menu theme stays in the game.
+	check(ResourceLoader.exists("res://assets/music/menu_vael.ogg") and World.MENU_TOUR_VAEL.size() >= 6 and World.MENU_TOUR_VAEL.all(func(p: Array) -> bool: return absf(p[0].x) < 110.0 and absf(p[0].z) < 110.0), "The Sunken Crown's tour of Port Vael and its theme are kept")
 	# The tide's clock.
 	check(is_equal_approx(MistTide.level_at(0.0), MistTide.LOW_Y) and not MistTide.is_high_at(10.0), "the night begins at low tide")
 	check(MistTide.is_high_at(MistTide.TURN + 1.0) and is_equal_approx(MistTide.level_at(MistTide.TURN + MistTide.RISE), MistTide.HIGH_Y), "after %d s it comes in, taking %d s" % [int(MistTide.TURN), int(MistTide.RISE)])
@@ -2086,7 +2221,7 @@ func _drowned_court() -> void:
 	for id: String in court:
 		var d: Dictionary = ZombieDefs.ALL[id]
 		check(SpawnRules.is_vael(d) and VaelMind.handles(id) and str(d.get("lore", "")).length() > 60 and Icons.exists(str(d["icon"]).get_slice("+", 0)), "%s: of Vael, with its own mind, lore and icon" % id)
-		check(CodexPanel.enemy_group(id) == (6 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
+		check(CodexPanel.enemy_group(id) == (8 if id == "hollow_sovereign" else 5), "%s in the Codex with the drowned of Vael%s" % [id, " (with the bosses)" if id == "hollow_sovereign" else ""])
 		var voices: Array = [Zombie.MESENLLA_VOICES.get(id, ""), Zombie.MESENLLA_HURT.get(id, ""), Zombie.MESENLLA_DEATHS.get(id, "")]
 		check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "%s has a voice, a hurt and a death of its own" % id)
 	var wanders := func(id: String) -> bool: return ZombieDefs.roams(id, 999.0, "vael") and float(ZombieDefs.ALL[id]["weight"]) > 0.0
@@ -2094,7 +2229,7 @@ func _drowned_court() -> void:
 	check(["harbourmaster", "lighthouse_keeper", "kraken_arm"].all(func(id: String) -> bool: return ZombieDefs.ALL[id].get("miniboss", false)) and ZombieDefs.ALL["hollow_sovereign"].get("vael_boss", false), "three of the court are minibosses, and the Hollow Sovereign the boss")
 	check(Director.BOSS_CARDS.has("hollow_sovereign") and Sfx.NAMES.has("boss_bells_sovereign") and ResourceLoader.exists("res://assets/sounds/boss_bells_sovereign.ogg"), "he enters with his own card and bells")
 	check(Net.ANIMS.size() <= 64 and ["m_sting", "m_song", "m_rise", "m_sink", "Throw", "WindUp", "Raise"].all(func(a: String) -> bool: return Net.ANIMS.has(a)), "every phone is sent what they are doing (%d states)" % Net.ANIMS.size())
-	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.Style.INK == 17 and MistSeal.LOOKS.size() == 18, "the new rings come after the old on the wire")
+	check(MistSeal.Style.NET == 7 and MistSeal.Style.CROWN == 13 and MistSeal.Style.INK == 17 and MistSeal.LOOKS.size() == MistSeal.Style.size(), "the new rings come after the old on the wire, each with its look")
 	var space := SubViewport.new()
 	space.own_world_3d = true
 	add_child(space)
@@ -2348,7 +2483,7 @@ func _last_light() -> void:
 	check(Game.MAPS.has("lantern_road") and Places.ALL.has("lantern_road") and Places.ORDER.has("lantern_road") and WorldAtlas.SPOTS.has("lantern_road") and Icons.exists("map_lantern_road"), "the Lantern Road is a map of its own, in the Places, on the atlas, with its icon")
 	check(ResourceLoader.exists("res://maps/lantern_road.tscn") and Sfx.MUSIC_SETS.has("lantern") and (Sfx.MUSIC_SETS["lantern"] as Array).all(func(m: String) -> bool: return ResourceLoader.exists("res://assets/music/%s.ogg" % m)), "with its own music")
 	var levi: Dictionary = ZombieDefs.ALL["leviathan"]
-	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 6, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
+	check(levi.get("vael_boss", false) and VaelMind.handles("leviathan") and Icons.exists("leviathan") and str(levi.get("lore", "")).length() > 60 and CodexPanel.enemy_group("leviathan") == 8, "the Leviathan of the Mists: a boss of Vael, with its own mind, icon, lore and place in the Codex")
 	var voices: Array = [Zombie.MESENLLA_VOICES.get("leviathan", ""), Zombie.MESENLLA_HURT.get("leviathan", ""), Zombie.MESENLLA_DEATHS.get("leviathan", ""), "leviathan_bite", "leviathan_rise", "waystation", "lighthouse_lit", "boss_bells_leviathan"]
 	check(voices.all(func(v: String) -> bool: return v != "" and Sfx.NAMES.has(v) and Net.SOUNDS.has(v) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % v)), "it and the road have sounds of their own")
 	check(Director.BOSS_CARDS.has("leviathan"), "it enters with its own card")
@@ -2610,7 +2745,7 @@ func _vael_weapons() -> void:
 	p.input_fire = true
 	p._handle_fire()
 	p.input_fire = false
-	check(p.harpoon_out and p.arrows == arrows_before and not p._vm_mesh.visible, "thrown: it is out of your hand, and spent no arrows")
+	check(p.harpoon_out and p.arrows == arrows_before and p.slots[0] == null and p.weapon_id() == "sword", "thrown: its slot is left empty, you turn to your sword, and no arrows are spent")
 	for i in 60:
 		await get_tree().physics_frame
 	check(whale.root_left > 1.5 and whale.hp < 5000.0, "it struck and pinned what it hit (%.1f s)" % whale.root_left)
@@ -2624,9 +2759,11 @@ func _vael_weapons() -> void:
 	check(w._projectiles.filter(func(q: Projectile) -> bool: return q.active).size() == flying, "with it out, there is nothing to throw")
 	p.global_position = lying.global_position + Vector3(0.5, 0, 0)
 	p._tick_harpoon(0.02)
-	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p._vm_mesh.visible, "walking over it takes it back")
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p.slots[0] == "harpoon" and p.weapon_id() == "sword", "walking over it takes it back into the slot it left")
 	p.global_position = Vector3(0, w.ground_at(Vector3(0, 0, 36)), 36)
 	whale.release()
+	p.current = 0
+	p._equip()
 	p._cooldown = 0.0
 	p.input_fire = true
 	p._handle_fire()
@@ -2635,7 +2772,38 @@ func _vael_weapons() -> void:
 		await get_tree().physics_frame
 	check(p.harpoon_out and w.harpoons.has(p.net_id()), "thrown at nothing, it lies on the ground")
 	p._tick_harpoon(16.0)
-	check(not p.harpoon_out and not w.harpoons.has(p.net_id()), "and after 15 s it is back in your hand by itself")
+	check(not p.harpoon_out and not w.harpoons.has(p.net_id()) and p.slots[0] == "harpoon" and p.weapon_id() == "sword", "and after 15 s it is back in its slot by itself")
+	# Thrown with nothing else to hold, it comes back into your empty hands.
+	p.slots[1] = null
+	p.current = 0
+	p._equip()
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	check(p.harpoon_out and p.current == 0 and p.slots == [null, null], "with no other weapon you are left empty-handed")
+	p._tick_harpoon(16.0)
+	check(p.weapon_id() == "harpoon", "and it comes back into your empty hands")
+	for i in 30:
+		await get_tree().physics_frame
+	# Both hands full when it comes back: it drops at your feet instead of vanishing.
+	p.slots[1] = "sword"
+	p.current = 0
+	p._equip()
+	p._cooldown = 0.0
+	p.input_fire = true
+	p._handle_fire()
+	p.input_fire = false
+	for i in 90:
+		await get_tree().physics_frame
+	p.slots[0] = "mace"
+	p.current = 0
+	p._equip()
+	var lying_round := w.pickups.size()
+	p._tick_harpoon(16.0)
+	var dropped := w.pickups.filter(func(q: Pickup) -> bool: return q.weapon_id == "harpoon" and q.global_position.distance_to(p.global_position) < 3.0)
+	check(not p.harpoon_out and not p.slots.has("harpoon") and w.pickups.size() == lying_round + 1 and dropped.size() == 1, "with both hands full it lies at your feet")
+	for item: Pickup in dropped: w.remove_pickup(item)
 	# Flare Pistol: 6 flares a pistol; a flare burns all within 3 m and shows all within 7 m for 8 s.
 	for item: Pickup in w.pickups.duplicate(): w.remove_pickup(item)
 	p.slots = ["sword", null]
@@ -2716,6 +2884,1167 @@ func _vael_weapons() -> void:
 	p.setup_class("infantry")
 	p.slots = ["sword", null]
 	p._equip()
+
+
+## The mutants of Fontanova: each one's tell, what lands and how to step out of it, what it leaves
+## behind, and where the night puts them.
+## Fontanova's land: high ground you can reach, a Ravine that kills, nothing floating, a full island.
+func _fonta_land(isle: World) -> void:
+	var t := isle.terrain
+	check(t.height(0, -88) > 30.0 and t.height(-94, -8) > 18.0 and t.height(-104, -22) > 25.0 and t.height(84, -8) > 17.0,
+		"real heights: the Acropolis (%.0f m), the West Ridge, Kerys' Watch and the Holm Wood's height" % t.height(0, -88))
+	for trip: Array in [[Vector3(0, 0, 70), Vector3(0, 0, -84), "the temple, up the Sacred Way"], [Vector3(0, 0, 70), Vector3(-46, 0, -2), "the village on the Ravine's rim"],
+			[Vector3(0, 0, 70), Vector3(-94, 0, 6), "the West Ridge, over a bridge"], [Vector3(0, 0, 70), Vector3(60, 0, -24), "the Oracle's Grotto"]]:
+		var way := isle.grid.route(trip[0], trip[1])
+		check(way.size() > 1 and Vector2(way[-1].x - trip[1].x, way[-1].z - trip[1].z).length() < 4.0, "a way on foot from the Landing to %s" % trip[2])
+	# The Ravine: deep, and a fall into it is death.
+	var floor_at := Vector3.INF
+	for z in range(-40, 30, 2):
+		for x in range(-80, -40, 2):
+			if t.in_chasm(x, z) and t.height(x, z) < Terrain.CHASM_DEATH - 1.0:
+				floor_at = Vector3(x, t.height(x, z), z)
+				break
+		if floor_at != Vector3.INF:
+			break
+	check(floor_at != Vector3.INF and floor_at.y < Terrain.CHASM_DEATH, "the Ravine's floor lies deep below the rims (%.1f m)" % floor_at.y)
+	var you := isle.player
+	you.hp = you.max_hp()
+	you.global_position = floor_at
+	you._tick_sea(0.1)
+	check(you.dead or you.hp <= 0.0, "falling into the Ravine kills you")
+	if you.dead:
+		you.respawn(Vector3(2, t.height(2, 64), 64))
+	you.guard_left = 0.0
+	if isle.spawn_zombie("thornback", floor_at + Vector3(0, 0.5, 0)):
+		var z: Zombie = isle.zombies.back()
+		z.position = floor_at
+		z._physics_process(0.05)
+		check(not z.is_alive(), "and kills whatever is knocked into it")
+	# Nothing in the air: every tree's root is on the ground, every prop on the lowest ground under it.
+	var adrift := 0
+	for at: Vector3 in isle.tree_spots:
+		if absf(at.y - t.height(at.x, at.z)) > 0.06:
+			adrift += 1
+	check(isle.tree_spots.size() >= 250 and adrift == 0, "%d trees, every one rooted in the ground (%d adrift)" % [isle.tree_spots.size(), adrift])
+	var column := MapFonta.new()
+	column.kind = "column"
+	column.size = 4.0
+	var on_slope := Transform3D(Basis.IDENTITY, Vector3(0, 0, 40))
+	var base := MapBuilder.settle_static(t, on_slope, column)
+	var half := column.footprint()
+	var under := INF
+	for i: float in [-1.0, 1.0]:
+		for j: float in [-1.0, 1.0]:
+			under = minf(under, t.height(on_slope.origin.x + half.x * i, on_slope.origin.z + half.y * j))
+	check(base <= under + 0.001, "a column on a slope is set down on its lowest corner, never left hanging")
+	column.free()
+	# The flora: a carpet of grass, flowers and shrubs, the cliffs dressed in strata.
+	var tufts := 0
+	var carpets := 0
+	for n in isle.find_children("*", "MultiMeshInstance3D", true, false):
+		var mm := (n as MultiMeshInstance3D).multimesh
+		if (n as MultiMeshInstance3D).material_override == FontaFlora.grass_material():
+			carpets += 1
+			tufts += mm.instance_count
+	check(carpets > 50 and tufts > 20000, "a carpet of grass over the island (%d tufts)" % tufts)
+	check(FontaFlora.FIELD_ZONES.size() >= 9 and FontaFlora.NOMINAL.size() >= 10, "%d kinds of tree, planted by %d parts of the island" % [FontaFlora.NOMINAL.size(), FontaFlora.FIELD_ZONES.size()])
+	FontaFlora.set_wind(1.0, Vector3(0, 0, 1))
+	check(is_equal_approx(float(FontaFlora.grass_material().get_shader_parameter("gust")), 1.0), "the grass bends in the wind too")
+	FontaFlora.set_wind(0.0, Vector3(1, 0, 0.3))
+
+
+## Fontanova's rites: the Oracle's braziers and sanctum, the waking altars, the rising sea, the blooms.
+func _fonta_rites(isle: World) -> void:
+	var rites := isle.fonta_rites
+	check(rites != null and (isle.grotto_rites["braziers"] as Array).size() == 3 and isle.altar_spots.size() == 4, "the Oracle's Grotto has its three braziers, and each god an altar")
+	var you := isle.player
+	var gate := isle.grid.route(Vector3(60, 0, -24), (isle.grotto_rites["relic"] as Vector3))
+	var shut := gate.size() < 2 or Vector2(gate[-1].x, gate[-1].z).distance_to(Vector2((isle.grotto_rites["relic"] as Vector3).x, (isle.grotto_rites["relic"] as Vector3).z)) > 3.0
+	check(shut, "the sanctum is sealed at first")
+	var pickups_before := isle.pickups.size()
+	for i in 3:
+		var at: Vector3 = (isle.grotto_rites["braziers"] as Array)[i]
+		you.global_position = at + Vector3(0.5, 0, 0)
+		rites._tick_braziers(FontaRites.BRAZIER_HOLD * 0.5)
+		if i == 0:
+			check(not rites.lit & 1, "a brazier takes a moment to light")
+		rites._tick_braziers(FontaRites.BRAZIER_HOLD * 0.6)
+	check(rites.lit == 7 and rites.door_open, "light all three braziers and the sanctum's door opens")
+	var flames: Array = rites._braziers.map(func(b: Dictionary) -> MeshInstance3D: return b["fire"])
+	check(flames.all(func(f: MeshInstance3D) -> bool: return f.visible and f.mesh == WorldLight.brazier_mesh() and (f.get_meta("halo") as Node3D).visible and (not f.has_meta("sparks") or (f.get_meta("sparks") as CPUParticles3D).emitting)),
+		"each burns with living tongues of fire, a halo and sparks, as Port Vael's braziers do")
+	var pickups_after := isle.pickups.size()
+	check(pickups_after >= pickups_before + 2, "inside: a rare weapon and the Oracle's Eye")
+	# The Oracle's Eye: harder blows, and the enemies near you shown.
+	var dmg := you.damage_multiplier()
+	you.activate_power(PowerDefs.EYE)
+	check(is_equal_approx(you.damage_multiplier(), dmg * PowerDefs.EYE_DAMAGE), "the Oracle's Eye: blows %d%% harder" % int(round((PowerDefs.EYE_DAMAGE - 1.0) * 100.0)))
+	check(PowerDefs.relic_banner(PowerDefs.EYE).contains("Oracle's Eye") and not PowerDefs.relic_banner(PowerDefs.EYE).contains("Crown") and you.skin_bits() & 2 == 0, "taken up, it says what it is and what it does, not the Sunken Crown's words")
+	you._tick_powers(600.0)
+	check(you.has_power(PowerDefs.EYE), "carried for as long as you stand")
+	var eyes := func() -> int: return isle.pickups.filter(func(k: Pickup) -> bool: return is_instance_valid(k) and k.item_id == PowerDefs.EYE).size()
+	var lying: int = eyes.call()
+	var at_eye := you.global_position
+	you._kill()
+	check(not you.has_power(PowerDefs.EYE) and eyes.call() == lying, "fall, and it is lost for good: not on you, not on the ground")
+	you.respawn(at_eye)
+	check(not you.has_power(PowerDefs.EYE), "and it does not come back with you")
+	you.guard_left = 0.0 # a fresh respawn's moment of safety, run out (physics is off here)
+	# The altars wake one at a time.
+	check(FontaRites.awake_at(FontaRites.ALTAR_FIRST - 1.0).x == 0 and int(FontaRites.awake_at(FontaRites.ALTAR_FIRST + 1.0).x) == FontaRites.ALTAR_ORDER[0], "the first altar wakes after %d s" % int(FontaRites.ALTAR_FIRST))
+	check(FontaRites.awake_at(FontaRites.ALTAR_FIRST + FontaRites.ALTAR_AWAKE + 1.0).x == 0 and int(FontaRites.awake_at(FontaRites.ALTAR_FIRST + FontaRites.ALTAR_EVERY + 1.0).x) == FontaRites.ALTAR_ORDER[1], "sleeps after %d s, and the next wakes %d s after the first" % [int(FontaRites.ALTAR_AWAKE), int(FontaRites.ALTAR_EVERY)])
+	isle.director.elapsed = FontaRites.ALTAR_FIRST + 1.0
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	rites._tick_altars(0.0)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	var god := rites.altar_god
+	var altar := rites._altar_at(god)
+	check(god == FontaRites.ALTAR_ORDER[0] and altar != Vector3.INF, "%s's altar is awake" % FontaRites.GOD_NAMES.get(god, "?"))
+	you.global_position = altar + Vector3(1, 0, 0)
+	rites._tick_altars(FontaRites.ALTAR_HOLD * 0.5)
+	check(rites.claims == 0, "it has to be held")
+	rites._bless_claimed() # (every frame, as the altar burns, it notes whose it is)
+	rites._tick_altars(FontaRites.ALTAR_HOLD * 0.6)
+	rites._bless_claimed()
+	check(rites.claims == 1 and you._buffs.has("god_ilyria_melee_damage"), "held for %d s, Ilyria blesses whoever stands there: blows %d%% harder" % [int(FontaRites.ALTAR_HOLD), int(Player.GOD_DAMAGE * 100.0)])
+	check(isle.director.banner.contains("Ilyria's blessing is yours now") and isle.director.banner.contains(Player.god_gift(2)), "and says so at once, with what it gives and for how long")
+	check(Player.god_gift(1).contains("%d at once" % int(Player.GOD_HEAL)) and Player.god_gift(1).contains("%d health a second" % int(Player.GOD_REGEN)) and Player.god_gift(3).contains("%d%% faster" % roundi(Player.GOD_SPEED * 100.0))
+		and Player.god_gift(4).contains("%d%% harder shots" % roundi(Player.GOD_AIM * 100.0)) and [1, 2, 3, 4].all(func(g: int) -> bool: return Player.god_gift(g).contains("%d s" % int(Player.BLESSING_TIME["god_%d" % g]))), "each god's blessing in its own words, with its numbers")
+	for key: String in you._buffs.keys():
+		if key.begins_with("god_"):
+			you._buffs.erase(key)
+	# The sea rises, three times a night, and goes down again.
+	check(FontaRites.tide_at(FontaRites.TIDES[0] - 1.0) == 0.0 and is_equal_approx(FontaRites.tide_at(FontaRites.TIDES[0] + FontaRites.TIDE_RAMP + 1.0), FontaRites.TIDE_RISE), "at %d s the sea rises %.1f m" % [int(FontaRites.TIDES[0]), FontaRites.TIDE_RISE])
+	check(FontaRites.tide_at(FontaRites.TIDES[0] + FontaRites.TIDE_HIGH + FontaRites.TIDE_RAMP + 1.0) == 0.0 and FontaRites.TIDES.size() == 3, "and falls again after %d s, three times a night" % int(FontaRites.TIDE_HIGH))
+	isle.director.elapsed = FontaRites.TIDES[0] + FontaRites.TIDE_RAMP + 1.0
+	rites._tick_tide()
+	var beach := Vector3(4, 0, 80)
+	check(isle.isle_sea.slow_at(beach) < 1.0 or isle.terrain.height(beach.x, beach.z) < Terrain.ISLE_SEA_Y + FontaRites.TIDE_RISE, "the high sea covers the beach")
+	# The blooms.
+	check(FontaRites.bloom_at(FontaRites.BLOOM_FIRST - 1.0).x < 0 and FontaRites.bloom_at(FontaRites.BLOOM_FIRST + 1.0).z == 1 and FontaRites.bloom_at(FontaRites.BLOOM_FIRST + FontaRites.BLOOM_WARN + 1.0).z == 2,
+		"violet buds break through after %d s, and open %d s later" % [int(FontaRites.BLOOM_FIRST), int(FontaRites.BLOOM_WARN)])
+	isle.director.elapsed = FontaRites.BLOOM_FIRST + FontaRites.BLOOM_WARN + 1.0
+	rites._tick_blooms(0.0)
+	check(rites._bloom != null and rites._bloom_at != Vector3.INF and rites.in_bloom(rites._bloom_at), "they open at %s" % FontaRites.BLOOM_PLACES[FontaRites.bloom_at(isle.director.elapsed).y])
+	you.hp = you.max_hp()
+	you.global_position = rites._bloom_at
+	rites._hurt_tick = 0.0
+	rites._tick_blooms(0.6)
+	check(you.hp < you.max_hp() and you.poison_left > 0.0, "standing in them poisons and hurts you")
+	you.global_position = rites._bloom_at + Vector3(FontaRites.BLOOM_RADIUS + 2.0, 0, 0)
+	check(not rites.in_bloom(you.global_position), "step out of the ring and you are clear")
+	isle.director.elapsed = 0.0
+	rites._tick_tide()
+	rites._tick_blooms(0.0)
+	you.hp = you.max_hp()
+	you.poison_left = 0.0
+	# Royal Jelly, from a broken hive.
+	you.hp = 10.0
+	you._rage_cd = 9.0
+	you.royal_jelly()
+	check(is_equal_approx(you.hp, you.max_hp()) and you._rage_cd == 0.0 and you._buffs.has("royal_jelly_melee_rate"), "Royal Jelly: full health, every ability ready, and %d%% quicker for %d s" % [int(PowerDefs.JELLY_RATE * 100.0), int(PowerDefs.JELLY_TIME)])
+	you._buffs.erase("royal_jelly_melee_rate")
+	you._buffs.erase("royal_jelly_spell_rate")
+
+
+## The cult of Al'quimelea: who they are, how they are dressed, what each of them does, the night's
+## processions and riders.
+func _fonta_cult(isle: World) -> void:
+	var you := isle.player
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var ready_you := func() -> void:
+		you.position = at
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+		you.poison_left = 0.0
+		you.slowed_left = 0.0
+		you.frozen_left = 0.0
+		you.velocity = Vector3.ZERO
+		you._status_immune = 0.0
+	var drop_seals := func() -> void:
+		for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	# Some Worshippers carry a hunting bow, and put the sickle away for it; it shoots from afar.
+	var archers := 0
+	var sicklers := 0
+	for i in 24:
+		isle.spawn_zombie("cult_worshipper", at + Vector3(i % 6 * 2.0 - 5.0, 0, -12.0 - int(i / 6) * 2.0))
+		var w: Zombie = isle.zombies.back()
+		var sickle: MeshInstance3D = w._parts.filter(func(m: MeshInstance3D) -> bool: return m.has_meta("cult_held")).front()
+		if w.weapon_id == "bow":
+			archers += 1
+			check(not sickle.visible and w._hand_mesh != null and w._attack_style() == "ranged" and w._ranged_reach() > 20.0, "a Worshipper with a bow holds it, not its sickle, and shoots from %.0f m" % w._ranged_reach())
+			w.net_weapon("")
+			check(sickle.visible, "told by the host it carries its sickle after all, it shows the sickle again")
+		else:
+			sicklers += 1
+			check(w.weapon_id == "" and sickle.visible and w._attack_style() == "melee", "the rest come at you with the sickle")
+		w.release()
+	check(archers > 0 and sicklers > archers, "about one in four carries a bow (%d of 24)" % archers)
+	await frames(1)
+	# A staff or a spear is swung head first, never jabbed butt first with its head behind.
+	for id: String in ["cult_priest", "cult_guardian", "hierophant", "polemarch"]:
+		isle.spawn_zombie(id, at + Vector3(0, 0, -12))
+		var c: Zombie = isle.zombies.back()
+		c.set_physics_process(false)
+		var held: MeshInstance3D = c._parts.filter(func(m: MeshInstance3D) -> bool: return m.get_parent() is BoneAttachment3D and (m.get_parent() as BoneAttachment3D).bone_name == "handslot.r").front()
+		c._current_anim = ""
+		c._play(c._blow_anim(), 1.0, 0.0)
+		var ahead := -1.0
+		for f: float in [0.3, 0.4, 0.5]:
+			c._anim.seek(c._anim.current_animation_length * f, true)
+			await frames(1)
+			ahead = maxf(ahead, (c.global_transform.basis.inverse() * held.global_transform.basis.y.normalized()).z)
+		check(c._blow_anim() != "Unarmed_Melee_Attack_Punch_A" and ahead > 0.4, "%s swings what it holds head first at you (%.1f ahead)" % [id, ahead])
+		c.release()
+	await frames(1)
+	# Backing off from you with a wall behind it: it goes round, along the wall, and does not walk into
+	# it; boxed in, it stands its ground.
+	ready_you.call()
+	var path_grid := isle.grid
+	var by_wall := at + Vector3(0, 0, -6)
+	isle.spawn_zombie("cult_priest", by_wall)
+	var backer: Zombie = isle.zombies.back()
+	backer.set_physics_process(false)
+	backer.position = by_wall
+	var shut: Array[Vector2i] = []
+	var wall := func(cells: Array) -> void:
+		for c: Vector2i in cells:
+			if path_grid.is_free(c):
+				path_grid.astar.set_point_solid(c, true)
+				shut.append(c)
+	var behind := path_grid.to_cell(by_wall + Vector3(0, 0, -1.2))
+	var row: Array = []
+	for dx in range(-12, 13): row.append(behind + Vector2i(dx, 0))
+	wall.call(row)
+	var backing := backer.mesenlla_mind as VaelMind
+	var start := backer.position
+	for i in 40:
+		var to := you.global_position - backer.position
+		backing._keep(backer, to, Vector2(to.x, to.z).length(), CultMind.PRIEST_RANGE, 1.0 / 30.0, you)
+	var moved := Vector2(backer.position.x - start.x, backer.position.z - start.z)
+	check(absf(moved.x) > 1.0 and path_grid.is_free(path_grid.to_cell(backer.position)), "a backer backing into a wall goes along it instead (%.1f m aside)" % moved.x)
+	backer.position = by_wall
+	var box: Array = []
+	for dx in range(-12, 13):
+		for dz in range(-12, 0): box.append(path_grid.to_cell(by_wall) + Vector2i(dx, dz))
+		for dz in range(1, 13): box.append(path_grid.to_cell(by_wall) + Vector2i(dx, dz) if absi(dx) > 1 else path_grid.to_cell(by_wall) + Vector2i(12, 12))
+	wall.call(box)
+	for c: Vector2i in [path_grid.to_cell(by_wall) + Vector2i(-1, 0), path_grid.to_cell(by_wall) + Vector2i(1, 0)]: wall.call([c])
+	start = backer.position
+	for i in 20:
+		var to := you.global_position - backer.position
+		backing._keep(backer, to, Vector2(to.x, to.z).length(), CultMind.PRIEST_RANGE, 1.0 / 30.0, you)
+	check(Vector2(backer.position.x - start.x, backer.position.z - start.z).length() < 0.2, "and cornered, it stands its ground")
+	for c in shut: path_grid.astar.set_point_solid(c, false)
+	backer.release()
+	await frames(1)
+	for id: String in CultMind.CULT:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(d["maps"] == ["fontanova"] and CodexPanel.enemy_group(id) == 7 and Icons.exists(id) and str(d.get("lore", "")).length() > 60 and CultMind.handles(id), id + ": of Fontanova's cult, in the Codex with its icon, lore and mind")
+		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
+			var sound: String = table.get(id, "")
+			check(sound != "" and Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s has its own voice (%s)" % [id, sound])
+		# Dressed piece by piece on the body's bones: robes and sleeves move with the limbs.
+		ready_you.call()
+		check(isle.spawn_zombie(id, at + Vector3(0, 0, -10)), id + " spawns")
+		var z: Zombie = isle.zombies.back()
+		var bones := {}
+		for n in z._visual.find_children("*", "BoneAttachment3D", true, false):
+			bones[(n as BoneAttachment3D).bone_name] = true
+		var limbs := bones.keys().filter(func(b: String) -> bool: return b.begins_with("upper") or b.begins_with("lower"))
+		check(bones.has("head") and bones.has("chest") and bones.has("hips") and limbs.size() >= 4, "%s wears its gear on its head, chest, hips and %d limbs" % [id, limbs.size()])
+		z.release()
+	# The worshippers: when one falls the others near it take up the cry.
+	for i in 2:
+		isle.spawn_zombie("cult_worshipper", at + Vector3(i * 2.0, 0, -12))
+	var first: Zombie = isle.zombies[-2]
+	var second: Zombie = isle.zombies[-1]
+	first.take_damage(first.hp + 100.0, Vector3.ZERO, 0.0, first.centre())
+	check(second.haste_left >= CultMind.FERVOUR_TIME - 0.01, "a Worshipper falls: those within %d m hurry on for %d s" % [int(CultMind.FERVOUR_REACH), int(CultMind.FERVOUR_TIME)])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The priest: a tell, a flask thrown where you will be, poison and a slow where it bursts.
+	ready_you.call()
+	isle.spawn_zombie("cult_priest", at + Vector3(0, 0, -12))
+	var priest: Zombie = isle.zombies.back()
+	priest.set_physics_process(false)
+	priest._sees = true
+	var mind := priest.mesenlla_mind as CultMind
+	mind.cooldown = 0.0
+	mind.cooldown_b = 99.0
+	mind.tick(priest, you, Vector3.ZERO, 12.0, 0.01)
+	check(mind.phase == "throw" and priest.is_warning() and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.ELIXIR, "a Priest draws back and throws a flask of elixir")
+	var flask: MistSeal = isle.mist_seals[0]
+	flask.set_physics_process(false)
+	you.position = flask.position
+	var hp := you.hp
+	flask.strike()
+	check(you.hp < hp and is_equal_approx(you.poison_left, CultMind.ELIXIR_POISON) and you.slowed_left >= CultMind.ELIXIR_SLOW - 0.01, "where it bursts: poisoned %d s and slowed %d s" % [int(CultMind.ELIXIR_POISON), int(CultMind.ELIXIR_SLOW)])
+	drop_seals.call()
+	# And it anoints the hurt: a third of their health back, and haste.
+	mind.phase = ""
+	priest._current_anim = ""
+	isle.spawn_zombie("thornback", at + Vector3(3, 0, -12))
+	var hurt: Zombie = isle.zombies.back()
+	hurt.hp = hurt.max_hp * 0.3
+	mind.cooldown_b = 0.0
+	mind.cooldown = 99.0
+	mind.tick(priest, you, Vector3.ZERO, 12.0, 0.01)
+	check(mind.phase == "anoint" and priest.is_warning(), "a Priest raises its staff over a hurt creature")
+	mind.tick(priest, you, Vector3.ZERO, 12.0, CultMind.ANOINT_TELL + 0.01)
+	check(is_equal_approx(hurt.hp, hurt.max_hp * (0.3 + CultMind.ANOINT_HEAL)) and hurt.haste_left >= CultMind.ANOINT_HASTE - 0.01, "and anoints it: a third of its health back, and %d s of haste" % int(CultMind.ANOINT_HASTE))
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The guardian: braces behind its shield, then rushes and bashes you down.
+	ready_you.call()
+	isle.spawn_zombie("cult_guardian", at + Vector3(0, 0, -6))
+	var guard: Zombie = isle.zombies.back()
+	guard.set_physics_process(false)
+	guard._sees = true
+	var gm := guard.mesenlla_mind as CultMind
+	gm.cooldown = 0.0
+	gm.tick(guard, you, Vector3.ZERO, 6.0, 0.01)
+	check(gm.phase == "brace" and guard.is_warning(), "a Guardian braces behind its shield before it rushes")
+	gm.tick(guard, you, Vector3.ZERO, 6.0, CultMind.RUSH_TELL + 0.01)
+	for i in 60:
+		if gm.phase != "rush" or isle.mist_seals.size() > 0:
+			break
+		gm.tick(guard, you, Vector3.ZERO, guard.position.distance_to(you.position), 1.0 / 30.0)
+	check(isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.BASH, "then rushes, and its shield meets you")
+	if isle.mist_seals.size() == 1:
+		hp = you.hp
+		(isle.mist_seals[0] as MistSeal).strike()
+		check(you.hp < hp and you.frozen_left >= CultMind.BASH_STUN - 0.01, "stunned %.1f s by the bash" % CultMind.BASH_STUN)
+	drop_seals.call()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The Ostrich Guardian: on its bird until the bird is brought down, then on foot behind its shield.
+	ready_you.call()
+	isle.spawn_zombie("ostrich_rider", at + Vector3(0, 0, -14))
+	var rider: Zombie = isle.zombies.back()
+	rider.set_physics_process(false)
+	check(rider._mounted and rider._horse_node != null and rider._horse_node.visible, "an Ostrich Guardian rides its war-bird")
+	check(rider._horse_node.scale.x < rider._scale * 1.0 and rider._horse_node.scale.x > rider._scale * 0.9, "a bird of a rider's own size, not a giant")
+	rider.take_damage(rider.max_hp * 0.65, Vector3.ZERO, 0.0, rider.centre())
+	check(not rider._mounted and rider.is_alive(), "below 40%: the bird goes down, the Guardian fights on")
+	var mount := rider._horse_node
+	var t := 0.0
+	var saw_down := false
+	while rider._mount_fall > 0.0 and t < 5.0:
+		rider._tick_mount_fall(1.0 / 30.0)
+		t += 1.0 / 30.0
+		saw_down = saw_down or mount.has_meta("did_thud")
+	check(saw_down and absf(t - FontaModels.MOUNT_FALL_TIME) < 0.1 and not mount.visible, "the bird dies as a battle ostrich does, over %.1f s, and is gone" % FontaModels.MOUNT_FALL_TIME)
+	check((mount.get_node("Rig") as Node3D).position.is_equal_approx(Vector3(0, 1.25, 0)) or not mount.has_meta("did_thud"), "and stands ready again for the next rider")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The cult's great ones.
+	for id: String in CultMind.GREAT:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(d.get("miniboss", false) and CodexPanel.enemy_group(id) == 7 and Icons.exists(id) and CultMind.handles(id) and str(d.get("first_words", "")) != "" and str(d.get("last_words", "")) != "", id + ": a miniboss of the cult, with its icon, words and mind")
+		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
+			check(Sfx.NAMES.has(table.get(id, "")) and Net.SOUNDS.has(table.get(id, "")), "%s has its own voice (%s)" % [id, table.get(id, "")])
+	ready_you.call()
+	isle.spawn_zombie("hierophant", at + Vector3(0, 0, -11))
+	var hiero: Zombie = isle.zombies.back()
+	hiero.set_physics_process(false)
+	hiero._sees = true
+	var hm := hiero.mesenlla_mind as CultMind
+	hm.cooldown = 0.0
+	hm.cooldown_b = 99.0
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, 0.01)
+	check(hm.phase == "fan" and hiero.is_warning() and isle.mist_seals.size() == 3 and isle.mist_seals.all(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.ELIXIR), "the Hierophant throws three flasks at once")
+	var spread := (isle.mist_seals[0] as MistSeal).position.distance_to((isle.mist_seals[2] as MistSeal).position)
+	check(absf(spread - CultMind.FAN_SPREAD * 2.0) < 0.6, "one where you are going and one %.1f m to either side" % CultMind.FAN_SPREAD)
+	drop_seals.call()
+	hm.phase = ""
+	hiero._current_anim = ""
+	hiero.mesenlla_warning = false
+	# Below half health, the elixir of change.
+	for i in 2:
+		isle.spawn_zombie("cult_worshipper", hiero.position + Vector3(3.0 + i * 1.5, 0, 0))
+	hiero.hp = hiero.max_hp * 0.4
+	hm.cooldown_b = 0.0
+	hm.cooldown = 99.0
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, 0.01)
+	check(hm.phase == "rite" and hiero.is_warning(), "below half health it raises its staff to pour the elixir of change")
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, CultMind.RITE_TELL + 0.01)
+	check(isle.count_type("cult_worshipper") == 0 and isle.count_type("battle_ostrich") + isle.count_type("thornback") == CultMind.RITE_COUNT, "and the Worshippers near it become mutants")
+	hm.cooldown_b = 0.0
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, 0.01)
+	hm.tick(hiero, you, Vector3.ZERO, 11.0, CultMind.RITE_TELL + 0.01)
+	check(isle.count_type("cult_worshipper") == CultMind.RITE_COUNT, "with none near, it calls %d down to it" % CultMind.RITE_COUNT)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The Polemarch: behind its tower shield, a sweep close in, a charge further off, its Guardians called.
+	ready_you.call()
+	isle.spawn_zombie("polemarch", at + Vector3(0, 0, -3))
+	var pole: Zombie = isle.zombies.back()
+	pole.set_physics_process(false)
+	pole._sees = true
+	pole.rotation.y = 0.0 # facing +Z, toward you
+	var full := pole.hp
+	pole.take_damage(100.0, Vector3(0, 0, -1), 0.0, pole.centre())
+	check(is_equal_approx(full - pole.hp, 100.0 * float(ZombieDefs.ALL["polemarch"]["shield_cut"])), "a blow from the front: only a quarter gets past the tower shield")
+	full = pole.hp
+	pole.take_damage(100.0, Vector3(0, 0, 1), 0.0, pole.centre())
+	check(is_equal_approx(full - pole.hp, 100.0), "from behind, all of it")
+	var pm := pole.mesenlla_mind as CultMind
+	pm.cooldown = 99.0
+	pm.cooldown_b = 0.0
+	pm.tick(pole, you, Vector3.ZERO, 3.0, 0.01)
+	check(pm.phase == "sweep" and pole.is_warning() and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.SWEEP, "close in, it draws back its spear to sweep")
+	var sweep: MistSeal = isle.mist_seals[0]
+	sweep.set_physics_process(false)
+	you.position = sweep.position
+	hp = you.hp
+	sweep.strike()
+	check(you.hp < hp and you.frozen_left >= CultMind.SPEAR_STUN - 0.01, "caught by the sweep: thrown back and stunned %d s" % int(CultMind.SPEAR_STUN))
+	drop_seals.call()
+	pm.phase = ""
+	ready_you.call()
+	pole.hp = pole.max_hp * 0.55
+	pm.tick(pole, you, Vector3.ZERO, 3.0, 0.01)
+	check(pm.phase == "call", "at %d%% it calls its Guardians" % int(CultMind.PHALANX[0] * 100.0))
+	pm.tick(pole, you, Vector3.ZERO, 3.0, 1.3)
+	check(isle.count_type("cult_guardian") == CultMind.PHALANX_COUNT, "and %d come to its sides" % CultMind.PHALANX_COUNT)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	# Each comes once in the night, at its hour, at its place.
+	isle.director._court_came.clear()
+	isle.director.elapsed = Director.HIEROPHANT_AT + 0.1
+	isle.director._next_procession = INF
+	isle.director._next_ostrich_rider = INF
+	isle.director._tick_cult()
+	check(isle.count_type("hierophant") == 1, "at %d:%02d the Hierophant comes" % [int(Director.HIEROPHANT_AT) / 60, int(Director.HIEROPHANT_AT) % 60])
+	isle.director.elapsed = Director.POLEMARCH_AT + 0.1
+	isle.director._tick_cult()
+	isle.director._tick_cult()
+	check(isle.count_type("polemarch") == 1 and isle.count_type("hierophant") == 1, "at %d:%02d the Polemarch; each of them once" % [int(Director.POLEMARCH_AT) / 60, int(Director.POLEMARCH_AT) % 60])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	isle.director._court_came.clear()
+	# The Ravine's floor is shut to paths: nothing is led down into it.
+	var floor_cell := Vector3.INF
+	for zz in range(-40, 30, 2):
+		if isle.terrain.in_chasm(-64, zz) and not isle.terrain.on_deck(-64, zz) and isle.terrain.ground_height(-64, zz) < Terrain.CHASM_DEATH:
+			floor_cell = Vector3(-64, 0, zz)
+			break
+	check(floor_cell != Vector3.INF and isle.grid.astar.is_point_solid(isle.grid.to_cell(floor_cell)), "the Ravine's floor is shut to paths")
+	# The night: processions from 2:00, riders from 7:00, out of sight of everyone.
+	var director := isle.director
+	you.position = at
+	director.elapsed = Director.PROCESSION_FROM + 0.1
+	director._next_procession = Director.PROCESSION_FROM
+	director._next_ostrich_rider = INF
+	director._tick_cult()
+	check(isle.count_type("cult_worshipper") == int(ZombieDefs.ALL["cult_worshipper"]["pack"]), "from %d:%02d a procession of %d Worshippers comes" % [int(Director.PROCESSION_FROM) / 60, int(Director.PROCESSION_FROM) % 60, int(ZombieDefs.ALL["cult_worshipper"]["pack"])])
+	var near := INF
+	for z: Zombie in isle.zombies:
+		near = minf(near, z.position.distance_to(you.position))
+	check(near > Director.CULT_HIDDEN, "out of your sight (%.0f m away)" % near)
+	director.elapsed = Director.RIDERS_FROM + 0.1
+	director._next_ostrich_rider = Director.RIDERS_FROM
+	director._next_procession = INF
+	director._tick_cult()
+	check(isle.count_type("ostrich_rider") == 1, "from %d:%02d Guardians ride out on their birds" % [int(Director.RIDERS_FROM) / 60, int(Director.RIDERS_FROM) % 60])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	director.elapsed = 0.0
+	director._next_procession = Director.PROCESSION_FROM
+	director._next_ostrich_rider = Director.RIDERS_FROM
+	ready_you.call()
+
+
+## Al'quimelea, the end of Fontanova's night: it comes down from its temple at 11:00, keeps its distance
+## floating over everything, tells each of its four arts before it lands, broods twice, and dawn waits for it.
+func _fonta_god(isle: World) -> void:
+	var you := isle.player
+	var d := isle.director
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var ready_you := func() -> void:
+		you.position = at
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+		you.poison_left = 0.0
+		you.slowed_left = 0.0
+		you.frozen_left = 0.0
+		you.rooted_left = 0.0
+		you.burn_time = 0.0
+		you.velocity = Vector3.ZERO
+		you._status_immune = 0.0
+	var drop_seals := func() -> void:
+		for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	var id := Director.ALQUIMELEA
+	var def: Dictionary = ZombieDefs.ALL[id]
+	check(def.get("god_boss", false) and def["maps"] == ["fontanova"] and GodMind.handles(id) and Icons.exists(id) and Director.BOSS_CARDS.has(id)
+		and Game.zombie_pool_plan().has(id) and str(def.get("lore", "")).length() > 80 and str(def.get("first_words", "")) != "" and str(def.get("last_words", "")) != "",
+		"Al'quimelea is Fontanova's god, with its card, icon, lore, words and mind")
+	for sound: String in ["alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea"]:
+		check(Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s sound" % sound)
+	# Dawn waits for it, and it comes at 11:00 from the temple's court.
+	check(d.requires_regent(), "on Fontanova, dawn waits for the god")
+	d._mist_boss_spawned = false
+	d._mist_boss_defeated = false
+	d.elapsed = Director.ALQ_AT - 1.0
+	d._tick_mist_boss()
+	check(isle.count_type(id) == 0, "not before %d:%02d" % [int(Director.ALQ_AT) / 60, int(Director.ALQ_AT) % 60])
+	d.elapsed = Director.ALQ_AT + 0.1
+	d._tick_mist_boss()
+	d._tick_mist_boss()
+	check(isle.count_type(id) == 1 and d._mist_boss_spawned, "at %d:%02d it comes down, once" % [int(Director.ALQ_AT) / 60, int(Director.ALQ_AT) % 60])
+	var god: Zombie = isle.zombies.filter(func(z: Zombie) -> bool: return z.type_id == id).front()
+	check(Vector2(god.position.x - Director.ALQ_FROM.x, god.position.z - Director.ALQ_FROM.z).length() < 6.0, "from the temple's court on the Acropolis")
+	check(god.is_boss() and god._visual.get_node_or_null("Rig/Body/Crucible") != null and god._visual.get_node_or_null("Rig/Head/Halo") != null and god._visual.get_node_or_null("Pour") != null,
+		"a boss with its crucible, its halo of flasks and the elixir it floats on")
+	d.elapsed = d.match_length() + 5.0
+	check(d.dawn_amount() < 0.5, "past the night's end, while it lives: no dawn")
+	god.set_physics_process(false)
+	god._sees = true
+	var mind := god.mesenlla_mind as GodMind
+	# It rises first; nothing lands while it does.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -14)), at.z - 14.0)
+	mind.tick(god, you, Vector3.ZERO, 14.0, 0.01)
+	check(mind.phase == "rise" and isle.mist_seals.is_empty(), "it rises before it does anything")
+	mind.tick(god, you, Vector3.ZERO, 14.0, GodModels.RISE_TIME + 0.01)
+	check(mind.phase == "", "and is ready after %.0f s" % GodModels.RISE_TIME)
+	# It floats to keep its distance, over everything.
+	god.position = Vector3(at.x, 0, at.z - 4.0)
+	var was := Vector2(god.position.x - you.position.x, god.position.z - you.position.z).length()
+	mind.cooldown = 99.0
+	mind._cool_field = 99.0
+	mind._cool_nova = 99.0
+	mind._cool_lance = 99.0
+	for i in 30:
+		mind.tick(god, you, Vector3.ZERO, Vector2(god.position.x - you.position.x, god.position.z - you.position.z).length(), 0.1)
+	var now := Vector2(god.position.x - you.position.x, god.position.z - you.position.z).length()
+	check(now > was + 2.0, "too close, it floats back from you (%.1f m to %.1f m)" % [was, now])
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -13)), at.z - 13.0)
+	# Elixir rain: several flasks round you.
+	mind.cooldown = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	var rain := isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.ELIXIR)
+	check(mind.phase == "rain" and god.is_warning() and rain.size() == GodMind.RAIN_PER[0], "elixir rain: %d flasks fall round you, each told" % GodMind.RAIN_PER[0])
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind.cooldown = 99.0
+	# Fields of change: poisoned and held fast.
+	mind._cool_field = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	check(mind.phase == "field" and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.CHANGE, "a field of change opens under you")
+	var field: MistSeal = isle.mist_seals[0]
+	field.set_physics_process(false)
+	you.position = field.position
+	var hp := you.hp
+	field.strike()
+	check(you.hp < hp and you.poison_left >= GodMind.CHANGE_POISON - 0.01 and you.rooted_left >= GodMind.CHANGE_ROOT - 0.01, "caught in it: poisoned %.0f s and held fast %.1f s" % [GodMind.CHANGE_POISON, GodMind.CHANGE_ROOT])
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_field = 99.0
+	# Crucible nova: close in, thrown back and set burning.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -5)), at.z - 5.0)
+	mind._cool_nova = 0.0
+	mind.tick(god, you, Vector3.ZERO, 5.0, 0.01)
+	check(mind.phase == "nova" and isle.mist_seals.size() == 1 and isle.mist_seals[0].style == MistSeal.Style.NOVA and is_equal_approx(isle.mist_seals[0].radius, GodMind.NOVA_REACH), "within %.0f m, its crucible gathers light" % GodMind.NOVA_REACH)
+	var nova: MistSeal = isle.mist_seals[0]
+	nova.set_physics_process(false)
+	hp = you.hp
+	nova.strike()
+	check(you.hp < hp and you.velocity.length() > 6.0 and you.burn_time > 0.0, "and the nova throws you back burning")
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_nova = 99.0
+	# Crystal lance: a line of shards toward whoever stands furthest off.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -16)), at.z - 16.0)
+	mind._cool_lance = 0.0
+	mind.tick(god, you, Vector3.ZERO, 16.0, 0.01)
+	var shards := isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.SHARD)
+	check(mind.phase == "lance" and shards.size() == GodMind.LANCE_SHARDS, "further off, a lance of %d shards strikes out toward you" % GodMind.LANCE_SHARDS)
+	var toward := ((shards.back() as MistSeal).position - (shards.front() as MistSeal).position) * Vector3(1, 0, 1)
+	check(toward.normalized().dot(Vector3(0, 0, 1)) > 0.95, "in a line, from it toward you")
+	var shard: MistSeal = shards[2]
+	shard.set_physics_process(false)
+	you.position = shard.position
+	shard.strike()
+	check(you.slowed_left >= GodMind.SHARD_SLOW - 0.01, "a shard slows you %.1f s" % GodMind.SHARD_SLOW)
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	# Once it has changed, a fan of lances.
+	god.hp = god.max_hp * (float(GodMind.STAGES[0]) - 0.01)
+	mind._brooded = 1
+	mind._cool_lance = 0.0
+	mind.tick(god, you, Vector3.ZERO, 16.0, 0.01)
+	shards = isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.SHARD)
+	check(mind.phase == "lance" and shards.size() == GodMind.LANCE_SHARDS * GodMind.LANCE_FAN, "once it has changed, %d lances at once (%d shards)" % [GodMind.LANCE_FAN, shards.size()])
+	god.hp = god.max_hp
+	mind._brooded = 0
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_lance = 99.0
+	# It aims where you are going: a ring of change and the first flask land ahead of you.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -13)), at.z - 13.0)
+	you.velocity = Vector3(5, 0, 0)
+	mind._cool_field = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	var ring: Array = isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.CHANGE)
+	check(ring.size() == 1 and (ring[0] as MistSeal).position.x > you.position.x + 2.0, "its ring of change opens where you are heading (%.1f m ahead)" % ((ring[0] as MistSeal).position.x - you.position.x if ring.size() == 1 else 0.0))
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind._cool_field = 99.0
+	mind.cooldown = 0.0
+	mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+	var flasks: Array = isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.style == MistSeal.Style.ELIXIR)
+	var centre_x := 0.0
+	for f: MistSeal in flasks: centre_x += f.position.x / flasks.size()
+	check(flasks.size() == GodMind.RAIN_PER[0] and centre_x > you.position.x + 2.0, "and its flasks close round where you are going")
+	you.velocity = Vector3.ZERO
+	drop_seals.call()
+	await frames(1)
+	mind.phase = ""
+	mind.cooldown = 99.0
+	# Bots fight it: seen from far off, before the mutants round them, unless one is at their throat.
+	var info := {"name": "Godslayer", "class": "ranger", "team": 0}
+	var body := Avatar.new(isle, Net.BOT_BASE + 91, info)
+	isle.add_child(body)
+	var bot := BotPlayer.new(isle, body, info)
+	isle.add_child(bot)
+	await frames(3)
+	bot.set_physics_process(false)
+	bot.pawn.set_physics_process(false)
+	bot.pawn.global_position = Vector3(at.x + 2.0, isle.ground_at(at + Vector3(2, 0, 16)) + 0.05, at.z + 16.0)
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -14)), at.z - 14.0)
+	check(god.position.distance_to(bot.pawn.global_position) > BotPlayer.SEE_ZOMBIES, "(the god is %.0f m off, past where a bot sees the rest)" % god.position.distance_to(bot.pawn.global_position))
+	isle.spawn_zombie("mutant_wasp", bot.pawn.global_position + Vector3(0, 0, -9))
+	bot._decide()
+	check(bot._target == god, "a bot fights the god, though it is far and a mutant is nearer")
+	var throat: Zombie = isle.zombies.filter(func(z: Zombie) -> bool: return z.type_id == "mutant_wasp").front()
+	throat.position = bot.pawn.global_position + Vector3(0, 0, -2.5)
+	bot._decide()
+	check(bot._target == throat, "but first whatever is at its throat")
+	throat.release()
+	bot.queue_free()
+	await frames(2)
+	# Below two thirds and one third: it broods, and grows quicker.
+	ready_you.call()
+	god.position = Vector3(at.x, isle.ground_at(at + Vector3(0, 0, -13)), at.z - 13.0)
+	for stage in [1, 2]:
+		god.hp = god.max_hp * (float(GodMind.STAGES[stage - 1]) - 0.01)
+		var before := isle.zombies.size()
+		mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+		check(mind.phase == "brood" and GodMind.stage_of(god) == stage, "below %d%% of its health it changes" % int(float(GodMind.STAGES[stage - 1]) * 100.0))
+		mind.tick(god, you, Vector3.ZERO, 13.0, GodMind.BROOD_TIME + 0.01)
+		check(isle.zombies.size() > before, "and mutants are born of it (%d)" % (isle.zombies.size() - before))
+		mind.cooldown = 0.0
+		mind.tick(god, you, Vector3.ZERO, 13.0, 0.01)
+		check(is_equal_approx(mind.cooldown, GodMind.RAIN_EVERY * float(GodMind.QUICKER[stage])), "its arts come quicker (%.1f s)" % mind.cooldown)
+		drop_seals.call()
+		await frames(1)
+		mind.phase = ""
+		for z: Zombie in isle.zombies.duplicate():
+			if z != god: z.release()
+	# It falls: its long death, and then the dawn.
+	check(is_equal_approx(MesenllaModels.death_time(id), GodModels.DEATH_TIME), "its death takes %.0f s" % GodModels.DEATH_TIME)
+	d.boss_fallen(god)
+	check(d._mist_boss_defeated and d.dawn_amount() >= 1.0, "when it falls, the dawn comes")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	d.elapsed = 0.0
+	d._mist_boss_spawned = false
+	d._mist_boss_defeated = false
+	ready_you.call()
+	await frames(1)
+
+
+## The Ascendant against Fontanova's own: it strikes the divine and the changed harder, its Deicide breaks
+## a miniboss's attack, and the Ruin-Breaker goes through a Guardian's shield and into stone.
+func _fonta_ascendant(isle: World) -> void:
+	var you := isle.player
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var was_class := you.class_id
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	var place := func(kind: String, ahead: float, side := 0.0) -> Zombie:
+		var spot := at + Vector3(side, 0, -ahead)
+		spot.y = isle.ground_at(spot)
+		if not isle.spawn_zombie(kind, spot):
+			return null
+		var z: Zombie = isle.zombies.back()
+		z.position = spot
+		z.set_physics_process(false)
+		z.hp = 10000.0
+		z.max_hp = 10000.0
+		return z
+	you.setup_class("ascendant")
+	you.chosen.clear()
+	you.flags.clear()
+	you.mods = Player.BASE_MODS.duplicate()
+	you.spec_id = ""
+	you.position = at
+	you.rotation = Vector3.ZERO
+	you.yaw = 0.0
+	you.pitch = 0.0
+	you.camera.rotation = Vector3.ZERO
+	var snail: Zombie = place.call("mutant_snail", 3.0)
+	var pole: Zombie = place.call("polemarch", 3.0, 3.0)
+	var worshipper: Zombie = place.call("cult_worshipper", 3.0, -3.0)
+	check(snail != null and pole != null and worshipper != null, "a mutant, a miniboss and a Worshipper to try it on")
+	if snail == null or pole == null or worshipper == null:
+		return
+	check(is_equal_approx(AscendantKit.damage_scale(you, snail), 1.0 + AscendantKit.BANE) and is_equal_approx(AscendantKit.damage_scale(you, pole), 1.0 + AscendantKit.BANE)
+		and is_equal_approx(AscendantKit.damage_scale(you, worshipper), 1.0), "the Ascendant strikes mutants and minibosses %d%% harder, and a mere Worshipper no harder" % roundi(AscendantKit.BANE * 100.0))
+	you.flags["unbowed"] = true
+	check(is_equal_approx(AscendantKit.hurt_scale(you), 1.0 - AscendantKit.UNBOWED), "Unbowed: with a miniboss near, less harm")
+	you.flags.erase("unbowed")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# A Godslayer's Deicide on the Hierophant as it readies its flasks: the attack is broken.
+	you.points = 4
+	for step in Player.CORE_STEPS:
+		you.choose_ability(step, 0)
+	you.choose_ability(Player.CORE_STEPS, 0)
+	check(you.spec_id == "godslayer", "a Godslayer")
+	var hiero: Zombie = place.call("hierophant", 7.0)
+	hiero._sees = true
+	var hm := hiero.mesenlla_mind as CultMind
+	hm.cooldown = 0.0
+	hm.cooldown_b = 99.0
+	hm.tick(hiero, you, Vector3.ZERO, 7.0, 0.01)
+	await frames(1)
+	var own := func() -> int: return isle.mist_seals.filter(func(m: MistSeal) -> bool: return m.source_id == hiero.net_id and not m.struck).size()
+	check(hiero.is_warning() and own.call() == 3, "the Hierophant readies three flasks")
+	var h0 := hiero.hp
+	AscendantKit.deicide(you)
+	check(you.deicide_on == hiero, "Deicide leaps on it")
+	you.set_physics_process(true)
+	for i in 120:
+		if you._leap_t < 0.0:
+			break
+		await get_tree().physics_frame
+	you.set_physics_process(false)
+	await frames(1)
+	check(hiero.hp < h0 and not hiero.is_warning() and hm.phase == "" and own.call() == 0, "and breaks its attack, though stuns do not touch it: its rings fade without landing")
+	for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	# The Ruin-Breaker Greataxe: through a Guardian's shield, and into stone.
+	you.setup_class("infantry")
+	you.position = at
+	you.rotation = Vector3.ZERO
+	you.yaw = 0.0
+	you.camera.rotation = Vector3.ZERO
+	var guard: Zombie = place.call("cult_guardian", 2.0)
+	guard.look_at(Vector3(you.position.x, guard.position.y, you.position.z), Vector3.UP, true)
+	var sword: Dictionary = WeaponDefs.ALL["sword"]
+	var axe: Dictionary = WeaponDefs.ALL["ruin_greataxe"]
+	var g0 := guard.hp
+	isle.melee_hit(you, sword, you.melee_stats(sword))
+	var by_sword := g0 - guard.hp
+	g0 = guard.hp
+	isle.melee_hit(you, axe, you.melee_stats(axe))
+	var by_axe := g0 - guard.hp
+	var plain := float(you.melee_stats(axe)["damage"]) / float(you.melee_stats(sword)["damage"])
+	check(by_sword > 0.0 and absf(by_axe / by_sword - plain / float(ZombieDefs.ALL["cult_guardian"].get("shield_cut", 0.5))) < 0.05, "a sword glances off a Guardian's shield; the Greataxe goes through it")
+	guard.release()
+	await frames(1)
+	var stony: Zombie = place.call("cult_worshipper", 2.0)
+	stony.def = stony.def.duplicate()
+	stony.def["stone"] = true # this one only: what counts is that it is stone
+	var s0 := stony.hp
+	isle.melee_hit(you, axe, you.melee_stats(axe))
+	check(absf((s0 - stony.hp) - float(you.melee_stats(axe)["damage"]) * float(axe["breaker"])) < 1.0, "it strikes stone things %d%% harder" % roundi((float(axe["breaker"]) - 1.0) * 100.0))
+	check(["earth_elemental", "great_revenant_elemental", "gargoyle"].all(func(k: String) -> bool: return ZombieDefs.ALL[k].get("stone", false)), "the elementals of stone and the gargoyles are stone")
+	stony.release()
+	# The Resin Repeater against a mutant bee.
+	var bee: Zombie = place.call("mutant_bee", 6.0)
+	check(bee != null and bee.flies, "a mutant bee flies, and the Repeater's bolts are made for it")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	await frames(1)
+	you.setup_class(was_class)
+	you.position = at
+
+
+func _fonta_mutants(isle: World) -> void:
+	var you := isle.player
+	var at := Vector3(0, isle.ground_at(Vector3(0, 0, 30)), 30)
+	var ready_you := func() -> void:
+		you.position = at
+		you.hp = you.max_hp()
+		you.guard_left = 0.0
+		you.poison_left = 0.0
+		you.rooted_left = 0.0
+		you.burn_time = 0.0
+		you.night_blind_left = 0.0
+		you.velocity = Vector3.ZERO
+		you._status_immune = 0.0
+	var drop_seals := func() -> void:
+		for seal: MistSeal in isle.mist_seals.duplicate(): seal.queue_free()
+	var honey := func() -> Array:
+		return isle.pickups.filter(func(p: Pickup) -> bool: return p.item_id == "honey")
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	drop_seals.call()
+	await frames(1)
+	# Who they are.
+	for id: String in FontaModels.KINDS:
+		var d: Dictionary = ZombieDefs.ALL[id]
+		check(d["maps"] == ["fontanova"] and SpawnRules.is_archipelago(d) and CodexPanel.enemy_group(id) == 6 and Icons.exists(id) and str(d.get("lore", "")).length() > 60, id + ": of Fontanova, in the Codex with its icon and lore")
+		check(not ZombieDefs.roams(id, 600, "vael") and not ZombieDefs.roams(id, 600, "village") and not ZombieDefs.roams(id, 600, "mists"), id + " lives only on Fontanova")
+		var model := MesenllaModels.build(id)
+		check(MesenllaModels.KINDS.has(id) and model.has_node("Rig") and FontaMind.handles(id), id + " has its own model and mind")
+		model.free()
+		for table: Dictionary in [Zombie.MESENLLA_VOICES, Zombie.MESENLLA_HURT, Zombie.MESENLLA_DEATHS]:
+			var sound: String = table.get(id, "")
+			check(sound != "" and Sfx.NAMES.has(sound) and Net.SOUNDS.has(sound) and ResourceLoader.exists("res://assets/sounds/%s.ogg" % sound), "%s has its own voice (%s)" % [id, sound])
+	check(CodexPanel.enemy_group("kraken") == 8 and CodexPanel.enemy_group("cult_priest") == 7, "the cult has its own place in the Codex, and the bosses still come last")
+	for i in 300:
+		var pick := ZombieDefs.pick_roamer(900.0, "fontanova")
+		if pick in ["beehive", "mutant_spider", "ostrich_rider"] or not (FontaModels.KINDS.has(pick) or CultMind.CULT.has(pick)):
+			check(false, "hives, spiders and riders come only where the night puts them, never as roamers (%s)" % pick)
+			break
+	check(MistSeal.Style.INK == 17 and MistSeal.Style.DUST == 22 and Net.ANIMS.size() <= 63, "their strikes append wire styles and reuse animation slots")
+	# Mutant Bee: a tell, a dive at where you stood, a poisoned sting; a step aside is enough.
+	ready_you.call()
+	check(isle.spawn_zombie("mutant_bee", at + Vector3(0, 0, -8)), "a Mutant Bee spawns")
+	var bee: Zombie = isle.zombies.back()
+	bee.set_physics_process(false)
+	bee._sees = true
+	var mind := bee.mesenlla_mind as FontaMind
+	check(bee.flies and mind != null, "it flies, with its own mind")
+	mind.cooldown = 0.0
+	mind.tick(bee, you, Vector3.ZERO, 8.0, 0.01)
+	check(mind.phase == "tell" and bee.is_warning() and bee._current_anim == "m_cast" and isle.mist_seals.is_empty(), "it curls its stinger forward before it dives, and nothing lands yet")
+	var aim := mind.aim
+	mind.tick(bee, you, Vector3.ZERO, 8.0, FontaMind.BEE_TELL + 0.01)
+	check(mind.phase == "dive" and bee._current_anim == "m_dive", "then it dives")
+	for i in 120:
+		if mind.phase != "dive":
+			break
+		mind.tick(bee, you, Vector3.ZERO, 8.0, 1.0 / 30.0)
+	check(mind.phase == "recover" and isle.mist_seals.size() == 1, "and stings where you stood")
+	var sting: MistSeal = isle.mist_seals[0]
+	sting.set_physics_process(false)
+	you.position = aim + Vector3(4, 0, 0)
+	var hp := you.hp
+	sting.strike()
+	check(you.hp == hp and you.poison_left <= 0.0, "a step aside and it misses")
+	you.position = aim
+	sting.strike()
+	check(you.hp < hp and is_equal_approx(you.poison_left, FontaMind.STING_POISON), "where it lands it stings, and poisons you for %d s" % int(FontaMind.STING_POISON))
+	drop_seals.call()
+	await frames(1)
+	bee.stun(0.5)
+	check(mind.phase == "" and not bee.is_warning(), "a stun breaks off its attack")
+	bee.release()
+	# Honey: half the bees leave some.
+	seed(11)
+	var before := (honey.call() as Array).size()
+	for i in 40:
+		mind.on_death(bee)
+	var dropped := (honey.call() as Array).size() - before
+	check(dropped > 10 and dropped < 30, "about half the bees leave Honey (%d of 40)" % dropped)
+	for p: Pickup in honey.call(): isle.remove_pickup(p)
+	# Beehive: it grows where the map says, sends bees out when struck, spills Honey when broken.
+	check(isle.hive_spots.size() == 6, "the map has six places where hives grow")
+	var living := isle.count_living()
+	check(isle.spawn_zombie("beehive", at + Vector3(8, 0, -8)), "a Beehive grows")
+	var hive: Zombie = isle.zombies.back()
+	hive.set_physics_process(false)
+	check(isle.count_living() == living, "a hive is part of the island, not one of the night's hunters")
+	var bees := isle.count_type("mutant_bee")
+	hive.take_damage(10.0, Vector3.FORWARD, 0.0, hive.centre())
+	check(isle.count_type("mutant_bee") == bees + FontaMind.HIVE_RELEASE, "struck, it sends out %d bees" % FontaMind.HIVE_RELEASE)
+	hive.take_damage(10.0, Vector3.FORWARD, 0.0, hive.centre())
+	check(isle.count_type("mutant_bee") == bees + FontaMind.HIVE_RELEASE, "not again at once")
+	var hive_mind := hive.mesenlla_mind as FontaMind
+	for i in 6:
+		hive_mind._released = 0.0
+		hive_mind.on_hurt(hive)
+	var from_hive := isle.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and int(z.get_meta("from", -1)) == hive.net_id).size()
+	check(from_hive == FontaMind.HIVE_BEES, "never more than %d of its bees at once" % FontaMind.HIVE_BEES)
+	hive_mind.on_death(hive)
+	check((honey.call() as Array).size() == FontaMind.HIVE_HONEY, "broken, it spills %d Honey" % FontaMind.HIVE_HONEY)
+	for p: Pickup in honey.call(): isle.remove_pickup(p)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	# Honey: worth eating unhurt, for its speed, but not twice over.
+	ready_you.call()
+	you._buffs.erase("honey")
+	var pot := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
+	isle._scan_pickups_for(you)
+	check(not isle.pickups.has(pot) and you._buffs.has("honey") and is_equal_approx(float(you._buffs["honey"]["val"]), PowerDefs.HONEY_SPEED) and is_equal_approx(float(you._buffs["honey"]["left"]), PowerDefs.HONEY_HASTE), "Honey quickens you even unhurt")
+	you._buffs["honey"]["left"] = 1.0
+	var pot2 := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
+	isle._scan_pickups_for(you)
+	check(not isle.pickups.has(pot2) and is_equal_approx(float(you._buffs["honey"]["left"]), PowerDefs.HONEY_HASTE), "a second pot, unhurt and still quick: you take it, and the speed starts over")
+	you.hp = you.max_hp() - 40.0
+	var pot3 := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
+	isle._scan_pickups_for(you)
+	check(not isle.pickups.has(pot3) and is_equal_approx(you.hp, you.max_hp() - 40.0 + float(PowerDefs.FOODS["honey"]["heal"])), "hurt, you eat it for its healing")
+	# Something freed out from under the list of pickups does not stop you taking what is there.
+	var gone := isle.spawn_pickup_at(you.position + Vector3(30, 0, 0), Pickup.Kind.FOOD, "apple")
+	gone.free()
+	you.hp = you.max_hp() - 40.0
+	var pot4 := isle.spawn_pickup_at(you.position, Pickup.Kind.FOOD, "honey")
+	isle._scan_pickups_for(you)
+	check(not isle.pickups.has(pot4) and isle.pickups.all(func(k: Variant) -> bool: return is_instance_valid(k)), "a freed pickup in the list is let go of, and Honey is still taken")
+	you.hp = you.max_hp()
+	you._buffs.erase("honey")
+	check(PowerDefs.FOODS["honey"]["weight"] == 0.0 and PowerDefs.mesh("honey") != null, "Honey is never found lying about, only dropped, and has its own pot")
+	# Mutant Wasp: the stinger from afar, which poisons; close in, a dive to bite.
+	ready_you.call()
+	check(isle.spawn_zombie("mutant_wasp", at + Vector3(0, 0, -10)), "a Mutant Wasp spawns")
+	var wasp: Zombie = isle.zombies.back()
+	wasp.set_physics_process(false)
+	wasp._sees = true
+	mind = wasp.mesenlla_mind as FontaMind
+	mind.cooldown = 0.0
+	mind.tick(wasp, you, Vector3.ZERO, 10.0, 0.01)
+	check(mind.phase == "tell" and wasp.is_warning(), "at range it arches its abdomen under itself first")
+	mind.tick(wasp, you, Vector3.ZERO, 10.0, FontaMind.WASP_TELL + 0.01)
+	var stingers := isle._projectiles.filter(func(p: Projectile) -> bool: return p.active and p.source == "mutant_wasp")
+	check(stingers.size() == 1 and wasp._current_anim == "m_throw", "then shoots its stinger")
+	if stingers.size() == 1:
+		var stinger: Projectile = stingers[0]
+		ready_you.call()
+		await get_tree().physics_frame
+		for i in 60:
+			if not stinger.active:
+				break
+			stinger._fly(1.0 / 30.0)
+		check(you.hp < you.max_hp() and is_equal_approx(you.poison_left, FontaMind.WASP_POISON), "which poisons you for %d s" % int(FontaMind.WASP_POISON))
+	for p: Projectile in isle._projectiles:
+		if p.active: p.stop()
+	mind.phase = ""
+	mind.cooldown = 0.0
+	mind.tick(wasp, you, Vector3.ZERO, 2.0, 0.01)
+	mind.tick(wasp, you, Vector3.ZERO, 2.0, FontaMind.WASP_TELL + 0.01)
+	check(mind.phase == "dive", "close in, it dives to bite")
+	wasp.release()
+	# Wasp-Hive Snail: its nest shudders, then a wasp crawls out; no more than three of its own.
+	check(isle.spawn_zombie("wasp_hive_snail", at + Vector3(0, 0, -12)), "a Wasp-Hive Snail spawns")
+	var nest: Zombie = isle.zombies.back()
+	nest.set_physics_process(false)
+	nest._sees = true
+	mind = nest.mesenlla_mind as FontaMind
+	for i in 5:
+		mind.cooldown = 0.0
+		mind.tick(nest, you, Vector3.ZERO, 12.0, 0.01)
+		check(i > 0 or (mind.phase == "tell" and nest.is_warning()), "its nest shudders first")
+		mind.tick(nest, you, Vector3.ZERO, 12.0, FontaMind.NEST_TELL + 0.01)
+	var wasps := isle.zombies.filter(func(z: Zombie) -> bool: return z.is_alive() and int(z.get_meta("from", -1)) == nest.net_id).size()
+	check(wasps == FontaMind.NEST_WASPS, "then wasps crawl out of it, %d of its own at most" % FontaMind.NEST_WASPS)
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	# Mutant Snail: a trail behind it, poison or fire, that lasts.
+	ready_you.call()
+	check(isle.spawn_zombie("mutant_snail", at + Vector3(0, 0, -6)), "a Mutant Snail spawns")
+	var snail: Zombie = isle.zombies.back()
+	snail.set_physics_process(false)
+	var trails := FontaTrails.of(isle)
+	for step in 6:
+		snail.position = at + Vector3(0, 0, -6 + step * 1.4)
+		trails.track(snail)
+	var laid := trails._life.filter(func(life: float) -> bool: return life > 0.0).size()
+	check(laid >= 4, "a snail leaves a trail as it crawls (%d)" % laid)
+	you.position = at + Vector3(0, 0, -2)
+	trails._check = 0.0
+	trails._process(0.01)
+	var poisoned := FontaMind.trail_of(snail) == "poison"
+	check(you.poison_left > 0.0 if poisoned else you.burn_time > 0.0, "stepping in it %s" % ("poisons you" if poisoned else "sets you alight"))
+	trails._process(FontaTrails.TRAIL_LIFE)
+	check(trails._life.all(func(life: float) -> bool: return life <= 0.0), "and it is gone after %d s" % int(FontaTrails.TRAIL_LIFE))
+	snail.release()
+	# Mutant Spider: perched head down on a trunk, on the bark, until you come near; its web roots and poisons.
+	ready_you.call()
+	check(isle.spider_trunks.size() >= 10, "the island's trees have trunks to cling to (%d)" % isle.spider_trunks.size())
+	var trunk: Dictionary = isle.spider_trunks[0]
+	var tree: Vector3 = trunk["at"]
+	you.position = tree + Vector3(25, 0, 0)
+	you.position.y = isle.ground_at(you.position)
+	var spider: Zombie = null
+	var placed := false
+	for i in 30:
+		if isle.spawn_spider():
+			placed = true
+			break
+	check(placed, "a spider takes to a tree a way off from you")
+	spider = isle.zombies.back()
+	spider.set_physics_process(false)
+	mind = spider.mesenlla_mind as FontaMind
+	var home: Dictionary = {}
+	for p: Dictionary in isle.spider_trunks:
+		if home.is_empty() or Vector2((p["at"] as Vector3).x - spider.position.x, (p["at"] as Vector3).z - spider.position.z).length() < Vector2((home["at"] as Vector3).x - spider.position.x, (home["at"] as Vector3).z - spider.position.z).length():
+			home = p
+	var off := Vector2((home["at"] as Vector3).x - spider.position.x, (home["at"] as Vector3).z - spider.position.z).length()
+	var up := spider.position.y + FontaMind.SPIDER_RIG - isle.ground_at(home["at"])
+	check(mind.perched and is_equal_approx(off, float(home["girth"]) + FontaMind.CLING), "it clings on the bark of its trunk, not inside it (%.2f m out)" % off)
+	check(up >= FontaMind.PERCH_LOW - 0.01 and up <= FontaMind.PERCH_HIGH + 0.01 and up <= maxf(float(home["high"]), FontaMind.PERCH_LOW) + 0.01, "below the leaves (%.1f m up)" % up)
+	spider._sees = true
+	mind.tick(spider, you, Vector3.ZERO, 30.0, 0.1)
+	check(mind.perched and spider._current_anim == "m_sink" and mind.phase == "", "far off, it waits head down")
+	# On the side it faces, out from its trunk.
+	you.position = spider.position + Vector3(sin(spider.rotation.y), 0, cos(spider.rotation.y)) * 6.0
+	you.position.y = isle.ground_at(you.position)
+	mind.tick(spider, you, Vector3.ZERO, 6.0, 0.1)
+	check(mind.phase == "pounce" and isle.mist_seals.size() == 1, "come near and it drops on you, its landing marked")
+	var web: MistSeal = isle.mist_seals[0]
+	web.set_physics_process(false)
+	for i in 40:
+		mind.tick(spider, you, Vector3.ZERO, 3.0, 1.0 / 30.0)
+	check(not mind.perched and mind.phase == "" and absf(spider.position.y - isle.ground_at(spider.position)) < 0.3, "and lands on the ground")
+	you.position = web.position
+	web.strike()
+	check(you.rooted_left >= FontaMind.WEB_ROOT - 0.01 and you.poison_left >= FontaMind.WEB_POISON - 0.01, "its web holds you and poisons you")
+	drop_seals.call()
+	await frames(1)
+	spider.release()
+	isle.spawn_spider()
+	spider = isle.zombies.back()
+	spider.set_physics_process(false)
+	spider.stun(0.5)
+	check(not (spider.mesenlla_mind as FontaMind).perched, "a stun knocks a spider off its tree")
+	spider.release()
+	# Battle Ostrich: paws the ground, charges, and kicks away whoever it reaches.
+	ready_you.call()
+	check(isle.spawn_zombie("battle_ostrich", at + Vector3(0, 0, -12)), "a Battle Ostrich spawns")
+	var ostrich: Zombie = isle.zombies.back()
+	ostrich.set_physics_process(false)
+	ostrich._sees = true
+	mind = ostrich.mesenlla_mind as FontaMind
+	mind.cooldown = 0.0
+	mind.tick(ostrich, you, Vector3.ZERO, 12.0, 0.01)
+	check(mind.phase == "tell" and ostrich.is_warning(), "it paws the ground before it charges")
+	mind.tick(ostrich, you, Vector3.ZERO, 12.0, FontaMind.CHARGE_TELL_OSTRICH + 0.01)
+	check(mind.phase == "charge" and ostrich._current_anim == "m_charge", "then charges")
+	for i in 90:
+		if mind.phase != "charge":
+			break
+		mind.tick(ostrich, you, Vector3.ZERO, ostrich.position.distance_to(you.position), 1.0 / 30.0)
+	check(isle.mist_seals.size() == 1, "and kicks you when it reaches you")
+	var kick: MistSeal = isle.mist_seals[0]
+	kick.set_physics_process(false)
+	hp = you.hp
+	kick.strike()
+	check(you.hp < hp and Vector2(you.velocity.x, you.velocity.z).length() > 5.0, "the kick throws you away")
+	drop_seals.call()
+	await frames(1)
+	ostrich.release()
+	# Ember Moth: wings spread a second, then the burning dust dazzles and sets alight.
+	ready_you.call()
+	check(isle.spawn_zombie("ember_moth", at + Vector3(0, 0, -10)), "an Ember Moth spawns")
+	var moth: Zombie = isle.zombies.back()
+	moth.set_physics_process(false)
+	moth._sees = true
+	mind = moth.mesenlla_mind as FontaMind
+	mind.cooldown = 0.0
+	mind.tick(moth, you, Vector3.ZERO, 10.0, 0.01)
+	check(mind.phase == "tell" and moth.is_warning() and isle.mist_seals.is_empty(), "it spreads its wings, eye-spots blazing")
+	mind.tick(moth, you, Vector3.ZERO, 10.0, FontaMind.MOTH_TELL * 0.5)
+	check(isle.mist_seals.is_empty(), "and holds them")
+	mind.tick(moth, you, Vector3.ZERO, 10.0, FontaMind.MOTH_TELL * 0.5 + 0.01)
+	check(isle.mist_seals.size() == 1 and moth._current_anim == "m_throw", "then claps them")
+	var dust: MistSeal = isle.mist_seals[0]
+	dust.set_physics_process(false)
+	you.position = dust.position
+	dust.strike()
+	check(you.night_blind_left >= FontaMind.DUST_BLIND - 0.01 and you.burn_time >= FontaMind.DUST_BURN - 0.01, "the dust dazzles you and sets you alight")
+	drop_seals.call()
+	await frames(1)
+	moth.release()
+	# Thornback: blows from the front glance off its shell.
+	check(isle.spawn_zombie("thornback", at + Vector3(0, 0, -6)), "a Thornback spawns")
+	var tortoise: Zombie = isle.zombies.back()
+	tortoise.set_physics_process(false)
+	tortoise.rotation.y = 0.0
+	var full := tortoise.hp
+	tortoise.take_damage(40.0, Vector3(0, 0, -1), 0.0, tortoise.centre())
+	var front := full - tortoise.hp
+	tortoise.hp = full
+	tortoise.take_damage(40.0, Vector3(0, 0, 1), 0.0, tortoise.centre())
+	var back := full - tortoise.hp
+	check(front > 0.0 and is_equal_approx(front * 2.0, back), "struck from the front it takes half (%.0f of %.0f)" % [front, back])
+	tortoise.release()
+	# The night: hives grow at its start, spiders take to the trees from 3:20.
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	ready_you.call()
+	isle.director.elapsed = 10.0
+	isle.director._tick_fontanova()
+	check(isle.count_type("beehive") == isle.hive_spots.size(), "the hives grow where the map says, at the start of the night")
+	isle.director._tick_fontanova()
+	check(isle.count_type("beehive") == isle.hive_spots.size(), "once a night")
+	check(isle.count_type("mutant_spider") == 0, "no spiders yet")
+	isle.director.elapsed = Director.SPIDERS_FROM + 1.0
+	you.position = tree + Vector3(25, 0, 0)
+	you.position.y = isle.ground_at(you.position)
+	for i in 10:
+		isle.director._next_spider = 0.0
+		isle.director._tick_fontanova()
+	check(isle.count_type("mutant_spider") == Director.MAX_SPIDERS, "from %d:%02d spiders wait in the trees, %d at most" % [int(Director.SPIDERS_FROM) / 60, int(Director.SPIDERS_FROM) % 60, Director.MAX_SPIDERS])
+	for z: Zombie in isle.zombies.duplicate(): z.release()
+	ready_you.call()
+	# How each of them dies: in stages, the body moving through them, the god's glow going out, and
+	# whole again when the same creature comes back.
+	for id: String in FontaModels.KINDS:
+		var spot := at + Vector3(0, 2.2 if id in FontaModels.FLYERS else 0.0, -8)
+		if not isle.spawn_zombie(id, spot):
+			check(false, id + " spawns to be killed")
+			continue
+		var z: Zombie = isle.zombies.back()
+		z.position = spot
+		var rig := z._visual.get_node("Rig") as Node3D
+		var pose_of := func() -> Array:
+			var out: Array = [z._visual.transform]
+			for n in z._visual.find_children("*", "Node3D", true, false):
+				out.append((n as Node3D).transform)
+			return out
+		var rest: Array = pose_of.call()
+		z.take_damage(z.hp + 1000.0, Vector3.ZERO, 0.0, z.centre())
+		var poses: Array[Array] = []
+		var t := 0.0
+		while z.active and t < 4.0:
+			z._physics_process(1.0 / 30.0)
+			t += 1.0 / 30.0
+			if absf(fmod(t, 0.5)) < 1.0 / 30.0:
+				poses.append(pose_of.call())
+		var same := func(a: Array, b: Array) -> bool:
+			for i in a.size():
+				if not (a[i] as Transform3D).is_equal_approx(b[i]):
+					return false
+			return true
+		var moved := poses.filter(func(p: Array) -> bool: return not same.call(p, rest)).size()
+		var distinct := 0
+		for i in range(1, poses.size()):
+			if not same.call(poses[i], poses[i - 1]):
+				distinct += 1
+		check(t >= FontaModels.death_time(id) - 0.1 and moved >= 3 and distinct >= 2, "%s dies in stages over %.1f s (%d poses)" % [id, FontaModels.death_time(id), distinct + 1])
+		var beat := "splash" if id in ["mutant_bee", "mutant_wasp"] else "dust" if id == "ember_moth" else "slump" if id == "mutant_spider" else "spill" if id in FontaModels.SNAILS else "crack" if id == "beehive" else "thud"
+		check(not z.active and z._visual.has_meta("did_" + beat), "%s: the moment it hits the ground is marked (%s), and the body is gone after" % [id, beat])
+		isle.spawn_zombie(id, spot)
+		var again: Zombie = isle.zombies.back()
+		if again == z:
+			check(same.call(pose_of.call(), rest) and not z._visual.has_meta("landed_at") and z._visual.find_children("*", "MeshInstance3D", true, false).all(func(m: Node) -> bool: return (m as MeshInstance3D).visible), "%s comes back whole" % id)
+		for other: Zombie in isle.zombies.duplicate(): other.release()
+	# The wasp's stinger is its own, not an arrow.
+	isle.spawn_enemy_arrow(at + Vector3(0, 2, 0), at + Vector3(0, 2, 10), 5.0, 30.0, false, "mutant_wasp")
+	var shot: Projectile = null
+	for n in isle.find_children("*", "Projectile", true, false):
+		if (n as Projectile).active and (n as Projectile).source == "mutant_wasp":
+			shot = n
+	check(shot != null and shot.mesh != World._arrow_mesh and shot.spins and shot.poison_trail, "a Mutant Wasp's stinger flies as a stinger, corkscrewing and venomous, not as an arrow")
+	if shot:
+		shot.stop()
 
 
 ## Coastal flyers exercise real wind-ups, dodges, interruption, damage and pool reuse.

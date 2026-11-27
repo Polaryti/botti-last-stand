@@ -17,11 +17,15 @@ static func t(when: String, action: String, params := {}) -> Dictionary:
 	return d
 
 
-static func _spec(id: String, name: String, desc: String, color: Color, entry: Dictionary, path: Array, final: Dictionary) -> Dictionary:
+## `earned`: a profession that has to be earned before it can be taken (Game.earn_spec); its card says how.
+static func _spec(id: String, name: String, desc: String, color: Color, entry: Dictionary, path: Array, final: Dictionary, earned := "") -> Dictionary:
 	final["final"] = true
 	entry["icon"] = "spec_%s" % id
 	final["icon"] = "spec_%s+crown" % id
-	return {"id": id, "name": name, "desc": desc, "color": color, "entry": entry, "path": path, "final": final}
+	var spec := {"id": id, "name": name, "desc": desc, "color": color, "entry": entry, "path": path, "final": final}
+	if earned != "":
+		spec["earned"] = earned
+	return spec
 
 
 static func tree(class_id: String) -> Dictionary:
@@ -43,6 +47,7 @@ static func tree(class_id: String) -> Dictionary:
 			"harpooner": _cache[class_id] = _harpooner()
 			"tidecaller": _cache[class_id] = _tidecaller()
 			"ferryman": _cache[class_id] = _ferryman()
+			"ascendant": _cache[class_id] = _ascendant()
 	return _cache[class_id]
 
 
@@ -732,6 +737,45 @@ static func _tidecaller() -> Dictionary:
 			[a("deep_tide", "Deep Tide", "Call of the Deep costs 30% less tide", "serpent+feather", {"art_cost": -0.3}),
 			a("shed_skin", "Shed Skin", "When the serpent falls you heal 30, and your next call is ready 50% sooner", "serpent+plus", {}, [], "shed_skin")]],
 			a("leviathans_child", "Leviathan's Child", "The serpent grows, with 50% more health, and lashes whatever your Trident strikes within 12 m of it for half the blow", "serpent+crown", {}, [], "leviathans_child")),
+	]}
+
+
+## The Ascendant has one ability button, Ascend, which each profession makes its own (AscendantKit). A
+## Godslayer can always be taken; an Adorer of Al'quimelea has to be earned.
+static func _ascendant() -> Dictionary:
+	var ichor := Color(0.62, 0.66, 0.24)
+	var change := Color(0.5, 0.78, 0.36)
+	return {"core": [
+		[a("marble_skin", "Marble Skin", "+25 max health", "heart+up", {"max_hp": 25.0}),
+		a("pilgrims_stride", "Pilgrim's Stride", "+10% move speed", "boot+up", {"speed": 0.1})],
+		[a("heavy_hand", "Heavy Hand", "+15% melee damage", "ruin_greataxe+up", {"melee_damage": 0.15}),
+		a("restless", "Restless", "Your class ability comes back 20% sooner", "ascend+clock", {"art_cd": -0.2})],
+		[a("divine_bane", "Divine Bane", "Strike bosses, minibosses and mutants 20% harder again", "skull+up", {"divine_bane": AscendantKit.DIVINE_BANE}),
+		a("ichor", "Ichor", "Each kill heals you 3", "heart+skull", {}, [], "ichor")],
+	], "specs": [
+		_spec("godslayer", "Godslayer", "Hunts what was worshipped: leaps on it, breaks what it readies, and ends it.", ichor,
+			a("godslayer_entry", "Godslayer", "Ascend becomes Deicide: you leap on the enemy you face, up to 10 m away, and strike it for 70. It ends anything but a boss or miniboss below 25% health. Strike something as it readies an attack and the attack is broken, even a god's", "deicide", {}, [], "art_deicide"),
+			[[a("long_leap", "Long Leap", "Deicide reaches 4 m further", "deicide+up", {"deicide_reach": AscendantKit.LONG_LEAP}),
+			a("heavy_fall", "Heavy Fall", "Deicide's landing strikes everything else within 3 m for 35", "quake+deicide", {}, [], "heavy_fall")],
+			[a("headsman", "Headsman", "Deicide ends anything but a boss or miniboss below 40% health instead", "skull+deicide", {}, [], "headsman"),
+			a("godmark", "Godmark", "What Deicide strikes takes 20% more damage from everyone for 8 s", "target+deicide", {}, [], "godmark")],
+			[a("hunters_rhythm", "Hunter's Rhythm", "Deicide comes back 30% sooner", "deicide+clock", {"art_cd": -0.3}),
+			a("trophy", "Trophy", "Each boss, miniboss or mutant you kill heals you 15 and takes 3 s off Deicide", "heart+crown", {}, [], "trophy")],
+			[a("unbowed", "Unbowed", "While a boss or miniboss is within 20 m, you take 15% less damage", "shield+skull", {}, [], "unbowed"),
+			a("faith_breaker", "Faith-Breaker", "Breaking an attack gives back half of Deicide's wait", "rite_break+clock", {}, [], "faith_breaker")]],
+			a("twilight", "Twilight of the Gods", "Deicide strikes bosses and minibosses for 5% of their max health more, and breaks every attack being readied within 8 m of where you land", "", {}, [], "twilight")),
+		_spec("adorer", "Adorer of Al'quimelea", "Drinks what its god drank: changed by the elixir, and changing everything near it.", change,
+			a("adorer_entry", "Adorer of Al'quimelea", "Ascend becomes Elixir of Change: you drink and are Changed for 8 s: 20% faster, and your blows poison for 5 a second over 3 s. A field of change opens where you stand: enemies still in it 0.8 s later are poisoned for 8 a second over 3 s and held fast for 1.2 s", "elixir", {}, [], "art_elixir"),
+			[[a("long_draught", "Long Draught", "You stay Changed 4 s longer", "elixir+clock", {"changed_time": AscendantKit.LONG_DRAUGHT}),
+			a("wide_field", "Wide Field", "The field of change reaches 2 m further", "elixir+up", {"field_reach": AscendantKit.WIDE_FIELD})],
+			[a("mutagen", "Mutagen", "Changed, everything you do strikes 20% harder", "elixir+star", {}, [], "mutagen"),
+			a("thick_hide", "Thick Hide", "Changed, you take 20% less damage", "shield+elixir", {}, [], "thick_hide")],
+			[a("quick_change", "Quick Change", "Elixir of Change comes back 30% sooner", "elixir+wind", {"art_cd": -0.3}),
+			a("transmute", "Transmute", "Changed, each kill heals you 8", "heart+elixir", {}, [], "transmute")],
+			[a("alembic", "Alembic", "Changed, each kill keeps you Changed 1 s longer", "elixir+plus", {}, [], "alembic"),
+			a("spreading_change", "Spreading Change", "Changed, a poisoned enemy you kill opens a field of change where it falls", "elixir+skull", {}, [], "spreading")]],
+			a("crucible_heart", "Crucible Heart", "When the change ends, light bursts from you: 60 damage within 6 m, throwing enemies back and setting them burning for 2 s", "", {}, [], "crucible"),
+			"adorer"),
 	]}
 
 

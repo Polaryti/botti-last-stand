@@ -282,6 +282,11 @@ func _keep(z: Zombie, to: Vector3, dist: float, band: Vector2, delta: float, tar
 	# Cover must not make a ranged creature idle forever inside its preferred distance band.
 	if not _clear(z, target) and dist > 2.4: want = 1.0
 	var dir := to.normalized() * want if dist > 0.1 else Vector3.ZERO
+	if want < 0.0:
+		# Backing away, round whatever is behind it; cornered, it stands (_back_way).
+		dir = _back_way(z, -to)
+		if dir == Vector3.ZERO:
+			want = 0.0
 	dir.y = 0.0
 	var speed := z._speed * (0.5 if z._slow > 0.0 else 1.0) * (z.world.tide.quickens(z) if z.world.tide else 1.0)
 	if want < 0.0:
@@ -289,7 +294,10 @@ func _keep(z: Zombie, to: Vector3, dist: float, band: Vector2, delta: float, tar
 	z.velocity = dir * speed
 	if want > 0 and z.world.vael_sites and not z.world.grid.line_is_open(z.position, z.position + dir * 2.0) and z._try_vael_vault(to, dist):
 		return
+	var from := z.position
 	z.move_and_slide()
+	if want < 0.0:
+		_backed(z, from, speed * delta)
 	z.position.y = z.world.ground_at(z.position)
 	_face(z, target.global_position, delta, 6.0)
 	if not z._custom:

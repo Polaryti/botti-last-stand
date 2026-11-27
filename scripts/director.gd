@@ -23,7 +23,7 @@ const FIRST_AMBUSH := 90.0
 const AMBUSH_EVERY := 35.0
 const DAWN_GLOW := 120.0 # seconds before dawn when the sky starts to change
 ## What each land sounds like when the dead sense the dawn. The Village and the Fort keep the wolf.
-const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael"}
+const DAWN_SOUNDS := {"mists": "dawn_mists", "mesenlla": "dawn_valleys", "bastion": "dawn_bastion", "vael": "dawn_vael", "fontanova": "dawn_fontanova"}
 const LAST_STAND := 480.0 # the undead sense the dawn: more of them, and they all come for you
 const LAST_STAND_CALL := 18.0
 const FAR_AWAY := 92.0
@@ -63,6 +63,9 @@ const SOVEREIGN_FROM := Vector3(0, 0, 44) # the middle of the flats
 # still, and after a little while the Kraken rises in front of the quay, under the Tide King's gaze.
 # Dawn will not come until it sinks.
 const KRAKEN := "kraken"
+const ALQUIMELEA := "alquimelea"
+const ALQ_AT := 540.0 # 9:00: the god comes down from its temple (the night there is 12 minutes)
+const ALQ_FROM := Vector3(0, 0, -86) # the temple's court on the Acropolis
 const KRAKEN_AFTER := 14.0 # seconds of stillness before it rises
 const KRAKEN_FROM := Vector3(0, 0, 24)
 const KRAKEN_HOLDS_TIDE := 900.0 # it holds the tide in while it lives
@@ -187,6 +190,7 @@ const BOSS_CARDS := {
 	BASTION_BOSS: {"name": "War Wyvern", "line": "comes for the Great Portal", "color": Color(1.0, 0.56, 0.2), "glow": Color(0.72, 0.12, 0.06), "bells": "boss_bells_wyvern", "strikes": [0.0, 0.24, 0.48, 0.8, 1.25]},
 	LastLight.LEVIATHAN: {"name": "Leviathan of the Mists", "line": "the drowned harbour belongs to the deep", "color": Color(0.5, 0.95, 0.85), "glow": Color(0.05, 0.3, 0.35), "bells": "boss_bells_leviathan", "strikes": [0.0, 1.1, 2.2, 2.6, 3.0]},
 	VAEL_BOSS: {"name": "Hollow Sovereign", "line": "rises from the drowned harbour", "color": Color(0.98, 0.8, 0.36), "glow": Color(0.1, 0.42, 0.4), "bells": "boss_bells_sovereign", "strikes": [0.0, 0.9, 1.8, 2.25, 2.7]},
+	ALQUIMELEA: {"name": "Al'quimelea", "line": "the god of change comes down from its temple", "color": Color(0.86, 0.6, 1.0), "glow": Color(0.2, 0.5, 0.18), "bells": "boss_bells_alquimelea", "strikes": [0.0, 0.4, 0.8, 1.4, 2.06, 2.6]},
 	KRAKEN: {"name": "The Kraken", "line": "the last of Vael rises from the deep", "color": Color(0.45, 1.0, 0.8), "glow": Color(0.32, 0.06, 0.2), "bells": "boss_bells_kraken", "strikes": [0.0, 0.32, 1.2, 1.86, 2.3, 3.3]},
 }
 const BOSS_CARD_TIME := 7.0 # long enough to read what it says
@@ -465,6 +469,9 @@ func _tick_mist_boss() -> void:
 	if not _follows_host and not sandbox and world.map_id == "vael" and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		_raise_sovereign()
 		return
+	if not _follows_host and not sandbox and world.map_id == "fontanova" and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= ALQ_AT:
+		_raise_alquimelea()
+		return
 	if not _follows_host and not sandbox and world.terrain.has_islands() and not Net.fog_rules() and not _mist_boss_spawned and elapsed >= _mist_boss_at:
 		var throne := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(Vector3.ZERO)))
 		throne.y = world.ground_at(throne)
@@ -498,6 +505,17 @@ func _raise_mesenlla_boss() -> void:
 		_sound("revenant_roar", 2.0)
 
 
+## Al'quimelea comes down from its temple on the Acropolis, and the island goes quiet for it.
+func _raise_alquimelea() -> void:
+	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(ALQ_FROM)))
+	spot.y = world.ground_at(spot)
+	if world.spawn_zombie(ALQUIMELEA, spot):
+		_mist_boss_spawned = true
+		world.fx_ring(spot + Vector3.UP * 0.2, 16.0, Color(0.8, 0.5, 1.0))
+		CommandField.visual_impact(world, spot, 12.0, true)
+		if Net.is_host(): Net.command_impact_visual(spot, 12.0, true)
+
+
 ## The Hollow Sovereign rises out of the middle of the flats, the tide pouring off him.
 func _raise_sovereign() -> void:
 	var spot := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(SOVEREIGN_FROM)))
@@ -516,6 +534,9 @@ func boss_fallen(_z: Zombie) -> void:
 	if _z.type_id == KRAKEN:
 		_kraken_fallen = true
 		show_banner("The Kraken sinks. The deep is still, and Vael is free.", 6.0)
+	elif _z.type_id == ALQUIMELEA:
+		_mist_boss_defeated = true
+		show_banner("Al'quimelea is gone. Nothing on Fontanova will change again.", 6.0)
 	elif _z.type_id != "leviathan":
 		_mist_boss_defeated = true
 
@@ -544,6 +565,111 @@ func _tick_mesenlla() -> void:
 
 ## Port Vael: Brine Hounds come up out of the sea in packs; the high tide carries Lantern Jellies in
 ## over the flats; and Anglers lie buried on the shore with their lures showing.
+## Fontanova: its hives grow at the start of the night, and from SPIDERS_FROM its spiders wait in the
+## trees, a new one every SPIDER_EVERY seconds while fewer than MAX_SPIDERS are about.
+const SPIDERS_FROM := 160.0
+const SPIDER_EVERY := 50.0
+const MAX_SPIDERS := 3
+var _hives_grown := false
+var _next_spider := SPIDERS_FROM
+func _tick_fontanova() -> void:
+	if _follows_host:
+		return
+	if not _hives_grown:
+		_hives_grown = true
+		world.grow_hives()
+	if elapsed >= _next_spider:
+		_next_spider = elapsed + SPIDER_EVERY
+		if world.count_type("mutant_spider") < MAX_SPIDERS:
+			world.spawn_spider()
+	_tick_cult()
+
+
+## The cult of Fontanova by place and time: processions of three Worshippers down from their village
+## or the Sacred Way from PROCESSION_FROM, every PROCESSION_EVERY seconds while there are not too many
+## about; Guardians on their ostriches along the Sacred Way or the Ravine from RIDERS_FROM.
+const PROCESSION_FROM := 100.0
+const PROCESSION_EVERY := 65.0
+const MAX_WORSHIPPERS := 9
+const RIDERS_FROM := 360.0
+const RIDER_EVERY_ISLAND := 100.0
+const MAX_OSTRICH_RIDERS := 2
+const PROCESSION_SITES := ["Worshippers' Village", "Sacred Way"]
+const RIDER_SITES := ["Sacred Way", "Worshippers' Village"] # (never the Ravine: its floor is a fall)
+const HIEROPHANT_AT := 180.0
+const POLEMARCH_AT := 330.0
+var _next_procession := PROCESSION_FROM
+var _next_ostrich_rider := RIDERS_FROM
+func _tick_cult() -> void:
+	if Net.fog_rules():
+		return
+	if elapsed >= _next_procession:
+		_next_procession = elapsed + PROCESSION_EVERY
+		var pack := int(ZombieDefs.ALL["cult_worshipper"]["pack"])
+		var site := cult_site(PROCESSION_SITES)
+		if site != Vector3.INF and world.count_type("cult_worshipper") <= MAX_WORSHIPPERS - pack:
+			var came := 0
+			for i in pack:
+				var at := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(site + Vector3(i * 1.6 - 1.6, 0, i % 2 * 1.2))))
+				at.y = world.ground_at(at)
+				if world.spawn_zombie("cult_worshipper", at):
+					came += 1
+			if came > 0:
+				_sound("cult_chant", 2.0)
+				show_banner("A procession of worshippers comes chanting from %s..." % _site_name(site), 3.5)
+	# The cult's great ones, once each: the Hierophant down the Sacred Way, the Polemarch out of the village.
+	if not _court_came.has("hierophant") and elapsed >= HIEROPHANT_AT:
+		if _summon("hierophant", _cult_mark("Sacred Way"), "hierophant_voice"):
+			show_banner("The Hierophant comes down the Sacred Way: \u201c%s\u201d" % ZombieDefs.ALL["hierophant"]["first_words"], 4.5)
+	if not _court_came.has("polemarch") and elapsed >= POLEMARCH_AT:
+		if _summon("polemarch", _cult_mark("Worshippers' Village"), "phalanx_call"):
+			show_banner("The Polemarch marches out of the village: \u201c%s\u201d" % ZombieDefs.ALL["polemarch"]["first_words"], 4.5)
+	if elapsed >= _next_ostrich_rider:
+		_next_ostrich_rider = elapsed + RIDER_EVERY_ISLAND
+		var site := cult_site(RIDER_SITES)
+		if site != Vector3.INF and world.count_type("ostrich_rider") < MAX_OSTRICH_RIDERS:
+			var at := world.grid.to_world(world.grid.nearest_free(world.grid.to_cell(site)))
+			at.y = world.ground_at(at)
+			if world.spawn_zombie("ostrich_rider", at):
+				_sound("ostrich_screech", 2.0)
+				show_banner("Claws on the stones: a Guardian rides out on its war-bird...", 3.5)
+
+
+## Where a named place of the island is (the Landing if it has none).
+func _cult_mark(name: String) -> Vector3:
+	for mark: Dictionary in world.map_marks:
+		if mark["name"] == name:
+			return Vector3(mark["at"].x, 0, mark["at"].y)
+	return Vector3(10, 0, 84)
+
+
+## Of these named places, the one farthest from anyone still standing, if it is out of their sight
+## (more than CULT_HIDDEN metres off); INF if none is.
+const CULT_HIDDEN := 22.0
+func cult_site(names: Array) -> Vector3:
+	var best := Vector3.INF
+	var best_d := CULT_HIDDEN
+	for mark: Dictionary in world.map_marks:
+		if not names.has(mark["name"]):
+			continue
+		var at := Vector3(mark["at"].x, 0, mark["at"].y)
+		var near := INF
+		for p: Target in world.players:
+			if not p.dead:
+				near = minf(near, Vector2(p.global_position.x - at.x, p.global_position.z - at.z).length())
+		if near > best_d:
+			best = at
+			best_d = near
+	return best
+
+
+func _site_name(at: Vector3) -> String:
+	for mark: Dictionary in world.map_marks:
+		if Vector2(mark["at"]).distance_to(Vector2(at.x, at.z)) < 0.5:
+			return "the " + str(mark["name"]) if str(mark["name"]) == "Sacred Way" else str(mark["name"])
+	return "the hills"
+
+
 func _tick_vael() -> void:
 	if elapsed >= _next_rider and elapsed >= ZombieDefs.ALL["brine_hound"]["from"]:
 		_next_rider = elapsed + HOUND_PACK_EVERY
@@ -673,6 +799,9 @@ func _tick_specials() -> void:
 	if world.map_id in SpawnRules.VAEL:
 		_tick_vael()
 		return
+	if world.map_id in SpawnRules.ARCHIPELAGO:
+		_tick_fontanova()
+		return
 	if elapsed >= _next_rider and SpawnRules.allows(ZombieDefs.ALL["rider"], world.spawn_map()):
 		_next_rider = elapsed + RIDER_EVERY
 		if world.count_type("rider") < MAX_RIDERS + (1 if _last_stand else 0) and world.spawn_zombie("rider"):
@@ -754,4 +883,4 @@ func _spawn_roamer() -> void:
 
 ## The Mists end only when the Veil Regent falls, and Mesenlla only when the Great Revenant Elemental does.
 func requires_regent() -> bool:
-	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA or world.map_id == "vael") and not sandbox and not Net.fog_rules()
+	return (world.terrain.has_islands() or world.map_id in SpawnRules.MESENLLA or world.map_id == "vael" or world.map_id == "fontanova") and not sandbox and not Net.fog_rules()

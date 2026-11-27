@@ -12,6 +12,11 @@ var base := Transform3D.IDENTITY: # everything added goes through this, so a sha
 		var determinant := value.basis.determinant()
 		_normal_basis = value.basis.inverse().transposed() if absf(determinant) > 0.000001 else Basis.IDENTITY
 		_mirrored = determinant < 0.0
+## For plants merged into one mesh (Fontanova's flowers and shrubs): each vertex carries its height
+## above its own plant's root in UV2.y, set root_y to the root of the plant being drawn, so the wind
+## bends each plant from its own foot (flora_sway.gdshader).
+var rooted := false
+var root_y := 0.0
 var _normal_basis := Basis.IDENTITY
 var _mirrored := false
 var _st := SurfaceTool.new()
@@ -53,7 +58,10 @@ func _tri(a: Vector3, b: Vector3, c: Vector3, centre: Vector3, col: Color) -> vo
 	for v: Vector3 in [a, b, c]:
 		_st.set_color(col)
 		_st.set_normal(n)
-		_st.add_vertex(base * v)
+		var p := base * v
+		if rooted:
+			_st.set_uv2(Vector2(0.0, maxf(0.0, p.y - root_y)))
+		_st.add_vertex(p)
 
 
 ## A triangle whose corners each have their own colour, blended across it.
@@ -71,7 +79,10 @@ func _tri_shaded(a: Vector3, b: Vector3, c: Vector3, centre: Vector3, ca: Color,
 	for corner: Array in corners:
 		_st.set_color(corner[1])
 		_st.set_normal(n)
-		_st.add_vertex(base * (corner[0] as Vector3))
+		var p := base * (corner[0] as Vector3)
+		if rooted:
+			_st.set_uv2(Vector2(0.0, maxf(0.0, p.y - root_y)))
+		_st.add_vertex(p)
 
 
 ## How much darker the foot of something this tall is than its top. Walls, towers and cliffs stand
@@ -122,6 +133,30 @@ func gable(a: Vector3, b: Vector3, c: Vector3, col: Color) -> LowPoly:
 func leaf(a: Vector3, b: Vector3, c: Vector3, col: Color) -> LowPoly:
 	var n := (b - a).cross(c - a).normalized()
 	_tri(a, b, c, (a + b + c) / 3.0 - n, col)
+	return self
+
+
+## An egg or a plump body: an ellipsoid with radii on its own axes (turned by `turn`), faceted into
+## `lat` bands and `lon` sides, shading from `col` on top to `under` beneath.
+func ovoid(centre: Vector3, radii: Vector3, col: Color, under: Color, lat := 5, lon := 10, turn := Basis.IDENTITY) -> LowPoly:
+	var rows: Array[Array] = []
+	for i in lat + 1:
+		var th := PI * i / lat
+		var row: Array[Vector3] = []
+		for j in lon:
+			var ph := TAU * j / lon + (PI / lon if i % 2 == 1 else 0.0)
+			row.append(centre + turn * Vector3(sin(th) * cos(ph) * radii.x, cos(th) * radii.y, sin(th) * sin(ph) * radii.z))
+		rows.append(row)
+	for i in lat:
+		var c0 := col.lerp(under, float(i) / lat)
+		var c1 := col.lerp(under, float(i + 1) / lat)
+		for j in lon:
+			var a: Vector3 = rows[i][j]
+			var b: Vector3 = rows[i][(j + 1) % lon]
+			var c: Vector3 = rows[i + 1][j]
+			var d: Vector3 = rows[i + 1][(j + 1) % lon]
+			_tri_shaded(a, b, c, centre, c0, c0, c1)
+			_tri_shaded(b, d, c, centre, c0, c1, c1)
 	return self
 
 

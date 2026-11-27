@@ -91,6 +91,45 @@ func _ground(z: Zombie, at: Vector3) -> Vector3:
 	return Vector3(at.x, z.world.ground_at(at), at.z)
 
 
+# --- Backing off -----------------------------------------------------------------------------------
+
+const BACK_LOOK := 2.5 # metres of open ground wanted behind, to back into
+const BACK_TURNS := [0.0, 0.45, 0.9, 1.35, 1.6] # radians off straight back, tried in turn
+const BACK_SHUT := 1.5 # seconds straight back is not tried again, once it got nowhere
+var _back_side := 1.0
+var _back_shut_until := -1.0
+
+
+## Which way to back off along `away`: straight back if the ground behind is open, else turned aside,
+## toward the side it turned last, fanning out to a right angle. ZERO when every way is shut: cornered,
+## it stands its ground rather than walk into the wall.
+func _back_way(z: Zombie, away: Vector3) -> Vector3:
+	away.y = 0.0
+	if away.length() < 0.01:
+		return Vector3.ZERO
+	away = away.normalized()
+	var grid := z.world.grid
+	for turn: float in BACK_TURNS:
+		if turn == 0.0 and z.world.now < _back_shut_until:
+			continue
+		for side: float in ([1.0] if turn == 0.0 else [_back_side, -_back_side]):
+			var way := away.rotated(Vector3.UP, turn * side)
+			var end := z.position + way * BACK_LOOK
+			if grid.line_is_open(z.position, end) and grid.is_free(grid.to_cell(end)):
+				if turn > 0.0:
+					_back_side = side
+				return way
+	return Vector3.ZERO
+
+
+## After a step back: if it barely moved (a wall or a prop the grid does not know about), straight back
+## is shut for a moment and the other side is tried first.
+func _backed(z: Zombie, from: Vector3, meant: float) -> void:
+	if meant > 0.001 and Vector2(z.position.x - from.x, z.position.z - from.z).length() < meant * 0.25:
+		_back_shut_until = z.world.now + BACK_SHUT
+		_back_side = -_back_side
+
+
 func tick(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> bool:
 	cooldown -= delta
 	cooldown_b -= delta
@@ -107,6 +146,24 @@ func tick(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -> 
 		"lantern_jelly": return _jelly(z, target, dist, delta)
 		"angler": return _angler(z, target, dist, delta)
 	return false
+
+
+## Struck, and still standing (the host's or a lone phone's blow). Nothing, unless a mind says otherwise.
+func on_hurt(z: Zombie) -> void:
+	if kind == "war_wyvern":
+		_call_eagles(z) # the blow that takes it below half calls them at once, whatever it is doing
+
+
+## The War Wyvern below half health calls the eagles of the peaks, once: from the blow that takes it
+## there (on_hurt), or from its next turn if its health fell some other way.
+func _call_eagles(z: Zombie) -> void:
+	if called or z.hp >= z.max_hp * 0.5:
+		return
+	called = true
+	z.world.director.show_banner("The War Wyvern calls the eagles of the peaks", 3.0)
+	for i in 3:
+		var a := TAU * i / 3.0
+		z.world.spawn_zombie("eagle", z.position + Vector3(cos(a) * 6.0, 0, sin(a) * 6.0))
 
 
 ## After an ordinary step: show a plain blow as a swipe, and settle back to walking.
@@ -283,9 +340,13 @@ func _shapeshifter(z: Zombie, target: Target, to: Vector3, dist: float, delta: f
 		if phase == "flee":
 			# Away from whoever hurt it, for STAG_FLEE seconds, and then back in a fighting shape.
 			left -= delta
-			var away := -to.normalized() if dist > 0.1 else Vector3.FORWARD
+			var away := _back_way(z, -to if dist > 0.1 else Vector3.FORWARD)
+			var from := z.position
 			z.velocity = away * z._speed * 1.25 * (0.5 if z._slow > 0.0 else 1.0)
 			z.move_and_slide()
+			_backed(z, from, z.velocity.length() * delta)
+			if away == Vector3.ZERO:
+				away = -to.normalized() if dist > 0.1 else Vector3.FORWARD # cornered: it turns at bay
 			z.position.y = z.world.ground_at(z.position)
 			z.rotation.y = lerp_angle(z.rotation.y, atan2(away.x, away.z), minf(1.0, delta * 6.0))
 			if left <= 0.0:
@@ -607,8 +668,13 @@ func _storm(z: Zombie, target: Target, to: Vector3, dist: float, delta: float) -
 	elif dist > STORM_RANGE.y:
 		want = 1.0
 	var dir := to.normalized() * want if dist > 0.1 else Vector3.ZERO
+	if want < 0.0:
+		dir = _back_way(z, -to)
+	var from := z.position
 	z.velocity = dir * z._speed * (0.5 if z._slow > 0.0 else 1.0) * (0.0 if phase == "cast" else 1.0)
 	z.move_and_slide()
+	if want < 0.0:
+		_backed(z, from, z.velocity.length() * delta)
 	z.position.y = z.world.ground_at(z.position)
 	_face(z, target.global_position, delta, 6.0)
 	return true
@@ -634,12 +700,8 @@ const DIVE_BURST_POWER := 0.5 # of its blow
 func _wyvern(z: Zombie, target: Target, dist: float, delta: float) -> bool:
 	var war := kind == "war_wyvern"
 	var style := element_style(z.element)
-	if war and not called and z.hp < z.max_hp * 0.5:
-		called = true
-		z.world.director.show_banner("The War Wyvern calls the eagles of the peaks", 3.0)
-		for i in 3:
-			var a := TAU * i / 3.0
-			z.world.spawn_zombie("eagle", z.position + Vector3(cos(a) * 6.0, 0, sin(a) * 6.0))
+	if war:
+		_call_eagles(z)
 	# Over a stronghold, the War Wyvern breaks off every so often to make a burning pass at its portal.
 	var fort := z.world.fort
 	if war and fort and phase == "":

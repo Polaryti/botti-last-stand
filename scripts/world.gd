@@ -30,6 +30,7 @@ static var _shadow_mesh: QuadMesh
 static var _arrow_mesh: Mesh
 static var _stone_mesh: Mesh
 static var _pellet_mesh: Mesh
+var _bee_mesh: Mesh # the Honeycomb's bees (bee_swarm_fx)
 static var _keg_mesh: Mesh
 static var _shard_mesh: Mesh
 var _ember_spark_mat: StandardMaterial3D
@@ -114,6 +115,9 @@ var waystations: Array[Transform3D] = []
 var lighthouse_top := Vector3.INF
 var last_light: LastLight
 var tide: MistTide # Port Vael's Mist Tide, or null
+var isle_sea: IsleSea # the sea round an island of the archipelago, or null
+var fonta_rites: FontaRites # Fontanova's braziers, altars, tides and blooms, or null
+var fonta_trails: FontaTrails # the trails Fontanova's snails leave, made when the first one crawls
 var _tide_fog := 1.0 # how much thicker the tide makes the fog
 var shrines: Array[Dictionary] = [] # {at, blessing, glow: Array[Node3D]}: see MesenllaBuilder.shrine
 var watchtowers: Array[Dictionary] = [] # {at, basis, high, parts: Array[Node3D]}: towers that can be brought down
@@ -127,6 +131,10 @@ const WOOD_NEAR_GATE_CLEARANCE := 9.0 # wood by the walls: off the gateway itsel
 ## Where new Fort wood lies: by the walls (6 to 15 m out), in the field (15 to 30 m) or in the woods.
 const WOOD_BANDS := {"near": 0.45, "field": 0.3, "forest": 0.25}
 var tree_spots: Array[Vector3] = []
+var hive_spots: Array[Vector3] = [] # Fontanova: where its beehives grow (MapSpot "hive")
+var grotto_rites := {} # Fontanova: the Oracle's Grotto's braziers, sealed door and relic (FontaRites)
+var altar_spots: Array[Dictionary] = [] # Fontanova: the lesser gods' altars, {god, at} (FontaRites)
+var spider_trunks: Array[Dictionary] = [] # Fontanova: tree trunks a spider can cling to, {at, girth, high}
 var forest_wood_spots: Array[Vector3] = []
 var near_wood_spots: Array[Vector3] = []
 var field_wood_spots: Array[Vector3] = []
@@ -270,7 +278,7 @@ static func make_flames() -> CPUParticles3D:
 func setup(game_mode: int) -> void:
 	mode = game_mode
 	var file := _map_file()
-	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "lantern" if file.contains("lantern") else "village")
+	Sfx.use_music("menu" if mode == Game.Mode.MENU else "bastion" if file.contains("bastion") else "fort" if mode == Game.Mode.FORT else "mists" if file.contains("mists") else "mesenlla" if file.contains("mesenlla") else "vael" if file.contains("vael") else "fontanova" if file.contains("fontanova") else "lantern" if file.contains("lantern") else "village")
 	var map: MapRoot = (load(file) as PackedScene).instantiate()
 	map_id = map.look if map.look != "village" else ("mists" if file.contains("mists") else "fort" if file.contains("fort") else "village")
 	Terrain.use_half(map.land_half)
@@ -310,6 +318,7 @@ func setup(game_mode: int) -> void:
 	builder.quality = Game.quality
 	builder.grass_tufts = int(Game.grass_count() * map.grass)
 	builder.skip_beyond = mode == Game.Mode.MENU
+	builder.walkless = mode == Game.Mode.MENU
 	# The title screen's camera flies high over the valley, so its grass and flowers are drawn much
 	# further off than a player on foot would need.
 	builder.sight = 3.0 if mode == Game.Mode.MENU else 1.0
@@ -327,16 +336,21 @@ func setup(game_mode: int) -> void:
 			elif mark["kind"] == "lane_way":
 				fort.add_lane_way(int(mark["gate"]), mark["at"])
 		fort.lay_ways()
-	if not terrain.coast.is_empty() or not terrain.sea.is_empty():
-		grid.block_steep(terrain, STEEP_RISE)
-		grid.fine_only = true
-	grid.astar.update()
-	grid.build_far_grid()
+	# The title screen's paths are never walked: no need to work them out each time it comes back.
+	if mode != Game.Mode.MENU:
+		if terrain.seaside():
+			grid.block_steep(terrain, STEEP_RISE)
+			grid.block_chasms(terrain)
+			grid.fine_only = true
+		grid.astar.update()
+		grid.build_far_grid()
 	prepare_forest_wood()
 	if terrain.has_islands():
 		_mists_look()
 	elif map_id in SpawnRules.MESENLLA:
 		_mesenlla_look()
+	elif map_id == "fontanova":
+		_fonta_look()
 	elif map_id in SpawnRules.VAEL:
 		_vael_look()
 		if map_id == "vael" and mode != Game.Mode.MENU:
@@ -350,6 +364,9 @@ func setup(game_mode: int) -> void:
 	_build_fx()
 	director = Director.new(self)
 	add_child(director)
+	if map_id == "fontanova" and mode != Game.Mode.MENU:
+		fonta_rites = FontaRites.new(self)
+		add_child(fonta_rites)
 	if map_id in SpawnRules.MESENLLA:
 		add_child(Ambience.new(self)) # wisps, motes and falling leaves or mist round the camera
 	if mode == Game.Mode.MENU:
@@ -606,6 +623,18 @@ const MENU_TOUR_VAEL := [
 	[Vector3(-58, 10, 66), Vector3(14, 10, 170)],
 	[Vector3(-24, 9, 98), Vector3(4, 6, -10)],
 ]
+## Fontanova by night, for the Archipelagos of the Forgotten Gods: in from the sea over the beached
+## sailboat, up the olive terraces, along the Ravine and its bridges, round the Temple of Al'quimelea,
+## and out over the Holm Wood to the other islands on the horizon.
+const MENU_TOUR_FONTANOVA := [
+	[Vector3(14, 9, 118), Vector3(6, 6, 40)],
+	[Vector3(44, 20, 62), Vector3(-6, 8, 4)],
+	[Vector3(-30, 26, 26), Vector3(-68, 6, -22)],
+	[Vector3(-48, 32, -48), Vector3(0, 22, -86)],
+	[Vector3(22, 34, -110), Vector3(0, 20, -82)],
+	[Vector3(92, 28, -40), Vector3(150, 14, 200)],
+	[Vector3(70, 18, 70), Vector3(10, 6, 80)],
+]
 const MENU_LEG := 22.0 # seconds from one point of the tour to the next
 
 
@@ -630,6 +659,7 @@ func _menu_tour() -> Array:
 	match map_id:
 		"mesenlla": return MENU_TOUR
 		"vael": return MENU_TOUR_VAEL
+		"fontanova": return MENU_TOUR_FONTANOVA
 	return []
 
 
@@ -649,7 +679,7 @@ func _map_file() -> String:
 	if Game.test_map != "":
 		return Game.test_map
 	match mode:
-		Game.Mode.MENU: return "res://maps/vael.tscn" # the title screen of The Sunken Crown
+		Game.Mode.MENU: return "res://maps/fontanova.tscn" # the title screen of the Archipelagos of the Forgotten Gods
 		Game.Mode.FORT: return "res://maps/bastion.tscn" if Game.current_map() == "bastion" else "res://maps/fort.tscn"
 		Game.Mode.SANDBOX: return "res://maps/sandbox.tscn"
 		Game.Mode.NIGHT:
@@ -661,6 +691,8 @@ func _map_file() -> String:
 				return "res://maps/vael.tscn"
 			if Game.current_map() == "lantern_road":
 				return "res://maps/lantern_road.tscn"
+			if Game.current_map() == "fontanova":
+				return "res://maps/fontanova.tscn"
 	return "res://maps/village.tscn"
 
 
@@ -1166,6 +1198,36 @@ func _vael_look() -> void:
 	_apply_sky(_last_dawn)
 
 
+## Fontanova: a warm, still Mediterranean night under a great golden moon, the sea all round, and
+## something wrong with it: a violet haze in the air and the god's lights in its ruins.
+func _fonta_look() -> void:
+	night_bg = Color(0.025, 0.04, 0.11)
+	night_fog_colour = Color(0.15, 0.14, 0.24)
+	night_fog = 0.0085 if Game.quality > 0 else 0.012
+	day_fog = 0.0035 if Game.quality > 0 else 0.007
+	night_ambient = Color(0.5, 0.48, 0.64)
+	night_sky_shows = true
+	night_moon_colour = Color(1.0, 0.88, 0.66)
+	night_moon = 0.75
+	var atmosphere := MistAtmosphere.new()
+	atmosphere.name = "FontaAura"
+	atmosphere.world = self
+	atmosphere.place = MistAtmosphere.Place.FONTANOVA
+	add_child(atmosphere)
+	_sky_material.set_shader_parameter("sea", 1.0)
+	_sky_material.set_shader_parameter("aurora", 0.0)
+	_sky_material.set_shader_parameter("sea_dir", Vector3(0, 0, 1))
+	# The other islands of the archipelago stand far out at sea: the sky has to be further off.
+	_sky_root.scale = Vector3.ONE * 2.85
+	if Ambience.wanted(self):
+		add_child(Ambience.new(self))
+	isle_sea = IsleSea.new(self)
+	add_child(isle_sea)
+
+	_sky_value = -1.0
+	_apply_sky(_last_dawn)
+
+
 ## A violet night with nothing under it.
 func _mists_look() -> void:
 	night_bg = Color(0.012, 0.025, 0.055)
@@ -1245,6 +1307,8 @@ func _apply_sky(dawn: float) -> void:
 		_water_material.set_shader_parameter("dawn", bright)
 	if tide:
 		tide.set_dawn(bright)
+	if isle_sea:
+		isle_sea.set_dawn(bright)
 	_sky_material.set_shader_parameter("sun_dir", _sun_direction(dawn))
 	_star_material.albedo_color = Color(1, 1, 1, clampf(1.0 - dawn * 1.8, 0.0, 1.0))
 	_night_dome.visible = dawn < 0.56 and not wet and night_sky_shows
@@ -1506,10 +1570,12 @@ func has_line_of_sight(a: Vector3, b: Vector3) -> bool:
 	return get_world_3d().direct_space_state.intersect_ray(q).is_empty()
 
 
+## The living that count toward the night's numbers: a fixture (a Beehive, grown where the map says)
+## is part of the place, not one of the hunters.
 func count_living() -> int:
 	var n := 0
 	for z in zombies:
-		if z.is_alive():
+		if z.is_alive() and not z.def.get("fixture", false):
 			n += 1
 	return n
 
@@ -1714,6 +1780,12 @@ func melee_hit(attacker: Player, d: Dictionary, stats: Dictionary) -> int:
 			push = Vector3(origin.x - centre.x, 0, origin.z - centre.z).normalized()
 			knock = float(d["drags"]) * 8.0 * z._scale if z.draggable() else 0.0
 		var blow := attacker.modify_damage(z, float(stats["damage"]))
+		if d.has("breaker"):
+			# The Ruin-Breaker: through a shield, and harder into stone.
+			if z.def.get("shielded", false):
+				z.unguard()
+			if z.def.get("stone", false):
+				blow *= float(d["breaker"])
 		if d.has("tide") and attacker.class_id == "tidecaller":
 			blow *= TidecallerKit.trident_scale(attacker, z) # the Trident's own tree: Skewer, Brine, Charged Tines
 		damage_zombie(z, blow, push, knock, centre, false)
@@ -1830,6 +1902,7 @@ func spawn_player_arrow(p: Player, at: Vector3, vel: Vector3, grav: float, max_r
 			var by := p
 			shot.on_burst = func(at: Vector3) -> void: flare(at, by)
 		shot.slow_secs = float(d.get("slows", 0.0))
+		shot.vs_flyers = float(d.get("flyers", 1.0))
 		shot.set_owner_player(p)
 		shot.pierce = int(p.m("pierce")) + int(d.get("pierce", 0))
 		shot.poison = d.get("poison", Vector2.ZERO)
@@ -2213,10 +2286,36 @@ func spawn_fireball(at: Vector3, target: Vector3, damage: float, source := "") -
 func spawn_enemy_arrow(at: Vector3, target: Vector3, damage: float, max_range: float, burning := false, source := "") -> void:
 	if Net.is_host():
 		Net.enemy_shot(false, at, target, damage, max_range, burning, source)
-	var shot := _launch(Projectile.Kind.ENEMY_ARROW, _arrow_mesh, at, (target - at).normalized() * 26.0, 0.0, max_range + 4.0, damage, 0.0, burning)
+	var stinger := source == "mutant_wasp"
+	var shot := _launch(Projectile.Kind.ENEMY_ARROW, _stinger_mesh() if stinger else _arrow_mesh, at, (target - at).normalized() * (22.0 if stinger else 26.0), 0.0, max_range + 4.0, damage, 0.0, burning)
 	if shot:
 		shot.source = source
-	sfx_at("bow", at, -6.0)
+		if stinger:
+			# A Mutant Wasp's stinger: it corkscrews as it flies, venom glistening along it.
+			shot.spins = true
+			shot.spin_axis = Vector3.BACK
+			shot.poison_trail = true
+	if not stinger:
+		sfx_at("bow", at, -6.0)
+
+
+## A Mutant Wasp's shot stinger: a long black barbed dart, red and yellow bands at its root where it
+## tore free, and a bead of the god's green venom at the base, nothing like an arrow.
+static var _stinger: Mesh
+func _stinger_mesh() -> Mesh:
+	if _stinger == null:
+		var l := LowPoly.new()
+		l.prism(Vector3(0, 0, 0.22), Vector3(0, 0, -0.42), 0.035, 0.004, 6, FontaModels.BLACK)
+		for k in 4:
+			var z := -0.05 - k * 0.08
+			for side: float in [-1.0, 1.0]:
+				# Barbs, swept back.
+				l.prism(Vector3(0, 0, z), Vector3(side * 0.035, 0, z + 0.06), 0.008, 0.0, 3, FontaModels.BLACK.lightened(0.15))
+		l.prism(Vector3(0, 0, 0.32), Vector3(0, 0, 0.22), 0.06, 0.045, 7, FontaModels.WASP_RED)
+		l.prism(Vector3(0, 0, 0.38), Vector3(0, 0, 0.32), 0.055, 0.06, 7, FontaModels.YELLOW)
+		l.ovoid(Vector3(0, 0, 0.44), Vector3(0.05, 0.05, 0.07), FontaModels.GOD_GREEN, FontaModels.GOD_GREEN.darkened(0.3), 3, 6)
+		_stinger = l.commit()
+	return _stinger
 
 
 # --- The Sandbox ----------------------------------------------------------------
@@ -2838,6 +2937,39 @@ func spawn_angler() -> bool:
 	return at != Vector3.INF and spawn_zombie("angler", at)
 
 
+## Fontanova: a Mutant Spider clinging head down to a tree trunk, a way off from someone, to drop on
+## whoever comes near (FontaMind). Returns whether one found a tree.
+func spawn_spider() -> bool:
+	var near := random_player_position()
+	var trees := spider_trunks.filter(func(p: Dictionary) -> bool:
+		var t: Vector3 = p["at"]
+		var d := Vector2(t.x - near.x, t.z - near.z).length()
+		return d > 16.0 and d < 42.0)
+	if trees.is_empty():
+		return false
+	var perch: Dictionary = trees.pick_random()
+	var tree: Vector3 = perch["at"]
+	var out := Vector3(near.x - tree.x, 0, near.z - tree.z).normalized()
+	var at := Vector3(tree.x, ground_at(tree), tree.z) + out * (float(perch["girth"]) + FontaMind.CLING)
+	if not spawn_zombie("mutant_spider", at):
+		return false
+	var spider: Zombie = zombies.back()
+	spider.position = FontaMind.perch_at(perch, out, ground_at(tree))
+	spider.rotation.y = atan2(out.x, out.z) # facing out from the trunk; perched, it tips head down
+	spider.reset_physics_interpolation()
+	(spider.mesenlla_mind as FontaMind).perched = true
+	return true
+
+
+## Fontanova: the beehives grow where the map says, once each night.
+func grow_hives() -> int:
+	var grown := 0
+	for at: Vector3 in hive_spots:
+		if spawn_zombie("beehive", Vector3(at.x, ground_at(at), at.z)):
+			grown += 1
+	return grown
+
+
 ## Port Vael: a Siren at the water's edge, down on the flats a way off from someone.
 func spawn_siren() -> bool:
 	if vael_sites:
@@ -3173,9 +3305,12 @@ func _scan_pickups_for(who: Player) -> void:
 	# A weapon just put down stays down until you have walked away from where it fell.
 	if who.shun_weapon != "" and Vector2(here.x - who.shun_at.x, here.z - who.shun_at.z).length_squared() > Pickup.SHUN_REACH * Pickup.SHUN_REACH:
 		who.shun_weapon = ""
+	# One freed out from under the list (its tween, an expiry) is let go of here first: a typed loop
+	# over it would stop the whole scan, and nothing nearby could be taken.
+	for i in range(pickups.size() - 1, -1, -1):
+		if not is_instance_valid(pickups[i]):
+			pickups.remove_at(i)
 	for p: Pickup in pickups.duplicate():
-		if not is_instance_valid(p):
-			continue
 		var distance_squared := p.global_position.distance_squared_to(here)
 		if distance_squared >= 12.25: continue
 		if p.kind == Pickup.Kind.WEAPON and p.weapon_id == who.shun_weapon and p.global_position.distance_squared_to(who.shun_at) < 6.25:
@@ -3207,9 +3342,18 @@ func _scan_pickups_for(who: Player) -> void:
 					near = p
 					near_distance_squared = distance_squared
 			Pickup.Kind.FOOD:
-				if distance_squared < 1.6 * 1.6 and who.hp < who.max_hp():
-					who.heal(float(PowerDefs.FOODS[p.item_id]["heal"]))
-					who.say("+%d %s" % [int(PowerDefs.FOODS[p.item_id]["heal"]), p.display_name()])
+				var food: Dictionary = PowerDefs.FOODS[p.item_id]
+				# Honey is worth taking even unhurt, for its speed: taken again, it starts the speed over.
+				var wanted: bool = who.hp < who.max_hp() or food.get("haste", false) or food.get("jelly", false)
+				if distance_squared < 1.6 * 1.6 and wanted:
+					who.heal(float(food["heal"]))
+					if food.get("jelly", false):
+						who.royal_jelly()
+					elif food.get("haste", false):
+						who._buffs["honey"] = {"stat": "speed", "val": PowerDefs.HONEY_SPEED, "left": PowerDefs.HONEY_HASTE, "stacks": 1}
+						who.say("+%d %s, and quicker for %d s" % [int(food["heal"]), p.display_name(), int(PowerDefs.HONEY_HASTE)])
+					else:
+						who.say("+%d %s" % [int(food["heal"]), p.display_name()])
 					who.sfx("eat", -2.0)
 					remove_pickup(p)
 			Pickup.Kind.ARROWS:
@@ -3365,9 +3509,9 @@ func imp_steal(p: Player) -> void:
 	var best: Pickup = null
 	var best_d := PowerDefs.IMP_RANGE * PowerDefs.IMP_RANGE
 	for it in pickups:
-		if it.kind == Pickup.Kind.WEAPON:
+		if not is_instance_valid(it) or it.kind == Pickup.Kind.WEAPON:
 			continue
-		if it.kind == Pickup.Kind.FOOD and p.hp >= p.max_hp():
+		if it.kind == Pickup.Kind.FOOD and p.hp >= p.max_hp() and not PowerDefs.FOODS[it.item_id].get("haste", false) and not PowerDefs.FOODS[it.item_id].get("jelly", false):
 			continue
 		if it.kind == Pickup.Kind.POWER and str(PowerDefs.ALL[it.item_id].get("spec", p.spec_id)) != p.spec_id:
 			continue
@@ -3496,6 +3640,89 @@ func take_harpoon(peer: int) -> void:
 
 
 ## A Ship's Anchor's slam, seen: a ring of dust running out over the ground, cracks under it, a blast.
+## The Honeycomb's bees going out to sting: a little swarm flying in arcs from `from` to `to`, gone as it lands.
+func bee_swarm_fx(from: Vector3, to: Vector3) -> void:
+	if _bee_mesh == null:
+		var l := LowPoly.new()
+		l.prism(Vector3(-0.045, 0, 0), Vector3(0.045, 0, 0), 0.03, 0.022, 5, Color(0.98, 0.78, 0.18))
+		l.box(Vector3(0.0, 0, 0), Vector3(0.014, 0.06, 0.062), Color(0.1, 0.07, 0.04))
+		l.box(Vector3(0.01, 0.04, 0), Vector3(0.06, 0.012, 0.05), Color(0.88, 0.95, 1.0))
+		_bee_mesh = l.commit()
+	sfx_at("honeycomb_hum", from, -6.0)
+	for i in 6:
+		var bee := MeshInstance3D.new()
+		bee.mesh = _bee_mesh
+		bee.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(bee)
+		bee.global_position = from + Vector3(randf_range(-0.2, 0.2), randf_range(-0.1, 0.2), randf_range(-0.2, 0.2))
+		var side := Vector3(randf_range(-1, 1), randf_range(0.3, 1.0), randf_range(-1, 1)).normalized() * randf_range(0.6, 1.4)
+		var mid := (from + to) * 0.5 + side
+		var end := to + Vector3(randf_range(-0.25, 0.25), randf_range(-0.2, 0.3), randf_range(-0.25, 0.25))
+		var start := bee.global_position
+		var flight := randf_range(0.32, 0.45)
+		var tw := create_tween()
+		tw.tween_method(func(t: float) -> void:
+			if not is_instance_valid(bee):
+				return
+			var a := start.lerp(mid, t)
+			var b := mid.lerp(end, t)
+			var at := a.lerp(b, t)
+			if (b - a).length() > 0.01 and absf((b - a).normalized().y) < 0.98:
+				bee.look_at_from_position(at, at + (b - a), Vector3.UP)
+			else:
+				bee.global_position = at, 0.0, 1.0, flight).set_delay(i * 0.04)
+		tw.tween_callback(bee.queue_free)
+
+
+## A field of change opening (an Adorer's Elixir of Change): a violet ring told first, then green light
+## welling up as it opens.
+func change_field_fx(at: Vector3, radius: float, tell: float) -> void:
+	show_ring(at + Vector3.UP * 0.05, radius, Color(0.82, 0.5, 1.0))
+	fx_mist(at + Vector3.UP * 0.3, radius * 0.3)
+	get_tree().create_timer(tell).timeout.connect(func() -> void:
+		if not is_inside_tree():
+			return
+		show_ring(at + Vector3.UP * 0.05, radius, Color(0.55, 1.0, 0.45))
+		fx_blast(at + Vector3.UP * 0.4, radius * 0.7, Color(0.55, 1.0, 0.45, 0.45))
+		sfx_at("alq_change", at, -3.0))
+
+
+## The Censer Flail's release: a ring of embers round the swinger and a cloud of resin smoke rolling out.
+func censer_fx(at: Vector3, reach: float) -> void:
+	fx_ring(at + Vector3.UP * 0.15, reach, Color(1.0, 0.62, 0.18))
+	fx_blast(at + Vector3.UP * 0.8, reach * 0.55, Color(0.95, 0.7, 0.3, 0.35))
+	sfx_at("censer_release", at, -1.0)
+	var smoke := CPUParticles3D.new()
+	smoke.mesh = WyvernRig.puff_mesh()
+	smoke.one_shot = true
+	smoke.explosiveness = 0.85
+	smoke.amount = 22
+	smoke.lifetime = 1.6
+	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_RING
+	smoke.emission_ring_axis = Vector3.UP
+	smoke.emission_ring_radius = 0.5
+	smoke.emission_ring_inner_radius = 0.2
+	smoke.emission_ring_height = 0.4
+	smoke.direction = Vector3(1, 0.4, 0)
+	smoke.spread = 180.0
+	smoke.flatness = 0.7
+	smoke.gravity = Vector3(0, 0.5, 0)
+	smoke.initial_velocity_min = reach * 0.8
+	smoke.initial_velocity_max = reach * 1.2
+	smoke.damping_min = reach * 1.1
+	smoke.damping_max = reach * 1.5
+	smoke.scale_amount_min = 1.3
+	smoke.scale_amount_max = 2.4
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.3, 1.0])
+	ramp.colors = PackedColorArray([Color(1.0, 0.7, 0.3, 0.75), Color(0.72, 0.64, 0.52, 0.5), Color(0.6, 0.58, 0.55, 0.0)])
+	smoke.color_ramp = ramp
+	smoke.position = at + Vector3.UP * 0.7
+	add_child(smoke)
+	smoke.emitting = true
+	get_tree().create_timer(smoke.lifetime + 0.3).timeout.connect(smoke.queue_free)
+
+
 func anchor_quake_fx(at: Vector3, reach: float) -> void:
 	fx_blast(at + Vector3.UP * 0.3, reach * 0.6, Color(0.7, 0.62, 0.5, 0.4))
 	sfx_at("anchor_slam", at, 0.0)

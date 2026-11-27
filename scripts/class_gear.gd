@@ -18,7 +18,7 @@ const RED := Color(0.75, 0.13, 0.12)
 
 ## Robe colours for the bodies that can be recoloured: how green cloth turns to theirs.
 const ROBES := {"commander": Vector3(0.52, 0.22, 0.72), "infantry": Vector3(1.05, 0.2, 0.16), "monk": Vector3(1.2, 0.62, 0.2), "adept": Vector3(0.3, 0.38, 0.95), "artificer": Vector3(0.68, 0.42, 0.22),
-	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64), "tidecaller": Vector3(0.24, 0.8, 0.74), "ferryman": Vector3(0.86, 0.84, 0.76),
+	"bandit": Vector3(0.36, 0.16, 0.28), "cartographer": Vector3(0.26, 0.56, 1.0), "harpooner": Vector3(0.2, 0.36, 0.64), "tidecaller": Vector3(0.24, 0.8, 0.74), "ferryman": Vector3(0.86, 0.84, 0.76), "ascendant": Vector3(0.7, 0.72, 0.3),
 	"mist_infantry": Vector3(0.2, 0.74, 0.78), "mist_ranger": Vector3(0.16, 0.42, 0.6), "lodge_hunter": Vector3(0.36, 0.48, 0.22)}
 ## How the bare steel of an armoured body is tinted.
 const PLATES := {"heavy": Vector3(0.62, 0.68, 0.82), "chivalry": Vector3(1.25, 0.98, 0.5), "mist_heavy": Vector3(0.66, 0.92, 0.98)}
@@ -106,6 +106,7 @@ static func _pieces(id: String) -> Dictionary:
 			"harpooner": built = _harpooner()
 			"tidecaller": built = _tidecaller()
 			"ferryman": built = _ferryman()
+			"ascendant": built = _ascendant()
 			"mist_infantry": built = _mist_infantry()
 			"mist_ranger": built = _mist_ranger()
 			"mist_heavy": built = _mist_heavy()
@@ -461,6 +462,82 @@ static func _tidecaller() -> Dictionary:
 	hips.prism(Vector3(-0.62, -0.08, 0.2), Vector3(-0.48, -0.16, 0.2), 0.04, 0.1, 7, SHELL)
 	hips.prism(Vector3(-0.48, -0.16, 0.2), Vector3(-0.42, -0.24, 0.2), 0.1, 0.0, 7, CORAL.lightened(0.3))
 	return {"head": head.commit(), "chest": chest.commit(), "chest:glow": glass.commit(), "hips": hips.commit()}
+
+
+## Ascendant: a circlet of bronze laurel round the hood with a broken halo standing behind the head, a
+## white sash over one shoulder, a ribbed bronze pauldron on the other, a cracked golden god-mask hung on
+## the chest as a trophy, and a belt with a vial of ichor that glows at the hip.
+static func _ascendant() -> Dictionary:
+	const BRONZE := Color(0.72, 0.5, 0.24)
+	const LAUREL := Color(0.56, 0.6, 0.26)
+	const HALO := Color(1.0, 0.86, 0.46)
+	const LINEN := Color(0.93, 0.9, 0.82)
+	var head := LowPoly.new()
+	# The circlet: a bronze band, laurel leaves along it pointing back to a knot behind.
+	head.prism(Vector3(0, 0.6, 0.0), Vector3(0, 0.64, 0.0), 0.578, 0.572, 16, BRONZE)
+	for side: float in [-1.0, 1.0]:
+		for i in 6:
+			var a := side * (0.25 + i * 0.42)
+			var at := Vector3(sin(a) * 0.6, 0.64 + 0.02 * (i % 2), cos(a) * 0.6)
+			head.box(at + Vector3(0, 0.02, 0), Vector3(0.035, 0.03, 0.11), LAUREL.lightened(0.08 * (i % 2)), Vector3(-25.0, rad_to_deg(a) + side * 35.0, side * 10.0))
+	head.box(Vector3(0, 0.63, 0.6), Vector3(0.09, 0.07, 0.03), Color(0.95, 0.78, 0.36)) # a gold boss at the brow
+	# The broken halo: rays round an arc behind the head, a gap where it was cracked.
+	var hub := Vector3(0, 0.82, -0.46)
+	for i in 13:
+		if i == 4 or i == 5:
+			continue # the break
+		var a := -1.7 + i * (3.4 / 12.0)
+		var inner := hub + Vector3(sin(a) * 0.42, cos(a) * 0.42, 0)
+		var outer := hub + Vector3(sin(a) * (0.62 if i % 2 == 0 else 0.54), cos(a) * (0.62 if i % 2 == 0 else 0.54), 0)
+		head.prism(inner, outer, 0.035, 0.0, 4, HALO.darkened(0.08 * (i % 2)))
+	for i in 12:
+		if i in [3, 4]:
+			continue
+		var a0 := -1.7 + i * (3.4 / 12.0)
+		var a1 := a0 + 3.4 / 12.0
+		head.prism(hub + Vector3(sin(a0) * 0.42, cos(a0) * 0.42, 0), hub + Vector3(sin(a1) * 0.42, cos(a1) * 0.42, 0), 0.03, 0.03, 4, HALO)
+	head.prism(Vector3(0, 0.62, -0.56), hub + Vector3(0, -0.36, 0), 0.025, 0.02, 4, BRONZE) # the rod that holds it
+	var chest := LowPoly.new()
+	# The sash: white linen from the left shoulder across the chest and back to the right hip, lying on
+	# the body all the way round.
+	for side: float in [1.0, -1.0]:
+		var prev := Vector3.INF
+		for i in 11:
+			var t := i / 10.0
+			var x := lerpf(0.36, -0.38, t)
+			var y := lerpf(0.22, -0.36, t)
+			var depth := 0.52 * sqrt(maxf(0.05, 1.0 - pow(x / 0.62, 2)))
+			var at := Vector3(x, y, side * depth)
+			if prev != Vector3.INF:
+				chest.prism(prev, at, 0.075, 0.075, 4, LINEN.darkened(0.06 * (i % 2)))
+			prev = at
+	chest.prism(Vector3(0.36, 0.22, 0.48), Vector3(0.4, 0.3, 0.0), 0.075, 0.075, 4, LINEN)
+	chest.prism(Vector3(0.4, 0.3, 0.0), Vector3(0.36, 0.22, -0.48), 0.075, 0.075, 4, LINEN)
+	chest.box(Vector3(-0.38, -0.36, 0.3), Vector3(0.1, 0.16, 0.03), LINEN.darkened(0.08), Vector3(0, -30, 10)) # its knotted end
+	# A ribbed bronze pauldron on the right shoulder, a gold rim at its edge.
+	var hinge := Vector3(-0.44, 0.18, 0.0)
+	for i in 4:
+		var rim := Vector3(-(0.54 + i * 0.04), 0.26 - i * 0.045, 0.0)
+		chest.prism(hinge, rim, 0.04, 0.15 - i * 0.012, 7, BRONZE.darkened(i * 0.05))
+	chest.prism(Vector3(-0.68, 0.1, 0.0), Vector3(-0.7, 0.07, 0.0), 0.14, 0.14, 7, Color(0.95, 0.78, 0.36))
+	# The trophy: a cracked golden god-mask on a cord over the heart, a violet glint in one eye.
+	chest.prism(Vector3(0.22, 0.26, 0.52), Vector3(0.12, 0.02, 0.58), 0.012, 0.012, 4, Color(0.3, 0.2, 0.14))
+	chest.prism(Vector3(-0.02, 0.26, 0.52), Vector3(0.08, 0.02, 0.58), 0.012, 0.012, 4, Color(0.3, 0.2, 0.14))
+	chest.box(Vector3(0.1, -0.06, 0.6), Vector3(0.16, 0.2, 0.035), Color(0.95, 0.78, 0.36))
+	chest.box(Vector3(0.1, 0.06, 0.6), Vector3(0.12, 0.05, 0.03), Color(0.95, 0.78, 0.36))
+	chest.box(Vector3(0.06, -0.04, 0.62), Vector3(0.035, 0.02, 0.01), Color(0.1, 0.05, 0.1))
+	chest.box(Vector3(0.14, -0.04, 0.62), Vector3(0.035, 0.02, 0.01), Color(0.7, 0.4, 1.0))
+	chest.box(Vector3(0.12, -0.1, 0.62), Vector3(0.012, 0.12, 0.01), Color(0.12, 0.06, 0.06), Vector3(0, 0, 18)) # the crack
+	var hips := LowPoly.new()
+	var vial := LowPoly.new()
+	# A broad belt with a bronze buckle, and a vial of ichor at the left hip.
+	hips.prism(Vector3(0, 0.08, 0), Vector3(0, 0.17, 0), 0.56, 0.56, 14, LEATHER)
+	hips.box(Vector3(0, 0.125, 0.56), Vector3(0.15, 0.13, 0.04), BRONZE)
+	hips.box(Vector3(0, 0.125, 0.585), Vector3(0.07, 0.05, 0.02), Color(0.95, 0.78, 0.36))
+	hips.prism(Vector3(0.6, 0.1, 0.18), Vector3(0.62, -0.04, 0.2), 0.012, 0.012, 4, LEATHER)
+	hips.prism(Vector3(0.62, -0.04, 0.2), Vector3(0.62, -0.08, 0.2), 0.05, 0.05, 6, BRONZE)
+	vial.prism(Vector3(0.62, -0.08, 0.2), Vector3(0.62, -0.26, 0.2), 0.045, 0.07, 7, Color(0.62, 0.95, 0.42))
+	return {"head": head.commit(), "chest": chest.commit(), "hips": hips.commit(), "hips:glow": vial.commit()}
 
 
 ## Ferryman: a broad, flat-brimmed boatman's hat of grey felt over the hood, a ragged black mantle over

@@ -34,7 +34,7 @@ func _ready() -> void:
 	p.head.rotation.x = 0.0
 	p.set_physics_process(false)
 	p.set_process(false)
-	for weapon: String in OS.get_cmdline_user_args().slice(1) if OS.get_cmdline_user_args().size() > 1 else ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword", "battleaxe", "chakram", "machete", "bolas", "cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar"]:
+	for weapon: String in OS.get_cmdline_user_args().slice(1) if OS.get_cmdline_user_args().size() > 1 else ["lance", "scythe", "flail", "bell_hammer", "bow", "longbow", "crossbow", "greatsword", "battleaxe", "chakram", "machete", "bolas", "cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar", "censer_flail", "resin_repeater", "ruin_greataxe"]:
 		p.class_id = "chivalry" if weapon == "lance" else "cartographer" if weapon in ["machete", "bolas"] else "infantry" if WeaponDefs.is_two_handed(weapon) or weapon in ["chakram", "cutlass", "boarding_hook", "harpoon", "flare_pistol"] else "ranger"
 		p.spec_id = "pathfinder" if p.class_id == "cartographer" else ""
 		p.slots = [weapon, null]
@@ -53,7 +53,8 @@ func _ready() -> void:
 		p.input_fire = false
 		p._swing = 0.3
 		p._reload = 0.05
-		p.pose_weapon(p.weapon_def(), p._swing)
+		# A thrown harpoon leaves the hand empty: pose the throw itself.
+		p.pose_weapon(WeaponDefs.ALL[weapon], p._swing)
 		await get_tree().create_timer(0.15).timeout
 		await snap(weapon + "_strike")
 	p._vm_root.visible = false
@@ -76,7 +77,7 @@ func _ready() -> void:
 	await get_tree().create_timer(0.2).timeout
 	await snap("vanguard_banner")
 	a.show_statuses(0)
-	for id: String in ["bow", "longbow", "crossbow", "flail", "scythe", "greatsword", "battleaxe", "chakram", "machete", "bolas", "cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar"]:
+	for id: String in ["bow", "longbow", "crossbow", "flail", "scythe", "greatsword", "battleaxe", "chakram", "machete", "bolas", "cutlass", "boarding_hook", "harpoon", "flare_pistol", "anchor", "oar", "censer_flail", "resin_repeater", "ruin_greataxe"]:
 		a._attack_seen = 0
 		a.apply_pose(at, 0.0, 0.0, Vector3.ZERO, 1.0, 0, 0, id, 1.0)
 		a._hand.reload_left = 0.0

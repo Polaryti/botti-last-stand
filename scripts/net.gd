@@ -22,12 +22,12 @@ const ASK_PORT := 27417
 const ASK_EVERY := 2.5
 const MAX_PLAYERS := 4
 const MAX_SPECTATORS := 4 # watching a match: on top of the players
-const PROTOCOL := 69
+const PROTOCOL := 72
 const POSE_BYTES := 41 # one player's pose on the wire: see pose_bytes
 const CONNECT_WAIT := 25.0 # how long a relay gets to bring two phones together
 const BOT_BASE := 2147483000 # peer ids this high are never given to real phones in practice
 const BOT_NAMES := ["Aldric", "Mara", "Osric", "Ysolde", "Bram", "Wynn"]
-enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH, FLARE, HARPOON_LIE, HARPOON_GONE, QUAKE }
+enum Fx { FIRE_PATCH, SPARK, SENTRY, POISON_PATCH, MIST_PATCH, FLARE, HARPOON_LIE, HARPOON_GONE, QUAKE, CENSER, CHANGE_FIELD, BEES }
 enum Status { FREEZE, STUN, SLOW, BURN, POISON, BLEED, ROOT, REVEAL, BLIND } # new ones go at the end: the number travels
 const LIVES := 3 # All vs All: how many times you can fall
 const FOG_RESPAWN := 6.0
@@ -69,7 +69,13 @@ const SOUNDS := ["groan", "attack", "zombie_hurt", "zombie_death", "block", "cro
 	"crossing", "toll_bell", "obol", "souls_go",
 	# Class Upgrades of the Adept, the Cartographer and the Bandit; the Trappers' Guild
 	"mirror_shatter", "encore", "rift_open", "rift_collapse", "coin_flip", "contract_seal", "snare_snap", "trapper_horn", "cache_drop",
-	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike"]
+	"wreck_gull_call", "wreck_gull_release", "wreck_gull_hurt", "wreck_gull_death", "storm_ray_call", "storm_ray_release", "storm_ray_hurt", "storm_ray_death", "bell_wraith_call", "bell_wraith_release", "bell_wraith_hurt", "bell_wraith_death", "salt_splash", "brine_crack", "knell_strike", "dawn_fontanova",
+	"bee_buzz", "bee_sting", "wasp_buzz", "wasp_shot", "wasp_bite", "hive_hum", "hive_hurt", "hive_swarm", "hive_break", "nest_shudder", "snail_squelch", "snail_hurt", "snail_death", "spider_hiss", "spider_pounce", "spider_bite", "spider_hurt", "spider_death", "ostrich_screech", "ostrich_hiss", "ostrich_kick", "ostrich_hurt", "ostrich_death", "moth_flutter", "moth_dust", "insect_hurt", "insect_death", "thornback_grunt", "thornback_death",
+	"brazier_lit", "sanctum_open", "altar_wake", "altar_bless", "tide_rising",
+	"cult_chant", "worshipper_hurt", "worshipper_death", "priest_intone", "priest_hurt", "priest_death", "elixir_throw", "elixir_shatter", "anoint_chime", "guardian_shout", "guardian_hurt", "guardian_death", "shield_rush", "shield_bash",
+	"hierophant_voice", "hierophant_hurt", "hierophant_death", "transmute_rite", "polemarch_voice", "polemarch_hurt", "polemarch_death", "spear_sweep", "phalanx_call",
+	"alq_voice", "alq_roar", "alq_hurt", "alq_death", "alq_shatter", "alq_gather", "alq_nova", "alq_change", "alq_shard", "alq_lance", "boss_bells_alquimelea",
+	"censer_swing", "censer_ready", "censer_release", "repeater_shot", "greataxe_swing", "ascend_leap", "ascend_crash", "deicide_strike", "rite_break", "elixir_drink", "change_end", "honeycomb_hum", "honey_forage", "flask_drink", "flask_sour"]
 const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_Melee_Attack_Chop", "Unarmed_Melee_Attack_Punch_A", "Spellcast_Shoot",
 	"2H_Ranged_Shoot", "PickUp", "Death_A", "Death_B", "Thrust", "Overhead", "Sweep",
 	# What the creatures of Mesenlla are doing (MesenllaModels.animate).
@@ -86,6 +92,7 @@ const ANIMS := ["", "Idle", "Walking_A", "Walking_C", "Running_A", "Hit_A", "1H_
 var role: int = Role.OFFLINE
 var way: int = Way.LOCAL
 var night_map := "village" # which map a co-op night is played on: the host's choice
+var map_random := false # the host chose a random place: rolled each time a match starts
 var fort_map := "fort" # which stronghold Defend the Fort is played on: the host's choice
 var online: EpicNet # stays once made, because its system can only start once
 var room_code := ""
@@ -653,7 +660,7 @@ func _spectator_loaded() -> void:
 		if not z.active or not z.is_alive() or z.net_id < 0:
 			continue
 		_z_spawn.rpc_id(id, z.net_id, z.type_id, z.position, z.hero_minute)
-		if z.weapon_id != "":
+		if z.weapon_id != "" or z.def.has("weapons"):
 			_z_weapon.rpc_id(id, z.net_id, z.weapon_id)
 		if z.element != "":
 			_z_element.rpc_id(id, z.net_id, z.element)
@@ -808,7 +815,7 @@ func _beacon_text() -> PackedByteArray:
 	# "live": a match under way, which can be watched while "a" (spectators allowed) and "w" (how
 	# many watch) leave room.
 	return JSON.stringify({"g": "botti-last-stand", "v": protocol_version(), "n": Game.player_name, "p": roster.size(), "r": rules,
-		"live": 1 if in_game else 0, "a": 1 if allow_spectators else 0, "w": spectators.size(), "m": fort_map if rules == Rules.FORT else night_map}).to_utf8_buffer()
+		"live": 1 if in_game else 0, "a": 1 if allow_spectators else 0, "w": spectators.size(), "m": listed_map()}).to_utf8_buffer()
 
 
 func _answer_questions() -> void:
@@ -954,6 +961,13 @@ func start_match() -> void:
 		if _answer:
 			_answer.close()
 			_answer = null
+	if map_random:
+		# Where tonight is, told to everyone before it begins (the same reliable channel, in order).
+		if rules == Rules.FORT:
+			fort_map = Game.roll_map(playable_maps(), fort_map)
+		else:
+			night_map = Game.roll_map(playable_maps(), night_map)
+		_share_lobby()
 	var tonight := Weather.roll(Game.current_map())
 	var fog_at := Vector2(randf_range(-22.0, 22.0), randf_range(-22.0, 22.0))
 	# Off the list of games waiting for players.
@@ -1143,17 +1157,45 @@ func _world_fx(kind: int, a: Vector3, b: Vector3, by: int) -> void:
 		Fx.HARPOON_LIE: world.lay_harpoon(by, a, b, true)
 		Fx.HARPOON_GONE: world.take_harpoon(by)
 		Fx.QUAKE: world.anchor_quake_fx(a, b.x)
+		Fx.CENSER: world.censer_fx(a, clampf(b.x, 0.5, 8.0))
+		Fx.CHANGE_FIELD: world.change_field_fx(a, clampf(b.x, 0.5, 10.0), clampf(b.y, 0.1, 3.0))
+		Fx.BEES:
+			if a.distance_to(b) < 40.0:
+				world.bee_swarm_fx(a, b)
 
 
 func set_night_map(id: String) -> void:
 	if is_host() and not in_game and Game.MAPS.has(id):
 		night_map = id
+		map_random = false
 		_share_lobby()
+
+
+## A random place, for the night or the siege, whatever the game: rolled as the match starts.
+func set_map_random() -> void:
+	if is_host() and not in_game:
+		map_random = true
+		_share_lobby()
+
+
+## The place a room's listing names: "random" while it waits on a random place, else where it plays.
+func listed_map() -> String:
+	if map_random and not in_game:
+		return "random"
+	return fort_map if rules == Rules.FORT else night_map
+
+
+## The places this room's game can be played on.
+func playable_maps() -> Array:
+	if rules == Rules.FORT:
+		return Game.FORT_MAPS.keys()
+	return Game.VERSUS_MAPS.duplicate() if rules == Rules.FFA or rules == Rules.TEAMS else Game.MAPS.keys()
 
 
 func set_fort_map(id: String) -> void:
 	if is_host() and not in_game and Game.FORT_MAPS.has(id):
 		fort_map = id
+		map_random = false
 		_share_lobby()
 
 
@@ -1462,6 +1504,8 @@ func _z_effect(net_id: int, what: int, a: float, b: float) -> void:
 		Zombie.Effect.HAUL: z.haul_to(Vector3(a, 0.0, b))
 		Zombie.Effect.DRIFT: z.drift_to(Vector3(a, 0.0, b), CrownUpgrades.HORIZON_PULL) # only Event Horizon draws them now
 		Zombie.Effect.BLIND: z.blind_for(clampf(a, 0.0, 20.0))
+		Zombie.Effect.UNGUARD: z.unguard()
+		Zombie.Effect.BREAK: z.break_rite()
 
 
 func noise(at: Vector3, radius: float) -> void:
@@ -2243,6 +2287,18 @@ func _healed_by_you(healed: int, amount: float) -> void:
 ## A boss of Beyond the Mists enters: every phone shows its card and rings its bells.
 ## Last Light: where the Lantern Barge is on its course, and how it stands (LastLight.state_bits),
 ## sent by the host every LastLight.SEND_EVERY.
+## Fontanova's rites (FontaRites): the braziers lit, the sanctum's door, the altar awake and how far
+## it is held, and how many altars have been held.
+func fonta_rites(lit: int, door: bool, god: int, hold: float, claims: int) -> void:
+	_fonta_rites.rpc(lit, door, god, hold, claims)
+
+
+@rpc("authority", "unreliable_ordered")
+func _fonta_rites(lit: int, door: bool, god: int, hold: float, claims: int) -> void:
+	if world and is_instance_valid(world) and world.fonta_rites and is_finite(hold):
+		world.fonta_rites.follow(lit & 7, door, clampi(god, 0, 4), clampf(hold, 0.0, 60.0), maxi(claims, 0))
+
+
 func last_light(progress: float, bits: int, dim: float) -> void:
 	_last_light.rpc(progress, bits, dim)
 
@@ -2937,6 +2993,18 @@ func _command_impact_visual(at: Vector3, radius: float, storm: bool) -> void:
 func mist_seal(at: Vector3, radius: float, eye: float, delay: float, damage: float, source: int, style := 0) -> void:
 	if is_host():
 		_spawn_mist_seal.rpc(at, radius, eye, delay, damage, source, style)
+
+
+## Every ring of one caster that has not landed yet, gone: its attack was broken (Zombie.break_rite).
+func seals_broken(source: int) -> void:
+	if is_host():
+		_seals_broken.rpc(source)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _seals_broken(source: int) -> void:
+	if world and is_instance_valid(world):
+		MistSeal.break_from(world, source, true)
 
 
 @rpc("authority", "call_local", "reliable")

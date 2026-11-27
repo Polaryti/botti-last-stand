@@ -1,0 +1,1160 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/map_root.gd" id="root"]
+[ext_resource type="Script" path="res://scripts/map/map_level.gd" id="level"]
+[ext_resource type="Script" path="res://scripts/map/map_hill.gd" id="hill"]
+[ext_resource type="Script" path="res://scripts/map/map_road.gd" id="road"]
+[ext_resource type="Script" path="res://scripts/map/map_fonta.gd" id="fonta"]
+[ext_resource type="Script" path="res://scripts/map/map_spot.gd" id="spot"]
+
+[sub_resource type="Curve3D" id="Curve_1"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -60, -7.0, -90, 0, 0, 0, 0, 0, 0, -62, -7.0, -56, 0, 0, 0, 0, 0, 0, -65, -7.0, -24, 0, 0, 0, 0, 0, 0, -66, -7.0, 10, 0, 0, 0, 0, 0, 0, -70, -7.0, 40, 0, 0, 0, 0, 0, 0, -82, -7.0, 68, 0, 0, 0, 0, 0, 0, -96, -7.0, 84),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0, 0, 0)
+}
+point_count = 7
+
+[sub_resource type="Curve3D" id="Curve_2"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 4, 1.2, 92, 0, 0, 0, 0, 0, 0, 6, 2.6, 78, 0, 0, 0, 0, 0, 0, 2, 4.4, 62, 0, 0, 0, 0, 0, 0, 0, 6.6, 44),
+"tilts": PackedFloat32Array(0, 0, 0, 0)
+}
+point_count = 4
+
+[sub_resource type="Curve3D" id="Curve_3"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 6.6, 44, 0, 0, 0, 0, 0, 0, -4, 9.0, 20, 0, 0, 0, 0, 0, 0, 0, 11.4, -6, 0, 0, 0, 0, 0, 0, 2, 12.0, -30, 0, 0, 0, 0, 0, 0, 0, 11.5, -40),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0)
+}
+point_count = 5
+
+[sub_resource type="Curve3D" id="Curve_4"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 11.5, -40, 0, 0, 0, 0, 0, 0, 0, 22.0, -55, 0, 0, 0, 0, 0, 0, 0, 23.0, -59, 0, 0, 0, 0, 0, 0, 0, 34.0, -74),
+"tilts": PackedFloat32Array(0, 0, 0, 0)
+}
+point_count = 4
+
+[sub_resource type="Curve3D" id="Curve_5"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -20, 8.8, 20, 0, 0, 0, 0, 0, 0, -28, 12.0, 14, 0, 0, 0, 0, 0, 0, -34, 16.0, 8, 0, 0, 0, 0, 0, 0, -40, 19.0, 2),
+"tilts": PackedFloat32Array(0, 0, 0, 0)
+}
+point_count = 4
+
+[sub_resource type="Curve3D" id="Curve_6"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -86, 21.0, 2, 0, 0, 0, 0, 0, 0, -96, 27.5, -14),
+"tilts": PackedFloat32Array(0, 0)
+}
+point_count = 2
+
+[sub_resource type="Curve3D" id="Curve_7"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 11.4, -6, 0, 0, 0, 0, 0, 0, 30, 12.0, -8, 0, 0, 0, 0, 0, 0, 48, 14.0, -6, 0, 0, 0, 0, 0, 0, 60, 17.0, -4, 0, 0, 0, 0, 0, 0, 70, 20.0, -2),
+"tilts": PackedFloat32Array(0, 0, 0, 0, 0)
+}
+point_count = 5
+
+[sub_resource type="Curve3D" id="Curve_8"]
+_data = {
+"points": PackedVector3Array(0, 0, 0, 0, 0, 0, -34, 1.1, 94, 0, 0, 0, 0, 0, 0, 4, 1.2, 92, 0, 0, 0, 0, 0, 0, 40, 1.2, 94),
+"tilts": PackedFloat32Array(0, 0, 0)
+}
+point_count = 3
+
+[node name="Fontanova" type="Node3D"]
+script = ExtResource("root")
+play_half = 166.0
+land_half = 170
+forest_wall = false
+grass = 0.8
+roughness = 3.6
+calm_radius = 30.0
+look = "fontanova"
+
+[node name="Land" type="Node3D" parent="."]
+
+[node name="Isle" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("fonta")
+kind = "isle"
+size = 128.0
+wide = 0.035
+shore = PackedFloat32Array(124.0, 130.0, 142.0, 134.0, 122.0, 98.0, 78.0, 92.0, 128.0, 112.0, 124.0, 118.0, 130.0, 136.0, 128.0, 114.0, 124.0, 136.0, 130.0, 120.0, 138.0, 116.0, 100.0, 112.0)
+on_ground = false
+
+[node name="Rise" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -30)
+script = ExtResource("hill")
+height = 10.0
+radius = 52.0
+
+[node name="Rise2" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, 10)
+script = ExtResource("hill")
+height = 4.0
+radius = 26.0
+
+[node name="Rise3" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0, 8)
+script = ExtResource("hill")
+height = 4.0
+radius = 24.0
+
+[node name="Rise4" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, -40)
+script = ExtResource("hill")
+height = 5.0
+radius = 20.0
+
+[node name="Rise5" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0, -48)
+script = ExtResource("hill")
+height = 5.0
+radius = 18.0
+
+[node name="OliveTerraces" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 30)
+script = ExtResource("fonta")
+kind = "terraces"
+size = 52.0
+wide = 2.2
+on_ground = false
+
+[node name="UpperTerraces" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -22)
+script = ExtResource("fonta")
+kind = "terraces"
+size = 30.0
+wide = 2.2
+on_ground = false
+
+[node name="Acropolis" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 34, -88)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 29.0
+wide = 6.0
+on_ground = false
+
+[node name="TempleCourt" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 34, -86)
+script = ExtResource("level")
+size = Vector2(50, 38)
+blend = 4.0
+
+[node name="RavineRim" type="Node3D" parent="Land"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -50, 19, -10)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 17.0
+wide = 5.0
+stretch = 2.1
+on_ground = false
+
+[node name="WestRidge" type="Node3D" parent="Land"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -94, 21, -8)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 28.0
+wide = 4.0
+stretch = 2.5
+on_ground = false
+
+[node name="WestRidgeSouth" type="Node3D" parent="Land"]
+transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, -92, 18, 40)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 15.0
+wide = 4.0
+stretch = 1.4
+on_ground = false
+
+[node name="KerysWatch" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -104, 28, -22)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 9.0
+wide = 3.0
+on_ground = false
+
+[node name="AcropolisWest" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 28, -96)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 14.0
+wide = 5.0
+on_ground = false
+
+[node name="AcropolisEast" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24, 30, -100)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 13.0
+wide = 5.0
+on_ground = false
+
+[node name="HolmHeight" type="Node3D" parent="Land"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 84, 20, -22)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 21.0
+wide = 8.0
+stretch = 1.3
+on_ground = false
+
+[node name="NorthEastCrag" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 24, -98)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 15.0
+wide = 5.0
+on_ground = false
+
+[node name="NorthWestCrag" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -58, 22, -98)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 14.0
+wide = 5.0
+on_ground = false
+
+[node name="EastHeadland" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 88, 15, 92)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 13.0
+wide = 4.0
+on_ground = false
+
+[node name="WestHeadland" type="Node3D" parent="Land"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -62, 11, 96)
+script = ExtResource("fonta")
+kind = "mesa"
+size = 11.0
+wide = 4.0
+on_ground = false
+
+[node name="Ravine" type="Path3D" parent="Land"]
+script = ExtResource("road")
+curve = SubResource("Curve_1")
+width = 8.0
+cut = true
+draw = false
+cut_blend = 1.0
+chasm = true
+
+[node name="Roads" type="Node3D" parent="."]
+
+[node name="LandingPath" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_2")
+width = 3.6
+
+[node name="OliveWay" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_3")
+width = 3.6
+
+[node name="SacredWay" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_4")
+width = 6.0
+cut = true
+draw = false
+cut_blend = 1.0
+
+[node name="RimPath" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_5")
+width = 3.4
+cut = true
+cut_blend = 2.5
+
+[node name="WatchPath" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_6")
+width = 3.0
+cut = true
+cut_blend = 2.0
+
+[node name="WoodPath" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_7")
+width = 3.2
+cut = true
+cut_blend = 2.5
+
+[node name="CoveShore" type="Path3D" parent="Roads"]
+script = ExtResource("road")
+curve = SubResource("Curve_8")
+width = 3.0
+
+[node name="Landing" type="Node3D" parent="."]
+
+[node name="Sailboat" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.99027, 0, -0.13917, 0, 1, 0, 0.13917, 0, -0.99027, 14, 0, 86)
+script = ExtResource("fonta")
+kind = "sailboat"
+size = 26.0
+
+[node name="ShoreCrates" type="Node3D" parent="Landing"]
+transform = Transform3D(0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, 0.93969, 0, 0, 68)
+script = ExtResource("fonta")
+kind = "shore_crates"
+
+[node name="ShoreCrates2" type="Node3D" parent="Landing"]
+transform = Transform3D(0.81915, 0, 0.57358, 0, 1, 0, -0.57358, 0, 0.81915, -12, 0, 70)
+script = ExtResource("fonta")
+kind = "shore_crates"
+
+[node name="Amphorae" type="Node3D" parent="Landing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0, 70)
+script = ExtResource("fonta")
+kind = "amphorae"
+
+[node name="Start" type="Node3D" parent="Landing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 0, 70)
+script = ExtResource("spot")
+kind = "start"
+
+[node name="Start2" type="Node3D" parent="Landing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, 68)
+script = ExtResource("spot")
+kind = "start"
+
+[node name="Start3" type="Node3D" parent="Landing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 72)
+script = ExtResource("spot")
+kind = "start"
+
+[node name="Start4" type="Node3D" parent="Landing"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 72)
+script = ExtResource("spot")
+kind = "start"
+
+[node name="SeaStack" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.27564, 0, -0.96126, 0, 1, 0, 0.96126, 0, -0.27564, 118, 0, 104)
+script = ExtResource("fonta")
+kind = "sea_stack"
+size = 16.0
+on_ground = false
+
+[node name="SeaStack2" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.99756, 0, -0.06976, 0, 1, 0, 0.06976, 0, -0.99756, 128, 0, 88)
+script = ExtResource("fonta")
+kind = "sea_stack"
+size = 12.0
+on_ground = false
+
+[node name="SeaStack3" type="Node3D" parent="Landing"]
+transform = Transform3D(0.43837, 0, 0.89879, 0, 1, 0, -0.89879, 0, 0.43837, -112, 0, 102)
+script = ExtResource("fonta")
+kind = "sea_stack"
+size = 14.0
+on_ground = false
+
+[node name="SeaStack4" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.84805, 0, 0.52992, 0, 1, 0, -0.52992, 0, -0.84805, -124, 0, 84)
+script = ExtResource("fonta")
+kind = "sea_stack"
+size = 10.0
+on_ground = false
+
+[node name="SeaStack5" type="Node3D" parent="Landing"]
+transform = Transform3D(0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, 0.5, 60, 0, -128)
+script = ExtResource("fonta")
+kind = "sea_stack"
+size = 13.0
+on_ground = false
+
+[node name="SeaStack6" type="Node3D" parent="Landing"]
+transform = Transform3D(0.17365, 0, -0.98481, 0, 1, 0, 0.98481, 0, 0.17365, -40, 0, -132)
+script = ExtResource("fonta")
+kind = "sea_stack"
+size = 11.0
+on_ground = false
+
+[node name="SeaStack7" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.91355, 0, 0.40674, 0, 1, 0, -0.40674, 0, -0.91355, 132, 0, -40)
+script = ExtResource("fonta")
+kind = "sea_stack"
+size = 12.0
+on_ground = false
+
+[node name="Limestone" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.37461, 0, -0.92718, 0, 1, 0, 0.92718, 0, -0.37461, 64, 0, 92)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 4.0
+
+[node name="Limestone2" type="Node3D" parent="Landing"]
+transform = Transform3D(0.40674, 0, 0.91355, 0, 1, 0, -0.91355, 0, 0.40674, 78, 0, 80)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 5.0
+
+[node name="Limestone3" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.10453, 0, -0.99452, 0, 1, 0, 0.99452, 0, -0.10453, -48, 0, 92)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
+
+[node name="Limestone4" type="Node3D" parent="Landing"]
+transform = Transform3D(0.82904, 0, 0.55919, 0, 1, 0, -0.55919, 0, 0.82904, -58, 0, 82)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 4.5
+
+[node name="Limestone5" type="Node3D" parent="Landing"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, 40, 0, 96)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 2.5
+
+[node name="Limestone6" type="Node3D" parent="Landing"]
+transform = Transform3D(0.66913, 0, -0.74314, 0, 1, 0, 0.74314, 0, 0.66913, -24, 0, 100)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.0
+
+[node name="Groves" type="Node3D" parent="."]
+
+[node name="FallenColossus" type="Node3D" parent="."]
+
+[node name="ColossusHead" type="Node3D" parent="FallenColossus"]
+transform = Transform3D(-0.90631, 0, 0.42262, 0, 1, 0, -0.42262, 0, -0.90631, 24, 0, 10)
+script = ExtResource("fonta")
+kind = "god_head"
+size = 5.0
+variant = 1
+
+[node name="ColossusHand" type="Node3D" parent="FallenColossus"]
+transform = Transform3D(0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, 0.5, 33, 0, 2)
+script = ExtResource("fonta")
+kind = "god_hand"
+size = 5.5
+
+[node name="ColossusBody" type="Node3D" parent="FallenColossus"]
+transform = Transform3D(-0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, -0.5, 30, 0, 18)
+script = ExtResource("fonta")
+kind = "fallen_god"
+size = 9.0
+variant = 1
+
+[node name="BrokenColumn" type="Node3D" parent="FallenColossus"]
+transform = Transform3D(-0.89101, 0, -0.45399, 0, 1, 0, 0.45399, 0, -0.89101, 17, 0, 2)
+script = ExtResource("fonta")
+kind = "broken_column"
+size = 6.0
+
+[node name="BrokenColumn2" type="Node3D" parent="FallenColossus"]
+transform = Transform3D(0.15643, 0, 0.98769, 0, 1, 0, -0.98769, 0, 0.15643, 31, 0, 26)
+script = ExtResource("fonta")
+kind = "broken_column"
+size = 6.0
+
+[node name="WaysideStele" type="Node3D" parent="Groves"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, -6, 0, 30)
+script = ExtResource("fonta")
+kind = "stele"
+size = 2.2
+variant = 2
+
+[node name="WaysideAltar" type="Node3D" parent="Groves"]
+transform = Transform3D(-0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, -0.93969, 8, 0, -14)
+script = ExtResource("fonta")
+kind = "altar"
+
+[node name="WorshippersVillage" type="Node3D" parent="."]
+
+[node name="RuinWall" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, 0, -10)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 8.0
+wide = 2.6
+
+[node name="RuinWall2" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -52, 0, -2)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 8.0
+wide = 1.8
+
+[node name="RuinWall3" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -56, 0, -6)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 8.0
+wide = 2.2
+
+[node name="RuinWall4" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -48, 0, -6)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 8.0
+wide = 1.2
+
+[node name="RuinWall5" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 6)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 7.0
+wide = 2.4
+
+[node name="RuinWall6" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 12)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 7.0
+wide = 1.6
+
+[node name="RuinWall7" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -43.5, 0, 9)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 6.0
+wide = 2.0
+
+[node name="RuinWall8" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48, 0, 14)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 6.0
+wide = 1.4
+
+[node name="RuinWall9" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -38, 0, -16)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 7.0
+wide = 2.2
+
+[node name="RuinWall10" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34, 0, -20)
+script = ExtResource("fonta")
+kind = "ruin_wall"
+size = 6.0
+wide = 1.5
+
+[node name="ShrineAltar" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -42, 0, -4)
+script = ExtResource("fonta")
+kind = "altar"
+
+[node name="Stele" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(-0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, -0.93969, -39, 0, -6)
+script = ExtResource("fonta")
+kind = "stele"
+size = 2.4
+variant = 0
+
+[node name="Amphorae2" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -54, 0, 4)
+script = ExtResource("fonta")
+kind = "amphorae"
+
+[node name="Amphorae3" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44, 0, 0)
+script = ExtResource("fonta")
+kind = "amphorae"
+
+[node name="Amphorae4" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36, 0, 10)
+script = ExtResource("fonta")
+kind = "amphorae"
+
+[node name="Cauldron" type="Node3D" parent="WorshippersVillage"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 0, -12)
+script = ExtResource("fonta")
+kind = "cauldron"
+size = 1.3
+
+[node name="WestRidge2" type="Node3D" parent="."]
+
+[node name="RavineBridgeNorth" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -64, 0, -28)
+script = ExtResource("fonta")
+kind = "rope_bridge"
+size = 20.0
+on_ground = false
+
+[node name="RavineBridgeSouth" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -66, 0, 8)
+script = ExtResource("fonta")
+kind = "rope_bridge"
+size = 20.0
+on_ground = false
+
+[node name="Kerys" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, -104, 0, -22)
+script = ExtResource("fonta")
+kind = "god_statue"
+size = 6.0
+variant = 4
+
+[node name="Orvane" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(-0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, -0.34202, -94, 0, 34)
+script = ExtResource("fonta")
+kind = "fallen_god"
+size = 6.0
+variant = 3
+
+[node name="Limestone7" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(0.80902, 0, 0.58779, 0, 1, 0, -0.58779, 0, 0.80902, -108, 0, -40)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 5.0
+
+[node name="Limestone8" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(-0.17365, 0, -0.98481, 0, 1, 0, 0.98481, 0, -0.17365, -100, 0, 18)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 4.0
+
+[node name="Limestone9" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(0.92718, 0, 0.37461, 0, 1, 0, -0.37461, 0, 0.92718, -86, 0, -54)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 5.5
+
+[node name="Limestone10" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(0.34202, 0, 0.93969, 0, 1, 0, -0.93969, 0, 0.34202, -110, 0, 44)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 4.5
+
+[node name="Limestone11" type="Node3D" parent="WestRidge2"]
+transform = Transform3D(0.69466, 0, -0.71934, 0, 1, 0, 0.71934, 0, 0.69466, -82, 0, 20)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.0
+
+[node name="HolmWood" type="Node3D" parent="."]
+
+[node name="OraclesGrotto" type="Node3D" parent="HolmWood"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 72, 11.6, -24)
+script = ExtResource("fonta")
+kind = "grotto"
+size = 26.0
+wide = 5.0
+on_ground = false
+
+[node name="Ilyria" type="Node3D" parent="HolmWood"]
+transform = Transform3D(-0.76604, 0, 0.64279, 0, 1, 0, -0.64279, 0, -0.76604, 58, 0, 22)
+script = ExtResource("fonta")
+kind = "god_statue"
+size = 6.0
+variant = 2
+
+[node name="Limestone12" type="Node3D" parent="HolmWood"]
+transform = Transform3D(0.30902, 0, 0.95106, 0, 1, 0, -0.95106, 0, 0.30902, 96, 0, 40)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 4.0
+
+[node name="Limestone13" type="Node3D" parent="HolmWood"]
+transform = Transform3D(0.80902, 0, 0.58779, 0, 1, 0, -0.58779, 0, 0.80902, 108, 0, -16)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 5.0
+
+[node name="Limestone14" type="Node3D" parent="HolmWood"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 90, 0, -62)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 4.5
+
+[node name="Limestone15" type="Node3D" parent="HolmWood"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 60, 0, -40)
+script = ExtResource("fonta")
+kind = "limestone"
+size = 3.5
+
+[node name="Acropolis2" type="Node3D" parent="."]
+
+[node name="TempleOfAlquimelea" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 34, -94)
+script = ExtResource("fonta")
+kind = "temple"
+size = 26.0
+wide = 18.0
+on_ground = false
+
+[node name="Alquimelea" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 34, -80)
+script = ExtResource("fonta")
+kind = "god_statue"
+size = 9.0
+variant = 0
+on_ground = false
+
+[node name="FallenGod" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(-0.64279, 0, -0.76604, 0, 1, 0, 0.76604, 0, -0.64279, -18, 34, -80)
+script = ExtResource("fonta")
+kind = "fallen_god"
+size = 6.0
+variant = 1
+on_ground = false
+
+[node name="FallenGod2" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(-0.64279, 0, 0.76604, 0, 1, 0, -0.76604, 0, -0.64279, 19, 34, -82)
+script = ExtResource("fonta")
+kind = "fallen_god"
+size = 6.0
+variant = 2
+on_ground = false
+
+[node name="FallenGod3" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(0.5, 0, -0.86603, 0, 1, 0, 0.86603, 0, 0.5, -17, 34, -100)
+script = ExtResource("fonta")
+kind = "fallen_god"
+size = 6.0
+variant = 3
+on_ground = false
+
+[node name="FallenGod4" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(0.5, 0, 0.86603, 0, 1, 0, -0.86603, 0, 0.5, 18, 34, -101)
+script = ExtResource("fonta")
+kind = "fallen_god"
+size = 6.0
+variant = 4
+on_ground = false
+
+[node name="GodHead" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(-0.93969, 0, -0.34202, 0, 1, 0, 0.34202, 0, -0.93969, -12, 34, -74)
+script = ExtResource("fonta")
+kind = "god_head"
+size = 3.2
+variant = 0
+on_ground = false
+
+[node name="Cauldron2" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 34, -75)
+script = ExtResource("fonta")
+kind = "cauldron"
+size = 1.6
+on_ground = false
+
+[node name="Cauldron3" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 34, -90)
+script = ExtResource("fonta")
+kind = "cauldron"
+size = 1.6
+on_ground = false
+
+[node name="Cauldron4" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 34, -92)
+script = ExtResource("fonta")
+kind = "cauldron"
+size = 1.6
+on_ground = false
+
+[node name="Altar" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 34, -76)
+script = ExtResource("fonta")
+kind = "altar"
+on_ground = false
+
+[node name="Altar2" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 34, -76)
+script = ExtResource("fonta")
+kind = "altar"
+on_ground = false
+
+[node name="SacredStair" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -40)
+script = ExtResource("fonta")
+kind = "sacred_stair"
+size = 34.0
+wide = 6.0
+on_ground = false
+
+[node name="SacredColumn" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.6, 0, -44)
+script = ExtResource("fonta")
+kind = "column"
+size = 6.5
+
+[node name="SacredColumn2" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 0, -44)
+script = ExtResource("fonta")
+kind = "broken_column"
+size = 6.5
+
+[node name="SacredColumn3" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.6, 0, -50)
+script = ExtResource("fonta")
+kind = "broken_column"
+size = 6.5
+
+[node name="SacredColumn4" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 0, -50)
+script = ExtResource("fonta")
+kind = "column"
+size = 6.5
+
+[node name="SacredColumn5" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.6, 0, -61)
+script = ExtResource("fonta")
+kind = "column"
+size = 6.5
+
+[node name="SacredColumn6" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 0, -61)
+script = ExtResource("fonta")
+kind = "column"
+size = 6.5
+
+[node name="SacredColumn7" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.6, 0, -67)
+script = ExtResource("fonta")
+kind = "column"
+size = 6.5
+
+[node name="SacredColumn8" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.6, 0, -67)
+script = ExtResource("fonta")
+kind = "broken_column"
+size = 6.5
+
+[node name="Cypress" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 34, -74)
+script = ExtResource("fonta")
+kind = "cypress"
+size = 11.0
+on_ground = false
+
+[node name="Cypress2" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 34, -74)
+script = ExtResource("fonta")
+kind = "cypress"
+size = 11.0
+on_ground = false
+
+[node name="Stele2" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -8, 0, -40)
+script = ExtResource("fonta")
+kind = "stele"
+size = 2.2
+variant = 0
+
+[node name="Stele3" type="Node3D" parent="Acropolis2"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 8, 0, -40)
+script = ExtResource("fonta")
+kind = "stele"
+size = 2.2
+variant = 0
+
+[node name="GodAltars" type="Node3D" parent="."]
+
+[node name="Thaleon" type="Node3D" parent="GodAltars"]
+transform = Transform3D(-0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, -0.93969, -34, 0, 78)
+script = ExtResource("fonta")
+kind = "god_statue"
+size = 6.0
+variant = 1
+
+[node name="ThaleonAltar" type="Node3D" parent="GodAltars"]
+transform = Transform3D(-0.93969, 0, 0.34202, 0, 1, 0, -0.34202, 0, -0.93969, -30, 0, 72)
+script = ExtResource("fonta")
+kind = "god_altar"
+variant = 1
+
+[node name="IlyriaAltar" type="Node3D" parent="GodAltars"]
+transform = Transform3D(-0.76604, 0, 0.64279, 0, 1, 0, -0.64279, 0, -0.76604, 54, 0, 17)
+script = ExtResource("fonta")
+kind = "god_altar"
+variant = 2
+
+[node name="OrvaneAltar" type="Node3D" parent="GodAltars"]
+transform = Transform3D(-0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, -0.34202, -89, 0, 29)
+script = ExtResource("fonta")
+kind = "god_altar"
+variant = 3
+
+[node name="KerysAltar" type="Node3D" parent="GodAltars"]
+transform = Transform3D(0.34202, 0, -0.93969, 0, 1, 0, 0.93969, 0, 0.34202, -99, 0, -17)
+script = ExtResource("fonta")
+kind = "god_altar"
+variant = 4
+
+[node name="Archipelago" type="Node3D" parent="."]
+
+[node name="HorizonIsle" type="Node3D" parent="Archipelago"]
+transform = Transform3D(-0.61566, 0, -0.78801, 0, 1, 0, 0.78801, 0, -0.61566, -232, 0, -70)
+script = ExtResource("fonta")
+kind = "horizon_isle"
+size = 70.0
+on_ground = false
+
+[node name="HorizonIsle2" type="Node3D" parent="Archipelago"]
+transform = Transform3D(-0.90631, 0, 0.42262, 0, 1, 0, -0.42262, 0, -0.90631, 205, 0, -150)
+script = ExtResource("fonta")
+kind = "horizon_isle"
+size = 80.0
+on_ground = false
+
+[node name="HorizonIsle3" type="Node3D" parent="Archipelago"]
+transform = Transform3D(-0.86603, 0, -0.5, 0, 1, 0, 0.5, 0, -0.86603, 150, 0, 205)
+script = ExtResource("fonta")
+kind = "horizon_isle"
+size = 55.0
+on_ground = false
+
+[node name="HorizonIsle4" type="Node3D" parent="Archipelago"]
+transform = Transform3D(-0.98481, 0, -0.17365, 0, 1, 0, 0.17365, 0, -0.98481, -190, 0, 175)
+script = ExtResource("fonta")
+kind = "horizon_isle"
+size = 50.0
+on_ground = false
+
+[node name="HorizonIsle5" type="Node3D" parent="Archipelago"]
+transform = Transform3D(0.86603, 0, -0.5, 0, 1, 0, 0.5, 0, 0.86603, 30, 0, -240)
+script = ExtResource("fonta")
+kind = "horizon_isle"
+size = 90.0
+on_ground = false
+
+[node name="Hives" type="Node3D" parent="."]
+
+[node name="Hive" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 44)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive2" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 0, 52)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive3" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 0, -26)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive4" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, -28)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive5" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 2)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Hive6" type="Node3D" parent="Hives"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, -40)
+script = ExtResource("spot")
+kind = "hive"
+
+[node name="Rivals" type="Node3D" parent="."]
+
+[node name="Rival" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 70)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Rival2" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, 30)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Rival3" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 30, 0, 30)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Rival4" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 0, -6)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Rival5" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, -10)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Rival6" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -30)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Rival7" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -96, 0, 0)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Rival8" type="Node3D" parent="Rivals"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 84, 0, -24)
+script = ExtResource("spot")
+kind = "rival"
+
+[node name="Loot" type="Node3D" parent="."]
+
+[node name="Loot2" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 0, 2)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot3" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, 10)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot4" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 80)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot5" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0, 6)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot6" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 0, -36)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot7" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 0, 14)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot8" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -84)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot9" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, -90)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot10" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, -90)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot11" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 18)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot12" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -100, 0, -10)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot13" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 96, 0, 6)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Loot14" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -104, 0, -22)
+script = ExtResource("spot")
+kind = "loot"
+
+[node name="Poi" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("spot")
+kind = "poi"
+
+[node name="Poi2" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -50, 0, 40)
+script = ExtResource("spot")
+kind = "poi"
+
+[node name="Poi3" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50, 0, -40)
+script = ExtResource("spot")
+kind = "poi"
+
+[node name="Poi4" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -40, 0, -40)
+script = ExtResource("spot")
+kind = "poi"
+
+[node name="Poi5" type="Node3D" parent="Loot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 50)
+script = ExtResource("spot")
+kind = "poi"
+
+[node name="Places" type="Node3D" parent="."]
+
+[node name="Place" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 84)
+script = ExtResource("spot")
+kind = "place"
+text = "The Landing"
+
+[node name="Place2" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46, 0, -2)
+script = ExtResource("spot")
+kind = "place"
+text = "Worshippers' Village"
+
+[node name="Place3" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26, 0, 10)
+script = ExtResource("spot")
+kind = "place"
+text = "Fallen Colossus"
+
+[node name="Place4" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 30)
+script = ExtResource("spot")
+kind = "place"
+text = "Olive Terraces"
+
+[node name="Place5" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 0, -10)
+script = ExtResource("spot")
+kind = "place"
+text = "The Ravine"
+
+[node name="Place6" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -104, 0, -22)
+script = ExtResource("spot")
+kind = "place"
+text = "Kerys' Watch"
+
+[node name="Place7" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, -24)
+script = ExtResource("spot")
+kind = "place"
+text = "Oracle's Grotto"
+
+[node name="Place8" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 88, 0, -10)
+script = ExtResource("spot")
+kind = "place"
+text = "Holm Wood"
+
+[node name="Place9" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58, 0, 22)
+script = ExtResource("spot")
+kind = "place"
+text = "Ilyria's Grove"
+
+[node name="Place10" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -92)
+script = ExtResource("spot")
+kind = "place"
+text = "Temple of Al'quimelea"
+
+[node name="Place11" type="Node3D" parent="Places"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -56)
+script = ExtResource("spot")
+kind = "place"
+text = "Sacred Way"
+
+[node name="Flora" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+script = ExtResource("fonta")
+kind = "flora"
+size = 140.0
+on_ground = false

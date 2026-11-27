@@ -3,7 +3,7 @@ class_name Places
 ## screen and the world atlas. Each has a name, an icon, a colour, its lore, what is played there and
 ## a few hints about it for the loading screen.
 
-const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael"]
+const ORDER := ["village", "fort", "mists", "mesenlla", "bastion", "vael", "fontanova"]
 
 const ALL := {
 	"village": {"name": "The Village", "icon": "map_village", "color": Color("efe8d8"), "plays": "Survive the Night, Co-op, All vs All and Teams",
@@ -36,6 +36,11 @@ const ALL := {
 		"tips": ["Low tide bares the seabed. Open the sea chests on the wrecks before the water comes back.",
 			"At high tide the flats flood: wading slows you and the sea-mist half blinds you. Keep to the quay and the moles.",
 			"Explore the headland paths and Harbourmaster's House for supplies. The bells warn when the tide is about to turn."]},
+	"fontanova": {"name": "Fontanova", "icon": "map_fontanova", "color": Color("c9a6f2"), "plays": "Survive the Night, Co-op, All vs All and Teams",
+		"lore": "With Port Vael reclaimed, a ship sails on across distant waters. The first island of an archipelago rises out of the sea: olive terraces gone wild, a temple on its crag, and the statues of forgotten gods broken on every hill. Something on it is still awake.",
+		"tips": ["Don't swim too far out, and get off the beaches when the sea rises: out of your depth it drowns you.",
+			"Mind the Ravine: the fall is deadly, for you and for anything you knock into it.",
+			"Light the three braziers in the Oracle's Grotto. When an altar wakes, hold it for its god's blessing."]},
 	"lantern_road": {"name": "The Lantern Road", "icon": "map_lantern_road", "color": Color("ffd36e"), "plays": "Last Light, alone or in Co-op",
 		"lore": "Beyond Port Vael an old causeway runs out across the drowned Sound to the Isle of Lamps, where the ferrymen once rowed the dead. Its lanterns went out when the Mists rose. Only the Lantern Barge still carries a light along it, and the Mist Tide never goes out.",
 		"tips": ["Keep inside the barge's light. Outside it, the tide starts to drown you after a few seconds.",

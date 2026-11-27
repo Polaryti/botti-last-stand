@@ -69,11 +69,21 @@ func setup(k: int, id: String, bonus := 0) -> void:
 			match id:
 				"dagger": mi.scale = Vector3.ONE * 0.5
 				"sword": mi.scale = Vector3.ONE * 0.5
-				"crossbow": mi.scale = Vector3.ONE * 0.42
+				"crossbow", "resin_repeater": mi.scale = Vector3.ONE * 0.42
 				"spear": mi.scale = Vector3.ONE * 0.5
 				_: mi.scale = Vector3.ONE * 0.75
 			if id == "dagger" or id == "sword" or id == "mace":
 				mi.position.y = -0.3
+			if WeaponDefs.chain_mesh(id) != null:
+				# A Flail's ball, a Censer Flail's censer: shown on its chain, swung out to the side, so
+				# what lies there is the whole weapon and not a bare handle.
+				var hang := MeshInstance3D.new()
+				hang.name = "Chain"
+				hang.mesh = WeaponDefs.chain_mesh(id)
+				hang.position.y = 0.36
+				hang.rotation.z = 2.0
+				hang.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mi.add_child(hang)
 		Kind.FOOD:
 			mi.mesh = PowerDefs.mesh(id)
 			mi.scale = Vector3.ONE * 1.1

@@ -51,6 +51,16 @@ const SEA_Y := -3.6
 const SEA_DEEP := -2.2 # past the flats and deeper than this: the open sea, which no one walks into
 var _pools: Array[Vector3] = []
 var _streams: Array = []
+## An island (Fontanova), or empty: land out to a wobbling shore "r" metres from the middle, then a
+## shelf going down into the open sea, which stays deep (ISLE_FLOOR) out to the horizon. Low land
+## meets the sea in long beaches; high land drops into it as cliffs. Wading in is allowed, but out
+## past ISLE_DROWN deep you drown (Player).
+var isle := {}
+const ISLE_SEA_Y := -0.2 # the water's level all round the island
+const ISLE_FLOOR := -7.0 # the open sea's floor
+const ISLE_SHELF := 34.0 # metres from the shore to the deep floor
+const ISLE_LAND := 1.6 # the lowest the land inside the shore is allowed to lie
+const ISLE_DROWN := 1.5 # water deeper than this closes over your head
 
 
 var half_extent := HALF
@@ -118,6 +128,12 @@ func _island_shape(x: float, z: float) -> float:
 	return best
 
 
+## Bridges that are solid things of their own, with nothing under them: the Mists' between islands,
+## and an island's rope bridges over its ravines. They start at the edge of the land each side.
+func ledge_bridges() -> bool:
+	return not islands.is_empty() or not isle.is_empty()
+
+
 func has_islands() -> bool:
 	return not islands.is_empty()
 
@@ -136,6 +152,84 @@ func island_floor(x: float, z: float) -> float:
 
 func hill(x: float, z: float, height_m: float, sigma: float) -> void:
 	_hills.append(Vector4(x, z, height_m, sigma))
+
+
+## A height with a flat top and cliffs all round (Fontanova's Acropolis and ridges): top metres high,
+## its rim radius metres out (stretch scales that along and across yaw), its cliffs edge metres from
+## rim to foot, the rim ragged by rag of the radius. It only ever raises the land.
+var _mesas: Array[Dictionary] = []
+func mesa(x: float, z: float, radius: float, top: float, edge: float, rag := 0.12, stretch := Vector2.ONE, yaw := 0.0) -> void:
+	_mesas.append({"c": Vector2(x, z), "r": radius, "top": top, "edge": maxf(edge, 0.5), "rag": rag, "s": stretch, "cos": cos(yaw), "sin": sin(yaw),
+		"reach": radius * maxf(stretch.x, stretch.y) * (1.0 + rag) + edge + 2.0, "seed": float(_mesas.size()) * 97.0})
+
+
+func _apply_mesa(m: Dictionary, x: float, z: float, h: float) -> float:
+	var c: Vector2 = m["c"]
+	var dx := x - c.x
+	var dz := z - c.y
+	var reach: float = m["reach"]
+	if dx * dx + dz * dz > reach * reach:
+		return h
+	var cs: float = m["cos"]
+	var sn: float = m["sin"]
+	var st: Vector2 = m["s"]
+	var lx := (dx * cs + dz * sn) / st.x
+	var lz := (-dx * sn + dz * cs) / st.y
+	var q := Vector2(lx, lz)
+	var bearing := atan2(lz, lx)
+	var seed: float = m["seed"]
+	# A ragged rim: broad bays and capes, and smaller notches in them.
+	var rag: float = m["rag"]
+	var rim: float = float(m["r"]) * (1.0 + rag * (_noise.get_noise_2d(cos(bearing) * 60.0 + seed, sin(bearing) * 60.0 - seed) * 2.0
+		+ _noise.get_noise_2d(cos(bearing) * 170.0 - seed, sin(bearing) * 170.0 + seed) * 0.9))
+	var out := (q.length() - rim) * minf(st.x, st.y)
+	var edge: float = m["edge"]
+	var top: float = m["top"]
+	if out >= edge:
+		return h
+	var k := 1.0 - smoothstep(0.0, edge, out)
+	# The cliff face is rock: broken, buttressed, never a smooth ramp.
+	var face := k * (1.0 - k) * 4.0
+	var rock := _detail.get_noise_2d(x * 3.1 + seed, z * 3.1) * 1.4 * face
+	return maxf(h, lerpf(h, top, k) + rock)
+
+
+## Ground stepped into level shelves step metres apart, each riser short and steep (the olive
+## terraces), within radius metres of a point, fading out over feather.
+var _terraced: Array[Dictionary] = []
+func shelves(x: float, z: float, radius: float, step: float, feather := 8.0) -> void:
+	_terraced.append({"c": Vector2(x, z), "r": radius, "step": step, "f": feather})
+
+
+func _apply_terrace(t: Dictionary, x: float, z: float, h: float) -> float:
+	var d := Vector2(x, z).distance_to(t["c"])
+	var r: float = t["r"]
+	if d >= r or h < 1.0:
+		return h
+	var step: float = t["step"]
+	var q := h / step
+	var fl := floorf(q)
+	# Each riser takes the last 45% of the shelf: steep enough to read as a terrace, gentle enough to
+	# walk up (a dry-stone wall is drawn along it, FontaBuilder.terrace_walls).
+	var stepped := (fl + smoothstep(0.55, 1.0, q - fl)) * step
+	return lerpf(h, stepped, 1.0 - smoothstep(r - float(t["f"]), r, d))
+
+
+## Chasms: falling into one is death (the Ravine of Fontanova). Each is a line and its half width.
+var chasms: Array[Dictionary] = []
+const CHASM_DEATH := 2.0 # below this height in a chasm, you have fallen
+func chasm(line: Array[Vector2], half: float) -> void:
+	chasms.append({"p": line, "half": half})
+
+
+func in_chasm(x: float, z: float) -> bool:
+	var at := Vector2(x, z)
+	for c: Dictionary in chasms:
+		var pts: Array[Vector2] = c["p"]
+		for i in pts.size() - 1:
+			if at.distance_to(Geometry2D.get_closest_point_to_segment(at, pts[i], pts[i + 1])) < float(c["half"]):
+				return true
+	return false
 
 
 ## A level platform, blended into the land around it. half is half its size, yaw how far it is turned.
@@ -182,7 +276,7 @@ func bake() -> void:
 			visual[j * vertices_per_side + i] = h
 			walk[j * vertices_per_side + i] = h
 	for b: Dictionary in _bridges:
-		if not islands.is_empty():
+		if ledge_bridges():
 			var from: Vector2 = b["a"]
 			var to: Vector2 = b["b"]
 			b["a"] = _rim_towards(from, to)
@@ -207,8 +301,14 @@ func _natural(x: float, z: float) -> float:
 		var dx := x - g.x
 		var dz := z - g.y
 		h += g.z * exp(-(dx * dx + dz * dz) / (2.0 * g.w * g.w))
+	for t: Dictionary in _terraced:
+		h = _apply_terrace(t, x, z, h)
+	for m: Dictionary in _mesas:
+		h = _apply_mesa(m, x, z, h)
 	if not coast.is_empty():
 		h = _shore(x, z, h)
+	if not isle.is_empty():
+		h = _isle_shore(x, z, h)
 	for p: Dictionary in _pads:
 		h = _apply_pad(p, x, z, h)
 	return h
@@ -219,6 +319,63 @@ func _natural(x: float, z: float) -> float:
 var sea := {}
 func set_sea(floor_y: float) -> void:
 	sea = {"floor": floor_y}
+
+
+## Makes this map an island (see isle): its shore lies shore[k] metres from the middle at bearings
+## evenly spaced round from the east (+X) towards the south (+Z), smoothly joined, and wobbles in
+## and out by up to wobble of that besides.
+func set_isle(shore: PackedFloat32Array, wobble: float) -> void:
+	isle = {"shore": shore, "wobble": wobble}
+
+
+## The island's edge at this bearing: how far out from the middle the shore lies.
+func isle_edge(x: float, z: float) -> float:
+	var shore: PackedFloat32Array = isle["shore"]
+	var n := shore.size()
+	var a := fposmod(atan2(z, x), TAU) / TAU * n
+	var k := int(a)
+	var t := a - k
+	# Catmull-Rom through the bearings either side, so bays and capes curve rather than kink.
+	var p0 := shore[(k - 1 + n) % n]
+	var p1 := shore[k % n]
+	var p2 := shore[(k + 1) % n]
+	var p3 := shore[(k + 2) % n]
+	var r := 0.5 * (2.0 * p1 + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t * t + (3.0 * p1 - p0 - 3.0 * p2 + p3) * t * t * t)
+	var b := atan2(z, x)
+	return r * (1.0 + _noise.get_noise_2d(cos(b) * 90.0 + 410.0, sin(b) * 90.0 - 90.0) * float(isle["wobble"]) * 2.0)
+
+
+## How far past the shore this point is: negative on the island, positive out at sea.
+func isle_past(x: float, z: float) -> float:
+	return Vector2(x, z).length() - isle_edge(x, z)
+
+
+## The land meeting the sea: where it is low it runs down in a long beach, where it stands high it
+## falls into the water as a cliff; past the shore the seabed shelves away into the deep.
+func _isle_shore(x: float, z: float, h: float) -> float:
+	var past := isle_past(x, z)
+	var land := maxf(h, ISLE_LAND + _detail.get_noise_2d(x * 0.7, z * 0.7) * 0.25)
+	var seabed := lerpf(ISLE_SEA_Y - 0.4, ISLE_FLOOR, smoothstep(0.0, ISLE_SHELF, past)) + _detail.get_noise_2d(x * 0.6, z * 0.6) * 0.3 + _noise.get_noise_2d(x * 1.7 + 300.0, z * 1.7) * 0.35
+	# High ground keeps its height almost to the water: a cliff. Low ground slopes away: a beach.
+	var high := smoothstep(5.0, 12.0, land)
+	var taper := lerpf(26.0, 2.2, high)
+	var beach := lerpf(land, ISLE_SEA_Y + 0.15, smoothstep(-taper, 0.0, past) * (1.0 - high))
+	var cliff_foot := lerpf(beach, seabed, smoothstep(-taper * 0.5, 1.5, past))
+	return lerpf(beach if past < -taper else cliff_foot, seabed, smoothstep(0.0, 6.0, past))
+
+
+## Whether the ground here lies under the island's sea, and how deep: 0 on dry land.
+func isle_depth(x: float, z: float) -> float:
+	if isle.is_empty():
+		return 0.0
+	if not chasms.is_empty() and in_chasm(x, z):
+		return 0.0 # the Ravine's floor lies below the sea, but it is a fall, not the sea: no wall round it
+	return maxf(0.0, ISLE_SEA_Y - ground_height(x, z))
+
+
+## A map by the sea: Port Vael's coast, the Lantern Road's drowned flats, or an island.
+func seaside() -> bool:
+	return not coast.is_empty() or not sea.is_empty() or not isle.is_empty()
 
 
 ## Sets the shore (see coast).
@@ -355,7 +512,7 @@ func river_flow(x: float, z: float) -> Vector2:
 
 
 func deck_y(b: Dictionary, s: float) -> float:
-	if not islands.is_empty():
+	if ledge_bridges():
 		# Dead level for the first and last few metres, right over the land's edge, so that the
 		# slope only starts once you are clear of it and there is no lip to walk into.
 		var length: float = b["length"]
@@ -394,7 +551,7 @@ func _lay_deck(b: Dictionary) -> void:
 			var at := Vector2(i * CELL - half_extent, j * CELL - half_extent) - a
 			var run := at.dot(along)
 			var side := absf(at.dot(along.orthogonal()))
-			if not islands.is_empty():
+			if ledge_bridges():
 				# Over the void this is only where mobs stand, a little wider than the deck so that they
 				# never read the bottom of the sky. The player stands on the deck itself.
 				if run < -CELL or run > length + CELL or side > float(b["half"]) + CELL * 1.5:
@@ -478,7 +635,7 @@ func on_deck(x: float, z: float) -> bool:
 		if not Rect2(b["bounds"]).has_point(point): continue
 		var q := _deck_place(b, x, z)
 		var length: float = b["length"]
-		if not islands.is_empty():
+		if ledge_bridges():
 			if q.x > 0.0 and q.x < length and q.y < float(b["half"]) + 0.2:
 				return true
 			continue
@@ -515,15 +672,17 @@ func is_walkable(x: float, z: float) -> bool:
 		var dx := ground_height(x + 0.5, z) - ground_height(x - 0.5, z)
 		var dz := ground_height(x, z + 0.5) - ground_height(x, z - 0.5)
 		return ground_height(x, z) > 0.0 and Vector2(dx, dz).length() < STEEP
+	if on_deck(x, z):
+		return true # a bridge's deck, whatever lies under it
 	if deep_water(x, z):
 		return false
-	return on_deck(x, z) or slope(x, z) < STEEP
+	return slope(x, z) < STEEP
 
 
 ## Water too deep to wade: only in the river's own bed. Low ground anywhere else (Mist Bastion has
 ## no river at all) is a dry hollow you walk through.
 func deep_water(x: float, z: float) -> bool:
-	return (height(x, z) < WATER_Y - WADE and by_river(x, z)) or open_sea(x, z)
+	return (height(x, z) < WATER_Y - WADE and by_river(x, z)) or open_sea(x, z) or (not isle.is_empty() and isle_depth(x, z) > WADE)
 
 
 ## Whether this spot is in or beside the river's course.
@@ -544,7 +703,7 @@ func collision_shape() -> HeightMapShape3D:
 	for j in side:
 		for i in side:
 			# On the islands the bridges are separate solid things: there is nothing under them.
-			data[j * side + i] = ground_height(i - half_extent, j - half_extent) if not islands.is_empty() else height(i - half_extent, j - half_extent)
+			data[j * side + i] = ground_height(i - half_extent, j - half_extent) if ledge_bridges() else height(i - half_extent, j - half_extent)
 	var shape := HeightMapShape3D.new()
 	shape.map_width = side
 	shape.map_depth = side
@@ -589,6 +748,12 @@ func blocked_rects() -> Array[Rect2i]:
 func _tint(x: float, z: float, h: float, steep: float, river_dist: float) -> Color:
 	var n := _detail.get_noise_2d(x * 1.7, z * 1.7) * 0.5 + 0.5
 	var far := _noise.get_noise_2d(z, x) * 0.5 + 0.5
+	if not isle.is_empty():
+		# An island of the Mediterranean in high summer: grass burnt gold, patches of green where the
+		# ground holds water, red earth showing through, and pale limestone where it is steep.
+		var island := Color(0.36, 0.37, 0.19).lerp(Color(0.24, 0.33, 0.17), n * 0.8).lerp(Color(0.44, 0.39, 0.22), far * 0.5)
+		island = island.lerp(Color(0.5, 0.31, 0.2), clampf(_noise.get_noise_2d(x * 3.1 + 77.0, z * 3.1) * 1.6 - 0.25, 0.0, 0.55))
+		return island.lerp(Color(0.66, 0.62, 0.55), smoothstep(0.45, 0.8, steep))
 	var col := Color(0.25, 0.4, 0.19).lerp(Color(0.34, 0.44, 0.2), n).lerp(Color(0.2, 0.33, 0.2), far * 0.7)
 	if h > 3.0:
 		col = col.lerp(Color(0.36, 0.42, 0.26), clampf((h - 3.0) / 6.0, 0.0, 0.6))
@@ -673,6 +838,8 @@ func skirt_mesh(sector: int) -> ArrayMesh:
 			if not sea.is_empty():
 				# Out to sea the world goes on as open water, not as hills: the seabed stays deep.
 				y = SEA_Y - 2.0
+			elif not isle.is_empty():
+				y = ISLE_FLOOR - 1.0
 			points[Vector2i(u, v)] = Vector3(p.x, y, p.y)
 	for u in along:
 		for v in RINGS:

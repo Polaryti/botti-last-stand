@@ -20,6 +20,7 @@ const LOOKS := {
 	"mesenlla": {"top": Color(0.11, 0.07, 0.22), "low": Color(0.96, 0.56, 0.34), "far": Color(0.33, 0.22, 0.37), "near": Color(0.12, 0.09, 0.17), "glow": Color(1.0, 0.75, 0.5), "accent": Color(0.45, 0.75, 1.0)},
 	"bastion": {"top": Color(0.07, 0.07, 0.19), "low": Color(0.78, 0.52, 0.58), "far": Color(0.27, 0.24, 0.38), "near": Color(0.1, 0.1, 0.17), "glow": Color(0.9, 0.78, 0.86), "accent": Color(0.45, 0.95, 0.92)},
 	"lantern_road": {"top": Color(0.02, 0.05, 0.09), "low": Color(0.2, 0.32, 0.36), "far": Color(0.1, 0.16, 0.2), "near": Color(0.04, 0.07, 0.09), "glow": Color(1.0, 0.82, 0.45), "accent": Color(0.5, 0.84, 0.76)},
+	"fontanova": {"top": Color(0.02, 0.03, 0.1), "low": Color(0.42, 0.26, 0.32), "far": Color(0.1, 0.08, 0.18), "near": Color(0.05, 0.04, 0.1), "glow": Color(0.98, 0.84, 0.55), "accent": Color(0.72, 0.45, 1.0)},
 	"vael": {"top": Color(0.03, 0.07, 0.11), "low": Color(0.3, 0.42, 0.44), "far": Color(0.14, 0.2, 0.24), "near": Color(0.05, 0.08, 0.1), "glow": Color(0.96, 0.87, 0.65), "accent": Color(0.5, 0.84, 0.76)},
 }
 
@@ -47,7 +48,7 @@ func _plan() -> void:
 	_stars = PackedVector2Array()
 	for i in 90:
 		_stars.append(Vector2(r.randf() * size.x, r.randf() * size.y * 0.55))
-	var layers := 0 if place in ["mists", "lantern_road"] else 1 if place == "vael" else 3
+	var layers := 0 if place in ["mists", "lantern_road"] else 1 if place in ["vael", "fontanova"] else 3
 	for k in layers:
 		var line := PackedVector2Array()
 		var base := size.y * (0.56 + 0.1 * k)
@@ -93,6 +94,10 @@ func _draw() -> void:
 			_glow(Vector2(w * 0.5, h * 0.62), h * 0.35, _look("glow"), 0.22)
 		"mesenlla", "bastion":
 			_glow(Vector2(w * 0.3, h * 0.66), h * 0.5, _look("glow"), 0.18)
+		"fontanova":
+			# A great golden moon low over the sea.
+			_glow(Vector2(w * 0.62, h * 0.34), h * 0.34, _look("glow"), 0.34)
+			draw_circle(Vector2(w * 0.62, h * 0.34), h * 0.11, _look("glow"))
 		"vael":
 			_glow(Vector2(w * 0.24, h * 0.18), h * 0.2, _look("glow"), 0.3)
 			draw_circle(Vector2(w * 0.24, h * 0.18), h * 0.04, _look("glow"))
@@ -110,9 +115,12 @@ func _draw() -> void:
 		"mesenlla": _mesenlla(w, h)
 		"bastion": _bastion(w, h)
 		"vael": _vael(w, h)
+		"fontanova": _fontanova(w, h)
 		"lantern_road": _lantern_road(w, h)
-	# Mist drifting across the bottom of the view.
-	var mist := _look("accent") if place in ["mists", "mesenlla", "bastion", "vael", "lantern_road"] else Color(0.7, 0.75, 0.85)
+	# Mist drifting across the bottom of the view (Fontanova's sea is clear).
+	if place == "fontanova":
+		return
+	var mist := _look("accent") if place in ["mists", "mesenlla", "bastion", "vael", "lantern_road", "fontanova"] else Color(0.7, 0.75, 0.85)
 	for i in 6:
 		var x := fmod(i * w / 5.0 + _t * (12.0 + i * 3.0), w * 1.3) - w * 0.15
 		var y := h * (0.8 + 0.03 * sin(_t * 0.4 + i))
@@ -315,6 +323,124 @@ func _bastion(w: float, h: float) -> void:
 ## Port Vael at night: the sea to the horizon under the moon, its waves catching the light; the town
 ## up on the left with a few windows lit; the harbour wall and a breakwater running out to the dark
 ## lighthouse; a wreck and the drowned bell tower out on the flats, the Mist Tide moving round them.
+## Fontanova from the sea: the island's hill under the moon, the temple's broken colonnade on top
+## with the god's violet light in it, olives on the slope, the moon's road gold on the water, and the
+## other islands of the archipelago dark along the horizon.
+func _fontanova(w: float, h: float) -> void:
+	var sea_top := h * 0.6
+	draw_rect(Rect2(0, sea_top, w, h - sea_top), Color(0.03, 0.05, 0.12))
+	# The sea: slow swells, fainter towards the horizon, and the moon's path broken into glints.
+	for i in 12:
+		var y := sea_top + h * 0.012 + pow(i / 11.0, 1.6) * (h - sea_top) * 0.95
+		var pts := PackedVector2Array()
+		for k in 33:
+			var f := k / 32.0
+			pts.append(Vector2(w * f, y + sin(f * (10.0 + i * 0.8) + _t * (0.5 + i * 0.05) + i * 1.3) * h * (0.002 + i * 0.0006)))
+		draw_polyline(pts, Color(_look("accent").lerp(_look("glow"), 0.3), 0.05 + i * 0.008), 1.0 + i * 0.12, true)
+	for i in 46:
+		var row := float(i % 23) / 22.0
+		var y := sea_top + h * 0.01 + pow(row, 1.4) * (h - sea_top) * 0.95
+		var spread := w * (0.01 + 0.07 * row)
+		var x := w * 0.62 + sin(i * 12.9898) * spread
+		var flick := 0.5 + 0.5 * sin(_t * (1.6 + (i % 5) * 0.3) + i * 2.1)
+		var len := w * (0.006 + 0.014 * row) * (0.5 + flick * 0.5)
+		draw_line(Vector2(x - len, y), Vector2(x + len, y), Color(_look("glow"), 0.1 + 0.3 * flick * (1.0 - row * 0.5)), 1.5 + row)
+	# The archipelago on the horizon.
+	var far := _look("far")
+	for isle: Array in [[0.0, 0.2, 0.06], [0.16, 0.3, 0.035], [0.84, 1.02, 0.07]]:
+		var pts := PackedVector2Array([Vector2(w * isle[0], sea_top)])
+		for k in 13:
+			var f := k / 12.0
+			pts.append(Vector2(w * lerpf(isle[0], isle[1], f), sea_top - h * isle[2] * pow(sin(f * PI), 0.8)))
+		pts.append(Vector2(w * isle[1], sea_top))
+		draw_colored_polygon(pts, far)
+	draw_circle(Vector2(w * 0.08, sea_top - h * 0.055), h * 0.006, Color(0.45, 0.95, 0.9))
+	# Fontanova: terraced slopes rising from a beach to the crag of the Acropolis, sheer on both sides,
+	# its top level, the temple standing on it.
+	var near := _look("near")
+	var top := sea_top - h * 0.27
+	var crag_l := w * 0.47
+	var crag_r := w * 0.64
+	var shore := sea_top + h * 0.012
+	var island := PackedVector2Array([Vector2(w * 0.2, shore)])
+	# Terraces up the left slope, in steps.
+	for k in 6:
+		var x0 := w * (0.22 + k * 0.04)
+		var y0 := sea_top - h * (0.01 + k * 0.03)
+		island.append(Vector2(x0, y0))
+		island.append(Vector2(x0 + w * 0.032, y0))
+		island.append(Vector2(x0 + w * 0.04, y0 - h * 0.03))
+	island.append(Vector2(crag_l - w * 0.01, sea_top - h * 0.2))
+	# The crag's west cliff, broken.
+	island.append(Vector2(crag_l, top + h * 0.02))
+	island.append(Vector2(crag_l + w * 0.006, top))
+	island.append(Vector2(crag_r - w * 0.006, top))
+	island.append(Vector2(crag_r, top + h * 0.03))
+	island.append(Vector2(crag_r + w * 0.012, sea_top - h * 0.17))
+	island.append(Vector2(crag_r + w * 0.05, sea_top - h * 0.15))
+	island.append(Vector2(w * 0.78, sea_top - h * 0.1))
+	island.append(Vector2(w * 0.86, sea_top - h * 0.03))
+	island.append(Vector2(w * 0.92, shore))
+	draw_colored_polygon(island, near)
+	# Where the island's skyline is at any x, from its own outline: everything below stands on it.
+	var skyline := island.duplicate()
+	var ground_at := func(x: float) -> float:
+		for i in skyline.size() - 1:
+			var a: Vector2 = skyline[i]
+			var b: Vector2 = skyline[i + 1]
+			if x >= a.x and x <= b.x:
+				if b.x - a.x < 1.0:
+					return minf(a.y, b.y) # a sheer face: its top
+				return lerpf(a.y, b.y, (x - a.x) / (b.x - a.x))
+		return shore
+	# Its reflection, broken by the swell, and the surf along the beach.
+	for k in 10:
+		var y := shore + h * (0.004 + k * 0.007)
+		var fade := 1.0 - k / 10.0
+		var x0 := w * (0.24 + k * 0.012) + sin(_t * 0.9 + k) * w * 0.004
+		var x1 := w * (0.88 - k * 0.012) + sin(_t * 1.1 + k * 2.0) * w * 0.004
+		draw_line(Vector2(x0, y), Vector2(x1, y), Color(near, 0.55 * fade), h * 0.006)
+	for k in 9:
+		var x := w * (0.22 + k * 0.078)
+		var flick := 0.5 + 0.5 * sin(_t * 1.4 + k * 2.3)
+		draw_line(Vector2(x, shore - 1.0), Vector2(x + w * 0.04, shore - 1.0), Color(_look("glow"), 0.12 + 0.18 * flick), 1.5)
+	# Strata on the crag's face.
+	for k in 5:
+		var y := top + h * (0.035 + k * 0.03)
+		draw_line(Vector2(crag_l + w * 0.002, y), Vector2(crag_l + w * 0.008, y + h * 0.004), near.lightened(0.12), 1.0)
+		draw_line(Vector2(crag_r - w * 0.002, y), Vector2(crag_r + w * 0.004, y + h * 0.006), near.lightened(0.12), 1.0)
+	# The temple, standing on the crag: a stepped floor, its columns on it, the roof fallen at one end.
+	var temple_l := w * 0.5
+	var temple_r := w * 0.61
+	var stand: float = ground_at.call((temple_l + temple_r) * 0.5)
+	draw_rect(Rect2(temple_l - w * 0.006, stand - h * 0.008, temple_r - temple_l + w * 0.012, h * 0.008 + 2.0), near)
+	draw_rect(Rect2(temple_l - w * 0.002, stand - h * 0.014, temple_r - temple_l + w * 0.004, h * 0.006 + 2.0), near)
+	var col_h := h * 0.07
+	var floor_y := stand - h * 0.014
+	for k in 7:
+		var x := lerpf(temple_l + w * 0.004, temple_r - w * 0.004, k / 6.0)
+		var tall := col_h if k != 5 else col_h * 0.45 # one broken
+		draw_rect(Rect2(x - w * 0.0045, floor_y - tall, w * 0.009, tall + 1.0), near)
+	draw_rect(Rect2(temple_l - w * 0.002, floor_y - col_h - h * 0.012, (temple_r - temple_l) * 0.72, h * 0.012), near)
+	draw_colored_polygon(PackedVector2Array([Vector2(temple_l - w * 0.004, floor_y - col_h - h * 0.012), Vector2(temple_l + (temple_r - temple_l) * 0.36, floor_y - col_h - h * 0.04), Vector2(temple_l + (temple_r - temple_l) * 0.72, floor_y - col_h - h * 0.012)]), near)
+	var pulse := 0.6 + 0.4 * sin(_t * 1.3)
+	_glow(Vector2((temple_l + temple_r) * 0.5, floor_y - col_h * 0.45), h * 0.05, _look("accent"), 0.45 * pulse)
+	# Cypresses like dark flames by the crag, olives round and grey on the terraces.
+	# Each stands on the ground under it, its foot a little sunk into the slope, so none hangs in the air.
+	for c: Array in [[0.43, 0.07], [0.443, 0.05], [0.67, 0.06]]:
+		var x := w * float(c[0])
+		var base: float = maxf(ground_at.call(x - w * 0.006), ground_at.call(x + w * 0.006)) + h * 0.004
+		var tall := h * float(c[1])
+		draw_colored_polygon(PackedVector2Array([Vector2(x - w * 0.006, base), Vector2(x, base - tall), Vector2(x + w * 0.006, base)]), near.lightened(0.04))
+	for k in 6:
+		var x := w * (0.235 + k * 0.04)
+		for j in 2:
+			var ox := x + w * (0.004 + j * 0.014)
+			var foot: float = ground_at.call(ox) + 1.0
+			draw_line(Vector2(ox, foot - h * 0.012), Vector2(ox, foot), near, 2.0)
+			draw_circle(Vector2(ox, foot - h * 0.02), h * 0.011, near.lightened(0.09))
+
+
 func _vael(w: float, h: float) -> void:
 	var sea_top := h * 0.56
 	draw_rect(Rect2(0, sea_top, w, h - sea_top), Color(0.05, 0.11, 0.13))

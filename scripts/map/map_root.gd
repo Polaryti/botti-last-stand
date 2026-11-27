@@ -18,7 +18,7 @@ extends Node3D
 ## Inside this distance from the centre the land is smooth.
 @export var calm_radius := 30.0
 ## Which lands this is, for its light, mist, music and creatures. The Village, Fort and Mists maps leave it.
-@export_enum("village", "mesenlla", "bastion", "vael", "lantern_road") var look := "village"
+@export_enum("village", "mesenlla", "bastion", "vael", "lantern_road", "fontanova") var look := "village"
 ## Redraw the land by itself after a hill, a road or a building moves. Turn off if it gets in the way.
 @export var auto_redraw := true
 @export_tool_button("Redraw the whole map") var redraw_button := rebuild_preview
@@ -146,7 +146,7 @@ func _snap(p: Node) -> void:
 	if p is MapPiece and (p as MapPiece).on_ground and terrain:
 		var piece := p as MapPiece
 		var g := piece.global_position
-		var y := terrain.height(g.x, g.z) + piece.lift
+		var y := MapBuilder.settle_static(terrain, piece.global_transform, piece)
 		if absf(g.y - y) > 0.001:
 			_snapping = true
 			piece.global_position = Vector3(g.x, y, g.z)

@@ -4,7 +4,8 @@ extends Node3D
 ## through the trees on the wind, motes of mist light hanging and wandering in the twilight, and in the
 ## Valleys of Mesenlla leaves coming down from the forest; at Mist Bastion fine mist sifting down and
 ## sparks of the Great Portal carried up on the wind; over the sea of Vael, low sea-mist and the deep's
-## green light rising off the water. It follows the camera, so it costs the same
+## green light rising off the water; on Fontanova, fireflies blinking in the dark, petals and olive
+## leaves blown off the trees, a star falling now and then, and a thin violet haze that is the god's. It follows the camera, so it costs the same
 ## wherever you are, and it is only drawn on this phone.
 
 const WISPS := 9
@@ -16,6 +17,7 @@ var _wisps: Array[MeshInstance3D] = []
 var _motes: CPUParticles3D
 var _falling: CPUParticles3D
 var _sea := false
+var _isle := false
 static var _wisp_material: ShaderMaterial
 
 
@@ -23,7 +25,7 @@ static var _wisp_material: ShaderMaterial
 ## kingdom of Vael, where it is the sea's: low banks of sea-mist on the water and the green light of
 ## the deep rising off it.
 static func wanted(w: World) -> bool:
-	return w.map_id in SpawnRules.VAEL
+	return w.map_id in SpawnRules.VAEL or w.map_id == "fontanova"
 
 
 func _init(w: World) -> void:
@@ -36,6 +38,7 @@ func _ready() -> void:
 	r.seed = 9157
 	var quiet := Game.quality == 0
 	_sea = world.map_id in SpawnRules.VAEL
+	_isle = world.map_id == "fontanova"
 	for i in (WISPS / 2 if quiet else WISPS):
 		var wisp := MeshInstance3D.new()
 		wisp.mesh = _wisp_mesh(r.randf_range(7.0, 13.0), r.randf_range(0.8, 1.6), r)
@@ -46,6 +49,8 @@ func _ready() -> void:
 		wisp.set_meta("height", r.randf_range(0.5, 2.6) if _sea else r.randf_range(1.2, 6.0))
 		if _sea:
 			(wisp.material_override as ShaderMaterial).set_shader_parameter("mist", Vector3(0.66, 0.84, 0.84))
+		elif _isle:
+			(wisp.material_override as ShaderMaterial).set_shader_parameter("mist", Vector3(0.7, 0.6, 0.86))
 		wisp.set_meta("phase", r.randf() * TAU)
 		wisp.position = Vector3(r.randf_range(-WISP_REACH, WISP_REACH), 0, r.randf_range(-WISP_REACH, WISP_REACH))
 		wisp.rotation.y = atan2(WIND.x, WIND.z) + r.randf_range(-0.4, 0.4)
@@ -67,6 +72,25 @@ func _ready() -> void:
 		_motes.emitting = true
 		_motes.emission_box_extents = Vector3(24, 2.5, 24)
 		_falling = _particles(0, Vector3.ONE, 0.1, 1.0)
+	elif _isle:
+		# Fireflies wandering low over the grass, blinking.
+		_motes.color = Color(0.85, 1.0, 0.35, 0.95)
+		_motes.gravity = Vector3(0, 0.02, 0)
+		_motes.amount = 40 if quiet else 130
+		_motes.emitting = true
+		_motes.emission_box_extents = Vector3(24, 1.8, 24)
+		_motes.initial_velocity_max = 0.45
+		_motes.lifetime = 4.0
+		_motes.preprocess = 4.0
+		_motes.color_ramp = _blinks()
+		# Petals and olive leaves, blown off the trees along the wind.
+		_falling = _particles(30 if quiet else 95, Vector3(22, 2, 22), 0.13, 9.0)
+		_falling.color_ramp = null
+		_falling.color_initial_ramp = _petal_colours()
+		_falling.gravity = Vector3(0.6, -0.45, 0.2)
+		_falling.angular_velocity_min = -200.0
+		_falling.angular_velocity_max = 200.0
+		_falling.angle_max = 360.0
 	elif bastion:
 		# Fine mist sifting down on the mountaintop.
 		_falling = _particles(40 if quiet else 110, Vector3(18, 2, 18), 0.09, 9.0)
@@ -120,6 +144,25 @@ func _particles(amount: int, extents: Vector3, size: float, life: float) -> CPUP
 	return p
 
 
+## A firefly's light over its life: dark, a soft glow, dark, a brighter one, and out.
+func _blinks() -> Gradient:
+	var g := Gradient.new()
+	g.set_color(0, Color(1, 1, 1, 0))
+	for p: Array in [[0.12, 0.0], [0.2, 0.9], [0.3, 0.05], [0.5, 0.0], [0.6, 1.0], [0.72, 0.1], [0.85, 0.0], [0.9, 0.7]]:
+		g.add_point(p[0], Color(1, 1, 1, p[1]))
+	g.set_color(g.get_point_count() - 1, Color(1, 1, 1, 0))
+	return g
+
+
+func _petal_colours() -> Gradient:
+	var g := Gradient.new()
+	g.set_color(0, Color(0.95, 0.92, 0.85))
+	g.add_point(0.35, Color(0.92, 0.3, 0.25))
+	g.add_point(0.6, Color(0.6, 0.64, 0.52))
+	g.set_color(g.get_point_count() - 1, Color(0.95, 0.82, 0.3))
+	return g
+
+
 func _leaf_colours() -> Gradient:
 	var g := Gradient.new()
 	g.set_color(0, Color(0.42, 0.62, 0.28))
@@ -128,11 +171,62 @@ func _leaf_colours() -> Gradient:
 	return g
 
 
+## Now and then a star falls over Fontanova: a bright streak across the sky, gone in a moment.
+const SHOOTING_EVERY := 14.0 # seconds, on average
+var _shooting: MeshInstance3D
+var _shooting_left := 0.0
+var _shooting_from := Vector3.ZERO
+var _shooting_dir := Vector3.ZERO
+
+
+func _shooting_star(delta: float, eye: Vector3) -> void:
+	if _shooting == null:
+		_shooting = MeshInstance3D.new()
+		var q := QuadMesh.new()
+		q.size = Vector2(9.0, 0.12)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		m.albedo_texture = load("res://assets/sprites/glow.png")
+		m.albedo_color = Color(1.0, 0.95, 0.85)
+		m.disable_fog = true
+		m.no_depth_test = false
+		q.material = m
+		_shooting.mesh = q
+		_shooting.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_shooting.visible = false
+		add_child(_shooting)
+	if _shooting_left > 0.0:
+		_shooting_left -= delta
+		var done := 1.0 - _shooting_left / 0.9
+		var at := _shooting_from + _shooting_dir * done * 60.0
+		_shooting.global_position = eye + at
+		var m := (_shooting.mesh as QuadMesh).material as StandardMaterial3D
+		m.albedo_color.a = sin(done * PI)
+		_shooting.visible = _shooting_left > 0.0
+		return
+	if randf() < delta / SHOOTING_EVERY:
+		var a := randf() * TAU
+		_shooting_from = Vector3(cos(a) * 110.0, randf_range(70.0, 110.0), sin(a) * 110.0)
+		_shooting_dir = (Vector3(-sin(a), -0.35, cos(a)) * (1.0 if randf() < 0.5 else -1.0)).normalized()
+		_shooting_left = 0.9
+		_shooting.global_position = eye + _shooting_from
+		# Lie along its path, facing the eye.
+		var side := _shooting_dir
+		var face := (-_shooting_from).normalized()
+		var up := face.cross(side).normalized()
+		_shooting.global_basis = Basis(side, up, side.cross(up).normalized())
+		_shooting.visible = true
+
+
 func _process(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
 		return
 	var eye := cam.global_position
+	if _isle and Game.quality > 0:
+		_shooting_star(delta, eye)
 	_motes.global_position = eye
 	if _sea and world.tide:
 		_motes.global_position.y = maxf(world.ground_at(eye), world.tide.level) + 1.6

@@ -36,6 +36,7 @@ var _ground_material: ShaderMaterial
 var _road_lines: Array[Dictionary] = []
 var _dirt_patches: Array[Dictionary] = []
 var skip_beyond := false # the menu only needs the village
+var walkless := false # the title screen: nothing walks there, so nothing needs blocking for walkers
 var _glow_cells := {} # 24 m square -> SurfaceTool of everything that glows there
 var sight := 1.0 # how far grass and other small things are drawn, as a share of the usual
 var xf := Transform3D.IDENTITY # where the piece being built stands
@@ -46,6 +47,7 @@ var _trees := {}
 var _indoors: Array[Rect2] = []
 var _plant_clearings: Array[Vector3] = []
 var _plant_rooms: Array[Dictionary] = []
+var tree_clearings: Array[Vector3] = [] # (x, z, radius) kept clear of trees only: a cave's mouth
 var _cells := {} # small things, merged by map area into one mesh each
 static var _cow_mesh: Mesh
 
@@ -79,11 +81,30 @@ func _walk(node: Node, parent: Transform3D) -> void:
 			continue
 		var at := parent * (c as Node3D).transform
 		if c is MapPiece and (c as MapPiece).on_ground:
-			at.origin.y = terrain.height(at.origin.x, at.origin.z) + (c as MapPiece).lift
+			at.origin.y = settle(at, c as MapPiece)
 		if c.has_method("build"):
 			stand_at(at)
 			c.call("build", self)
 		_walk(c, at)
+
+
+## Where a piece on the ground stands: at the lowest ground under its footprint (its half extents
+## along its own X and Z, if it has one), so on a slope no side of it hangs in the air.
+func settle(at: Transform3D, piece: MapPiece) -> float:
+	return settle_static(terrain, at, piece)
+
+
+static func settle_static(terrain: Terrain, at: Transform3D, piece: MapPiece) -> float:
+	var y := terrain.height(at.origin.x, at.origin.z)
+	if piece.has_method("footprint"):
+		var half: Vector2 = piece.call("footprint")
+		if half != Vector2.ZERO:
+			var b := at.basis.orthonormalized()
+			for i: float in [-1.0, 0.0, 1.0]:
+				for j: float in [-1.0, 0.0, 1.0]:
+					var p := at.origin + b.x * half.x * i + b.z * half.y * j
+					y = minf(y, terrain.height(p.x, p.z))
+	return y + piece.lift
 
 
 func stand_at(at: Transform3D) -> void:
@@ -163,6 +184,7 @@ func shine(l: LowPoly) -> void:
 
 
 func flush() -> void:
+	FontaFlora.flush(self)
 	for key: Vector2i in _glow_cells:
 		var mi := MeshInstance3D.new()
 		mi.mesh = (_glow_cells[key] as SurfaceTool).commit()
@@ -181,7 +203,8 @@ func flush() -> void:
 		list.assign(_trees[key])
 		var source := key.get_slice("|", 0)
 		# "proc:<kind>" are trees drawn by code (MesenllaBuilder.tree_mesh), the rest come from files.
-		var tree_mesh: Mesh = MesenllaBuilder.tree_mesh(source.substr(5)) if source.begins_with("proc:") else Models.merged(source)
+		# "flora:<kind>" are Fontanova's, drawn by code and moving in the wind (FontaFlora).
+		var tree_mesh: Mesh = MesenllaBuilder.tree_mesh(source.substr(5)) if source.begins_with("proc:") else FontaFlora.tree_mesh(source.substr(6)) if source.begins_with("flora:") else Models.merged(source)
 		w.add_child(Models.scatter(tree_mesh, list))
 	_trees.clear()
 	for key: Vector2i in _cells:
@@ -210,8 +233,8 @@ func ground() -> void:
 	mat.set_shader_parameter("dirt", Vector3(DIRT.r, DIRT.g, DIRT.b))
 	mat.set_shader_parameter("map_half", float(terrain.half_extent))
 	mat.set_shader_parameter("mask_reach", ROAD_REACH)
-	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" else 0.0)
-	mat.set_shader_parameter("shore", SHORE_Y if not terrain.coast.is_empty() or not terrain.sea.is_empty() else -1000.0)
+	mat.set_shader_parameter("cliffs", 1.0 if terrain.has_islands() or look in SpawnRules.MESENLLA or look == "vael" or look == "fontanova" else 0.0)
+	mat.set_shader_parameter("shore", SHORE_Y if terrain.seaside() else -1000.0)
 	if look in SpawnRules.MESENLLA:
 		# Mountain meadow in the twilight: cooler grass, and dark heather-coloured earth.
 		mat.set_shader_parameter("tint", Vector3(0.9, 1.0, 1.06))
@@ -222,6 +245,10 @@ func ground() -> void:
 		mat.set_shader_parameter("tint", Vector3(1.12, 0.86, 0.7))
 		mat.set_shader_parameter("dirt", Vector3(0.34, 0.31, 0.27))
 		mat.set_shader_parameter("highland", 1.0 if look == "vael" else 0.0)
+	elif look == "fontanova":
+		# Dry Mediterranean ground: golden-green grass burnt by the summer, and red-ochre earth.
+		mat.set_shader_parameter("tint", Vector3(1.08, 1.0, 0.86))
+		mat.set_shader_parameter("dirt", Vector3(0.46, 0.33, 0.24))
 	_ground_material = mat
 	var j := 0
 	while j < terrain.vertices_per_side - 1:
@@ -251,6 +278,8 @@ func boundary(h: float) -> void:
 	w.add_collider(Vector3(0, 15, h + t * 0.5), Vector3(h * 2 + 4, 70, t))
 	w.add_collider(Vector3(-h - t * 0.5, 15, 0), Vector3(t, 70, h * 2 + 4))
 	w.add_collider(Vector3(h + t * 0.5, 15, 0), Vector3(t, 70, h * 2 + 4))
+	if walkless:
+		return
 	# Cliffs and deep water.
 	for r in terrain.blocked_rects():
 		var c := Vector2(r.position) + Vector2(r.size) * 0.5 - Vector2.ONE * terrain.half_extent
@@ -1690,7 +1719,7 @@ func forest_wall(h: float) -> void:
 			for at: Vector3 in [Vector3(t, 0, -off), Vector3(t, 0, off), Vector3(-off, 0, t), Vector3(off, 0, t)]:
 				var p := at + Vector3(rng.randf_range(-1, 1), 0, rng.randf_range(-1, 1))
 				p.y = terrain.height(p.x, p.z)
-				if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4:
+				if terrain.seaside() and p.y < SHORE_Y + 0.4:
 					continue # no trees in the sea: the coast's edge is open water
 				stand_at(Transform3D(Basis(Vector3.UP, rng.randf() * TAU), p))
 				var file := "res://assets/nature/tree_single_A.gltf" if rng.randf() < 0.72 else "res://assets/nature/tree_single_B.gltf"
@@ -1763,7 +1792,7 @@ func grass(h: float) -> void:
 			if MapIslands.on_masonry(Vector2(p.x, p.z)): continue
 			if not is_preview and MapIslands._near_gate(w, p, 4.0): continue
 		p.y = terrain.height(p.x, p.z)
-		if (not terrain.coast.is_empty() or not terrain.sea.is_empty()) and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
+		if terrain.seaside() and p.y < SHORE_Y + 0.4: continue # no grass on the beach or the seabed
 		var key := Vector2i(int(floor(p.x / 24.0)), int(floor(p.z / 24.0)))
 		if not patches.has(key):
 			patches[key] = [[], PackedColorArray()]

@@ -172,8 +172,26 @@ func _entries() -> void:
 	check(strays == 0, "the Village never picks a creature of Mesenlla to roam (%d)" % strays)
 	var bosses := ["great_revenant_elemental", "war_wyvern"]
 	for id: String in bosses:
-		check(ZombieDefs.ALL[id].get("mesenlla_boss", false) and CodexPanel.enemy_group(id) == 6, "%s is listed with the bosses" % id)
+		check(ZombieDefs.ALL[id].get("mesenlla_boss", false) and CodexPanel.enemy_group(id) == 8, "%s is listed with the bosses" % id)
 	check(CodexPanel.enemy_group("bear") == 4, "the others are Creatures of Mesenlla")
+	# The Codex: when an enemy first comes is only shown once you have killed one; bosses and
+	# minibosses, called up by the night, never show a clock (they used to read 166:39).
+	var kills: Dictionary = Game.killed_kinds.duplicate()
+	var timed: Array = ZombieDefs.ALL.keys().filter(func(k: String) -> bool: return float(ZombieDefs.ALL[k].get("from", -1.0)) > 0.0 and float(ZombieDefs.ALL[k]["from"]) < CodexPanel.UNTIMED and not ZombieDefs.ALL[k].get("miniboss", false) and not ZombieDefs.ALL[k].get("carried", false) and not str(ZombieDefs.ALL[k].get("icon", "")).ends_with("+crown"))
+	var some: String = timed[0]
+	Game.killed_kinds.erase(some)
+	check(not CodexPanel.enemy_note(some).contains("Appears from"), "before the first kill the Codex keeps when %s comes to itself" % some)
+	Game.killed_kinds[some] = true
+	check(CodexPanel.enemy_note(some).contains("Appears from"), "after it, it tells")
+	var notes := PackedStringArray()
+	for id: String in ZombieDefs.ALL:
+		Game.killed_kinds[id] = true
+		if CodexPanel.enemy_note(id).contains("166:"): notes.append(id)
+	check(notes.is_empty(), "no enemy appears from 166:39 (%s)" % ", ".join(notes))
+	for id: String in ["leviathan", "kraken", "hollow_sovereign"]:
+		check(str(ZombieDefs.ALL[id]["icon"]).ends_with("+crown") and CodexPanel.enemy_note(id).ends_with("Boss encounter"), "%s wears the boss crown and is a boss encounter" % id)
+	check(CodexPanel.enemy_note("harbourmaster").ends_with("Miniboss encounter"), "the Harbourmaster is a miniboss encounter")
+	Game.killed_kinds = kills
 
 
 func _bear() -> void:
@@ -629,9 +647,9 @@ func _flyers() -> void:
 	var fell_from := first.position.y
 	await seconds(0.4)
 	check(first.position.y < fell_from - 1.0, "and falls")
-	war.hp = war.max_hp * 0.45
-	await seconds(0.3)
-	check(w.count_type("eagle") >= 2, "and below half health it calls eagles")
+	war.take_damage(war.hp - war.max_hp * 0.45, Vector3.ZERO, 0.0, war.centre())
+	await frames(1)
+	check(w.count_type("eagle") >= 2, "and the blow that takes it below half health calls eagles, at once")
 	war.take_damage(war.hp + 1.0, Vector3.ZERO, 0.0, war.centre())
 	check(not second.is_alive(), "when the War Wyvern falls, its rider falls with it")
 

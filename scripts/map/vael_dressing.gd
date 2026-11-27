@@ -557,6 +557,14 @@ static var _spark_mesh: QuadMesh
 static func sparks(b: MapBuilder, local: Vector3, spread: float) -> void:
 	if b.is_preview or b.quality == 0:
 		return
+	var p := spark_emitter(spread)
+	p.position = b.xf * local
+	b.w.add_child(p)
+	b.w.add_scenery(p, 50.0)
+
+
+## The sparks off a fire, as an emitter to place (a Fontanova brazier lit at night uses one too).
+static func spark_emitter(spread: float) -> CPUParticles3D:
 	if _spark_mesh == null:
 		_spark_mesh = QuadMesh.new()
 		_spark_mesh.size = Vector2(0.07, 0.07)
@@ -587,11 +595,9 @@ static func sparks(b: MapBuilder, local: Vector3, spread: float) -> void:
 	ramp.set_color(0, Color(1, 1, 1, 1))
 	ramp.set_color(ramp.get_point_count() - 1, Color(1, 0.4, 0.1, 0))
 	p.color_ramp = ramp
-	p.position = b.xf * local
 	p.visibility_range_end = 60.0
 	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	b.w.add_child(p)
-	b.w.add_scenery(p, 50.0)
+	return p
 
 
 ## A roadside shrine of the Tide: a little stone niche on a post, a small figure of a Tide King in it,

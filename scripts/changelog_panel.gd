@@ -24,7 +24,7 @@ const CATEGORIES := [
 	[["store", "armory", "shop", "doubloon", "prize", "leaderboard", "redeem"], "Store", "crown", Color("e8c25a")],
 	[["boss", "enem", "creature", "wild", "beast", "wyvern", "bear", "words"], "Enemies", "skull", Color("d8604a")],
 	[["class", "upgrade", "path", "weapon", "beastmaster", "abilit", "familiar", "item", "found"], "Classes and items", "up", Color("efa93f")],
-	[["map", "valley", "bastion", "mists", "village", "fort", "world", "mesenlla", "vael", "harbour", "tide", "lantern"], "Maps", "compass", Color("a880ff")],
+	[["map", "valley", "bastion", "mists", "village", "fort", "world", "mesenlla", "vael", "harbour", "tide", "lantern", "fontanova", "island", "archipelago"], "Maps", "compass", Color("a880ff")],
 	[["screen", "menu", "icon", "look", "graphic", "performance", "sound", "music", "number", "seeing", "hud", "changelog", "setting", "control"], "Look and feel", "eye", Color("8fb0e6")],
 ]
 const OTHER := ["", "Changes", "plus", Color("a9b0bd")]

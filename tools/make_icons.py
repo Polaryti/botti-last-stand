@@ -847,11 +847,301 @@ def lodge_hunter():
         + line("#c9a24a", 2.6, (40, 82), (42, 89), ink=False) + line("#c9a24a", 2.6, (52, 77), (56, 84), ink=False))
 PLAIN.append(lodge_hunter)
 
+# --- The creatures of Fontanova ------------------------------------------------------------------
+AMBER = ("#ffd65a", "#c97a12"); CHITIN = ("#3a3030", "#120c0c"); WINGS = "#e8f6ff"; WASP_RED = ("#ff6a48", "#9a1810")
+GOD_GLOW = ("#fff2c0", "#ffae2e"); SHELL = ("#d8b48a", "#7a4e2a"); LIME = ("#efe4cc", "#9a8a6a")
+
+def _wing(x, y, rx, ry, rot):
+    return ell(WINGS, x, y, rx, ry, rot, 2).replace("/>", ' fill-opacity="0.7"/>')
+
+def mutant_bee():
+    # A great bee in a dive: amber and black bands, blurred wings, its stinger curled forward.
+    return (_wing(36, 30, 20, 10, -30) + _wing(62, 28, 18, 9, 30)
+        + path(AMBER, "M30 50 C30 36 46 32 58 38 C74 44 84 58 80 72 C76 84 60 84 48 76 C38 68 30 60 30 50Z")
+        + "".join(curve(CHITIN[1], 6, d, ink=False) for d in ("M50 38 C44 50 46 66 54 76", "M64 44 C58 56 60 70 68 80"))
+        + poly(CHITIN, (74, 78), (88, 94), (78, 80), w=2)
+        + circ(CHITIN, 26, 46, 12) + ell(("#ffb060", "#a03a10"), 21, 44, 4.6, 6, 20, 1.4)
+        + line(CHITIN[1], 2.4, (22, 36), (14, 22), ink=False) + line(CHITIN[1], 2.4, (28, 35), (26, 18), ink=False))
+PLAIN.append(mutant_bee)
+
+def beehive():
+    # A great comb over an olive stump: hexagon cells, a few aglow with the god's light, honey running.
+    def hexa(x, y, r, c):
+        return poly(c, *[(x + r * math.cos(math.radians(60 * k + 30)), y + r * math.sin(math.radians(60 * k + 30))) for k in range(6)], w=1.6)
+    cells = ""
+    for row in range(5):
+        for col in range(4 + (row % 2 == 0)):
+            x = 22 + col * 13 + (0 if row % 2 == 0 else 6.5)
+            y = 22 + row * 11
+            lit = (row, col) in ((1, 1), (2, 3), (3, 0), (0, 2))
+            cells += hexa(x, y, 6.6, GOD_GLOW if lit else AMBER)
+    return (path(WOOD, "M30 90 C34 80 36 74 34 66 L66 66 C64 74 66 80 72 90Z")
+        + path(("#e0a43a", "#7a4a12"), "M14 46 C10 20 30 8 50 8 C70 8 90 20 86 46 C84 64 70 74 50 74 C30 74 16 64 14 46Z")
+        + f'<clipPath id="comb"><path d="M14 46 C10 20 30 8 50 8 C70 8 90 20 86 46 C84 64 70 74 50 74 C30 74 16 64 14 46Z"/></clipPath>'
+        + f'<g clip-path="url(#comb)">{cells}</g>'
+        + path(("#ffd040", "#d08010"), "M60 70 C62 78 58 84 62 92 C64 96 68 94 66 88 C64 82 66 76 64 70Z", 1.4)
+        + at(84, 82, 0.2, mutant_bee()) + at(16, 84, 0.16, mutant_bee()))
+PLAIN.append(beehive)
+
+def mutant_wasp():
+    # A red-and-black wasp side on, its abdomen arched under to shoot, the stinger flying ahead.
+    return (_wing(48, 26, 20, 8, -15) + _wing(60, 30, 16, 7, 10)
+        + path(WASP_RED, "M52 44 C64 44 74 52 76 62 C78 74 70 84 60 86 C54 80 54 70 58 62 C56 54 52 50 52 44Z")
+        + "".join(curve(CHITIN[1], 4.4, d, ink=False) for d in ("M70 52 C64 58 62 66 64 74", "M76 64 C70 70 66 76 66 84"))
+        + ell(CHITIN, 42, 46, 12, 8, 0) + circ(WASP_RED, 22, 44, 10)
+        + ell("#1a0a0a", 18, 41, 3.8, 5, 20, 0) + path(CHITIN, "M12 50 L4 56 L14 54Z", 1.4)
+        + line(CHITIN[1], 2.4, (36, 52), (30, 66), ink=False) + line(CHITIN[1], 2.4, (44, 54), (42, 70), ink=False)
+        + poly(BONE, (60, 88), (30, 94), (56, 82), w=1.6) + line("#ffffff", 1.4, (28, 94), (16, 96), ink=False))
+PLAIN.append(mutant_wasp)
+
+def _snail_body(x0=8, x1=92):
+    return path(("#a09078", "#4a3e30"), f"M{x0} 84 C{x0} 72 20 66 34 68 L80 70 C88 72 {x1} 78 {x1} 86 L{x0} 88Z")
+
+def mutant_snail():
+    # A boar-sized snail: its spiral shell split by seams that glow green on one side and ember on the other.
+    return (_snail_body()
+        + path(SHELL, "M28 72 C18 50 30 20 56 18 C80 18 90 40 84 58 C78 74 58 80 44 74 C36 72 30 74 28 72Z")
+        + curve("#7a4e2a", 2.4, "M44 74 C32 68 32 52 42 46 C52 40 62 48 58 56", ink=False)
+        + curve("#9cf06a", 3.2, "M40 70 C30 56 36 34 56 30 C74 28 82 46 76 58", ink=False)
+        + curve("#ff9a3a", 3.2, "M48 62 C42 54 46 42 56 42 C64 42 68 50 64 56", ink=False)
+        + line("#a09078", 5, (16, 72), (8, 54)) + line("#a09078", 5, (20, 72), (18, 52))
+        + circ("#1a1410", 8, 52, 3, 0) + circ("#1a1410", 18, 50, 3, 0)
+        + path(("#b8f07a", "#3a8a20"), "M60 94 C70 90 84 92 96 90 L96 98 L58 98Z", 1.2).replace("/>", ' opacity="0.8"/>'))
+PLAIN.append(mutant_snail)
+
+def wasp_hive_snail():
+    # A snail carrying a paper wasps' nest for its shell, a wasp crawling out of the hole.
+    layers = "".join(curve("#8a7a64", 2, f"M{30 + k} {34 + k * 9} C46 {28 + k * 9} 66 {28 + k * 9} {80 - k} {36 + k * 9}", ink=False) for k in range(4))
+    return (_snail_body()
+        + path(("#e6dcc8", "#8a7a5e"), "M26 72 C20 48 34 14 56 14 C78 14 88 42 82 64 C78 74 64 78 50 76 C38 76 30 76 26 72Z")
+        + layers + ell("#1a1208", 58, 56, 8, 6, 0, 2)
+        + at(66, 46, 0.3, mutant_wasp())
+        + line("#a09078", 5, (16, 72), (8, 54)) + line("#a09078", 5, (20, 72), (18, 52))
+        + circ("#1a1410", 8, 52, 3, 0) + circ("#1a1410", 18, 50, 3, 0))
+PLAIN.append(wasp_hive_snail)
+
+def mutant_spider():
+    # A long-legged spider head down on a trunk, legs splayed round it, eyes aglow, a thread above.
+    legs = ""
+    for k, (dx, dy, ex, ey) in enumerate(((-14, -6, -42, -30), (-16, 0, -44, -4), (-15, 6, -42, 22), (-12, 10, -34, 42))):
+        for sgn in (-1, 1):
+            kx, ky = 50 + sgn * (-dx + 10), 50 + dy - 14
+            legs += line(CHITIN[1], 3.6, (50 + sgn * -dx * 0.4, 50 + dy * 0.6), (kx, ky), (50 + sgn * -ex, 50 + ey))
+    return (rect(WOOD, 40, -2, 20, 104, 4, 2.4).replace("/>", ' opacity="0.9"/>')
+        + line("#e9eef5", 1.4, (50, 0), (50, 26), ink=False)
+        + legs
+        + ell(("#5a4a3a", "#1a1410"), 50, 40, 12, 15, 0) + "".join(curve("#c9a040", 2, f"M{44 + k * 4} 30 L{44 + k * 4} 50", ink=False) for k in range(4))
+        + circ(("#5a4a3a", "#1a1410"), 50, 62, 9)
+        + "".join(circ("#ffcf4a", x, y, 1.8, 0) for x, y in ((46, 64), (54, 64), (48, 68), (52, 68)))
+        + poly(BONE, (45, 70), (47, 76), (49, 70), w=1) + poly(BONE, (51, 70), (53, 76), (55, 70), w=1))
+PLAIN.append(mutant_spider)
+
+def battle_ostrich():
+    # An ostrich's head and long neck in a bronze war-harness: a crested headpiece, beak open, eye wild.
+    return (path(("#4a3a30", "#1a120c"), "M18 98 C20 80 30 70 40 62 C48 56 50 44 46 32 L56 30 C62 46 58 62 48 74 C40 84 36 92 36 98Z")
+        + path(("#e6d0b0", "#8a6a4a"), "M46 34 C42 20 52 10 64 12 C74 14 78 24 74 32 C68 36 56 38 46 34Z")
+        + path(BRASS, "M44 30 C46 20 54 14 64 14 L70 24 C62 22 52 26 48 34Z", 2)
+        + path(("#ff6a48", "#9a1810"), "M56 14 C54 4 62 0 70 6 C64 6 62 10 62 14Z", 1.6)
+        + path(("#e8c070", "#8a5a20"), "M72 22 L96 28 L74 32Z", 2) + line(INK, 1.4, (74, 27), (92, 28), ink=False)
+        + circ("#fff4d0", 64, 22, 4, 1.4) + circ("#a01010", 65, 22, 1.8, 0)
+        + path(BRASS, "M36 66 C44 60 52 60 58 66 L54 74 C48 70 42 70 38 74Z", 2)
+        + "".join(circ(BRASS, x, y, 2.2, 1.2) for x, y in ((40, 70), (48, 67), (55, 70))))
+PLAIN.append(battle_ostrich)
+
+def ember_moth():
+    # A great moth with its wings spread, eye-spots blazing, dust burning off its wingtips.
+    spot = lambda x, y: circ(("#ffe08a", "#e2301a"), x, y, 7, 1.6) + circ("#1a0a08", x, y, 3, 0)
+    return (path(("#a0784a", "#4a2e1a"), "M50 46 C36 20 14 12 6 22 C2 40 18 54 46 54Z")
+        + path(("#a0784a", "#4a2e1a"), "M50 46 C64 20 86 12 94 22 C98 40 82 54 54 54Z")
+        + path(("#8a5a3a", "#3a2010"), "M48 54 C30 56 16 70 22 84 C32 86 44 74 50 60Z")
+        + path(("#8a5a3a", "#3a2010"), "M52 54 C70 56 84 70 78 84 C68 86 56 74 50 60Z")
+        + spot(26, 34) + spot(74, 34)
+        + ell(("#d8b48a", "#6a4a2a"), 50, 52, 5, 18, 0)
+        + curve("#d8b48a", 2, "M48 36 C44 26 38 22 34 22", ink=False) + curve("#d8b48a", 2, "M52 36 C56 26 62 22 66 22", ink=False)
+        + "".join(circ("#ffb52e", x, y, r, 0).replace("/>", ' opacity="0.8"/>') for x, y, r in ((8, 12, 2.4), (14, 6, 1.6), (92, 12, 2.4), (86, 6, 1.6), (4, 30, 1.6), (96, 30, 1.6))))
+PLAIN.append(ember_moth)
+
+def thornback():
+    # A cart-sized tortoise, its shell grown into limestone thorns, its old head low and forward.
+    thorns = "".join(poly(LIME, (x - 6, y + 4), (x + tx, y - 18), (x + 6, y + 4), w=2) for x, y, tx in ((24, 54, -6), (36, 42, -3), (50, 38, 0), (64, 42, 3), (76, 54, 6)))
+    return (path(("#8a7a60", "#3a3020"), "M16 74 L12 90 L26 90 L28 76Z") + path(("#8a7a60", "#3a3020"), "M62 76 L64 90 L78 90 L74 74Z")
+        + path(("#8a7a60", "#3a3020"), "M74 68 C80 56 94 54 98 64 C100 74 92 80 82 78Z")
+        + circ("#fff1c8", 90, 64, 2.6, 1.2) + circ(INK, 90.6, 64, 1.2, 0)
+        + path(("#c8b898", "#6a5a40"), "M8 76 C8 52 28 40 50 40 C72 40 88 54 86 76Z")
+        + "".join(curve("#6a5a40", 2.2, d, ink=False) for d in ("M24 76 L32 56 L50 50 L68 56 L74 76", "M32 56 L16 64", "M68 56 L82 64", "M50 50 L50 76"))
+        + thorns
+        + line("#5a4a30", 4, (8, 77), (86, 77)))
+PLAIN.append(thornback)
+
+# The cult of Al'quimelea: heads, each told by what it wears.
+LINEN_C = ("#efe6d2", "#9c8f74"); WAX_C = ("#f6d77a", "#b9862a"); VIOLET_C = ("#a26bd8", "#3e1a6a"); BRONZE_C = ("#f0b45a", "#7a4818")
+
+def _violet_eyes(y, xs=(38, 62), w_=12):
+    return "".join(rect("#e8c8ff", x - w_ / 2, y - 1.6, w_, 3.2, 1.2, 0) for x in xs)
+
+def cult_worshipper():
+    # A linen hood over a wax mask pressed with honeycomb, its slit eyes lit violet, a violet stole.
+    cells = "".join(poly(("#e8c060", "#a87a20"), *[(x + 4.2 * math.cos(a * math.pi / 3), y + 4.2 * math.sin(a * math.pi / 3)) for a in range(6)], w=1)
+        for x, y in ((40, 40), (50, 36), (60, 40), (45, 62), (55, 62)))
+    return (path(LINEN_C, "M14 96 C14 70 22 58 30 54 L70 54 C78 58 86 70 86 96Z")
+        + rect(VIOLET_C, 34, 60, 9, 38, 2, 2) + rect(VIOLET_C, 57, 60, 9, 38, 2, 2)
+        + path(LINEN_C, "M18 62 C10 30 30 4 54 6 C70 8 76 2 84 0 C80 12 86 22 84 40 C82 54 78 62 72 66 L28 66Z")
+        + ell(WAX_C, 50, 46, 20, 22, 0, 2.4) + cells
+        + rect(BRONZE_C, 30, 30, 40, 4, 1.5, 1.6)
+        + _violet_eyes(48) + poly(WAX_C, (44, 66), (50, 76), (56, 66), w=1.6))
+PLAIN.append(cult_worshipper)
+
+def cult_priest():
+    # A hood woven like a bee-skep, a violet veil in strips, one violet eye at the brow; a green vial.
+    rings = "".join(path(("#e8c068", "#8a6020"), f"M{50 - r} {y} C{50 - r} {y - 8} {50 + r} {y - 8} {50 + r} {y} L{50 + r - 2} {y + 9} C{50 + r - 2} {y + 2} {50 - r + 2} {y + 2} {50 - r + 2} {y + 9}Z", 1.6)
+        for r, y in ((34, 64), (32, 54), (29, 44), (25, 34), (19, 24), (12, 15)))
+    veil = "".join(rect(VIOLET_C, 30 + k * 7, 50, 6, 22 + (k % 2) * 5, 1, 1.2) for k in range(6))
+    return (path(VIOLET_C, "M12 98 C14 80 24 72 36 70 L64 70 C76 72 86 80 88 98Z")
+        + rings + veil + rect(BRONZE_C, 28, 48, 44, 4, 1, 1.4)
+        + circ(BRONZE_C, 50, 38, 7, 1.6) + circ(("#f0d8ff", "#9a4af0"), 50, 38, 4.4, 0)
+        + rect(("#d8ffb0", "#3c9a2a"), 74, 74, 9, 16, 3, 1.8) + rect(LEATHER, 75, 70, 7, 5, 1, 1.2))
+PLAIN.append(cult_priest)
+
+def cult_guardian():
+    # A closed bronze helmet, a ridge of black plumes, violet eyes in the T of its face.
+    plumes = "".join(poly(("#3a3440", "#0e0c12"), (x - 4, 26), (x + 2, 2 + abs(x - 50) * 0.15), (x + 4, 26), w=1.4) for x in range(28, 76, 6))
+    return (plumes + rect(BRONZE_C, 26, 24, 48, 6, 2, 1.6)
+        + path(BRONZE_C, "M20 58 C18 30 32 24 50 24 C68 24 82 30 80 58 L78 90 L60 92 L56 66 L44 66 L40 92 L22 90Z")
+        + path(("#1a1418", "#000000"), "M30 46 L70 46 L70 52 L54 52 L54 72 L46 72 L46 52 L30 52Z", 1)
+        + _violet_eyes(49, (38, 62), 11)
+        + curve("#7a4818", 2.2, "M24 40 C40 34 60 34 76 40", ink=False)
+        + poly(VIOLET_C, (50, 30), (55, 33), (55, 38), (50, 41), (45, 38), (45, 33), w=1.4))
+PLAIN.append(cult_guardian)
+
+def ostrich_rider():
+    # The Guardian's helmet behind the war-bird's head, the bird's neck reaching forward.
+    return (at(36, 50, 0.72, cult_guardian()) + at(66, 54, 0.7, battle_ostrich()))
+PLAIN.append(ostrich_rider)
+
+GOLD_C = ("#ffe08a", "#a8721c"); CRIMSON_C = ("#e0503c", "#6a1010")
+
+def hierophant():
+    # The Hierophant: a tall crowned skep-mitre, a golden mask with a third eye lit at its brow.
+    rings = "".join(path(("#e8c068", "#8a6020"), f"M{50 - r} {y} C{50 - r} {y - 7} {50 + r} {y - 7} {50 + r} {y} L{50 + r - 2} {y + 8} C{50 + r - 2} {y + 2} {50 - r + 2} {y + 2} {50 - r + 2} {y + 8}Z", 1.4)
+        for r, y in ((30, 56), (28, 47), (25, 38), (22, 29), (18, 21), (13, 13)))
+    crown = "".join(poly(GOLD_C, (50 + dx - 4, 60), (50 + dx, 50 - (6 if dx == 0 else 0)), (50 + dx + 4, 60), w=1.2) for dx in (-24, -16, -8, 0, 8, 16, 24))
+    return (path(VIOLET_C, "M10 98 C12 80 22 72 34 70 L66 70 C78 72 88 80 90 98Z") + path(GOLD_C, "M24 98 L30 76 L70 76 L76 98Z", 1.4)
+        + rings + poly(GOLD_C, (46, 8), (50, 0), (54, 8), w=1.2) + crown
+        + ell(GOLD_C, 50, 72, 19, 20, 0, 2.4)
+        + _violet_eyes(72, (42, 58), 9) + circ(("#f0d8ff", "#9a4af0"), 50, 63, 3.6, 1.2)
+        + rect(GOLD_C, 46, 74, 8, 10, 2, 1.2))
+PLAIN.append(hierophant)
+
+def polemarch():
+    # The Polemarch: a closed gilded helmet, its crimson crest set crosswise, over the top of a tower shield.
+    crest = "".join(poly(CRIMSON_C, (x - 4, 28), (x + (x - 50) * 0.18, 4 + abs(x - 50) * 0.3), (x + 4, 28), w=1.3) for x in range(14, 90, 6))
+    return (rect(CRIMSON_C, 8, 66, 84, 34, 6, 2.4) + rect(GOLD_C, 8, 66, 84, 6, 2, 1.6)
+        + crest + rect(GOLD_C, 12, 24, 76, 7, 2, 1.6)
+        + path(BRONZE_C, "M20 60 C18 32 32 26 50 26 C68 26 82 32 80 60 L78 84 L60 86 L56 64 L44 64 L40 86 L22 84Z")
+        + path(("#1a1418", "#000000"), "M30 44 L70 44 L70 50 L54 50 L54 68 L46 68 L46 50 L30 50Z", 1)
+        + _violet_eyes(47, (38, 62), 11) + rect(GOLD_C, 47, 28, 6, 18, 1.5, 1.2)
+        + poly(GOLD_C, (50, 82), (58, 87), (58, 95), (50, 100), (42, 95), (42, 87), w=1.4))
+PLAIN.append(polemarch)
+
+def alquimelea():
+    # Al'quimelea: its long golden mask, cracked, three eyes lit violet, a crown of rays behind it, and
+    # the crucible glowing green under its chin.
+    rays = "".join(poly(GOLD_C if k % 2 == 0 else ("#c08030", "#5a3a10"), (50 + 30 * math.sin(a - 0.08), 52 - 30 * math.cos(a - 0.08)), (50 + 48 * math.sin(a), 52 - 48 * math.cos(a)), (50 + 30 * math.sin(a + 0.08), 52 - 30 * math.cos(a + 0.08)), w=1.2)
+        for k, a in enumerate([-1.4 + i * (2.8 / 10) for i in range(11)]))
+    return (rays + ell(("#3a1e48", "#120818"), 50, 52, 28, 34, 0, 2)
+        + ell(GOLD_C, 50, 50, 21, 30, 0, 2.4)
+        + curve("#1a0a1a", 1.6, "M52 22 L49 32 L53 40 L48 52 L51 60", ink=False)
+        + _violet_eyes(48, (41, 59), 9) + circ(("#f0d8ff", "#9a4af0"), 50, 36, 3.6, 1.2)
+        + rect(GOLD_C, 46, 52, 8, 12, 2, 1.2)
+        + circ(("#d8ffb0", "#2c9a2a"), 50, 88, 9, 2) + curve("#a8721c", 2.4, "M39 88 A11 11 0 1 0 61 88 A11 11 0 1 0 39 88", ink=False))
+PLAIN.append(alquimelea)
+
+# Fontanova's weapons
+BRONZE_W = ("#f0b870", "#7a4a1c"); RESIN_W = ("#ffe08a", "#e07a10"); OLIVE_W = ("#d0a46a", "#6a4422"); MARBLE_W = ("#ffffff", "#c8c2b4")
+
+def censer_flail():
+    # A turned haft, its chain, and the pierced bronze censer swinging out, embers glowing through it.
+    links = "".join(ell("none", 46 + i * 5, 34 + i * 6, 3.2, 2.2, 40, 2.6) for i in range(4))
+    holes = "".join(circ(RESIN_W, x, y, 3.2, 1) for x, y in ((60, 72), (70, 70), (80, 72), (66, 62), (76, 62)))
+    return (line("#a87a48", 7, (12, 94), (40, 30)) + "".join(line("#5a2c6a", 7, a, b, ink=False) for a, b in (((18, 80), (20, 76)), ((24, 66), (26, 62))))
+        + circ(BRONZE_W, 42, 26, 6, 2.4) + links
+        + path(BRONZE_W, "M52 60 C52 52 88 52 88 60 C90 76 82 88 70 88 C58 88 50 76 52 60Z") + holes
+        + path(BRONZE_W, "M54 58 C56 44 84 44 86 58Z", 2.4) + poly(GOLD, (66, 44), (70, 34), (74, 44), w=2)
+        + curve("#e0d8c8", 3, "M72 32 C66 24 76 18 70 10", ink=False) + curve("#e0d8c8", 2.4, "M60 46 C56 38 64 34 60 26", ink=False))
+def resin_repeater():
+    # A crossbow seen from above at a slant: its olive stock, the tall box of bolts on it, a horn prod.
+    return (path(("#f0e4c8", "#9c8a62"), "M10 40 C26 30 40 28 50 32 C60 28 74 30 90 40 L86 46 C74 38 62 38 50 40 C38 38 26 38 14 46Z")
+        + line("#fff4d8", 1.6, (12, 44), (50, 72), (88, 44), ink=False)
+        + path(OLIVE_W, "M44 34 L56 34 L60 96 L40 96Z") + rect(BRONZE_W, 38, 46, 24, 28, 3) + "".join(line("#7a4a1c", 2, (38, y), (62, y), ink=False) for y in (54, 62))
+        + "".join(poly(RESIN_W, (x - 3, 46), (x, 38), (x + 3, 46), w=1.4) for x in (44, 50, 56))
+        + rect(RESIN_W, 46, 26, 8, 8, 2, 2))
+def ruin_greataxe():
+    # A long dark haft, a double crescent head with white edges, and a spike on top.
+    return (line("#6a4226", 7, (50, 98), (50, 22)) + "".join(line("#f0b870", 8, a, b, ink=False) for a, b in (((50, 86), (50, 82)), ((50, 50), (50, 46))))
+        + path(DSTEEL, "M46 22 C30 18 16 12 8 4 C2 20 2 42 8 56 C18 46 32 42 46 40Z") + path(DSTEEL, "M54 22 C70 18 84 12 92 4 C98 20 98 42 92 56 C82 46 68 42 54 40Z")
+        + curve("#ffffff", 3.4, "M8 6 C3 20 3 42 8 54", ink=False) + curve("#ffffff", 3.4, "M92 6 C97 20 97 42 92 54", ink=False)
+        + rect(DARK, 44, 18, 12, 26, 2) + poly(STEEL, (46, 18), (50, 2), (54, 18)) + rect(GOLD, 47, 26, 6, 8, 1, 1.4))
+for g in (censer_flail, resin_repeater, ruin_greataxe):
+    PLAIN.append(g)
+
+# The Ascendant
+ICHOR_C = ("#e4e88a", "#5a6012"); CHANGE_C = ("#d8ffb0", "#2c9a2a"); HALO_C = ("#fff6c8", "#d8a83a")
+
+def ascend():
+    # Ascend: a figure's rise drawn as a golden chevron climbing out of cracked ground, with light above.
+    return (path(ROCK, "M4 92 L34 80 L42 88 L58 78 L66 86 L96 92 L96 98 L4 98Z", 2.4)
+        + curve("#2a2418", 2, "M42 88 L46 94 M58 78 L56 70", ink=False)
+        + poly(HALO_C, (50, 8), (82, 44), (64, 44), (64, 72), (36, 72), (36, 44), (18, 44))
+        + line("#ffffff", 2.4, (50, 16), (70, 38), ink=False)
+        + "".join(line("#fff6c8", 3, (x, 74), (x, 82), ink=False) for x in (40, 50, 60)))
+def deicide():
+    # Deicide: an axe coming down on a cracked halo.
+    return (circ("none", 50, 66, 26, 7) + circ("none", 50, 66, 26, 4).replace('stroke="#12141c"', 'stroke="#ffe08a"')
+        + curve("#12141c", 4, "M44 38 L52 52 L46 62 L56 74 L50 92", ink=False)
+        + at(56, 40, 0.74, turn(-30, ruin_greataxe())))
+def elixir():
+    # The Elixir of Change: a round flask of green elixir with a gold stopper, violet light swirling in it.
+    return (path(CHANGE_C, "M38 30 L62 30 L62 42 C80 48 88 62 86 74 C84 90 70 96 50 96 C30 96 16 90 14 74 C12 62 20 48 38 42Z")
+        + curve("#c07af0", 3.4, "M26 74 C34 62 48 66 52 74 C56 82 68 82 74 70", ink=False)
+        + circ("#ffffff", 34, 60, 4, 0) + rect(GOLD, 34, 18, 32, 14, 3) + poly(GOLD, (42, 18), (50, 6), (58, 18), w=2.4)
+        + "".join(circ(("#f0ffe0", "#7ad060"), x, y, r, 1.4) for x, y, r in ((70, 22, 4), (78, 10, 3), (24, 16, 3))))
+def rite_break():
+    # A broken attack: a ring of holy light split by a crack, its pieces falling away.
+    return (path(HALO_C, "M50 10 A40 40 0 0 1 88 40 L76 44 A28 28 0 0 0 50 22Z") + path(HALO_C, "M90 52 A40 40 0 0 1 50 90 L50 78 A28 28 0 0 0 78 56Z")
+        + path(HALO_C, "M44 90 A40 40 0 0 1 10 50 L22 50 A28 28 0 0 0 44 78Z") + path(HALO_C, "M10 42 A40 40 0 0 1 40 11 L42 23 A28 28 0 0 0 22 42Z")
+        + curve("#12141c", 4, "M50 30 L44 44 L56 54 L48 70", ink=False) + poly(VIO, (60, 30), (66, 22), (70, 32), w=1.6) + poly(VIO, (30, 66), (24, 76), (36, 74), w=1.6))
+def honeycomb():
+    # A piece of wild comb: golden hexagons, some capped, honey dripping, and two bees about it.
+    cells = "".join(poly(("#ffd870", "#c07a10") if (i % 3) else ("#ffeaa0", "#d08a20"), *[(x + 13 * math.cos(math.pi / 6 + k * math.pi / 3), y + 13 * math.sin(math.pi / 6 + k * math.pi / 3)) for k in range(6)], w=2.4)
+        for i, (x, y) in enumerate(((50, 48), (28, 36), (72, 36), (28, 60), (72, 60), (50, 24), (50, 72))))
+    def bee(x, y, r):
+        return at(x, y, 0.3, turn(r, ell(("#ffe070", "#c08010"), 50, 50, 24, 16) + line("#12141c", 6, (44, 36), (44, 64), ink=False) + line("#12141c", 6, (58, 38), (58, 62), ink=False)
+            + ell(("#ffffff", "#bcd8f0"), 46, 26, 12, 8, -20, 2) + ell(("#ffffff", "#bcd8f0"), 60, 26, 12, 8, 20, 2)))
+    return (cells + path(("#ffd040", "#e08a10"), "M44 82 C44 90 48 96 50 96 C52 96 56 90 56 82Z", 2.4) + bee(82, 16, 20) + bee(16, 84, -30))
+def mystery_flask():
+    # A pear-shaped flask, violet below and green above, a gold-wired cork and a red wax seal on a cord.
+    return (path(("#a070ff", "#4a1ca0"), "M40 30 L60 30 L60 40 C80 48 86 64 82 78 C78 92 66 96 50 96 C34 96 22 92 18 78 C14 64 20 48 40 40Z")
+        + path(("#a8f0a0", "#2c9a2a"), "M40 40 C28 46 20 56 20 64 L80 64 C80 56 72 46 60 40Z", 2)
+        + circ("#ffffff", 32, 74, 4, 0) + rect(("#c08a52", "#6f4522"), 40, 18, 20, 14, 3) + line("#ffe08a", 2.4, (38, 22), (62, 22), ink=False)
+        + curve("#5a3a20", 2.4, "M60 34 C72 40 78 50 78 56", ink=False) + circ(("#ff8080", "#a01020"), 80, 60, 7, 2) + curve("#ffffff", 3, "M46 6 C42 12 54 12 50 16", ink=False))
+for g in (honeycomb, mystery_flask):
+    PLAIN.append(g)
+
+def crest_ascendant():
+    # An olive-gold shield cut like a temple's pediment, a broken halo over it and the greataxe upright.
+    return (path(ICHOR_C, "M50 4 L96 30 L90 78 L50 98 L10 78 L4 30Z", 4)
+        + curve("#fff0b0", 6, "M26 50 A25 25 0 0 1 56 20") + curve("#fff0b0", 6, "M66 24 A25 25 0 0 1 72 60")
+        + at(50, 58, 0.72, ruin_greataxe()))
+for g in (ascend, deicide, elixir, rite_break):
+    PLAIN.append(g)
+CRESTS.append(crest_ascendant)
+
 # Specializations: a lozenge in the class's colour, and what makes that path itself.
 COL = {"commander": ("#e4bf61", "#69441d"), "infantry": ("#d9483a", "#7c1414"), "ranger": ("#5fb24d", "#1c5a2c"), "heavy": ("#9aa5ba", "#3f485c"), "chivalry": ("#f4c94e", "#a86a10"),
     "magician": ("#a86bff", "#3a1786"), "revenant": ("#3ec7c0", "#0e4d57"), "artificer": ("#d99a45", "#6d4315"), "monk": ("#ffb040", "#b25a10"),
     "plague_doctor": ("#6c7e54", "#1f2a1a"), "adept": ("#5f73d8", "#1b2368"), "bandit": ("#a8577f", "#3d1430"), "cartographer": ("#5aa6e8", "#163f78"),
-    "harpooner": ("#3f74a8", "#102640"), "tidecaller": ("#36c6b8", "#0d4a46"), "ferryman": ("#c8bf9e", "#3a3428")}
+    "harpooner": ("#3f74a8", "#102640"), "tidecaller": ("#36c6b8", "#0d4a46"), "ferryman": ("#c8bf9e", "#3a3428"),
+    "ascendant": ("#c8cc5a", "#3e4410")}
 
 def lozenge(cls, inner):
     return rect(COL[cls], 7, 7, 86, 86, 18, 4) + rect("none", 13, 13, 74, 74, 13, 1.6) + inner
@@ -908,6 +1198,8 @@ SPECS = {
     "reaver": ("harpooner", lambda: at(46, 54, 0.66, turn(-20, cutlass())) + at(74, 30, 0.34, drop()) + at(26, 30, 0.22, drop())),
     "rigger": ("harpooner", lambda: line("#e8d6a8", 5, (14, 70), (86, 38)) + rect(WOOD, 10, 62, 8, 30, 2) + rect(WOOD, 82, 30, 8, 30, 2) + at(50, 70, 0.4, rope())),
     "leviathan_hunter": ("harpooner", lambda: at(42, 60, 0.7, leviathan_head()) + at(60, 42, 0.72, turn(-10, harpoon()))),
+    "godslayer": ("ascendant", lambda: at(50, 54, 0.62, alquimelea()) + curve("#12141c", 5, "M40 20 L54 44 L44 60 L58 84", ink=False) + at(62, 46, 0.62, turn(-25, ruin_greataxe()))),
+    "adorer": ("ascendant", lambda: at(50, 40, 0.56, alquimelea()) + at(50, 70, 0.5, elixir())),
     "void_walker": ("adept", lambda: circ(NIGHT, 50, 50, 28) + at(50, 50, 0.7, eye_closed()) + at(74, 26, 0.22, star())),
 }
 

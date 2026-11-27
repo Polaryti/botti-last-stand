@@ -21,7 +21,7 @@ extends MapPiece
 ## where the hunters leave a cache (gate 0 by the camp's fire, gate 1 once the camp is lost);
 ## guild_camp, the fallback camp's fire.
 
-@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way", "barge", "snare", "hunter", "trap_cache", "guild_camp", "vael_spawn") var kind := "loot":
+@export_enum("loot", "poi", "crop", "wood", "yard_wood", "start", "rival", "place", "weapon", "item", "familiar", "dummy", "lane", "muster", "post", "cache", "lane_way", "barge", "snare", "hunter", "trap_cache", "guild_camp", "vael_spawn", "hive") var kind := "loot":
 	set(v):
 		kind = v
 		refresh()
@@ -45,6 +45,9 @@ func build(b: MapBuilder) -> void:
 			if not b.is_preview:
 				b.w.vael_approaches.append(at)
 		"cache": b.w.cache_spots.append(at)
+		"hive":
+			if not b.is_preview:
+				b.w.hive_spots.append(at)
 		"poi": b.w.pois.append(at)
 		"crop": b.w.crop_spots.append(at)
 		"wood": b.w.wood_spots.append(at)

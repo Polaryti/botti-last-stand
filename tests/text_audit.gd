@@ -205,6 +205,26 @@ static func facts() -> Dictionary:
 		"restless_dead": [FerrymanKit.SOUL_AURA_REACH, FerrymanKit.SOUL_AURA],
 		"reaping": [2.0],
 		"gate_of_the_dead": [float(FerrymanKit.GATE_SOULS)],
+		# Ascendant
+		"class:ascendant": [pct(AscendantKit.BANE), AscendantKit.ASCEND_REACH, AscendantKit.ASCEND_RADIUS, AscendantKit.ASCEND_DAMAGE, AscendantKit.ASCEND_STUN],
+		"ichor": [AscendantKit.ICHOR_HEAL],
+		"godslayer_entry": [AscendantKit.DEICIDE_REACH, AscendantKit.DEICIDE_DAMAGE, pct(AscendantKit.EXECUTE_BELOW)],
+		"heavy_fall": [AscendantKit.HEAVY_FALL_RADIUS, AscendantKit.HEAVY_FALL],
+		"headsman": [pct(AscendantKit.HEADSMAN_BELOW)],
+		"godmark": [pct(AscendantKit.GODMARK), AscendantKit.GODMARK_TIME],
+		"trophy": [AscendantKit.TROPHY_HEAL, AscendantKit.TROPHY_CD],
+		"unbowed": [AscendantKit.UNBOWED_REACH, pct(AscendantKit.UNBOWED)],
+		"twilight": [pct(AscendantKit.TWILIGHT_SHARE), AscendantKit.TWILIGHT_REACH],
+		"adorer_entry": [AscendantKit.CHANGED_TIME, pct(AscendantKit.CHANGED_SPEED), AscendantKit.BLOW_DOT, AscendantKit.BLOW_DOT_TIME, AscendantKit.FIELD_TELL, AscendantKit.FIELD_DOT, AscendantKit.FIELD_POISON, AscendantKit.FIELD_ROOT],
+		"mutagen": [pct(AscendantKit.MUTAGEN)],
+		"thick_hide": [pct(AscendantKit.THICK_HIDE)],
+		"transmute": [AscendantKit.TRANSMUTE_HEAL],
+		"alembic": [AscendantKit.ALEMBIC],
+		"crucible_heart": [AscendantKit.CRUCIBLE_DAMAGE, AscendantKit.CRUCIBLE_RADIUS, AscendantKit.CRUCIBLE_BURN],
+		# Fontanova's weapons and finds
+		"weapon:censer_flail": [(WeaponDefs.ALL["censer_flail"]["censer_smoke"] as Vector2).x, (WeaponDefs.ALL["censer_flail"]["censer_smoke"] as Vector2).y],
+		"power:honeycomb": [PowerDefs.COMB_INTERVAL, PowerDefs.COMB_REACH, PowerDefs.COMB_STING, PowerDefs.COMB_POISON.x, PowerDefs.COMB_POISON.y, PowerDefs.COMB_FORAGE],
+		"power:mystery_flask": [float(PowerDefs.ALL["mystery_flask"]["time"]), roundf(1.0 / PowerDefs.FLASK_BAD), PowerDefs.FLASK_POISON],
 		# Commander
 		"composure": [pct(1.0 - CommanderKit.TRAINED_COMMAND_CD / CommanderKit.COMMAND_CD)],
 		"warlock": [WeaponDefs.DAMAGE * 1.8, 0.8, 16.0],
@@ -265,6 +285,19 @@ static func facts() -> Dictionary:
 		"enemy:siren": [VaelMind.SONG_REACH, VaelMind.SONG_PULL],
 		"enemy:kraken": [VaelMind.KRAKEN_SWEEP_REACH, VaelMind.KRAKEN_INK_BLIND, VaelMind.KRAKEN_PULL_REACH, VaelMind.KRAKEN_PULL_TIME, VaelMind.KRAKEN_BROOD],
 		"enemy:press_gang": [VaelMind.NET_HOLD],
+		"enemy:mutant_bee": [FontaMind.STING_POISON],
+		"enemy:beehive": [float(FontaMind.HIVE_RELEASE), float(FontaMind.HIVE_BEES), float(FontaMind.HIVE_HONEY)],
+		"enemy:mutant_wasp": [FontaMind.WASP_POISON],
+		"enemy:mutant_snail": [FontaTrails.TRAIL_LIFE],
+		"enemy:wasp_hive_snail": [FontaMind.NEST_EVERY, float(FontaMind.NEST_WASPS)],
+		"enemy:mutant_spider": [FontaMind.PERCH_WAKE, FontaMind.WEB_ROOT, FontaMind.WEB_POISON],
+		"enemy:ember_moth": [FontaMind.MOTH_TELL, FontaMind.DUST_BLIND],
+		"enemy:cult_worshipper": [CultMind.FERVOUR_REACH, CultMind.FERVOUR_TIME],
+		"enemy:cult_priest": [CultMind.PRIEST_RANGE.x, CultMind.PRIEST_RANGE.y, CultMind.ELIXIR_POISON, CultMind.ELIXIR_SLOW, CultMind.ANOINT_EVERY, CultMind.ANOINT_REACH, CultMind.ANOINT_HASTE],
+		"enemy:cult_guardian": [CultMind.BASH_STUN],
+		"enemy:hierophant": [CultMind.HIERO_RANGE.x, CultMind.HIERO_RANGE.y, 3, CultMind.ELIXIR_POISON, CultMind.ELIXIR_SLOW, CultMind.RITE_EVERY, CultMind.RITE_REACH, CultMind.RITE_COUNT, CultMind.RITE_COUNT, int(Director.HIEROPHANT_AT) / 60, int(Director.HIEROPHANT_AT) % 60],
+		"enemy:polemarch": [CultMind.SPEAR_STUN, roundf(CultMind.PHALANX[0] * 100.0), roundf(CultMind.PHALANX[1] * 100.0), CultMind.PHALANX_COUNT, int(Director.POLEMARCH_AT) / 60, int(Director.POLEMARCH_AT) % 60],
+		"enemy:alquimelea": [int(Director.ALQ_AT) / 60, int(Director.ALQ_AT) % 60, GodMind.RANGE.x, GodMind.RANGE.y, MistSeal.ELIXIR_POISON, MistSeal.ELIXIR_SLOW, GodMind.CHANGE_POISON, GodMind.CHANGE_ROOT, GodMind.NOVA_REACH, GodMind.NOVA_BURN, GodMind.LANCE_SHARDS, GodMind.SHARD_SLOW, GodMind.LANCE_FAN],
 		"enemy:tide_witch": [float(VaelMind.WAVES), VaelMind.WAVE_SLOW, float(VaelMind.RAISE_COUNT)],
 		"enemy:harbourmaster": _clock(Director.HARBOURMASTER_AT),
 		"enemy:lighthouse_keeper": [VaelMind.FLASH_REACH, VaelMind.FLASH_STUN, 2.0] + _clock(Director.KEEPER_AT),
@@ -351,6 +384,9 @@ func run() -> Array[String]:
 		if SpawnRules.is_vael(ZombieDefs.ALL[zid]):
 			_audit("enemy:" + zid, str(ZombieDefs.ALL[zid]["desc"]), [ZombieDefs.ALL[zid], [VaelSkyMind.REACH, VaelSkyMind.RECOVERY, 1.5, 2.0]] if zid in VaelSkyMind.KINDS else [ZombieDefs.ALL[zid]])
 	_audit("power:sunken_crown", str(PowerDefs.ALL[PowerDefs.CROWN]["desc"]), [PowerDefs.CROWN_DAMAGE])
+	_audit("power:oracle_eye", str(PowerDefs.ALL[PowerDefs.EYE]["desc"]), [PowerDefs.EYE_RANGE, roundf((PowerDefs.EYE_DAMAGE - 1.0) * 100.0)])
+	_audit("power:honeycomb", str(PowerDefs.ALL["honeycomb"]["desc"]), [])
+	_audit("power:mystery_flask", str(PowerDefs.ALL["mystery_flask"]["desc"]), [PowerDefs.FLASK_GIFTS])
 	for bid: String in Boons.ALL:
 		_audit("boon:" + bid, str(Boons.ALL[bid]["desc"]), [Boons.ALL[bid].get("add", {})])
 	# Weapons: every number a weapon's words quote (Codex, Armory) is one of its own, or a fact.

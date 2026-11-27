@@ -38,6 +38,7 @@ var poison := Vector2.ZERO # damage per second, and seconds
 var stagger := 0.0
 var pins := 0.0 # a Whaler's Harpoon: seconds it holds what it strikes to the spot
 var tether := false # ...and where it ends up, it lies until its owner takes it back
+var vs_flyers := 1.0 # the Resin Repeater's bolts: how much harder they strike what flies
 var harpoon_mark := false # a Harpooner's harpoon: what it strikes is marked and torn (HarpoonerKit)
 ## A Highwayman's Toll knife (CrownUpgrades): it gleams gold, and what it pins pays when it dies.
 var toll := false:
@@ -126,6 +127,7 @@ func launch(k: int, m: Mesh, pos: Vector3, vel: Vector3, grav: float, max_range:
 	stagger = 0.0
 	pins = 0.0
 	harpoon_mark = false
+	vs_flyers = 1.0
 	tether = false
 	toll = false
 	glow = Color.TRANSPARENT
@@ -321,6 +323,8 @@ func _fly(delta: float) -> void:
 		t.hurt(damage, position)
 		if kind == Kind.FIREBALL or fire:
 			t.ignite(ZombieDefs.BURN_SECONDS)
+		if source == "mutant_wasp" and t is Player:
+			(t as Player).poison_by_creature(FontaMind.WASP_POISON)
 		stop()
 		return
 	world.fx_impact(at)
@@ -427,6 +431,8 @@ func _hit_zombie(z: Zombie, at: Vector3) -> void:
 		amount = shooter.modify_damage(z, amount)
 	if fire and z.phases:
 		amount *= 1.5
+	if z.flies:
+		amount *= vs_flyers
 	if amount > 0.0 and garrison:
 		z.next_hitter = -1
 		z.take_damage(amount, _vel.normalized(), knock, at)
