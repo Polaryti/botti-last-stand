@@ -69,6 +69,15 @@ func _run() -> void:
 		check(g["closed"], "%s gate can be repaired" % g["name"])
 	for z: Zombie in _world.zombies.duplicate():
 		z.release()
+	var vine := fort.gates[1]
+	var vine_front := fort.gate_front(vine, Vector3(40, 4, 0))
+	check(_world.spawn_zombie("cult_worshipper", vine_front + Vector3.RIGHT * 2.2), "a Worshipper joins the Vine lane")
+	var marcher: Zombie = _world.zombies.back()
+	marcher._set_goal(vine_front + Vector3.RIGHT * 1.4)
+	await get_tree().create_timer(2.4).timeout
+	check(float(vine["hp"]) < Fort.GATE_HP, "an attacker replaces the old lane waypoint and hits the Vine gate")
+	marcher.release()
+	fort.repair(1, Fort.GATE_HP)
 	if DisplayServer.get_name() != "headless" and _out != "":
 		_camera = Camera3D.new()
 		_camera.far = 550.0

@@ -2286,7 +2286,8 @@ func _lane_plan(target: Target, dist: float, me_inside: bool, they_inside: bool)
 		_fort_goal((g["at"] as Vector3) - (g["dir"] as Vector3) * (Fort.WALL_T * 0.5 + 1.6))
 		_marching = false
 		return true
-	_fort_goal(front)
+	# A marching waypoint can be close to the gate and still outside striking distance.
+	_fort_goal(front, 0.6)
 	_marching = to_front > MARCH_UNTIL
 	if to_front < 1.6:
 		_hold = true
@@ -2294,8 +2295,8 @@ func _lane_plan(target: Target, dist: float, me_inside: bool, they_inside: bool)
 	return true
 
 
-func _fort_goal(at: Vector3) -> void:
-	if not _has_goal or _goal.distance_squared_to(at) > 4.0:
+func _fort_goal(at: Vector3, tolerance := 2.0) -> void:
+	if not _has_goal or _goal.distance_squared_to(at) > tolerance * tolerance:
 		_set_goal(at)
 
 
