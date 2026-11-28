@@ -96,11 +96,26 @@ func _court(b: MapBuilder) -> void:
 		l.base = b.xf * deck_xf
 		l.box(Vector3.ZERO, Vector3(24.0, 0.56, 3.1), STONE.darkened(0.17))
 		l.box(Vector3(0, 0.23, 1.52), Vector3(24.1, 0.16, 0.22), TEAL)
+		# Stone brackets connect the gallery's underside to the sloped face, leaving both passages clear.
+		for offset: float in [-11.15, -5.9, 5.9, 11.15]:
+			l.prism(Vector3(offset, -2.15, -0.68), Vector3(offset, -0.22, 1.22), 0.29, 0.32, 6, STONE.darkened(0.31))
+			l.box(Vector3(offset, -0.34, 1.12), Vector3(0.9, 0.32, 0.55), CREAM.darkened(0.28))
 		l.base = walk_saved
 		b.w.add_collider_xf(b.xf * deck_xf, Vector3(24.0, 0.56, 3.1))
 		var stair_top := face * Vector3(-10 if door > 0 else 10, 4.75, 8.08)
 		var stair_foot := stair_top - Vector3.UP * 4.75 - out * 11.0
 		_walkway(b, l, stair_foot, stair_top, 2.55, CLAY)
+		for step: float in [0.43, 0.78]:
+			for edge: float in [-0.96, 0.96]:
+				var top := stair_foot.lerp(stair_top, step) + along * edge - Vector3.UP * 0.13
+				var foot := _ground_local(b, top) - Vector3.UP * 0.13
+				var h := top.y - foot.y
+				if h <= 0.15:
+					continue
+				var middle := foot + Vector3.UP * h * 0.5
+				b.collider(middle, Vector3(0.47, h, 0.47))
+				l.box(middle, Vector3(0.47, h, 0.47), STONE.darkened(0.22))
+				l.box(top - Vector3.UP * 0.06, Vector3(0.66, 0.18, 0.66), CREAM.darkened(0.22))
 	for vertex: Vector3 in OUTLINE:
 		_pyramid_corner(b, l, light, vertex)
 	b.add(l)
@@ -153,7 +168,10 @@ func _pyramid_corner(b: MapBuilder, l: LowPoly, light: LowPoly, vertex: Vector3)
 		l.prism(at, at + Vector3.UP * h, radius, radius - 0.19, 6, STONE.lerp(CREAM, i * 0.095))
 		l.prism(at + Vector3.UP * (h - 0.17), at + Vector3.UP * h, radius, radius, 6, TEAL if i in [2, 5] else GOLD.darkened(0.18))
 		if i == 0:
-			b.solid(at + Vector3.UP * 1.5, Vector3(8.8, 3.0, 8.8))
+			var bottom := minf(at.y - 0.2, _ground_span(b, at, Vector2(radius, radius)).x - 0.2)
+			l.prism(Vector3(at.x, bottom, at.z), at + Vector3.UP * 0.02, radius * 1.015, radius, 6, STONE.darkened(0.18))
+			var top := at.y + h
+			b.solid(Vector3(at.x, (top + bottom) * 0.5, at.z), Vector3(8.8, top - bottom, 8.8))
 		else:
 			b.collider(at + Vector3.UP * h * 0.5, Vector3.ONE * (radius * 1.14) * Vector3(1.0, h / (radius * 1.14), 1.0))
 	var flame := centre.move_toward(Vector3.ZERO, 2.05) + Vector3.UP * 11.8
@@ -178,20 +196,25 @@ func _pave_court(b: MapBuilder, l: LowPoly) -> void:
 				col = TEAL if (x - z) % 2 == 0 else GOLD.darkened(0.23)
 			l.box(at, Vector3(0.965, 0.06, 0.965), col)
 	for side: int in [-1, 1]:
-		var table := Vector3(side * 13.0, 0, 8.0)
+		var table := Vector3(side * 9.0, 0, 8.3)
 		l.box(table + Vector3.UP * 0.9, Vector3(5.3, 0.16, 1.87), WOOD)
 		l.box(table + Vector3.UP * 1.0, Vector3(3.9, 0.05, 2.0), PLUM if side < 0 else TEAL)
 		for j: float in [-2.25, 2.25]:
 			l.box(table + Vector3(j, 0.45, 0.0), Vector3(0.25, 0.9, 1.6), WOOD)
 		for i in 12:
-			var at := table + Vector3(-2.2 + (i % 6) * 0.82, 1.19, -0.46 + floorf(i / 6.0) * 0.92)
-			_fruit(l, at, 0.19 + (i % 3) * 0.052, i)
+			var size := 0.19 + (i % 3) * 0.052
+			var at := table + Vector3(-2.2 + (i % 6) * 0.82, 1.02 + _fruit_base(size, i), -0.46 + floorf(i / 6.0) * 0.92)
+			_fruit(l, at, size, i)
 		b.solid(table + Vector3.UP * 0.47, Vector3(5.2, 0.95, 1.75))
 
 
 func _wall_banner(l: LowPoly, at: Vector3, along: Vector3, out: Vector3, col: Color) -> void:
 	var a := at + Vector3.UP * 5.37
 	l.prism(a - along * 1.6, a + along * 1.6, 0.065, 0.065, 7, GOLD)
+	for side: float in [-1.0, 1.0]:
+		var peg := a + along * side * 1.48
+		l.prism(peg, peg + out * 1.85, 0.072, 0.058, 6, WOOD.darkened(0.18))
+		l.ovoid(peg, Vector3.ONE * 0.12, GOLD, CLAY, 3, 6)
 	var top := a - Vector3.UP * 0.08
 	var base := at + Vector3.UP * 2.82 - out * 0.09
 	for i in 10:
@@ -311,24 +334,45 @@ func _cornucopia(b: MapBuilder) -> void:
 		# Support the spill without making a square invisible obstacle around the horn.
 		b.w.add_wedge(b.xf, PackedVector3Array([
 			Vector3(-1.75, 0, 0.9), Vector3(1.75, 0, 0.9), Vector3(-1.7, 0, 4.85), Vector3(1.7, 0, 4.85),
-			Vector3(-1.55, 2.35, 0.9), Vector3(1.55, 2.35, 0.9), Vector3(-1.1, 0.55, 4.85), Vector3(1.1, 0.55, 4.85)]))
+			Vector3(-1.55, _spill_height(0.9) + 0.14, 0.9), Vector3(1.55, _spill_height(0.9) + 0.14, 0.9), Vector3(-1.1, _spill_height(4.85) + 0.18, 4.85), Vector3(1.1, _spill_height(4.85) + 0.18, 4.85)]))
 		b.no_walk(Vector3(0, 0, 1.5), Vector3(3.8, 1.0, 6.4))
 		b.no_walk(Vector3(0, 0, -2.35), Vector3(3.2, 1.0, 2.6))
+	# The spill rests on one continuous pile. Its shoulders taper to the paving at the outer edge.
 	var rng := b.seeded()
-	for i in 37:
-		var z := rng.randf_range(0.45, 5.1)
-		var x := rng.randf_range(-2.2, 2.2) * lerpf(0.65, 1.0, z / 5.1)
-		var size := rng.randf_range(0.22, 0.56)
-		var mound := maxf(0.0, 2.9 - z * 0.73 - absf(x) * 0.28)
-		_fruit(l, Vector3(x, size + mound * rng.randf_range(0.60, 1.05), z), size, i)
-	for i in 9:
-		var at := Vector3(-1.6 + i * 0.4, 2.3 + sin(i) * 0.20, 1.30)
-		_wheat(l, at, 1.3, 3)
+	for row in 7:
+		for column in 6:
+			var z := 1.12 + row * 0.60 + rng.randf_range(-0.11, 0.11)
+			var x := (column - 2.5) * (0.48 + row * 0.025) + rng.randf_range(-0.07, 0.07)
+			var size := rng.randf_range(0.24, 0.47) * lerpf(1.16, 0.79, row / 6.0)
+			var pick := row * 6 + column
+			var mound := _spill_height(z)
+			# The large fruit overlap enough to read as a continuous load from mouth to paving.
+			_fruit(l, Vector3(x, mound + _fruit_base(size, pick) - 0.09, z), size, pick)
+	var bedding := LowPoly.new()
+	bedding.base = l.base
+	for row in 8:
+		var z := 0.90 + row * 0.57
+		var next := z + 0.57
+		var span := lerpf(1.31, 1.55, row / 7.0)
+		var a := Vector3(-span, _spill_height(z), z)
+		var c := Vector3(span, _spill_height(z), z)
+		var d := Vector3(-span, _spill_height(next), next)
+		var e := Vector3(span, _spill_height(next), next)
+		bedding._tri(a, c, e, a - Vector3.UP, CLAY.darkened(0.18))
+		bedding._tri(a, e, d, a - Vector3.UP, WOOD.lerp(CLAY, 0.55))
+		bedding._tri(a, d, Vector3(-span, 0.08, next), Vector3(0, 0, z), CLAY.darkened(0.25))
+		bedding._tri(a, Vector3(-span, 0.08, next), Vector3(-span, 0.08, z), Vector3(0, 0, z), WOOD)
+		bedding._tri(c, e, Vector3(span, 0.08, next), Vector3(0, 0, z), CLAY.darkened(0.25))
+		bedding._tri(c, Vector3(span, 0.08, next), Vector3(span, 0.08, z), Vector3(0, 0, z), WOOD)
+	for i in 7:
+		var at := Vector3(-1.23 + i * 0.41, _spill_height(1.31) - 0.04, 1.31)
+		_wheat(l, at, 1.20, 3)
 	for i in 22:
 		var a := TAU * i / 22.0
 		var p := Vector3(cos(a), 0.95, sin(a)) * Vector3(2.60, 1, 2.60)
 		light.ovoid(p, Vector3(0.11, 0.06, 0.11), GOLD, CLAY, 2, 5)
 	var horn := b.add(l)
+	b.add(bedding).reparent(horn)
 	var shine := b.add(light)
 	shine.material_override = MesenllaBuilder.glow_material()
 	shine.reparent(horn)
@@ -336,6 +380,16 @@ func _cornucopia(b: MapBuilder) -> void:
 	b.w.add_glow(b.xf * Vector3(0, 5.0, -2.5), Color("fa9352"), 6.6)
 	if not b.is_preview:
 		b.w.fort.set_heart(b.xf.origin, horn, "Cornucopia", 5.9)
+
+
+static func _spill_height(z: float) -> float:
+	return maxf(0.08, 2.21 - (z - 0.9) * 0.53)
+
+
+static func _fruit_base(size: float, kind_id: int) -> float:
+	if kind_id % 5 == 2:
+		return size
+	return size * (0.72 if kind_id % 3 == 0 else 1.03)
 
 
 static func _fruit(l: LowPoly, at: Vector3, size: float, kind_id: int) -> void:
@@ -368,7 +422,7 @@ func _orchard(b: MapBuilder) -> void:
 	for i in 11:
 		var a := i * 2.39
 		var at := b.on_ground(Vector3(cos(a) * (1.35 + i * 0.15), 0, sin(a) * (1.35 + i * 0.15)))
-		_fruit(l, b.xf.affine_inverse() * at + Vector3.UP * 0.19, 0.21, i)
+		_fruit(l, b.xf.affine_inverse() * at + Vector3.UP * (_fruit_base(0.21, i) - 0.025), 0.21, i)
 	FontaFlora.wildflowers(b, 6.8)
 
 
@@ -383,6 +437,45 @@ func _grain(b: MapBuilder) -> void:
 		_wheat(l, at, rng.randf_range(0.63, 1.2), 2)
 
 
+func _ground_local(b: MapBuilder, at: Vector3) -> Vector3:
+	return b.xf.affine_inverse() * b.on_ground(at)
+
+
+## The lowest and highest corners plus centre of a rectangular prop's footing.
+func _ground_span(b: MapBuilder, at: Vector3, half: Vector2) -> Vector2:
+	var centre := _ground_local(b, Vector3(at.x, 0.0, at.z)).y
+	var height := Vector2(centre, centre)
+	for x: float in [-half.x, half.x]:
+		for z: float in [-half.y, half.y]:
+			var y := _ground_local(b, Vector3(at.x + x, 0, at.z + z)).y
+			height.x = minf(height.x, y)
+			height.y = maxf(height.y, y)
+	return height
+
+
+func _foundation(b: MapBuilder, l: LowPoly, at: Vector3, half: Vector2) -> Vector3:
+	var ground := _ground_span(b, at, half)
+	var low := ground.x - 0.19
+	var top := ground.y + 0.11
+	var middle := Vector3(at.x, (low + top) * 0.5, at.z)
+	var size := Vector3(half.x * 2.0, top - low, half.y * 2.0)
+	l.box(middle, size, STONE.darkened(0.14))
+	l.box(Vector3(at.x, top - 0.045, at.z), Vector3(size.x + 0.045, 0.09, size.z + 0.045), CREAM.darkened(0.25))
+	b.collider(middle, size)
+	return Vector3(at.x, top, at.z)
+
+
+func _tile_on_ground(b: MapBuilder, l: LowPoly, at: Vector3, size: Vector2, colour: Color, trim: Color) -> void:
+	for half: Vector2 in [size * 0.5, size * 0.33]:
+		var points: Array[Vector3] = []
+		for corner: Vector2 in [Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]:
+			var ground := _ground_local(b, at + Vector3(corner.x, 0.0, corner.y))
+			points.append(ground + Vector3.UP * (0.043 if half.x < size.x * 0.5 else 0.025))
+		var dye := trim if half.x < size.x * 0.5 else colour
+		l._tri(points[0], points[1], points[2], points[0] + Vector3.DOWN, dye)
+		l._tri(points[0], points[2], points[3], points[0] + Vector3.DOWN, dye)
+
+
 func _stall(b: MapBuilder, l: LowPoly, p: Vector3, colours: Array) -> void:
 	for dx in [-2.4, 2.4]:
 		for dz in [-1.65, 1.65]:
@@ -392,27 +485,31 @@ func _stall(b: MapBuilder, l: LowPoly, p: Vector3, colours: Array) -> void:
 		l.box(p + Vector3(x, 3.24, 0), Vector3(0.515, 0.10, 3.65), colours[i % colours.size()], Vector3(10, 0, 0))
 		l.box(p + Vector3(x, 2.80 - 0.06 * (i % 2), 1.79), Vector3(0.51, 0.36, 0.08), colours[i % colours.size()])
 	l.box(p + Vector3(0, 0.86, 0.42), Vector3(4.35, 0.18, 1.6), WOOD)
+	for x: float in [-1.80, 1.80]:
+		for z: float in [-0.15, 1.02]:
+			l.box(p + Vector3(x, 0.41, z), Vector3(0.19, 0.82, 0.19), WOOD.darkened(0.18))
 	b.solid(p + Vector3(0, 0.49, 0.42), Vector3(4.1, 0.98, 1.45))
 	for i in 14:
-		_fruit(l, p + Vector3((i % 7 - 3) * 0.56, 1.18, float(floori(i / 7.0)) * 0.56), 0.21 + (i % 3) * 0.04, i)
+		var size := 0.21 + (i % 3) * 0.04
+		_fruit(l, p + Vector3((i % 7 - 3) * 0.56, 0.95 + _fruit_base(size, i) - 0.025, floorf(i / 7.0) * 0.56), size, i)
 
 
 func _market(b: MapBuilder) -> void:
 	var l := b.mesh()
-	_stall(b, l, Vector3.ZERO, [cloth, CREAM, cloth])
+	var dais := _foundation(b, l, Vector3.ZERO, Vector2(2.68, 1.94))
+	_stall(b, l, dais, [cloth, CREAM, cloth])
 	for i in 4:
-		var at := Vector3(-2.8 + i * 1.9, 0.02, 2.4)
-		l.box(at, Vector3(1.2, 0.05, 0.9), cloth.darkened(0.25))
-		l.box(at + Vector3.UP * 0.04, Vector3(0.8, 0.035, 0.54), GOLD.darkened(0.25))
+		var at := Vector3(-2.8 + i * 1.9, 0, 2.58)
+		_tile_on_ground(b, l, at, Vector2(1.20, 0.9), cloth.darkened(0.25), GOLD.darkened(0.25))
 	b.add(l)
-	_lamp(b, Vector3(3, 0, 1.6), GOLD)
+	_lamp(b, _ground_local(b, Vector3(3.45, 0, 1.82)), GOLD)
 
 
 func _kilns(b: MapBuilder) -> void:
 	var l := b.mesh()
 	for i in 3:
 		var x := (i - 1) * 4.4
-		var at := Vector3(x, 0, 0)
+		var at := _foundation(b, l, Vector3(x, 0, 0), Vector2(1.82, 1.72))
 		l.prism(at, at + Vector3.UP * 1.3, 1.65, 1.65, 12, STONE)
 		l.ovoid(at + Vector3.UP * 1.25, Vector3(1.63, 1.49, 1.52), CLAY, WOOD, 5, 12)
 		l.prism(at + Vector3(0.7, 1.6, -0.6), at + Vector3(0.7, 3.3, -0.6), 0.42, 0.34, 8, CREAM)
@@ -431,20 +528,23 @@ func _vineyard(b: MapBuilder) -> void:
 		var z := row * 3.7
 		for knot in 7:
 			var at := b.xf.affine_inverse() * b.on_ground(Vector3((knot - 3) * 2.8, 0, z))
-			l.prism(at, at + Vector3.UP * 1.8, 0.08, 0.065, 5, WOOD)
+			l.prism(at - Vector3.UP * 0.12, at + Vector3.UP * 1.8, 0.08, 0.065, 5, WOOD)
 			if knot < 6:
 				var next := b.xf.affine_inverse() * b.on_ground(Vector3((knot - 2) * 2.8, 0, z))
 				l.prism(at + Vector3.UP * 1.58, next + Vector3.UP * 1.58, 0.04, 0.04, 4, WOOD)
 				for i in 3:
 					var bunch := at.lerp(next, (i + 0.5) / 3.0) + Vector3.UP * 1.32
 					l.ovoid(bunch + Vector3.UP * 0.29, Vector3(0.55, 0.32, 0.36), MOSS, TEAL.darkened(0.27), 3, 6)
+					l.prism(bunch + Vector3.UP * 0.13, bunch + Vector3.UP * 0.38, 0.037, 0.025, 5, MOSS)
 					_fruit(l, bunch, 0.23, 2)
 	b.add(l)
 
 
 func _harbour(b: MapBuilder) -> void:
 	var l := b.mesh()
-	var start := Vector3(0, b.terrain.height(b.xf.origin.x, b.xf.origin.z) - b.xf.origin.y, 0)
+	var start := _ground_local(b, Vector3.ZERO)
+	# A stone landing fills the gap below the ramp's first planks on the sloped beach.
+	_foundation(b, l, Vector3(0, 0, -0.45), Vector2(2.38, 0.68))
 	_walkway(b, l, start, Vector3(0, 0, 5), 4.6, WOOD)
 	_walkway(b, l, Vector3(0, 0, 5), Vector3(0, 0, 27), 4.6, WOOD)
 	_walkway(b, l, Vector3(-11, 0, 26), Vector3(11, 0, 26), 2.5, WOOD)
@@ -480,7 +580,7 @@ func _shrine(b: MapBuilder) -> void:
 	for i in 4:
 		var x := (i - 1.5) * 0.82
 		_wheat(l, Vector3(x, 0.77, -1.85), 1.6, 4)
-		_fruit(l, Vector3(x, 1.18, -0.82), 0.37, i)
+		_fruit(l, Vector3(x, 0.75 + _fruit_base(0.37, i) - 0.015, -0.82), 0.37, i)
 	b.collider(Vector3.UP * 0.34, Vector3(6, 0.70, 6))
 	b.add(l)
 
@@ -489,7 +589,7 @@ func _lamp(b: MapBuilder, at: Vector3, colour: Color, tall := true) -> void:
 	var l := b.cell()
 	var base := at + Vector3.UP * (2.65 if tall else 0.24)
 	if tall:
-		l.prism(at, base, 0.095, 0.068, 6, WOOD)
+		l.prism(at - Vector3.UP * 0.12, base, 0.095, 0.068, 6, WOOD)
 	l.prism(base, base + Vector3.UP * 0.15, 0.15, 0.35, 8, CLAY)
 	l.prism(base + Vector3.UP * 0.15, base + Vector3.UP * 0.38, 0.35, 0.36, 8, WOOD)
 	var light := b.mesh()
@@ -533,7 +633,7 @@ func _basin(b: MapBuilder) -> void:
 		var rim := Vector3(cos(a) * 2.27, 0.55, sin(a) * 2.27)
 		l.prism(rim, Vector3(cos(n) * 2.27, 0.55, sin(n) * 2.27), 0.19, 0.19, 5, CREAM)
 		if i % 3 == 0:
-			l.ovoid(rim * Vector3(0.72, 1.04, 0.72), Vector3(0.22, 0.025, 0.14), MOSS, TEAL, 2, 5)
+			l.ovoid(Vector3(rim.x * 0.72, 0.493, rim.z * 0.72), Vector3(0.22, 0.025, 0.14), MOSS, TEAL, 2, 5)
 	l.prism(Vector3.UP * 0.48, Vector3.UP * 1.17, 0.48, 0.31, 8, CLAY)
 	l.prism(Vector3.UP * 1.17, Vector3.UP * 1.32, 0.3, 0.68, 8, GOLD)
 	b.add(l)

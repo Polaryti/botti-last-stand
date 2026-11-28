@@ -2,6 +2,10 @@
 
 ## 0.23.0 — Archipelagos of the Forgotten Gods (27 November 2026)
 
+### Thalys polish
+- Pipburst splits open and scatters its seeds. Ovenback buckles, lands on its side and goes cold. Pepperwing's wings falter as it falls to the ground.
+- Grounded the market stalls, hearth kilns and quay landing. Repositioned overlapping gardens and lamps, attached the pyramid's galleries and banners, and rebuilt the Golden Cornucopia's fruit spill.
+
 ### Thalys: Pyramid of the Feast
 - The three siege roads now climb to a stepped triangular pyramid, with one gate and a firing gallery on each face. The Golden Cornucopia and its spilled fruit block movement, and attackers can still reach the objective when a gate breaks.
 - Added flower gardens, lily basins, terraced hills and limestone ridges. The market road still leads to the merchant ship at Lantern Quay.

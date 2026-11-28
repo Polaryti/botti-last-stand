@@ -946,18 +946,22 @@ static func horizon_isle(b: MapBuilder, size: float) -> void:
 	var rng := b.seeded()
 	var l := b.mesh()
 	var dark := Color(0.3, 0.32, 0.4)
+	var peak := Vector3(0, -INF, 0)
 	for k in 6:
 		var at := Vector3(rng.randf_range(-size * 0.3, size * 0.3), Terrain.ISLE_FLOOR + 2.0, rng.randf_range(-size * 0.15, size * 0.15))
 		var h := size * rng.randf_range(0.18, 0.42) * (1.4 if k == 0 else 1.0)
-		l.prism(at, at + Vector3(rng.randf_range(-size * 0.05, size * 0.05), h, 0), size * rng.randf_range(0.18, 0.3), size * 0.03, 7, dark.lightened(rng.randf() * 0.06))
-	var peak := Vector3(0, Terrain.ISLE_FLOOR + 2.0 + size * 0.42 * 1.4, 0)
-	l.box(peak + Vector3(0, 1.0, 0), Vector3(size * 0.08, size * 0.03, size * 0.05), dark.lightened(0.1))
+		var summit := at + Vector3(rng.randf_range(-size * 0.05, size * 0.05), h, 0)
+		l.prism(at, summit, size * rng.randf_range(0.18, 0.3), size * 0.052, 7, dark.lightened(rng.randf() * 0.06))
+		if summit.y > peak.y:
+			peak = summit
+	var crown := size * 0.037
+	l.box(peak + Vector3.UP * crown * 0.47, Vector3(size * 0.065, crown, size * 0.055), dark.lightened(0.1))
 	var mi := b.add(l)
 	mi.material_override = b.no_fog()
 	mi.material_override.albedo_color = Color(0.55, 0.58, 0.66)
 	var glow := b.mesh()
 	var colours := [SEA_GLOW, GOLD.lightened(0.2), Color(0.85, 0.85, 1.0), Color(0.6, 1.0, 0.5)]
-	glow.box(peak + Vector3(0, size * 0.04, 0), Vector3(size * 0.02, size * 0.02, size * 0.02), colours[rng.randi_range(0, colours.size() - 1)])
+	glow.box(peak + Vector3.UP * (crown + size * 0.008), Vector3(size * 0.02, size * 0.02, size * 0.02), colours[rng.randi_range(0, colours.size() - 1)])
 	var g := b.add(glow)
 	var shine := StandardMaterial3D.new()
 	shine.vertex_color_use_as_albedo = true

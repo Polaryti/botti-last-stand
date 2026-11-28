@@ -10,6 +10,8 @@ const PIP := Color("db3f64")
 const RIND := Color("933843")
 const LEAF := Color("6d963e")
 const CHILI := Color("c72d38")
+const DEATH_TIMES := {"pipburst": 2.15, "ovenback": 2.65, "pepperwing": 2.85}
+const PIP_FRAGMENTS := 11
 
 
 static func _pivot(parent: Node3D, label: String, at: Vector3) -> Node3D:
@@ -79,6 +81,18 @@ static func _pomegranate(rig: Node3D) -> void:
 		l.ovoid(Vector3(-side * 0.09, 0.01, 0.12), Vector3(0.24, 0.48, 0.18), RIND, COAL, 4, 8)
 		l.prism(Vector3(-side * 0.31, 0.24, 0.23), Vector3(-side * 0.075, 0.31, 0.25), 0.052, 0.07, 6, CREAM)
 		_mesh(cheek, l)
+	# Baked into every pooled rig. Kept small and hidden under the living fruit until the split.
+	var spill := _pivot(rig, "Spill", Vector3.ZERO)
+	spill.scale = Vector3.ONE * 0.001
+	spill.set_meta("rest", spill.transform)
+	for i in PIP_FRAGMENTS:
+		var fragment := _pivot(spill, "Piece%d" % i, Vector3.ZERO)
+		l = LowPoly.new()
+		if i < 3:
+			l.ovoid(Vector3.ZERO, Vector3(0.25, 0.13, 0.19), RIND, CREAM.darkened(0.35), 3, 7)
+		else:
+			l.ovoid(Vector3.ZERO, Vector3(0.09, 0.08, 0.12), PIP.lightened(0.1 * (i % 3)), RIND, 3, 6)
+		_mesh(fragment, l)
 
 
 static func _oven(rig: Node3D) -> void:
@@ -187,16 +201,120 @@ static func animate(z: Zombie, root: Node3D, delta: float, pace: float, clock: f
 		(rig.get_node("Leg%d" % i) as Node3D).rotation.x = sin(stride + i * PI * 0.71) * moving * 0.55 - melee * 0.19
 
 
+static func begin_death(z: Zombie, root: Node3D) -> void:
+	var rig := root.get_node("Rig") as Node3D
+	var poses := {}
+	for node: Node in rig.find_children("*", "Node3D", true, false):
+		if node.has_meta("rest"):
+			poses[node.name] = (node as Node3D).rotation
+	root.set_meta("fall_pose", poses)
+	if z.model_id != "pepperwing":
+		return
+	# Use the actual surface below the moth, including roofs and decks. The flight retains its
+	# altitude long enough for its failing wingbeats to read before it falls.
+	var from := z.position
+	var floor_y := minf(from.y, z.world.floor_contact(from).y)
+	root.set_meta("fall_origin", from)
+	root.set_meta("fall_floor", floor_y)
+
+
 static func fall(z: Zombie, root: Node3D, elapsed: float) -> void:
 	var rig := root.get_node("Rig") as Node3D
-	var p := clampf(elapsed / 1.3, 0.0, 1.0)
-	if z.model_id == "pipburst":
-		(rig.get_node("Fruit") as Node3D).scale = Vector3.ONE * (1.25 + p * 0.4)
-		rig.scale = Vector3.ONE * maxf(0.01, 1.0 - smoothstep(0.10, 0.67, p))
-		if elapsed < 0.05 and not root.has_meta("did_pop"):
-			root.set_meta("did_pop", true)
-			z.world.fx_gore(z.position + Vector3.UP * 0.8, PIP)
-	else:
-		rig.rotation.z = smoothstep(0.0, 0.64, p) * (1.37 if z.model_id == "ovenback" else -1.18)
-		rig.position.y = -0.58 * smoothstep(0.31, 1.0, p)
-		rig.scale = Vector3.ONE * maxf(0.02, 1.0 - smoothstep(0.63, 1.0, p))
+	var side := float(root.get_meta("side", 1.0))
+	var pose: Dictionary = root.get_meta("fall_pose", {})
+	match z.model_id:
+		"pipburst":
+			_split(z, root, rig, elapsed, side, pose)
+		"ovenback":
+			_crumple(z, root, rig, elapsed, side, pose)
+		"pepperwing":
+			_crash(z, root, rig, elapsed, side, pose)
+
+
+static func _split(z: Zombie, root: Node3D, rig: Node3D, t: float, side: float, pose: Dictionary) -> void:
+	var fruit := rig.get_node("Fruit") as Node3D
+	var husk := smoothstep(0.10, 0.36, t)
+	var drop := smoothstep(0.29, 0.73, t)
+	var settle := smoothstep(1.82, DEATH_TIMES["pipburst"], t)
+	var twitch := sin(t * 41.0) * exp(-t * 8.0)
+	fruit.rotation = (pose.get("Fruit", Vector3.ZERO) as Vector3).lerp(Vector3(0.27, 0, side * 0.63), drop)
+	fruit.scale = Vector3(1.0 + twitch * 0.065 + husk * 0.07, 1.0 - drop * 0.33, 1.0 + husk * 0.12)
+	fruit.position.y = 0.86 - drop * 0.51 - settle * 0.52
+	for i in 6:
+		var leg := rig.get_node("Leg%d" % i) as Node3D
+		var curl := smoothstep(0.21 + 0.032 * i, 0.79, t)
+		leg.rotation.x = lerpf((pose.get(leg.name, Vector3.ZERO) as Vector3).x, -1.0 + 0.16 * (i % 3), curl) + twitch * 0.16
+		leg.rotation.z = (-1.0 if i % 2 == 0 else 1.0) * curl * 0.53
+		leg.position.y = 0.48 - curl * 0.28 - settle * 0.30
+	(fruit.get_node("HuskL") as Node3D).rotation.y = lerpf((pose.get("HuskL", Vector3.ZERO) as Vector3).y, -1.79, husk)
+	(fruit.get_node("HuskR") as Node3D).rotation.y = lerpf((pose.get("HuskR", Vector3.ZERO) as Vector3).y, 1.83, husk)
+	(fruit.get_node("Pips") as Node3D).scale = Vector3.ONE * maxf(0.001, 1.0 - husk)
+	if t < 0.24:
+		return
+	var spill := rig.get_node("Spill") as Node3D
+	spill.scale = Vector3.ONE
+	var age := t - 0.24
+	for i in PIP_FRAGMENTS:
+		var fragment := spill.get_node("Piece%d" % i) as Node3D
+		var a := i * 2.399 + side * 0.44
+		var launch := Vector3(cos(a), 0, sin(a)) * (1.0 + 0.36 * (i % 5))
+		var roll := minf(age, 0.66 + 0.03 * (i % 3))
+		var y := maxf(0.072, 0.75 + (1.55 + 0.27 * (i % 4)) * roll - 5.3 * roll * roll)
+		fragment.position = Vector3(0, y - settle * 0.17, 0.51) + launch * roll
+		fragment.rotation = Vector3(roll * (5.0 + i), roll * 3.8 * side, roll * (5.9 - i))
+	if not root.has_meta("did_split"):
+		root.set_meta("did_split", true)
+		z.world.fx_water(z.position + Vector3.BACK * 0.54, 0.68, PIP)
+
+
+static func _crumple(z: Zombie, root: Node3D, rig: Node3D, t: float, side: float, pose: Dictionary) -> void:
+	var loaf := rig.get_node("Loaf") as Node3D
+	var buckle := smoothstep(0.07, 0.66, t)
+	var slam := smoothstep(0.48, 0.98, t)
+	var recoil := sin(maxf(0, t - 0.98) * 21.0) * exp(-maxf(0, t - 0.98) * 7.0) * 0.07
+	var settle := smoothstep(2.12, DEATH_TIMES["ovenback"], t)
+	loaf.rotation = (pose.get("Loaf", Vector3.ZERO) as Vector3).lerp(Vector3(0.21, side * 0.14, side * 1.05), slam) + Vector3(-0.19 * buckle * (1.0 - slam), 0, recoil)
+	loaf.position.y = 1.26 - buckle * 0.38 + slam * 0.11 - settle * 1.74
+	loaf.position.x = -side * 0.40 * slam
+	var jaw := loaf.get_node("Jaw") as Node3D
+	jaw.rotation.x = lerpf((pose.get("Jaw", Vector3.ZERO) as Vector3).x, 0.79, buckle) - 0.49 * slam + recoil
+	var coals := loaf.get_node("Coals") as Node3D
+	var out := smoothstep(0.83, 1.83, t)
+	coals.scale = Vector3.ONE * maxf(0.001, (1.0 - out) * (0.86 + sin(t * 27.0) * 0.16))
+	for i in 4:
+		var leg := rig.get_node("Leg%d" % i) as Node3D
+		var give := smoothstep(i * 0.095, 0.75 + i * 0.05, t)
+		leg.rotation = (pose.get(leg.name, Vector3.ZERO) as Vector3).lerp(Vector3(-1.21 + 0.33 * i, 0, side * (0.48 + 0.17 * i)), give)
+		leg.position.y = 0.69 - 0.48 * give - settle * 0.46
+	if t >= 0.85 and not root.has_meta("did_oven_impact"):
+		root.set_meta("did_oven_impact", true)
+		z.world.fx_gore(z.position + Vector3(-side * 0.54, 0.18, 0.65), CRUST.lightened(0.29))
+		z.world.fx_mist(z.position + Vector3(-side * 0.30, 0.58, 0.93), 0.64)
+
+
+static func _crash(z: Zombie, root: Node3D, rig: Node3D, t: float, side: float, pose: Dictionary) -> void:
+	var pod := rig.get_node("Pod") as Node3D
+	var from: Vector3 = root.get_meta("fall_origin", z.position)
+	var floor_y := float(root.get_meta("fall_floor", from.y))
+	var air := minf(maxf(0.0, from.y - floor_y), 28.0)
+	var flight := clampf(sqrt(air / 9.7), 0.21, 1.55)
+	var plunge := clampf((t - 0.15) / flight, 0.0, 1.0)
+	z.position.y = from.y - (from.y - floor_y) * plunge * plunge
+	var land := smoothstep(0.77, 1.0, plunge)
+	var stop := smoothstep(0.18, 0.95, plunge)
+	var thrash := sin(28.0 * t - 5.4 * t * t)
+	pod.rotation = (pose.get("Pod", Vector3.ZERO) as Vector3).lerp(Vector3(0.94 * (1.0 - land) + 0.18, side * 0.36 * plunge, -side * (0.92 + 0.48 * land)), smoothstep(0.0, 0.44, t))
+	for flank: float in [-1.0, 1.0]:
+		var label := "WingL" if flank < 0.0 else "WingR"
+		var wing := pod.get_node(label) as Node3D
+		var fold := 0.94 if flank == side else -0.13
+		var flap := flank * thrash * (0.63 if flank == side else 0.30) * (1.0 - stop)
+		wing.rotation.z = lerpf((pose.get(label, Vector3.ZERO) as Vector3).z, flap + flank * fold * stop, smoothstep(0.0, 0.22, t))
+		wing.rotation.y = flank * stop * 0.54
+	(pod.get_node("Spark") as Node3D).scale = Vector3.ONE * maxf(0.001, 1.0 - smoothstep(0.0, 0.28, t))
+	var sink := smoothstep(2.25, DEATH_TIMES["pepperwing"], t)
+	rig.position.y = -0.07 * land - 0.79 * sink
+	if plunge >= 1.0 and not root.has_meta("did_pepper_impact"):
+		root.set_meta("did_pepper_impact", true)
+		z.world.fx_gore(z.position + Vector3.UP * 0.17, CHILI.lightened(0.22))
+		z.world.fx_mist(z.position + Vector3.UP * 0.18, 0.48)

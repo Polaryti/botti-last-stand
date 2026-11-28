@@ -2438,7 +2438,7 @@ func _physics_process(delta: float) -> void:
 				_parts[i].position += Vector3(sin(i * 2.4), 1.0, cos(i * 2.4)) * t
 				_parts[i].scale *= maxf(0.01, 1.0 - t)
 		var floor_y := world.ground_at(position)
-		if position.y > floor_y:
+		if position.y > floor_y and model_id != "pepperwing":
 			# Flyers and leapers fall out of the air; Fontanova's insects tumble down under their own
 			# weight, so the fall can be seen, and the great moth glides down on its dead wings.
 			var drop := 14.0

@@ -1456,7 +1456,7 @@ static func reset_pose(root: Node3D) -> void:
 	root.remove_meta("side")
 	# A Fontanova mutant's death beats (FontaModels.fall) start over.
 	for key: StringName in root.get_meta_list():
-		if str(key).begins_with("did_") or key == &"landed_at":
+		if (str(key).begins_with("did_") or str(key).begins_with("fall_")) or key == &"landed_at":
 			root.remove_meta(key)
 	# The Shapeshifter stands as a stag again, the Revenant's stones are still.
 	var beast := root.get_node_or_null("Beast") as Node3D
@@ -1477,8 +1477,8 @@ static func reset_pose(root: Node3D) -> void:
 
 ## How long each kind takes to die before the body is gone.
 static func death_time(id: String) -> float:
-	if id in HarvestMind.KINDS:
-		return 1.3
+	if id in HarvestModels.DEATH_TIMES:
+		return HarvestModels.DEATH_TIMES[id]
 	if id == FeastMind.ID:
 		return 3.6
 	if id in FontaModels.KINDS:
@@ -1502,6 +1502,9 @@ static func death_time(id: String) -> float:
 ## The moment it dies: which way it falls, and the boss's name taken down.
 static func begin_death(z: Zombie, root: Node3D) -> void:
 	root.set_meta("side", -1.0 if randf() < 0.5 else 1.0)
+	if z.model_id in HarvestMind.KINDS:
+		HarvestModels.begin_death(z, root)
+		return
 	if root.has_meta("rig"):
 		(root.get_meta("rig") as WyvernRig).stop()
 	var label := root.get_node_or_null("BossHealth") as Label3D

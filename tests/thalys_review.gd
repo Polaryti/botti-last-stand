@@ -210,6 +210,38 @@ func _harvest_review(player: Player) -> void:
 	check(is_instance_valid(pips) and pips.struck and not _world.mist_seals.has(pips), "killing Pipburst interrupts its pips")
 	pepper_mind.tick(pepper, player, Vector3.BACK, 6.0, HarvestMind.PEPPER_TELL + 0.2)
 	check(pepper_mind.phase == "recoil" and not pepper.is_warning(), "Pepperwing releases the seed and enters recovery")
+	for seal: MistSeal in _world.mist_seals.duplicate():
+		seal.queue_free()
+	await get_tree().process_frame
+	var pepper_y := pepper.position.y
+	var pepper_floor := _world.floor_contact(pepper.position).y
+	check(pepper_y > pepper_floor + 1.0, "Pepperwing starts well above its landing surface")
+	for z: Zombie in [oven, pepper]:
+		z.take_damage(z.hp + 2.0, Vector3.ZERO, 0.0, z.centre())
+	for i in 27:
+		for z: Zombie in mobs:
+			z._physics_process(1.0 / 60.0)
+	var spill := pip._visual.get_node("Rig/Spill") as Node3D
+	var loaf := oven._visual.get_node("Rig/Loaf") as Node3D
+	check(spill.scale.x > 0.99 and (spill.get_child(2) as Node3D).position.y > 0.75, "Pipburst launches pieces from its split shell")
+	check(pepper.position.y < pepper_y and pepper.position.y > pepper_floor + 0.25, "Pepperwing loses altitude over multiple frames")
+	await shot("harvest_death_start", Vector3(1, 7.1, 23), Vector3(0, 6.4, 12), 66.0)
+	for i in 44:
+		for z: Zombie in mobs:
+			z._physics_process(1.0 / 60.0)
+	check(absf(loaf.rotation.z) > 1.0 and oven._visual.has_meta("did_oven_impact"), "Ovenback buckles and strikes the floor on its side")
+	check(is_equal_approx(pepper.position.y, pepper_floor) and pepper._visual.has_meta("did_pepper_impact"), "Pepperwing hits the surface it fell towards")
+	await shot("harvest_death_impact", Vector3(1, 6.9, 22), Vector3(0, 5.2, 12), 66.0)
+	for i in 104:
+		for z: Zombie in mobs:
+			if z.active:
+				z._physics_process(1.0 / 60.0)
+	for z: Zombie in mobs:
+		check(not z.active, "%s corpse is returned to its pool" % z.type_id)
+		check(_world.spawn_zombie(z.type_id, spots[mobs.find(z)]), "pool can spawn %s again after its death" % z.type_id)
+		var replacement: Zombie = _world.zombies.back()
+		check(not replacement._visual.has_meta("fall_pose"), "%s respawns with its living rig" % z.type_id)
+	check(spill.scale.x < 0.01, "pooled Pipburst hides the empty shell fragments")
 
 
 func _finish() -> void:
